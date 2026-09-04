@@ -218,7 +218,7 @@ describe("document templates", () => {
     it("declares a _provenance property listed after the value fields and _confidence", () => {
       const schema = buildDocumentJsonSchema(provFields)
       const keys = Object.keys(schema.properties)
-      expect(keys).toEqual(["vendor", "line_items", "_confidence", "_provenance", "_classification"])
+      expect(keys).toEqual(["vendor", "line_items", "_confidence", "_provenance"])
     })
 
     it("gives scalar fields a page+quote object and array fields a list of them", () => {
@@ -280,9 +280,9 @@ describe("document templates", () => {
       expect(extractClassification({ _classification: { doc_type: 42 } })).toEqual({ docType: "", entity: "", period: "" })
     })
 
-    it("declares a _classification schema property", () => {
+    it("does not include _classification in the schema (removed to save tokens)", () => {
       const schema = buildDocumentJsonSchema(parseTemplateFields([{ key: "vendor", label: "Vendor", type: "string", required: true, instruction: "" }]))
-      expect(schema.properties).toHaveProperty("_classification")
+      expect(schema.properties).not.toHaveProperty("_classification")
     })
   })
 })

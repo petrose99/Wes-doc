@@ -236,16 +236,6 @@ export function buildDocumentJsonSchema(fields: DocumentFieldDefinition[]) {
           description: "For each field above, where in the document the value was found (page and a short verbatim quote)",
         },
       } : {}),
-      _classification: {
-        type: "object",
-        properties: {
-          doc_type: { type: "string", description: "Generic 2-4 word label for this kind of document" },
-          entity: { type: "string", description: "The issuing organization or person, as printed" },
-          period: { type: "string", description: "The YYYY-MM period this document covers, if any" },
-        },
-        additionalProperties: false,
-        description: "A domain-agnostic classification of the whole document",
-      },
     },
     required: fields.filter((field) => field.required).map((field) => field.key),
     additionalProperties: false,
@@ -286,7 +276,6 @@ export function buildDocumentPrompt(templateName: string, fields: DocumentFieldD
     ]),
     "Also return a `_confidence` object with a 0-1 confidence score for each top-level field, reflecting how certain you are that the extracted value is correct.",
     "Also return a `_provenance` object: for each field, the 1-based page number the value appears on and a short verbatim quote (under 120 characters) of the text around it. For array fields, give one entry per row in the same order as the rows.",
-    "Also return a `_classification` object: doc_type (a generic 2-4 word label for this kind of document), entity (the issuing organization or person as printed), and period (the YYYY-MM this document covers, if any).",
     customPrompt?.trim() ? `Workspace instructions:\n${customPrompt.trim()}` : "",
     fewShotExamples?.length ? buildFewShotBlock(fewShotExamples) : "",
   ].filter(Boolean).join("\n")

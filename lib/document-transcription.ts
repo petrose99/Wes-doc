@@ -78,7 +78,6 @@ export function buildTranscriptPrompt(templateName: string, fields: DocumentFiel
       "and `_provenance`: for each field, a short verbatim quote (under 120 characters) of the transcript around where it was said.",
       "Page numbers do not apply to audio; omit `page`.",
     ] : []),
-    "Also return `_classification`: doc_type, entity, period.",
     buildFieldSuggestionInstructions(mode),
     customPrompt?.trim() ? `\nWorkspace instructions:\n${customPrompt.trim()}` : "",
     "",

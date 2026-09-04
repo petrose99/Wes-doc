@@ -13,7 +13,7 @@ import { SourceViewer, type ProvenanceTarget, type SourceDocument } from "@/comp
 import type { DocumentFieldDefinition } from "@/lib/document-templates"
 import type { PipelineStage } from "@/lib/documents/stages"
 import type { Ref } from "@/lib/provenance"
-import { Archive, ArrowDown, ArrowLeft, ArrowUp, CheckCircle2, ChevronLeft, ChevronRight, Eye, EyeOff, Flag, Loader2, Maximize2, Minimize2, PanelLeftClose, PanelLeftOpen } from "lucide-react"
+import { Archive, ArrowDown, ArrowLeft, ArrowUp, Building2, CheckCircle2, ChevronLeft, ChevronRight, Eye, EyeOff, Flag, Loader2, Maximize2, Minimize2, PanelLeftClose, PanelLeftOpen } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState, type ReactNode } from "react"
@@ -24,7 +24,7 @@ type PanelLayout = "split" | "source-only" | "details-only"
 
 export function SplitPane({
   workspaceId, source, fields, data, fieldConfidence, provenanceFields, provenanceItems, initialTarget, conflictingLabels, missingRequiredFields,
-  saveReview, documentType: initialDocumentType, suggestedDocumentType, note: initialNote, auditEvents, prevHref, nextHref, position, stage, afterActionHref,
+  saveReview, documentType: initialDocumentType, note: initialNote, auditEvents, prevHref, nextHref, position, stage, afterActionHref,
   header, canPush, pushCard, canCreateRule, defaultSupplier, matchKind, bankMatches,
 }: {
   workspaceId: string
@@ -38,8 +38,7 @@ export function SplitPane({
   conflictingLabels: string[]
   missingRequiredFields: string[]
   saveReview: (formData: FormData) => Promise<void>
-  documentType: "expense" | "sale" | null
-  suggestedDocumentType: string | null
+  documentType: "expense" | "sale" | "bank_statement" | null
   note: string
   auditEvents: Array<{ id: string; label: string; createdAt: string; actorName: string | null }>
   prevHref: string | null
@@ -61,20 +60,12 @@ export function SplitPane({
   const [note, setNote] = useState(initialNote)
   const [savingNote, setSavingNote] = useState(false)
   const [flagged, setFlagged] = useState(header.flagged)
-  const [docType, setDocType] = useState<"expense" | "sale" | null>(initialDocumentType)
+  const [docType, setDocType] = useState<"expense" | "sale" | "bank_statement" | null>(initialDocumentType)
   const [savingDocType, setSavingDocType] = useState(false)
   const [busyAction, setBusyAction] = useState<"flag" | "archive" | "ready" | null>(null)
   const [layout, setLayout] = useState<PanelLayout>("split")
 
-  const suggestedType: "expense" | "sale" | null = (() => {
-    if (initialDocumentType) return null
-    const dt = (suggestedDocumentType ?? "").toLowerCase()
-    if (["invoice", "receipt", "bill", "purchase_order", "expense"].some((k) => dt.includes(k))) return "expense"
-    if (["sales_invoice", "credit_note", "quotation", "sales"].some((k) => dt.includes(k))) return "sale"
-    return null
-  })()
-
-  const selectDocType = async (type: "expense" | "sale") => {
+  const selectDocType = async (type: "expense" | "sale" | "bank_statement") => {
     setSavingDocType(true)
     setDocType(type)
     try {
@@ -261,11 +252,11 @@ export function SplitPane({
             {docType ? (
               <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2">
                 <span className="text-xs font-medium text-slate-500">Type</span>
-                <span className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-semibold ${docType === "expense" ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}`}>
-                  {docType === "expense" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
-                  {docType === "expense" ? "Expense" : "Sale"}
+                <span className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-semibold ${docType === "expense" ? "bg-red-50 text-red-700" : docType === "sale" ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-blue-700"}`}>
+                  {docType === "expense" ? <ArrowUp className="h-3 w-3" /> : docType === "sale" ? <ArrowDown className="h-3 w-3" /> : <Building2 className="h-3 w-3" />}
+                  {docType === "expense" ? "Expense" : docType === "sale" ? "Sale" : "Bank Statement"}
                 </span>
-                <button type="button" disabled={savingDocType} onClick={() => void selectDocType(docType === "expense" ? "sale" : "expense")}
+                <button type="button" disabled={savingDocType} onClick={() => setDocType(null)}
                   className="ml-auto text-[11px] font-medium text-slate-400 transition-colors hover:text-slate-600">Change</button>
               </div>
             ) : (
@@ -278,15 +269,16 @@ export function SplitPane({
                   <button type="button" disabled={savingDocType} onClick={() => void selectDocType("expense")}
                     className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border-2 border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 transition-all hover:border-red-200 hover:bg-red-50/50 hover:text-red-700">
                     <ArrowUp className="h-3.5 w-3.5" />Expense
-                    {suggestedType === "expense" && <span className="rounded-full bg-amber-100 px-1.5 py-px text-[10px] font-semibold text-amber-700">Suggested</span>}
                   </button>
                   <button type="button" disabled={savingDocType} onClick={() => void selectDocType("sale")}
                     className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border-2 border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 transition-all hover:border-emerald-200 hover:bg-emerald-50/50 hover:text-emerald-700">
                     <ArrowDown className="h-3.5 w-3.5" />Sale
-                    {suggestedType === "sale" && <span className="rounded-full bg-amber-100 px-1.5 py-px text-[10px] font-semibold text-amber-700">Suggested</span>}
+                  </button>
+                  <button type="button" disabled={savingDocType} onClick={() => void selectDocType("bank_statement")}
+                    className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border-2 border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 transition-all hover:border-blue-200 hover:bg-blue-50/50 hover:text-blue-700">
+                    <Building2 className="h-3.5 w-3.5" />Bank Statement
                   </button>
                 </div>
-                <p className="mt-2 text-xs text-amber-700/80">Expense (money out) or sale (money in)?</p>
               </div>
             )}
 

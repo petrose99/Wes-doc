@@ -48,7 +48,7 @@ describe("buildDocumentJsonSchema with no fields (discover mode)", () => {
     const schema = buildDocumentJsonSchema([])
     expect(schema.properties).not.toHaveProperty("_confidence")
     expect(schema.properties).not.toHaveProperty("_provenance")
-    expect(schema.properties).toHaveProperty("_classification")
+    expect(schema.properties).not.toHaveProperty("_classification")
   })
 
   it("still emits both when fields are present", () => {
