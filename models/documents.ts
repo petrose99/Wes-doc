@@ -133,9 +133,6 @@ export async function createDocumentFromBuffer(input: {
 export function stageWhereClause(stage: PipelineStage): Prisma.DocumentWhereInput {
   return {
     ...stageToStatusFilter(stage),
-    ...(stage !== "archive" ? { archivedAt: null } : {}),
-    ...(stage === "approvals" ? { reviewTasks: { some: { status: { in: ["open", "in_review"] } } } } : {}),
-    ...(stage === "ready" ? { reviewTasks: { none: { status: { in: ["open", "in_review"] } } } } : {}),
   }
 }
 

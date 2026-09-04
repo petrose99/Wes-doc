@@ -16,12 +16,12 @@ export function useRowSelection<T extends { id: string }>(rows: T[]) {
     setMarked((previous) => new Set([...previous].filter((id) => live.has(id))))
   }
 
-  const markRow = (index: number, event: React.MouseEvent | React.KeyboardEvent) => {
+  const markRow = (index: number, event?: { shiftKey?: boolean; preventDefault?: () => void }) => {
     const row = rows[index]
     if (!row) return
     const start = anchor.current
-    if ("shiftKey" in event && event.shiftKey && start !== null && start < rows.length) {
-      event.preventDefault()
+    if (event?.shiftKey && start !== null && start < rows.length) {
+      event.preventDefault?.()
       window.getSelection()?.removeAllRanges()
       const [from, to] = start <= index ? [start, index] : [index, start]
       setMarked((previous) => {

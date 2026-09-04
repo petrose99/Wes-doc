@@ -61,7 +61,7 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
   const moduleWorkItems = MODULES
     .filter((module) => enabled.has(module.key))
     .flatMap((module) => module.navItems ?? [])
-    .filter((item) => !item.href.startsWith("settings/") && item.href !== "review" && item.href !== "expenses" && item.href !== "dictation")
+    .filter((item) => !item.href.startsWith("settings/") && item.href !== "review" && item.href !== "expenses" && item.href !== "dictation" && item.href !== "health")
     .map((item) => ({ href: `${base}/${item.href}`, label: item.label, icon: ICONS[item.icon] ?? Files, exact: false }))
 
   // Home is every workspace's unconditional first entry — exact-matched so it doesn't stay lit on
@@ -78,15 +78,16 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
   const workItems = [
     { href: base, label: "Dashboard", icon: BarChart3, exact: true },
     { href: `${base}/pipeline`, label: "Extraction", icon: ListChecks, exact: false, badge: pipelineReviewCount > 0 ? pipelineReviewCount : undefined, tourTarget: "extraction" as const },
-    { href: `${base}/library`, label: "Docu Library", icon: Library, exact: false, tourTarget: "library" as const },
     { href: `${base}/files`, label: "Sheets", icon: Table2, exact: false, tourTarget: "sheets" as const },
-    { href: `${base}/activity`, label: "Activity", icon: History, exact: false },
-  ]
-  const moduleItems = [
+    { href: `${base}/library`, label: "Docu Library", icon: Library, exact: false, tourTarget: "library" as const },
     ...(accountingEnabled ? [{ href: `${base}/accounting`, label: "Accounting", icon: Landmark, exact: false }] : []),
     ...moduleWorkItems,
   ]
-  const settingsItems = [{ href: `${base}/settings/workspace`, label: "Settings", icon: Settings, exact: false }]
+  const bottomItems = [
+    { href: `${base}/settings/workspace`, label: "Settings", icon: Settings, exact: false },
+    { href: `${base}/activity`, label: "Activity", icon: History, exact: false },
+    { href: `${base}/health`, label: "Health Checks", icon: HeartPulse, exact: false },
+  ]
 
   const navLink = (item: { href: string; label: string; icon: typeof Files; exact: boolean; badge?: number; tourTarget?: string }) => {
     // Non-exact entries stay lit while you're inside a page under them — Settings while you're on
@@ -111,17 +112,11 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
 
     <div className="mb-1 mt-2"><WorkspaceSwitcher workspaces={workspaces} workspaceId={workspaceId} /></div>
 
-    <nav className="mt-2 flex flex-col">
+    <nav className="mt-2 flex flex-1 flex-col">
       {sectionLabel("Workspace")}
       <div className="space-y-0.5">{workItems.map(navLink)}</div>
 
-      {moduleItems.length > 0 && <>
-        {sectionLabel("Modules")}
-        <div className="space-y-0.5">{moduleItems.map(navLink)}</div>
-      </>}
-
-      {sectionLabel("Settings")}
-      <div className="space-y-0.5">{settingsItems.map(navLink)}</div>
+      <div className="mt-auto space-y-0.5">{bottomItems.map(navLink)}</div>
     </nav>
 
     <div className="mt-auto pt-3">

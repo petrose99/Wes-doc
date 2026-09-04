@@ -2,11 +2,9 @@ import { DocumentList, type ContentMatchRow, type PipelineDocumentRow } from "@/
 import { FilterPanel } from "@/components/pipeline/filter-panel"
 import { StageTabs } from "@/components/pipeline/stage-tabs"
 import { FileHubUploadButton } from "@/components/files/file-hub-upload-button"
-import { SectionIntro } from "@/components/shell/section-intro"
 import type { SheetTemplate, WorkspaceUsage } from "@/components/extract/types"
 import type { PipelineStage } from "@/lib/documents/stages"
-import { ArrowRight } from "lucide-react"
-import Link from "next/link"
+import { ReadyBanner } from "@/components/pipeline/ready-banner"
 
 /** The one list shell every pipeline tab renders through — a header with the workspace-wide
  * upload entry point, tabs, a filter bar, then the table. A server component: the data (rows,
@@ -28,7 +26,6 @@ export function PipelineShell({ workspaceId, stage, counts, rows, contentMatches
       <div>
         <div className="flex items-center gap-2">
           <h1 className="text-xl font-bold text-slate-900">Extraction</h1>
-          <SectionIntro section="extraction" workspaceId={workspaceId} />
         </div>
         <p className="text-sm text-slate-500">Add, review, and extract documents — one list across every file.</p>
       </div>
@@ -46,14 +43,8 @@ export function PipelineShell({ workspaceId, stage, counts, rows, contentMatches
       </div>
     </div>
     <StageTabs workspaceId={workspaceId} active={stage} counts={counts} />
-    {stage === "ready" && counts.ready > 0 && <div className="flex items-center gap-2 border-b bg-emerald-50/60 px-6 py-2.5 text-[13px] text-emerald-800">
-      <span className="font-medium">{counts.ready} document{counts.ready === 1 ? "" : "s"} ready</span>
-      <span className="text-emerald-600">·</span>
-      <Link href={`/workspaces/${workspaceId}/library`} className="inline-flex items-center gap-1 font-semibold text-emerald-700 hover:text-emerald-900">
-        Find in Docu Library <ArrowRight className="h-3.5 w-3.5" />
-      </Link>
-    </div>}
-    <FilterPanel query={query} flaggedOnly={flaggedOnly} documentSearchEnabled={documentSearchEnabled} />
+    {stage === "ready" && counts.ready > 0 && <ReadyBanner workspaceId={workspaceId} count={counts.ready} />}
+    <FilterPanel query={query} documentSearchEnabled={documentSearchEnabled} />
     <DocumentList workspaceId={workspaceId} stage={stage} rows={rows} contentMatches={contentMatches} query={query} />
   </div>
 }

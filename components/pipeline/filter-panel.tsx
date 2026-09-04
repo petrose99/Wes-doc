@@ -13,7 +13,7 @@ import { useEffect, useState } from "react"
  * search the Files browser's content search runs — not just a filename match — so the placeholder
  * and the sparkle hint say so, and the results below carry a "Matched inside documents" section
  * for hits found by content rather than by name. */
-export function FilterPanel({ query, flaggedOnly, documentSearchEnabled }: { query: string; flaggedOnly: boolean; documentSearchEnabled: boolean }) {
+export function FilterPanel({ query, documentSearchEnabled }: { query: string; documentSearchEnabled: boolean }) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [value, setValue] = useState(query)
@@ -29,12 +29,6 @@ export function FilterPanel({ query, flaggedOnly, documentSearchEnabled }: { que
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value])
 
-  const toggleFlagged = () => {
-    const params = new URLSearchParams(searchParams.toString())
-    if (flaggedOnly) params.delete("flagged"); else params.set("flagged", "1")
-    router.push(`?${params.toString()}`)
-  }
-
   return <div className="flex flex-wrap items-center gap-3 border-b bg-slate-50/60 px-6 py-3">
     <div className="relative w-80 max-w-full">
       <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -47,8 +41,5 @@ export function FilterPanel({ query, flaggedOnly, documentSearchEnabled }: { que
         <Sparkles className="h-3.5 w-3.5" />Also searching what&apos;s inside each document
       </span>
     )}
-    <label className="ml-auto inline-flex items-center gap-1.5 rounded-md border bg-white px-2.5 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
-      <input type="checkbox" className="h-4 w-4 accent-emerald-600" checked={flaggedOnly} onChange={toggleFlagged} />Flagged only
-    </label>
   </div>
 }

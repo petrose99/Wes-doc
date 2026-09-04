@@ -2,6 +2,7 @@ import { SheetView } from "@/components/sheet/sheet-view"
 import { getCurrentUser } from "@/lib/auth"
 import config from "@/lib/config"
 import { prisma } from "@/lib/db"
+import { filterSnapshotByDocuments, splitSnapshotByDocuments } from "@/lib/sheet-seed"
 import { getWorkspaceFile } from "@/models/files"
 import { ensureFileWorkbook } from "@/models/spreadsheets"
 import { requireWorkspaceRole } from "@/models/workspaces"
@@ -28,7 +29,7 @@ function parseSourceParams(query: { doc?: string; page?: string; bb?: string }):
  * uploading and extraction happen on Home/Files or the file's own hub page instead. */
 export default async function SheetPage({ params, searchParams }: {
   params: Promise<{ workspaceId: string; fileId: string }>
-  searchParams: Promise<{ doc?: string; page?: string; bb?: string }>
+  searchParams: Promise<{ doc?: string; page?: string; bb?: string; docs?: string; mode?: string }>
 }) {
   const [{ workspaceId, fileId }, query, user] = await Promise.all([params, searchParams, getCurrentUser()])
   await requireWorkspaceRole(workspaceId, user.id)
@@ -46,6 +47,14 @@ export default async function SheetPage({ params, searchParams }: {
   // The workbook is brought up to date with extraction before it is handed to the client, so a
   // file whose documents were extracted while nothing was watching still opens with its rows.
   const workbook = await ensureFileWorkbook(workspaceId, fileId)
+  const docFilter = query.docs ? new Set(query.docs.split(",").filter(Boolean)) : null
+
+  let snapshot = (workbook?.snapshot as IWorkbookData | undefined) ?? null
+  if (snapshot && docFilter && docFilter.size > 0) {
+    snapshot = (query.mode === "separate"
+      ? splitSnapshotByDocuments(snapshot, docFilter)
+      : filterSnapshotByDocuments(snapshot, docFilter)) as IWorkbookData
+  }
 
   const [documentCount, queued] = await Promise.all([
     prisma.document.count({ where: { fileId } }),
@@ -57,7 +66,7 @@ export default async function SheetPage({ params, searchParams }: {
     fileId={fileId}
     fileName={file.name}
     linkAccess={file.linkAccess}
-    snapshot={(workbook?.snapshot as IWorkbookData | undefined) ?? null}
+    snapshot={snapshot}
     rev={workbook?.rev ?? 0}
     queuedIds={queued.map((document) => document.id)}
     hasRows={documentCount > 0}

@@ -14,10 +14,11 @@ import { toast } from "sonner"
  *
  * `status` is the spreadsheet's save state, which sits beside the filename the way every other
  * spreadsheet puts it — the grid below owns the rest of the window and has nowhere to say it. */
-export function FileHeader({ workspaceId, fileId, name, linkAccess, status, backHref, backLabel, trailing }: {
+export function FileHeader({ workspaceId, fileId, name, linkAccess, status, backHref, backLabel, trailing, hasUnsavedChanges }: {
   workspaceId: string; fileId: string; name: string; linkAccess: string; status?: ReactNode
   backHref?: string; backLabel?: string
   trailing?: ReactNode
+  hasUnsavedChanges?: boolean
 }) {
   const router = useRouter()
   const [value, setValue] = useState(name)
@@ -47,7 +48,10 @@ export function FileHeader({ workspaceId, fileId, name, linkAccess, status, back
   }
 
   return <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2">
-    <Link href={backHref ?? `/workspaces/${workspaceId}/files`} className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-800">
+    <Link href={backHref ?? `/workspaces/${workspaceId}/files`} className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+      onClick={(e) => {
+        if (hasUnsavedChanges && !window.confirm("You have unsaved changes. Leave without saving?")) e.preventDefault()
+      }}>
       <ArrowLeft className="h-4 w-4" />{backLabel ?? "Files"}
     </Link>
     <input

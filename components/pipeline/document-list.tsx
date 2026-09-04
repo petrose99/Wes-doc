@@ -5,11 +5,12 @@ import { highlightSnippet } from "@/components/shared/highlight-snippet"
 import { LastUpdated } from "@/components/shared/relative-time"
 import { useRowSelection } from "@/components/shared/use-row-selection"
 import type { PipelineStage } from "@/lib/documents/stages"
-import { AlertTriangle, FileText, Flag, Inbox, Loader2 } from "lucide-react"
+import { AlertTriangle, FileText, Inbox, Loader2 } from "lucide-react"
 import Link from "next/link"
 
 export type PipelineDocumentRow = {
   id: string
+  fileId: string
   filename: string
   status: string
   receivedAt: string
@@ -39,11 +40,9 @@ const STATUS_BADGE: Record<string, string> = {
 /** What each stage's empty table says, so "nothing here" reads as expected-and-fine on Archive
  * but as an invitation to upload on Inbox. */
 const EMPTY_COPY: Record<PipelineStage, string> = {
-  inbox: "Drop PDFs or a folder. We OCR, split and extract; you review; then use them in Sheets.",
+  inbox: "Documents are being processed. Upload PDFs or a folder to get started.",
   to_review: "Nothing needs a look right now.",
   ready: "Nothing marked ready yet — approve documents to use them in Sheets.",
-  approvals: "No documents are waiting on an approval.",
-  archive: "Nothing archived.",
 }
 
 /** The shared list shell for every pipeline tab: a plain table with checkbox/flag/status columns,
@@ -61,12 +60,10 @@ export function DocumentList({ workspaceId, stage, rows, contentMatches, query }
 }) {
   const { marked, markRow, toggleAll, clear } = useRowSelection(rows)
   const selected = [...marked]
-  // Every stage but Inbox swaps the single "Document" column for Supplier/Category/Total — a
-  // document still in Inbox hasn't been extracted yet, so there's nothing to show but its name.
-  // Elsewhere, whoever's looking cares who the document is from and how much it's for, not what
-  // it happened to be named on upload — which shifts every colSpan below by one column.
-  const isReview = stage !== "inbox"
-  const columnCount = isReview ? 7 : 6
+  const selectedFileId = selected.length > 0 ? rows.find((r) => r.id === selected[0])?.fileId : undefined
+  const isReview = stage === "ready"
+  const columnCount = isReview ? 6 : 5
+
 
   const contentRow = (match: ContentMatchRow) => {
     const params = new URLSearchParams()
@@ -75,8 +72,7 @@ export function DocumentList({ workspaceId, stage, rows, contentMatches, query }
     const hrefQuery = params.toString()
     return <tr key={`content-${match.documentId}`} className="hover:bg-slate-50">
       <td className="border-b px-2 py-2" />
-      <td className="border-b px-1 py-2" />
-      <td colSpan={columnCount - 2} className="border-b px-3 py-2">
+      <td colSpan={columnCount - 1} className="border-b px-3 py-2">
         <Link href={`/workspaces/${workspaceId}/documents/${match.documentId}?stage=${stage}${hrefQuery ? `&${hrefQuery}` : ""}`} className="block">
           <span className="flex items-center gap-2">
             <FileText className="h-3.5 w-3.5 shrink-0 text-slate-400" />
@@ -90,13 +86,12 @@ export function DocumentList({ workspaceId, stage, rows, contentMatches, query }
   }
 
   return <div className="flex min-h-0 flex-1 flex-col">
-    {selected.length > 0 && <BulkActionBar workspaceId={workspaceId} stage={stage} selectedIds={selected} onDone={clear} />}
+    <BulkActionBar workspaceId={workspaceId} stage={stage} selectedIds={selected} selectedFileId={selectedFileId} onDone={clear} />
     <div className="min-h-0 flex-1 overflow-auto px-6 pb-4">
       <table className="w-full border-collapse text-sm">
         <thead className="sticky top-0 z-10 bg-white text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
           <tr>
-            <th className="w-10 border-b px-2 py-2"><input type="checkbox" aria-label="Select all" className="h-4 w-4 accent-emerald-600" checked={rows.length > 0 && marked.size === rows.length} onChange={toggleAll} /></th>
-            <th className="w-8 border-b px-1 py-2" />
+            <th className="w-10 border-b px-2 py-2" />
             {isReview ? <>
               <th className="border-b px-3 py-2">Supplier</th>
               <th className="border-b px-3 py-2">Category</th>
@@ -113,11 +108,8 @@ export function DocumentList({ workspaceId, stage, rows, contentMatches, query }
           {rows.map((row, index) => <tr key={row.id} className={marked.has(row.id) ? "bg-emerald-50/60" : "hover:bg-slate-50"}>
             <td className="border-b px-2 py-2">
               <input type="checkbox" aria-label={`Select ${row.filename}`} className="h-4 w-4 accent-emerald-600" checked={marked.has(row.id)}
-                onMouseDown={(event) => { if (event.shiftKey) event.preventDefault() }}
-                onClick={(event) => { event.preventDefault(); markRow(index, event) }}
-                onChange={() => {}} />
+                onChange={(e) => markRow(index, e.nativeEvent)} />
             </td>
-            <td className="border-b px-1 py-2">{row.flagged && <Flag className="h-3.5 w-3.5 text-indigo-500" aria-label="Flagged" />}</td>
             {isReview && row.review ? <>
               <td className="border-b px-3 py-2">
                 <Link href={`/workspaces/${workspaceId}/documents/${row.id}?stage=${stage}`} className="inline-flex items-center gap-2 font-medium text-slate-800 hover:text-emerald-800" title={row.filename}>

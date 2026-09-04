@@ -1,13 +1,11 @@
 import { STAGE_LABELS, PIPELINE_STAGES, type PipelineStage } from "@/lib/documents/stages"
-import { Archive, CheckCircle2, ClipboardCheck, Inbox as InboxIcon, SearchCheck } from "lucide-react"
+import { CheckCircle2, Loader2, SearchCheck } from "lucide-react"
 import Link from "next/link"
 
-const STAGE_ICONS: Record<PipelineStage, typeof InboxIcon> = {
-  inbox: InboxIcon,
+const STAGE_ICONS: Record<PipelineStage, typeof Loader2> = {
+  inbox: Loader2,
   to_review: SearchCheck,
   ready: CheckCircle2,
-  approvals: ClipboardCheck,
-  archive: Archive,
 }
 
 /** The pipeline's five tabs, with an icon and a count badge each. Plain links (?stage=) rather

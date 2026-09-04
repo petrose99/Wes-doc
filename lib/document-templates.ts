@@ -284,3 +284,28 @@ export function buildDocumentPrompt(templateName: string, fields: DocumentFieldD
 export function findMissingRequiredFields(fields: DocumentFieldDefinition[], value: Record<string, unknown>) {
   return fields.filter((field) => field.required && (value[field.key] === undefined || value[field.key] === null || value[field.key] === "")).map((field) => field.key)
 }
+
+export function buildFreeFormPrompt() {
+  return [
+    "Extract ALL factual data from this document. You decide what fields exist based on the content.",
+    "Return a flat JSON object with snake_case keys for each header-level field you find (supplier, invoice_number, date, due_date, currency, subtotal, tax, total, etc.).",
+    "If the document contains a table of line items (products, services, charges), return them as an array field called `line_items`. Each entry should have keys for every column in the table (description, quantity, unit_price, amount, tax_rate, etc.).",
+    "Rules:",
+    "- Dates use YYYY-MM-DD. Amounts are plain numbers. Never convert currencies.",
+    "- Keep every string value short and factual (under 300 characters).",
+    "- Extract EVERY row from tables. Do not omit, summarize, or truncate.",
+    "- Do not invent values; omit unreadable values.",
+    "- The document is supplied as markdown from a document-parsing service. Where a value looks garbled, extract the most plausible reading.",
+    "Also return `_confidence`: an object with a 0-1 confidence score for each top-level key.",
+  ].join("\n")
+}
+
+export function buildFreeFormJsonSchema() {
+  return {
+    type: "object",
+    properties: {
+      _confidence: { type: "object", description: "A confidence score from 0 to 1 for each extracted field", additionalProperties: { type: "number" } },
+    },
+    additionalProperties: true,
+  }
+}

@@ -158,3 +158,107 @@ export function appendRowsToSnapshot(snapshot: WorkbookSnapshot, sheetId: string
     sheets: { ...sheets, [sheetId]: { ...sheet, cellData, rowCount: Math.max(sheet.rowCount ?? 0, start + rows.length + 100) } },
   }
 }
+
+/** Removes columns that are entirely empty across all data rows (row 0 is the header).
+ * Remaps remaining columns to a contiguous 0..N range so the grid has no gaps. */
+function stripEmptyColumns(cellData: CellMatrix, dataRowCount: number): CellMatrix {
+  const usedCols = new Set<number>()
+  for (const rowStr of Object.keys(cellData)) {
+    const rowIdx = Number(rowStr)
+    if (rowIdx === 0) continue
+    const row = cellData[rowIdx] ?? {}
+    for (const colStr of Object.keys(row)) {
+      const cell = row[Number(colStr)] as SheetCell | undefined
+      if (cell && cell.v !== undefined && cell.v !== null && cell.v !== "") usedCols.add(Number(colStr))
+    }
+  }
+  if (!usedCols.size) return cellData
+  const sortedCols = [...usedCols].sort((a, b) => a - b)
+  const remap = new Map(sortedCols.map((old, idx) => [old, idx]))
+  const out: CellMatrix = {}
+  for (const rowStr of Object.keys(cellData)) {
+    const rowIdx = Number(rowStr)
+    const row = cellData[rowIdx] ?? {}
+    const newRow: Record<number, SheetCell> = {}
+    if (rowIdx === 0) {
+      for (const [old, neu] of remap) { if (row[old]) newRow[neu] = row[old] }
+    } else {
+      for (const [old, neu] of remap) { if (row[old]) newRow[neu] = row[old] }
+    }
+    out[rowIdx] = newRow
+  }
+  return out
+}
+
+/** Returns a copy of the snapshot containing only rows whose cells belong to the given document
+ * IDs. Row 0 (header) is always kept. Empty sheets (no matching rows) are dropped entirely.
+ * Columns that have no values in the kept rows are also removed. */
+export function filterSnapshotByDocuments(snapshot: WorkbookSnapshot, documentIds: Set<string>): WorkbookSnapshot {
+  const sheets = (snapshot.sheets ?? {}) as Record<string, { cellData?: CellMatrix; rowCount?: number; columnCount?: number; [k: string]: unknown }>
+  const filtered: Record<string, unknown> = {}
+  const order: string[] = []
+
+  for (const [sheetId, sheet] of Object.entries(sheets)) {
+    const cellData = sheet.cellData ?? {}
+    const kept: CellMatrix = {}
+    if (cellData[0]) kept[0] = cellData[0]
+    let nextRow = 1
+    for (const rowStr of Object.keys(cellData).sort((a, b) => Number(a) - Number(b))) {
+      const rowIdx = Number(rowStr)
+      if (rowIdx === 0) continue
+      const row = cellData[rowIdx]
+      const firstCell = Object.values(row ?? {})[0] as { custom?: { documentId?: string } } | undefined
+      if (firstCell?.custom?.documentId && documentIds.has(firstCell.custom.documentId)) {
+        kept[nextRow] = row
+        nextRow++
+      }
+    }
+    if (nextRow > 1) {
+      const trimmed = stripEmptyColumns(kept, nextRow - 1)
+      const colCount = Math.max(Object.keys(trimmed[0] ?? {}).length + 10, 26)
+      filtered[sheetId] = { ...sheet, cellData: trimmed, rowCount: Math.max(nextRow + 100, 200), columnCount: colCount }
+      order.push(sheetId)
+    }
+  }
+
+  return { ...snapshot, sheets: filtered, sheetOrder: order }
+}
+
+/** Like filterSnapshotByDocuments but creates one sheet tab per document, each named after the
+ * document's filename (read from the first cell's custom metadata). */
+export function splitSnapshotByDocuments(snapshot: WorkbookSnapshot, documentIds: Set<string>): WorkbookSnapshot {
+  const sheets = (snapshot.sheets ?? {}) as Record<string, { cellData?: CellMatrix; rowCount?: number; [k: string]: unknown }>
+  const perDoc: Record<string, { name: string; header: Record<number, SheetCell>; rows: Record<number, SheetCell>[] }> = {}
+
+  for (const sheet of Object.values(sheets)) {
+    const cellData = sheet.cellData ?? {}
+    const header = cellData[0]
+    for (const rowStr of Object.keys(cellData).sort((a, b) => Number(a) - Number(b))) {
+      const rowIdx = Number(rowStr)
+      if (rowIdx === 0) continue
+      const row = cellData[rowIdx]
+      const firstCell = Object.values(row ?? {})[0] as { custom?: { documentId?: string; filename?: string } } | undefined
+      const docId = firstCell?.custom?.documentId
+      if (!docId || !documentIds.has(docId)) continue
+      if (!perDoc[docId]) {
+        const name = firstCell?.custom?.filename?.replace(/\.[^.]+$/, "") ?? docId.slice(0, 8)
+        perDoc[docId] = { name, header: header ?? {}, rows: [] }
+      }
+      perDoc[docId].rows.push(row)
+    }
+  }
+
+  const newSheets: Record<string, unknown> = {}
+  const order: string[] = []
+  for (const [docId, data] of Object.entries(perDoc)) {
+    const sheetId = docId
+    const cellData: CellMatrix = { 0: data.header }
+    data.rows.forEach((row, i) => { cellData[i + 1] = row })
+    const trimmed = stripEmptyColumns(cellData, data.rows.length)
+    const colCount = Math.max(Object.keys(trimmed[0] ?? {}).length + 10, 26)
+    newSheets[sheetId] = { id: sheetId, name: data.name, rowCount: Math.max(data.rows.length + 100, 200), columnCount: colCount, zoomRatio: 1, freeze: { xSplit: 0, ySplit: 1, startRow: 1, startColumn: 0 }, defaultColumnWidth: 130, cellData: trimmed }
+    order.push(sheetId)
+  }
+
+  return { ...snapshot, sheets: newSheets, sheetOrder: order }
+}

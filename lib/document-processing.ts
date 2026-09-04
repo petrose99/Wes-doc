@@ -8,7 +8,7 @@ import { getFewShotExamples } from "@/models/field-corrections"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { regenerateBankMatchSuggestions, regenerateSupplierStatementMatches } from "@/models/bank-matches"
 import config from "@/lib/config"
-import { buildDocumentJsonSchema, buildDocumentPrompt, DocumentClassification, DocumentFieldDefinition, extractClassification, extractFieldConfidence, extractFieldProvenance, FieldProvenanceHints, findMissingRequiredFields, parseTemplateFields, ProvenanceHint, validateDocumentValues } from "@/lib/document-templates"
+import { buildDocumentJsonSchema, buildDocumentPrompt, buildFreeFormJsonSchema, buildFreeFormPrompt, DocumentClassification, DocumentFieldDefinition, extractClassification, extractFieldConfidence, extractFieldProvenance, FieldProvenanceHints, findMissingRequiredFields, parseTemplateFields, ProvenanceHint, validateDocumentValues } from "@/lib/document-templates"
 import { documentBlocksKey, putDocumentSource, readDocumentSource } from "@/lib/document-storage"
 import { processEmbedJob } from "@/lib/document-embedding"
 import { PERMANENT_ASR_ERROR_CODES, processTranscribeJob } from "@/lib/document-transcription"
@@ -220,6 +220,14 @@ async function failDocumentJob(
   }
 }
 
+function stripMeta(output: Record<string, unknown>): Record<string, unknown> {
+  const result: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(output)) {
+    if (!key.startsWith("_")) result[key] = value
+  }
+  return result
+}
+
 export async function processDocumentJob(jobId: string) {
   const now = new Date()
   const claimed = await prisma.documentProcessingJob.updateMany({
@@ -336,9 +344,10 @@ export async function processDocumentJob(jobId: string) {
     // field when adaptive extraction is on; otherwise returns templateFields unchanged. Never
     // throws — see lib/adaptive-extraction.ts.
     const fields = await deriveAdaptiveFields({ document, templateFields, contents })
-    const fewShotExamples = document.template?.code ? await getFewShotExamples(document.workspaceId, document.template.code).catch(() => []) : []
-    const prompt = buildDocumentPrompt(document.template?.name || "document", fields, document.templateVersion?.prompt, fewShotExamples)
-    const schema = buildDocumentJsonSchema(fields)
+    const freeForm = !fields.length
+    const fewShotExamples = !freeForm && document.template?.code ? await getFewShotExamples(document.workspaceId, document.template.code).catch(() => []) : []
+    const prompt = freeForm ? buildFreeFormPrompt() : buildDocumentPrompt(document.template?.name || "document", fields, document.templateVersion?.prompt, fewShotExamples)
+    const schema = freeForm ? buildFreeFormJsonSchema() : buildDocumentJsonSchema(fields)
     const passes: Array<Record<string, unknown>> = []
     const confidencePasses: Array<Record<string, number>> = []
     const provenancePasses: FieldProvenanceHints[] = []
@@ -349,9 +358,9 @@ export async function processDocumentJob(jobId: string) {
       const response = await requestLLM({ providers: [{ provider: aiProvider, apiKey, model: modelName }] }, { prompt, schema, textParts })
       if (response.error) batchFailures++
       else {
-        passes.push(validateDocumentValues(fields, response.output))
-        confidencePasses.push(extractFieldConfidence(fields, response.output))
-        provenancePasses.push(extractFieldProvenance(fields, response.output))
+        passes.push(freeForm ? stripMeta(response.output) : validateDocumentValues(fields, response.output))
+        confidencePasses.push(freeForm ? (response.output?._confidence as Record<string, number> ?? {}) : extractFieldConfidence(fields, response.output))
+        provenancePasses.push(freeForm ? { fields: {}, items: {} } : extractFieldProvenance(fields, response.output))
         classificationPasses.push(extractClassification(response.output))
       }
       const isLastBatch = index === batches.length - 1
@@ -359,10 +368,10 @@ export async function processDocumentJob(jobId: string) {
     }
     if (!passes.length) throw new Error("ai_extraction_failed")
 
-    const extraction = mergeExtractionPasses(fields, passes)
-    const fieldConfidence = mergeFieldConfidence(fields, passes, confidencePasses)
-    const conflictingFields = findConflictingScalarFields(fields, passes)
-    const missing = findMissingRequiredFields(fields, extraction)
+    const extraction = freeForm ? Object.assign({}, ...passes) : mergeExtractionPasses(fields, passes)
+    const fieldConfidence = freeForm ? Object.assign({}, ...confidencePasses) : mergeFieldConfidence(fields, passes, confidencePasses)
+    const conflictingFields = freeForm ? [] : findConflictingScalarFields(fields, passes)
+    const missing = freeForm ? [] : findMissingRequiredFields(fields, extraction)
     const classification = mergeClassification(classificationPasses)
     // Save this run's setup as a reusable shape and stamp the document with it, so the next
     // similar upload can be matched and this run can later be diffed against. Best effort: a
@@ -381,14 +390,9 @@ export async function processDocumentJob(jobId: string) {
     }
     // Resolve each merged value's source location against the parsed blocks, remapping pages back
     // to the original numbering when a page range narrowed the parse.
-    const provenance = buildDocumentProvenance(fields, mergeProvenancePasses(fields, passes, provenancePasses), extraction, parsed.blocks ?? null, parsed.pageSizes ?? null, pageRanges)
-    // (The blocks sidecar was already written above, before the LLM step, so the embed job can use
-    // it even when extraction fails.)
+    const provenance = freeForm ? null : buildDocumentProvenance(fields, mergeProvenancePasses(fields, passes, provenancePasses), extraction, parsed.blocks ?? null, parsed.pageSizes ?? null, pageRanges)
     const status = missing.length || batchFailures ? "needs_review" : "ready_for_review"
-    // Flatten the merged values into the structured spine, written in the SAME transaction as
-    // reviewedData below so the two can never disagree — a projection that lagged its source would
-    // silently answer "all invoices from X" with a stale set, which is worse than not answering.
-    const fieldValues = projectDocumentFields({ fields, values: extraction, confidence: fieldConfidence, provenance, source: "llm_structured" })
+    const fieldValues = freeForm ? [] : projectDocumentFields({ fields, values: extraction, confidence: fieldConfidence, provenance, source: "llm_structured" })
     // Interactive form (not the array form) because the projection is raw SQL and has to run on the
     // same tx client. Timeout raised over the 5s default: a long line-item table projects to a few
     // hundred rows, which is still only a handful of batched statements but not instant.

@@ -278,7 +278,7 @@ export function ExtractPanel({ workspaceId, fileId, fileName, template, template
     // so on a brand-new file there was never a document to auto-suggest fields from. Reveal the
     // Fields section (normally hidden until a file is present) rather than failing into a toast
     // with no visible way to fix it: the user can add a field by hand and try again.
-    if (!fields.length) { setSetupRevealed(true); toast.error("Add at least one field first"); return null }
+    if (!fields.length && !savedTemplateId) { setSetupRevealed(true); toast.error("Add at least one field first"); return null }
     const result = await saveExtractionSheetAction(workspaceId, fileId, savedTemplateId, { name: name.trim() || "Sheet", fields, prompt, multiRow })
     if (!result.success || !result.data) { toast.error(result.error || "Could not save the sheet"); return null }
     setSavedTemplateId(result.data.templateId)
@@ -322,6 +322,7 @@ export function ExtractPanel({ workspaceId, fileId, fileName, template, template
       }
       if (queued.length) onDocumentsQueued(queued)
       if (batchId) { setLastBatch({ id: batchId, size: rows.length }); batchQueuedIds.current = queued; batchToasted.current = false }
+      onClose()
     } catch {
       toast.error("Upload failed — please try again")
     } finally { setBusy(false) }
@@ -464,7 +465,7 @@ export function ExtractPanel({ workspaceId, fileId, fileName, template, template
   ]
 
   return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-8 backdrop-blur-[3px]" onClick={onClose}>
-    <div className="flex h-[88vh] max-h-[820px] w-full max-w-[1000px] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+    <div className="flex h-[88vh] max-h-[820px] w-full max-w-[560px] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
       <div className="flex items-center gap-3 border-b px-6 py-4">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700"><FileUp className="h-[18px] w-[18px]" /></div>
         <div className="min-w-0 flex-1">
@@ -475,8 +476,8 @@ export function ExtractPanel({ workspaceId, fileId, fileName, template, template
         <button type="button" className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100" onClick={onClose} aria-label="Close"><X className="h-[18px] w-[18px]" /></button>
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-2">
-        <div className="flex min-h-0 flex-col overflow-y-auto border-b p-5 lg:border-b-0 lg:border-r">
+      <div className="min-h-0 flex-1">
+        <div className="flex min-h-0 flex-col overflow-y-auto p-5">
           <div className="mb-3 flex items-center justify-between">
             <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Sources</div>
             <div className="flex gap-3">
@@ -516,7 +517,8 @@ export function ExtractPanel({ workspaceId, fileId, fileName, template, template
             onDrop={(event) => { event.preventDefault(); setDragOver(false); handleDrop(event.dataTransfer) }}>
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700"><FileUp className="h-[21px] w-[21px]" /></div>
             <span><span className="font-semibold text-emerald-700">Click to upload</span> <span className="text-slate-500">or drag and drop</span></span>
-            <span className="text-xs text-slate-400">PDF, JPG, PNG</span>
+            <span className="text-xs text-slate-400">Upload your invoices, receipts, or bank statements</span>
+            <span className="text-[11px] text-slate-300">PDF, JPG, PNG</span>
             <span className="mt-1 flex flex-wrap items-center justify-center gap-3">
               <button type="button" className="text-xs font-medium text-slate-400 hover:text-emerald-700" onClick={(event) => { event.stopPropagation(); folderInputRef.current?.click() }}>or upload a whole folder</button>
               <button type="button" className="text-xs font-medium text-slate-400 hover:text-emerald-700" disabled={busy} onClick={(event) => { event.stopPropagation(); zipInputRef.current?.click() }}>or upload a ZIP</button>
@@ -539,39 +541,12 @@ export function ExtractPanel({ workspaceId, fileId, fileName, template, template
             <button type="button" className="font-medium text-red-500 hover:text-red-700 disabled:opacity-50" disabled={busy || deleting} onClick={requestDeleteAll}>Delete all files</button>
           </div>}
         </div>
-
-        <div className="flex min-h-0 flex-col overflow-y-auto p-5">
-          <div className="mb-3 text-[11px] font-bold uppercase tracking-wide text-slate-400">What to extract</div>
-          {templates && templates.length > 1 && <div className="mb-4">
-            <label className="mb-1.5 block text-xs font-semibold text-slate-600" htmlFor="extract-document-type">Document type</label>
-            <select id="extract-document-type" className={inputClass} value={template?.id ?? ""} disabled={staged.length > 0}
-              title={staged.length > 0 ? "Reset files to change document type" : undefined}
-              onChange={(event) => onSelectTemplate?.(event.target.value)}>
-              {templates.map((choice) => <option key={choice.id} value={choice.id}>{choice.name}</option>)}
-            </select>
-            <p className="mt-1 text-xs text-slate-400">Sets which worksheet — and which record type your accounting export sees — these documents are filed under.</p>
-          </div>}
-
-          {hasFile ? <>
-            <label className="mb-2 block text-xs font-semibold text-slate-600">Fields</label>
-            <p className="mb-2 -mt-1.5 text-xs text-slate-400">Each field is one data point the AI extracts. Click a chip to refine it.</p>
-            <ColumnChips fields={fields} onChange={(next) => { setFields(next); markDirty() }} />
-            {!fields.length && <p className="mt-1.5 text-xs text-slate-400">{shapeChecking ? "Checking for a matching setup…" : "Add at least one field before processing."}</p>}
-          </> : <p className="rounded-lg border border-dashed border-slate-200 px-4 py-6 text-center text-sm text-slate-400">Add a file to set up which fields DocuBite extracts.</p>}
-
-          <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3.5">
-            <div className="mb-1.5 flex items-center gap-2 text-xs font-semibold text-slate-600">
-              <Sparkles className="h-[15px] w-[15px] text-indigo-600" />Tip
-            </div>
-            <p className="text-xs leading-relaxed text-slate-500">DocuBite reads handwriting and low-quality scans too. Add a field for anything specific — like a PO number — and it&apos;ll look for it on every page.</p>
-          </div>
-        </div>
       </div>
 
       <div className="flex items-center gap-4 border-t px-6 py-4">
         <div className="min-w-0 flex-1"><UsageMeter usage={usage} inline /></div>
         <button type="button" className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50" onClick={onClose}>Cancel</button>
-        <button type="button" className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-800 disabled:pointer-events-none disabled:opacity-50" disabled={busy || !processable.length || !fields.length} onClick={() => void uploadRows(processable)}>
+        <button type="button" className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-800 disabled:pointer-events-none disabled:opacity-50" disabled={busy || !processable.length} onClick={() => void uploadRows(processable)}>
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}Process all files{processable.length > 1 ? ` (${processable.length})` : ""}
         </button>
       </div>

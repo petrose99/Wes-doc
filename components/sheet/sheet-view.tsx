@@ -73,9 +73,6 @@ export function SheetView({ workspaceId, fileId, fileName, linkAccess, snapshot,
   // next save is not rejected by work it effectively did itself.
   const [adoptRev, setAdoptRev] = useState<number | null>(null)
   const [assistantOpen, setAssistantOpen] = useState(false)
-  useEffect(() => {
-    if (!readOnly && window.innerWidth >= 640) setAssistantOpen(true)
-  }, [readOnly])
   const apiRef = useRef<FUniver | null>(null)
   const saveNowRef = useRef<(() => Promise<boolean>) | null>(null)
 
@@ -317,17 +314,28 @@ export function SheetView({ workspaceId, fileId, fileName, linkAccess, snapshot,
       <FileHeader
         workspaceId={workspaceId}
         fileId={fileId}
-        name={fileName}
+        name={fileName || "Untitled"}
         linkAccess={linkAccess}
         backHref={`/workspaces/${workspaceId}/files`}
-        backLabel="Back"
+        backLabel="Sheets"
+        hasUnsavedChanges={saveState === "saving" || saveState === "error"}
         status={label ? <span className={`text-xs ${saveState === "error" && !readOnly ? "text-destructive" : "text-slate-400"}`}>{label}</span> : null}
-        trailing={!readOnly ? <button
-          type="button"
-          onClick={() => setAssistantOpen((open) => !open)}
-          className="inline-flex h-7 items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2 text-xs font-semibold text-emerald-800 transition-colors hover:border-emerald-300 hover:bg-emerald-100 sm:px-2.5">
-          <Sparkles className="h-3.5 w-3.5" /><span className="sm:hidden">AI</span><span className="hidden sm:inline">AI Assistant</span>
-        </button> : undefined} />
+        trailing={!readOnly ? <div className="flex items-center gap-1.5">
+          <a href={`/workspaces/${workspaceId}/files/${fileId}/export?format=csv`} download
+            className="inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 sm:px-2.5">
+            <FileDown className="h-3.5 w-3.5" />Export CSV
+          </a>
+          <a href={`/workspaces/${workspaceId}/files/${fileId}/export?format=xlsx`} download
+            className="inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 sm:px-2.5">
+            <Download className="h-3.5 w-3.5" />Export Excel
+          </a>
+          <button
+            type="button"
+            onClick={() => setAssistantOpen((open) => !open)}
+            className="inline-flex h-7 items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2 text-xs font-semibold text-emerald-800 transition-colors hover:border-emerald-300 hover:bg-emerald-100 sm:px-2.5">
+            <Sparkles className="h-3.5 w-3.5" /><span className="sm:hidden">AI</span><span className="hidden sm:inline">AI Assistant</span>
+          </button>
+        </div> : undefined} />
 
       <div className="relative flex min-h-0 flex-1">
         <UniverSheetLoader

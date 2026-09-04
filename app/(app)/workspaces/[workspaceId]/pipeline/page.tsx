@@ -65,6 +65,7 @@ export default async function PipelinePage({ params, searchParams }: {
 
   const rows: PipelineDocumentRow[] = filtered.map((doc) => ({
     id: doc.id,
+    fileId: doc.fileId,
     filename: doc.filename,
     status: doc.status,
     receivedAt: doc.receivedAt.toISOString(),

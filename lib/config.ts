@@ -178,6 +178,7 @@ const envSchema = z.object({
   // redirect flow. Defaults to a local self-hosted instance so dev/staging work with zero setup;
   // production points this at the real deployment.
   BIGCAPITAL_API_BASE: z.string().url().default("http://localhost:4000"),
+  BIGCAPITAL_WEBAPP_URL: z.string().url().default("http://localhost:4001"),
   // A deliberate second gate ON TOP OF the master encryption key. Unlike QuickBooks/Xero (each
   // needing its own client id/secret before it turns on), a bare SECRETS_ENCRYPTION_KEY says
   // nothing about wanting Bigcapital specifically — plenty of deployments will set it only for
@@ -331,6 +332,7 @@ const config = {
     bigcapital: {
       enabled: Boolean(env.SECRETS_ENCRYPTION_KEY) && env.BIGCAPITAL_ENABLED === "true",
       apiBase: env.BIGCAPITAL_API_BASE.replace(/\/+$/, ""),
+      webappUrl: env.BIGCAPITAL_WEBAPP_URL.replace(/\/+$/, ""),
     },
   },
 } as const

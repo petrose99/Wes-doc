@@ -25,15 +25,13 @@ export const LOW_CONFIDENCE = 0.6
 /** The UI pipeline tabs. Derived from Document.status (+ archive/review-task state), never
  * persisted — "processing" is deliberately not a stage; it is an inline spinner state within
  * Inbox, driven by `hasActiveJob`. */
-export const PIPELINE_STAGES = ["inbox", "to_review", "ready", "approvals", "archive"] as const
+export const PIPELINE_STAGES = ["inbox", "to_review", "ready"] as const
 export type PipelineStage = (typeof PIPELINE_STAGES)[number]
 
 export const STAGE_LABELS: Record<PipelineStage, string> = {
-  inbox: "Inbox",
+  inbox: "Processing",
   to_review: "To review",
   ready: "Ready",
-  approvals: "Approvals",
-  archive: "Archive",
 }
 
 /** Folds legacy/phantom status values onto the real ones: the schema's "received" default
@@ -61,12 +59,11 @@ export type StageContext = {
 /** Maps a document (+ its job/review-task context) onto the tab it belongs on. Archive wins over
  * every other rule: a document can be archived at any point in its lifecycle. */
 export function documentStage(doc: StageableDocument, context: StageContext = {}): PipelineStage {
-  if (doc.archivedAt != null) return "archive"
   const status = normalizeStatus(doc.status)
   if (status === "failed" || status === "queued") return "inbox"
   if (status === "needs_review" || status === "ready_for_review") return "to_review"
   // status === "reviewed"
-  return context.openReviewTask ? "approvals" : "ready"
+  return "ready"
 }
 
 /** The Prisma where-fragment for a stage's document-status set, so the pipeline list and its
@@ -80,10 +77,7 @@ export function stageToStatusFilter(stage: PipelineStage): Prisma.DocumentWhereI
     case "to_review":
       return { status: { in: ["needs_review", "ready_for_review"] } }
     case "ready":
-    case "approvals":
       return { status: "reviewed" }
-    case "archive":
-      return {}
   }
 }
 

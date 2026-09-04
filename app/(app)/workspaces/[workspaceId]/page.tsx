@@ -1,8 +1,8 @@
 import type { SheetTemplate } from "@/components/extract/types"
 import { FileHubUploadButton } from "@/components/files/file-hub-upload-button"
-import { GettingStartedCard } from "@/components/onboarding/getting-started"
+
 import { WelcomeTour } from "@/components/onboarding/welcome-tour"
-import { SectionIntro } from "@/components/shell/section-intro"
+
 import { LastUpdated } from "@/components/shared/relative-time"
 import config from "@/lib/config"
 import { getCurrentUser } from "@/lib/auth"
@@ -74,7 +74,6 @@ export default async function WorkspaceHomePage({ params }: {
         <p className="mb-1.5 text-[11.5px] font-bold uppercase tracking-[0.08em] text-[#0f9d6f] md:text-xs">{greeting(new Date())}, {(user.name || user.email).split(" ")[0]}</p>
         <div className="flex items-center gap-2">
           <h1 className="font-display text-[25px] font-extrabold leading-[1.15] tracking-[-0.025em] text-slate-900 md:text-[33px] md:leading-normal">Welcome back to {membership.workspace.name}</h1>
-          <SectionIntro section="dashboard" workspaceId={workspaceId} />
         </div>
         {stageCounts.to_review > 0 && <p className="mt-1.5 text-[13.5px] text-slate-500 md:text-[14.5px]">{stageCounts.to_review} document{stageCounts.to_review === 1 ? " is" : "s are"} waiting for review across your pipeline.</p>}
       </div>
@@ -176,10 +175,5 @@ export default async function WorkspaceHomePage({ params }: {
       </div>
     </div>
 
-    <GettingStartedCard
-      workspaceId={workspaceId}
-      initialState={onboardingState}
-      liveCounts={{ uploaded: documentsThisMonth, reviewed: stageCounts.ready, placedInSheet: (stageCounts.ready) - unplacedCount }}
-    />
   </main>
 }
