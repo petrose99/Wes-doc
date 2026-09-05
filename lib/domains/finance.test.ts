@@ -45,7 +45,7 @@ describe("FINANCE_OPTIONAL_TEMPLATES", () => {
     expect(fields.find((f) => f.key === "closing_balance")?.mergeStrategy).toBe("last")
     const transactions = fields.find((f) => f.key === "transactions")!
     expect(transactions.type).toBe("array")
-    expect(transactions.itemFields?.map((f) => f.key)).toEqual(["transaction_date", "description", "debit", "credit", "running_balance"])
+    expect(transactions.itemFields?.map((f) => f.key)).toEqual(["transaction_date", "description", "debit", "credit", "running_balance", "account_ref"])
   })
 
   it("remittance_advice allocates a payment across invoices as an array", () => {

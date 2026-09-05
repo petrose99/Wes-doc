@@ -1,4 +1,5 @@
 import { amountsMatch } from "@/lib/checks/types"
+import { groupTransactionsByAccount } from "@/lib/extraction/balance-solver"
 
 /** Post-extraction confidence calibration — pure, no Prisma.
  *
@@ -45,14 +46,14 @@ export type CalibrationResult = {
 /** Per-template key names for the arithmetic identities. Mirrors models/document-checks.ts's
  * CHECK_FIELD_MAPS (kept local: that module imports Prisma, this one must stay pure). */
 const AMOUNT_KEYS: Record<string, {
-  subtotal?: string; taxTotal?: string; shippingTotal?: string; total?: string; lineItems?: string
-  openingBalance?: string; closingBalance?: string; transactions?: string
+  subtotal?: string; taxTotal?: string; shippingTotal?: string; otherCharges?: string; total?: string; lineItems?: string
+  openingBalance?: string; closingBalance?: string; transactions?: string; accounts?: string
   currency?: string
 }> = {
-  invoice: { subtotal: "subtotal", taxTotal: "tax_total", shippingTotal: "shipping_total", total: "total", lineItems: "line_items", currency: "currency_code" },
+  invoice: { subtotal: "subtotal", taxTotal: "tax_total", shippingTotal: "shipping_total", otherCharges: "other_charges", total: "total", lineItems: "line_items", currency: "currency_code" },
   receipt: { taxTotal: "tax_total", total: "total", lineItems: "line_items", currency: "currency_code" },
   purchase_order: { total: "total", lineItems: "line_items", currency: "currency_code" },
-  bank_statement: { openingBalance: "opening_balance", closingBalance: "closing_balance", transactions: "transactions", currency: "currency_code" },
+  bank_statement: { openingBalance: "opening_balance", closingBalance: "closing_balance", transactions: "transactions", accounts: "accounts", currency: "currency_code" },
 }
 
 export function calibrateFieldConfidence(input: CalibrationInput): CalibrationResult {
@@ -102,15 +103,27 @@ function applyArithmetic(
   }
 
   // Invoice-style header identity: subtotal + tax (+ shipping) = total.
+  // Two-form: pass if base matches OR base+Σother matches (guards double counting).
   const subtotal = num(map.subtotal)
   const taxTotal = num(map.taxTotal)
   const shipping = num(map.shippingTotal)
   const total = num(map.total)
+  const otherRows = map.otherCharges ? asRows(input.extraction[map.otherCharges]) : []
+  const otherAmounts = otherRows.map((row) => asNumber(row.amount))
+  const allOtherPresent = otherAmounts.length > 0 && otherAmounts.every((a): a is number => a !== null)
+  const otherSum = allOtherPresent ? (otherAmounts as number[]).reduce((s, a) => s + a, 0) : 0
+
   if (subtotal !== null && taxTotal !== null && total !== null) {
-    if (amountsMatch(subtotal + taxTotal + (shipping ?? 0), total, currency)) {
+    const baseExpected = subtotal + taxTotal + (shipping ?? 0)
+    const baseMatch = amountsMatch(baseExpected, total, currency)
+    const inclusiveMatch = allOtherPresent && otherSum !== 0 && amountsMatch(baseExpected + otherSum, total, currency)
+
+    if (baseMatch || inclusiveMatch) {
       corroborate(map.subtotal, map.taxTotal, shipping !== null ? map.shippingTotal : undefined, map.total)
+      if (inclusiveMatch && !baseMatch && allOtherPresent && otherSum !== 0) {
+        corroborate(map.otherCharges)
+      }
     } else {
-      // One of these four is wrong (or the document itself is) — worth a verification pass.
       flagSuspect(map.subtotal, map.taxTotal, map.shippingTotal, map.total)
     }
   }
@@ -131,9 +144,33 @@ function applyArithmetic(
   }
 
   // Bank statement identity: opening + Σ(credit − debit) = closing corroborates all three.
+  // Multi-account: when ≥2 accounts exist, the top-level opening/closing is a cross-account
+  // pair (first account's opening, last account's closing) — skip the top-level identity and
+  // corroborate only when every per-account chain reconciles.
   const opening = num(map.openingBalance)
   const closing = num(map.closingBalance)
-  if (opening !== null && closing !== null && map.transactions) {
+  const accountRows = map.accounts ? asRows(input.extraction[map.accounts]) : []
+  if (accountRows.length >= 2 && map.transactions) {
+    const txnRows = asRows(input.extraction[map.transactions])
+    if (txnRows.length > 0) {
+      const groups = groupTransactionsByAccount(txnRows, accountRows, opening, closing)
+      let allReconciled = true
+      let anyChecked = false
+      for (const group of groups) {
+        if (group.openingBalance === null || group.closingBalance === null || !group.rows.length) continue
+        anyChecked = true
+        const net = group.rows.reduce((s, r) => s + (r.credit ?? 0) - (r.debit ?? 0), 0)
+        if (!amountsMatch(group.openingBalance + net, group.closingBalance, currency)) { allReconciled = false; break }
+      }
+      if (anyChecked) {
+        if (allReconciled) {
+          corroborate(map.transactions, map.accounts)
+        } else {
+          flagSuspect(map.transactions, map.accounts)
+        }
+      }
+    }
+  } else if (opening !== null && closing !== null && map.transactions) {
     const rows = asRows(input.extraction[map.transactions])
     if (rows.length > 0) {
       const net = rows.reduce((sum, row) => sum + (asNumber(row.credit) ?? 0) - (asNumber(row.debit) ?? 0), 0)

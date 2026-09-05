@@ -29,6 +29,35 @@
         "opening_balance": 3005.93,
         "closing_balance": 6682.22
       }
+    },
+    {
+      "name": "multi-page-invoice",
+      "file": "eval/fixtures/multi-page-invoice.pdf",
+      "templateCode": "invoice",
+      "$comment": "Synthetic 2-page invoice with a table row wrapping onto page 2, a repeated header, and other charges. Exercises P1 (merge-rows) and P4 (other_charges).",
+      "expected": {
+        "vendor": "Acme Testing Corp",
+        "invoice_number": "TEST-MPG-001",
+        "issue_date": "2025-03-15",
+        "currency_code": "USD",
+        "subtotal": 1310,
+        "tax_total": 131,
+        "total": 1406,
+        "line_items.length": 5,
+        "other_charges.length": 2
+      }
+    },
+    {
+      "name": "multi-account-statement",
+      "file": "eval/fixtures/multi-account-statement.pdf",
+      "templateCode": "bank_statement",
+      "$comment": "Synthetic 2-account statement with running balances. Exercises P2 (balance-solver) and P3 (multi-account).",
+      "expected": {
+        "account_holder": "Jane Test",
+        "currency_code": "USD",
+        "accounts.length": 2,
+        "transactions.length": 7
+      }
     }
   ]
 }

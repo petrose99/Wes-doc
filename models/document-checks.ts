@@ -21,17 +21,17 @@ import { Prisma } from "@/prisma/client"
  * no checks — not every document has arithmetic or a balance to verify. */
 type CheckFieldMap = {
   supplier?: string; invoiceNumber?: string; date?: string
-  subtotal?: string; taxTotal?: string; shippingTotal?: string; total?: string; currency?: string; lineItems?: string
-  accountNumber?: string; openingBalance?: string; closingBalance?: string; periodStart?: string; periodEnd?: string; transactions?: string
+  subtotal?: string; taxTotal?: string; shippingTotal?: string; otherCharges?: string; total?: string; currency?: string; lineItems?: string
+  accountNumber?: string; openingBalance?: string; closingBalance?: string; periodStart?: string; periodEnd?: string; transactions?: string; accounts?: string
   supplierVatNumber?: string
 }
 
 const CHECK_FIELD_MAPS: Record<string, CheckFieldMap> = {
-  invoice: { supplier: "vendor", invoiceNumber: "invoice_number", date: "issue_date", subtotal: "subtotal", taxTotal: "tax_total", shippingTotal: "shipping_total", total: "total", currency: "currency_code", lineItems: "line_items", supplierVatNumber: "supplier_vat_number" },
+  invoice: { supplier: "vendor", invoiceNumber: "invoice_number", date: "issue_date", subtotal: "subtotal", taxTotal: "tax_total", shippingTotal: "shipping_total", otherCharges: "other_charges", total: "total", currency: "currency_code", lineItems: "line_items", supplierVatNumber: "supplier_vat_number" },
   receipt: { supplier: "merchant", invoiceNumber: "receipt_number", date: "purchase_date", taxTotal: "tax_total", total: "total", currency: "currency_code", lineItems: "line_items" },
   expense_receipt: { supplier: "merchant", invoiceNumber: "receipt_number", date: "purchase_date", taxTotal: "tax_total", total: "total", currency: "currency_code" },
   purchase_order: { supplier: "supplier", invoiceNumber: "po_number", date: "order_date", total: "total", currency: "currency_code", lineItems: "line_items" },
-  bank_statement: { accountNumber: "account_number", openingBalance: "opening_balance", closingBalance: "closing_balance", periodStart: "statement_period_start", periodEnd: "statement_period_end", transactions: "transactions", currency: "currency_code" },
+  bank_statement: { accountNumber: "account_number", openingBalance: "opening_balance", closingBalance: "closing_balance", periodStart: "statement_period_start", periodEnd: "statement_period_end", transactions: "transactions", accounts: "accounts", currency: "currency_code" },
 }
 
 /** Only these two default to "fail" — every other check defaults to "warn" (the roadmap's own
@@ -75,13 +75,21 @@ export async function runDeterministicChecks(input: { workspaceId: string; docum
     const results: CheckResult[] = []
 
     if (map.total || map.subtotal) {
-      const arithmetic = checkInvoiceArithmetic({ currencyCode, subtotal: asNumber(get("subtotal")), taxTotal: asNumber(get("taxTotal")), shippingTotal: asNumber(get("shippingTotal")), total: asNumber(get("total")), lineItems })
+      const otherCharges = Array.isArray(get("otherCharges")) ? (get("otherCharges") as unknown[]).map((item) => ({ amount: asNumber((item as Record<string, unknown> | null)?.amount) })) : []
+      const arithmetic = checkInvoiceArithmetic({ currencyCode, subtotal: asNumber(get("subtotal")), taxTotal: asNumber(get("taxTotal")), shippingTotal: asNumber(get("shippingTotal")), otherCharges, total: asNumber(get("total")), lineItems })
       if (arithmetic) results.push(arithmetic)
     }
 
     if (map.openingBalance && map.closingBalance) {
-      const transactions = Array.isArray(get("transactions")) ? (get("transactions") as unknown[]).map((row) => ({ debit: asNumber((row as Record<string, unknown> | null)?.debit), credit: asNumber((row as Record<string, unknown> | null)?.credit) })) : []
-      const balance = checkStatementBalance({ currencyCode, openingBalance: asNumber(get("openingBalance")), closingBalance: asNumber(get("closingBalance")), transactions })
+      const transactions = Array.isArray(get("transactions")) ? (get("transactions") as unknown[]).map((row) => {
+        const r = row as Record<string, unknown> | null
+        return { debit: asNumber(r?.debit), credit: asNumber(r?.credit), running_balance: asNumber(r?.running_balance), account_ref: asString(r?.account_ref) }
+      }) : []
+      const accounts = Array.isArray(get("accounts")) ? (get("accounts") as unknown[]).map((row) => {
+        const r = row as Record<string, unknown> | null
+        return { account_number: asString(r?.account_number), opening_balance: asNumber(r?.opening_balance), closing_balance: asNumber(r?.closing_balance) }
+      }) : []
+      const balance = checkStatementBalance({ currencyCode, openingBalance: asNumber(get("openingBalance")), closingBalance: asNumber(get("closingBalance")), transactions, accounts })
       if (balance) results.push(balance)
     }
 

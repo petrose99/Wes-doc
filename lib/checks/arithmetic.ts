@@ -7,6 +7,8 @@ export type ArithmeticInput = {
   /** Shipping/handling/freight shown separately from the subtotal — part of the total but not of
    * subtotal or tax. Optional so older callers (and templates without the field) keep working. */
   shippingTotal?: number | null
+  /** Charges/fees/credits outside the standard subtotal+tax+shipping breakdown. */
+  otherCharges?: { amount: number | null }[]
   total: number | null
   lineItems: { amount: number | null }[]
 }
@@ -27,14 +29,24 @@ export function checkInvoiceArithmetic(input: ArithmeticInput): CheckResult | nu
 
   if (input.subtotal !== null && input.taxTotal !== null && input.total !== null) {
     const shipping = input.shippingTotal ?? null
-    const expected = input.subtotal + input.taxTotal + (shipping ?? 0)
-    detail.subtotalPlusTax = expected
+    const baseExpected = input.subtotal + input.taxTotal + (shipping ?? 0)
+    detail.subtotalPlusTax = baseExpected
     if (shipping !== null) detail.shippingTotal = shipping
-    if (!amountsMatch(expected, input.total, input.currencyCode)) {
+
+    const otherAmounts = (input.otherCharges ?? []).map((c) => c.amount)
+    const allOtherPresent = otherAmounts.length > 0 && otherAmounts.every((a): a is number => a !== null)
+    const otherSum = allOtherPresent ? otherAmounts.reduce((s, a) => s + (a as number), 0) : 0
+    if (allOtherPresent) detail.otherChargesSum = otherSum
+
+    const baseMatch = amountsMatch(baseExpected, input.total, input.currencyCode)
+    const inclusiveMatch = allOtherPresent && otherSum !== 0 && amountsMatch(baseExpected + otherSum, input.total, input.currencyCode)
+
+    if (!baseMatch && !inclusiveMatch) {
       const parts = shipping !== null
         ? `subtotal (${input.subtotal}) + tax (${input.taxTotal}) + shipping (${shipping})`
         : `subtotal (${input.subtotal}) + tax (${input.taxTotal})`
-      issues.push(`${parts} = ${round2(expected)}, but total is ${input.total}`)
+      const suffix = allOtherPresent && otherSum !== 0 ? ` (also tried + other charges ${round2(otherSum)})` : ""
+      issues.push(`${parts} = ${round2(baseExpected)}, but total is ${input.total}${suffix}`)
     }
   }
 

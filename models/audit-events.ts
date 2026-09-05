@@ -60,6 +60,7 @@ const EVENT_LABELS: Record<string, string> = {
   activity_exported: "Activity log exported",
   readiness_evaluated: "Readiness evaluated",
   extraction_verified: "Extraction verified and corrected",
+  balance_reconciled: "Balance reconciled via running-balance chain",
   "ai_coding.suggested": "AI coding suggested",
   "ai_coding.overridden": "AI coding overridden",
 }

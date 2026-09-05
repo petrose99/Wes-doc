@@ -11,6 +11,8 @@ import { regenerateBankMatchSuggestions, regenerateSupplierStatementMatches } fr
 import config from "@/lib/config"
 import { buildDocumentJsonSchema, buildDocumentPrompt, buildFreeFormJsonSchema, buildFreeFormPrompt, DocumentClassification, DocumentFieldDefinition, extractClassification, extractFieldConfidence, extractFieldProvenance, FieldProvenanceHints, findMissingRequiredFields, parseTemplateFields, ProvenanceHint, validateDocumentValues } from "@/lib/document-templates"
 import { documentBlocksKey, putDocumentSource, readDocumentSource } from "@/lib/document-storage"
+import { mergeContinuationRows } from "@/lib/extraction/merge-rows"
+import { solveRunningBalance, groupTransactionsByAccount } from "@/lib/extraction/balance-solver"
 import { calibrateFieldConfidence } from "@/lib/extraction/calibrate"
 import { verifySuspectFields } from "@/lib/extraction/verify"
 import { processEmbedJob } from "@/lib/document-embedding"
@@ -373,6 +375,64 @@ export async function processDocumentJob(jobId: string) {
 
     const extraction = freeForm ? Object.assign({}, ...passes) : mergeExtractionPasses(fields, passes)
     const rawFieldConfidence = freeForm ? Object.assign({}, ...confidencePasses) : mergeFieldConfidence(fields, passes, confidencePasses)
+
+    // P1: merge continuation rows — string-only fragments at page boundaries onto the preceding
+    // numeric row, and drop repeated headers/markers.
+    let mergedProvenance = freeForm ? { fields: {}, items: {} } as FieldProvenanceHints : mergeProvenancePasses(fields, passes, provenancePasses)
+    const mergeAuditDetail: Record<string, unknown> = {}
+    if (!freeForm) {
+      for (const field of fields) {
+        if (field.type !== "array" || !field.itemFields?.length) continue
+        const rows = extraction[field.key]
+        if (!Array.isArray(rows) || rows.length < 2) continue
+        const hints = mergedProvenance.items[field.key] ?? []
+        const boundaries = new Set<number>()
+        let offset = 0
+        for (const pass of passes) {
+          const passRows = Array.isArray(pass[field.key]) ? (pass[field.key] as unknown[]).length : 0
+          if (passRows > 0 && offset > 0) boundaries.add(offset)
+          offset += passRows
+        }
+        const result = mergeContinuationRows({ itemFields: field.itemFields, rows: rows as Record<string, unknown>[], hints, passBoundaries: boundaries })
+        if (result.merges || result.dropped) {
+          extraction[field.key] = result.rows
+          mergedProvenance = { ...mergedProvenance, items: { ...mergedProvenance.items, [field.key]: result.hints } }
+          mergeAuditDetail[field.key] = { merges: result.merges, dropped: result.dropped }
+        }
+      }
+    }
+
+    // P2: running-balance constraint solver for bank statements — anchored on printed balances,
+    // auto-corrects single OCR-confusable misreads before calibration sees the rows.
+    const balanceSolverDetail: Record<string, unknown> = {}
+    if (!freeForm && document.template?.code === "bank_statement") {
+      const txnRows = Array.isArray(extraction.transactions) ? extraction.transactions as Record<string, unknown>[] : []
+      const accountRows = Array.isArray(extraction.accounts) ? extraction.accounts as Record<string, unknown>[] : []
+      const openingBalance = typeof extraction.opening_balance === "number" ? extraction.opening_balance : null
+      const closingBalance = typeof extraction.closing_balance === "number" ? extraction.closing_balance : null
+      const currencyCode = typeof extraction.currency_code === "string" ? extraction.currency_code : null
+
+      const groups = groupTransactionsByAccount(txnRows, accountRows, openingBalance, closingBalance)
+      for (const group of groups) {
+        const result = solveRunningBalance({ rows: group.rows, openingBalance: group.openingBalance, closingBalance: group.closingBalance, currencyCode })
+        if (result.corrections.length) {
+          for (const correction of result.corrections) {
+            const globalIdx = group.rowIndexes[correction.rowIndex]
+            const txn = txnRows[globalIdx] as Record<string, unknown>
+            txn[correction.field] = correction.corrected
+          }
+          balanceSolverDetail[group.accountNumber ?? "default"] = { corrections: result.corrections, chainConsistent: result.chainConsistent }
+        }
+        if (result.suspectRowIndexes.length) {
+          const globalSuspects = result.suspectRowIndexes.map((i) => group.rowIndexes[i])
+          balanceSolverDetail[`${group.accountNumber ?? "default"}_suspects`] = globalSuspects
+        }
+      }
+      if (Object.keys(balanceSolverDetail).length) {
+        await recordSystemAudit({ workspaceId: document.workspaceId, documentId: document.id, type: "balance_reconciled", detail: balanceSolverDetail as Prisma.InputJsonValue })
+      }
+    }
+
     // Replace the LLM's self-reported confidence with evidence wherever the document corroborates
     // itself (arithmetic identities, verbatim presence in the OCR text) — see lib/extraction/calibrate.
     let calibration = freeForm ? null : calibrateFieldConfidence({
@@ -423,7 +483,7 @@ export async function processDocumentJob(jobId: string) {
     }
     // Resolve each merged value's source location against the parsed blocks, remapping pages back
     // to the original numbering when a page range narrowed the parse.
-    const provenance = freeForm ? null : buildDocumentProvenance(fields, mergeProvenancePasses(fields, passes, provenancePasses), extraction, parsed.blocks ?? null, parsed.pageSizes ?? null, pageRanges)
+    const provenance = freeForm ? null : buildDocumentProvenance(fields, mergedProvenance, extraction, parsed.blocks ?? null, parsed.pageSizes ?? null, pageRanges)
     const status = missing.length || batchFailures ? "needs_review" : "ready_for_review"
     const fieldValues = freeForm ? [] : projectDocumentFields({ fields, values: extraction, confidence: fieldConfidence, provenance, source: "llm_structured" })
     // Interactive form (not the array form) because the projection is raw SQL and has to run on the
@@ -433,7 +493,7 @@ export async function processDocumentJob(jobId: string) {
     await prisma.$transaction(async (tx) => {
       await tx.document.update({ where: { id: document.id }, data: { status, ocrText, fieldSnapshot: fields as unknown as Prisma.InputJsonValue, rawExtraction: extraction as Prisma.InputJsonValue, reviewedData: extraction as Prisma.InputJsonValue, provenance: provenance as Prisma.InputJsonValue, shapeId, classification: classification as Prisma.InputJsonValue, confidence: confidence as Prisma.InputJsonValue } })
       await tx.documentProcessingJob.update({ where: { id: job.id }, data: { status: "completed", completedAt: new Date(), leaseUntil: null } })
-      await recordSystemAudit({ workspaceId: document.workspaceId, documentId: document.id, type: "extraction_completed" }, tx)
+      await recordSystemAudit({ workspaceId: document.workspaceId, documentId: document.id, type: "extraction_completed", detail: Object.keys(mergeAuditDetail).length ? { rowMerges: mergeAuditDetail } as Prisma.InputJsonValue : undefined }, tx)
       await replaceDocumentFieldValues({ workspaceId: document.workspaceId, documentId: document.id, fileId: document.fileId, templateCode: document.template?.code ?? null, rows: fieldValues }, tx)
       // Fan the lifecycle event out to subscribed endpoints in the SAME tx, so an event is never
       // queued for a completion that then rolls back. The drain is kicked after commit (below).

@@ -24,7 +24,7 @@ const { createDocumentFromBuffer, requeueDocumentExtraction } = await import("@/
 const { processDocumentJob } = await import("@/lib/document-processing")
 const { amountsMatch } = await import("@/lib/checks/types")
 
-type EvalCase = { name: string; url: string; templateCode: string; expected: Record<string, unknown> }
+type EvalCase = { name: string; url?: string; file?: string; templateCode: string; expected: Record<string, unknown> }
 
 async function main() {
   const manifest = JSON.parse(fs.readFileSync(path.join(process.cwd(), "eval", "extraction-manifest.json"), "utf8")) as { cases: EvalCase[] }
@@ -39,7 +39,9 @@ async function main() {
 
   for (const evalCase of manifest.cases) {
     console.log(`\n=== ${evalCase.name} (${evalCase.templateCode}) ===`)
-    const buffer = await fetchCached(evalCase.url, cacheDir, evalCase.name)
+    const buffer = evalCase.file
+      ? fs.readFileSync(path.join(process.cwd(), evalCase.file))
+      : await fetchCached(evalCase.url!, cacheDir, evalCase.name)
 
     const template = await prisma.documentTemplate.findFirst({
       where: { workspaceId, code: evalCase.templateCode },
@@ -71,7 +73,8 @@ async function main() {
 
     const extraction = document.rawExtraction as Record<string, unknown>
     for (const [key, expected] of Object.entries(evalCase.expected)) {
-      const got = extraction[key]
+      const lengthMatch = key.match(/^(.+)\.length$/)
+      const got = lengthMatch ? (Array.isArray(extraction[lengthMatch[1]]) ? (extraction[lengthMatch[1]] as unknown[]).length : null) : extraction[key]
       const correct = valuesMatch(expected, got)
       totalFields++
       if (correct) totalCorrect++

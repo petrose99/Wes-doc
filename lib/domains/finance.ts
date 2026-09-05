@@ -27,6 +27,12 @@ export const FINANCE_TEMPLATES = [
         { key: "unit_price", label: "Unit price", type: "number", instruction: "Price per unit before tax", required: false },
         { key: "amount", label: "Amount", type: "number", instruction: "Line total", required: false },
       ] },
+      // Must come AFTER line_items — findArrayField picks the first array field, and line_items
+      // is the primary one for adaptive discovery and sheet projection.
+      { key: "other_charges", label: "Other charges", type: "array", instruction: "Charges, fees, or credits shown separately from the line items and not included in subtotal, tax, or shipping (e.g. handling fee, environmental levy, early-payment discount). Omit if none.", required: false, itemFields: [
+        { key: "label", label: "Label", type: "string", instruction: "Charge or credit label as printed", required: false },
+        { key: "amount", label: "Amount", type: "number", instruction: "Amount; negative for discounts or credits", required: false },
+      ] },
     ],
   },
   {
@@ -92,6 +98,13 @@ export const FINANCE_OPTIONAL_TEMPLATES = [
         { key: "debit", label: "Money out", type: "number", instruction: "Amount debited (money leaving the account), if any", required: false },
         { key: "credit", label: "Money in", type: "number", instruction: "Amount credited (money entering the account), if any", required: false },
         { key: "running_balance", label: "Balance", type: "number", instruction: "Running balance after this transaction, if shown", required: false },
+        { key: "account_ref", label: "Account", type: "string", instruction: "Account number or IBAN this row belongs to; omit on single-account statements", required: false },
+      ] },
+      // Must come AFTER transactions — findArrayField picks the first array field.
+      { key: "accounts", label: "Accounts", type: "array", instruction: "Only for statements covering more than one account — one row per account with its own opening and closing balance. Omit entirely on single-account statements.", required: false, itemFields: [
+        { key: "account_number", label: "Account number", type: "string", instruction: "Account number or IBAN as printed", required: false },
+        { key: "opening_balance", label: "Opening balance", type: "number", instruction: "Opening balance for this account", required: false },
+        { key: "closing_balance", label: "Closing balance", type: "number", instruction: "Closing balance for this account", required: false },
       ] },
     ],
   },

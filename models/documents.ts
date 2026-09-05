@@ -619,14 +619,14 @@ export async function deleteWorkspaceDocuments(workspaceId: string, documentIds:
 /** Re-runs extraction for one document (the panel's re-process action). The AI quota flag
  * stays claimed, so a re-run never double-charges the workspace. */
 export async function requeueDocumentExtraction(workspaceId: string, documentId: string) {
-  const document = await prisma.document.findFirst({ where: { id: documentId, workspaceId }, select: { id: true, storageKey: true } })
+  const document = await prisma.document.findFirst({ where: { id: documentId, workspaceId }, select: { id: true, storageKey: true, templateVersion: { select: { fields: true } } } })
   if (!document) throw new Error("document_not_found")
   if (!document.storageKey) throw new Error("document_source_missing")
   const active = await prisma.documentProcessingJob.findFirst({ where: { documentId: document.id, status: { in: ["queued", "processing"] } }, select: { id: true } })
   if (active) throw new Error("document_already_processing")
   const context = await getRequestAuditContext()
   const [, job] = await prisma.$transaction([
-    prisma.document.update({ where: { id: document.id }, data: { status: "queued", errorCode: null } }),
+    prisma.document.update({ where: { id: document.id }, data: { status: "queued", errorCode: null, ...(document.templateVersion ? { fieldSnapshot: document.templateVersion.fields as Prisma.InputJsonValue } : {}) } }),
     prisma.documentProcessingJob.create({ data: { workspaceId, documentId: document.id, type: "extract" } }),
     prisma.documentAuditEvent.create({ data: auditEventData({ workspaceId, documentId: document.id, type: "extraction_requeued" }, context) }),
   ])
