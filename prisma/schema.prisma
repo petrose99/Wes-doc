@@ -79,6 +79,10 @@ model Workspace {
   /// "finance" (types/industry.ts) — the app is finance-only; kept as a string column rather than
   /// dropped outright since a handful of nav/AI-prompt code paths still key off it.
   industry        String                 @default("finance")
+  country         String                 @default("US")
+  baseCurrency    String                 @default("USD") @map("base_currency")
+  timezone        String                 @default("UTC")
+  fiscalYearStart String                 @default("january") @map("fiscal_year_start")
   aiEnabled       Boolean                @default(true) @map("ai_enabled")
   /// F15: when on, this workspace is presumed to handle ePHI. setLinkAccess refuses anything but
   /// "none", getFileAccess ignores an existing linkAccess for a signed-out viewer, and the share

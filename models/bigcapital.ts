@@ -106,7 +106,7 @@ type ProvisionOutcome = { success: boolean; errorCode: string | null; retryable:
  * TENANT_ALREADY_BUILT — but wastes a round trip and a poll cycle first) — see
  * IntegrationProvisionJob.externalRef. Returns the build job id to persist on the row for the NEXT
  * attempt (null once it's no longer needed: the build finished, or failed terminally). */
-async function buildAndConnect(workspace: { id: string; name: string }, ownerUserId: string | null, existingBuildJobId: string | null): Promise<ProvisionOutcome> {
+async function buildAndConnect(workspace: { id: string; name: string; country: string; baseCurrency: string; timezone: string; fiscalYearStart: string }, ownerUserId: string | null, existingBuildJobId: string | null): Promise<ProvisionOutcome> {
   // Idempotency short-circuit: a connection that's already active means this workspace's org was
   // already built successfully by an earlier attempt (or the job row and the connection fell out of
   // sync — a crash between this function returning success and the job being marked succeeded, or
@@ -127,10 +127,10 @@ async function buildAndConnect(workspace: { id: string; name: string }, ownerUse
   if (!jobId) {
     const built = await bigcapital.buildOrganization(session.token, account.organizationId, {
       name: workspace.name,
-      location: "US",
-      baseCurrency: "USD",
-      timezone: "UTC",
-      fiscalYear: "january",
+      location: workspace.country,
+      baseCurrency: workspace.baseCurrency,
+      timezone: workspace.timezone,
+      fiscalYear: workspace.fiscalYearStart,
       language: "en",
     })
     // alreadyBuilt: a prior attempt's build succeeded but crashed before this job row (or the
@@ -208,7 +208,7 @@ export async function claimNextProvisionJob(now = new Date()): Promise<string | 
 export async function attemptProvisionJob(jobId: string, now = new Date()): Promise<void> {
   const job = await prisma.integrationProvisionJob.findUnique({
     where: { id: jobId },
-    select: { id: true, workspaceId: true, status: true, attempts: true, ownerUserId: true, externalRef: true, workspace: { select: { id: true, name: true } } },
+    select: { id: true, workspaceId: true, status: true, attempts: true, ownerUserId: true, externalRef: true, workspace: { select: { id: true, name: true, country: true, baseCurrency: true, timezone: true, fiscalYearStart: true } } },
   })
   if (!job || job.status !== "pending") return
 

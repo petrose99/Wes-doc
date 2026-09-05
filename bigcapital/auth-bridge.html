@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head><title>Signing in…</title></head>
+<body>
+<p>Signing you in…</p>
+<script>
+(function() {
+  var hash = window.location.hash.slice(1);
+  if (!hash) { document.body.textContent = "Missing credentials."; return; }
+  try {
+    var params = JSON.parse(decodeURIComponent(hash));
+    var store = JSON.stringify({
+      token: JSON.stringify(params.token),
+      organizationId: JSON.stringify(params.organizationId),
+      _persist: JSON.stringify({ version: -1, rehydrated: true })
+    });
+    localStorage.setItem("persist:bigcapital:authentication", store);
+    window.location.replace("/");
+  } catch(e) {
+    document.body.textContent = "Sign-in failed: " + e.message;
+  }
+})();
+</script>
+</body>
+</html>

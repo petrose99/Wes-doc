@@ -40,7 +40,7 @@ export default async function AccountingPage({ params }: { params: Promise<{ wor
       </div>
       {connection?.status === "active" && connection.externalTenantId && (
         <a
-          href={config.integrations.bigcapital.webappUrl}
+          href={`/api/accounting/session?workspaceId=${workspaceId}`}
           target="_blank"
           rel="noreferrer"
           className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"

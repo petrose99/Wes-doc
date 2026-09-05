@@ -17,8 +17,8 @@ export default async function NewWorkspacePage() {
 
   return <main className="mx-auto max-w-4xl space-y-8 p-8">
     <header className="space-y-1 text-center">
-      <h1 className="text-2xl font-bold text-slate-900">What will you use DocuBite for?</h1>
-      <p className="text-sm text-muted-foreground">Pick the closest fit — you can enable more from Settings later, and this can&apos;t be changed once the workspace has files.</p>
+      <h1 className="text-2xl font-bold text-slate-900">Set up your workspace</h1>
+      <p className="text-sm text-muted-foreground">Tell us about your organization so we can configure your accounting ledger.</p>
     </header>
     <NewWorkspaceForm defaultName={`${user.name || user.email}'s workspace`} />
   </main>

@@ -29,12 +29,16 @@ const parseRole = (value: unknown): WorkspaceRole => (value === "owner" ? "owner
  * currently running and happily wave through demoting or removing the last owner. */
 const countOwners = (workspaceId: string) => prisma.workspaceMember.count({ where: { workspaceId, role: "owner" } })
 
-export async function createWorkspaceForUser(user: Pick<User, "id" | "name" | "email">, options: { name?: string; kind?: WorkspaceKind } = {}) {
+export async function createWorkspaceForUser(user: Pick<User, "id" | "name" | "email">, options: { name?: string; kind?: WorkspaceKind; country?: string; baseCurrency?: string; timezone?: string; fiscalYearStart?: string } = {}) {
   const workspace = await prisma.workspace.create({
     data: {
       name: options.name?.trim() || `${user.name || user.email}'s workspace`,
       kind: options.kind || "personal",
       industry: "finance",
+      country: options.country || "US",
+      baseCurrency: options.baseCurrency || "USD",
+      timezone: options.timezone || "UTC",
+      fiscalYearStart: options.fiscalYearStart || "january",
       members: { create: { userId: user.id, role: "owner" } },
     },
   })
