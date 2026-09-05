@@ -92,7 +92,7 @@ export async function refreshDocumentReadiness(input: RefreshInput): Promise<Rea
     }
 
     const result = evaluateReadiness({
-      fieldConfidences: document.confidence as Record<string, number> | null,
+      fieldConfidences: (document.confidence as Record<string, unknown> | null)?.fieldConfidence as Record<string, number> | null ?? null,
       minConfidence,
       checkResults,
       blockOnWarnChecks,
