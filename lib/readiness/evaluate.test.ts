@@ -1,79 +1,239 @@
 import { describe, expect, it } from "vitest"
 import { AI_CODING_MIN_CONFIDENCE, evaluateReadiness, type ReadinessInput } from "./evaluate"
 
-const base = (): ReadinessInput => ({
-  hasActiveRules: true,
-  hasRuleMatch: false,
-  codingSource: null,
-  codingConfidence: null,
-  missingRequiredFields: [],
-  failedChecks: [],
-  fieldConfidence: {},
-  lowConfidenceThreshold: 0.6,
-})
+function base(overrides: Partial<ReadinessInput> = {}): ReadinessInput {
+  return {
+    fieldConfidences: { vendor: 0.95, total: 0.92 },
+    minConfidence: 0.85,
+    checkResults: [],
+    blockOnWarnChecks: false,
+    hasExtraction: true,
+    appliedRuleId: "rule-1",
+    hasActiveRules: true,
+    hasOpenReviewTask: false,
+    policyVerdict: "disabled",
+    isPushable: true,
+    ...overrides,
+  }
+}
 
 describe("evaluateReadiness", () => {
-  it("reports no_rule_match when no rule matched and no AI coding", () => {
-    const blockers = evaluateReadiness(base())
-    expect(blockers).toContainEqual({ code: "no_rule_match" })
+  it("returns ready when all conditions met", () => {
+    const result = evaluateReadiness(base())
+    expect(result.status).toBe("ready")
+    expect(result.blockers).toEqual([])
   })
 
-  it("suppresses no_rule_match when codingSource is manual", () => {
-    const blockers = evaluateReadiness({ ...base(), codingSource: "manual" })
-    expect(blockers.find((b) => b.code === "no_rule_match")).toBeUndefined()
-    expect(blockers.find((b) => b.code === "ai_coding_unconfirmed")).toBeUndefined()
+  it("blocks on no extraction", () => {
+    const result = evaluateReadiness(base({ hasExtraction: false }))
+    expect(result.status).toBe("blocked")
+    expect(result.blockers).toHaveLength(1)
+    expect(result.blockers[0].code).toBe("no_extraction")
   })
 
-  it("suppresses no_rule_match when AI confidence >= threshold", () => {
-    const blockers = evaluateReadiness({ ...base(), codingSource: "ai", codingConfidence: AI_CODING_MIN_CONFIDENCE })
-    expect(blockers.find((b) => b.code === "no_rule_match")).toBeUndefined()
-    expect(blockers.find((b) => b.code === "ai_coding_unconfirmed")).toBeUndefined()
+  it("returns early on no extraction (no other blockers evaluated)", () => {
+    const result = evaluateReadiness(base({
+      hasExtraction: false,
+      fieldConfidences: { vendor: 0.1 },
+      hasOpenReviewTask: true,
+    }))
+    expect(result.blockers).toHaveLength(1)
+    expect(result.blockers[0].code).toBe("no_extraction")
   })
 
-  it("reports ai_coding_unconfirmed when AI confidence < threshold", () => {
-    const blockers = evaluateReadiness({ ...base(), codingSource: "ai", codingConfidence: 0.89 })
-    expect(blockers).toContainEqual(expect.objectContaining({ code: "ai_coding_unconfirmed" }))
+  describe("confidence checks", () => {
+    it("blocks on low-confidence field", () => {
+      const result = evaluateReadiness(base({ fieldConfidences: { vendor: 0.80, total: 0.92 } }))
+      expect(result.status).toBe("blocked")
+      expect(result.blockers).toHaveLength(1)
+      expect(result.blockers[0].code).toBe("low_confidence:vendor")
+    })
+
+    it("blocks on multiple low-confidence fields", () => {
+      const result = evaluateReadiness(base({ fieldConfidences: { vendor: 0.50, total: 0.60 } }))
+      expect(result.blockers).toHaveLength(2)
+      expect(result.blockers.map((b) => b.code)).toEqual(["low_confidence:vendor", "low_confidence:total"])
+    })
+
+    it("passes when confidence equals threshold exactly", () => {
+      const result = evaluateReadiness(base({ fieldConfidences: { vendor: 0.85 } }))
+      expect(result.status).toBe("ready")
+    })
+
+    it("blocks when confidence is just below threshold", () => {
+      const result = evaluateReadiness(base({ fieldConfidences: { vendor: 0.849 } }))
+      expect(result.status).toBe("blocked")
+    })
+
+    it("handles null fieldConfidences gracefully", () => {
+      const result = evaluateReadiness(base({ fieldConfidences: null }))
+      expect(result.status).toBe("ready")
+    })
   })
 
-  it("treats exactly the threshold as confirmed", () => {
-    const blockers = evaluateReadiness({ ...base(), codingSource: "ai", codingConfidence: 0.9 })
-    expect(blockers.find((b) => b.code === "ai_coding_unconfirmed")).toBeUndefined()
+  describe("check results", () => {
+    it("blocks on failed check", () => {
+      const result = evaluateReadiness(base({ checkResults: [{ checkCode: "invoice_arithmetic", status: "fail" }] }))
+      expect(result.status).toBe("blocked")
+      expect(result.blockers.some((b) => b.code === "check_failed")).toBe(true)
+    })
+
+    it("ignores warn checks when blockOnWarnChecks is false", () => {
+      const result = evaluateReadiness(base({ checkResults: [{ checkCode: "tax_consistency", status: "warn" }] }))
+      expect(result.status).toBe("ready")
+    })
+
+    it("blocks on warn checks when blockOnWarnChecks is true", () => {
+      const result = evaluateReadiness(base({
+        checkResults: [{ checkCode: "tax_consistency", status: "warn" }],
+        blockOnWarnChecks: true,
+      }))
+      expect(result.status).toBe("blocked")
+      expect(result.blockers.some((b) => b.code === "check_warned")).toBe(true)
+    })
+
+    it("passes on pass checks", () => {
+      const result = evaluateReadiness(base({ checkResults: [{ checkCode: "invoice_arithmetic", status: "pass" }] }))
+      expect(result.status).toBe("ready")
+    })
   })
 
-  it("does not block on no_rule_match when hasActiveRules is false", () => {
-    const blockers = evaluateReadiness({ ...base(), hasActiveRules: false })
-    expect(blockers.find((b) => b.code === "no_rule_match")).toBeUndefined()
+  describe("duplicate detection", () => {
+    it("blocks on duplicate fail check", () => {
+      const result = evaluateReadiness(base({ checkResults: [{ checkCode: "duplicate", status: "fail" }] }))
+      expect(result.status).toBe("blocked")
+      const codes = result.blockers.map((b) => b.code)
+      expect(codes).toContain("duplicate")
+      expect(codes).toContain("check_failed")
+    })
+
+    it("does not add duplicate blocker for duplicate warn", () => {
+      const result = evaluateReadiness(base({ checkResults: [{ checkCode: "duplicate", status: "warn" }] }))
+      expect(result.blockers.some((b) => b.code === "duplicate")).toBe(false)
+    })
   })
 
-  it("does not block on AI coding when a rule matched", () => {
-    const blockers = evaluateReadiness({ ...base(), hasRuleMatch: true })
-    expect(blockers.find((b) => b.code === "no_rule_match")).toBeUndefined()
-    expect(blockers.find((b) => b.code === "ai_coding_unconfirmed")).toBeUndefined()
+  describe("rule matching", () => {
+    it("blocks when no rule matched and active rules exist", () => {
+      const result = evaluateReadiness(base({ appliedRuleId: null, hasActiveRules: true }))
+      expect(result.status).toBe("blocked")
+      expect(result.blockers.some((b) => b.code === "no_rule_match")).toBe(true)
+    })
+
+    it("does not block when no rule matched and no active rules exist", () => {
+      const result = evaluateReadiness(base({ appliedRuleId: null, hasActiveRules: false }))
+      expect(result.status).toBe("ready")
+    })
+
+    it("does not block when a rule matched", () => {
+      const result = evaluateReadiness(base({ appliedRuleId: "rule-1", hasActiveRules: true }))
+      expect(result.blockers.some((b) => b.code === "no_rule_match")).toBe(false)
+    })
   })
 
-  it("reports missing required fields", () => {
-    const blockers = evaluateReadiness({ ...base(), missingRequiredFields: ["vendor"] })
-    expect(blockers).toContainEqual({ code: "missing_required_fields", detail: "vendor" })
+  describe("review tasks", () => {
+    it("blocks on open review task", () => {
+      const result = evaluateReadiness(base({ hasOpenReviewTask: true }))
+      expect(result.status).toBe("blocked")
+      expect(result.blockers.some((b) => b.code === "open_review_task")).toBe(true)
+    })
   })
 
-  it("reports failed checks", () => {
-    const blockers = evaluateReadiness({ ...base(), failedChecks: ["duplicate"] })
-    expect(blockers).toContainEqual({ code: "check_failed", detail: "duplicate" })
+  describe("policy verdict", () => {
+    it("does not block when policy is disabled", () => {
+      const result = evaluateReadiness(base({ policyVerdict: "disabled" }))
+      expect(result.status).toBe("ready")
+    })
+
+    it("does not block when policy passes", () => {
+      const result = evaluateReadiness(base({ policyVerdict: "pass" }))
+      expect(result.status).toBe("ready")
+    })
+
+    it("blocks on policy violation", () => {
+      const result = evaluateReadiness(base({ policyVerdict: "violation" }))
+      expect(result.status).toBe("blocked")
+      expect(result.blockers.some((b) => b.code === "policy_violation")).toBe(true)
+    })
+
+    it("blocks on policy error", () => {
+      const result = evaluateReadiness(base({ policyVerdict: "error" }))
+      expect(result.status).toBe("blocked")
+      expect(result.blockers.some((b) => b.code === "policy_error")).toBe(true)
+    })
   })
 
-  it("reports low-confidence fields", () => {
-    const blockers = evaluateReadiness({ ...base(), fieldConfidence: { total: 0.3 } })
-    expect(blockers).toContainEqual({ code: "low_confidence", detail: "total" })
+  describe("pushability", () => {
+    it("blocks when not pushable", () => {
+      const result = evaluateReadiness(base({ isPushable: false }))
+      expect(result.status).toBe("blocked")
+      expect(result.blockers.some((b) => b.code === "not_pushable")).toBe(true)
+    })
   })
 
-  it("AI coding with null confidence is treated as zero", () => {
-    const blockers = evaluateReadiness({ ...base(), codingSource: "ai", codingConfidence: null })
-    expect(blockers).toContainEqual(expect.objectContaining({ code: "ai_coding_unconfirmed" }))
+  describe("multiple blockers", () => {
+    it("accumulates all blockers", () => {
+      const result = evaluateReadiness(base({
+        fieldConfidences: { vendor: 0.50 },
+        checkResults: [{ checkCode: "invoice_arithmetic", status: "fail" }],
+        hasOpenReviewTask: true,
+        policyVerdict: "violation",
+        isPushable: false,
+      }))
+      expect(result.status).toBe("blocked")
+      expect(result.blockers.length).toBeGreaterThanOrEqual(5)
+      const codes = result.blockers.map((b) => b.code)
+      expect(codes).toContain("low_confidence:vendor")
+      expect(codes).toContain("check_failed")
+      expect(codes).toContain("open_review_task")
+      expect(codes).toContain("policy_violation")
+      expect(codes).toContain("not_pushable")
+    })
   })
 })
 
-describe("AI_CODING_MIN_CONFIDENCE", () => {
-  it("is 0.9", () => {
+describe("AI coding fallback", () => {
+  const noRule = { appliedRuleId: null, hasActiveRules: true }
+
+  it("blocks no_rule_match when there is no coding source", () => {
+    const result = evaluateReadiness(base(noRule))
+    expect(result.blockers.map((b) => b.code)).toContain("no_rule_match")
+  })
+
+  it("suppresses no_rule_match for manual coding", () => {
+    const result = evaluateReadiness(base({ ...noRule, codingSource: "manual" }))
+    const codes = result.blockers.map((b) => b.code)
+    expect(codes).not.toContain("no_rule_match")
+    expect(codes).not.toContain("ai_coding_unconfirmed")
+  })
+
+  it("suppresses no_rule_match for AI coding at the threshold", () => {
+    const result = evaluateReadiness(base({ ...noRule, codingSource: "ai", codingConfidence: AI_CODING_MIN_CONFIDENCE }))
+    const codes = result.blockers.map((b) => b.code)
+    expect(codes).not.toContain("no_rule_match")
+    expect(codes).not.toContain("ai_coding_unconfirmed")
+  })
+
+  it("blocks ai_coding_unconfirmed for AI coding below the threshold", () => {
+    const result = evaluateReadiness(base({ ...noRule, codingSource: "ai", codingConfidence: 0.89 }))
+    const codes = result.blockers.map((b) => b.code)
+    expect(codes).toContain("ai_coding_unconfirmed")
+    expect(codes).not.toContain("no_rule_match")
+  })
+
+  it("treats AI coding with null confidence as zero", () => {
+    const result = evaluateReadiness(base({ ...noRule, codingSource: "ai", codingConfidence: null }))
+    expect(result.blockers.map((b) => b.code)).toContain("ai_coding_unconfirmed")
+  })
+
+  it("ignores coding source entirely when a rule matched", () => {
+    const result = evaluateReadiness(base({ codingSource: "ai", codingConfidence: 0.1 }))
+    const codes = result.blockers.map((b) => b.code)
+    expect(codes).not.toContain("no_rule_match")
+    expect(codes).not.toContain("ai_coding_unconfirmed")
+  })
+
+  it("pins the threshold at 0.9", () => {
     expect(AI_CODING_MIN_CONFIDENCE).toBe(0.9)
   })
 })

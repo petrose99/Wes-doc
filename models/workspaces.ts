@@ -15,14 +15,14 @@ import { User } from "@/prisma/client"
 import crypto, { randomBytes } from "crypto"
 import { cache } from "react"
 
-export type WorkspaceRole = "owner" | "member"
+export type WorkspaceRole = "owner" | "reviewer" | "member"
 /** "personal" is the implicit one-member workspace every user gets; "team" is the shared kind
  * any member may create — there is no plan gate on this anymore. */
 export type WorkspaceKind = "personal" | "team"
 
 const invitationHash = (value: string) => crypto.createHash("sha256").update(value).digest("hex")
 
-const parseRole = (value: unknown): WorkspaceRole => (value === "owner" ? "owner" : "member")
+const parseRole = (value: unknown): WorkspaceRole => (value === "owner" ? "owner" : value === "reviewer" ? "reviewer" : "member")
 
 /** Every invariant a mutation depends on has to be read through this, never through
  * getWorkspaceMembership/getWorkspacesForUser/getWorkspaceMembers: those are React-`cache`d, so
@@ -77,7 +77,7 @@ export const getWorkspaceMembership = cache(async (workspaceId: string, userId: 
   include: { workspace: true },
 }))
 
-export async function requireWorkspaceRole(workspaceId: string, userId: string, allowed: WorkspaceRole[] = ["owner", "member"]) {
+export async function requireWorkspaceRole(workspaceId: string, userId: string, allowed: WorkspaceRole[] = ["owner", "reviewer", "member"]) {
   const membership = await getWorkspaceMembership(workspaceId, userId)
   if (!membership || !allowed.includes(membership.role as WorkspaceRole)) throw new Error("workspace_access_denied")
   return membership

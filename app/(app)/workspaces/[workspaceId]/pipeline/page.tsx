@@ -9,6 +9,7 @@ import { searchDocumentsByContent } from "@/lib/retrieval"
 import { activeJobDocumentIds, countDocumentsByStage, documentIdsInStage, flaggedFieldsFromConfidence, listWorkspaceDocuments, summarizeDocumentForReview } from "@/models/documents"
 import { ensurePipelineFile, getFileTemplates } from "@/models/files"
 import { getListPreference } from "@/models/list-preferences"
+import { getTouchlessRateStats } from "@/lib/analytics/workspace-analytics"
 import { getWorkspaceUsage, requireWorkspaceRole } from "@/models/workspaces"
 
 export const dynamic = "force-dynamic"
@@ -43,7 +44,10 @@ export default async function PipelinePage({ params, searchParams }: {
     countDocumentsByStage(workspaceId),
     getListPreference(user.id, workspaceId, `pipeline:${stage}`),
   ])
-  const pipelineTemplates = await getFileTemplates(workspaceId, pipelineFile.id)
+  const [pipelineTemplates, touchlessStats] = await Promise.all([
+    getFileTemplates(workspaceId, pipelineFile.id),
+    stage === "ready" ? getTouchlessRateStats(workspaceId) : Promise.resolve(null),
+  ])
 
   // Content search runs alongside the ordinary filename/OCR-text match, not instead of it — the
   // same "advanced" hybrid (vector + lexical, RRF-fused) search the Files browser uses, scoped
@@ -73,6 +77,8 @@ export default async function PipelinePage({ params, searchParams }: {
     flagged: doc.flaggedAt !== null,
     hasActiveJob: activeJobs.has(doc.id),
     missingRequiredFields: flaggedFieldsFromConfidence(doc.confidence),
+    readinessStatus: (doc as Record<string, unknown>).readinessStatus as string | null ?? null,
+    readinessBlockers: parseReadinessBlockers((doc as Record<string, unknown>).readinessDetail),
     // Every stage but Inbox shows this — a document still in Inbox hasn't been extracted yet, so
     // there's nothing to summarize. Computed for every row is cheap (pure JSON reads) and keeps
     // this map a single pass rather than a second one keyed by stage.
@@ -104,5 +110,13 @@ export default async function PipelinePage({ params, searchParams }: {
     flaggedOnly={flaggedOnly}
     documentSearchEnabled={documentSearchEnabled}
     upload={{ fileId: pipelineFile.id, templates: uploadTemplates, usage, sheetCount: pipelineTemplates.length }}
+    touchlessStats={touchlessStats}
   />
+}
+
+function parseReadinessBlockers(detail: unknown): string[] {
+  if (!Array.isArray(detail)) return []
+  return detail
+    .filter((b): b is { detail: string } => typeof b === "object" && b !== null && typeof b.detail === "string")
+    .map((b) => b.detail)
 }

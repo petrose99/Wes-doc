@@ -440,6 +440,7 @@ export async function updateDocumentField(input: { workspaceId: string; document
   }, { timeout: 20_000 })
   recordFieldCorrectionsFromDiff({ workspaceId: input.workspaceId, templateCode: document.template?.code ?? null, oldValues: current, newValues: reviewedData })
   await track("document_correction_saved", { documentId: document.id, fieldCount: 1 }, { workspaceId: input.workspaceId, actorId: input.actorId })
+  await track("field_corrected", { documentId: document.id, fieldKey: input.fieldKey }, { workspaceId: input.workspaceId, actorId: input.actorId })
   return { document: updated, missingRequiredFields: missing }
 }
 

@@ -64,6 +64,7 @@ export type CurrencyContext = { baseCurrency: string | null; hasMultipleCurrenci
 export type WorkspaceAnalytics = {
   period: Period
   spend: SpendByCategoryRow[]
+  vendorSpend: VendorSpendRow[]
   cashFlow: CashFlowMonth[]
   aging: ApAging
   currency: CurrencyContext
@@ -311,8 +312,48 @@ export function buildCurrencyInventorySql(workspaceId: string): Sql {
   }
 }
 
+export type VendorSpendRow = {
+  vendor: string
+  totalSpend: number
+  documentCount: number
+  lastDocumentDate: string | null
+}
+
+/** Spend grouped by vendor name (from the `vendor` field value), summed from each expense
+ * document's `total`. Same date-join as buildSpendByCategorySql. */
+export function buildVendorSpendSql(workspaceId: string, period: Period): Sql {
+  const params: unknown[] = []
+  const bind = (value: unknown) => { params.push(value); return `$${params.length}` }
+  const workspaceRef = `${bind(workspaceId)}::uuid`
+  const where = [
+    `d."workspace_id" = ${workspaceRef}`,
+    `d."status" NOT IN (${POST_INTAKE_STATUSES.map((status) => bind(status)).join(", ")})`,
+    ...periodPredicates(`dt."value_date"`, period, bind),
+  ]
+  return {
+    text: `SELECT COALESCE(NULLIF(btrim(vendor."value_text"), ''), 'Unknown Vendor') AS "vendor",
+        SUM(total."value_number") AS "totalSpend",
+        COUNT(DISTINCT d."id")::int AS "documentCount",
+        MAX(to_char(dt."value_date", 'YYYY-MM-DD')) AS "lastDocumentDate"
+      FROM "documents" d
+      JOIN "document_field_values" total ON total."document_id" = d."id" AND total."workspace_id" = ${workspaceRef}
+        AND total."field_key" = 'total' AND total."item_key" IS NULL
+        AND total."template_code" IN (${EXPENSE_TEMPLATE_CODES.map((code) => bind(code)).join(", ")})
+      LEFT JOIN "document_field_values" vendor ON vendor."document_id" = d."id" AND vendor."workspace_id" = ${workspaceRef}
+        AND vendor."field_key" = 'vendor' AND vendor."item_key" IS NULL
+      LEFT JOIN "document_field_values" dt ON dt."document_id" = d."id" AND dt."workspace_id" = ${workspaceRef}
+        AND dt."item_key" IS NULL
+        AND dt."field_key" = CASE total."template_code" WHEN 'invoice' THEN 'issue_date' ELSE 'purchase_date' END
+      WHERE ${where.join(" AND ")}
+      GROUP BY "vendor"
+      ORDER BY "totalSpend" DESC`,
+    params,
+  }
+}
+
 // ---- Execution ------------------------------------------------------------------------------------
 
+type VendorSpendSqlRow = { vendor: string; totalSpend: string | number | null; documentCount: number; lastDocumentDate: string | null }
 type SpendRow = { category: string; totalSpend: string | number | null; documentCount: number }
 type DocOutflowRow = { month: string; documentOutflow: string | number | null }
 type BankFlowRow = { month: string; bankDebits: string | number | null; bankCredits: string | number | null }
@@ -326,13 +367,15 @@ const toNumber = (value: string | number | null): number => (value == null ? 0 :
  * both to resolve an unbounded month series and to bucket invoice aging. */
 export async function getWorkspaceAnalytics(workspaceId: string, period: Period, today: Date = new Date()): Promise<WorkspaceAnalytics> {
   const spendSql = buildSpendByCategorySql(workspaceId, period)
+  const vendorSpendSql = buildVendorSpendSql(workspaceId, period)
   const docOutflowSql = buildDocumentOutflowByMonthSql(workspaceId, period)
   const bankFlowSql = buildBankFlowByMonthSql(workspaceId, period)
   const unpaidSql = buildUnpaidInvoicesSql(workspaceId)
   const currencySql = buildCurrencyInventorySql(workspaceId)
 
-  const [spendRows, docOutflowRows, bankFlowRows, unpaidRows, currencyRows, taxProfile, openReviewTasks] = await Promise.all([
+  const [spendRows, vendorSpendRows, docOutflowRows, bankFlowRows, unpaidRows, currencyRows, taxProfile, openReviewTasks] = await Promise.all([
     prisma.$queryRawUnsafe<SpendRow[]>(spendSql.text, ...spendSql.params),
+    prisma.$queryRawUnsafe<VendorSpendSqlRow[]>(vendorSpendSql.text, ...vendorSpendSql.params),
     prisma.$queryRawUnsafe<DocOutflowRow[]>(docOutflowSql.text, ...docOutflowSql.params),
     prisma.$queryRawUnsafe<BankFlowRow[]>(bankFlowSql.text, ...bankFlowSql.params),
     prisma.$queryRawUnsafe<UnpaidInvoiceSqlRow[]>(unpaidSql.text, ...unpaidSql.params),
@@ -342,6 +385,7 @@ export async function getWorkspaceAnalytics(workspaceId: string, period: Period,
   ])
 
   const spend: SpendByCategoryRow[] = spendRows.map((row) => ({ category: row.category, totalSpend: toNumber(row.totalSpend), documentCount: Number(row.documentCount) }))
+  const vendorSpend: VendorSpendRow[] = vendorSpendRows.map((row) => ({ vendor: row.vendor, totalSpend: toNumber(row.totalSpend), documentCount: Number(row.documentCount), lastDocumentDate: row.lastDocumentDate }))
   const cashFlow = fillMonthSeries(
     docOutflowRows.map((row) => ({ month: row.month, documentOutflow: toNumber(row.documentOutflow) })),
     bankFlowRows.map((row) => ({ month: row.month, bankDebits: toNumber(row.bankDebits), bankCredits: toNumber(row.bankCredits) })),
@@ -368,9 +412,82 @@ export async function getWorkspaceAnalytics(workspaceId: string, period: Period,
   return {
     period,
     spend,
+    vendorSpend,
     cashFlow,
     aging: { buckets, invoices, truncated },
     currency,
     headline: { totalSpend, totalOutstanding, netCashFlow, openReviewTasks },
+  }
+}
+
+export type TouchlessRateStats = {
+  totalExtracted: number
+  totalReady: number
+  totalPushedTouchless: number
+  touchlessRate: number
+}
+
+export async function getTouchlessRateStats(workspaceId: string, days = 30): Promise<TouchlessRateStats> {
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+  const [extracted, ready, touchless] = await Promise.all([
+    prisma.document.count({
+      where: { workspaceId, status: { notIn: POST_INTAKE_STATUSES }, receivedAt: { gte: since } },
+    }),
+    prisma.document.count({
+      where: { workspaceId, readinessStatus: "ready", receivedAt: { gte: since } },
+    }),
+    prisma.documentAuditEvent.count({
+      where: { workspaceId, type: "push.touchless_enqueued", createdAt: { gte: since } },
+    }),
+  ])
+  return {
+    totalExtracted: extracted,
+    totalReady: ready,
+    totalPushedTouchless: touchless,
+    touchlessRate: extracted > 0 ? touchless / extracted : 0,
+  }
+}
+
+export type AutomationMetrics = {
+  touchless: TouchlessRateStats
+  matchCoverage: { totalDocuments: number; matchedDocuments: number; matchRate: number }
+  readiness: { ready: number; blocked: number; pending: number }
+  policyVerdicts: { pass: number; violation: number; error: number }
+}
+
+export async function getAutomationMetrics(workspaceId: string, days = 30): Promise<AutomationMetrics> {
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+  const touchless = await getTouchlessRateStats(workspaceId, days)
+
+  const [totalDocuments, matchedDocumentIds, readyCount, blockedCount, policyPass, policyViolation, policyError] = await Promise.all([
+    prisma.document.count({
+      where: { workspaceId, status: { notIn: POST_INTAKE_STATUSES }, receivedAt: { gte: since } },
+    }),
+    prisma.$queryRawUnsafe<{ count: number }[]>(
+      `SELECT COUNT(DISTINCT x."doc_id")::int AS "count"
+       FROM (
+         SELECT "source_id" AS "doc_id" FROM "document_matches" WHERE "workspace_id" = $1::uuid
+         UNION
+         SELECT "target_id" AS "doc_id" FROM "document_matches" WHERE "workspace_id" = $1::uuid
+       ) x
+       JOIN "documents" d ON d."id" = x."doc_id" AND d."workspace_id" = $1::uuid AND d."received_at" >= $2::timestamp`,
+      workspaceId,
+      since,
+    ),
+    prisma.document.count({ where: { workspaceId, readinessStatus: "ready", receivedAt: { gte: since } } }),
+    prisma.document.count({ where: { workspaceId, readinessStatus: "blocked", receivedAt: { gte: since } } }),
+    prisma.documentAuditEvent.count({ where: { workspaceId, type: "policy_evaluated", detail: { path: ["decision"], equals: "approve" }, createdAt: { gte: since } } }),
+    prisma.documentAuditEvent.count({ where: { workspaceId, type: "policy_evaluated", detail: { path: ["decision"], equals: "reject" }, createdAt: { gte: since } } }),
+    prisma.documentAuditEvent.count({ where: { workspaceId, type: "policy_evaluated", detail: { path: ["decision"], equals: "error" }, createdAt: { gte: since } } }),
+  ])
+
+  const matchedCount = Number(matchedDocumentIds[0]?.count ?? 0)
+  const pending = totalDocuments - readyCount - blockedCount
+
+  return {
+    touchless,
+    matchCoverage: { totalDocuments, matchedDocuments: matchedCount, matchRate: totalDocuments > 0 ? matchedCount / totalDocuments : 0 },
+    readiness: { ready: readyCount, blocked: blockedCount, pending: Math.max(0, pending) },
+    policyVerdicts: { pass: policyPass, violation: policyViolation, error: policyError },
   }
 }

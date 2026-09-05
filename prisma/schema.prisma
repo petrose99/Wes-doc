@@ -66,6 +66,8 @@ model User {
   provisionedIntegrationJobs IntegrationProvisionJob[] @relation("IntegrationProvisionJobOwner")
   resolvedHealthCheckResults HealthCheckResult[] @relation("HealthCheckResultResolver")
   dismissedHealthCheckResults HealthCheckResult[] @relation("HealthCheckResultDismisser")
+  routingAssignments ReviewRoutingRule[] @relation("RoutingAssignee")
+  matchResolutions   DocumentMatch[]     @relation("MatchResolver")
 
   @@map("users")
 }
@@ -138,7 +140,6 @@ model Workspace {
   inboundEmailAllowedSenders InboundEmailAllowedSender[]
   fieldCorrections FieldCorrection[]
   codingCorrections CodingCorrection[]
-  agentVerdicts AgentVerdict[]
   accountingEntities AccountingEntity[]
   bankMatches BankMatch[]
   approvalWorkflows ApprovalWorkflow[]
@@ -152,6 +153,11 @@ model Workspace {
   ledgerTransactions LedgerTransaction[]
   sheetPlacements DocumentSheetPlacement[]
   categoryAccountMappings CategoryAccountMapping[]
+  agentVerdicts AgentVerdict[]
+  automationConfig WorkspaceAutomationConfig?
+  reviewRoutingRules ReviewRoutingRule[]
+  budgets            WorkspaceBudget[]
+  documentMatches    DocumentMatch[]
 
   @@map("workspaces")
 }
@@ -456,6 +462,13 @@ model Document {
   /// has never seen it, which is what makes the extraction-into-sheet bridge idempotent across
   /// reloads and tabs closed mid-processing.
   sheetAppliedAt    DateTime?                @map("sheet_applied_at")
+  /// Touchless-automation readiness: "ready" or "blocked", computed by lib/readiness/evaluate.ts
+  /// and persisted by lib/readiness/refresh.ts. Null until first evaluation.
+  readinessStatus   String?                  @map("readiness_status")
+  /// Machine-readable blocker list when readinessStatus is "blocked": [{code, detail}].
+  readinessDetail   Json?                    @map("readiness_detail")
+  /// Timestamp when the document first became "ready". Null if never ready or currently blocked.
+  readyAt           DateTime?                @map("ready_at")
   /// Pipeline redesign: archive is a separate axis from `status`, not a status value — a document
   /// can be archived at any lifecycle point, and modelling it as a boolean-ish timestamp avoids
   /// rewriting `status` history. Null means not archived. See lib/documents/stages.ts.
@@ -490,12 +503,13 @@ model Document {
   integrationPushes IntegrationPush[]
   ingestionItems    IngestionItem[]
   reviewTasks       ReviewTask[]
+  documentMatchesAsSource DocumentMatch[] @relation("MatchSource")
+  documentMatchesAsTarget DocumentMatch[] @relation("MatchTarget")
   bankMatchesAsStatement BankMatch[] @relation("BankMatchStatement")
   bankMatchesAsMatched   BankMatch[] @relation("BankMatchMatched")
   expenseClaimItems ExpenseClaimItem[]
   healthCheckResults HealthCheckResult[]
   sheetPlacements    DocumentSheetPlacement[]
-  agentVerdicts      AgentVerdict[]
 
   @@unique([fileId, sha256])
   @@index([workspaceId, status])
@@ -1604,28 +1618,6 @@ model CodingCorrection {
   @@map("coding_corrections")
 }
 
-/// Cached LLM verdicts for AI agents (coding, policy, approval-context). Keyed by (documentId,
-/// agentKind, inputHash) so a re-run with identical inputs returns the cached result. The verdict
-/// is Json (not String) because each agent kind stores a different shape — coding stores
-/// {codingData, confidence}, policy stores {decision, reasoning}.
-model AgentVerdict {
-  id          String   @id @default(uuid()) @db.Uuid
-  workspaceId String   @map("workspace_id") @db.Uuid
-  documentId  String   @map("document_id") @db.Uuid
-  agentKind   String   @map("agent_kind")
-  inputHash   String   @map("input_hash")
-  verdict     Json
-  rationale   Json?
-  model       String?
-  createdAt   DateTime @default(now()) @map("created_at")
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  document    Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
-
-  @@index([documentId, agentKind, inputHash])
-  @@index([workspaceId])
-  @@map("agent_verdicts")
-}
-
 /// WP1.5: a synced snapshot of one QuickBooks/Xero entity (account, vendor, or tax rate) — powers
 /// the rules UI's account picker (WP1.6) without a live provider round-trip on every page render.
 /// `externalId` is the provider's id (QuickBooks Account.Id / Xero Account.Code, etc.); `active`
@@ -1763,4 +1755,107 @@ model UserListPreference {
 
   @@unique([userId, workspaceId, viewKey])
   @@map("user_list_preferences")
+}
+
+/// Cached LLM verdict for policy evaluation, approval context, and match explanation agents.
+/// Re-running with the same inputs (inputHash) skips the LLM call entirely.
+model AgentVerdict {
+  id          String    @id @default(uuid()) @db.Uuid
+  workspaceId String    @map("workspace_id") @db.Uuid
+  agentKind   String    @map("agent_kind")
+  subjectType String    @map("subject_type")
+  subjectId   String    @map("subject_id") @db.Uuid
+  documentId  String?   @map("document_id") @db.Uuid
+  /// Json (not String): each agent kind stores a different shape — coding stores
+  /// {codingData, confidence}, policy stores {decision, reasoning}.
+  verdict     Json
+  rationale   Json
+  model       String?
+  inputHash   String    @map("input_hash")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, agentKind, subjectId, inputHash])
+  @@index([workspaceId, agentKind])
+  @@index([documentId])
+  @@map("agent_verdicts")
+}
+
+/// Per-workspace touchless automation configuration (1:1 with Workspace).
+model WorkspaceAutomationConfig {
+  id                String    @id @default(uuid()) @db.Uuid
+  workspaceId       String    @unique @map("workspace_id") @db.Uuid
+  touchlessEnabled  Boolean   @default(false) @map("touchless_enabled")
+  minConfidence     Float     @default(0.85) @map("min_confidence")
+  requirePolicyPass Boolean   @default(false) @map("require_policy_pass")
+  policyText        String?   @map("policy_text")
+  blockOnWarnChecks Boolean   @default(false) @map("block_on_warn_checks")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+  workspace         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("workspace_automation_configs")
+}
+
+/// Routes review tasks to the right reviewer based on document attributes.
+/// Evaluated in priority order (highest first); the first matching rule wins.
+model ReviewRoutingRule {
+  id             String    @id @default(uuid()) @db.Uuid
+  workspaceId    String    @map("workspace_id") @db.Uuid
+  name           String
+  priority       Int       @default(0)
+  isActive       Boolean   @default(true) @map("is_active")
+  /// Match criteria stored as JSON: { templateCode?, vendorPattern?, minAmount?, maxAmount? }
+  matcher        Json
+  assigneeId     String    @map("assignee_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  assignee       User      @relation("RoutingAssignee", fields: [assigneeId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, isActive])
+  @@map("review_routing_rules")
+}
+
+model WorkspaceBudget {
+  id             String    @id @default(uuid()) @db.Uuid
+  workspaceId    String    @map("workspace_id") @db.Uuid
+  name           String
+  category       String?
+  vendor         String?
+  templateCode   String?   @map("template_code")
+  amount         Float
+  periodType     String    @default("monthly") @map("period_type")
+  warnAtPercent  Int       @default(80) @map("warn_at_percent")
+  isActive       Boolean   @default(true) @map("is_active")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, isActive])
+  @@map("workspace_budgets")
+}
+
+model DocumentMatch {
+  id             String    @id @default(uuid()) @db.Uuid
+  workspaceId    String    @map("workspace_id") @db.Uuid
+  sourceId       String    @map("source_id") @db.Uuid
+  targetId       String    @map("target_id") @db.Uuid
+  matchType      String    @map("match_type")
+  confidence     Float
+  discrepancies  Json      @default("[]")
+  status         String    @default("pending")
+  resolvedAt     DateTime? @map("resolved_at")
+  resolvedById   String?   @map("resolved_by_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  source         Document  @relation("MatchSource", fields: [sourceId], references: [id], onDelete: Cascade)
+  target         Document  @relation("MatchTarget", fields: [targetId], references: [id], onDelete: Cascade)
+  resolvedBy     User?     @relation("MatchResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  @@unique([sourceId, targetId])
+  @@index([workspaceId, matchType])
+  @@index([workspaceId, status])
+  @@map("document_matches")
 }

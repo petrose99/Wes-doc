@@ -3,6 +3,7 @@
 import { ActionState } from "@/lib/actions"
 import { canDecideStage, findCurrentStage } from "@/lib/approvals/engine"
 import { maybeAutopublish } from "@/lib/automation/autopublish"
+import { refreshDocumentReadiness } from "@/lib/readiness/refresh"
 import { getCurrentUser } from "@/lib/auth"
 import { parseTemplateFields } from "@/lib/document-templates"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
@@ -41,7 +42,9 @@ export async function updateReviewTaskStatusAction(workspaceId: string, taskId: 
   if (!parsed) return { success: false, error: "Invalid status" }
   try {
     const task = await updateReviewTaskStatus({ workspaceId, taskId, status: parsed, actorId: user.id })
-    if (parsed === "approved") { await maybeConfirmAiCoding(workspaceId, task.documentId, user.id); await maybeAutopublish(workspaceId, task.documentId, user.id) }
+    if (parsed === "approved") await maybeConfirmAiCoding(workspaceId, task.documentId, user.id)
+    await refreshDocumentReadiness({ workspaceId, documentId: task.documentId })
+    if (parsed === "approved") await maybeAutopublish(workspaceId, task.documentId, user.id)
     revalidatePath(paths(workspaceId).review)
     return { success: true, data: null }
   } catch (error) { return { success: false, error: errorMessage(error, "Could not update the review task") } }
@@ -55,7 +58,9 @@ export async function bulkUpdateReviewTaskStatusAction(workspaceId: string, task
   if (!taskIds.length) return { success: false, error: "Nothing selected" }
   try {
     const result = await bulkUpdateReviewTaskStatus({ workspaceId, taskIds, status: parsed, actorId: user.id })
-    if (parsed === "approved") await Promise.all(result.documentIds.map(async (documentId) => { await maybeConfirmAiCoding(workspaceId, documentId, user.id); await maybeAutopublish(workspaceId, documentId, user.id) }))
+    if (parsed === "approved") await Promise.all(result.documentIds.map((documentId) => maybeConfirmAiCoding(workspaceId, documentId, user.id)))
+    await Promise.all(result.documentIds.map((documentId) => refreshDocumentReadiness({ workspaceId, documentId })))
+    if (parsed === "approved") await Promise.all(result.documentIds.map((documentId) => maybeAutopublish(workspaceId, documentId, user.id)))
     revalidatePath(paths(workspaceId).review)
     return { success: true, data: { updated: result.updated } }
   } catch (error) { return { success: false, error: errorMessage(error, "Could not update the selected review tasks") } }
@@ -149,7 +154,9 @@ export async function decideReviewTaskStageAction(workspaceId: string, taskId: s
   if (!membership) return { success: false, error: NO_ACCESS }
   try {
     const task = await decideReviewTaskStage({ workspaceId, taskId, decision, actorId: user.id, actorRole: membership.role === "owner" ? "owner" : "member" })
-    if (task.status === "approved") { await maybeConfirmAiCoding(workspaceId, task.documentId, user.id); await maybeAutopublish(workspaceId, task.documentId, user.id) }
+    if (task.status === "approved") await maybeConfirmAiCoding(workspaceId, task.documentId, user.id)
+    await refreshDocumentReadiness({ workspaceId, documentId: task.documentId })
+    if (task.status === "approved") await maybeAutopublish(workspaceId, task.documentId, user.id)
     revalidatePath(paths(workspaceId).review)
     return { success: true, data: null }
   } catch (error) { return { success: false, error: errorMessage(error, "Could not record that decision") } }

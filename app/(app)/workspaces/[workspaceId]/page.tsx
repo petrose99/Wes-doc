@@ -16,6 +16,7 @@ import { getWorkspaceAnalytics, resolvePeriod } from "@/lib/analytics/workspace-
 import { HeadlineCards } from "@/components/analytics/stat-cards"
 import { CashFlowChart } from "@/components/analytics/cash-flow-chart"
 import { SpendByCategoryChart } from "@/components/analytics/spend-by-category-chart"
+import { VendorSpendChart } from "@/components/analytics/vendor-spend-chart"
 import { MobileUploadButtons } from "@/components/shell/mobile-upload-buttons"
 import { getOnboardingStateAction } from "./onboarding-actions"
 import { ArrowRight, CheckCircle2, ChevronRight, FileText, ListChecks, SearchCheck, Table2, Upload } from "lucide-react"
@@ -207,6 +208,9 @@ export default async function WorkspaceHomePage({ params }: {
           <h2 className="mb-4 text-[15px] font-bold text-slate-900">Spend by category</h2>
           <SpendByCategoryChart workspaceId={workspaceId} rows={analytics.spend} formatMoney={formatMoney} />
         </div>
+      </div>
+      <div className="rounded-2xl border border-[#e6ebf1] bg-white p-5 shadow-panel">
+        <VendorSpendChart rows={analytics.vendorSpend} formatMoney={formatMoney} />
       </div>
     </>}
 

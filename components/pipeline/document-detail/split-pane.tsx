@@ -12,8 +12,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { SourceViewer, type ProvenanceTarget, type SourceDocument } from "@/components/viewer/source-preview"
 import type { DocumentFieldDefinition } from "@/lib/document-templates"
 import type { PipelineStage } from "@/lib/documents/stages"
-import type { FieldRationale } from "@/lib/rationale"
 import type { Ref } from "@/lib/provenance"
+import type { FieldRationale } from "@/lib/rationale"
 import { Archive, ArrowDown, ArrowLeft, ArrowUp, Building2, CheckCircle2, ChevronLeft, ChevronRight, Eye, EyeOff, Flag, Loader2, Maximize2, Minimize2, PanelLeftClose, PanelLeftOpen } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -26,7 +26,7 @@ type PanelLayout = "split" | "source-only" | "details-only"
 export function SplitPane({
   workspaceId, source, fields, data, fieldConfidence, provenanceFields, provenanceItems, initialTarget, conflictingLabels, missingRequiredFields,
   saveReview, documentType: initialDocumentType, note: initialNote, auditEvents, prevHref, nextHref, position, stage, afterActionHref,
-  header, canPush, pushCard, canCreateRule, defaultSupplier, matchKind, bankMatches, paymentStatus, fieldRationales,
+  header, canPush, pushCard, canCreateRule, defaultSupplier, matchKind, bankMatches, paymentStatus, rationales,
 }: {
   workspaceId: string
   source: SourceDocument
@@ -55,7 +55,7 @@ export function SplitPane({
   matchKind: "bank" | "supplier_statement" | null
   bankMatches: ReactNode
   paymentStatus?: string | null
-  fieldRationales?: Record<string, FieldRationale>
+  rationales?: Record<string, FieldRationale>
 }) {
   const router = useRouter()
   const [tab, setTab] = useState<Tab>("details")
@@ -293,7 +293,7 @@ export function SplitPane({
             <form action={saveReview} className="space-y-3">
               {formFields.map((field) => field.type === "array"
                 ? <LineItemsSection key={field.key} field={field} value={data[field.key]} fieldKey={field.key} summaryFields={summaryFields} fieldValues={data} provenanceFields={provenanceFields} provenanceItems={provenanceItems[field.key] ?? []} onFocusSource={setTarget} />
-                : <FieldRow key={field.key} field={field} value={data[field.key]} confidence={fieldConfidence[field.key] ?? null} ref={provenanceFields[field.key] ?? null} onFocusSource={setTarget} codingSource={fieldRationales?.[field.key]} />)}
+                : <FieldRow key={field.key} field={field} value={data[field.key]} confidence={fieldConfidence[field.key] ?? null} ref={provenanceFields[field.key] ?? null} onFocusSource={setTarget} rationale={rationales?.[field.key] ?? null} />)}
 
               <div className="flex items-center gap-3 border-t border-slate-100 pt-3">
                 <button type="submit" disabled={!docType} className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40" title={!docType ? "Choose Expense or Sale first" : undefined}>

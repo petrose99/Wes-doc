@@ -30,6 +30,9 @@ const EVENT_SCHEMAS = {
    * numbers involved, which could reconstruct a customer's actual financial data from the event
    * stream alone. */
   document_check_failed: z.object({ documentId: uuid, checkCode: z.string().max(80), status: z.enum(["warn", "fail"]) }).strict(),
+  field_corrected: z.object({ documentId: uuid, fieldKey: z.string().max(80) }).strict(),
+  document_ready: z.object({ documentId: uuid }).strict(),
+  document_blocked: z.object({ documentId: uuid, blockerCount: z.number().int().nonnegative() }).strict(),
   ai_coding_suggested: z.object({ documentId: uuid, confidence: z.number() }).strict(),
   ai_coding_accepted: z.object({ documentId: uuid }).strict(),
   ai_coding_overridden: z.object({ documentId: uuid, fieldCount: z.number().int().nonnegative() }).strict(),

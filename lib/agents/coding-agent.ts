@@ -89,7 +89,7 @@ export async function suggestCoding(input: CodingAgentInput): Promise<CodingSugg
 
   try {
     const cached = await prisma.agentVerdict.findFirst({
-      where: { documentId: input.documentId, agentKind: AGENT_KIND, inputHash },
+      where: { workspaceId: input.workspaceId, agentKind: AGENT_KIND, subjectId: input.documentId, inputHash },
       orderBy: { createdAt: "desc" },
     })
 
@@ -143,13 +143,21 @@ export async function suggestCoding(input: CodingAgentInput): Promise<CodingSugg
     }
     if (Object.keys(codingData).length === 0) return null
 
-    await prisma.agentVerdict.create({
-      data: {
+    await prisma.agentVerdict.upsert({
+      where: { workspaceId_agentKind_subjectId_inputHash: { workspaceId: input.workspaceId, agentKind: AGENT_KIND, subjectId: input.documentId, inputHash } },
+      create: {
         workspaceId: input.workspaceId,
-        documentId: input.documentId,
         agentKind: AGENT_KIND,
+        subjectType: "document",
+        subjectId: input.documentId,
+        documentId: input.documentId,
         inputHash,
-        verdict: { entries: parsed.data.entries, confidence: parsed.data.confidence } as unknown as Prisma.InputJsonValue,
+        verdict: parsed.data as unknown as Prisma.InputJsonValue,
+        rationale: { text: parsed.data.rationale } as unknown as Prisma.InputJsonValue,
+        model: modelName,
+      },
+      update: {
+        verdict: parsed.data as unknown as Prisma.InputJsonValue,
         rationale: { text: parsed.data.rationale } as unknown as Prisma.InputJsonValue,
         model: modelName,
       },

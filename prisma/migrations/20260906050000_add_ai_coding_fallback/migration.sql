@@ -34,29 +34,13 @@ DROP POLICY IF EXISTS "coding_corrections_workspace_isolation" ON "coding_correc
 CREATE POLICY "coding_corrections_workspace_isolation" ON "coding_corrections"
   USING ("workspace_id" = app_current_workspace()) WITH CHECK ("workspace_id" = app_current_workspace());
 
--- Agent verdicts: cached LLM results keyed by (document, agentKind, inputHash).
-CREATE TABLE "agent_verdicts" (
-    "id" UUID NOT NULL,
-    "workspace_id" UUID NOT NULL,
-    "document_id" UUID NOT NULL,
-    "agent_kind" TEXT NOT NULL,
-    "input_hash" TEXT NOT NULL,
-    "verdict" JSONB NOT NULL,
-    "rationale" JSONB,
-    "model" TEXT,
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "agent_verdicts_pkey" PRIMARY KEY ("id")
+-- Pre-existing bug fix: agent_verdicts.verdict was TEXT but every agent writes a structured
+-- object into it (policy stores {decision, reasons}, coding stores {codingData, confidence}).
+-- Convert to JSONB, keeping any row that already holds valid JSON and wrapping anything else
+-- as a JSON string.
+ALTER TABLE "agent_verdicts" ALTER COLUMN "verdict" TYPE JSONB USING (
+  CASE
+    WHEN "verdict" ~ '^\s*[\[{"]' THEN "verdict"::jsonb
+    ELSE to_jsonb("verdict")
+  END
 );
-
-CREATE INDEX "agent_verdicts_document_id_agent_kind_input_hash_idx" ON "agent_verdicts"("document_id", "agent_kind", "input_hash");
-CREATE INDEX "agent_verdicts_workspace_id_idx" ON "agent_verdicts"("workspace_id");
-
-ALTER TABLE "agent_verdicts" ADD CONSTRAINT "agent_verdicts_workspace_id_fkey" FOREIGN KEY ("workspace_id") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-ALTER TABLE "agent_verdicts" ADD CONSTRAINT "agent_verdicts_document_id_fkey" FOREIGN KEY ("document_id") REFERENCES "documents"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- RLS for agent_verdicts
-ALTER TABLE "agent_verdicts" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "agent_verdicts" FORCE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "agent_verdicts_workspace_isolation" ON "agent_verdicts";
-CREATE POLICY "agent_verdicts_workspace_isolation" ON "agent_verdicts"
-  USING ("workspace_id" = app_current_workspace()) WITH CHECK ("workspace_id" = app_current_workspace());

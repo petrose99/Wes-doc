@@ -5,7 +5,7 @@ import { highlightSnippet } from "@/components/shared/highlight-snippet"
 import { LastUpdated } from "@/components/shared/relative-time"
 import { useRowSelection } from "@/components/shared/use-row-selection"
 import type { PipelineStage } from "@/lib/documents/stages"
-import { AlertTriangle, FileText, Inbox, Loader2 } from "lucide-react"
+import { AlertTriangle, CheckCircle2, FileText, Inbox, Loader2, XCircle } from "lucide-react"
 import Link from "next/link"
 
 export type PipelineDocumentRow = {
@@ -18,6 +18,8 @@ export type PipelineDocumentRow = {
   flagged: boolean
   hasActiveJob: boolean
   missingRequiredFields: string[]
+  readinessStatus: string | null
+  readinessBlockers: string[]
   /** Set only on the to-review stage — supplier/category/total in place of the filename, since a
    * reviewer triaging this list cares who the document is from and how much it's for, not what
    * it happened to be named on upload. */
@@ -35,6 +37,17 @@ const STATUS_BADGE: Record<string, string> = {
   needs_review: "bg-indigo-100 text-indigo-700",
   ready_for_review: "bg-emerald-100 text-emerald-700",
   reviewed: "bg-emerald-100 text-emerald-700",
+}
+
+function ReadinessBadge({ status, blockers }: { status: string | null; blockers: string[] }) {
+  if (!status) return null
+  if (status === "ready") return <span className="inline-flex items-center gap-1 rounded bg-emerald-50 px-1.5 py-0.5 text-xs font-medium text-emerald-700">
+    <CheckCircle2 className="h-3 w-3" />Ready to sync
+  </span>
+  const title = blockers.length > 0 ? `Blocked: ${blockers.join(", ")}` : "Blocked"
+  return <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-xs font-medium text-amber-700" title={title}>
+    <XCircle className="h-3 w-3" />{blockers.length} blocker{blockers.length !== 1 ? "s" : ""}
+  </span>
 }
 
 /** What each stage's empty table says, so "nothing here" reads as expected-and-fine on Archive
@@ -62,7 +75,7 @@ export function DocumentList({ workspaceId, stage, rows, contentMatches, query }
   const selected = [...marked]
   const selectedFileId = selected.length > 0 ? rows.find((r) => r.id === selected[0])?.fileId : undefined
   const isReview = stage === "ready"
-  const columnCount = isReview ? 6 : 5
+  const columnCount = isReview ? 7 : 5
 
 
   const contentRow = (match: ContentMatchRow) => {
@@ -96,6 +109,7 @@ export function DocumentList({ workspaceId, stage, rows, contentMatches, query }
               <th className="border-b px-3 py-2">Supplier</th>
               <th className="border-b px-3 py-2">Category</th>
               <th className="border-b px-3 py-2">Total</th>
+              <th className="border-b px-3 py-2">Readiness</th>
             </> : <>
               <th className="border-b px-3 py-2">Document</th>
               <th className="border-b px-3 py-2">Template</th>
@@ -121,6 +135,7 @@ export function DocumentList({ workspaceId, stage, rows, contentMatches, query }
               </td>
               <td className="border-b px-3 py-2 text-slate-500">{row.review.category}</td>
               <td className="border-b px-3 py-2 text-slate-500">{row.review.total ?? "—"}</td>
+              <td className="border-b px-3 py-2"><ReadinessBadge status={row.readinessStatus} blockers={row.readinessBlockers} /></td>
             </> : <>
               <td className="border-b px-3 py-2">
                 <Link href={`/workspaces/${workspaceId}/documents/${row.id}?stage=${stage}`} className="inline-flex items-center gap-2 font-medium text-slate-800 hover:text-emerald-800" title={row.filename}>
