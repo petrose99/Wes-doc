@@ -10,6 +10,7 @@ import { prisma } from "@/lib/db"
 import config from "@/lib/config"
 import { deleteFiles } from "@/models/files"
 import { enqueueBigcapitalProvisionJob } from "@/models/bigcapital"
+import { provisionMemberAccount } from "@/models/bigcapital-members"
 import { User } from "@/prisma/client"
 import crypto, { randomBytes } from "crypto"
 import { cache } from "react"
@@ -295,5 +296,11 @@ export async function acceptWorkspaceInvitation(token: string, user: Pick<User, 
       data: auditEventData({ workspaceId: invitation.workspaceId, actorId: user.id, type: "invitation_accepted", detail: { role: invitation.role } }, context),
     }),
   ])
+  const fullUser = await prisma.user.findUnique({ where: { id: user.id }, select: { id: true, name: true, email: true } })
+  if (fullUser) {
+    provisionMemberAccount(invitation.workspaceId, { id: fullUser.id, name: fullUser.name ?? "", email: fullUser.email }).catch((err) => {
+      console.error("[bigcapital-members] provision after invite accept failed:", err instanceof Error ? err.message : err)
+    })
+  }
   return invitation.workspaceId
 }

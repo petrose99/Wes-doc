@@ -79,10 +79,10 @@ services:
       DB_CHARSET: utf8
       SYSTEM_DB_NAME: bigcapital
       TENANT_DB_NAME_PREFIX: bigcapital_tenant_
-      MAIL_HOST: ""
-      MAIL_PORT: "587"
-      MAIL_USERNAME: ""
-      MAIL_PASSWORD: ""
+      MAIL_HOST: "${BIGCAPITAL_MAIL_HOST:-}"
+      MAIL_PORT: "${BIGCAPITAL_MAIL_PORT:-587}"
+      MAIL_USERNAME: "${BIGCAPITAL_MAIL_USERNAME:-}"
+      MAIL_PASSWORD: "${BIGCAPITAL_MAIL_PASSWORD:-}"
       REDIS_HOST: bigcapital-redis
       REDIS_PORT: "6379"
       QUEUE_HOST: bigcapital-redis

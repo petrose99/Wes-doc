@@ -43,7 +43,7 @@ export function PipelineShell({ workspaceId, stage, counts, rows, contentMatches
       </div>
     </div>
     <StageTabs workspaceId={workspaceId} active={stage} counts={counts} />
-    {stage === "ready" && counts.ready > 0 && <ReadyBanner workspaceId={workspaceId} count={counts.ready} />}
+    {stage === "ready" && counts.ready > 0 && <ReadyBanner workspaceId={workspaceId} count={counts.ready} documentIds={rows.map((r) => r.id)} />}
     <FilterPanel query={query} documentSearchEnabled={documentSearchEnabled} />
     <DocumentList workspaceId={workspaceId} stage={stage} rows={rows} contentMatches={contentMatches} query={query} />
   </div>

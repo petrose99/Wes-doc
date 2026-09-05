@@ -16,7 +16,7 @@
     });
     localStorage.setItem("persist:bigcapital:authentication", store);
     if (params.returnUrl) localStorage.setItem("docubite:return-url", params.returnUrl);
-    window.location.replace("/");
+    window.location.replace(params.redirectPath || "/");
   } catch(e) {
     document.body.textContent = "Sign-in failed: " + e.message;
   }

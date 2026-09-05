@@ -11,6 +11,8 @@ import * as xero from "@/lib/integrations/xero/client"
 import { toXeroBillBody } from "@/lib/integrations/xero/bill-mapper"
 import * as bigcapital from "@/lib/integrations/bigcapital/client"
 import { toBigcapitalBillBody } from "@/lib/integrations/bigcapital/bill-mapper"
+import { toBigcapitalInvoiceBody } from "@/lib/integrations/bigcapital/invoice-mapper"
+import { type BankStatementPayload, toBigcapitalCashflowBody } from "@/lib/integrations/bigcapital/bank-statement-mapper"
 import { computePushUpdate, PUSH_LEASE_MS, type PushAttemptResult } from "@/lib/integration-push-policy"
 
 /** The push loop: claim a due IntegrationPush, resolve the vendor/contact + default expense account
@@ -43,7 +45,7 @@ export async function claimNextIntegrationPush(now = new Date()): Promise<string
  * throws: a lookup failure (network blip, transient provider error) must not block a push that
  * would otherwise succeed, so this swallows any error and reports "not a duplicate" rather than
  * risk false-blocking every push whenever the lookup itself is flaky. */
-async function ledgerHasDuplicate(provider: string, externalTenantId: string | null, accessToken: string, referenceNumber: string): Promise<boolean> {
+async function ledgerHasDuplicate(provider: string, externalTenantId: string | null, accessToken: string, referenceNumber: string, direction: "payable" | "receivable" = "payable"): Promise<boolean> {
   if (!externalTenantId) return false
   try {
     switch (provider) {
@@ -52,6 +54,7 @@ async function ledgerHasDuplicate(provider: string, externalTenantId: string | n
       case "xero":
         return await xero.findBillByInvoiceNumber(externalTenantId, accessToken, referenceNumber)
       case "bigcapital":
+        if (direction === "receivable") return await bigcapital.findInvoiceByReferenceNumber(accessToken, externalTenantId, referenceNumber)
         return await bigcapital.findBillByReferenceNumber(accessToken, externalTenantId, referenceNumber)
       default:
         return false
@@ -74,16 +77,33 @@ async function pushToXero(tenantId: string, accessToken: string, bill: Normalize
   return xero.createBill(tenantId, accessToken, body)
 }
 
-async function pushToBigcapital(organizationId: string, apiKey: string, bill: NormalizedBill, accountId: string): Promise<{ id: string }> {
-  // Bigcapital bill lines reference a catalog Item, not an account directly (confirmed live — an
-  // entry with no item_id is rejected) — findOrCreateExpenseItem maps the connection's configured
-  // default expense account onto one generic, reusable item.
+async function pushBankStatementToBigcapital(organizationId: string, apiKey: string, payload: BankStatementPayload): Promise<{ count: number; recordKind: string }> {
+  let created = 0
+  for (const txn of payload.transactions) {
+    const body = toBigcapitalCashflowBody(txn, payload.cashflowAccountId, payload.creditAccountId)
+    await bigcapital.createCashflowTransaction(apiKey, organizationId, body)
+    created++
+  }
+  return { count: created, recordKind: "cashflow_batch" }
+}
+
+async function pushToBigcapital(organizationId: string, apiKey: string, bill: NormalizedBill, accountId: string, direction: "payable" | "receivable" = "payable"): Promise<{ id: string; recordKind: string }> {
+  if (direction === "receivable") {
+    const [customerId, itemId] = await Promise.all([
+      bigcapital.findOrCreateCustomer(apiKey, organizationId, bill.vendorName),
+      bigcapital.findOrCreateIncomeItem(apiKey, organizationId, accountId),
+    ])
+    const body = toBigcapitalInvoiceBody(bill, customerId, itemId)
+    const created = await bigcapital.createSaleInvoice(apiKey, organizationId, body)
+    return { id: created.id, recordKind: "sale_invoice" }
+  }
   const [vendorId, itemId] = await Promise.all([
     bigcapital.findOrCreateVendor(apiKey, organizationId, bill.vendorName),
     bigcapital.findOrCreateExpenseItem(apiKey, organizationId, accountId),
   ])
   const body = toBigcapitalBillBody(bill, vendorId, itemId)
-  return bigcapital.createBill(apiKey, organizationId, body)
+  const created = await bigcapital.createBill(apiKey, organizationId, body)
+  return { id: created.id, recordKind: "bill" }
 }
 
 /** Attempts one claimed push and records the outcome. Safe to call on a row another driver may also
@@ -111,7 +131,8 @@ export async function attemptIntegrationPush(pushId: string, now = new Date()): 
     result = { success: false, errorCode: connection.status === "needs_reauth" ? "integration_needs_reauth" : "integration_connection_disabled", externalBillId: null }
     forceTerminal = true
   } else {
-    const payloadRaw = push.payload as unknown as NormalizedBill & { expenseAccountId?: string }
+    const payloadRaw = push.payload as unknown as NormalizedBill & { expenseAccountId?: string; direction?: "payable" | "receivable"; documentType?: string }
+    const direction = payloadRaw.direction ?? (payloadRaw.documentType === "sale" ? "receivable" : "payable")
     const expenseAccountId = payloadRaw.expenseAccountId ?? connection.defaultExpenseAccountId
     if (!connection.externalTenantId || !expenseAccountId) {
       result = { success: false, errorCode: "integration_default_account_not_configured", externalBillId: null }
@@ -120,7 +141,7 @@ export async function attemptIntegrationPush(pushId: string, now = new Date()): 
       try {
         const bill = { ...payloadRaw, currencyCode: payloadRaw.currencyCode ?? null }
         const accessToken = await getValidAccessToken(connection.id, now)
-        const isDuplicate = bill.referenceNumber ? await ledgerHasDuplicate(connection.provider, connection.externalTenantId, accessToken, bill.referenceNumber) : false
+        const isDuplicate = bill.referenceNumber ? await ledgerHasDuplicate(connection.provider, connection.externalTenantId, accessToken, bill.referenceNumber, direction) : false
         if (isDuplicate) throw new IntegrationPermanentError("ledger_duplicate")
         let created: { id: string }
         switch (connection.provider) {
@@ -130,9 +151,19 @@ export async function attemptIntegrationPush(pushId: string, now = new Date()): 
           case "xero":
             created = await pushToXero(connection.externalTenantId, accessToken, bill, expenseAccountId)
             break
-          case "bigcapital":
-            created = await pushToBigcapital(connection.externalTenantId, accessToken, bill, expenseAccountId)
+          case "bigcapital": {
+            if (payloadRaw.documentType === "bank_statement" && Array.isArray((payloadRaw as unknown as BankStatementPayload).transactions)) {
+              const bsPayload = payloadRaw as unknown as BankStatementPayload
+              const bsResult = await pushBankStatementToBigcapital(connection.externalTenantId, accessToken, bsPayload)
+              created = { id: `cashflow_batch_${bsResult.count}` }
+              await prisma.integrationPush.update({ where: { id: push.id }, data: { externalRecordKind: bsResult.recordKind } }).catch(() => {})
+            } else {
+              const bcResult = await pushToBigcapital(connection.externalTenantId, accessToken, bill, expenseAccountId, direction)
+              created = { id: bcResult.id }
+              await prisma.integrationPush.update({ where: { id: push.id }, data: { externalRecordKind: bcResult.recordKind } }).catch(() => {})
+            }
             break
+          }
           default:
             throw new IntegrationPermanentError(`${connection.provider}_push_not_implemented`)
         }

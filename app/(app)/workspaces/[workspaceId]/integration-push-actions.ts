@@ -11,10 +11,12 @@ import { recordDocumentAudit } from "@/lib/audit"
 import { getCurrentUser } from "@/lib/auth"
 import config from "@/lib/config"
 import { BillMappingError, normalizeBillFromDocument } from "@/lib/integration-bill-mapping"
+import { extractBankStatementPayload } from "@/lib/integrations/bigcapital/bank-statement-mapper"
 import { attemptIntegrationPush, kickIntegrationPushDrain } from "@/lib/integration-push"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { getWorkspaceDocument, listReadyToPushDocuments } from "@/models/documents"
-import { upsertWorkspaceIntegrationPush, workspaceIntegrationsPlanEnabled } from "@/models/integrations"
+import { getCategoryAccountMap, upsertWorkspaceIntegrationPush, workspaceIntegrationsPlanEnabled } from "@/models/integrations"
+import { listCategoryAccountMappings, resolveCategoryAccount } from "@/models/category-account-mappings"
 import { prisma } from "@/lib/db"
 import { revalidatePath } from "next/cache"
 import { errorMessage, NO_ACCESS, requireMember } from "./action-helpers"
@@ -38,15 +40,31 @@ async function pushDocumentToConnection(
   if (!templateCode || !pushableTemplateCodes.includes(templateCode)) {
     throw new Error("This document's type can't be pushed to accounting")
   }
-  const connection = await prisma.integrationConnection.findFirst({ where: { id: connectionId, workspaceId }, select: { id: true, provider: true } })
+  const connection = await prisma.integrationConnection.findFirst({ where: { id: connectionId, workspaceId }, select: { id: true, provider: true, defaultExpenseAccountId: true } })
   if (!connection) throw new Error("That connection no longer exists")
 
   const reviewedData = (document.reviewedData as Record<string, unknown> | null) ?? (document.rawExtraction as Record<string, unknown> | null) ?? {}
-  const bill = normalizeBillFromDocument({ documentId: document.id, filename: document.filename, templateCode, reviewedData })
   const coding = (document.codingData as Record<string, unknown> | null) ?? {}
   const category = (typeof coding.account === "string" && coding.account) || (typeof reviewedData.category === "string" && reviewedData.category) || null
   const documentType = coding.documentType === "expense" || coding.documentType === "sale" || coding.documentType === "bank_statement" ? coding.documentType : "expense"
-  const payload = { ...bill, documentType, ...(expenseAccountId ? { expenseAccountId } : {}), ...(category ? { category } : {}) }
+
+  let resolvedAccountId = expenseAccountId
+  if (!resolvedAccountId && category && connection.defaultExpenseAccountId) {
+    const [mappings, inferredMap] = await Promise.all([listCategoryAccountMappings(connectionId), getCategoryAccountMap(connectionId)])
+    resolvedAccountId = resolveCategoryAccount(mappings, category, inferredMap, connection.defaultExpenseAccountId)
+  }
+
+  let payload: object
+  if (documentType === "bank_statement" && connection.provider === "bigcapital") {
+    const cashflowAccountId = resolvedAccountId ?? connection.defaultExpenseAccountId
+    const creditAccountId = connection.defaultExpenseAccountId
+    if (!cashflowAccountId || !creditAccountId) throw new Error("No bank account configured for statement push")
+    payload = extractBankStatementPayload(document.id, reviewedData, cashflowAccountId, creditAccountId)
+  } else {
+    const bill = normalizeBillFromDocument({ documentId: document.id, filename: document.filename, templateCode, reviewedData })
+    const direction: "payable" | "receivable" = documentType === "sale" ? "receivable" : "payable"
+    payload = { ...bill, documentType, direction, ...(resolvedAccountId ? { expenseAccountId: resolvedAccountId } : {}), ...(category ? { category } : {}) }
+  }
 
   const push = await upsertWorkspaceIntegrationPush(workspaceId, {
     connectionId: connection.id,
@@ -122,6 +140,6 @@ export async function listDocumentPushesAction(workspaceId: string, documentId: 
   return prisma.integrationPush.findMany({
     where: { workspaceId, documentId },
     orderBy: { createdAt: "desc" },
-    select: { id: true, connectionId: true, provider: true, status: true, attempts: true, externalBillId: true, errorCode: true, completedAt: true },
+    select: { id: true, connectionId: true, provider: true, status: true, attempts: true, externalBillId: true, externalRecordKind: true, errorCode: true, completedAt: true },
   })
 }

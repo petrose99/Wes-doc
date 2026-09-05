@@ -14,6 +14,7 @@ import { listDocumentAuditEvents } from "@/models/audit-events"
 import { getWorkspaceDocument, listWorkspaceDocuments } from "@/models/documents"
 import { getOpenReviewTaskForDocument } from "@/models/review-tasks"
 import { listWorkspaceIntegrationConnections, listWorkspaceIntegrationPushes } from "@/models/integrations"
+import { getDocumentPaymentStatuses } from "@/models/ledger-payments"
 import { requireWorkspaceRole } from "@/models/workspaces"
 import { notFound } from "next/navigation"
 
@@ -41,11 +42,12 @@ export default async function DocumentPage({ params, searchParams }: {
   const capabilities = await getWorkspaceCapabilities(workspaceId)
   const canPush = document.status === "reviewed" && capabilities.has("accounting-push")
     && capabilities.pushableTemplateCodes.includes(document.template?.code ?? "")
-  const [connections, pushes, auditEvents, neighbors] = await Promise.all([
+  const [connections, pushes, auditEvents, neighbors, paymentStatuses] = await Promise.all([
     canPush ? listWorkspaceIntegrationConnections(workspaceId) : Promise.resolve([]),
     canPush ? listWorkspaceIntegrationPushes(workspaceId, documentId) : Promise.resolve([]),
     listDocumentAuditEvents(workspaceId, documentId),
     stage ? listWorkspaceDocuments(workspaceId, { stage }) : Promise.resolve([]),
+    canPush ? getDocumentPaymentStatuses(workspaceId, [documentId]) : Promise.resolve(new Map()),
   ])
 
   const fields = parseTemplateFields(document.fieldSnapshot)
@@ -122,7 +124,8 @@ export default async function DocumentPage({ params, searchParams }: {
       reviewLink: reviewQueueEnabled && openReviewTask ? { href: `/workspaces/${workspaceId}/review/${openReviewTask.id}`, label: openReviewTask.status === "in_review" ? "In review" : "Open — view review task" } : null,
     }}
     canPush={canPush}
-    pushCard={canPush ? <PushToAccountingCard workspaceId={workspaceId} documentId={documentId} connections={connections} pushes={pushes} /> : null}
+    paymentStatus={paymentStatuses.get(documentId)?.paymentStatus ?? null}
+    pushCard={canPush ? <PushToAccountingCard workspaceId={workspaceId} documentId={documentId} connections={connections} pushes={pushes} paymentStatus={(() => { const ps = paymentStatuses.get(documentId); return ps ? { ...ps, syncedAt: ps.syncedAt.toISOString() } : null })()} /> : null}
     canCreateRule={canCreateRule}
     defaultSupplier={supplier}
     matchKind={matchKind}

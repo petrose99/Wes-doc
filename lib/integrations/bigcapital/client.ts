@@ -234,6 +234,148 @@ export async function voidBill(apiKey: string, organizationId: string, billId: s
   await request<void>(`/api/bills/${billId}`, { method: "DELETE" }, { token: apiKey, organizationId })
 }
 
+// ---- Customers (A/R) ---------------------------------------------------------------------------
+
+export type BigcapitalSyncedCustomer = { id: string; name: string; active: boolean }
+
+export async function listCustomers(apiKey: string, organizationId: string): Promise<BigcapitalSyncedCustomer[]> {
+  const result = await request<{ data: Array<{ id: number; display_name: string; active: number }> }>(
+    "/api/customers",
+    { method: "GET" },
+    { token: apiKey, organizationId }
+  )
+  return result.data.map((c) => ({ id: String(c.id), name: c.display_name, active: Boolean(c.active) }))
+}
+
+export async function findOrCreateCustomer(apiKey: string, organizationId: string, name: string): Promise<string> {
+  const existing = (await listCustomers(apiKey, organizationId)).find((c) => c.name.toLowerCase() === name.toLowerCase())
+  if (existing) return existing.id
+  const created = await request<{ id: number }>(
+    "/api/customers",
+    { method: "POST", body: JSON.stringify({ display_name: name }) },
+    { token: apiKey, organizationId }
+  )
+  return String(created.id)
+}
+
+export async function findOrCreateIncomeItem(apiKey: string, organizationId: string, accountId: string): Promise<string> {
+  const itemName = `DocuBite income (account ${accountId})`
+  const existing = await request<{ data: Array<{ id: number; name: string; sell_account_id: number | null }> }>(
+    "/api/items",
+    { method: "GET" },
+    { token: apiKey, organizationId }
+  )
+  const found = existing.data.find((item) => item.name === itemName && String(item.sell_account_id) === accountId)
+  if (found) return String(found.id)
+  const created = await request<{ id: number }>(
+    "/api/items",
+    { method: "POST", body: JSON.stringify({ name: itemName, type: "service", sellable: true, purchasable: false, sell_account_id: Number(accountId) }) },
+    { token: apiKey, organizationId }
+  )
+  return String(created.id)
+}
+
+// ---- Sale invoices (A/R) -----------------------------------------------------------------------
+
+export async function createSaleInvoice(apiKey: string, organizationId: string, body: unknown): Promise<{ id: string }> {
+  const created = await request<{ id: number }>(
+    "/api/sale-invoices",
+    { method: "POST", body: JSON.stringify(body) },
+    { token: apiKey, organizationId }
+  )
+  return { id: String(created.id) }
+}
+
+export async function findInvoiceByReferenceNumber(apiKey: string, organizationId: string, referenceNumber: string): Promise<boolean> {
+  const result = await request<{ data: Array<{ invoice_no: string | null }> }>("/api/sale-invoices", { method: "GET" }, { token: apiKey, organizationId })
+  return result.data.some((inv) => inv.invoice_no === referenceNumber)
+}
+
+export async function listSaleInvoices(apiKey: string, organizationId: string): Promise<BigcapitalLedgerTransaction[]> {
+  type Row = {
+    id: number; invoice_no: string | null; invoice_date: string | null; balance: number | null
+    payment_amount?: number | null; total: number | null
+    currency_code: string | null
+    customer_id: number | null; customer?: { id: number; display_name: string } | null
+    entries?: Array<{ sell_account_id?: number | null; item?: { name?: string } | null }>
+  }
+  const invoices: BigcapitalLedgerTransaction[] = []
+  for (let page = 1; ; page++) {
+    const result = await request<{ data: Row[]; pagination: { total: number; page: number; page_size: number } }>(
+      `/api/sale-invoices?page=${page}`, { method: "GET" }, { token: apiKey, organizationId }
+    )
+    invoices.push(...result.data.map((row): BigcapitalLedgerTransaction => {
+      const entry = row.entries?.find((e) => e.sell_account_id != null)
+      return {
+        id: String(row.id), docNumber: row.invoice_no, txnDate: row.invoice_date, total: row.total,
+        taxAmount: null, currencyCode: row.currency_code,
+        contactId: row.customer_id != null ? String(row.customer_id) : null,
+        contactName: row.customer?.display_name ?? null,
+        accountId: entry?.sell_account_id != null ? String(entry.sell_account_id) : null,
+        accountName: entry?.item?.name ?? null,
+        dueAmount: row.balance ?? null,
+        paidAmount: row.payment_amount ?? null,
+      }
+    }))
+    if (result.data.length === 0 || result.data.length < result.pagination.page_size) return invoices
+  }
+}
+
+// ---- Organization invites (per-member accounts) --------------------------------------------------
+
+export type BigcapitalRole = { id: number; name: string; slug: string }
+
+export async function listRoles(token: string, organizationId: string): Promise<BigcapitalRole[]> {
+  const result = await request<{ roles: Array<{ id: number; name: string; slug: string }> }>(
+    "/api/roles",
+    { method: "GET" },
+    { token, organizationId }
+  )
+  return result.roles
+}
+
+export async function sendOrganizationInvite(token: string, organizationId: string, email: string, roleId: number): Promise<void> {
+  await request<unknown>(
+    "/api/invite/send",
+    { method: "POST", body: JSON.stringify({ emails: [email], role_id: roleId }) },
+    { token, organizationId }
+  )
+}
+
+// ---- Cashflow transactions (bank statement push) ------------------------------------------------
+
+export type BigcapitalCashflowAccount = { id: string; name: string; accountType: string }
+
+export async function listCashflowAccounts(apiKey: string, organizationId: string): Promise<BigcapitalCashflowAccount[]> {
+  const result = await request<{ accounts: Array<{ id: number; name: string; account_type: string }> }>(
+    "/api/cashflow/accounts",
+    { method: "GET" },
+    { token: apiKey, organizationId }
+  )
+  return result.accounts.map((a) => ({ id: String(a.id), name: a.name, accountType: a.account_type }))
+}
+
+export async function createCashflowTransaction(
+  apiKey: string,
+  organizationId: string,
+  body: {
+    date: string
+    amount: number
+    cashflow_account_id: number
+    credit_account_id: number
+    transaction_type: "other_income" | "other_expense"
+    description: string
+    reference_no?: string
+  }
+): Promise<{ id: string }> {
+  const created = await request<{ id: number }>(
+    "/api/cashflow/transactions",
+    { method: "POST", body: JSON.stringify(body) },
+    { token: apiKey, organizationId }
+  )
+  return { id: String(created.id) }
+}
+
 // ---- Reports (table DTO) -----------------------------------------------------------------------
 
 export type BigcapitalReportColumn = { key: string; label: string; children?: BigcapitalReportColumn[] }
@@ -283,6 +425,8 @@ export type BigcapitalLedgerTransaction = {
    * ledger-sync functions make. */
   accountId: string | null
   accountName: string | null
+  dueAmount: number | null
+  paidAmount: number | null
 }
 
 type BigcapitalBillEntry = { cost_account_id: number | null; item?: { name?: string; cost_account_id?: number | null } }
@@ -303,6 +447,7 @@ export async function listBills(apiKey: string, organizationId: string): Promise
     tax_amount_withheld: number | null; currency_code: string | null
     vendor_id: number | null; vendor?: { id: number; display_name: string } | null
     entries?: BigcapitalBillEntry[]
+    due_amount?: number | null; payment_amount?: number | null
   }
   const bills: BigcapitalLedgerTransaction[] = []
   for (let page = 1; ; page++) {
@@ -314,6 +459,7 @@ export async function listBills(apiKey: string, organizationId: string): Promise
       taxAmount: row.tax_amount_withheld, currencyCode: row.currency_code,
       contactId: row.vendor_id != null ? String(row.vendor_id) : null, contactName: row.vendor?.display_name ?? null,
       ...firstEntryAccount(row.entries),
+      dueAmount: row.due_amount ?? null, paidAmount: row.payment_amount ?? null,
     })))
     if (result.data.length === 0 || result.data.length < result.pagination.page_size) return bills
   }
@@ -346,6 +492,7 @@ export async function listExpenses(apiKey: string, organizationId: string): Prom
       contactName: row.payee?.display_name ?? row.payee?.formatted_name ?? null,
       accountId: row.payment_account_id != null ? String(row.payment_account_id) : null,
       accountName: row.payment_account?.name ?? null,
+      dueAmount: null, paidAmount: null,
     })))
     if (result.data.length === 0 || result.data.length < result.pagination.page_size) return expenses
   }

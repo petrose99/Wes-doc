@@ -30,13 +30,17 @@ export async function syncLedgerTransactions(connectionId: string): Promise<void
         contactExternalId: row.contactExternalId, contactName: row.contactName,
         accountExternalId: row.accountExternalId, accountName: row.accountName,
         docNumber: row.docNumber, amount: row.amount, taxAmount: row.taxAmount, currencyCode: row.currencyCode,
-        txnDate: row.txnDate, reconciled: row.reconciled, active: true, raw: row.raw as Prisma.InputJsonValue, syncedAt,
+        txnDate: row.txnDate, reconciled: row.reconciled, active: true, raw: row.raw as Prisma.InputJsonValue,
+        dueAmount: row.dueAmount, paidAmount: row.paidAmount, paymentStatus: row.paymentStatus,
+        syncedAt,
       },
       update: {
         contactExternalId: row.contactExternalId, contactName: row.contactName,
         accountExternalId: row.accountExternalId, accountName: row.accountName,
         docNumber: row.docNumber, amount: row.amount, taxAmount: row.taxAmount, currencyCode: row.currencyCode,
-        txnDate: row.txnDate, reconciled: row.reconciled, active: true, raw: row.raw as Prisma.InputJsonValue, syncedAt,
+        txnDate: row.txnDate, reconciled: row.reconciled, active: true, raw: row.raw as Prisma.InputJsonValue,
+        dueAmount: row.dueAmount, paidAmount: row.paidAmount, paymentStatus: row.paymentStatus,
+        syncedAt,
       },
     })),
     prisma.ledgerTransaction.updateMany({
@@ -47,6 +51,7 @@ export async function syncLedgerTransactions(connectionId: string): Promise<void
 }
 
 const LEDGER_SYNC_STALE_MS = 24 * 60 * 60 * 1000
+const BIGCAPITAL_SYNC_STALE_MS = 1 * 60 * 60 * 1000
 
 /** Drains every active IntegrationConnection whose ledger sync is due — more than 24h since its
  * newest LedgerTransaction.syncedAt, or a connection with no LedgerTransaction rows at all yet
@@ -62,7 +67,7 @@ export async function syncDueLedgerConnections(): Promise<number> {
   // across all tenants.
   const connections = await unscoped(() => prisma.integrationConnection.findMany({
     where: { status: "active" },
-    select: { id: true },
+    select: { id: true, provider: true },
   }))
   if (!connections.length) return 0
 
@@ -78,7 +83,8 @@ export async function syncDueLedgerConnections(): Promise<number> {
   let synced = 0
   for (const connection of connections) {
     const latestSyncedAt = latestSyncByConnection.get(connection.id)
-    const due = !latestSyncedAt || now - latestSyncedAt.getTime() > LEDGER_SYNC_STALE_MS
+    const staleMs = connection.provider === "bigcapital" ? BIGCAPITAL_SYNC_STALE_MS : LEDGER_SYNC_STALE_MS
+    const due = !latestSyncedAt || now - latestSyncedAt.getTime() > staleMs
     if (!due) continue
     try {
       await syncLedgerTransactions(connection.id)
@@ -91,7 +97,7 @@ export async function syncDueLedgerConnections(): Promise<number> {
 }
 
 type SyncRow = {
-  kind: "bill" | "expense" | "bank_transaction"
+  kind: "bill" | "expense" | "bank_transaction" | "invoice"
   externalId: string
   contactExternalId: string | null
   contactName: string | null
@@ -103,6 +109,9 @@ type SyncRow = {
   currencyCode: string | null
   txnDate: Date | null
   reconciled: boolean
+  dueAmount: number | null
+  paidAmount: number | null
+  paymentStatus: string | null
   raw: unknown
 }
 
@@ -141,13 +150,13 @@ async function fetchQuickBooksLedgerTransactions(realmId: string, accessToken: s
       kind: "bill", externalId: b.id, contactExternalId: b.contactId, contactName: b.contactName,
       accountExternalId: b.accountId, accountName: b.accountName, docNumber: b.docNumber,
       amount: b.totalAmt, taxAmount: null, currencyCode: b.currencyCode, txnDate: toDate(b.txnDate),
-      reconciled: false, raw: b,
+      reconciled: false, dueAmount: null, paidAmount: null, paymentStatus: null, raw: b,
     })),
     ...expenses.map((e): SyncRow => ({
       kind: "expense", externalId: e.id, contactExternalId: e.contactId, contactName: e.contactName,
       accountExternalId: e.accountId, accountName: e.accountName, docNumber: e.docNumber,
       amount: e.totalAmt, taxAmount: null, currencyCode: e.currencyCode, txnDate: toDate(e.txnDate),
-      reconciled: false, raw: e,
+      reconciled: false, dueAmount: null, paidAmount: null, paymentStatus: null, raw: e,
     })),
   ]
 }
@@ -167,13 +176,13 @@ async function fetchXeroLedgerTransactions(tenantId: string, accessToken: string
       kind: "bill", externalId: b.id, contactExternalId: b.contactId, contactName: b.contactName,
       accountExternalId: b.accountCode, accountName: b.accountCode, docNumber: b.docNumber,
       amount: b.total, taxAmount: null, currencyCode: b.currencyCode, txnDate: toDate(b.txnDate),
-      reconciled: false, raw: b,
+      reconciled: false, dueAmount: null, paidAmount: null, paymentStatus: null, raw: b,
     })),
     ...bankTransactions.map((t): SyncRow => ({
       kind: "bank_transaction", externalId: t.id, contactExternalId: t.contactId, contactName: t.contactName,
       accountExternalId: t.accountCode, accountName: t.accountCode, docNumber: t.docNumber,
       amount: t.total, taxAmount: null, currencyCode: t.currencyCode, txnDate: toDate(t.txnDate),
-      reconciled: false, raw: t,
+      reconciled: false, dueAmount: null, paidAmount: null, paymentStatus: null, raw: t,
     })),
   ]
 }
@@ -186,23 +195,48 @@ async function fetchXeroLedgerTransactions(tenantId: string, accessToken: string
  * doesn't fit this sync's one-connection-wide pull; a later phase can add a per-account loop once
  * bank/cash accounts are identifiable from cached data (see control-account-postings.ts's note
  * about account-type data not being cached today). */
+function computePaymentStatus(dueAmount: number | null, paidAmount: number | null, total: number | null): string | null {
+  if (dueAmount == null && paidAmount == null) return null
+  const due = dueAmount ?? total ?? 0
+  const paid = paidAmount ?? 0
+  if (due <= 0 && paid > 0) return "paid"
+  if (paid <= 0) return "unpaid"
+  return "partial"
+}
+
 async function fetchBigcapitalLedgerTransactions(organizationId: string, apiKey: string): Promise<SyncRow[]> {
-  const [bills, expenses] = await Promise.all([
+  const [bills, expenses, invoices] = await Promise.all([
     bigcapital.listBills(apiKey, organizationId),
     bigcapital.listExpenses(apiKey, organizationId),
+    bigcapital.listSaleInvoices(apiKey, organizationId),
   ])
   return [
     ...bills.map((b): SyncRow => ({
       kind: "bill", externalId: b.id, contactExternalId: b.contactId, contactName: b.contactName,
       accountExternalId: b.accountId, accountName: b.accountName, docNumber: b.docNumber,
       amount: b.total, taxAmount: b.taxAmount, currencyCode: b.currencyCode, txnDate: toDate(b.txnDate),
-      reconciled: false, raw: b,
+      reconciled: false,
+      dueAmount: b.dueAmount, paidAmount: b.paidAmount,
+      paymentStatus: computePaymentStatus(b.dueAmount, b.paidAmount, b.total),
+      raw: b,
     })),
     ...expenses.map((e): SyncRow => ({
       kind: "expense", externalId: e.id, contactExternalId: e.contactId, contactName: e.contactName,
       accountExternalId: e.accountId, accountName: e.accountName, docNumber: e.docNumber,
       amount: e.total, taxAmount: e.taxAmount, currencyCode: e.currencyCode, txnDate: toDate(e.txnDate),
-      reconciled: false, raw: e,
+      reconciled: false,
+      dueAmount: e.dueAmount, paidAmount: e.paidAmount,
+      paymentStatus: computePaymentStatus(e.dueAmount, e.paidAmount, e.total),
+      raw: e,
+    })),
+    ...invoices.map((inv): SyncRow => ({
+      kind: "invoice" as SyncRow["kind"], externalId: inv.id, contactExternalId: inv.contactId, contactName: inv.contactName,
+      accountExternalId: inv.accountId, accountName: inv.accountName, docNumber: inv.docNumber,
+      amount: inv.total, taxAmount: inv.taxAmount, currencyCode: inv.currencyCode, txnDate: toDate(inv.txnDate),
+      reconciled: false,
+      dueAmount: inv.dueAmount, paidAmount: inv.paidAmount,
+      paymentStatus: computePaymentStatus(inv.dueAmount, inv.paidAmount, inv.total),
+      raw: inv,
     })),
   ]
 }

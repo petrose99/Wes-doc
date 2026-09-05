@@ -25,7 +25,7 @@ type PanelLayout = "split" | "source-only" | "details-only"
 export function SplitPane({
   workspaceId, source, fields, data, fieldConfidence, provenanceFields, provenanceItems, initialTarget, conflictingLabels, missingRequiredFields,
   saveReview, documentType: initialDocumentType, note: initialNote, auditEvents, prevHref, nextHref, position, stage, afterActionHref,
-  header, canPush, pushCard, canCreateRule, defaultSupplier, matchKind, bankMatches,
+  header, canPush, pushCard, canCreateRule, defaultSupplier, matchKind, bankMatches, paymentStatus,
 }: {
   workspaceId: string
   source: SourceDocument
@@ -44,7 +44,7 @@ export function SplitPane({
   prevHref: string | null
   nextHref: string | null
   position: { index: number; total: number } | null
-  stage: PipelineStage | null
+  stage: PipelineStage | "archive" | null
   afterActionHref: string
   header: { filename: string; documentId: string; fileId: string; status: string; flagged: boolean; reviewLink: { href: string; label: string } | null }
   canPush: boolean
@@ -53,6 +53,7 @@ export function SplitPane({
   defaultSupplier: string
   matchKind: "bank" | "supplier_statement" | null
   bankMatches: ReactNode
+  paymentStatus?: string | null
 }) {
   const router = useRouter()
   const [tab, setTab] = useState<Tab>("details")
@@ -182,6 +183,10 @@ export function SplitPane({
       {docType && <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium ${docType === "expense" ? "border-red-200 bg-red-50 text-red-700" : "border-emerald-200 bg-emerald-50 text-emerald-700"}`}>
         {docType === "expense" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
         {docType === "expense" ? "Expense" : "Sale"}
+      </span>}
+
+      {paymentStatus && <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${paymentStatus === "paid" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : paymentStatus === "partial" ? "border-amber-200 bg-amber-50 text-amber-700" : "border-red-200 bg-red-50 text-red-700"}`}>
+        {paymentStatus === "paid" ? "Paid" : paymentStatus === "partial" ? "Partially paid" : "Unpaid"}
       </span>}
 
       <div className="mx-2 h-5 w-px bg-slate-200" />

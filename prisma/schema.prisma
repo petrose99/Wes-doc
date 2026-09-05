@@ -62,6 +62,7 @@ model User {
   createdApprovalWorkflows ApprovalWorkflow[] @relation("ApprovalWorkflowCreator")
   submittedExpenseClaims ExpenseClaim[] @relation("ExpenseClaimSubmitter")
   bigcapitalAccounts    BigcapitalAccount[]
+  bigcapitalMemberAccounts BigcapitalMemberAccount[]
   provisionedIntegrationJobs IntegrationProvisionJob[] @relation("IntegrationProvisionJobOwner")
   resolvedHealthCheckResults HealthCheckResult[] @relation("HealthCheckResultResolver")
   dismissedHealthCheckResults HealthCheckResult[] @relation("HealthCheckResultDismisser")
@@ -126,6 +127,7 @@ model Workspace {
   integrationPushes IntegrationPush[]
   integrationProvisionJobs IntegrationProvisionJob[]
   bigcapitalAccount BigcapitalAccount?
+  bigcapitalMemberAccounts BigcapitalMemberAccount[]
   taxProfile      TaxProfile?
   productEvents   ProductEvent[]
   ingestionItems  IngestionItem[]
@@ -147,6 +149,7 @@ model Workspace {
   healthScoreConfigs HealthScoreConfig[]
   ledgerTransactions LedgerTransaction[]
   sheetPlacements DocumentSheetPlacement[]
+  categoryAccountMappings CategoryAccountMapping[]
 
   @@map("workspaces")
 }
@@ -893,6 +896,7 @@ model IntegrationConnection {
   pushes                    IntegrationPush[]
   accountingEntities        AccountingEntity[]
   ledgerTransactions        LedgerTransaction[]
+  categoryAccountMappings   CategoryAccountMapping[]
 
   @@unique([workspaceId, provider])
   @@map("integration_connections")
@@ -916,7 +920,8 @@ model IntegrationPush {
   attempts      Int                   @default(0)
   nextAttemptAt DateTime              @default(now()) @map("next_attempt_at")
   leaseUntil    DateTime?             @map("lease_until")
-  externalBillId String?              @map("external_bill_id")
+  externalBillId    String?              @map("external_bill_id")
+  externalRecordKind String?            @map("external_record_kind")
   errorCode     String?               @map("error_code")
   createdById   String?               @map("created_by_id") @db.Uuid
   createdAt     DateTime              @default(now()) @map("created_at")
@@ -960,6 +965,23 @@ model BigcapitalAccount {
   user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("bigcapital_accounts")
+}
+
+model BigcapitalMemberAccount {
+  id               String   @id @default(uuid()) @db.Uuid
+  workspaceId      String   @map("workspace_id") @db.Uuid
+  userId           String   @map("user_id") @db.Uuid
+  bigcapitalUserId String?  @map("bigcapital_user_id")
+  email            String
+  passwordEnc      String   @map("password_enc")
+  status           String   @default("active")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+  workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@map("bigcapital_member_accounts")
 }
 
 /// One durable, retried attempt to provision a workspace's Bigcapital organization (build org +
@@ -1576,6 +1598,26 @@ model AccountingEntity {
   @@map("accounting_entities")
 }
 
+/// Phase B: explicit category-to-account mapping for accounting push — overrides the inferred
+/// map from getCategoryAccountMap (models/integrations.ts) when a workspace owner configures
+/// a category to always use a specific expense/income account.
+model CategoryAccountMapping {
+  id                String   @id @default(uuid()) @db.Uuid
+  workspaceId       String   @map("workspace_id") @db.Uuid
+  connectionId      String   @map("connection_id") @db.Uuid
+  category          String
+  kind              String   @default("expense")
+  accountExternalId String   @map("account_external_id")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+  workspace         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  connection        IntegrationConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@unique([connectionId, category, kind])
+  @@index([workspaceId])
+  @@map("category_account_mappings")
+}
+
 /// Data Health Phase B: one bill / expense / bank-transaction row pulled from an
 /// IntegrationConnection's provider by lib/health/sync.ts's syncLedgerTransactions — the local
 /// cache the cleanup-category health checks (lib/health/checks/*, see lib/health/registry.ts)
@@ -1601,6 +1643,9 @@ model LedgerTransaction {
   reconciled        Boolean  @default(false)
   active            Boolean  @default(true)
   raw               Json?
+  dueAmount         Float?   @map("due_amount")
+  paidAmount        Float?   @map("paid_amount")
+  paymentStatus     String?  @map("payment_status")
   syncedAt          DateTime @map("synced_at")
   workspace         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   connection        IntegrationConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)

@@ -4,7 +4,7 @@ import config from "@/lib/config"
 import { prisma } from "@/lib/db"
 import { filterSnapshotByDocuments, splitSnapshotByDocuments } from "@/lib/sheet-seed"
 import { getWorkspaceFile } from "@/models/files"
-import { ensureFileWorkbook } from "@/models/spreadsheets"
+import { ensureFileWorkbook, type WorkbookSnapshot } from "@/models/spreadsheets"
 import { requireWorkspaceRole } from "@/models/workspaces"
 import type { IWorkbookData } from "@univerjs/presets"
 import { notFound } from "next/navigation"
@@ -49,11 +49,11 @@ export default async function SheetPage({ params, searchParams }: {
   const workbook = await ensureFileWorkbook(workspaceId, fileId)
   const docFilter = query.docs ? new Set(query.docs.split(",").filter(Boolean)) : null
 
-  let snapshot = (workbook?.snapshot as IWorkbookData | undefined) ?? null
+  let snapshot = (workbook?.snapshot ?? null) as WorkbookSnapshot | null
   if (snapshot && docFilter && docFilter.size > 0) {
-    snapshot = (query.mode === "separate"
+    snapshot = query.mode === "separate"
       ? splitSnapshotByDocuments(snapshot, docFilter)
-      : filterSnapshotByDocuments(snapshot, docFilter)) as IWorkbookData
+      : filterSnapshotByDocuments(snapshot, docFilter)
   }
 
   const [documentCount, queued] = await Promise.all([
@@ -66,7 +66,7 @@ export default async function SheetPage({ params, searchParams }: {
     fileId={fileId}
     fileName={file.name}
     linkAccess={file.linkAccess}
-    snapshot={snapshot}
+    snapshot={snapshot as unknown as IWorkbookData | null}
     rev={workbook?.rev ?? 0}
     queuedIds={queued.map((document) => document.id)}
     hasRows={documentCount > 0}

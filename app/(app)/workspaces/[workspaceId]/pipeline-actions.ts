@@ -24,7 +24,7 @@ async function revalidatePipeline(workspaceId: string) {
  * (models/documents.markDocumentsReviewed, the same write the single-document review form makes);
  * moving onto "archive" only sets archivedAt, leaving `status` untouched, per the archive/status
  * split in lib/documents/stages.ts. */
-export async function moveDocumentsToStageAction(workspaceId: string, documentIds: string[], stage: Extract<PipelineStage, "ready" | "archive">): Promise<ActionState<{ moved: number }>> {
+export async function moveDocumentsToStageAction(workspaceId: string, documentIds: string[], stage: "ready" | "archive"): Promise<ActionState<{ moved: number }>> {
   const user = await getCurrentUser()
   if (!(await requireMember(workspaceId, user.id))) return { success: false, error: NO_ACCESS }
   try {

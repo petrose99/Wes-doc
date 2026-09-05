@@ -1,7 +1,7 @@
 "use client"
 
 import { MODULES } from "@/lib/modules"
-import { Blocks, CheckCircle2, FileBarChart, Mail, Percent, Settings, ShieldCheck, Users, Wand2, Webhook } from "lucide-react"
+import { Blocks, BookOpen, CheckCircle2, FileBarChart, Mail, Percent, Settings, ShieldCheck, Users, Wand2, Webhook } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
@@ -38,7 +38,10 @@ export function SettingsNav({ workspaceId, enabledModuleKeys, integrationsEnable
     { href: `${base}/reports`, label: "Reports", icon: FileBarChart },
     { href: `${base}/email`, label: "Email intake", icon: Mail },
     { href: `${base}/security`, label: "Security", icon: ShieldCheck },
-    ...(integrationsEnabled ? [{ href: `${base}/integrations`, label: "Integrations", icon: Webhook }] : []),
+    ...(integrationsEnabled ? [
+      { href: `${base}/integrations`, label: "Integrations", icon: Webhook },
+      { href: `${base}/accounting-mapping`, label: "Account mapping", icon: BookOpen },
+    ] : []),
   ]
 
   return <nav className="mb-6 flex flex-wrap gap-1 border-b pb-3">

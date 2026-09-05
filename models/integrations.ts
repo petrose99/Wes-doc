@@ -250,7 +250,7 @@ export async function listWorkspaceIntegrationPushes(workspaceId: string, docume
     orderBy: { createdAt: "desc" },
     select: {
       id: true, connectionId: true, documentId: true, provider: true, status: true, attempts: true,
-      externalBillId: true, errorCode: true, createdAt: true, completedAt: true,
+      externalBillId: true, externalRecordKind: true, errorCode: true, createdAt: true, completedAt: true,
     },
   })
 }

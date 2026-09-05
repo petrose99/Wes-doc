@@ -11,6 +11,11 @@ import { countDocumentsByStage, countDocumentsThisMonth, countToReviewByFile, fl
 import { countReviewedUnplaced } from "@/models/document-sheet-placements"
 import { ensurePipelineFile, getFileTemplates, listRecentFiles } from "@/models/files"
 import { getWorkspaceUsage, requireWorkspaceRole } from "@/models/workspaces"
+import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
+import { getWorkspaceAnalytics, resolvePeriod } from "@/lib/analytics/workspace-analytics"
+import { HeadlineCards } from "@/components/analytics/stat-cards"
+import { CashFlowChart } from "@/components/analytics/cash-flow-chart"
+import { SpendByCategoryChart } from "@/components/analytics/spend-by-category-chart"
 import { MobileUploadButtons } from "@/components/shell/mobile-upload-buttons"
 import { getOnboardingStateAction } from "./onboarding-actions"
 import { ArrowRight, CheckCircle2, ChevronRight, FileText, ListChecks, SearchCheck, Table2, Upload } from "lucide-react"
@@ -40,7 +45,7 @@ export default async function WorkspaceHomePage({ params }: {
 
   const documentSearchEnabled = config.embeddings.enabled
 
-  const [pipelineFile, usage, stageCounts, documentsThisMonth, recentFiles, onboardingState, unplacedCount] = await Promise.all([
+  const [pipelineFile, usage, stageCounts, documentsThisMonth, recentFiles, onboardingState, unplacedCount, capabilities] = await Promise.all([
     ensurePipelineFile(workspaceId, user.id),
     getWorkspaceUsage(workspaceId),
     countDocumentsByStage(workspaceId),
@@ -48,7 +53,16 @@ export default async function WorkspaceHomePage({ params }: {
     listRecentFiles(workspaceId, 4),
     getOnboardingStateAction(workspaceId),
     countReviewedUnplaced(workspaceId),
+    getWorkspaceCapabilities(workspaceId),
   ])
+
+  const showFinancials = capabilities.has("finance-analytics")
+  const today = new Date()
+  const analytics = showFinancials ? await getWorkspaceAnalytics(workspaceId, resolvePeriod({ period: "12m" }, today), today) : null
+  const formatMoney = (value: number) => {
+    const currency = analytics?.currency.baseCurrency ?? "USD"
+    return new Intl.NumberFormat("en", { style: "currency", currency, maximumFractionDigits: 0 }).format(value)
+  }
   const pipelineTemplates = await getFileTemplates(workspaceId, pipelineFile.id)
   const uploadTemplates: SheetTemplate[] = pipelineTemplates.flatMap((candidate) => {
     const version = candidate.versions[0]
@@ -174,6 +188,27 @@ export default async function WorkspaceHomePage({ params }: {
         </Link>
       </div>
     </div>
+
+    {analytics && <>
+      <HeadlineCards
+        workspaceId={workspaceId}
+        totalSpend={analytics.headline.totalSpend}
+        totalOutstanding={analytics.headline.totalOutstanding}
+        netCashFlow={analytics.headline.netCashFlow}
+        openReviewTasks={analytics.headline.openReviewTasks}
+        formatMoney={formatMoney}
+      />
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className="rounded-2xl border border-[#e6ebf1] bg-white p-5 shadow-panel">
+          <h2 className="mb-4 text-[15px] font-bold text-slate-900">Cash flow trend</h2>
+          <CashFlowChart months={analytics.cashFlow} formatMoney={formatMoney} />
+        </div>
+        <div className="rounded-2xl border border-[#e6ebf1] bg-white p-5 shadow-panel">
+          <h2 className="mb-4 text-[15px] font-bold text-slate-900">Spend by category</h2>
+          <SpendByCategoryChart workspaceId={workspaceId} rows={analytics.spend} formatMoney={formatMoney} />
+        </div>
+      </div>
+    </>}
 
   </main>
 }

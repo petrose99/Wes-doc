@@ -4,6 +4,7 @@ import config from "@/lib/config"
 import { getEntityCounts, getLastSyncedAt } from "@/models/accounting-entities"
 import { getWorkspaceProvisionJob } from "@/models/bigcapital"
 import { listReadyToPushDocuments } from "@/models/documents"
+import { listCategoryAccountMappings } from "@/models/category-account-mappings"
 import { getCategoryAccountMap, getWorkspaceIntegrationConnection } from "@/models/integrations"
 import { requireWorkspaceRole } from "@/models/workspaces"
 import { notFound } from "next/navigation"
@@ -27,9 +28,11 @@ export default async function AccountingPage({ params }: { params: Promise<{ wor
   // Same "pushable" gate PushToAccountingCard uses on a single document: an active connection with
   // a default expense account chosen. No point loading the ready list otherwise — nothing could push.
   const pushable = connection?.status === "active" && !!connection.defaultExpenseAccountId
-  const [readyToPush, categoryAccountMap] = pushable
-    ? await Promise.all([listReadyToPushDocuments(workspaceId, connection.id), getCategoryAccountMap(connection.id)])
-    : [[], {}]
+  const [readyToPush, inferredMap, explicitMappings] = pushable
+    ? await Promise.all([listReadyToPushDocuments(workspaceId, connection.id), getCategoryAccountMap(connection.id), listCategoryAccountMappings(connection.id)])
+    : [[], {}, []]
+  const categoryAccountMap = { ...inferredMap }
+  for (const m of explicitMappings) { categoryAccountMap[m.category] = m.accountExternalId }
 
   return <main className="space-y-8">
     <header className="flex items-start justify-between gap-4">

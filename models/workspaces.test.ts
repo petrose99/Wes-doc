@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 vi.mock("@/lib/db", () => ({ prisma: {} }))
 vi.mock("@/prisma/client", () => ({ Prisma: {}, PrismaClient: vi.fn() }))
+vi.mock("@/models/bigcapital-members", () => ({ provisionMemberAccount: vi.fn().mockResolvedValue(undefined) }))
 vi.mock("@/models/files", () => ({ createFile: vi.fn(), deleteFiles: vi.fn() }))
 vi.mock("@/lib/document-storage", () => ({ deleteDocumentSource: vi.fn() }))
 vi.mock("@/lib/audit-archive", () => ({ archiveWorkspaceAuditEvents: vi.fn().mockResolvedValue({ archived: 0 }) }))
@@ -255,6 +256,7 @@ describe("acceptWorkspaceInvitation", () => {
     db.workspaceInvitation = { findUnique: vi.fn().mockResolvedValue({ id: "i1", workspaceId: "w1", email: user.email, role: "member", acceptedAt: null, expiresAt: future() }), update: vi.fn().mockReturnValue("accept") }
     db.workspaceMember = { findUnique: vi.fn().mockResolvedValue(null), upsert: vi.fn().mockReturnValue("upsert") }
     db.documentAuditEvent = { create: vi.fn().mockReturnValue("audit") }
+    db.user = { findUnique: vi.fn().mockResolvedValue({ id: user.id, name: "Invitee", email: user.email }) }
 
     expect(await acceptWorkspaceInvitation("token", user)).toBe("w1")
     expect(db.$transaction).toHaveBeenCalledWith(["upsert", "accept", "audit"])

@@ -1,8 +1,10 @@
 import { normalizeBillFromDocument, BillMappingError } from "@/lib/integration-bill-mapping"
+import { extractBankStatementPayload } from "@/lib/integrations/bigcapital/bank-statement-mapper"
 import { attemptIntegrationPush, kickIntegrationPushDrain } from "@/lib/integration-push"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { prisma } from "@/lib/db"
-import { upsertWorkspaceIntegrationPush } from "@/models/integrations"
+import { listCategoryAccountMappings, resolveCategoryAccount } from "@/models/category-account-mappings"
+import { getCategoryAccountMap, upsertWorkspaceIntegrationPush } from "@/models/integrations"
 
 /** Pushes a document to its workspace's connected accounting provider automatically, when the rule
  * that coded it has autopublish=true. Called from two places: right after a rule applies to a
@@ -18,7 +20,7 @@ export async function maybeAutopublish(workspaceId: string, documentId: string, 
   try {
     const document = await prisma.document.findUnique({
       where: { id: documentId },
-      select: { id: true, filename: true, reviewedData: true, rawExtraction: true, appliedRuleId: true, template: { select: { code: true } } },
+      select: { id: true, filename: true, reviewedData: true, rawExtraction: true, codingData: true, appliedRuleId: true, template: { select: { code: true } } },
     })
     if (!document?.appliedRuleId) return
     const templateCode = document.template?.code
@@ -42,9 +44,28 @@ export async function maybeAutopublish(workspaceId: string, documentId: string, 
     if (existingPush) return
 
     const reviewedData = (document.reviewedData as Record<string, unknown> | null) ?? (document.rawExtraction as Record<string, unknown> | null) ?? {}
-    const bill = normalizeBillFromDocument({ documentId: document.id, filename: document.filename, templateCode, reviewedData })
+
+    const coding = (document.codingData as Record<string, unknown> | null) ?? {}
+    const category = (typeof coding.account === "string" && coding.account) || (typeof reviewedData.category === "string" && reviewedData.category) || null
+    let resolvedAccountId: string | undefined
+    if (category && connection.defaultExpenseAccountId) {
+      const [mappings, inferredMap] = await Promise.all([listCategoryAccountMappings(connection.id), getCategoryAccountMap(connection.id)])
+      resolvedAccountId = resolveCategoryAccount(mappings, category, inferredMap, connection.defaultExpenseAccountId)
+    }
+    const documentType = coding.documentType === "expense" || coding.documentType === "sale" || coding.documentType === "bank_statement" ? coding.documentType : "expense"
+    let payload: object
+    if (documentType === "bank_statement" && (connection.provider as string) === "bigcapital") {
+      const cashflowAccountId = resolvedAccountId ?? connection.defaultExpenseAccountId
+      if (!cashflowAccountId) return
+      payload = extractBankStatementPayload(document.id, reviewedData, cashflowAccountId, connection.defaultExpenseAccountId!)
+    } else {
+      const bill = normalizeBillFromDocument({ documentId: document.id, filename: document.filename, templateCode, reviewedData })
+      const direction: "payable" | "receivable" = documentType === "sale" ? "receivable" : "payable"
+      payload = { ...bill, documentType, direction, ...(resolvedAccountId ? { expenseAccountId: resolvedAccountId } : {}), ...(category ? { category } : {}) }
+    }
+
     const push = await upsertWorkspaceIntegrationPush(workspaceId, {
-      connectionId: connection.id, documentId: document.id, provider: connection.provider as "quickbooks" | "xero", payload: bill, createdById: actorId,
+      connectionId: connection.id, documentId: document.id, provider: connection.provider as "quickbooks" | "xero" | "bigcapital", payload, createdById: actorId,
     })
     await attemptIntegrationPush(push.id)
     const updated = await prisma.integrationPush.findUnique({ where: { id: push.id }, select: { status: true } })
