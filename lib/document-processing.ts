@@ -11,6 +11,8 @@ import { regenerateBankMatchSuggestions, regenerateSupplierStatementMatches } fr
 import config from "@/lib/config"
 import { buildDocumentJsonSchema, buildDocumentPrompt, buildFreeFormJsonSchema, buildFreeFormPrompt, DocumentClassification, DocumentFieldDefinition, extractClassification, extractFieldConfidence, extractFieldProvenance, FieldProvenanceHints, findMissingRequiredFields, parseTemplateFields, ProvenanceHint, validateDocumentValues } from "@/lib/document-templates"
 import { documentBlocksKey, putDocumentSource, readDocumentSource } from "@/lib/document-storage"
+import { calibrateFieldConfidence } from "@/lib/extraction/calibrate"
+import { verifySuspectFields } from "@/lib/extraction/verify"
 import { processEmbedJob } from "@/lib/document-embedding"
 import { PERMANENT_ASR_ERROR_CODES, processTranscribeJob } from "@/lib/document-transcription"
 import { projectDocumentFields } from "@/lib/field-projection"
@@ -370,7 +372,37 @@ export async function processDocumentJob(jobId: string) {
     if (!passes.length) throw new Error("ai_extraction_failed")
 
     const extraction = freeForm ? Object.assign({}, ...passes) : mergeExtractionPasses(fields, passes)
-    const fieldConfidence = freeForm ? Object.assign({}, ...confidencePasses) : mergeFieldConfidence(fields, passes, confidencePasses)
+    const rawFieldConfidence = freeForm ? Object.assign({}, ...confidencePasses) : mergeFieldConfidence(fields, passes, confidencePasses)
+    // Replace the LLM's self-reported confidence with evidence wherever the document corroborates
+    // itself (arithmetic identities, verbatim presence in the OCR text) — see lib/extraction/calibrate.
+    let calibration = freeForm ? null : calibrateFieldConfidence({
+      templateCode: document.template?.code ?? null, fields, extraction, fieldConfidence: rawFieldConfidence, ocrText,
+    })
+    let fieldConfidence = calibration?.fieldConfidence ?? rawFieldConfidence
+    // Fields with concrete evidence of a misread get ONE focused re-read (lib/extraction/verify):
+    // the second pass either independently agrees (real evidence of correctness) or corrects the
+    // value, after which calibration re-runs — a correction that makes the arithmetic reconcile
+    // ends at 0.99 like any other corroborated field. Best effort: a failed verification pass
+    // leaves the first-pass values and their honest (low) confidence in place.
+    if (calibration?.suspect.length) {
+      const verification = await verifySuspectFields({
+        settings: { providers: [{ provider: aiProvider, apiKey, model: modelName }] },
+        templateName: document.template?.name || "document",
+        fields, suspectKeys: calibration.suspect, extraction,
+        textParts: buildBatchParts(contents, collectedPages).textParts,
+      })
+      if (verification && Object.keys(verification.values).length) {
+        Object.assign(extraction, verification.values)
+        Object.assign(fieldConfidence, verification.confidence)
+        calibration = calibrateFieldConfidence({
+          templateCode: document.template?.code ?? null, fields, extraction, fieldConfidence, ocrText,
+        })
+        fieldConfidence = calibration.fieldConfidence
+        if (verification.changed.length) {
+          await recordSystemAudit({ workspaceId: document.workspaceId, documentId: document.id, type: "extraction_verified", detail: { corrected: verification.changed } })
+        }
+      }
+    }
     const conflictingFields = freeForm ? [] : findConflictingScalarFields(fields, passes)
     const missing = freeForm ? [] : findMissingRequiredFields(fields, extraction)
     const classification = mergeClassification(classificationPasses)
@@ -397,7 +429,7 @@ export async function processDocumentJob(jobId: string) {
     // Interactive form (not the array form) because the projection is raw SQL and has to run on the
     // same tx client. Timeout raised over the 5s default: a long line-item table projects to a few
     // hundred rows, which is still only a handful of batched statements but not instant.
-    const confidence = { missingRequiredFields: missing, partialFailure: batchFailures > 0, fieldConfidence, conflictingFields }
+    const confidence = { missingRequiredFields: missing, partialFailure: batchFailures > 0, fieldConfidence, conflictingFields, corroboratedFields: calibration?.corroborated ?? [] }
     await prisma.$transaction(async (tx) => {
       await tx.document.update({ where: { id: document.id }, data: { status, ocrText, fieldSnapshot: fields as unknown as Prisma.InputJsonValue, rawExtraction: extraction as Prisma.InputJsonValue, reviewedData: extraction as Prisma.InputJsonValue, provenance: provenance as Prisma.InputJsonValue, shapeId, classification: classification as Prisma.InputJsonValue, confidence: confidence as Prisma.InputJsonValue } })
       await tx.documentProcessingJob.update({ where: { id: job.id }, data: { status: "completed", completedAt: new Date(), leaseUntil: null } })
