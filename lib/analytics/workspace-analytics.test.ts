@@ -10,6 +10,7 @@ const {
   buildDocumentOutflowByMonthSql,
   buildSpendByCategorySql,
   buildUnpaidInvoicesSql,
+  buildVendorSpendSql,
   fillMonthSeries,
   resolveCurrency,
   resolvePeriod,
@@ -164,6 +165,22 @@ describe("SQL builders bind workspace_id and never interpolate it", () => {
   it("buildUnpaidInvoicesSql fetches limit+1 rows so truncation can be detected without a second query", () => {
     const sql = buildUnpaidInvoicesSql(WS, 10)
     expect(sql.params.at(-1)).toBe(11)
+  })
+
+  it("buildVendorSpendSql binds workspace_id on every alias and groups by vendor", () => {
+    const sql = buildVendorSpendSql(WS, UNBOUNDED)
+    expect(sql.params[0]).toBe(WS)
+    expect(sql.text).not.toContain(WS)
+    expect(sql.text).toContain(`d."workspace_id" = $1::uuid`)
+    expect(sql.text).toContain(`vendor."workspace_id" = $1::uuid`)
+    expect(sql.text).toContain(`GROUP BY "vendor"`)
+    expect(sql.text).toContain(`ORDER BY "totalSpend" DESC`)
+  })
+
+  it("buildVendorSpendSql adds date predicates for a bounded period", () => {
+    const bounded = buildVendorSpendSql(WS, { key: "custom", from: new Date("2026-01-01"), to: new Date("2026-06-01") })
+    expect(bounded.text).toContain(`dt."value_date" >=`)
+    expect(bounded.text).toContain(`dt."value_date" <=`)
   })
 
   it("buildCurrencyInventorySql binds workspace_id and never interpolates it", () => {

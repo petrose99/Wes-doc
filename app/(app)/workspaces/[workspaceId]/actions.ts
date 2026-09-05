@@ -12,6 +12,7 @@ import { listShapesForMatch } from "@/models/extraction-shapes"
 import { createIngestionItem } from "@/lib/ingestion"
 import { scanDocumentBuffer } from "@/lib/malware-scan"
 import { parsePageRange } from "@/lib/page-range"
+import { refreshDocumentReadiness } from "@/lib/readiness/refresh"
 import { expandZipBuffer } from "@/lib/zip-ingestion"
 import { deleteWorkspaceDocuments, getDocumentsStatus, getWorkspaceDocument, markDocumentsReviewed, requeueAdaptiveExtraction, requeueDocumentExtraction, updateDocumentField, updateDocumentReview, validateDocumentInput } from "@/models/documents"
 import { addDomainPackToFile, createFile, createFolder, deleteFileIfEmpty, deleteFiles, deleteFolder, duplicateFile, getFileTemplates, getWorkspaceFile, listFileShares, moveToFolder, removeFileShare, renameFile, renameFolder, setLinkAccess, touchFile, upsertFileShare } from "@/models/files"
@@ -164,7 +165,7 @@ export async function saveDocumentReviewAction(workspaceId: string, documentId: 
       if (field.type === "number") { data[field.key] = Number(raw); continue }
       data[field.key] = raw
     }
-    await updateDocumentReview({ workspaceId, documentId, reviewedData: data, actorId: user.id }); revalidatePath(`${paths(workspaceId).documents}/${documentId}`); await revalidateSheet(workspaceId, document.fileId); return { success: true, data: null }
+    await updateDocumentReview({ workspaceId, documentId, reviewedData: data, actorId: user.id }); after(async () => { await refreshDocumentReadiness({ workspaceId, documentId }) }); revalidatePath(`${paths(workspaceId).documents}/${documentId}`); await revalidateSheet(workspaceId, document.fileId); return { success: true, data: null }
   } catch { return { success: false, error: "Check the field values" } }
 }
 
@@ -213,6 +214,7 @@ export async function updateDocumentFieldAction(workspaceId: string, documentId:
   if (value !== null && typeof value === "object" && JSON.stringify(value).length > 100_000) return { success: false, error: "Value too large" }
   try {
     const result = await updateDocumentField({ workspaceId, documentId, fieldKey, value, actorId: user.id })
+    after(async () => { await refreshDocumentReadiness({ workspaceId, documentId }) })
     await revalidateSheet(workspaceId, result.document.fileId)
     return { success: true, data: { status: result.document.status, missingRequiredFields: result.missingRequiredFields } }
   } catch (error) { return { success: false, error: errorMessage(error, "Update failed") } }

@@ -7,6 +7,7 @@ import {
 } from "@/lib/finance/actions"
 import { findSupplierDocuments, getDocumentDetails, getExpenseClaims, getInboxSummary, getSupplierRules } from "@/lib/finance/inbox"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
+import { refreshDocumentReadiness } from "@/lib/readiness/refresh"
 import { personaAddendumForIndustry } from "@/lib/modules/personas"
 import { findMatchingDocuments, searchDocumentChunks } from "@/lib/retrieval"
 import { getWorkspaceMembership } from "@/models/workspaces"
@@ -59,7 +60,7 @@ How to work:
 const FINANCE_INBOX_SYSTEM_PROMPT = `You are the DocuBite finance assistant, helping someone work through their review inbox and supplier rules. There is no spreadsheet grid here — work only through your tools.
 
 How to work:
-- Use get_inbox_summary, find_supplier_documents, get_document_details, get_supplier_rules, and get_expense_claims to answer questions and find what's being asked about. Look things up rather than guessing at ids or numbers.
+- Use get_inbox_summary, find_supplier_documents, get_document_details, get_supplier_rules, get_expense_claims, get_document_readiness, get_budget_status, and get_document_matches to answer questions and find what's being asked about. Look things up rather than guessing at ids or numbers.
 - Answer in plain prose, briefly. No preamble, no restating the question.
 - A review task on an approval workflow (get_document_details' reviewTasks list shows a workflowId) can only move through decide_review_task_stage, never approve_review_tasks/reject_review_task — those two refuse a workflow task outright. A plain, workflow-less task is the reverse: use approve_review_tasks/reject_review_task for it.
 - To take an action — approve or reject a review task (plain or a workflow's current stage), decide an expense claim, set a document's coding, create a supplier rule, or push a document to accounting — call the matching tool (approve_review_tasks, reject_review_task, decide_review_task_stage, decide_expense_claim, set_document_coding, create_supplier_rule, push_to_accounting). Every one of these PROPOSES the action; it does not perform it. The tool's result is a summary of what would happen — say what you're proposing and that it's waiting for their confirmation in the panel below. Never claim an action happened, or that a document was pushed, coded, or a task or claim approved, until you see the person confirm it landed.
@@ -325,6 +326,47 @@ export async function POST(request: Request) {
           }),
           execute: async ({ claimId, decision }) => {
             try { return await describeDecideExpenseClaim(workspaceId, claimId, decision) } catch { return { error: "proposal_unavailable" } }
+          },
+        }),
+        get_document_readiness: tool({
+          description: "Check a document's touchless-automation readiness status: whether it's ready to sync or blocked, and what the blockers are (low confidence, failed checks, policy violations, budget exceeded, etc.).",
+          inputSchema: z.object({ documentId: z.string().describe("The document id") }),
+          execute: async ({ documentId }) => {
+            if (!(await getWorkspaceCapabilities(workspaceId)).has("touchless-automation")) return { error: "touchless_automation_not_enabled" }
+            try {
+              const result = await refreshDocumentReadiness({ workspaceId, documentId })
+              return result ?? { error: "document_not_found" }
+            } catch { return { error: "readiness_check_unavailable" } }
+          },
+        }),
+        get_budget_status: tool({
+          description: "List the workspace's active budgets and their current spend vs. limit. Use this for 'how are our budgets doing' or 'are we over budget' questions.",
+          inputSchema: z.object({}),
+          execute: async () => {
+            if (!(await getWorkspaceCapabilities(workspaceId)).has("budget-controls")) return { error: "budget_controls_not_enabled" }
+            try {
+              const budgets = await prisma.workspaceBudget.findMany({
+                where: { workspaceId, isActive: true },
+                select: { id: true, name: true, category: true, vendor: true, amount: true, periodType: true, warnAtPercent: true },
+              })
+              return { budgets: budgets.map((b: Record<string, unknown>) => ({ id: b.id, name: b.name, category: b.category, vendor: b.vendor, limit: b.amount, periodType: b.periodType, warnAtPercent: b.warnAtPercent })) }
+            } catch { return { error: "budget_status_unavailable" } }
+          },
+        }),
+        get_document_matches: tool({
+          description: "Get PO-to-invoice-to-receipt matches for a document: which other documents it's been matched to, with confidence scores and any discrepancies.",
+          inputSchema: z.object({ documentId: z.string().describe("The document id") }),
+          execute: async ({ documentId }) => {
+            if (!(await getWorkspaceCapabilities(workspaceId)).has("document-matching")) return { error: "document_matching_not_enabled" }
+            try {
+              const matches = await prisma.documentMatch.findMany({
+                where: { workspaceId, OR: [{ sourceId: documentId }, { targetId: documentId }] },
+                select: { id: true, sourceId: true, targetId: true, matchType: true, confidence: true, discrepancies: true, status: true },
+                orderBy: { confidence: "desc" },
+                take: 20,
+              })
+              return { matches }
+            } catch { return { error: "matches_unavailable" } }
           },
         }),
       }

@@ -58,6 +58,7 @@ const EVENT_LABELS: Record<string, string> = {
   accounting_report_imported: "Accounting report imported",
   accounting_report_failed: "Accounting report failed",
   activity_exported: "Activity log exported",
+  readiness_evaluated: "Readiness evaluated",
 }
 
 export function auditEventLabel(type: string) {

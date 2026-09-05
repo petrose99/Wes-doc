@@ -73,6 +73,12 @@ export const WORKSPACE_SCOPED_MODELS = new Set([
   // Dext-parity Phase 3 WP3.3: expense claims.
   "ExpenseClaim",
   "ExpenseClaimItem",
+  // Ramp-parity: touchless automation.
+  "AgentVerdict",
+  "WorkspaceAutomationConfig",
+  "ReviewRoutingRule",
+  "DocumentMatch",
+  "WorkspaceBudget",
 ])
 
 /** Operations that read or mutate an existing row set through a `where`, and so must be scoped.

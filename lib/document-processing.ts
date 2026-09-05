@@ -6,6 +6,7 @@ import { applyAutomationRules } from "@/models/automation-rules"
 import { runDeterministicChecks } from "@/models/document-checks"
 import { getFewShotExamples } from "@/models/field-corrections"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
+import { refreshDocumentReadiness } from "@/lib/readiness/refresh"
 import { regenerateBankMatchSuggestions, regenerateSupplierStatementMatches } from "@/models/bank-matches"
 import config from "@/lib/config"
 import { buildDocumentJsonSchema, buildDocumentPrompt, buildFreeFormJsonSchema, buildFreeFormPrompt, DocumentClassification, DocumentFieldDefinition, extractClassification, extractFieldConfidence, extractFieldProvenance, FieldProvenanceHints, findMissingRequiredFields, parseTemplateFields, ProvenanceHint, validateDocumentValues } from "@/lib/document-templates"
@@ -438,6 +439,7 @@ export async function processDocumentJob(jobId: string) {
         await regenerateSupplierStatementMatches(document.workspaceId, document.id)
       }
     }
+    await refreshDocumentReadiness({ workspaceId: document.workspaceId, documentId: document.id })
   } catch (error) {
     await failDocumentJob({ jobId: job.id, attempts: job.attempts, scheduledAt: job.scheduledAt, documentId: document.id, workspaceId: document.workspaceId }, error)
     // Rethrown below, after the embed job is kicked — a document that OCR'd successfully is

@@ -6,12 +6,15 @@ import { getCurrentUser } from "@/lib/auth"
 import { parseTemplateFields } from "@/lib/document-templates"
 import type { BlocksSidecar, DocumentProvenance } from "@/lib/provenance"
 import { repairMissingBboxes } from "@/lib/provenance"
+import { prisma } from "@/lib/db"
+import { buildFieldRationales, type FieldRationale } from "@/lib/rationale"
 import { documentBlocksKey, readDocumentBlocks } from "@/lib/document-storage"
 import { PIPELINE_STAGES, type PipelineStage } from "@/lib/documents/stages"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { listBankMatches } from "@/models/bank-matches"
 import { listDocumentAuditEvents } from "@/models/audit-events"
 import { getWorkspaceDocument, listWorkspaceDocuments } from "@/models/documents"
+import { getFewShotExamples } from "@/models/field-corrections"
 import { getOpenReviewTaskForDocument } from "@/models/review-tasks"
 import { listWorkspaceIntegrationConnections, listWorkspaceIntegrationPushes } from "@/models/integrations"
 import { getDocumentPaymentStatuses } from "@/models/ledger-payments"
@@ -60,6 +63,25 @@ export default async function DocumentPage({ params, searchParams }: {
   const sidecar: BlocksSidecar | null = blocksJson ? (() => { try { return JSON.parse(blocksJson) as BlocksSidecar } catch { return null } })() : null
   const provenance = rawProvenance && sidecar ? repairMissingBboxes(rawProvenance, sidecar, data) : rawProvenance
   const codingData = (document.codingData as Record<string, unknown> | null) ?? {}
+
+  const templateCode = document.template?.code ?? ""
+  const fewShotExamples = templateCode ? await getFewShotExamples(workspaceId, templateCode) : []
+  const appliedRuleId = (document as Record<string, unknown>).appliedRuleId as string | null
+  const appliedRule = appliedRuleId ? await prisma.automationRule.findUnique({ where: { id: appliedRuleId }, select: { name: true } }) : null
+  const appliedRuleName = appliedRule?.name ?? null
+  const fieldKeys = fields.map((f) => f.key)
+  const rationaleList = buildFieldRationales({
+    codingData: Object.keys(codingData).length > 0 ? codingData : null,
+    appliedRuleId,
+    appliedRuleName,
+    fieldConfidences: fieldConfidence,
+    provenance: rawProvenance as Record<string, unknown> | null,
+    fewShotExamples,
+    fieldKeys,
+  })
+  const rationales: Record<string, FieldRationale> = {}
+  for (const r of rationaleList) rationales[r.fieldKey] = r
+
   const saveReview = async (formData: FormData) => { "use server"; await saveDocumentReviewAction(workspaceId, documentId, formData) }
   const supplierValue = data.vendor ?? data.merchant
   const supplier = typeof supplierValue === "string" ? supplierValue.trim() : ""
@@ -128,6 +150,7 @@ export default async function DocumentPage({ params, searchParams }: {
     pushCard={canPush ? <PushToAccountingCard workspaceId={workspaceId} documentId={documentId} connections={connections} pushes={pushes} paymentStatus={(() => { const ps = paymentStatuses.get(documentId); return ps ? { ...ps, syncedAt: ps.syncedAt.toISOString() } : null })()} /> : null}
     canCreateRule={canCreateRule}
     defaultSupplier={supplier}
+    rationales={rationales}
     matchKind={matchKind}
     bankMatches={matchKind ? <MatchPanel
       workspaceId={workspaceId}

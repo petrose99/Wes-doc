@@ -61,6 +61,11 @@ export const MODULES: ModuleDefinition[] = [
   { key: "dictation", name: "Dictation", description: "Speech-to-structured-report dictation.", industry: "finance", tier: "always", activation: "enable", requiresConfig: "asr", navItems: [{ href: "dictation", label: "Dictation", icon: "mic" }] },
 
   { key: "data-health", name: "Data health", description: "Automated bookkeeping quality audits with source-document-linked findings.", industry: "finance", tier: "always", activation: "enable", navItems: [{ href: "health", label: "Health Checks", icon: "heart-pulse" }] },
+
+  { key: "touchless-automation", name: "Touchless automation", description: "Auto-approve routine documents that pass confidence, policy, and budget checks.", industry: "finance", tier: "default", activation: "enable", navItems: [{ href: "automation", label: "Automation", icon: "zap" }] },
+  { key: "policy-agent", name: "Policy agent", description: "AI policy evaluation against workspace rules before auto-approval.", industry: "finance", tier: "default", activation: "enable" },
+  { key: "document-matching", name: "Document matching", description: "2/3-way PO-to-invoice-to-receipt matching with confidence scoring.", industry: "finance", tier: "default", activation: "enable" },
+  { key: "budget-controls", name: "Budget controls", description: "Per-vendor and per-category spend budgets with threshold alerts.", industry: "finance", tier: "optional", activation: "enable", navItems: [{ href: "settings/budgets", label: "Budgets", icon: "wallet" }] },
 ]
 
 export function findModule(key: string | null | undefined): ModuleDefinition | null {
