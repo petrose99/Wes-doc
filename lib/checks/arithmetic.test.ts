@@ -61,4 +61,31 @@ describe("checkInvoiceArithmetic", () => {
     expect(result?.status).toBe("fail")
     expect(result?.message).toContain(";")
   })
+
+  describe("shipping & handling", () => {
+    it("passes when subtotal + tax + shipping equals total", () => {
+      // The Bioplex case: 5964.50 + 596.45 + 50.00 = 6610.95
+      const result = checkInvoiceArithmetic(base({ subtotal: 5964.5, taxTotal: 596.45, shippingTotal: 50, total: 6610.95 }))
+      expect(result?.status).toBe("pass")
+      expect(result?.detail?.shippingTotal).toBe(50)
+    })
+
+    it("fails and names shipping in the message when the sum still misses the total", () => {
+      const result = checkInvoiceArithmetic(base({ shippingTotal: 5, total: 120 }))
+      expect(result?.status).toBe("fail")
+      expect(result?.message).toContain("shipping (5)")
+    })
+
+    it("treats a null shipping total exactly like the field being absent", () => {
+      const withNull = checkInvoiceArithmetic(base({ shippingTotal: null }))
+      expect(withNull?.status).toBe("pass")
+      expect(withNull?.detail?.shippingTotal).toBeUndefined()
+      expect(withNull?.message).not.toContain("shipping")
+    })
+
+    it("does not let shipping mask a genuine mismatch", () => {
+      const result = checkInvoiceArithmetic(base({ shippingTotal: 10, total: 135 }))
+      expect(result?.status).toBe("fail")
+    })
+  })
 })

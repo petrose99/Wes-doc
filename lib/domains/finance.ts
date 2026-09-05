@@ -19,6 +19,7 @@ export const FINANCE_TEMPLATES = [
       { key: "currency_code", label: "Currency shown", type: "string", instruction: "Literal ISO 4217 code printed on the document; do not convert", required: false },
       { key: "subtotal", label: "Subtotal", type: "number", instruction: "Amount before tax", required: false, mergeStrategy: "last" },
       { key: "tax_total", label: "Tax total", type: "number", instruction: "Total tax or VAT", required: false, mergeStrategy: "last" },
+      { key: "shipping_total", label: "Shipping & handling", type: "number", instruction: "Shipping, handling, freight, or delivery charge shown separately from the subtotal. Leave blank if the invoice has none.", required: false, mergeStrategy: "last" },
       { key: "total", label: "Total", type: "number", instruction: "Amount payable including taxes", required: true, mergeStrategy: "last" },
       { key: "line_items", label: "Line items", type: "array", instruction: "Each billed line item", required: false, itemFields: [
         { key: "description", label: "Description", type: "string", instruction: "What was billed", required: false },

@@ -269,6 +269,7 @@ export function buildDocumentPrompt(templateName: string, fields: DocumentFieldD
     "Keep every string value short and factual (under 300 characters). Never repeat text.",
     "The document is supplied as markdown produced by a document-parsing service, with tables rendered as markdown or HTML. Parsing can introduce recognition errors, so where a value looks garbled, extract the most plausible reading of it.",
     "For array fields (such as line items): if the document contains a table of items, you MUST extract every row as one entry. Do not omit, summarize, or truncate rows.",
+    "Tables can break across pages, splitting one item into two rows. NEVER emit an entry that has only a description and no quantity, unit price, or amount — such a fragment (a product code, a description tail) is the continuation of the adjacent row: append its text to that row's description and do not count it as an item.",
     "Fields:",
     ...fields.flatMap((field) => [
       `- ${field.key} (${field.type}${field.required ? ", required" : ""}): ${field.instruction || field.label}`,
@@ -294,6 +295,7 @@ export function buildFreeFormPrompt() {
     "- Dates use YYYY-MM-DD. Amounts are plain numbers. Never convert currencies.",
     "- Keep every string value short and factual (under 300 characters).",
     "- Extract EVERY row from tables. Do not omit, summarize, or truncate.",
+    "- A near-empty row holding only a text fragment (a product code, a description tail) with no amounts is usually a page-break continuation of the adjacent row — merge it into that row rather than emitting it as its own entry.",
     "- Do not invent values; omit unreadable values.",
     "- The document is supplied as markdown from a document-parsing service. Where a value looks garbled, extract the most plausible reading.",
     "Also return `_confidence`: an object with a 0-1 confidence score for each top-level key.",

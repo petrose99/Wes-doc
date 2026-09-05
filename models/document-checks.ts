@@ -21,13 +21,13 @@ import { Prisma } from "@/prisma/client"
  * no checks — not every document has arithmetic or a balance to verify. */
 type CheckFieldMap = {
   supplier?: string; invoiceNumber?: string; date?: string
-  subtotal?: string; taxTotal?: string; total?: string; currency?: string; lineItems?: string
+  subtotal?: string; taxTotal?: string; shippingTotal?: string; total?: string; currency?: string; lineItems?: string
   accountNumber?: string; openingBalance?: string; closingBalance?: string; periodStart?: string; periodEnd?: string; transactions?: string
   supplierVatNumber?: string
 }
 
 const CHECK_FIELD_MAPS: Record<string, CheckFieldMap> = {
-  invoice: { supplier: "vendor", invoiceNumber: "invoice_number", date: "issue_date", subtotal: "subtotal", taxTotal: "tax_total", total: "total", currency: "currency_code", lineItems: "line_items", supplierVatNumber: "supplier_vat_number" },
+  invoice: { supplier: "vendor", invoiceNumber: "invoice_number", date: "issue_date", subtotal: "subtotal", taxTotal: "tax_total", shippingTotal: "shipping_total", total: "total", currency: "currency_code", lineItems: "line_items", supplierVatNumber: "supplier_vat_number" },
   receipt: { supplier: "merchant", invoiceNumber: "receipt_number", date: "purchase_date", taxTotal: "tax_total", total: "total", currency: "currency_code", lineItems: "line_items" },
   expense_receipt: { supplier: "merchant", invoiceNumber: "receipt_number", date: "purchase_date", taxTotal: "tax_total", total: "total", currency: "currency_code" },
   purchase_order: { supplier: "supplier", invoiceNumber: "po_number", date: "order_date", total: "total", currency: "currency_code", lineItems: "line_items" },
@@ -75,7 +75,7 @@ export async function runDeterministicChecks(input: { workspaceId: string; docum
     const results: CheckResult[] = []
 
     if (map.total || map.subtotal) {
-      const arithmetic = checkInvoiceArithmetic({ currencyCode, subtotal: asNumber(get("subtotal")), taxTotal: asNumber(get("taxTotal")), total: asNumber(get("total")), lineItems })
+      const arithmetic = checkInvoiceArithmetic({ currencyCode, subtotal: asNumber(get("subtotal")), taxTotal: asNumber(get("taxTotal")), shippingTotal: asNumber(get("shippingTotal")), total: asNumber(get("total")), lineItems })
       if (arithmetic) results.push(arithmetic)
     }
 

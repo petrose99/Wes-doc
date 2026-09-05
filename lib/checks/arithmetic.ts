@@ -4,11 +4,14 @@ export type ArithmeticInput = {
   currencyCode: string | null
   subtotal: number | null
   taxTotal: number | null
+  /** Shipping/handling/freight shown separately from the subtotal — part of the total but not of
+   * subtotal or tax. Optional so older callers (and templates without the field) keep working. */
+  shippingTotal?: number | null
   total: number | null
   lineItems: { amount: number | null }[]
 }
 
-/** subtotal + tax ≈ total, and (when every line item has an amount) the line items sum to
+/** subtotal + tax (+ shipping when present) ≈ total, and (when every line item has an amount) the line items sum to
  * whichever of subtotal/total is present. One of only two checks that defaults to "fail" rather
  * than "warn" (the roadmap's own call) — a total that doesn't add up is not a judgment call, it's
  * either a misread number or a genuinely wrong document, and either way it should not reach a
@@ -23,10 +26,15 @@ export function checkInvoiceArithmetic(input: ArithmeticInput): CheckResult | nu
   const detail: Record<string, unknown> = {}
 
   if (input.subtotal !== null && input.taxTotal !== null && input.total !== null) {
-    const expected = input.subtotal + input.taxTotal
+    const shipping = input.shippingTotal ?? null
+    const expected = input.subtotal + input.taxTotal + (shipping ?? 0)
     detail.subtotalPlusTax = expected
+    if (shipping !== null) detail.shippingTotal = shipping
     if (!amountsMatch(expected, input.total, input.currencyCode)) {
-      issues.push(`subtotal (${input.subtotal}) + tax (${input.taxTotal}) = ${round2(expected)}, but total is ${input.total}`)
+      const parts = shipping !== null
+        ? `subtotal (${input.subtotal}) + tax (${input.taxTotal}) + shipping (${shipping})`
+        : `subtotal (${input.subtotal}) + tax (${input.taxTotal})`
+      issues.push(`${parts} = ${round2(expected)}, but total is ${input.total}`)
     }
   }
 
