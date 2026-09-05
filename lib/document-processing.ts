@@ -425,6 +425,7 @@ export async function processDocumentJob(jobId: string) {
           supplierValue: typeof supplierValue === "string" ? supplierValue : null,
           supplierConfidence: fieldConfidence[supplierField] ?? null,
         },
+        aiContext: { documentData: extraction },
       })
     }
     // Runs after rules, per the roadmap — a check comparing against codingData (or a future check

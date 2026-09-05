@@ -30,6 +30,9 @@ const EVENT_SCHEMAS = {
    * numbers involved, which could reconstruct a customer's actual financial data from the event
    * stream alone. */
   document_check_failed: z.object({ documentId: uuid, checkCode: z.string().max(80), status: z.enum(["warn", "fail"]) }).strict(),
+  ai_coding_suggested: z.object({ documentId: uuid, confidence: z.number() }).strict(),
+  ai_coding_accepted: z.object({ documentId: uuid }).strict(),
+  ai_coding_overridden: z.object({ documentId: uuid, fieldCount: z.number().int().nonnegative() }).strict(),
 } as const
 
 export type AnalyticsEventName = keyof typeof EVENT_SCHEMAS

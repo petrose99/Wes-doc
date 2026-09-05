@@ -31,7 +31,7 @@ export type ReviewQueueRow = {
 
 type TaskDetail = Awaited<ReturnType<typeof getReviewTaskDetailAction>>
 
-const REASON_LABELS: Record<string, string> = { manual: "Manual", low_confidence: "Low confidence", rule_required: "Rule required", check_failed: "Check failed" }
+const REASON_LABELS: Record<string, string> = { manual: "Manual", low_confidence: "Low confidence", rule_required: "Rule required", check_failed: "Check failed", ai_suggestion: "AI suggestion" }
 const CHECK_LABELS: Record<string, string> = {
   duplicate: "Duplicate", invoice_arithmetic: "Arithmetic", statement_balance: "Balance",
   missing_statement_period: "Gap", tax_consistency: "Tax", suspicious_resubmission: "Resubmission",

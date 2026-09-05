@@ -137,6 +137,8 @@ model Workspace {
   modules         WorkspaceModule[]
   inboundEmailAllowedSenders InboundEmailAllowedSender[]
   fieldCorrections FieldCorrection[]
+  codingCorrections CodingCorrection[]
+  agentVerdicts AgentVerdict[]
   accountingEntities AccountingEntity[]
   bankMatches BankMatch[]
   approvalWorkflows ApprovalWorkflow[]
@@ -406,6 +408,13 @@ model Document {
   /// itself; a template has no "cost centre" field to validate it against. Null means no rule
   /// matched (or none exist yet).
   codingData        Json?                    @map("coding_data")
+  /// Who produced codingData: "rule" (automation rule matched), "ai" (coding agent suggested),
+  /// "manual" (a person set or confirmed it). Null for documents coded before this column existed.
+  codingSource      String?                  @map("coding_source")
+  /// The coding agent's confidence in its suggestion (0–1). Only meaningful when codingSource is
+  /// "ai"; null otherwise. High confidence (≥ 0.9) keeps the document touchless; lower lands it
+  /// in review with the suggestion pre-filled.
+  codingConfidence  Float?                   @map("coding_confidence")
   /// The rule that produced codingData, if any — SetNull so deleting a rule does not silently
   /// misattribute already-coded documents to no rule at all versus a different one.
   appliedRuleId     String?                  @map("applied_rule_id") @db.Uuid
@@ -486,6 +495,7 @@ model Document {
   expenseClaimItems ExpenseClaimItem[]
   healthCheckResults HealthCheckResult[]
   sheetPlacements    DocumentSheetPlacement[]
+  agentVerdicts      AgentVerdict[]
 
   @@unique([fileId, sha256])
   @@index([workspaceId, status])
@@ -1571,6 +1581,49 @@ model FieldCorrection {
   @@unique([workspaceId, templateCode, fieldKey, wrongValue, correctedValue])
   @@index([workspaceId, templateCode, fieldKey, updatedAt])
   @@map("field_corrections")
+}
+
+/// AI coding fallback: same shape as FieldCorrection but keyed on coding keys (account, taxCode,
+/// costCentre) rather than extraction fields. When a reviewer overrides an AI-suggested coding, the
+/// diff is recorded here and fed into future coding-agent prompts to prevent the same mistake.
+model CodingCorrection {
+  id             String    @id @default(uuid()) @db.Uuid
+  workspaceId    String    @map("workspace_id") @db.Uuid
+  templateCode   String    @map("template_code")
+  supplier       String?
+  codingKey      String    @map("coding_key")
+  wrongValue     String    @map("wrong_value")
+  correctedValue String    @map("corrected_value")
+  hitCount       Int       @default(1) @map("hit_count")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, templateCode, codingKey, wrongValue, correctedValue])
+  @@index([workspaceId, templateCode])
+  @@map("coding_corrections")
+}
+
+/// Cached LLM verdicts for AI agents (coding, policy, approval-context). Keyed by (documentId,
+/// agentKind, inputHash) so a re-run with identical inputs returns the cached result. The verdict
+/// is Json (not String) because each agent kind stores a different shape — coding stores
+/// {codingData, confidence}, policy stores {decision, reasoning}.
+model AgentVerdict {
+  id          String   @id @default(uuid()) @db.Uuid
+  workspaceId String   @map("workspace_id") @db.Uuid
+  documentId  String   @map("document_id") @db.Uuid
+  agentKind   String   @map("agent_kind")
+  inputHash   String   @map("input_hash")
+  verdict     Json
+  rationale   Json?
+  model       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  document    Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId, agentKind, inputHash])
+  @@index([workspaceId])
+  @@map("agent_verdicts")
 }
 
 /// WP1.5: a synced snapshot of one QuickBooks/Xero entity (account, vendor, or tax rate) — powers

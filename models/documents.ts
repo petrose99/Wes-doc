@@ -11,6 +11,7 @@ import { normalizeBillFromDocument } from "@/lib/integration-bill-mapping"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import type { DocumentProvenance } from "@/lib/provenance"
 import { replaceDocumentFieldValues } from "@/models/document-field-values"
+import { recordCodingCorrection } from "@/models/coding-corrections"
 import { recordFieldCorrection } from "@/models/field-corrections"
 import { listWorkspaceIntegrationPushes } from "@/models/integrations"
 import { emitWorkspaceEvent } from "@/lib/webhooks"
@@ -451,13 +452,49 @@ export async function updateDocumentField(input: { workspaceId: string; document
  * that machinery to keep in sync. `appliedRuleId` is left untouched: this is coding a person (or
  * the agent, on their behalf) chose, not a rule matching, so it must not look like one did. */
 export async function setDocumentCoding(input: { workspaceId: string; documentId: string; codingData: Record<string, string | number>; actorId: string }) {
-  const document = await prisma.document.findFirst({ where: { id: input.documentId, workspaceId: input.workspaceId }, select: { id: true } })
+  const document = await prisma.document.findFirst({
+    where: { id: input.documentId, workspaceId: input.workspaceId },
+    select: { id: true, codingData: true, codingSource: true, template: { select: { code: true } } },
+  })
   if (!document) throw new Error("document_not_found")
+
+  const priorCodingData = (document.codingData as Record<string, unknown> | null) ?? {}
+  const priorSource = document.codingSource
+
   const updated = await prisma.$transaction(async (tx) => {
-    const document_ = await tx.document.update({ where: { id: document.id }, data: { codingData: input.codingData as Prisma.InputJsonValue } })
+    const document_ = await tx.document.update({
+      where: { id: document.id },
+      data: { codingData: input.codingData as Prisma.InputJsonValue, codingSource: "manual", codingConfidence: null },
+    })
     await recordDocumentAudit({ workspaceId: input.workspaceId, documentId: document.id, actorId: input.actorId, type: "document_coding_set", detail: { codingData: input.codingData } }, tx)
     return document_
   })
+
+  if (priorSource === "ai") {
+    const templateCode = document.template?.code
+    if (templateCode) {
+      const reviewedData = (updated.reviewedData as Record<string, unknown> | null) ?? {}
+      const supplierField = SUPPLIER_FIELD_BY_TEMPLATE[templateCode]
+      const supplier = supplierField ? asScalarString(reviewedData[supplierField]) : null
+
+      let changedCount = 0
+      for (const [key, newValue] of Object.entries(input.codingData)) {
+        const oldValue = asScalarString(priorCodingData[key])
+        const newStr = asScalarString(newValue)
+        if (oldValue !== null && newStr !== null && oldValue !== newStr) {
+          changedCount++
+          recordCodingCorrection({ workspaceId: input.workspaceId, templateCode, codingKey: key, supplier, wrongValue: oldValue, correctedValue: newStr })
+            .catch((error) => console.error("[documents] failed to record coding correction:", error instanceof Error ? error.message : error))
+        }
+      }
+
+      if (changedCount > 0) {
+        await recordDocumentAudit({ workspaceId: input.workspaceId, documentId: document.id, actorId: input.actorId, type: "ai_coding.overridden" })
+        await track("ai_coding_overridden", { documentId: document.id, fieldCount: changedCount }, { workspaceId: input.workspaceId, actorId: input.actorId })
+      }
+    }
+  }
+
   return updated
 }
 

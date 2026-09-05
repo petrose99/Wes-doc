@@ -4,11 +4,16 @@ vi.mock("@/lib/db", () => ({ prisma: {} }))
 vi.mock("@/prisma/client", () => ({ Prisma: {} }))
 vi.mock("@/lib/analytics", () => ({ track: vi.fn() }))
 vi.mock("@/models/review-tasks", () => ({ createReviewTask: vi.fn() }))
+vi.mock("@/lib/modules/capabilities", () => ({ getWorkspaceCapabilities: vi.fn().mockResolvedValue({ has: () => false, pushableTemplateCodes: [] }) }))
+vi.mock("@/models/coding-corrections", () => ({ getCodingCorrectionExamples: vi.fn().mockResolvedValue([]) }))
+vi.mock("@/lib/agents/coding-agent", () => ({ suggestCoding: vi.fn().mockResolvedValue(null) }))
 
 const { applyAutomationRules, createAutomationRule, updateAutomationRule } = await import("@/models/automation-rules")
 const { prisma } = await import("@/lib/db")
 const { track } = await import("@/lib/analytics")
 const { createReviewTask } = await import("@/models/review-tasks")
+const { getWorkspaceCapabilities } = await import("@/lib/modules/capabilities")
+const { suggestCoding } = await import("@/lib/agents/coding-agent")
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = prisma as any
@@ -57,7 +62,7 @@ describe("updateAutomationRule", () => {
 describe("applyAutomationRules", () => {
   const extraction = { templateCode: "invoice", supplierValue: "Acme Supplies", supplierConfidence: 0.9 }
 
-  it("persists coding, bumps hitCount, and writes rule.applied when a rule matches", async () => {
+  it("persists coding with codingSource rule when a rule matches", async () => {
     db.automationRule = {
       findMany: vi.fn().mockResolvedValue([{ id: "r1", matcher: { type: "exact", value: "Acme Supplies" }, actions: { codingData: { account: "6000" } }, minConfidence: null, requireReview: false, isActive: true, createdAt: new Date() }]),
       update: vi.fn().mockReturnValue("bump-hits"),
@@ -67,12 +72,12 @@ describe("applyAutomationRules", () => {
 
     await applyAutomationRules({ workspaceId: "w1", documentId: "d1", templateCode: "invoice", extraction })
 
-    expect(db.document.update).toHaveBeenCalledWith({ where: { id: "d1" }, data: { codingData: { account: "6000" }, appliedRuleId: "r1" } })
+    expect(db.document.update).toHaveBeenCalledWith({ where: { id: "d1" }, data: { codingData: { account: "6000" }, appliedRuleId: "r1", codingSource: "rule", codingConfidence: null } })
     expect(db.automationRule.update).toHaveBeenCalledWith({ where: { id: "r1" }, data: { hitCount: { increment: 1 } } })
     expect(createReviewTask).not.toHaveBeenCalled()
   })
 
-  it("creates a review task and skips coding writes when nothing matches but rules exist", async () => {
+  it("creates a review task when no rule matches and AI is not enabled", async () => {
     db.automationRule = { findMany: vi.fn().mockResolvedValue([{ id: "r1", matcher: { type: "exact", value: "Someone Else" }, actions: { codingData: {} }, minConfidence: null, requireReview: false, isActive: true, createdAt: new Date() }]) }
     db.document = { update: vi.fn() }
 
@@ -80,6 +85,68 @@ describe("applyAutomationRules", () => {
 
     expect(db.document.update).not.toHaveBeenCalled()
     expect(createReviewTask).toHaveBeenCalledWith(expect.objectContaining({ workspaceId: "w1", documentId: "d1", reason: "rule_required" }))
+  })
+
+  it("invokes AI fallback when no rule matches and ai-coding is enabled", async () => {
+    db.automationRule = { findMany: vi.fn().mockResolvedValue([{ id: "r1", matcher: { type: "exact", value: "Someone Else" }, actions: { codingData: { account: "6000" } }, minConfidence: null, requireReview: false, isActive: true, createdAt: new Date() }]) }
+    db.document = { update: vi.fn().mockReturnValue("update-doc"), findFirst: vi.fn().mockResolvedValue({ codingData: null, codingSource: null }) }
+    db.documentAuditEvent = { create: vi.fn().mockReturnValue("audit") }
+    vi.mocked(getWorkspaceCapabilities).mockResolvedValue({ has: (k: string) => k === "ai-coding", pushableTemplateCodes: [] } as ReturnType<typeof getWorkspaceCapabilities> extends Promise<infer T> ? T : never)
+    vi.mocked(suggestCoding).mockResolvedValue({ codingData: { account: "7000" }, confidence: 0.95, rationale: "Similar to Beta Ltd" })
+
+    await applyAutomationRules({
+      workspaceId: "w1", documentId: "d1", templateCode: "invoice", extraction,
+      aiContext: { documentData: { vendor: "Acme Supplies", total: 500 } },
+    })
+
+    expect(suggestCoding).toHaveBeenCalled()
+    expect(db.document.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ codingSource: "ai", codingConfidence: 0.95 }),
+    }))
+    expect(createReviewTask).not.toHaveBeenCalled()
+  })
+
+  it("creates an ai_suggestion review task when AI confidence is low", async () => {
+    db.automationRule = { findMany: vi.fn().mockResolvedValue([{ id: "r1", matcher: { type: "exact", value: "Someone Else" }, actions: { codingData: { account: "6000" } }, minConfidence: null, requireReview: false, isActive: true, createdAt: new Date() }]) }
+    db.document = { update: vi.fn().mockReturnValue("update-doc"), findFirst: vi.fn().mockResolvedValue({ codingData: null, codingSource: null }) }
+    db.documentAuditEvent = { create: vi.fn().mockReturnValue("audit") }
+    vi.mocked(getWorkspaceCapabilities).mockResolvedValue({ has: (k: string) => k === "ai-coding", pushableTemplateCodes: [] } as ReturnType<typeof getWorkspaceCapabilities> extends Promise<infer T> ? T : never)
+    vi.mocked(suggestCoding).mockResolvedValue({ codingData: { account: "7000" }, confidence: 0.6, rationale: "Uncertain match" })
+
+    await applyAutomationRules({
+      workspaceId: "w1", documentId: "d1", templateCode: "invoice", extraction,
+      aiContext: { documentData: { vendor: "Acme Supplies" } },
+    })
+
+    expect(createReviewTask).toHaveBeenCalledWith(expect.objectContaining({ reason: "ai_suggestion" }))
+  })
+
+  it("falls back to rule_required when AI returns null", async () => {
+    db.automationRule = { findMany: vi.fn().mockResolvedValue([{ id: "r1", matcher: { type: "exact", value: "Someone Else" }, actions: { codingData: { account: "6000" } }, minConfidence: null, requireReview: false, isActive: true, createdAt: new Date() }]) }
+    db.document = { update: vi.fn(), findFirst: vi.fn().mockResolvedValue({ codingData: null, codingSource: null }) }
+    vi.mocked(getWorkspaceCapabilities).mockResolvedValue({ has: (k: string) => k === "ai-coding", pushableTemplateCodes: [] } as ReturnType<typeof getWorkspaceCapabilities> extends Promise<infer T> ? T : never)
+    vi.mocked(suggestCoding).mockResolvedValue(null)
+
+    await applyAutomationRules({
+      workspaceId: "w1", documentId: "d1", templateCode: "invoice", extraction,
+      aiContext: { documentData: {} },
+    })
+
+    expect(createReviewTask).toHaveBeenCalledWith(expect.objectContaining({ reason: "rule_required" }))
+  })
+
+  it("skips AI when document is already manually coded", async () => {
+    db.automationRule = { findMany: vi.fn().mockResolvedValue([{ id: "r1", matcher: { type: "exact", value: "Someone Else" }, actions: { codingData: { account: "6000" } }, minConfidence: null, requireReview: false, isActive: true, createdAt: new Date() }]) }
+    db.document = { update: vi.fn(), findFirst: vi.fn().mockResolvedValue({ codingData: {}, codingSource: "manual" }) }
+    vi.mocked(getWorkspaceCapabilities).mockResolvedValue({ has: (k: string) => k === "ai-coding", pushableTemplateCodes: [] } as ReturnType<typeof getWorkspaceCapabilities> extends Promise<infer T> ? T : never)
+
+    await applyAutomationRules({
+      workspaceId: "w1", documentId: "d1", templateCode: "invoice", extraction,
+      aiContext: { documentData: {} },
+    })
+
+    expect(suggestCoding).not.toHaveBeenCalled()
+    expect(createReviewTask).toHaveBeenCalledWith(expect.objectContaining({ reason: "rule_required" }))
   })
 
   it("swallows an internal error rather than throwing past the caller", async () => {
