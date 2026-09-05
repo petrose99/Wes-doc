@@ -3,12 +3,14 @@ import { SplitPane } from "@/components/pipeline/document-detail/split-pane"
 import { PushToAccountingCard } from "@/components/documents/push-to-accounting-card"
 import { MatchPanel } from "@/components/bank-match/match-panel"
 import { getCurrentUser } from "@/lib/auth"
+import { prisma } from "@/lib/db"
 import { parseTemplateFields } from "@/lib/document-templates"
 import type { BlocksSidecar, DocumentProvenance } from "@/lib/provenance"
 import { repairMissingBboxes } from "@/lib/provenance"
 import { documentBlocksKey, readDocumentBlocks } from "@/lib/document-storage"
 import { PIPELINE_STAGES, type PipelineStage } from "@/lib/documents/stages"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
+import { fieldRationale, type FieldRationale } from "@/lib/rationale"
 import { listBankMatches } from "@/models/bank-matches"
 import { listDocumentAuditEvents } from "@/models/audit-events"
 import { getWorkspaceDocument, listWorkspaceDocuments } from "@/models/documents"
@@ -60,6 +62,21 @@ export default async function DocumentPage({ params, searchParams }: {
   const sidecar: BlocksSidecar | null = blocksJson ? (() => { try { return JSON.parse(blocksJson) as BlocksSidecar } catch { return null } })() : null
   const provenance = rawProvenance && sidecar ? repairMissingBboxes(rawProvenance, sidecar, data) : rawProvenance
   const codingData = (document.codingData as Record<string, unknown> | null) ?? {}
+  const codingKeys = Object.keys(codingData)
+  const hasRuleMatch = document.appliedRuleId !== null
+  const codingSource = (document as Record<string, unknown>).codingSource as string | null
+  const codingConfidence = (document as Record<string, unknown>).codingConfidence as number | null
+  const aiVerdict = codingSource === "ai" ? await prisma.agentVerdict.findFirst({
+    where: { documentId, agentKind: "coding" },
+    orderBy: { createdAt: "desc" },
+    select: { rationale: true },
+  }) : null
+  const aiRationale = aiVerdict?.rationale as string | null
+  const fieldRationales: Record<string, FieldRationale> = {}
+  for (const f of fields) {
+    const r = fieldRationale({ fieldKey: f.key, codingKeys, codingSource, codingConfidence, aiRationale, hasRuleMatch })
+    if (r.source !== "extraction") fieldRationales[f.key] = r
+  }
   const saveReview = async (formData: FormData) => { "use server"; await saveDocumentReviewAction(workspaceId, documentId, formData) }
   const supplierValue = data.vendor ?? data.merchant
   const supplier = typeof supplierValue === "string" ? supplierValue.trim() : ""
@@ -128,6 +145,7 @@ export default async function DocumentPage({ params, searchParams }: {
     pushCard={canPush ? <PushToAccountingCard workspaceId={workspaceId} documentId={documentId} connections={connections} pushes={pushes} paymentStatus={(() => { const ps = paymentStatuses.get(documentId); return ps ? { ...ps, syncedAt: ps.syncedAt.toISOString() } : null })()} /> : null}
     canCreateRule={canCreateRule}
     defaultSupplier={supplier}
+    fieldRationales={fieldRationales}
     matchKind={matchKind}
     bankMatches={matchKind ? <MatchPanel
       workspaceId={workspaceId}

@@ -1,6 +1,7 @@
 // Deliberately NOT a "use server" module, matching models/documents.ts and models/workspaces.ts:
 // these helpers trust the workspaceId they are handed. Server actions live in
 // app/(app)/workspaces/[workspaceId]/review-actions.ts and do the auth.
+import { track } from "@/lib/analytics"
 import { canDecideStage, decideStage, findCurrentStage } from "@/lib/approvals/engine"
 import { auditEventData, getRequestAuditContext } from "@/lib/audit"
 import { prisma } from "@/lib/db"
@@ -184,4 +185,25 @@ export async function assignReviewTask(input: { workspaceId: string; taskId: str
     prisma.documentAuditEvent.create({ data: auditEventData({ workspaceId: input.workspaceId, documentId: task.documentId, actorId: input.actorId, type: "review_task_assigned", detail: { assigneeId: input.assigneeId } }, context) }),
   ])
   return updated
+}
+
+/** When a reviewer approves an ai_suggestion task, the AI coding is confirmed: codingSource
+ * flips to "manual" (reviewer has signed off) and we track the acceptance for analytics. Called
+ * from the server action layer after any approval, same pattern as maybeAutopublish. */
+export async function maybeConfirmAiCoding(workspaceId: string, documentId: string, actorId: string) {
+  const task = await prisma.reviewTask.findFirst({
+    where: { workspaceId, documentId, reason: "ai_suggestion", status: "approved" },
+    select: { id: true },
+  })
+  if (!task) return
+  const doc = await prisma.document.findFirst({
+    where: { id: documentId, workspaceId },
+    select: { codingSource: true },
+  })
+  if (doc?.codingSource !== "ai") return
+  await prisma.document.update({
+    where: { id: documentId },
+    data: { codingSource: "manual", codingConfidence: null },
+  })
+  await track("ai_coding_accepted", { documentId }, { workspaceId, actorId })
 }

@@ -6,7 +6,7 @@ import { AssistantPanel } from "@/components/assistant/assistant-panel"
 import { DocumentPreview } from "@/components/documents/document-preview"
 import { AutomationRuleForm } from "@/components/workspace/automation-rule-form"
 import type { FUniver } from "@univerjs/presets"
-import { Sparkles } from "lucide-react"
+import { Bot, Sparkles } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
@@ -360,6 +360,14 @@ export function ReviewInbox({ workspaceId, tasks, currentStatus, members, financ
           {detail.document.storageKey
             ? <DocumentPreview src={`/api/documents/${detail.document.id}/source`} filename={detail.document.filename} mimeType={detail.document.mimeType} className="mt-3 h-64 rounded border" />
             : <p className="mt-3 rounded border border-dashed p-4 text-center text-xs text-slate-400">Source not available</p>}
+
+          {detail.reason === "ai_suggestion" && detail.document.codingSource === "ai" && <div className="mt-3 flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2">
+            <Bot className="h-4 w-4 text-indigo-600" />
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold text-indigo-800">AI-suggested coding</p>
+              {typeof detail.document.codingConfidence === "number" && <p className="text-[10px] text-indigo-600">Confidence: {Math.round(detail.document.codingConfidence * 100)}%</p>}
+            </div>
+          </div>}
 
           <div className="mt-4 space-y-2">
             <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">Assignee</label>

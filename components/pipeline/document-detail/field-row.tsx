@@ -2,20 +2,43 @@
 
 import { LineItemsEditor } from "@/components/documents/line-items-editor"
 import type { DocumentFieldDefinition } from "@/lib/document-templates"
+import type { FieldSource } from "@/lib/rationale"
 import type { Ref } from "@/lib/provenance"
-import { Crosshair, Pencil } from "lucide-react"
+import { Bot, Crosshair, Pencil, Workflow } from "lucide-react"
+import { useState } from "react"
 
 const LOW_CONFIDENCE = 0.6
 
-export function FieldRow({ field, value, confidence, ref: provenanceRef, onFocusSource }: {
+const SOURCE_BADGE: Record<string, { label: string; color: string; icon: typeof Bot }> = {
+  ai: { label: "AI", color: "bg-indigo-50 text-indigo-700 border-indigo-200", icon: Bot },
+  rule: { label: "Rule", color: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: Workflow },
+  manual: { label: "Manual", color: "bg-slate-100 text-slate-600 border-slate-200", icon: Pencil },
+}
+
+function RationalePopover({ confidence, rationale }: { confidence?: number; rationale?: string }) {
+  const [open, setOpen] = useState(false)
+  if (!rationale && confidence === undefined) return null
+  return <span className="relative">
+    <button type="button" className="text-[10px] text-indigo-500 underline decoration-dotted" onClick={() => setOpen(!open)}>why?</button>
+    {open && <span className="absolute left-0 top-full z-20 mt-1 w-56 rounded-lg border border-slate-200 bg-white p-2.5 text-xs text-slate-600 shadow-lg">
+      {confidence !== undefined && <span className="mb-1 block font-semibold text-slate-800">Confidence: {Math.round(confidence * 100)}%</span>}
+      {rationale && <span className="block">{rationale}</span>}
+      <button type="button" className="mt-1.5 text-[10px] text-slate-400 hover:text-slate-600" onClick={() => setOpen(false)}>close</button>
+    </span>}
+  </span>
+}
+
+export function FieldRow({ field, value, confidence, ref: provenanceRef, onFocusSource, codingSource }: {
   field: DocumentFieldDefinition
   value: unknown
   confidence: number | null
   ref: Ref | null
   onFocusSource: (target: { page: number; bbox: Ref["bbox"]; quote: string }) => void
+  codingSource?: { source: FieldSource; confidence?: number; rationale?: string } | null
 }) {
   const lowConfidence = typeof confidence === "number" && confidence < LOW_CONFIDENCE
   const isArray = field.type === "array"
+  const badge = codingSource ? SOURCE_BADGE[codingSource.source] : null
 
   if (isArray) {
     return <div className="pt-2">
@@ -31,6 +54,10 @@ export function FieldRow({ field, value, confidence, ref: provenanceRef, onFocus
         {field.label}{field.required && <span className="ml-0.5 text-red-400">*</span>}
       </label>
       {lowConfidence && <span className="rounded-full bg-amber-100 px-1.5 py-px text-[10px] font-semibold text-amber-700">Low confidence</span>}
+      {badge && <span className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-px text-[10px] font-semibold ${badge.color}`}>
+        <badge.icon className="h-2.5 w-2.5" />{badge.label}
+      </span>}
+      {codingSource?.source === "ai" && <RationalePopover confidence={codingSource.confidence} rationale={codingSource.rationale} />}
       {provenanceRef ? (
         <button type="button" className="ml-auto inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-emerald-600 opacity-0 transition-opacity group-hover:opacity-60 hover:!opacity-100 hover:bg-emerald-50"
           onClick={() => onFocusSource({ page: provenanceRef.page, bbox: provenanceRef.bbox, quote: provenanceRef.quote })}

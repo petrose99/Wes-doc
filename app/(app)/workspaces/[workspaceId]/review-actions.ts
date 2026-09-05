@@ -9,7 +9,7 @@ import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { prisma } from "@/lib/db"
 import { listApprovalWorkflows, startWorkflowOnReviewTask } from "@/models/approval-workflows"
 import { listWorkspaceIntegrationConnections } from "@/models/integrations"
-import { assignReviewTask, bulkUpdateReviewTaskStatus, createReviewTask, decideReviewTaskStage, getReviewTask, parseReviewTaskStatus, updateReviewTaskStatus } from "@/models/review-tasks"
+import { assignReviewTask, bulkUpdateReviewTaskStatus, createReviewTask, decideReviewTaskStage, getReviewTask, maybeConfirmAiCoding, parseReviewTaskStatus, updateReviewTaskStatus } from "@/models/review-tasks"
 import { revalidatePath } from "next/cache"
 import { errorMessage, NO_ACCESS, paths, requireMember } from "./action-helpers"
 
@@ -41,7 +41,7 @@ export async function updateReviewTaskStatusAction(workspaceId: string, taskId: 
   if (!parsed) return { success: false, error: "Invalid status" }
   try {
     const task = await updateReviewTaskStatus({ workspaceId, taskId, status: parsed, actorId: user.id })
-    if (parsed === "approved") await maybeAutopublish(workspaceId, task.documentId, user.id)
+    if (parsed === "approved") { await maybeConfirmAiCoding(workspaceId, task.documentId, user.id); await maybeAutopublish(workspaceId, task.documentId, user.id) }
     revalidatePath(paths(workspaceId).review)
     return { success: true, data: null }
   } catch (error) { return { success: false, error: errorMessage(error, "Could not update the review task") } }
@@ -55,7 +55,7 @@ export async function bulkUpdateReviewTaskStatusAction(workspaceId: string, task
   if (!taskIds.length) return { success: false, error: "Nothing selected" }
   try {
     const result = await bulkUpdateReviewTaskStatus({ workspaceId, taskIds, status: parsed, actorId: user.id })
-    if (parsed === "approved") await Promise.all(result.documentIds.map((documentId) => maybeAutopublish(workspaceId, documentId, user.id)))
+    if (parsed === "approved") await Promise.all(result.documentIds.map(async (documentId) => { await maybeConfirmAiCoding(workspaceId, documentId, user.id); await maybeAutopublish(workspaceId, documentId, user.id) }))
     revalidatePath(paths(workspaceId).review)
     return { success: true, data: { updated: result.updated } }
   } catch (error) { return { success: false, error: errorMessage(error, "Could not update the selected review tasks") } }
@@ -101,14 +101,20 @@ export async function getReviewTaskDetailAction(workspaceId: string, taskId: str
     }
   })() : null
 
+  const codingSource = (task.document as Record<string, unknown>).codingSource as string | null
+  const codingConfidence = (task.document as Record<string, unknown>).codingConfidence as number | null
+
   return {
     id: task.id, status: task.status, assigneeId: task.assigneeId, detail: task.detail,
+    reason: task.reason,
     document: {
       id: task.document.id, filename: task.document.filename, mimeType: task.document.mimeType,
       storageKey: task.document.storageKey, status: task.document.status,
       fields: fields.filter((field) => field.type !== "array"),
       values,
       supplier,
+      codingSource,
+      codingConfidence,
     },
     checkResults: checkResults.map((check) => ({ id: check.id, checkCode: check.checkCode, status: check.status, message: check.message })),
     appliedRuleName: appliedRule?.name ?? null,
@@ -143,7 +149,7 @@ export async function decideReviewTaskStageAction(workspaceId: string, taskId: s
   if (!membership) return { success: false, error: NO_ACCESS }
   try {
     const task = await decideReviewTaskStage({ workspaceId, taskId, decision, actorId: user.id, actorRole: membership.role === "owner" ? "owner" : "member" })
-    if (task.status === "approved") await maybeAutopublish(workspaceId, task.documentId, user.id)
+    if (task.status === "approved") { await maybeConfirmAiCoding(workspaceId, task.documentId, user.id); await maybeAutopublish(workspaceId, task.documentId, user.id) }
     revalidatePath(paths(workspaceId).review)
     return { success: true, data: null }
   } catch (error) { return { success: false, error: errorMessage(error, "Could not record that decision") } }
