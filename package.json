@@ -19,7 +19,8 @@
     "db:generate": "prisma generate && node scripts/fix-next-admin-paths.mjs",
     "db:studio": "prisma studio",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "eval:extraction": "tsx --env-file .env scripts/eval-extraction.ts"
   },
   "dependencies": {
     "@ai-sdk/google": "^2.0.88",
