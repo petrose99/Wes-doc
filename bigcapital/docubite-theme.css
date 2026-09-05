@@ -1,0 +1,95 @@
+/* DocuBite skin for the Bigcapital webapp, injected by nginx (see nginx.conf sub_filter).
+ * The dark bp4-dark body class is stripped by docubite-theme.js, so these rules restyle the
+ * stock light theme: DocuBite's light-grey sidebar, slate text and emerald accents. */
+
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Sidebar: DocuBite light grey with slate text (app shell tokens: hsl(200 13% 93%) / slate). */
+.sidebar {
+  background: #e9edee !important;
+  border-right: 1px solid #d4dcde;
+}
+.sidebar .bp4-menu,
+.sidebar .sidebar-menu {
+  background: transparent !important;
+}
+.sidebar .bp4-menu-item {
+  color: #45525a !important;
+}
+.sidebar .bp4-menu-item .bp4-icon,
+.sidebar .bp4-menu-item .bp4-icon svg {
+  color: #64748b !important;
+  fill: #64748b !important;
+}
+.sidebar .bp4-menu-item:hover {
+  background: #dbe2e4 !important;
+  color: #0f172a !important;
+}
+.sidebar .bp4-menu-item.bp4-intent-primary,
+.sidebar .bp4-menu-item.bp4-active {
+  background: #047857 !important;
+  color: #fff !important;
+}
+.sidebar .bp4-menu-item.bp4-intent-primary .bp4-icon,
+.sidebar .bp4-menu-item.bp4-active .bp4-icon {
+  color: #fff !important;
+  fill: #fff !important;
+}
+.sidebar .bp4-menu-divider,
+.sidebar .bp4-heading,
+.sidebar [class*="label"] {
+  color: #8b9aa3 !important;
+}
+.sidebar__head {
+  background: transparent !important;
+}
+.sidebar__head .title,
+.sidebar__head .bp4-button-text,
+.sidebar__head .subtitle {
+  color: #1e293b !important;
+}
+.sidebar__head .bp4-icon {
+  color: #475569 !important;
+}
+/* The vendor logo — the accounting area presents as part of DocuBite. */
+.sidebar__head-logo {
+  display: none !important;
+}
+
+/* Emerald accents in place of Blueprint blue. */
+.dashboard-content a {
+  color: #047857;
+}
+.bp4-button.bp4-intent-primary {
+  background-color: #047857 !important;
+  background-image: none !important;
+}
+.bp4-button.bp4-intent-primary:hover {
+  background-color: #065f46 !important;
+}
+
+/* Back to DocuBite pill (element injected by docubite-theme.js). */
+#db-back {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 9999;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: #047857;
+  color: #fff;
+  border-radius: 9999px;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+}
+#db-back:hover {
+  background: #065f46;
+  color: #fff;
+  text-decoration: none;
+}

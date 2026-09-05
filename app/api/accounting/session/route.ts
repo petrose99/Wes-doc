@@ -23,7 +23,8 @@ export async function GET(req: NextRequest) {
     const session = await bigcapital.signIn(account.email, password)
 
     const webappUrl = config.integrations.bigcapital.webappUrl
-    const payload = encodeURIComponent(JSON.stringify({ token: session.token, organizationId: session.organizationId }))
+    const returnUrl = new URL(`/workspaces/${workspaceId}`, req.url).toString()
+    const payload = encodeURIComponent(JSON.stringify({ token: session.token, organizationId: session.organizationId, returnUrl }))
 
     return NextResponse.redirect(`${webappUrl}/auth-bridge.html#${payload}`)
   } catch {

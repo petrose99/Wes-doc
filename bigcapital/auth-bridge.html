@@ -15,6 +15,7 @@
       _persist: JSON.stringify({ version: -1, rehydrated: true })
     });
     localStorage.setItem("persist:bigcapital:authentication", store);
+    if (params.returnUrl) localStorage.setItem("docubite:return-url", params.returnUrl);
     window.location.replace("/");
   } catch(e) {
     document.body.textContent = "Sign-in failed: " + e.message;

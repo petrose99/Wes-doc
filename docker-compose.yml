@@ -114,6 +114,8 @@ services:
     volumes:
       - ./bigcapital/nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - ./bigcapital/auth-bridge.html:/usr/share/nginx/html/auth-bridge.html:ro
+      - ./bigcapital/docubite-theme.css:/usr/share/nginx/html/docubite-theme.css:ro
+      - ./bigcapital/docubite-theme.js:/usr/share/nginx/html/docubite-theme.js:ro
     depends_on:
       - bigcapital-server
 
