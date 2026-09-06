@@ -49,6 +49,17 @@ export type LedgerContext = {
   transactions: LedgerTransactionSlice[]
   accountingEntities: LedgerAccountingEntitySlice[]
   matchCandidateDocuments: MatchCandidateDocument[]
+  /** A7.4: the workspace's category → account mappings, so the COA drift check can compare
+   * each mapping's target against the (also-loaded) AccountingEntity cache. Optional so a
+   * fixture-built LedgerContext without mappings still typechecks. */
+  categoryMappings?: LedgerCategoryMappingSlice[]
+}
+
+export type LedgerCategoryMappingSlice = {
+  id: string
+  category: string
+  accountExternalId: string
+  connectionId: string
 }
 
 export type CheckDocumentSlice = {
