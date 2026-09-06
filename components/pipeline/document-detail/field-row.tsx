@@ -16,13 +16,19 @@ const SOURCE_BADGE: Record<string, { label: string; className: string; icon: typ
   extraction: { label: "Extracted", className: "bg-slate-50 text-slate-600 border-slate-200", icon: Info },
 }
 
-export function FieldRow({ field, value, confidence, ref: provenanceRef, onFocusSource, rationale }: {
+export function FieldRow({ field, value, confidence, ref: provenanceRef, onFocusSource, rationale, registerNav, isCurrent, isCompleted }: {
   field: DocumentFieldDefinition
   value: unknown
   confidence: number | null
   ref: Ref | null
   onFocusSource: (target: { page: number; bbox: Ref["bbox"]; quote: string }) => void
   rationale?: FieldRationale | null
+  /** A4.1: registers the row's wrapper with use-field-nav so the reviewer can jump straight
+   * to the lowest-confidence field. Optional so other callers of FieldRow don't have to know
+   * about the navigator. */
+  registerNav?: (key: string, element: HTMLElement | null) => void
+  isCurrent?: boolean
+  isCompleted?: boolean
 }) {
   const lowConfidence = typeof confidence === "number" && confidence < LOW_CONFIDENCE
   const isArray = field.type === "array"
@@ -38,7 +44,9 @@ export function FieldRow({ field, value, confidence, ref: provenanceRef, onFocus
 
   const badge = rationale ? SOURCE_BADGE[rationale.source] : null
 
-  return <div className={`group relative rounded-lg transition-colors ${lowConfidence ? "bg-amber-50/80 ring-1 ring-amber-200" : ""}`}>
+  return <div ref={(el) => registerNav?.(field.key, el)}
+    data-field-key={field.key} data-suspect={lowConfidence || undefined} data-current={isCurrent || undefined} data-completed={isCompleted || undefined}
+    className={`group relative rounded-lg transition-colors ${lowConfidence ? "bg-amber-50/80 ring-1 ring-amber-200" : ""} ${isCurrent ? "outline outline-2 outline-emerald-400" : ""} ${isCompleted ? "opacity-70" : ""}`}>
     <div className="flex items-center gap-2 px-1 pb-1">
       <label htmlFor={field.key} className="text-xs font-medium text-slate-500">
         {field.label}{field.required && <span className="ml-0.5 text-red-400">*</span>}

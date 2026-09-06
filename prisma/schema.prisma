@@ -1798,6 +1798,10 @@ model WorkspaceAutomationConfig {
   requirePolicyPass Boolean   @default(false) @map("require_policy_pass")
   policyText        String?   @map("policy_text")
   blockOnWarnChecks Boolean   @default(false) @map("block_on_warn_checks")
+  /// A1.3: fraction (0–1) of touchless-eligible documents to route through a non-blocking QA
+  /// sample review — the workspace-level control on the trust-but-verify safety net that
+  /// keeps a step-down threshold from silently drifting into a bad regime. Default 0.05.
+  qaSampleRate      Float     @default(0.05) @map("qa_sample_rate")
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
   workspace         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -1887,6 +1891,14 @@ model Supplier {
   /// Rolling counters the per-supplier automation thresholds (A1.1) and anomaly checks (A2.7)
   /// will read; maintained by models/suppliers.ts's touchSupplier, not derived on read.
   documentCount Int       @default(0) @map("document_count")
+  /// A1.1: rolling per-supplier automation stats — count of consecutive touchless documents
+  /// approved without a reviewer correction. Reset to 0 by ANY correction on a document keyed
+  /// to this supplier; drives the per-supplier threshold step-down (0.98 for a new supplier,
+  /// down to max(minConfidence, 0.90) once at least 10 have been correct).
+  consecutiveClean Int    @default(0) @map("consecutive_clean")
+  /// Total touchless-eligible documents seen — powers A1.4 cold-start (always review the first
+  /// N whatever their confidence).
+  touchlessSeen Int       @default(0) @map("touchless_seen")
   lastSeenAt    DateTime? @map("last_seen_at")
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")

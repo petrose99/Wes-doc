@@ -7,8 +7,12 @@ import { prisma } from "@/lib/db"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { resolveReviewAssignee } from "@/lib/review-routing/resolve"
 import { createReviewTask } from "@/models/review-tasks"
+import { markSupplierTouchless } from "@/models/suppliers"
 import type { Prisma } from "@/prisma/client"
+import { SUPPLIER_FIELD_BY_TEMPLATE } from "@/lib/automation/rules"
+import { resolveSupplier } from "@/lib/suppliers/alias"
 import { evaluateReadiness, type CheckInput, type PolicyVerdict, type ReadinessResult } from "./evaluate"
+import { shouldSampleForQa, supplierThreshold, type SupplierThresholdInput } from "./supplier-thresholds"
 
 type RefreshInput = {
   workspaceId: string
@@ -39,11 +43,43 @@ export async function refreshDocumentReadiness(input: RefreshInput): Promise<Rea
 
     const automationConfig = await prisma.workspaceAutomationConfig.findUnique({
       where: { workspaceId: input.workspaceId },
-      select: { minConfidence: true, blockOnWarnChecks: true, requirePolicyPass: true, policyText: true },
+      select: { minConfidence: true, blockOnWarnChecks: true, requirePolicyPass: true, policyText: true, qaSampleRate: true },
     })
-    const minConfidence = automationConfig?.minConfidence ?? 0.85
+    const workspaceMinConfidence = automationConfig?.minConfidence ?? 0.85
     const blockOnWarnChecks = automationConfig?.blockOnWarnChecks ?? false
     const requirePolicyPass = automationConfig?.requirePolicyPass ?? false
+    const qaSampleRate = automationConfig?.qaSampleRate ?? 0.05
+
+    // A1.1 + A1.4: resolve the extracted supplier and read its rolling stats to pick a
+    // per-document floor. Unknown supplier (no field, extraction failed, empty registry) treats
+    // as new — so cold-start applies and the strict 0.98 threshold holds. Wrapped in try so a
+    // registry hiccup can't take readiness offline.
+    let supplierStats: SupplierThresholdInput = { workspaceMinConfidence, touchlessSeen: null, consecutiveClean: null }
+    try {
+      const extractedData = (document.rawExtraction as Record<string, unknown> | null) ?? {}
+      const supplierField = document.template?.code ? SUPPLIER_FIELD_BY_TEMPLATE[document.template.code] : undefined
+      const rawSupplier = supplierField ? extractedData[supplierField] : null
+      if (typeof rawSupplier === "string" && rawSupplier.trim()) {
+        const resolution = await resolveSupplier(input.workspaceId, rawSupplier)
+        if (resolution.supplierId) {
+          const supplierRow = await prisma.supplier.findUnique({
+            where: { id: resolution.supplierId },
+            select: { touchlessSeen: true, consecutiveClean: true },
+          })
+          supplierStats = {
+            workspaceMinConfidence,
+            touchlessSeen: supplierRow?.touchlessSeen ?? 0,
+            consecutiveClean: supplierRow?.consecutiveClean ?? 0,
+          }
+        }
+      }
+    } catch (error) {
+      console.error("[readiness] supplier-threshold lookup failed, using workspace default:", error instanceof Error ? error.message : error)
+    }
+    const supplierVerdict = supplierThreshold(supplierStats)
+    const minConfidence = supplierVerdict.effectiveMinConfidence
+    // A1.3: pick this document into the QA sample deterministically by its own id.
+    const qaSample = shouldSampleForQa(document.id, qaSampleRate)
 
     const hasActiveRules = await prisma.automationRule.count({
       where: { workspaceId: input.workspaceId, isActive: true },
@@ -109,6 +145,8 @@ export async function refreshDocumentReadiness(input: RefreshInput): Promise<Rea
       // the document blocks on no_rule_match as if the suggestion never happened.
       codingSource: document.codingSource === "ai" && !capabilities.has("ai-coding") ? null : document.codingSource,
       codingConfidence: document.codingConfidence,
+      supplierColdStart: supplierVerdict.coldStart,
+      qaSample,
     })
 
     const previousStatus = document.readinessStatus
@@ -136,6 +174,18 @@ export async function refreshDocumentReadiness(input: RefreshInput): Promise<Rea
 
       if (result.status === "ready") {
         await track("document_ready", { documentId: document.id }, { workspaceId: input.workspaceId })
+        // A1.1: this document went touchless — reward the supplier's streak. Look up the raw
+        // supplier text off the same rawExtraction the threshold reader used.
+        try {
+          const extractedData = (document.rawExtraction as Record<string, unknown> | null) ?? {}
+          const supplierField = document.template?.code ? SUPPLIER_FIELD_BY_TEMPLATE[document.template.code] : undefined
+          const rawSupplier = supplierField ? extractedData[supplierField] : null
+          if (typeof rawSupplier === "string" && rawSupplier.trim()) {
+            await markSupplierTouchless(input.workspaceId, rawSupplier)
+          }
+        } catch (error) {
+          console.error("[readiness] failed to bump supplier streak:", error instanceof Error ? error.message : error)
+        }
       } else {
         await track("document_blocked", { documentId: document.id, blockerCount: result.blockers.length }, { workspaceId: input.workspaceId })
       }

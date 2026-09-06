@@ -13,6 +13,7 @@ import type { DocumentProvenance } from "@/lib/provenance"
 import { replaceDocumentFieldValues } from "@/models/document-field-values"
 import { recordCodingCorrection } from "@/models/coding-corrections"
 import { recordFieldCorrection } from "@/models/field-corrections"
+import { resetSupplierStreak } from "@/models/suppliers"
 import { listWorkspaceIntegrationPushes } from "@/models/integrations"
 import { emitWorkspaceEvent } from "@/lib/webhooks"
 import { kickWebhookDrain } from "@/lib/webhook-delivery"
@@ -339,13 +340,21 @@ function recordFieldCorrectionsFromDiff(input: { workspaceId: string; templateCo
   const supplierField = SUPPLIER_FIELD_BY_TEMPLATE[templateCode]
   const supplier = supplierField ? asScalarString(input.newValues[supplierField]) ?? asScalarString(input.oldValues[supplierField]) : null
 
+  let anyRealCorrection = false
   for (const [fieldKey, oldValue] of Object.entries(input.oldValues)) {
     const wrongValue = asScalarString(oldValue)
     if (wrongValue === null) continue
     const newValue = asScalarString(input.newValues[fieldKey])
     if (newValue === null || newValue === wrongValue) continue
+    anyRealCorrection = true
     recordFieldCorrection({ workspaceId: input.workspaceId, templateCode, fieldKey, supplier, wrongValue, correctedValue: newValue })
       .catch((error) => console.error("[documents] failed to record field correction:", error instanceof Error ? error.message : error))
+  }
+  // A1.1: any real correction resets this supplier's clean streak — the current threshold
+  // isn't safe yet for this vendor. Fire-and-forget.
+  if (anyRealCorrection && supplier) {
+    resetSupplierStreak(input.workspaceId, supplier)
+      .catch((error) => console.error("[documents] failed to reset supplier streak:", error instanceof Error ? error.message : error))
   }
 }
 

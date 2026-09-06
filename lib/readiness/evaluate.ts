@@ -18,6 +18,12 @@ export type BlockerCode =
   | "not_pushable"
   | "no_extraction"
   | "budget_exceeded"
+  /// A1.4: the supplier's first N documents route to review regardless of confidence — a new
+  /// mapping the workspace hasn't confirmed for this vendor yet.
+  | "supplier_cold_start"
+  /// A1.3: this document was picked into the QA sample. Kept as a blocker, not a "warn",
+  /// because the review is the whole point — bypassing it defeats the check.
+  | "qa_sample"
 
 export type Blocker = {
   code: BlockerCode
@@ -58,6 +64,10 @@ export type ReadinessInput = {
    * ai-coding capability should pass null instead of "ai" when the module is off. */
   codingSource?: string | null
   codingConfidence?: number | null
+  /** A1.4: true while the resolved supplier is inside its cold-start window. */
+  supplierColdStart?: boolean
+  /** A1.3: true when this document was picked into the workspace QA sample. */
+  qaSample?: boolean
 }
 
 export function evaluateReadiness(input: ReadinessInput): ReadinessResult {
@@ -124,6 +134,13 @@ export function evaluateReadiness(input: ReadinessInput): ReadinessResult {
 
   if (!input.isPushable) {
     blockers.push({ code: "not_pushable", detail: "Template is not pushable to the connected accounting provider." })
+  }
+
+  if (input.supplierColdStart) {
+    blockers.push({ code: "supplier_cold_start", detail: "First documents from a supplier always go through a reviewer, whatever the confidence." })
+  }
+  if (input.qaSample) {
+    blockers.push({ code: "qa_sample", detail: "This document was picked into the workspace QA sample — a spot check of touchless-eligible documents." })
   }
 
   return { status: blockers.length === 0 ? "ready" : "blocked", blockers }

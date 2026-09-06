@@ -5,6 +5,7 @@ import { CreateReviewTaskButton } from "@/components/documents/create-review-tas
 import { DeleteDocumentButton } from "@/components/documents/delete-document-button"
 import { FieldRow } from "@/components/pipeline/document-detail/field-row"
 import { LineItemsSection } from "@/components/pipeline/document-detail/line-items-section"
+import { useFieldNav } from "@/components/pipeline/document-detail/use-field-nav"
 import { archiveDocumentsAction, flagDocumentsAction, moveDocumentsToStageAction, updateDocumentNoteAction } from "@/app/(app)/workspaces/[workspaceId]/pipeline-actions"
 import { setDocumentTypeAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
 import { Badge } from "@/components/ui/badge"
@@ -289,19 +290,21 @@ export function SplitPane({
               </div>
             )}
 
-            {/* Review form */}
-            <form action={saveReview} className="space-y-3">
-              {formFields.map((field) => field.type === "array"
-                ? <LineItemsSection key={field.key} field={field} value={data[field.key]} fieldKey={field.key} summaryFields={summaryFields} fieldValues={data} provenanceFields={provenanceFields} provenanceItems={provenanceItems[field.key] ?? []} onFocusSource={setTarget} />
-                : <FieldRow key={field.key} field={field} value={data[field.key]} confidence={fieldConfidence[field.key] ?? null} ref={provenanceFields[field.key] ?? null} onFocusSource={setTarget} rationale={rationales?.[field.key] ?? null} />)}
-
-              <div className="flex items-center gap-3 border-t border-slate-100 pt-3">
-                <button type="submit" disabled={!docType} className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40" title={!docType ? "Choose Expense or Sale first" : undefined}>
-                  <CheckCircle2 className="h-4 w-4" />Save review
-                </button>
-                {!docType && <span className="text-xs text-amber-600">Choose a document type first</span>}
-              </div>
-            </form>
+            {/* Review form — A4.1 field navigation: land on the lowest-confidence field first,
+                Enter = confirm-and-advance. Non-array fields are what the nav visits; the array
+                editor has its own confidence signal and its own keyboard flow. */}
+            <FieldNavForm
+              saveReview={saveReview}
+              docType={docType}
+              formFields={formFields}
+              data={data}
+              fieldConfidence={fieldConfidence}
+              provenanceFields={provenanceFields}
+              provenanceItems={provenanceItems}
+              summaryFields={summaryFields}
+              rationales={rationales ?? null}
+              setTarget={setTarget}
+            />
 
             {canPush && <div className="pt-2">{pushCard}</div>}
 
@@ -335,4 +338,38 @@ export function SplitPane({
       </div>}
     </div>
   </div>
+}
+
+/** A4: the inner form that owns the field-nav state. Split out of SplitPane so the hook can
+ * derive its ordering directly from formFields without SplitPane touching field-nav internals. */
+function FieldNavForm({ saveReview, docType, formFields, data, fieldConfidence, provenanceFields, provenanceItems, summaryFields, rationales, setTarget }: {
+  saveReview: (formData: FormData) => void | Promise<void>
+  docType: string | null
+  formFields: DocumentFieldDefinition[]
+  data: Record<string, unknown>
+  fieldConfidence: Record<string, number>
+  provenanceFields: Record<string, Ref>
+  provenanceItems: Record<string, (Ref | null)[]>
+  summaryFields: DocumentFieldDefinition[]
+  rationales: Record<string, FieldRationale> | null
+  setTarget: (target: ProvenanceTarget) => void
+}) {
+  const navItems = formFields.map((field) => ({ key: field.key, confidence: fieldConfidence[field.key] ?? null, type: field.type }))
+  const nav = useFieldNav(navItems)
+  return <form action={saveReview} className="space-y-3" onKeyDown={nav.onFormKeyDown}>
+    {nav.totalSuspects > 0 && <div className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+      <span><span className="font-semibold">{nav.suspectsRemaining}</span> of {nav.totalSuspects} low-confidence fields to review — Enter confirms and moves to the next.</span>
+      <button type="button" className="rounded-md border border-amber-300 bg-white px-2 py-0.5 font-medium text-amber-800 hover:bg-amber-100" onClick={() => nav.focusNext()}>Next suspect</button>
+    </div>}
+    {formFields.map((field) => field.type === "array"
+      ? <LineItemsSection key={field.key} field={field} value={data[field.key]} fieldKey={field.key} summaryFields={summaryFields} fieldValues={data} provenanceFields={provenanceFields} provenanceItems={provenanceItems[field.key] ?? []} onFocusSource={setTarget} />
+      : <FieldRow key={field.key} field={field} value={data[field.key]} confidence={fieldConfidence[field.key] ?? null} ref={provenanceFields[field.key] ?? null} onFocusSource={setTarget} rationale={rationales?.[field.key] ?? null}
+          registerNav={nav.registerField} isCurrent={nav.currentKey === field.key} isCompleted={nav.completedKeys.has(field.key)} />)}
+    <div className="flex items-center gap-3 border-t border-slate-100 pt-3">
+      <button type="submit" disabled={!docType} className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40" title={!docType ? "Choose Expense or Sale first" : undefined}>
+        <CheckCircle2 className="h-4 w-4" />Save review
+      </button>
+      {!docType && <span className="text-xs text-amber-600">Choose a document type first</span>}
+    </div>
+  </form>
 }
