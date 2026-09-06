@@ -11,17 +11,17 @@ export const FINANCE_TEMPLATES = [
   {
     code: "invoice", name: "Invoice", documentType: "invoice", isSystem: true, multiRow: true,
     fields: [
-      { key: "vendor", label: "Supplier", type: "string", instruction: "Seller or supplier name", required: true },
+      { key: "vendor", label: "Supplier", type: "string", instruction: "Seller or supplier name", required: true, retrievalHints: ["supplier", "vendor", "from", "billed by", "seller"], negative: "not the customer, not the bill-to name, not the payment recipient bank" },
       { key: "supplier_vat_number", label: "Supplier VAT number", type: "string", instruction: "Supplier's VAT/tax registration number exactly as printed (e.g. GB123456789). Leave blank if not shown — do not infer.", required: false },
       { key: "payment_iban", label: "Payment IBAN", type: "string", instruction: "Bank account IBAN the invoice asks to be paid to, exactly as printed (e.g. DE89370400440532013000). Leave blank if no IBAN is shown — do not infer.", required: false },
-      { key: "invoice_number", label: "Invoice number", type: "string", instruction: "Invoice, bill, or reference number", required: true },
-      { key: "issue_date", label: "Issue date", type: "date", instruction: "Date the invoice was issued", required: true },
-      { key: "due_date", label: "Due date", type: "date", instruction: "Payment due date", required: false },
+      { key: "invoice_number", label: "Invoice number", type: "string", instruction: "Invoice, bill, or reference number", required: true, retrievalHints: ["invoice number", "invoice #", "bill number", "reference", "document no"], negative: "not the purchase order number, not the customer account number" },
+      { key: "issue_date", label: "Issue date", type: "date", instruction: "Date the invoice was issued", required: true, retrievalHints: ["invoice date", "issue date", "issued", "date"], negative: "not the due date, not the delivery date, not the period covered" },
+      { key: "due_date", label: "Due date", type: "date", instruction: "Payment due date", required: false, retrievalHints: ["due date", "payment due", "pay by", "payable by"], negative: "not the issue date" },
       { key: "currency_code", label: "Currency shown", type: "string", instruction: "Literal ISO 4217 code printed on the document; do not convert", required: false },
-      { key: "subtotal", label: "Subtotal", type: "number", instruction: "Amount before tax", required: false, mergeStrategy: "last" },
-      { key: "tax_total", label: "Tax total", type: "number", instruction: "Total tax or VAT", required: false, mergeStrategy: "last" },
-      { key: "shipping_total", label: "Shipping & handling", type: "number", instruction: "Shipping, handling, freight, or delivery charge shown separately from the subtotal. Leave blank if the invoice has none.", required: false, mergeStrategy: "last" },
-      { key: "total", label: "Total", type: "number", instruction: "Amount payable including taxes", required: true, mergeStrategy: "last" },
+      { key: "subtotal", label: "Subtotal", type: "number", instruction: "Amount before tax", required: false, mergeStrategy: "last", retrievalHints: ["subtotal", "net total", "amount before tax", "sub total"], negative: "not the grand total, not the balance due, not any single line amount" },
+      { key: "tax_total", label: "Tax total", type: "number", instruction: "Total tax or VAT", required: false, mergeStrategy: "last", retrievalHints: ["VAT", "tax", "tax total", "GST", "sales tax"], negative: "not a per-line tax amount, not a tax rate percentage" },
+      { key: "shipping_total", label: "Shipping & handling", type: "number", instruction: "Shipping, handling, freight, or delivery charge shown separately from the subtotal. Leave blank if the invoice has none.", required: false, mergeStrategy: "last", retrievalHints: ["shipping", "freight", "delivery", "handling", "postage"] },
+      { key: "total", label: "Total", type: "number", instruction: "Amount payable including taxes", required: true, mergeStrategy: "last", retrievalHints: ["total", "amount due", "balance due", "grand total", "total payable"], negative: "not the subtotal, not tax alone, not a previous balance carried forward" },
       { key: "line_items", label: "Line items", type: "array", instruction: "Each billed line item", required: false, itemFields: [
         { key: "description", label: "Description", type: "string", instruction: "What was billed", required: false },
         { key: "quantity", label: "Quantity", type: "number", instruction: "Quantity billed", required: false },
@@ -39,29 +39,29 @@ export const FINANCE_TEMPLATES = [
   {
     code: "receipt", name: "Receipt", documentType: "receipt", isSystem: true, multiRow: true,
     fields: [
-      { key: "merchant", label: "Merchant", type: "string", instruction: "Store, merchant, or supplier name", required: true },
-      { key: "purchase_date", label: "Purchase date", type: "date", instruction: "Date of purchase", required: true },
-      { key: "receipt_number", label: "Receipt number", type: "string", instruction: "Receipt or reference number", required: false },
+      { key: "merchant", label: "Merchant", type: "string", instruction: "Store, merchant, or supplier name", required: true, retrievalHints: ["merchant", "store", "shop", "restaurant", "vendor"], negative: "not the cardholder name, not the cashier name" },
+      { key: "purchase_date", label: "Purchase date", type: "date", instruction: "Date of purchase", required: true, retrievalHints: ["date", "purchase date", "transaction date", "receipt date"], negative: "not the printed-at time on a reprint" },
+      { key: "receipt_number", label: "Receipt number", type: "string", instruction: "Receipt or reference number", required: false, retrievalHints: ["receipt number", "receipt no", "transaction id", "reference", "ticket"], negative: "not the merchant's store number, not a loyalty card number" },
       { key: "currency_code", label: "Currency shown", type: "string", instruction: "Literal ISO 4217 code printed on the document; do not convert", required: false },
-      { key: "tax_total", label: "Tax total", type: "number", instruction: "Total tax or VAT", required: false, mergeStrategy: "last" },
+      { key: "tax_total", label: "Tax total", type: "number", instruction: "Total tax or VAT", required: false, mergeStrategy: "last", retrievalHints: ["VAT", "tax", "tax total", "GST", "sales tax"], negative: "not a tax rate percentage, not a per-line tax amount" },
       { key: "line_items", label: "Line items", type: "array", instruction: "Each purchased item", required: false, itemFields: [
         { key: "description", label: "Description", type: "string", instruction: "What was purchased", required: false },
         { key: "quantity", label: "Quantity", type: "number", instruction: "Quantity purchased", required: false },
         { key: "unit_price", label: "Unit price", type: "number", instruction: "Price per unit before tax", required: false },
         { key: "amount", label: "Amount", type: "number", instruction: "Line total", required: false },
       ] },
-      { key: "total", label: "Total", type: "number", instruction: "Amount paid including taxes", required: true, mergeStrategy: "last" },
+      { key: "total", label: "Total", type: "number", instruction: "Amount paid including taxes", required: true, mergeStrategy: "last", retrievalHints: ["total", "amount paid", "grand total", "balance due", "amount due"], negative: "not the subtotal, not tax alone, not the tendered amount alone, not any change given" },
     ],
   },
   {
     code: "expense_receipt", name: "Expense receipt", documentType: "expense_receipt", isSystem: true, multiRow: false,
     fields: [
-      { key: "merchant", label: "Merchant", type: "string", instruction: "Store, merchant, or supplier name", required: true },
-      { key: "purchase_date", label: "Purchase date", type: "date", instruction: "Date of purchase", required: true },
-      { key: "receipt_number", label: "Receipt number", type: "string", instruction: "Receipt or reference number", required: false },
+      { key: "merchant", label: "Merchant", type: "string", instruction: "Store, merchant, or supplier name", required: true, retrievalHints: ["merchant", "store", "shop", "restaurant", "vendor"], negative: "not the cardholder name, not the cashier name" },
+      { key: "purchase_date", label: "Purchase date", type: "date", instruction: "Date of purchase", required: true, retrievalHints: ["date", "purchase date", "transaction date", "receipt date"], negative: "not the printed-at time on a reprint" },
+      { key: "receipt_number", label: "Receipt number", type: "string", instruction: "Receipt or reference number", required: false, retrievalHints: ["receipt number", "receipt no", "transaction id", "reference", "ticket"], negative: "not the merchant's store number, not a loyalty card number" },
       { key: "currency_code", label: "Currency shown", type: "string", instruction: "Literal ISO 4217 code printed on the document; do not convert", required: false },
-      { key: "total", label: "Total", type: "number", instruction: "Amount paid including taxes", required: true, mergeStrategy: "last" },
-      { key: "tax_total", label: "Tax total", type: "number", instruction: "Total tax or VAT", required: false, mergeStrategy: "last" },
+      { key: "total", label: "Total", type: "number", instruction: "Amount paid including taxes", required: true, mergeStrategy: "last", retrievalHints: ["total", "amount paid", "grand total", "balance due", "amount due"], negative: "not the subtotal, not tax alone, not the tendered amount alone, not any change given" },
+      { key: "tax_total", label: "Tax total", type: "number", instruction: "Total tax or VAT", required: false, mergeStrategy: "last", retrievalHints: ["VAT", "tax", "tax total", "GST", "sales tax"], negative: "not a tax rate percentage, not a per-line tax amount" },
       // Deliberately generic: no hardcoded category or tax-code vocabulary here. A workspace's
       // real vocabulary is its TaxProfile (lib/tax/regions.ts) — WP12's tax-consistency check is
       // what actually compares against it. Read verbatim off the receipt, never invented.
@@ -91,8 +91,8 @@ export const FINANCE_OPTIONAL_TEMPLATES = [
       { key: "statement_period_start", label: "Period start", type: "date", instruction: "First day of the statement period", required: false },
       { key: "statement_period_end", label: "Period end", type: "date", instruction: "Last day of the statement period", required: false },
       { key: "currency_code", label: "Currency shown", type: "string", instruction: "Literal ISO 4217 code printed on the document; do not convert", required: false },
-      { key: "opening_balance", label: "Opening balance", type: "number", instruction: "Balance at the start of the period", required: false, mergeStrategy: "first" },
-      { key: "closing_balance", label: "Closing balance", type: "number", instruction: "Balance at the end of the period", required: false, mergeStrategy: "last" },
+      { key: "opening_balance", label: "Opening balance", type: "number", instruction: "Balance at the start of the period", required: false, mergeStrategy: "first", retrievalHints: ["opening balance", "balance brought forward", "b/f", "starting balance", "previous balance"], negative: "not the closing balance, not any running balance after a transaction" },
+      { key: "closing_balance", label: "Closing balance", type: "number", instruction: "Balance at the end of the period", required: false, mergeStrategy: "last", retrievalHints: ["closing balance", "balance carried forward", "c/f", "ending balance", "current balance"], negative: "not the opening balance, not a mid-period running balance" },
       { key: "transactions", label: "Transactions", type: "array", instruction: "Every transaction row in the statement, in the order printed", required: false, itemFields: [
         { key: "transaction_date", label: "Date", type: "date", instruction: "Date of the transaction", required: false },
         { key: "description", label: "Description", type: "string", instruction: "Transaction description as printed", required: false },
@@ -112,12 +112,12 @@ export const FINANCE_OPTIONAL_TEMPLATES = [
   {
     code: "purchase_order", name: "Purchase order", documentType: "purchase_order", isSystem: false, multiRow: true,
     fields: [
-      { key: "po_number", label: "PO number", type: "string", instruction: "Purchase order number", required: true },
-      { key: "supplier", label: "Supplier", type: "string", instruction: "Supplier or vendor name", required: true },
-      { key: "order_date", label: "Order date", type: "date", instruction: "Date the order was placed", required: false },
-      { key: "delivery_date", label: "Delivery date", type: "date", instruction: "Requested or expected delivery date", required: false },
+      { key: "po_number", label: "PO number", type: "string", instruction: "Purchase order number", required: true, retrievalHints: ["PO number", "purchase order", "PO #", "order number", "order no"], negative: "not the invoice number, not the customer account number, not a delivery note number" },
+      { key: "supplier", label: "Supplier", type: "string", instruction: "Supplier or vendor name", required: true, retrievalHints: ["supplier", "vendor", "to", "seller"], negative: "not the buyer, not the ship-to name, not the invoicing entity" },
+      { key: "order_date", label: "Order date", type: "date", instruction: "Date the order was placed", required: false, retrievalHints: ["order date", "PO date", "issued", "date"], negative: "not the delivery date, not the required-by date" },
+      { key: "delivery_date", label: "Delivery date", type: "date", instruction: "Requested or expected delivery date", required: false, retrievalHints: ["delivery date", "required by", "ship date", "expected delivery"], negative: "not the order date" },
       { key: "currency_code", label: "Currency shown", type: "string", instruction: "Literal ISO 4217 code printed on the document; do not convert", required: false },
-      { key: "total", label: "Total", type: "number", instruction: "Total order amount", required: false, mergeStrategy: "last" },
+      { key: "total", label: "Total", type: "number", instruction: "Total order amount", required: false, mergeStrategy: "last", retrievalHints: ["total", "order total", "grand total", "total value", "amount"], negative: "not the subtotal, not tax alone, not any single line amount" },
       { key: "line_items", label: "Line items", type: "array", instruction: "Each ordered line item", required: false, itemFields: [
         { key: "description", label: "Description", type: "string", instruction: "What was ordered", required: false },
         { key: "quantity", label: "Quantity", type: "number", instruction: "Quantity ordered", required: false },
@@ -129,11 +129,11 @@ export const FINANCE_OPTIONAL_TEMPLATES = [
   {
     code: "remittance_advice", name: "Remittance advice", documentType: "remittance_advice", isSystem: false, multiRow: true,
     fields: [
-      { key: "payer", label: "Payer", type: "string", instruction: "Who is making the payment", required: false },
-      { key: "payee", label: "Payee", type: "string", instruction: "Who is being paid", required: false },
-      { key: "remittance_date", label: "Remittance date", type: "date", instruction: "Date of the payment", required: false },
+      { key: "payer", label: "Payer", type: "string", instruction: "Who is making the payment", required: false, retrievalHints: ["payer", "from", "paid by", "remitter"], negative: "not the payee, not the bank, not any allocated invoice's supplier" },
+      { key: "payee", label: "Payee", type: "string", instruction: "Who is being paid", required: false, retrievalHints: ["payee", "to", "paid to", "beneficiary", "supplier"], negative: "not the payer, not the payer's bank" },
+      { key: "remittance_date", label: "Remittance date", type: "date", instruction: "Date of the payment", required: false, retrievalHints: ["remittance date", "payment date", "date", "value date"], negative: "not any allocated invoice's date, not the statement date" },
       { key: "currency_code", label: "Currency shown", type: "string", instruction: "Literal ISO 4217 code printed on the document; do not convert", required: false },
-      { key: "total", label: "Total remitted", type: "number", instruction: "Total amount paid across every allocation", required: false, mergeStrategy: "last" },
+      { key: "total", label: "Total remitted", type: "number", instruction: "Total amount paid across every allocation", required: false, mergeStrategy: "last", retrievalHints: ["total", "total remitted", "payment total", "amount paid", "grand total"], negative: "not any single allocation amount, not a per-invoice amount" },
       { key: "allocations", label: "Allocations", type: "array", instruction: "Each invoice this payment is applied against", required: false, itemFields: [
         { key: "invoice_number", label: "Invoice number", type: "string", instruction: "The invoice this line pays, as printed", required: false },
         { key: "amount", label: "Amount", type: "number", instruction: "Amount allocated to this invoice", required: false },
@@ -143,10 +143,10 @@ export const FINANCE_OPTIONAL_TEMPLATES = [
   {
     code: "supplier_statement", name: "Supplier statement", documentType: "supplier_statement", isSystem: false, multiRow: true,
     fields: [
-      { key: "supplier", label: "Supplier", type: "string", instruction: "Supplier or vendor name", required: true },
-      { key: "statement_date", label: "Statement date", type: "date", instruction: "Date the statement was issued", required: false },
+      { key: "supplier", label: "Supplier", type: "string", instruction: "Supplier or vendor name", required: true, retrievalHints: ["supplier", "vendor", "from", "statement from"], negative: "not the customer, not the account holder receiving the statement" },
+      { key: "statement_date", label: "Statement date", type: "date", instruction: "Date the statement was issued", required: false, retrievalHints: ["statement date", "as of", "date", "issued"], negative: "not any individual entry date, not the period start" },
       { key: "currency_code", label: "Currency shown", type: "string", instruction: "Literal ISO 4217 code printed on the document; do not convert", required: false },
-      { key: "closing_balance", label: "Closing balance", type: "number", instruction: "Balance owed as of the statement date", required: false, mergeStrategy: "last" },
+      { key: "closing_balance", label: "Closing balance", type: "number", instruction: "Balance owed as of the statement date", required: false, mergeStrategy: "last", retrievalHints: ["closing balance", "balance due", "total outstanding", "amount due", "total owing", "balance carried forward"], negative: "not any single entry amount, not a running balance mid-statement" },
       { key: "entries", label: "Entries", type: "array", instruction: "Each line on the statement, in the order printed", required: false, itemFields: [
         { key: "entry_date", label: "Date", type: "date", instruction: "Date of the entry", required: false },
         { key: "description", label: "Description", type: "string", instruction: "Entry description as printed (e.g. an invoice or payment reference)", required: false },
