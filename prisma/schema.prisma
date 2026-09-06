@@ -164,6 +164,7 @@ model Workspace {
   bankMatchMemory    BankMatchMemory[]
   goldenDocuments    GoldenDocument[]
   reviewerActivity   ReviewerActivity[]
+  supplierMergeEvents SupplierMergeEvent[]
 
   @@map("workspaces")
 }
@@ -2037,4 +2038,28 @@ model ReviewerActivity {
   @@index([workspaceId, reviewerId, createdAt])
   @@index([workspaceId, outcome])
   @@map("reviewer_activity")
+}
+
+/// A5.6 reversible supplier merges. A workspace owner merges "Acme Ltd" + "Acme Limited" into
+/// one canonical supplier — this table records what was merged into what, with enough state
+/// (the losing side's original id, canonicalName, aliases, and the winning side's id at merge
+/// time) that /admin can unmerge later and restore the losing row exactly as it was.
+model SupplierMergeEvent {
+  id                String    @id @default(uuid()) @db.Uuid
+  workspaceId       String    @map("workspace_id") @db.Uuid
+  winnerId          String    @map("winner_id") @db.Uuid
+  loserId           String    @map("loser_id") @db.Uuid
+  /// The loser's canonicalName + aliases + counters at merge time, serialized so an unmerge can
+  /// reconstruct the row without depending on a soft-delete flag or a shadow table.
+  loserSnapshot     Json      @map("loser_snapshot")
+  /// Null means "still merged"; a set value means an operator unmerged this row on that date
+  /// (records the reversal but keeps the audit trail intact).
+  revertedAt        DateTime? @map("reverted_at")
+  createdById       String?   @map("created_by_id") @db.Uuid
+  createdAt         DateTime  @default(now()) @map("created_at")
+  workspace         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, winnerId])
+  @@index([workspaceId, loserId])
+  @@map("supplier_merge_events")
 }
