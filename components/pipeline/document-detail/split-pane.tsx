@@ -64,12 +64,12 @@ export function SplitPane({
   const [note, setNote] = useState(initialNote)
   const [savingNote, setSavingNote] = useState(false)
   const [flagged, setFlagged] = useState(header.flagged)
-  const [docType, setDocType] = useState<"expense" | "sale" | "bank_statement" | null>(initialDocumentType)
+  const [docType, setDocType] = useState<"expense" | "sale" | "bank_statement" | "other" | null>(initialDocumentType)
   const [savingDocType, setSavingDocType] = useState(false)
   const [busyAction, setBusyAction] = useState<"flag" | "archive" | "ready" | null>(null)
   const [layout, setLayout] = useState<PanelLayout>("split")
 
-  const selectDocType = async (type: "expense" | "sale" | "bank_statement") => {
+  const selectDocType = async (type: "expense" | "sale" | "bank_statement" | "other") => {
     setSavingDocType(true)
     setDocType(type)
     try {
@@ -183,9 +183,9 @@ export function SplitPane({
         {header.status.replaceAll("_", " ")}
       </span>
 
-      {docType && <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium ${docType === "expense" ? "border-red-200 bg-red-50 text-red-700" : "border-emerald-200 bg-emerald-50 text-emerald-700"}`}>
-        {docType === "expense" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
-        {docType === "expense" ? "Expense" : "Sale"}
+      {docType && <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium ${docType === "expense" ? "border-red-200 bg-red-50 text-red-700" : docType === "sale" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : docType === "bank_statement" ? "border-blue-200 bg-blue-50 text-blue-700" : "border-slate-200 bg-slate-50 text-slate-700"}`}>
+        {docType === "expense" ? <ArrowUp className="h-3 w-3" /> : docType === "sale" ? <ArrowDown className="h-3 w-3" /> : docType === "bank_statement" ? <Building2 className="h-3 w-3" /> : null}
+        {docType === "expense" ? "Expense" : docType === "sale" ? "Sale" : docType === "bank_statement" ? "Bank Statement" : "Other"}
       </span>}
 
       {paymentStatus && <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${paymentStatus === "paid" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : paymentStatus === "partial" ? "border-amber-200 bg-amber-50 text-amber-700" : "border-red-200 bg-red-50 text-red-700"}`}>
@@ -258,34 +258,22 @@ export function SplitPane({
           {tab === "details" && <div className={`mx-auto space-y-4 p-4 ${layout === "details-only" ? "max-w-2xl" : ""}`}>
             {/* Document type confirmation — compact inline when confirmed, prominent when not */}
             {docType ? (
-              <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2">
-                <span className="text-xs font-medium text-slate-500">Type</span>
-                <span className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-semibold ${docType === "expense" ? "bg-red-50 text-red-700" : docType === "sale" ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-blue-700"}`}>
-                  {docType === "expense" ? <ArrowUp className="h-3 w-3" /> : docType === "sale" ? <ArrowDown className="h-3 w-3" /> : <Building2 className="h-3 w-3" />}
-                  {docType === "expense" ? "Expense" : docType === "sale" ? "Sale" : "Bank Statement"}
-                </span>
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-xs text-slate-500">Type:</span>
+                <span className="font-medium text-slate-800">{docType === "expense" ? "Expense" : docType === "sale" ? "Sale" : docType === "bank_statement" ? "Bank Statement" : "Other"}</span>
                 <button type="button" disabled={savingDocType} onClick={() => setDocType(null)}
-                  className="ml-auto text-[11px] font-medium text-slate-400 transition-colors hover:text-slate-600">Change</button>
+                  className="text-xs text-slate-400 hover:text-slate-600">Change</button>
               </div>
             ) : (
-              <div className="rounded-lg border-2 border-amber-300 bg-amber-50/80 p-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold text-slate-800">What type of document is this?</p>
-                  <span className="rounded-full bg-amber-200/80 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-800">Required</span>
-                </div>
-                <div className="mt-2.5 flex gap-2">
-                  <button type="button" disabled={savingDocType} onClick={() => void selectDocType("expense")}
-                    className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border-2 border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 transition-all hover:border-red-200 hover:bg-red-50/50 hover:text-red-700">
-                    <ArrowUp className="h-3.5 w-3.5" />Expense
-                  </button>
-                  <button type="button" disabled={savingDocType} onClick={() => void selectDocType("sale")}
-                    className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border-2 border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 transition-all hover:border-emerald-200 hover:bg-emerald-50/50 hover:text-emerald-700">
-                    <ArrowDown className="h-3.5 w-3.5" />Sale
-                  </button>
-                  <button type="button" disabled={savingDocType} onClick={() => void selectDocType("bank_statement")}
-                    className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border-2 border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 transition-all hover:border-blue-200 hover:bg-blue-50/50 hover:text-blue-700">
-                    <Building2 className="h-3.5 w-3.5" />Bank Statement
-                  </button>
+              <div>
+                <p className="mb-1.5 text-sm font-medium text-slate-800">What type of document is this?</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {([["expense", "Expense"], ["sale", "Sale"], ["bank_statement", "Bank Statement"], ["other", "Other"]] as const).map(([value, label]) => (
+                    <button key={value} type="button" disabled={savingDocType} onClick={() => void selectDocType(value)}
+                      className="rounded border px-2.5 py-1 text-sm text-slate-600 hover:bg-slate-50">
+                      {label}
+                    </button>
+                  ))}
                 </div>
               </div>
             )}

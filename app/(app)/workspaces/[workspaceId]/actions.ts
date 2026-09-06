@@ -136,7 +136,7 @@ export async function uploadZipAction(workspaceId: string, fileId: string, formD
   } catch (error) { return { success: false, error: errorMessage(error, "ZIP upload failed") } }
 }
 
-export async function setDocumentTypeAction(workspaceId: string, documentId: string, documentType: "expense" | "sale" | "bank_statement"): Promise<ActionState<null>> {
+export async function setDocumentTypeAction(workspaceId: string, documentId: string, documentType: "expense" | "sale" | "bank_statement" | "other"): Promise<ActionState<null>> {
   const user = await getCurrentUser()
   if (!(await requireMember(workspaceId, user.id))) return { success: false, error: NO_ACCESS }
   const document = await getWorkspaceDocument(workspaceId, documentId)

@@ -1,6 +1,5 @@
 import { AutomationTabs } from "@/components/automation/automation-tabs"
 import { ReviewInbox } from "@/components/workspace/review-inbox"
-import config from "@/lib/config"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { countOpenReviewTasks, listReviewTasks, parseReviewTaskStatus, type ReviewTaskStatus } from "@/models/review-tasks"
 import { summarizeDocumentForReview } from "@/models/documents"
@@ -60,8 +59,6 @@ export default async function ReviewQueuePage({ params, searchParams }: {
     <ReviewInbox
       workspaceId={workspaceId}
       currentStatus={statusParam ?? "open"}
-      financeAgentEnabled={capabilities.has("finance-agent")}
-      documentSearchEnabled={config.embeddings.enabled}
       members={members.map((member) => ({ id: member.userId, name: member.user.name }))}
       tasks={tasks.map((task) => {
         const confidence = (task.document.confidence as Record<string, number> | null) ?? null
