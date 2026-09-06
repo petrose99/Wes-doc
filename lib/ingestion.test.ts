@@ -99,4 +99,31 @@ describe("createIngestionItem", () => {
       create: expect.objectContaining({ status: "duplicate" }),
     }))
   })
+
+  // The idempotency key is scoped to (workspace, file), not the workspace alone. A workspace-wide
+  // key ran ahead of Document's own (fileId, sha256) constraint and short-circuited on it, which
+  // made that per-file rule unreachable and silently blocked the case it exists to allow.
+  it("scopes the idempotency lookup by file, so the same bytes can be staged in a second sheet", async () => {
+    vi.mocked(createDocumentFromBuffer).mockResolvedValue({ document: { id: "d5", filename: "invoice.pdf" }, job: { id: "j5" }, duplicate: false } as never)
+    db.ingestionItem.upsert.mockResolvedValue({ id: "i5", documentId: "d5" })
+
+    await createIngestionItem({ ...input, fileId: "f2" })
+
+    expect(db.ingestionItem.findUnique).toHaveBeenCalledWith({
+      where: { workspaceId_fileId_idempotencyKey: { workspaceId: "w1", fileId: "f2", idempotencyKey: "hash:hello" } },
+    })
+  })
+
+  // The retry case the key exists for: every automated intake path resolves to a fixed fileId (a
+  // re-sent email always lands in the workspace's "Email intake" file), so a provider redelivery
+  // still collides and is recognised at the door, before the malware scan and extraction.
+  it("still short-circuits a provider retry of the same bytes into the same file", async () => {
+    db.ingestionItem.findUnique.mockResolvedValue({ id: "i6", documentId: "d6", workspaceId: "w1", fileId: "f1" })
+
+    const result = await createIngestionItem({ ...input, source: "email" })
+
+    expect(result.outcome).toBe("duplicate")
+    expect(scanDocumentBuffer).not.toHaveBeenCalled()
+    expect(createDocumentFromBuffer).not.toHaveBeenCalled()
+  })
 })

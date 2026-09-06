@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db"
+import { SUPPLIER_COLD_START_COUNT, SUPPLIER_TRUST_STREAK, supplierThreshold } from "@/lib/readiness/supplier-thresholds"
 import { getTaxProfile } from "@/models/tax-profiles"
 
 /** Workspace-scoped finance analytics: spend by category, cash-flow trend, and AP aging, read
@@ -490,4 +491,59 @@ export async function getAutomationMetrics(workspaceId: string, days = 30): Prom
     readiness: { ready: readyCount, blocked: blockedCount, pending: Math.max(0, pending) },
     policyVerdicts: { pass: policyPass, violation: policyViolation, error: policyError },
   }
+}
+
+/** One supplier's automation trust, as the Automation page shows it. Trust is otherwise invisible
+ * — it lives in two counters that silently decide whether a document can go touchless — so a
+ * person had no way to see why a vendor's invoices keep routing to review, or how close it is to
+ * graduating. `effectiveMinConfidence` is the bar THIS supplier's fields must clear, which is
+ * higher than the workspace floor until the trust streak is earned. */
+export type SupplierTrustRow = {
+  supplierId: string
+  name: string
+  documentCount: number
+  touchlessSeen: number
+  consecutiveClean: number
+  coldStart: boolean
+  trusted: boolean
+  effectiveMinConfidence: number
+  /** Documents still needed to leave the cold-start window; 0 once past it. */
+  remainingToGraduate: number
+}
+
+/** Supplier trust for the workspace, most-active first. Mirrors supplierThreshold's own arithmetic
+ * (lib/readiness/supplier-thresholds.ts) rather than re-deriving it, so the page can never disagree
+ * with the gate it is describing. */
+export async function getSupplierTrust(workspaceId: string, limit = 12): Promise<SupplierTrustRow[]> {
+  const config = await prisma.workspaceAutomationConfig.findUnique({
+    where: { workspaceId },
+    select: { minConfidence: true },
+  })
+  const workspaceMinConfidence = config?.minConfidence ?? 0.85
+
+  const suppliers = await prisma.supplier.findMany({
+    where: { workspaceId },
+    select: { id: true, canonicalName: true, documentCount: true, touchlessSeen: true, consecutiveClean: true },
+    orderBy: [{ documentCount: "desc" }, { canonicalName: "asc" }],
+    take: limit,
+  })
+
+  return suppliers.map((supplier) => {
+    const { effectiveMinConfidence, coldStart } = supplierThreshold({
+      workspaceMinConfidence,
+      touchlessSeen: supplier.touchlessSeen,
+      consecutiveClean: supplier.consecutiveClean,
+    })
+    return {
+      supplierId: supplier.id,
+      name: supplier.canonicalName,
+      documentCount: supplier.documentCount,
+      touchlessSeen: supplier.touchlessSeen,
+      consecutiveClean: supplier.consecutiveClean,
+      coldStart,
+      trusted: supplier.consecutiveClean >= SUPPLIER_TRUST_STREAK,
+      effectiveMinConfidence,
+      remainingToGraduate: Math.max(0, SUPPLIER_COLD_START_COUNT - supplier.touchlessSeen),
+    }
+  })
 }

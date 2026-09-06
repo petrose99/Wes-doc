@@ -1463,14 +1463,14 @@ model ExpenseClaimItem {
  *
  * Two things a Document row cannot give the intake layer on its own: an idempotency key that
  * exists BEFORE a Document is created (so a provider retry of the same bytes — a re-sent email,
- * a re-uploaded ZIP — is recognised at the door rather than becoming a second Document.fileId_
- * sha256-scoped row in a different file), and a status ledger that survives across every intake
- * channel (upload, camera, email, zip, api) uniformly, which is what a batch progress panel polls.
+ * a re-uploaded ZIP — is recognised at the door, without the malware scan and extraction a second
+ * Document would cost), and a status ledger that survives across every intake channel (upload,
+ * camera, email, zip, api) uniformly, which is what a batch progress panel polls.
  *
  * Wraps DocumentProcessingJob rather than replacing it: extraction retry/backoff still lives
  * there (lib/document-processing.ts); this only tracks whether the item ever became a Document at
- * all, and if not, why (rejected by malware scan, or a workspace-wide duplicate of one already
- * ingested). attempts/nextRetryAt mirror the WebhookDelivery/IntegrationPush shape for a future
+ * all, and if not, why (rejected by malware scan, or a duplicate of one already ingested into the
+ * same file). attempts/nextRetryAt mirror the WebhookDelivery/IntegrationPush shape for a future
  * ingestion-level retry (e.g. a transient malware-scan outage); nothing drains them yet — every
  * ingestion attempt today is synchronous within the request/action that created this row. */
 model IngestionItem {
@@ -1480,9 +1480,14 @@ model IngestionItem {
   documentId     String?   @map("document_id") @db.Uuid
   /// upload | camera | email | zip | api
   source         String
-  /// sha256 of the raw bytes, unique per workspace — the workspace-wide idempotency key described
-  /// above. Distinct from Document's own (fileId, sha256) unique constraint, which is scoped to
-  /// one file and exists for a different reason (the same PDF may deliberately go into two files).
+  /// sha256 of the raw bytes. Unique per (workspace, file) — deliberately the same scope as
+  /// Document's own (fileId, sha256) constraint, so the two layers agree instead of contradicting
+  /// each other. It was workspace-wide until 2026-09-06; that scope ran first and short-circuited,
+  /// which made Document's per-file rule unreachable and silently blocked the case that rule
+  /// exists to allow (the same PDF deliberately extracted into two sheets with different columns).
+  /// Retry idempotency is unaffected: every automated intake path resolves to a fixed fileId — a
+  /// re-sent email always lands in the workspace's "Email intake" file (ensureEmailIntakeFile) —
+  /// so a provider retry still collides on this key exactly as before.
   idempotencyKey String    @map("idempotency_key")
   /// pending | clean | infected | scan_failed
   malwareStatus  String    @default("pending") @map("malware_status")
@@ -1496,7 +1501,7 @@ model IngestionItem {
   workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   document       Document? @relation(fields: [documentId], references: [id], onDelete: SetNull)
 
-  @@unique([workspaceId, idempotencyKey])
+  @@unique([workspaceId, fileId, idempotencyKey])
   @@index([workspaceId, createdAt])
   @@index([documentId])
   @@map("ingestion_items")

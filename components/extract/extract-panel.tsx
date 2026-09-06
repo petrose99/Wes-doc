@@ -295,6 +295,11 @@ export function ExtractPanel({ workspaceId, fileId, fileName, template, template
       // One batch id ties a multi-file run together so it can be reported on as a folder.
       const batchId = rows.length > 1 ? crypto.randomUUID() : null
       const queued: string[] = []
+      // Tracked so a run that queued nothing can say why instead of closing on silence — a batch
+      // of files the workspace has already ingested returns duplicates with no new document, no
+      // job, and nothing for the pipeline to show.
+      const duplicates: { id: string; filename: string }[] = []
+      let failed = 0
       for (const row of rows) {
         if (!row.file) continue
         setStaged((previous) => previous.map((current) => (current.localId === row.localId ? { ...current, status: "uploading", error: null } : current)))
@@ -317,11 +322,29 @@ export function ExtractPanel({ workspaceId, fileId, fileName, template, template
           if (!uploaded) return { ...current, status: "failed", error: failure }
           return { ...current, documentId: uploaded.id, status: uploaded.duplicate ? "duplicate" : "queued" }
         }))
-        if (!uploaded) continue
-        if (!uploaded.duplicate) queued.push(uploaded.id)
+        if (!uploaded) { failed++; continue }
+        if (uploaded.duplicate) duplicates.push({ id: uploaded.id, filename: uploaded.filename })
+        else queued.push(uploaded.id)
       }
       if (queued.length) onDocumentsQueued(queued)
       if (batchId) { setLastBatch({ id: batchId, size: rows.length }); batchQueuedIds.current = queued; batchToasted.current = false }
+
+      // Closing is only right when something is actually queued for the pipeline to show. A run
+      // that produced nothing but duplicates or failures used to close on silence, so an upload
+      // of an already-ingested file looked indistinguishable from a no-op — the panel vanished,
+      // the list was unchanged, and nothing said why. Report it and keep the panel open instead.
+      if (!queued.length) {
+        if (failed) toast.error(failed === 1 ? "That file could not be uploaded" : `${failed} files could not be uploaded`, { description: "See the reason on each row below." })
+        else if (duplicates.length) {
+          const first = duplicates[0]
+          toast.info(duplicates.length === 1 ? "Already uploaded" : `All ${duplicates.length} files were already uploaded`, {
+            description: duplicates.length === 1 ? `“${first.filename}” is already in this workspace — nothing new to extract.` : "These documents are already in this workspace — nothing new to extract.",
+            ...(duplicates.length === 1 ? { action: { label: "View document", onClick: () => router.push(`/workspaces/${workspaceId}/documents/${first.id}`) } } : {}),
+          })
+        }
+        return
+      }
+      if (duplicates.length) toast.info(`${duplicates.length} of ${rows.length} ${duplicates.length === 1 ? "file was" : "files were"} already uploaded`, { description: "The rest are extracting now." })
       onClose()
     } catch {
       toast.error("Upload failed — please try again")

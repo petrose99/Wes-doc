@@ -11,7 +11,7 @@ import { markSupplierTouchless } from "@/models/suppliers"
 import type { Prisma } from "@/prisma/client"
 import { SUPPLIER_FIELD_BY_TEMPLATE } from "@/lib/automation/rules"
 import { resolveSupplier } from "@/lib/suppliers/alias"
-import { evaluateReadiness, type CheckInput, type PolicyVerdict, type ReadinessResult } from "./evaluate"
+import { evaluateReadiness, isTouchlessEligible, type Blocker, type CheckInput, type PolicyVerdict, type ReadinessResult } from "./evaluate"
 import { shouldSampleForQa, supplierThreshold, type SupplierThresholdInput } from "./supplier-thresholds"
 import { bandFor, parseBands } from "./amount-band"
 import { detectRecurrence } from "./recurrence"
@@ -34,6 +34,7 @@ export async function refreshDocumentReadiness(input: RefreshInput): Promise<Rea
         rawExtraction: true,
         appliedRuleId: true,
         readinessStatus: true,
+        readinessDetail: true,
         codingSource: true,
         codingConfidence: true,
         template: { select: { code: true } },
@@ -225,6 +226,33 @@ export async function refreshDocumentReadiness(input: RefreshInput): Promise<Rea
       },
     })
 
+    // A1.1/A1.4: credit the supplier when this document becomes touchless-ELIGIBLE, not when it
+    // reaches "ready". Crediting on "ready" deadlocked: supplier_cold_start blocks "ready" until
+    // touchlessSeen reaches its threshold, and touchlessSeen only moved on "ready", so no supplier
+    // could ever graduate and touchless never fired for anyone. Counting eligibility lets a
+    // supplier earn trust from the first N documents — which still go to a human, exactly as
+    // A1.4 intends — and lets the (N+1)th push untouched.
+    //
+    // Gated on the eligibility TRANSITION rather than statusChanged, so a document is credited at
+    // most once however many times readiness is recomputed for it. Under-counting on a later
+    // recovery is the safe direction here; over-counting would buy a supplier unearned trust on a
+    // path that ends in real money leaving the accounting system.
+    const previousBlockers = Array.isArray(document.readinessDetail) ? (document.readinessDetail as unknown as Blocker[]) : null
+    const wasEligible = previousBlockers ? isTouchlessEligible(previousBlockers) : false
+    const nowEligible = isTouchlessEligible(result.blockers)
+    if (nowEligible && !wasEligible) {
+      try {
+        const extractedData = (document.rawExtraction as Record<string, unknown> | null) ?? {}
+        const supplierField = document.template?.code ? SUPPLIER_FIELD_BY_TEMPLATE[document.template.code] : undefined
+        const rawSupplier = supplierField ? extractedData[supplierField] : null
+        if (typeof rawSupplier === "string" && rawSupplier.trim()) {
+          await markSupplierTouchless(input.workspaceId, rawSupplier)
+        }
+      } catch (error) {
+        console.error("[readiness] failed to bump supplier streak:", error instanceof Error ? error.message : error)
+      }
+    }
+
     if (statusChanged) {
       await recordSystemAudit({
         workspaceId: input.workspaceId,
@@ -235,18 +263,6 @@ export async function refreshDocumentReadiness(input: RefreshInput): Promise<Rea
 
       if (result.status === "ready") {
         await track("document_ready", { documentId: document.id }, { workspaceId: input.workspaceId })
-        // A1.1: this document went touchless — reward the supplier's streak. Look up the raw
-        // supplier text off the same rawExtraction the threshold reader used.
-        try {
-          const extractedData = (document.rawExtraction as Record<string, unknown> | null) ?? {}
-          const supplierField = document.template?.code ? SUPPLIER_FIELD_BY_TEMPLATE[document.template.code] : undefined
-          const rawSupplier = supplierField ? extractedData[supplierField] : null
-          if (typeof rawSupplier === "string" && rawSupplier.trim()) {
-            await markSupplierTouchless(input.workspaceId, rawSupplier)
-          }
-        } catch (error) {
-          console.error("[readiness] failed to bump supplier streak:", error instanceof Error ? error.message : error)
-        }
       } else {
         await track("document_blocked", { documentId: document.id, blockerCount: result.blockers.length }, { workspaceId: input.workspaceId })
       }
