@@ -1,5 +1,5 @@
 import { auditEventData } from "@/lib/audit"
-import { chunkFromBlocks, chunkFromText, type Chunk } from "@/lib/chunking"
+import { chunkFromBlocks, chunkFromText, documentTitleFromFilename, type Chunk } from "@/lib/chunking"
 import config from "@/lib/config"
 import { prisma } from "@/lib/db"
 import { documentBlocksKey, readDocumentBlocks } from "@/lib/document-storage"
@@ -33,6 +33,8 @@ export type EmbedJobInput = {
     workspaceId: string
     fileId: string
     ocrText: string
+    /** A8.5: the document's filename, used as the title prefix on every chunk. */
+    filename?: string | null
     /** "upload" or "dictation" — decides the source tag written onto the chunks. */
     source: string
     workspace: { aiEnabled: boolean }
@@ -79,9 +81,13 @@ export async function processEmbedJob(job: EmbedJobInput): Promise<void> {
     // Chunk from the blocks sidecar when present (it carries page/bbox provenance), else fall back
     // to splitting the flat ocrText.
     const sidecar = parseSidecar(await readDocumentBlocks(documentBlocksKey(document.workspaceId, document.id)))
+    // A8.5: prepend the document title to every chunk's embedded text so a row-group chunk
+    // still knows what document it came from — a semantic search for "Acme August invoice"
+    // matches on the header line, not just the body.
+    const docTitle = documentTitleFromFilename(document.filename ?? null)
     const chunks: Chunk[] = sidecar
-      ? chunkFromBlocks(sidecar, config.embeddings.modelName)
-      : chunkFromText(document.ocrText ?? "", config.embeddings.modelName)
+      ? chunkFromBlocks(sidecar, config.embeddings.modelName, docTitle)
+      : chunkFromText(document.ocrText ?? "", config.embeddings.modelName, docTitle)
 
     // Image-only or empty document: clear any stale chunks from a previous version and finish.
     if (!chunks.length) {

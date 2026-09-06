@@ -64,3 +64,19 @@ describe("parseSignatureHeader", () => {
     expect(verifySignature("secret3", body, header, { now: t })).toBe(false)
   })
 })
+
+describe("buildSignatureHeader with multiple secrets (A9.7 rotation)", () => {
+  it("stacks a v1= field per secret so either verifies", () => {
+    const header = buildSignatureHeader([secret, "whsec_previous"], t, body)
+    const matches = header.match(/v1=[0-9a-f]{64}/g) ?? []
+    expect(matches).toHaveLength(2)
+    expect(verifySignature(secret, body, header, { now: t })).toBe(true)
+    expect(verifySignature("whsec_previous", body, header, { now: t })).toBe(true)
+    expect(verifySignature("whsec_neither", body, header, { now: t })).toBe(false)
+  })
+
+  it("dedupes identical secrets — passing the same twice does not double-sign", () => {
+    const header = buildSignatureHeader([secret, secret], t, body)
+    expect((header.match(/v1=/g) ?? []).length).toBe(1)
+  })
+})

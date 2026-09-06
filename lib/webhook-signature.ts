@@ -24,9 +24,15 @@ export function computeSignature(secret: string, timestamp: number, rawBody: str
   return createHmac("sha256", secret).update(signaturePayload(timestamp, rawBody)).digest("hex")
 }
 
-/** The value for the X-DocuBite-Signature header. */
-export function buildSignatureHeader(secret: string, timestamp: number, rawBody: string): string {
-  return `t=${timestamp},${SCHEME}=${computeSignature(secret, timestamp, rawBody)}`
+/** The value for the X-DocuBite-Signature header. Multiple secrets stack their v1= fields into
+ * ONE header (Stripe does the same), so a receiver running with either secret verifies. A6.7:
+ * pass BOTH the current and the previous signing secret during a rotation window; the receiver
+ * cuts over on its own schedule. Duplicates are removed — passing the same secret twice is a
+ * no-op, not two identical signatures. */
+export function buildSignatureHeader(secret: string | string[], timestamp: number, rawBody: string): string {
+  const secrets = Array.isArray(secret) ? secret : [secret]
+  const macs = [...new Set(secrets.filter(Boolean).map((one) => computeSignature(one, timestamp, rawBody)))]
+  return `t=${timestamp},${macs.map((mac) => `${SCHEME}=${mac}`).join(",")}`
 }
 
 /** Parses `t=...,v1=...` into its fields, ignoring unknown keys. Returns null if `t` is missing

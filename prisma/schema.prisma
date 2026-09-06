@@ -845,6 +845,14 @@ model WebhookEndpoint {
   workspaceId  String            @map("workspace_id") @db.Uuid
   url          String
   secretEnc    String            @map("secret_enc")
+  /// A9.7: the previous secret during a rotation window. When set, outbound deliveries sign
+  /// with BOTH secrets (the verifier picks whichever matches — see verifySignature's multi-v1
+  /// support in lib/webhook-signature.ts). Cleared once the customer has rolled their receiver
+  /// over. Null when no rotation is in flight.
+  previousSecretEnc String?      @map("previous_secret_enc")
+  /// When the previous secret was set, so a caller can show "rotation started X ago" and a
+  /// scheduled job can auto-expire ancient dual-active windows.
+  previousSecretRotatedAt DateTime? @map("previous_secret_rotated_at")
   events       String[]          @default([])
   status       String            @default("active")
   failureCount Int               @default(0) @map("failure_count")

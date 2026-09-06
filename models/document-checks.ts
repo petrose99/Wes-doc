@@ -4,7 +4,10 @@
 import { track } from "@/lib/analytics"
 import { recordSystemAudit } from "@/lib/audit"
 import { checkInvoiceArithmetic } from "@/lib/checks/arithmetic"
+import { checkAmountAnomaly } from "@/lib/checks/amount-anomaly"
 import { checkBankDetails } from "@/lib/checks/bank-details"
+import { checkPdfForensics, readPdfForensicSignals } from "@/lib/checks/pdf-forensics"
+import { documentStorageKey, readDocumentSource } from "@/lib/document-storage"
 import { resolveSupplier } from "@/lib/suppliers/alias"
 import { normalizeIban } from "@/lib/suppliers/normalize"
 import { checkStatementBalance } from "@/lib/checks/balance"
@@ -65,7 +68,7 @@ export async function runDeterministicChecks(input: { workspaceId: string; docum
   try {
     const document = await prisma.document.findFirst({
       where: { id: input.documentId, workspaceId: input.workspaceId },
-      select: { id: true, templateId: true, reviewedData: true, template: { select: { code: true } } },
+      select: { id: true, templateId: true, reviewedData: true, mimeType: true, template: { select: { code: true } } },
     })
     if (!document?.template) return
     const map = CHECK_FIELD_MAPS[document.template.code]
@@ -118,11 +121,23 @@ export async function runDeterministicChecks(input: { workspaceId: string; docum
     }
 
     if (map.supplier && map.invoiceNumber && map.total) {
-      const identity: DocumentIdentity = { documentId: document.id, supplier: asString(get("supplier")), invoiceNumber: asString(get("invoiceNumber")), total: asNumber(get("total")), currencyCode }
+      const totalValue = asNumber(get("total"))
+      // A2.3: infer credit-note-ness deterministically — negative total OR the template's own
+      // documentType is a credit note. Consumers already know the sign; nothing else changes.
+      const isCreditNote = totalValue !== null && totalValue < 0
+      const identity: DocumentIdentity = { documentId: document.id, supplier: asString(get("supplier")), invoiceNumber: asString(get("invoiceNumber")), total: totalValue, currencyCode, isCreditNote }
       results.push(...(await checkDuplicates(input.workspaceId, document.templateId, identity)))
       const resubmission = await checkSuspiciousResubmission(input.workspaceId, document.id, identity)
       if (resubmission) results.push(resubmission)
+
+      // A2.7: per-supplier amount anomaly + round-number spike.
+      const anomaly = await checkAmountAnomalyAgainstHistory(input.workspaceId, document.templateId, document.id, identity, map)
+      if (anomaly) results.push(anomaly)
     }
+
+    // A2.1: PDF forensic mismatches (DocInfo vs XMP dates/tools). Only meaningful for PDFs.
+    const forensics = await runPdfForensicsCheck(input.workspaceId, document.id, document.mimeType ?? null)
+    if (forensics) results.push(forensics)
 
     if (map.accountNumber && map.periodStart && map.periodEnd) {
       const accountNumber = asString(get("accountNumber"))
@@ -175,6 +190,47 @@ async function checkSupplierBankDetails(workspaceId: string, supplierName: strin
     await recordSystemAudit({ workspaceId, type: "supplier.bank_details_learned", detail: { supplierId: resolution.supplierId, iban } })
   }
   return result
+}
+
+/** A2.7 wiring: pulls the supplier's per-template amount history (capped to the last N
+ * comparable documents) and hands it to the pure checker. Fails silent on any lookup error —
+ * an anomaly report is a "look at it" signal, never a blocker on its own. */
+async function checkAmountAnomalyAgainstHistory(workspaceId: string, templateId: string | null, documentId: string, identity: DocumentIdentity, map: CheckFieldMap): Promise<CheckResult | null> {
+  if (!templateId || !map.supplier || !map.total || identity.total === null || !identity.supplier?.trim()) return null
+  const supplier = identity.supplier.trim().toLowerCase()
+  const siblings = await prisma.document.findMany({
+    where: { workspaceId, templateId, id: { not: documentId }, status: { notIn: ["received", "queued", "processing"] } },
+    select: { reviewedData: true },
+    orderBy: { receivedAt: "desc" },
+    take: 500,
+  })
+  const history: number[] = []
+  for (const sibling of siblings) {
+    const values = (sibling.reviewedData ?? {}) as Record<string, unknown>
+    const otherSupplier = asString(values[map.supplier as string])?.trim().toLowerCase() ?? null
+    const otherTotal = asNumber(values[map.total as string])
+    if (otherSupplier === supplier && otherTotal !== null) history.push(otherTotal)
+    if (history.length >= 200) break
+  }
+  return checkAmountAnomaly({ amount: identity.total, history, supplierName: identity.supplier })
+}
+
+/** A2.1 wiring: reads the first 64KB and last 64KB of the source PDF (metadata clusters near
+ * the trailer, XMP earlier) and runs the pure forensic check. Never throws; a storage read
+ * miss simply skips the check. */
+async function runPdfForensicsCheck(workspaceId: string, documentId: string, mimeType: string | null): Promise<CheckResult | null> {
+  if (mimeType !== "application/pdf") return null
+  try {
+    const buffer = await readDocumentSource(documentStorageKey(workspaceId, documentId))
+    // A truncated head+tail is enough for forensic markers without loading the whole file.
+    const head = buffer.subarray(0, Math.min(buffer.length, 65_536))
+    const tail = buffer.length > 65_536 ? buffer.subarray(buffer.length - 65_536) : Buffer.alloc(0)
+    const sample = tail.length ? Buffer.concat([head, tail]) : head
+    return checkPdfForensics(readPdfForensicSignals(sample))
+  } catch (error) {
+    console.error("[checks] pdf forensics read failed:", error instanceof Error ? error.message : error)
+    return null
+  }
 }
 
 async function checkDuplicates(workspaceId: string, templateId: string | null, identity: DocumentIdentity): Promise<CheckResult[]> {

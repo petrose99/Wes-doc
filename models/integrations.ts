@@ -75,6 +75,32 @@ export async function createWorkspaceWebhookEndpoint(workspaceId: string, input:
   return { secret, endpoint }
 }
 
+/** A9.7: rotate one endpoint's signing secret without breaking in-flight receivers. Generates a
+ * fresh secret, moves the current secret into `previousSecretEnc`, stamps the rotation time so
+ * a scheduled job can auto-expire ancient dual-active windows, and returns the plaintext once
+ * for the settings UI to reveal. During the window, buildSignatureHeader stacks both signatures
+ * into the outbound header — see lib/webhook-delivery.ts. */
+export async function rotateWorkspaceWebhookEndpointSecret(workspaceId: string, endpointId: string) {
+  const existing = await prisma.webhookEndpoint.findFirst({ where: { id: endpointId, workspaceId }, select: { secretEnc: true } })
+  if (!existing) throw new Error("webhook_endpoint_not_found")
+  const secret = generateWebhookSecret()
+  await prisma.webhookEndpoint.update({
+    where: { id: endpointId },
+    data: { secretEnc: encryptSecret(secret), previousSecretEnc: existing.secretEnc, previousSecretRotatedAt: new Date() },
+  })
+  return { secret }
+}
+
+/** A9.7: end a rotation window — after the customer has cut their receiver over to the new
+ * secret, they call this to drop the previous secret from the outbound header. */
+export async function completeWorkspaceWebhookEndpointRotation(workspaceId: string, endpointId: string) {
+  const res = await prisma.webhookEndpoint.updateMany({
+    where: { id: endpointId, workspaceId, previousSecretEnc: { not: null } },
+    data: { previousSecretEnc: null, previousSecretRotatedAt: null },
+  })
+  if (!res.count) throw new Error("no_rotation_in_flight")
+}
+
 export async function deleteWorkspaceWebhookEndpoint(workspaceId: string, endpointId: string) {
   const res = await prisma.webhookEndpoint.deleteMany({ where: { id: endpointId, workspaceId } })
   if (!res.count) throw new Error("webhook_endpoint_not_found")

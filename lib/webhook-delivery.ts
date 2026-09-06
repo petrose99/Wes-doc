@@ -81,7 +81,7 @@ export async function deliverWebhook(deliveryId: string, now = new Date()): Prom
     where: { id: deliveryId },
     select: {
       id: true, workspaceId: true, status: true, attempts: true, eventId: true, eventType: true, payload: true,
-      endpoint: { select: { id: true, url: true, secretEnc: true, status: true, failureCount: true } },
+      endpoint: { select: { id: true, url: true, secretEnc: true, previousSecretEnc: true, status: true, failureCount: true } },
     },
   })
   if (!delivery || delivery.status !== "pending") return
@@ -100,12 +100,19 @@ export async function deliverWebhook(deliveryId: string, now = new Date()): Prom
   let result: DeliveryAttemptResult
   try {
     await assertUrlSafe(endpoint.url)
-    const secret = decryptSecret(endpoint.secretEnc)
+    // A9.7: during a rotation window BOTH the current and the previous secret sign the
+    // outbound header, so a receiver can cut over on its own schedule. Decrypting the previous
+    // secret is best-effort — a decrypt failure (KMS key rotated away, envelope changed) just
+    // means the delivery is signed with the current secret only.
+    const secrets: string[] = [decryptSecret(endpoint.secretEnc)]
+    if (endpoint.previousSecretEnc) {
+      try { secrets.push(decryptSecret(endpoint.previousSecretEnc)) } catch { /* ignored: single-sig fallback */ }
+    }
     const timestamp = Math.floor(now.getTime() / 1000)
     const headers: Record<string, string> = {
       "content-type": "application/json",
       "user-agent": "DocuBite-Webhooks/1",
-      "x-docubite-signature": buildSignatureHeader(secret, timestamp, rawBody),
+      "x-docubite-signature": buildSignatureHeader(secrets, timestamp, rawBody),
       "x-docubite-event": delivery.eventType,
       "x-docubite-delivery": delivery.id,
     }
