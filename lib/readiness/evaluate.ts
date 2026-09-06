@@ -6,6 +6,7 @@
 
 export type BlockerCode =
   | `low_confidence:${string}`
+  | `missing_required_field:${string}`
   | "low_confidence:overall"
   | "check_failed"
   | "check_warned"
@@ -85,6 +86,18 @@ export type ReadinessInput = {
    * confidence never block on their own — a wrong-looking "notes" field shouldn't hold up a
    * clean-total invoice. Empty/absent falls back to the historic behaviour (every field gates). */
   criticalFieldKeys?: string[]
+  /** The template's own `required: true` field keys, at the version this document was extracted
+   * against (Document.fieldSnapshot, not the live template — a template edited since extraction
+   * must not retroactively judge an old document by fields it never had a chance to fill).
+   *
+   * A field entirely absent from fieldConfidences was invisible to the loop above: the low-
+   * confidence check only ever iterates keys THAT EXIST in the map, so a required field the
+   * extractor found nothing for — not "unsure", but nothing — produced no blocker at all and the
+   * document could go touchless without it. Confirmed live: a 40-document load test hit this on
+   * a document extracted with no invoice_number whatsoever, which sailed through to
+   * ready_for_review. A missing required field is at least as bad as a low-confidence one, so it
+   * blocks the same way. */
+  requiredFieldKeys?: string[]
   /** A1.5: when true, the document matches a recurring pattern for this supplier — a strong
    * business-as-usual signal. Doesn't override checks or policy, but lets the caller relax the
    * minConfidence input to the workspace floor even inside cold-start. */
@@ -129,6 +142,17 @@ export function evaluateReadiness(input: ReadinessInput): ReadinessResult {
           detail: `Field "${field}" confidence ${confidence.toFixed(2)} is below threshold ${input.minConfidence.toFixed(2)}.`,
         })
       }
+    }
+
+    // A field the extractor found nothing for is worse than one it is merely unsure about, but
+    // was previously invisible here — the loop above only ever considers keys THAT EXIST in
+    // fieldConfidences. Gated by the same criticalSet as the loop above: a workspace that has
+    // narrowed which fields matter should get that narrowing applied consistently, not have
+    // "missing" held to a stricter standard than "low confidence" the moment it opts in.
+    for (const field of input.requiredFieldKeys ?? []) {
+      if (criticalSet && !criticalSet.has(field)) continue
+      if (field in input.fieldConfidences) continue
+      blockers.push({ code: `missing_required_field:${field}`, detail: `Required field "${field}" was not extracted at all.` })
     }
   }
 

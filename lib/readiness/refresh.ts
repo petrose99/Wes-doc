@@ -6,6 +6,7 @@ import { recordSystemAudit } from "@/lib/audit"
 import { prisma } from "@/lib/db"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { resolveReviewAssignee } from "@/lib/review-routing/resolve"
+import { parseTemplateFields } from "@/lib/document-templates"
 import { createReviewTask } from "@/models/review-tasks"
 import { markSupplierTouchless } from "@/models/suppliers"
 import type { Prisma } from "@/prisma/client"
@@ -35,6 +36,7 @@ export async function refreshDocumentReadiness(input: RefreshInput): Promise<Rea
         appliedRuleId: true,
         readinessStatus: true,
         readinessDetail: true,
+        fieldSnapshot: true,
         codingSource: true,
         codingConfidence: true,
         template: { select: { code: true } },
@@ -57,6 +59,14 @@ export async function refreshDocumentReadiness(input: RefreshInput): Promise<Rea
     const criticalFieldKeys = document.template?.code && Array.isArray(criticalMap[document.template.code])
       ? (criticalMap[document.template.code] as unknown[]).filter((entry): entry is string => typeof entry === "string")
       : undefined
+
+    // From fieldSnapshot — the field DEFINITIONS as they stood when this document was extracted,
+    // not the live template. A template edited since then must not retroactively judge an old
+    // document by requirements it never had a chance to satisfy.
+    const requiredFieldKeys = (() => {
+      try { return parseTemplateFields(document.fieldSnapshot).filter((field) => field.required).map((field) => field.key) }
+      catch { return [] }
+    })()
 
     // A1.1 + A1.4: resolve the extracted supplier and read its rolling stats to pick a
     // per-document floor. Unknown supplier (no field, extraction failed, empty registry) treats
@@ -208,6 +218,7 @@ export async function refreshDocumentReadiness(input: RefreshInput): Promise<Rea
       supplierColdStart: supplierVerdict.coldStart && !isRecurring,
       qaSample,
       criticalFieldKeys,
+      requiredFieldKeys,
       isRecurring,
     })
 

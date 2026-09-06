@@ -8,10 +8,33 @@ import { prisma } from "@/lib/db"
 import {
   normalizeIban,
   normalizeSupplierName,
+  supplierTokens,
   SUPPLIER_MATCH_AUTO_THRESHOLD,
   SUPPLIER_MATCH_REVIEW_THRESHOLD,
   tokenSetRatio,
 } from "@/lib/suppliers/normalize"
+
+/** A single generic word ("Jackson", "Smith") is frequently a real surname or noun shared by
+ * entirely unrelated companies ("Jackson Ltd" vs "Rodriguez-Jackson", "Smith Ltd" vs
+ * "Smith-Cook") — yet being a one-token subset of a longer name makes tokenSetRatio return a
+ * literal 1.0, since there's no leftover token on the short side to disagree with. That clears
+ * SUPPLIER_MATCH_AUTO_THRESHOLD outright and silently merges two different suppliers' entire
+ * history under one identity. Confirmed live: a 40-document load test against a public
+ * invoice/receipt corpus hit this twice organically (5% of documents), and one merge went on to
+ * trip a false bank_detail_change fraud alert comparing the wrong company's IBAN.
+ *
+ * Scoped to identity resolution specifically, not to tokenSetRatio itself — the same subset
+ * behavior is correct and wanted elsewhere (lib/matching/engine.ts's scoreVendorMatch treats a
+ * truncated bank-statement payee like "ACME" matching "Acme Europe Ltd" as a strong signal, and
+ * that domain's cost of a false containment match is far lower than pooling two suppliers'
+ * fraud-check history). A multi-token subset match ("acme" vs "acme software services") keeps
+ * its full score here too — a distinctive multi-word name is unlikely to collide by coincidence,
+ * so only the single-token case is capped, to the review threshold rather than to zero: still
+ * surfaced as a possible match for a person to confirm, never silently merged. */
+function capSingleTokenContainment(score: number, keyA: string, keyB: string): number {
+  const shorterTokenCount = Math.min(supplierTokens(keyA).length, supplierTokens(keyB).length)
+  return shorterTokenCount === 1 ? Math.min(score, SUPPLIER_MATCH_REVIEW_THRESHOLD) : score
+}
 
 export type SupplierMatchKind = "exact" | "alias" | "iban" | "fuzzy_auto" | "fuzzy_review" | "none"
 
@@ -49,7 +72,8 @@ export async function resolveSupplier(workspaceId: string, rawName: string | nul
   })
   let best: { id: string; canonicalName: string; score: number } | null = null
   for (const candidate of candidates) {
-    const score = Math.max(tokenSetRatio(key, candidate.normalizedKey), tokenSetRatio(key, candidate.canonicalName))
+    const rawScore = Math.max(tokenSetRatio(key, candidate.normalizedKey), tokenSetRatio(key, candidate.canonicalName))
+    const score = capSingleTokenContainment(rawScore, key, candidate.normalizedKey)
     if (score >= SUPPLIER_MATCH_REVIEW_THRESHOLD && (!best || score > best.score)) {
       best = { id: candidate.id, canonicalName: candidate.canonicalName, score }
     }
@@ -102,7 +126,7 @@ export async function recordSupplierObservation(input: SupplierObservation): Pro
         select: { id: true, canonicalName: true, normalizedKey: true },
       })
       if (byIban) {
-        ibanNameConflict = tokenSetRatio(key, byIban.normalizedKey) < SUPPLIER_MATCH_REVIEW_THRESHOLD
+        ibanNameConflict = capSingleTokenContainment(tokenSetRatio(key, byIban.normalizedKey), key, byIban.normalizedKey) < SUPPLIER_MATCH_REVIEW_THRESHOLD
         resolution = { supplierId: byIban.id, canonicalName: byIban.canonicalName, matchKind: "iban", score: 1 }
       }
     }

@@ -71,6 +71,55 @@ describe("evaluateReadiness", () => {
     })
   })
 
+  // A field the extractor found nothing for never appeared as a key in fieldConfidences, so the
+  // low-confidence loop above — which only ever iterates keys THAT EXIST — had nothing to block
+  // on. Confirmed live: a 40-document load test produced a document with invoice_number (a
+  // required field) missing entirely, and it reached ready_for_review with no blocker for it.
+  describe("missing required fields", () => {
+    it("blocks when a required field is entirely absent from fieldConfidences", () => {
+      const result = evaluateReadiness(base({ fieldConfidences: { vendor: 0.95 }, requiredFieldKeys: ["vendor", "invoice_number"] }))
+      expect(result.status).toBe("blocked")
+      expect(result.blockers).toEqual([{ code: "missing_required_field:invoice_number", detail: expect.stringContaining("invoice_number") }])
+    })
+
+    it("does not block a required field that is present, even at exactly the threshold", () => {
+      const result = evaluateReadiness(base({ fieldConfidences: { vendor: 0.95, invoice_number: 0.85 }, requiredFieldKeys: ["vendor", "invoice_number"] }))
+      expect(result.status).toBe("ready")
+    })
+
+    it("does not block on a missing field that isn't in requiredFieldKeys", () => {
+      const result = evaluateReadiness(base({ fieldConfidences: { vendor: 0.95 }, requiredFieldKeys: ["vendor"] }))
+      expect(result.status).toBe("ready")
+    })
+
+    it("is unaffected when requiredFieldKeys is absent (no regression for callers that don't pass it)", () => {
+      const result = evaluateReadiness(base({ fieldConfidences: { vendor: 0.95 } }))
+      expect(result.status).toBe("ready")
+    })
+
+    // criticalFieldKeys narrows which fields matter at all — a workspace that opts into it should
+    // get that narrowing applied consistently, not have "missing" held to a stricter standard
+    // than "low confidence" the moment it turns the feature on.
+    it("respects criticalFieldKeys: an out-of-scope required field missing does not block", () => {
+      const result = evaluateReadiness(base({
+        fieldConfidences: { vendor: 0.95 },
+        requiredFieldKeys: ["vendor", "invoice_number"],
+        criticalFieldKeys: ["vendor"],
+      }))
+      expect(result.status).toBe("ready")
+    })
+
+    it("still blocks a required field missing when it IS in criticalFieldKeys", () => {
+      const result = evaluateReadiness(base({
+        fieldConfidences: { vendor: 0.95 },
+        requiredFieldKeys: ["vendor", "invoice_number"],
+        criticalFieldKeys: ["vendor", "invoice_number"],
+      }))
+      expect(result.status).toBe("blocked")
+      expect(result.blockers[0].code).toBe("missing_required_field:invoice_number")
+    })
+  })
+
   describe("check results", () => {
     it("blocks on failed check", () => {
       const result = evaluateReadiness(base({ checkResults: [{ checkCode: "invoice_arithmetic", status: "fail" }] }))
