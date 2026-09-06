@@ -14,6 +14,8 @@ import { toBigcapitalBillBody } from "@/lib/integrations/bigcapital/bill-mapper"
 import { toBigcapitalInvoiceBody } from "@/lib/integrations/bigcapital/invoice-mapper"
 import { type BankStatementPayload, toBigcapitalCashflowBody } from "@/lib/integrations/bigcapital/bank-statement-mapper"
 import { computePushUpdate, PUSH_LEASE_MS, type PushAttemptResult } from "@/lib/integration-push-policy"
+import { preflightPush } from "@/lib/integration-preflight"
+import { createReviewTask } from "@/models/review-tasks"
 
 /** The push loop: claim a due IntegrationPush, resolve the vendor/contact + default expense account
  * at the provider, create the bill, and apply the pure policy's verdict (succeeded / retry-with-
@@ -65,16 +67,44 @@ async function ledgerHasDuplicate(provider: string, externalTenantId: string | n
   }
 }
 
-async function pushToQuickbooks(realmId: string, accessToken: string, bill: NormalizedBill, accountId: string): Promise<{ id: string }> {
+async function pushToQuickbooks(realmId: string, accessToken: string, bill: NormalizedBill, accountId: string, idempotencyKey: string | null): Promise<{ id: string }> {
   const vendorRef = await quickbooks.findOrCreateVendor(realmId, accessToken, bill.vendorName)
   const body = toQuickBooksBillBody(bill, vendorRef, accountId)
-  return quickbooks.createBill(realmId, accessToken, body)
+  return quickbooks.createBill(realmId, accessToken, body, idempotencyKey)
 }
 
-async function pushToXero(tenantId: string, accessToken: string, bill: NormalizedBill, accountCode: string): Promise<{ id: string }> {
+async function pushToXero(tenantId: string, accessToken: string, bill: NormalizedBill, accountCode: string, idempotencyKey: string | null): Promise<{ id: string }> {
   const contactId = await xero.findOrCreateContact(tenantId, accessToken, bill.vendorName)
   const body = toXeroBillBody(bill, contactId, accountCode)
-  return xero.createBill(tenantId, accessToken, body)
+  return xero.createBill(tenantId, accessToken, body, idempotencyKey)
+}
+
+/** A7.1: validates the push against the synced AccountingEntity cache and fails CLOSED — a
+ * problem becomes a terminal error code plus one open review task, never a provider round-trip
+ * that half-creates records. Cache-read failures wave the push through (the provider itself is
+ * the final validator; pre-flight exists to fail fast, not to add a new way to get stuck). */
+async function preflightAgainstCache(push: { workspaceId: string; documentId: string }, connectionId: string, expenseAccountId: string, vendorName: string | null): Promise<void> {
+  let verdict: ReturnType<typeof preflightPush>
+  try {
+    const entities = await prisma.accountingEntity.findMany({
+      where: { connectionId, entityType: { in: ["account", "vendor"] } },
+      select: { entityType: true, externalId: true, code: true, name: true, active: true },
+    })
+    verdict = preflightPush({ expenseAccountId, vendorName, entities })
+  } catch (error) {
+    console.error("[integration-push] preflight cache read failed, proceeding with push:", error instanceof Error ? error.message : error)
+    return
+  }
+  if (verdict.ok) return
+  // One open task per document+reason, same dedupe shape as models/document-checks.ts.
+  const existing = await prisma.reviewTask.findFirst({
+    where: { workspaceId: push.workspaceId, documentId: push.documentId, reason: "push_preflight", status: { in: ["open", "in_review"] }, detail: { contains: verdict.errorCode } },
+    select: { id: true },
+  }).catch(() => null)
+  if (!existing) {
+    await createReviewTask({ workspaceId: push.workspaceId, documentId: push.documentId, reason: "push_preflight", detail: `${verdict.errorCode}: ${verdict.message}`, priority: 1, createdById: null }).catch(() => {})
+  }
+  throw new IntegrationPermanentError(verdict.errorCode)
 }
 
 async function pushBankStatementToBigcapital(organizationId: string, apiKey: string, payload: BankStatementPayload): Promise<{ count: number; recordKind: string }> {
@@ -112,7 +142,7 @@ export async function attemptIntegrationPush(pushId: string, now = new Date()): 
   const push = await prisma.integrationPush.findUnique({
     where: { id: pushId },
     select: {
-      id: true, workspaceId: true, documentId: true, status: true, attempts: true, payload: true,
+      id: true, workspaceId: true, documentId: true, status: true, attempts: true, payload: true, idempotencyKey: true,
       connection: {
         select: {
           id: true, provider: true, status: true, externalTenantId: true,
@@ -140,16 +170,21 @@ export async function attemptIntegrationPush(pushId: string, now = new Date()): 
     } else {
       try {
         const bill = { ...payloadRaw, currencyCode: payloadRaw.currencyCode ?? null }
+        // A7.1: bill-shaped pushes are validated against the entity cache before any provider
+        // call; bank-statement batches carry no vendor/expense-account pair to validate.
+        if (payloadRaw.documentType !== "bank_statement") {
+          await preflightAgainstCache(push, connection.id, expenseAccountId, bill.vendorName ?? null)
+        }
         const accessToken = await getValidAccessToken(connection.id, now)
         const isDuplicate = bill.referenceNumber ? await ledgerHasDuplicate(connection.provider, connection.externalTenantId, accessToken, bill.referenceNumber, direction) : false
         if (isDuplicate) throw new IntegrationPermanentError("ledger_duplicate")
         let created: { id: string }
         switch (connection.provider) {
           case "quickbooks":
-            created = await pushToQuickbooks(connection.externalTenantId, accessToken, bill, expenseAccountId)
+            created = await pushToQuickbooks(connection.externalTenantId, accessToken, bill, expenseAccountId, push.idempotencyKey)
             break
           case "xero":
-            created = await pushToXero(connection.externalTenantId, accessToken, bill, expenseAccountId)
+            created = await pushToXero(connection.externalTenantId, accessToken, bill, expenseAccountId, push.idempotencyKey)
             break
           case "bigcapital": {
             if (payloadRaw.documentType === "bank_statement" && Array.isArray((payloadRaw as unknown as BankStatementPayload).transactions)) {

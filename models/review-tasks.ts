@@ -11,7 +11,7 @@ export const REVIEW_TASK_STATUSES = ["open", "in_review", "approved", "rejected"
 export type ReviewTaskStatus = (typeof REVIEW_TASK_STATUSES)[number]
 const RESOLVED_STATUSES = new Set<ReviewTaskStatus>(["approved", "rejected"])
 
-export const REVIEW_TASK_REASONS = ["manual", "low_confidence", "rule_required", "check_failed", "ai_suggestion"] as const
+export const REVIEW_TASK_REASONS = ["manual", "low_confidence", "rule_required", "check_failed", "ai_suggestion", "push_preflight"] as const
 export type ReviewTaskReason = (typeof REVIEW_TASK_REASONS)[number]
 
 export function parseReviewTaskStatus(value: unknown): ReviewTaskStatus | null {

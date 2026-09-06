@@ -134,10 +134,12 @@ export async function findBillByInvoiceNumber(tenantId: string, accessToken: str
 
 /** Creates the bill (an ACCPAY invoice). `body` is the exact shape from
  * lib/integrations/xero/bill-mapper.ts. */
-export async function createBill(tenantId: string, accessToken: string, body: unknown): Promise<{ id: string }> {
+export async function createBill(tenantId: string, accessToken: string, body: unknown, idempotencyKey?: string | null): Promise<{ id: string }> {
   const created = await apiRequest<{ Invoices: Array<{ InvoiceID: string }> }>(tenantId, accessToken, "/Invoices", {
     method: "POST",
     body: JSON.stringify(body),
+    // A7.2: Xero dedupes on this for 24h — a retry after a timeout can't double-create the bill.
+    ...(idempotencyKey ? { headers: { "Idempotency-Key": idempotencyKey } } : {}),
   })
   return { id: created.Invoices[0].InvoiceID }
 }

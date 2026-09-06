@@ -949,6 +949,11 @@ model IntegrationPush {
   leaseUntil    DateTime?             @map("lease_until")
   externalBillId    String?              @map("external_bill_id")
   externalRecordKind String?            @map("external_record_kind")
+  /// A7.2: the client-generated idempotency token sent with the provider create call (QuickBooks
+  /// `requestid`, Xero `Idempotency-Key`), so a retry after a timeout can never create the same
+  /// bill twice. Fresh per push INTENT: set on enqueue and rotated when a re-push resets the row —
+  /// retries of one intent reuse it, a deliberate new push is a new token. Null on legacy rows.
+  idempotencyKey String?               @map("idempotency_key")
   errorCode     String?               @map("error_code")
   createdById   String?               @map("created_by_id") @db.Uuid
   createdAt     DateTime              @default(now()) @map("created_at")

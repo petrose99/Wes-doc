@@ -1,4 +1,4 @@
-import { BillMappingError, normalizeBillFromDocument } from "@/lib/integration-bill-mapping"
+import { BillMappingError, normalizeBillFromDocument, reconcileLineItemRounding } from "@/lib/integration-bill-mapping"
 import { describe, expect, it } from "vitest"
 
 const makeDoc = (overrides: Partial<Parameters<typeof normalizeBillFromDocument>[0]> = {}) => ({
@@ -71,5 +71,52 @@ describe("normalizeBillFromDocument", () => {
     expect(normalizeBillFromDocument(makeDoc({ reviewedData: { vendor: "Acme", total: 5 } })).currencyCode).toBeNull()
     expect(normalizeBillFromDocument(makeDoc({ reviewedData: { vendor: "Acme", total: 5, currency_code: "US" } })).currencyCode).toBeNull()
     expect(normalizeBillFromDocument(makeDoc({ reviewedData: { vendor: "Acme", total: 5, currency_code: "USDOLLAR" } })).currencyCode).toBeNull()
+  })
+})
+
+describe("reconcileLineItemRounding", () => {
+  const item = (amount: number) => ({ description: "x", quantity: 1, unitPrice: amount, amount })
+
+  it("returns lines untouched (post-round) when they already sum to the total", () => {
+    const lines = reconcileLineItemRounding([item(10), item(5.5)], 15.5, "USD")
+    expect(lines.map((l) => l.amount)).toEqual([10, 5.5])
+  })
+
+  it("allocates a one-cent rounding residual to the line with the largest remainder", () => {
+    // 3 × 33.333 rounds to 3 × 33.33 = 99.99 against a 100.00 header — one line absorbs the cent.
+    const lines = reconcileLineItemRounding([item(33.333), item(33.333), item(33.334)], 100, "USD")
+    expect(lines.reduce((s, l) => s + l.amount, 0)).toBeCloseTo(100, 10)
+    expect(lines.filter((l) => l.amount === 33.34)).toHaveLength(1)
+  })
+
+  it("handles a negative residual", () => {
+    const lines = reconcileLineItemRounding([item(33.335), item(33.335), item(33.335)], 100, "USD")
+    expect(lines.reduce((s, l) => s + l.amount, 0)).toBeCloseTo(100, 10)
+  })
+
+  it("leaves a real discrepancy (bigger than rounding could explain) alone", () => {
+    const lines = reconcileLineItemRounding([item(40), item(40)], 100, "USD")
+    expect(lines.reduce((s, l) => s + l.amount, 0)).toBeCloseTo(80, 10)
+  })
+
+  it("rounds to whole units for zero-decimal currencies", () => {
+    const lines = reconcileLineItemRounding([item(33.4), item(33.4), item(33.4)], 100, "JPY")
+    expect(lines.every((l) => Number.isInteger(l.amount))).toBe(true)
+    expect(lines.reduce((s, l) => s + l.amount, 0)).toBe(100)
+  })
+
+  it("property: whenever the residual is within one minor unit per line, lines sum exactly to the header", () => {
+    let seed = 42
+    const rand = () => (seed = (seed * 1103515245 + 12345) % 2 ** 31) / 2 ** 31
+    for (let trial = 0; trial < 200; trial++) {
+      const n = 1 + Math.floor(rand() * 8)
+      const items = Array.from({ length: n }, () => item(Math.round(rand() * 100000) / 1000))
+      const exact = items.reduce((s, l) => s + l.amount, 0)
+      // Header rounded to cents, so the residual is pure rounding.
+      const total = Math.round(exact * 100) / 100
+      const lines = reconcileLineItemRounding(items, total, "USD")
+      const sum = Math.round(lines.reduce((s, l) => s + l.amount, 0) * 100) / 100
+      expect(sum).toBe(total)
+    }
   })
 })

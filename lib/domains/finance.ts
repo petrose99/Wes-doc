@@ -13,6 +13,7 @@ export const FINANCE_TEMPLATES = [
     fields: [
       { key: "vendor", label: "Supplier", type: "string", instruction: "Seller or supplier name", required: true },
       { key: "supplier_vat_number", label: "Supplier VAT number", type: "string", instruction: "Supplier's VAT/tax registration number exactly as printed (e.g. GB123456789). Leave blank if not shown — do not infer.", required: false },
+      { key: "payment_iban", label: "Payment IBAN", type: "string", instruction: "Bank account IBAN the invoice asks to be paid to, exactly as printed (e.g. DE89370400440532013000). Leave blank if no IBAN is shown — do not infer.", required: false },
       { key: "invoice_number", label: "Invoice number", type: "string", instruction: "Invoice, bill, or reference number", required: true },
       { key: "issue_date", label: "Issue date", type: "date", instruction: "Date the invoice was issued", required: true },
       { key: "due_date", label: "Due date", type: "date", instruction: "Payment due date", required: false },

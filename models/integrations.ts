@@ -1,4 +1,4 @@
-import { randomBytes } from "crypto"
+import { randomBytes, randomUUID } from "crypto"
 import { prisma } from "@/lib/db"
 import type { Prisma } from "@/prisma/client"
 import { generateApiKey } from "@/lib/api-key"
@@ -297,6 +297,7 @@ export async function upsertWorkspaceIntegrationPush(
       status: "pending",
       nextAttemptAt: new Date(),
       createdById: input.createdById,
+      idempotencyKey: randomUUID(),
     },
     update: {
       payload: input.payload as Prisma.InputJsonValue,
@@ -306,6 +307,9 @@ export async function upsertWorkspaceIntegrationPush(
       leaseUntil: null,
       errorCode: null,
       completedAt: null,
+      // A7.2: a re-push is a NEW intent (possibly after an edit, possibly deliberately re-sending)
+      // — it gets a fresh idempotency token; only retries of one intent share a token.
+      idempotencyKey: randomUUID(),
     },
     select: { id: true, status: true },
   })

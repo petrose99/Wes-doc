@@ -139,9 +139,12 @@ export async function findBillByDocNumber(realmId: string, accessToken: string, 
   return Boolean(result.QueryResponse?.Bill?.length)
 }
 
-/** Creates the bill. `body` is the exact shape from lib/integrations/quickbooks/bill-mapper.ts. */
-export async function createBill(realmId: string, accessToken: string, body: unknown): Promise<{ id: string }> {
-  const created = await apiRequest<{ Bill: { Id: string } }>(realmId, accessToken, "/bill", {
+/** Creates the bill. `body` is the exact shape from lib/integrations/quickbooks/bill-mapper.ts.
+ * A7.2: `requestId` rides QuickBooks' `requestid` idempotency param — the same token replayed
+ * after a timeout returns the originally created bill instead of creating a second one. */
+export async function createBill(realmId: string, accessToken: string, body: unknown, requestId?: string | null): Promise<{ id: string }> {
+  const path = requestId ? `/bill?requestid=${encodeURIComponent(requestId)}` : "/bill"
+  const created = await apiRequest<{ Bill: { Id: string } }>(realmId, accessToken, path, {
     method: "POST",
     body: JSON.stringify(body),
   })

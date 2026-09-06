@@ -59,6 +59,39 @@ function normalizeLineItems(raw: unknown, total: number): NormalizedLineItem[] {
   return items
 }
 
+/** A7.3: makes the pushed lines sum EXACTLY to the header total when the difference is plain
+ * per-line rounding, so the provider never rejects (or silently adjusts) a bill over a stray
+ * cent. Every amount is first rounded to the currency's minor unit; any residual against the
+ * header total is then allocated by largest remainder — one minor unit per line, biggest
+ * pre-rounding fractional loser first — but ONLY when the residual is small enough to actually
+ * be rounding (≤ one minor unit per line). A larger discrepancy is a real extraction problem
+ * that must stay visible to the arithmetic check, not be silently "fixed" here. */
+export function reconcileLineItemRounding(items: NormalizedLineItem[], total: number, currencyCode: string | null): NormalizedLineItem[] {
+  if (!items.length) return items
+  // Zero-decimal currencies (JPY & co) round to whole units; everything else to cents. Mirrors
+  // lib/checks/types.ts's amountTolerance cutoff without importing its private currency set.
+  const zeroDecimal = ["JPY", "KRW", "VND", "CLP", "ISK", "UGX", "XOF", "XAF"].includes((currencyCode ?? "").toUpperCase())
+  const unit = zeroDecimal ? 1 : 0.01
+  const toMinor = (value: number) => Math.round(value / unit)
+
+  const rounded = items.map((item) => ({ ...item, amount: toMinor(item.amount) * unit }))
+  const residualMinor = toMinor(total) - rounded.reduce((sum, item) => sum + toMinor(item.amount), 0)
+  if (residualMinor === 0) return rounded
+  if (Math.abs(residualMinor) > items.length) return rounded
+
+  // Largest remainder: the lines that lost the most in rounding (or gained the most, when the
+  // residual is negative) absorb one minor unit each.
+  const order = items
+    .map((item, index) => ({ index, remainder: item.amount / unit - Math.floor(item.amount / unit) }))
+    .sort((a, b) => (residualMinor > 0 ? b.remainder - a.remainder : a.remainder - b.remainder))
+  const step = residualMinor > 0 ? 1 : -1
+  for (let i = 0; i < Math.abs(residualMinor); i++) {
+    const target = order[i % order.length].index
+    rounded[target] = { ...rounded[target], amount: toMinor(rounded[target].amount + step * unit) * unit }
+  }
+  return rounded
+}
+
 /** Reads vendor/invoice or merchant/receipt fields off a reviewed document and produces a single
  * normalized bill. Throws BillMappingError if there is no total — a bill with no amount is not a
  * bill a provider can create, and this is the one case scope explicitly says to refuse rather than
@@ -78,8 +111,8 @@ export function normalizeBillFromDocument(input: {
   const dueDate = input.templateCode === "receipt" ? null : asString(data.due_date)
   const total = asNumber(data.total)
   if (total === null) throw new BillMappingError("bill_missing_total")
-  const lineItems = normalizeLineItems(data.line_items, total)
   const currencyCode = asCurrencyCode(data.currency_code)
+  const lineItems = reconcileLineItemRounding(normalizeLineItems(data.line_items, total), total, currencyCode)
   return {
     documentId: input.documentId,
     filename: input.filename,

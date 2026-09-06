@@ -2,7 +2,11 @@
 // package: this trusts the documentId/workspaceId it is handed. Called from the worker
 // (lib/document-processing.ts), which has already authorised the document by construction.
 import { track } from "@/lib/analytics"
+import { recordSystemAudit } from "@/lib/audit"
 import { checkInvoiceArithmetic } from "@/lib/checks/arithmetic"
+import { checkBankDetails } from "@/lib/checks/bank-details"
+import { resolveSupplier } from "@/lib/suppliers/alias"
+import { normalizeIban } from "@/lib/suppliers/normalize"
 import { checkStatementBalance } from "@/lib/checks/balance"
 import { findNearDuplicate, type DocumentIdentity } from "@/lib/checks/duplicates"
 import { findMissingStatementPeriods } from "@/lib/checks/statement-periods"
@@ -23,11 +27,11 @@ type CheckFieldMap = {
   supplier?: string; invoiceNumber?: string; date?: string
   subtotal?: string; taxTotal?: string; shippingTotal?: string; otherCharges?: string; total?: string; currency?: string; lineItems?: string
   accountNumber?: string; openingBalance?: string; closingBalance?: string; periodStart?: string; periodEnd?: string; transactions?: string; accounts?: string
-  supplierVatNumber?: string
+  supplierVatNumber?: string; paymentIban?: string
 }
 
 const CHECK_FIELD_MAPS: Record<string, CheckFieldMap> = {
-  invoice: { supplier: "vendor", invoiceNumber: "invoice_number", date: "issue_date", subtotal: "subtotal", taxTotal: "tax_total", shippingTotal: "shipping_total", otherCharges: "other_charges", total: "total", currency: "currency_code", lineItems: "line_items", supplierVatNumber: "supplier_vat_number" },
+  invoice: { supplier: "vendor", invoiceNumber: "invoice_number", date: "issue_date", subtotal: "subtotal", taxTotal: "tax_total", shippingTotal: "shipping_total", otherCharges: "other_charges", total: "total", currency: "currency_code", lineItems: "line_items", supplierVatNumber: "supplier_vat_number", paymentIban: "payment_iban" },
   receipt: { supplier: "merchant", invoiceNumber: "receipt_number", date: "purchase_date", taxTotal: "tax_total", total: "total", currency: "currency_code", lineItems: "line_items" },
   expense_receipt: { supplier: "merchant", invoiceNumber: "receipt_number", date: "purchase_date", taxTotal: "tax_total", total: "total", currency: "currency_code" },
   purchase_order: { supplier: "supplier", invoiceNumber: "po_number", date: "order_date", total: "total", currency: "currency_code", lineItems: "line_items" },
@@ -38,7 +42,7 @@ const CHECK_FIELD_MAPS: Record<string, CheckFieldMap> = {
  * call): a wrong total or a knowingly-reingested file are not judgment calls, everything else
  * (a statement's own rounding, a rate mismatch, a plausible near-dupe) is worth a look, not a
  * block. "duplicate" is fail only for its exact-match branch — see runDeterministicChecks. */
-const FAIL_BY_DEFAULT = new Set(["invoice_arithmetic"])
+const FAIL_BY_DEFAULT = new Set(["invoice_arithmetic", "bank_detail_change"])
 
 function asNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null
@@ -108,6 +112,11 @@ export async function runDeterministicChecks(input: { workspaceId: string; docum
       if (vatNumber) results.push(vatNumber)
     }
 
+    if (map.supplier && map.paymentIban) {
+      const bankDetails = await checkSupplierBankDetails(input.workspaceId, asString(get("supplier")), asString(get("paymentIban")))
+      if (bankDetails) results.push(bankDetails)
+    }
+
     if (map.supplier && map.invoiceNumber && map.total) {
       const identity: DocumentIdentity = { documentId: document.id, supplier: asString(get("supplier")), invoiceNumber: asString(get("invoiceNumber")), total: asNumber(get("total")), currencyCode }
       results.push(...(await checkDuplicates(input.workspaceId, document.templateId, identity)))
@@ -144,6 +153,28 @@ async function persistCheckResult(workspaceId: string, documentId: string, resul
   // must not pile up duplicate tasks every run.
   const existing = await prisma.reviewTask.findFirst({ where: { workspaceId, documentId, reason: "check_failed", status: { in: ["open", "in_review"] }, detail: { contains: result.checkCode } }, select: { id: true } })
   if (!existing) await createReviewTask({ workspaceId, documentId, reason: "check_failed", detail: `${result.checkCode}: ${result.message}`, priority: status === "fail" ? 1 : 0, createdById: null })
+}
+
+/** A2.2 wiring: resolves the extracted supplier through the A5 registry, compares this document's
+ * payment IBAN against the supplier's remembered bank details, and LEARNS a first-seen IBAN onto
+ * the Supplier row (audited — a remembered detail is a security-relevant fact). A change is never
+ * learned automatically: the check fails, and only a person updating the supplier clears it. */
+async function checkSupplierBankDetails(workspaceId: string, supplierName: string | null, extractedIban: string | null): Promise<CheckResult | null> {
+  if (!supplierName || !normalizeIban(extractedIban)) return null
+  const resolution = await resolveSupplier(workspaceId, supplierName)
+  if (!resolution.supplierId) {
+    // Registry hasn't seen this supplier yet (worker ordering or backfill gap) — compare against
+    // nothing; the observation writer will create the row and next run learns the IBAN.
+    return checkBankDetails({ extractedIban, knownIban: null, supplierName })
+  }
+  const supplier = await prisma.supplier.findUnique({ where: { id: resolution.supplierId }, select: { iban: true, canonicalName: true } })
+  const result = checkBankDetails({ extractedIban, knownIban: supplier?.iban ?? null, supplierName: supplier?.canonicalName ?? supplierName })
+  if (result?.status === "pass" && result.detail?.firstSeen && supplier) {
+    const iban = normalizeIban(extractedIban)
+    await prisma.supplier.update({ where: { id: resolution.supplierId }, data: { iban, bankDetails: { iban } } }).catch(() => {})
+    await recordSystemAudit({ workspaceId, type: "supplier.bank_details_learned", detail: { supplierId: resolution.supplierId, iban } })
+  }
+  return result
 }
 
 async function checkDuplicates(workspaceId: string, templateId: string | null, identity: DocumentIdentity): Promise<CheckResult[]> {
