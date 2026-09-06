@@ -3,6 +3,7 @@ import { track } from "@/lib/analytics"
 import { auditEventData, getRequestAuditContext, recordDocumentAudit } from "@/lib/audit"
 import { SUPPLIER_FIELD_BY_TEMPLATE } from "@/lib/automation/rules"
 import config from "@/lib/config"
+import { isPushableDocument, resolveDocType } from "@/lib/doc-types"
 import { findMissingRequiredFields, parseTemplateFields, validateDocumentValues } from "@/lib/document-templates"
 import { deleteDocumentSource, documentBlocksKey, documentStorageKey, putDocumentSource } from "@/lib/document-storage"
 import { projectDocumentFields } from "@/lib/field-projection"
@@ -280,8 +281,7 @@ export type ReadyToPushDocument = {
  * single-document push action already applies) is silently excluded: it can't be pushed either
  * way, so it doesn't belong on a "ready to push" list. */
 export async function listReadyToPushDocuments(workspaceId: string, connectionId: string): Promise<ReadyToPushDocument[]> {
-  const [{ pushableTemplateCodes }, documents, pushes] = await Promise.all([
-    getWorkspaceCapabilities(workspaceId),
+  const [documents, pushes] = await Promise.all([
     listWorkspaceDocuments(workspaceId, { stage: "ready" }),
     listWorkspaceIntegrationPushes(workspaceId),
   ])
@@ -290,8 +290,8 @@ export async function listReadyToPushDocuments(workspaceId: string, connectionId
   )
   const results: ReadyToPushDocument[] = []
   for (const doc of documents) {
+    if (!isPushableDocument(doc) || succeededDocumentIds.has(doc.id)) continue
     const templateCode = doc.template?.code ?? null
-    if (!templateCode || !pushableTemplateCodes.includes(templateCode) || succeededDocumentIds.has(doc.id)) continue
     const reviewedData = (doc.reviewedData as Record<string, unknown> | null) ?? (doc.rawExtraction as Record<string, unknown> | null) ?? {}
     try {
       const bill = normalizeBillFromDocument({ documentId: doc.id, filename: doc.filename, templateCode, reviewedData })
@@ -600,8 +600,12 @@ export async function deleteWorkspaceDocuments(workspaceId: string, documentIds:
   const documents = await prisma.document.findMany({ where: { workspaceId, id: { in: documentIds.slice(0, 100) } }, select: { id: true, storageKey: true, filename: true } })
   let deleted = 0
   let anyQueued = false
+  const deletingIds = new Set(documents.map((d) => d.id))
   for (const document of documents) {
-    if (document.storageKey) await deleteDocumentSource(document.storageKey).catch(() => {})
+    if (document.storageKey) {
+      const otherRefs = await prisma.document.count({ where: { storageKey: document.storageKey, id: { notIn: [...deletingIds] } } })
+      if (otherRefs === 0) await deleteDocumentSource(document.storageKey).catch(() => {})
+    }
     // The blocks sidecar (if any) sits under the same document prefix; drop it too. Best effort —
     // an absent sidecar is the common case.
     await deleteDocumentSource(documentBlocksKey(workspaceId, document.id)).catch(() => {})

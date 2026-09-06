@@ -165,6 +165,7 @@ const envSchema = z.object({
   // Image preprocessing before MinerU upload (Stage 3). Off by default — MinerU's VLM backend
   // handles messy scans; enable only when raw scan quality is provably hurting recall.
   DOCUMENT_PREPROCESS_IMAGES: z.enum(["true", "false"]).default("false"),
+  SCHEMA_FREE_EXTRACTION: z.enum(["true", "false"]).default("true"),
   // Outbound integrations (webhooks, API keys, accounting connectors). The single master gate:
   // with no encryption key set the whole surface is dark — the sidebar entry is omitted, webhook
   // secrets and connector OAuth tokens have nowhere safe to live, so none of it is offered. The
@@ -247,6 +248,7 @@ const config = {
     retrievalMinPages: env.DOCUMENT_RETRIEVAL_MIN_PAGES,
     retrievalTopK: env.DOCUMENT_RETRIEVAL_TOP_K,
     preprocessImages: env.DOCUMENT_PREPROCESS_IMAGES === "true",
+    schemaFreeExtraction: env.SCHEMA_FREE_EXTRACTION === "true",
   },
   mineru: { apiToken: env.MINERU_API_TOKEN || "", apiBase: env.MINERU_API_BASE.replace(/\/+$/, ""), modelVersion: env.MINERU_MODEL_VERSION, pollIntervalMs: env.MINERU_POLL_INTERVAL_MS, timeoutMs: env.MINERU_TIMEOUT_MS },
   // `enabled` is the single feature gate read by the enqueue point, the embed job handler and the

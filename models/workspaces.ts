@@ -211,7 +211,8 @@ export async function deleteWorkspace(input: { workspaceId: string; actorId: str
   // Document.fileId is non-nullable, so the sweep above should have reached every blob. Assert
   // it rather than trust it: a straggler here is a permanently orphaned object.
   const strays = await prisma.document.findMany({ where: { workspaceId: input.workspaceId }, select: { storageKey: true } })
-  for (const stray of strays) if (stray.storageKey) await deleteDocumentSource(stray.storageKey).catch(() => {})
+  const seenKeys = new Set<string>()
+  for (const stray of strays) if (stray.storageKey && !seenKeys.has(stray.storageKey)) { seenKeys.add(stray.storageKey); await deleteDocumentSource(stray.storageKey).catch(() => {}) }
 
   // The workspace -> DocumentAuditEvent relation is onDelete: Restrict (HIPAA §164.316(b) requires
   // 6-year retention, so deleting a workspace must not be a way to destroy the evidence of what

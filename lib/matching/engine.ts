@@ -2,6 +2,7 @@
  *
  * Matches purchase orders → invoices → receipts by vendor name, amount (within tolerance),
  * date proximity, and PO number. Returns a confidence score and any discrepancies found. */
+import { legacyTemplateCodeToDocType, matchRoleForDoc } from "@/lib/doc-types"
 import { normalizeSupplierName, SUPPLIER_MATCH_AUTO_THRESHOLD, SUPPLIER_MATCH_REVIEW_THRESHOLD, tokenSetRatio } from "@/lib/suppliers/normalize"
 
 export type MatchableDocument = {
@@ -37,15 +38,8 @@ const DEFAULT_CONFIG: MatchConfig = {
   dateDaysWindow: 30,
 }
 
-const TEMPLATE_ROLES: Record<string, "po" | "invoice" | "receipt" | null> = {
-  purchase_order: "po",
-  expense: "invoice",
-  sale: "invoice",
-  receipt: "receipt",
-}
-
 function getRole(templateCode: string): "po" | "invoice" | "receipt" | null {
-  return TEMPLATE_ROLES[templateCode] ?? null
+  return matchRoleForDoc({ docType: legacyTemplateCodeToDocType(templateCode) })
 }
 
 function getMatchType(sourceRole: string, targetRole: string): MatchResult["matchType"] | null {

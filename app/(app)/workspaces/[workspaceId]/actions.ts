@@ -4,6 +4,7 @@ import type { SuggestResult } from "@/components/extract/types"
 import { ActionState } from "@/lib/actions"
 import { recordDocumentAudit } from "@/lib/audit"
 import config from "@/lib/config"
+import { DOC_TYPE_SPECS, isDocType } from "@/lib/doc-types"
 import { processDocumentJob } from "@/lib/document-processing"
 import { sampleDocumentPages } from "@/lib/document-suggest"
 import { DocumentFieldDefinition, documentTemplateFieldsSchema, parseTemplateFields } from "@/lib/document-templates"
@@ -26,6 +27,22 @@ import { errorMessage, NO_ACCESS, paths, requireMember, sheetPath } from "./acti
 
 const templateForm = z.object({ name: z.string().trim().min(2).max(80), code: z.string().regex(/^[a-z][a-z0-9_]{1,62}$/), fields: z.string().min(2), prompt: z.string().max(2000).optional() })
 
+async function ensureGenericTemplate(workspaceId: string, fileId: string) {
+  const existing = await prisma.documentTemplate.findFirst({
+    where: { workspaceId, fileId, code: "generic" },
+    include: { versions: { orderBy: { version: "desc" as const }, take: 1 } },
+  })
+  if (existing) return existing
+  return prisma.documentTemplate.create({
+    data: {
+      workspaceId, fileId, code: "generic", name: "Documents",
+      documentType: "generic", isSystem: true, multiRow: false,
+      versions: { create: { version: 1, fields: [] } },
+    },
+    include: { versions: { orderBy: { version: "desc" as const }, take: 1 } },
+  })
+}
+
 /** Every sheet mutation touches two surfaces: the sheet itself and the Files list, whose LAST
  * UPDATED column is only meaningful if the file's timestamp moves with the work. */
 async function revalidateSheet(workspaceId: string, fileId: string) {
@@ -39,17 +56,16 @@ export async function uploadDocumentsAction(workspaceId: string, fileId: string,
   if (!(await requireMember(workspaceId, user.id))) return { success: false, error: NO_ACCESS }
   if (!(await getWorkspaceFile(workspaceId, fileId))) return { success: false, error: "File not found" }
   const templates = await getFileTemplates(workspaceId, fileId)
-  const template = templates.find((item) => item.id === String(formData.get("templateId"))) || templates.find((item) => item.code === "generic")
-  if (!template) return { success: false, error: "Choose a document template" }
+  let template = templates.find((item) => item.id === String(formData.get("templateId"))) || templates.find((item) => item.code === "generic")
+  if (!template) {
+    template = await ensureGenericTemplate(workspaceId, fileId)
+  }
   const files = formData.getAll("files").filter((file): file is File => file instanceof File && file.size > 0)
   if (!files.length) return { success: false, error: "Choose at least one PDF or image" }
   try {
     const pageRangeRaw = String(formData.get("pageRange") || "").trim()
     parsePageRange(pageRangeRaw)
-    // A grouping key shared by every file of one multi-file drag, so the batch can be reported on.
     const uploadBatchId = String(formData.get("uploadBatchId") || "").trim() || null
-    // "camera" (WP13's mobile capture sheet) is the only other source this action is ever called
-    // with today; anything else falls back to the ordinary "upload" it always meant.
     const source = String(formData.get("source") || "") === "camera" ? "camera" : "upload"
     let count = 0
     const documents: Array<{ id: string; filename: string; duplicate: boolean }> = []
@@ -87,8 +103,10 @@ export async function uploadZipAction(workspaceId: string, fileId: string, formD
   if (!(await requireMember(workspaceId, user.id))) return { success: false, error: NO_ACCESS }
   if (!(await getWorkspaceFile(workspaceId, fileId))) return { success: false, error: "File not found" }
   const templates = await getFileTemplates(workspaceId, fileId)
-  const template = templates.find((item) => item.id === String(formData.get("templateId"))) || templates.find((item) => item.code === "generic")
-  if (!template) return { success: false, error: "Choose a document template" }
+  let template = templates.find((item) => item.id === String(formData.get("templateId"))) || templates.find((item) => item.code === "generic")
+  if (!template) {
+    template = await ensureGenericTemplate(workspaceId, fileId)
+  }
   const zip = formData.get("file")
   if (!(zip instanceof File) || !zip.size) return { success: false, error: "Choose a ZIP file" }
 
@@ -123,7 +141,29 @@ export async function setDocumentTypeAction(workspaceId: string, documentId: str
   const document = await getWorkspaceDocument(workspaceId, documentId)
   if (!document) return { success: false, error: "Document not found" }
   const prev = (document.codingData as Record<string, unknown> | null) ?? {}
-  await prisma.document.update({ where: { id: documentId }, data: { codingData: { ...prev, documentType } as Prisma.InputJsonValue } })
+  await prisma.document.update({ where: { id: documentId }, data: { codingData: { ...prev, documentType, documentTypeSource: "human", categoryConfirmed: true } as Prisma.InputJsonValue } })
+  revalidatePath(`${paths(workspaceId).documents}/${documentId}`)
+  return { success: true, data: null }
+}
+
+export async function reclassifyDocumentAction(workspaceId: string, documentId: string, docType: string): Promise<ActionState<null>> {
+  if (!isDocType(docType)) return { success: false, error: "Invalid document type" }
+  const user = await getCurrentUser()
+  if (!(await requireMember(workspaceId, user.id))) return { success: false, error: NO_ACCESS }
+  const document = await prisma.document.findFirst({
+    where: { id: documentId, workspaceId },
+    select: { id: true, fileId: true, codingData: true },
+  })
+  if (!document) return { success: false, error: "Document not found" }
+  const prev = (document.codingData as Record<string, unknown> | null) ?? {}
+  const spec = DOC_TYPE_SPECS[docType]
+  await prisma.document.update({
+    where: { id: documentId },
+    data: {
+      docType,
+      codingData: { ...prev, documentType: spec.defaultCategory, documentTypeSource: "human", categoryConfirmed: true } as Prisma.InputJsonValue,
+    },
+  })
   revalidatePath(`${paths(workspaceId).documents}/${documentId}`)
   return { success: true, data: null }
 }

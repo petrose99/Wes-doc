@@ -23,27 +23,8 @@ import { checkVatNumber } from "@/lib/checks/vat-number"
 import { prisma } from "@/lib/db"
 import { createReviewTask } from "@/models/review-tasks"
 import { getTaxProfile } from "@/models/tax-profiles"
+import { DOC_TYPE_SPECS, resolveDocType, type CheckFieldMap } from "@/lib/doc-types"
 import { Prisma } from "@/prisma/client"
-
-/** Which reviewedData keys each finance template (lib/domains/finance.ts) uses for the concepts
- * the checks above compare — the same "per-template field name" problem
- * lib/automation/rules.ts's SUPPLIER_FIELD_BY_TEMPLATE solves, extended with every field a check
- * needs. Templates absent here (generic, bank domain packs' own non-finance templates) simply run
- * no checks — not every document has arithmetic or a balance to verify. */
-type CheckFieldMap = {
-  supplier?: string; invoiceNumber?: string; date?: string
-  subtotal?: string; taxTotal?: string; shippingTotal?: string; otherCharges?: string; total?: string; currency?: string; lineItems?: string
-  accountNumber?: string; openingBalance?: string; closingBalance?: string; periodStart?: string; periodEnd?: string; transactions?: string; accounts?: string
-  supplierVatNumber?: string; paymentIban?: string
-}
-
-const CHECK_FIELD_MAPS: Record<string, CheckFieldMap> = {
-  invoice: { supplier: "vendor", invoiceNumber: "invoice_number", date: "issue_date", subtotal: "subtotal", taxTotal: "tax_total", shippingTotal: "shipping_total", otherCharges: "other_charges", total: "total", currency: "currency_code", lineItems: "line_items", supplierVatNumber: "supplier_vat_number", paymentIban: "payment_iban" },
-  receipt: { supplier: "merchant", invoiceNumber: "receipt_number", date: "purchase_date", taxTotal: "tax_total", total: "total", currency: "currency_code", lineItems: "line_items" },
-  expense_receipt: { supplier: "merchant", invoiceNumber: "receipt_number", date: "purchase_date", taxTotal: "tax_total", total: "total", currency: "currency_code" },
-  purchase_order: { supplier: "supplier", invoiceNumber: "po_number", date: "order_date", total: "total", currency: "currency_code", lineItems: "line_items" },
-  bank_statement: { accountNumber: "account_number", openingBalance: "opening_balance", closingBalance: "closing_balance", periodStart: "statement_period_start", periodEnd: "statement_period_end", transactions: "transactions", accounts: "accounts", currency: "currency_code" },
-}
 
 /** Only these two default to "fail" — every other check defaults to "warn" (the roadmap's own
  * call): a wrong total or a knowingly-reingested file are not judgment calls, everything else
@@ -72,10 +53,11 @@ export async function runDeterministicChecks(input: { workspaceId: string; docum
   try {
     const document = await prisma.document.findFirst({
       where: { id: input.documentId, workspaceId: input.workspaceId },
-      select: { id: true, templateId: true, reviewedData: true, mimeType: true, ocrText: true, template: { select: { code: true } } },
+      select: { id: true, templateId: true, reviewedData: true, mimeType: true, ocrText: true, docType: true, template: { select: { code: true } } },
     })
-    if (!document?.template) return
-    const map = CHECK_FIELD_MAPS[document.template.code]
+    if (!document) return
+    const docType = resolveDocType(document)
+    const map: CheckFieldMap | undefined = DOC_TYPE_SPECS[docType].checkFields
     if (!map) return
 
     const values = (document.reviewedData ?? {}) as Record<string, unknown>
@@ -155,7 +137,7 @@ export async function runDeterministicChecks(input: { workspaceId: string; docum
       // documentType is a credit note. Consumers already know the sign; nothing else changes.
       const isCreditNote = totalValue !== null && totalValue < 0
       const identity: DocumentIdentity = { documentId: document.id, supplier: asString(get("supplier")), invoiceNumber: asString(get("invoiceNumber")), total: totalValue, currencyCode, isCreditNote }
-      results.push(...(await checkDuplicates(input.workspaceId, document.templateId, identity)))
+      results.push(...(await checkDuplicates(input.workspaceId, document.templateId, identity, map)))
       const resubmission = await checkSuspiciousResubmission(input.workspaceId, document.id, identity)
       if (resubmission) results.push(resubmission)
 
@@ -314,7 +296,7 @@ async function checkVendorOnboardingForDocument(workspaceId: string, input: {
 /** A2.8 wiring: pulls up to N same-template sibling documents in a 7-day window from the same
  * supplier, then hands them to the pure split-invoice checker. Approval threshold comes from
  * the smallest active ReviewRoutingRule.thresholdAmount above zero, or a 1000 default. */
-async function checkSplitInvoicesAgainstHistory(workspaceId: string, templateId: string | null, documentId: string, supplierName: string | null, amount: number | null, date: Date | null, _map: CheckFieldMap): Promise<CheckResult | null> {
+async function checkSplitInvoicesAgainstHistory(workspaceId: string, templateId: string | null, documentId: string, supplierName: string | null, amount: number | null, date: Date | null, map: CheckFieldMap): Promise<CheckResult | null> {
   if (!templateId || !supplierName?.trim() || amount === null || !date) return null
   try {
     const supplier = supplierName.trim().toLowerCase()
@@ -325,8 +307,7 @@ async function checkSplitInvoicesAgainstHistory(workspaceId: string, templateId:
       orderBy: { receivedAt: "desc" },
       take: 50,
     })
-    const map = Object.values(CHECK_FIELD_MAPS).find((c) => c.supplier && c.total)
-    if (!map?.supplier || !map.total) return null
+    if (!map.supplier || !map.total) return null
     const window: { documentId: string; amount: number; date: Date }[] = []
     for (const sibling of siblings) {
       const values = (sibling.reviewedData ?? {}) as Record<string, unknown>
@@ -354,19 +335,17 @@ async function checkSplitInvoicesAgainstHistory(workspaceId: string, templateId:
   }
 }
 
-async function checkDuplicates(workspaceId: string, templateId: string | null, identity: DocumentIdentity): Promise<CheckResult[]> {
+async function checkDuplicates(workspaceId: string, templateId: string | null, identity: DocumentIdentity, map: CheckFieldMap): Promise<CheckResult[]> {
   const ingestion = await prisma.ingestionItem.findFirst({ where: { workspaceId, documentId: identity.documentId }, select: { status: true } })
   if (ingestion?.status === "duplicate") {
     return [{ checkCode: "duplicate", status: "fail", message: "This exact file was already ingested into this workspace.", detail: { exact: true } }]
   }
-  if (!templateId) return []
+  if (!templateId || !map.supplier || !map.invoiceNumber || !map.total) return []
   const siblings = await prisma.document.findMany({
     where: { workspaceId, templateId, id: { not: identity.documentId }, status: { notIn: ["received", "queued", "processing"] } },
     select: { id: true, reviewedData: true },
     take: 500,
   })
-  const map = Object.values(CHECK_FIELD_MAPS).find((candidate) => candidate.supplier && candidate.invoiceNumber && candidate.total)
-  if (!map) return []
   const others: DocumentIdentity[] = siblings.map((sibling) => {
     const values = (sibling.reviewedData ?? {}) as Record<string, unknown>
     return { documentId: sibling.id, supplier: asString(values[map.supplier as string]), invoiceNumber: asString(values[map.invoiceNumber as string]), total: asNumber(values[map.total as string]), currencyCode: identity.currencyCode }
@@ -381,8 +360,8 @@ async function checkDuplicates(workspaceId: string, templateId: string | null, i
  * re-process. */
 async function checkSuspiciousResubmission(workspaceId: string, documentId: string, identity: DocumentIdentity): Promise<CheckResult | null> {
   if (!identity.supplier || !identity.invoiceNumber) return null
-  // Matching JSON field values case-insensitively per template is exactly the per-template
-  // mapping problem CHECK_FIELD_MAPS already solves once — reusing it in application code avoids
+  // Matching JSON field values case-insensitively per doc type is exactly the per-type
+  // mapping problem DOC_TYPE_SPECS.checkFields already solves — reusing it avoids
   // a second, JSON-path dialect of the same logic in raw SQL. The candidate set is capped, not
   // exhaustive: a workspace with an unbounded rejection history is a real edge case, but scanning
   // the 200 most recent rejections is more than enough to catch a resubmission of something
@@ -398,15 +377,15 @@ async function checkSuspiciousResubmission(workspaceId: string, documentId: stri
 
   const rejectedDocuments = await prisma.document.findMany({
     where: { id: { in: rejectedTasks.map((task) => task.documentId) } },
-    select: { id: true, reviewedData: true, template: { select: { code: true } } },
+    select: { id: true, reviewedData: true, docType: true, template: { select: { code: true } } },
   })
   const supplier = identity.supplier.trim().toLowerCase()
   const invoiceNumber = identity.invoiceNumber.trim().toLowerCase()
   const match = rejectedDocuments.find((candidate) => {
-    const map = candidate.template ? CHECK_FIELD_MAPS[candidate.template.code] : null
-    if (!map?.supplier || !map.invoiceNumber) return false
+    const candidateMap = DOC_TYPE_SPECS[resolveDocType(candidate)].checkFields
+    if (!candidateMap?.supplier || !candidateMap.invoiceNumber) return false
     const values = (candidate.reviewedData ?? {}) as Record<string, unknown>
-    return asString(values[map.supplier])?.trim().toLowerCase() === supplier && asString(values[map.invoiceNumber])?.trim().toLowerCase() === invoiceNumber
+    return asString(values[candidateMap.supplier])?.trim().toLowerCase() === supplier && asString(values[candidateMap.invoiceNumber])?.trim().toLowerCase() === invoiceNumber
   })
   if (!match) return null
   return { checkCode: "suspicious_resubmission", status: "warn", message: "Same supplier and invoice number as a document rejected in a previous review.", detail: { rejectedDocumentId: match.id } }

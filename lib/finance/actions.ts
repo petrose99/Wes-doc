@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db"
+import { isPushableDocument } from "@/lib/doc-types"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { listAccountingEntities } from "@/models/accounting-entities"
 
@@ -104,11 +105,11 @@ export async function describePushToAccounting(workspaceId: string, documentId: 
   if (!capabilities.has("accounting-push")) return { error: "accounting_push_not_enabled" }
   const document = await prisma.document.findFirst({
     where: { id: documentId, workspaceId },
-    select: { filename: true, status: true, template: { select: { code: true } } },
+    select: { filename: true, status: true, docType: true, template: { select: { code: true } } },
   })
   if (!document) return { error: "document_not_found" }
   if (document.status !== "reviewed") return { error: "document_not_reviewed" }
-  if (!document.template?.code || !capabilities.pushableTemplateCodes.includes(document.template.code)) return { error: "document_type_not_pushable" }
+  if (!isPushableDocument(document)) return { error: "document_type_not_pushable" }
   // defaultExpenseAccountId is required, matching PushToAccountingCard's own filter — an active
   // connection with no coding account configured yet can't actually accept a push, so it must not
   // be proposed as one. Every provider gets an explicit label (PROVIDER_LABELS, matching push-to-

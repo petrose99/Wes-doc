@@ -28,6 +28,7 @@ export type BlockerCode =
   /// A4.3: a hard business-rule invariant fired (duplicate, arithmetic fail, bank-detail
   /// change, split invoice) — these never go touchless whatever the confidence.
   | "business_rule_backstop"
+  | "category_unconfirmed"
 
 export type Blocker = {
   code: BlockerCode
@@ -102,6 +103,7 @@ export type ReadinessInput = {
    * business-as-usual signal. Doesn't override checks or policy, but lets the caller relax the
    * minConfidence input to the workspace floor even inside cold-start. */
   isRecurring?: boolean
+  categoryConfirmed?: boolean
 }
 
 /** Blockers that route a document to a human WITHOUT saying anything is wrong with it: the
@@ -221,6 +223,10 @@ export function evaluateReadiness(input: ReadinessInput): ReadinessResult {
   }
   if (input.qaSample) {
     blockers.push({ code: "qa_sample", detail: "This document was picked into the workspace QA sample — a spot check of touchless-eligible documents." })
+  }
+
+  if (input.isPushable && input.categoryConfirmed === false) {
+    blockers.push({ code: "category_unconfirmed", detail: "Document category must be confirmed before pushing." })
   }
 
   return { status: blockers.length === 0 ? "ready" : "blocked", blockers }

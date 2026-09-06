@@ -11,6 +11,7 @@ import { createReviewTask } from "@/models/review-tasks"
 import { markSupplierTouchless } from "@/models/suppliers"
 import type { Prisma } from "@/prisma/client"
 import { SUPPLIER_FIELD_BY_TEMPLATE } from "@/lib/automation/rules"
+import { isCategoryConfirmed, isPushableDocument } from "@/lib/doc-types"
 import { resolveSupplier } from "@/lib/suppliers/alias"
 import { evaluateReadiness, isTouchlessEligible, type Blocker, type CheckInput, type PolicyVerdict, type ReadinessResult } from "./evaluate"
 import { shouldSampleForQa, supplierThreshold, type SupplierThresholdInput } from "./supplier-thresholds"
@@ -39,6 +40,8 @@ export async function refreshDocumentReadiness(input: RefreshInput): Promise<Rea
         fieldSnapshot: true,
         codingSource: true,
         codingConfidence: true,
+        codingData: true,
+        docType: true,
         template: { select: { code: true } },
         checkResults: { select: { checkCode: true, status: true } },
         reviewTasks: { where: { status: { in: ["open", "in_review"] } }, select: { id: true }, take: 1 },
@@ -154,8 +157,7 @@ export async function refreshDocumentReadiness(input: RefreshInput): Promise<Rea
     }).then((count) => count > 0)
 
     const capabilities = await getWorkspaceCapabilities(input.workspaceId)
-    const templateCode = document.template?.code ?? ""
-    const isPushable = capabilities.has("accounting-push") && capabilities.pushableTemplateCodes.includes(templateCode)
+    const isPushable = capabilities.has("accounting-push") && isPushableDocument(document)
 
     const checkResults: CheckInput[] = document.checkResults.map((cr) => ({
       checkCode: cr.checkCode,
@@ -172,7 +174,7 @@ export async function refreshDocumentReadiness(input: RefreshInput): Promise<Rea
           workspaceId: input.workspaceId,
           documentId: document.id,
           documentData,
-          templateCode,
+          templateCode: document.template?.code ?? "generic",
           policyText,
         })
         policyVerdict = policyDecision.decision === "approve" ? "pass"
@@ -190,7 +192,7 @@ export async function refreshDocumentReadiness(input: RefreshInput): Promise<Rea
         const vendor = typeof extractedData.vendor === "string" ? extractedData.vendor : typeof extractedData.merchant === "string" ? extractedData.merchant : null
         const amount = typeof extractedData.total === "number" ? extractedData.total : null
         const category = typeof (extractedData as Record<string, unknown>).account === "string" ? (extractedData as Record<string, unknown>).account as string : null
-        const budgetResults = await checkDocumentBudgets(input.workspaceId, { templateCode, vendor, category, amount })
+        const budgetResults = await checkDocumentBudgets(input.workspaceId, { templateCode: document.template?.code ?? "generic", vendor, category, amount })
         budgetExceeded = budgetResults.some((r) => r.status === "exceeded")
       } catch {
         // budget check failures are non-fatal
@@ -220,6 +222,7 @@ export async function refreshDocumentReadiness(input: RefreshInput): Promise<Rea
       criticalFieldKeys,
       requiredFieldKeys,
       isRecurring,
+      categoryConfirmed: isCategoryConfirmed((document.codingData as Record<string, unknown> | null)),
     })
 
     const previousStatus = document.readinessStatus
@@ -286,14 +289,14 @@ export async function refreshDocumentReadiness(input: RefreshInput): Promise<Rea
           workspaceId: input.workspaceId,
           documentId: document.id,
           documentData,
-          templateCode,
+          templateCode: document.template?.code ?? "generic",
           policyViolationReasons: policyDecision.reasons,
           policyText,
         })
         const extractedData = (document.rawExtraction as Record<string, unknown>) ?? {}
         const vendor = typeof extractedData.vendor === "string" ? extractedData.vendor : typeof extractedData.merchant === "string" ? extractedData.merchant : null
         const amount = typeof extractedData.total === "number" ? extractedData.total : null
-        const assigneeId = await resolveReviewAssignee(input.workspaceId, { templateCode, vendor, amount })
+        const assigneeId = await resolveReviewAssignee(input.workspaceId, { templateCode: document.template?.code ?? null, vendor, amount })
 
         await createReviewTask({
           workspaceId: input.workspaceId,

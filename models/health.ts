@@ -3,6 +3,7 @@
 // app/(app)/workspaces/[workspaceId]/health-actions.ts and do the auth + capability gate.
 import { SUPPLIER_FIELD_BY_TEMPLATE, type AutomationRuleInput } from "@/lib/automation/rules"
 import type { MatchCandidateDocument } from "@/lib/bank-match/matcher"
+import { DOC_TYPE_SPECS, DOC_TYPES, resolveDocType, type MatchCandidateFieldMap } from "@/lib/doc-types"
 import { buildConfidenceDriftSql } from "@/lib/health/checks/confidence-drift"
 import { REGISTRY, runnableChecks } from "@/lib/health/registry"
 import { computeHealthScore, projectHealthScore, type CheckScoreInput, type HealthScoreConfigInput, type HealthScoreResult, type ProjectedScoreResult } from "@/lib/health/score"
@@ -16,15 +17,6 @@ import { cache } from "react"
 const CANDIDATE_CAP = 500
 const LOW_CONFIDENCE_THRESHOLD = 0.7
 
-// Same per-template field map lib/bank-match's models/bank-matches.ts uses to read a document's
-// amount/date/currency out of its reviewedData — duplicated here (not imported, that file doesn't
-// export it) since this call site's population differs (every eligible document in the workspace,
-// not "every document except the one being matched").
-const CANDIDATE_FIELD_MAPS: Record<string, { supplier: string; total: string; date: string; currency: string; invoiceNumber?: string }> = {
-  invoice: { supplier: "vendor", total: "total", date: "issue_date", currency: "currency_code", invoiceNumber: "invoice_number" },
-  receipt: { supplier: "merchant", total: "total", date: "purchase_date", currency: "currency_code", invoiceNumber: "receipt_number" },
-  expense_receipt: { supplier: "merchant", total: "total", date: "purchase_date", currency: "currency_code", invoiceNumber: "receipt_number" },
-}
 
 function asNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null
@@ -44,22 +36,12 @@ function fingerprintFor(checkCode: string, documentId: string | null | undefined
 
 // ---- Context assembly -----------------------------------------------------------------------
 
-// Phase C: which reviewedData key each finance template uses for its tax total — same
-// per-template field-name problem CANDIDATE_FIELD_MAPS above and models/document-checks.ts's
-// CHECK_FIELD_MAPS both solve, narrowed to just the one field tax-mismatch.ts/missing-tax.ts need.
-// Not imported from document-checks.ts: that module doesn't export its map, and this call site's
-// need (one field, across every eligible document) doesn't warrant widening that module's surface.
-const TAX_FIELD_BY_TEMPLATE: Record<string, string> = {
-  invoice: "tax_total",
-  receipt: "tax_total",
-  expense_receipt: "tax_total",
-}
 
 async function loadDocuments(workspaceId: string, taxExpectedByDefault: boolean): Promise<CheckDocumentSlice[]> {
   const documents = await prisma.document.findMany({
     where: { workspaceId, status: { notIn: ["received", "queued", "processing"] } },
     select: {
-      id: true, fileId: true, filename: true, receivedAt: true, reviewedData: true, reviewedAt: true, appliedRuleId: true,
+      id: true, fileId: true, filename: true, receivedAt: true, reviewedData: true, reviewedAt: true, appliedRuleId: true, docType: true,
       template: { select: { code: true } },
       integrationPushes: { select: { id: true, status: true, externalBillId: true }, take: 1, orderBy: { updatedAt: "desc" } },
       reviewTasks: { select: { id: true }, where: { status: "rejected" }, take: 1 },
@@ -70,10 +52,12 @@ async function loadDocuments(workspaceId: string, taxExpectedByDefault: boolean)
 
   return documents.map((document) => {
     const templateCode = document.template?.code ?? null
-    const supplierField = templateCode ? SUPPLIER_FIELD_BY_TEMPLATE[templateCode] : undefined
+    const docType = resolveDocType(document)
+    const spec = DOC_TYPE_SPECS[docType]
+    const supplierField = spec.counterpartyField
     const values = (document.reviewedData ?? {}) as Record<string, unknown>
     const supplierValue = supplierField && typeof values[supplierField] === "string" ? (values[supplierField] as string).trim() || null : null
-    const taxField = templateCode ? TAX_FIELD_BY_TEMPLATE[templateCode] : undefined
+    const taxField = spec.taxField
     const succeededPush = document.integrationPushes.find((push) => push.status === "succeeded" && push.externalBillId)
     return {
       id: document.id, fileId: document.fileId, filename: document.filename, templateCode,
@@ -235,14 +219,14 @@ async function loadLedgerContext(workspaceId: string): Promise<LedgerContext | n
  * "every document except the one being matched" (there is no single statement document driving
  * this comparison the way there is for a bank-match run). */
 async function loadCandidateDocuments(workspaceId: string): Promise<MatchCandidateDocument[]> {
-  const templateCodes = Object.keys(CANDIDATE_FIELD_MAPS)
+  const matchableDocTypes = DOC_TYPES.filter((dt) => DOC_TYPE_SPECS[dt].matchCandidateFields)
   const documents = await prisma.document.findMany({
-    where: { workspaceId, status: { notIn: ["received", "queued", "processing"] }, template: { code: { in: templateCodes } } },
-    select: { id: true, reviewedData: true, template: { select: { code: true } } },
+    where: { workspaceId, status: { notIn: ["received", "queued", "processing"] }, OR: [{ docType: { in: matchableDocTypes } }, { template: { code: { in: ["invoice", "receipt", "expense_receipt"] } } }] },
+    select: { id: true, reviewedData: true, docType: true, template: { select: { code: true } } },
     take: CANDIDATE_CAP,
   })
   return documents.flatMap((document) => {
-    const map = document.template ? CANDIDATE_FIELD_MAPS[document.template.code] : undefined
+    const map: MatchCandidateFieldMap | undefined = DOC_TYPE_SPECS[resolveDocType(document)].matchCandidateFields
     if (!map) return []
     const values = (document.reviewedData ?? {}) as Record<string, unknown>
     return [{

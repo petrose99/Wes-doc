@@ -220,6 +220,29 @@ describe("evaluateReadiness", () => {
     })
   })
 
+  describe("category confirmation", () => {
+    it("blocks when pushable but category not confirmed", () => {
+      const result = evaluateReadiness(base({ isPushable: true, categoryConfirmed: false }))
+      expect(result.status).toBe("blocked")
+      expect(result.blockers.some((b) => b.code === "category_unconfirmed")).toBe(true)
+    })
+
+    it("does not block when category is confirmed", () => {
+      const result = evaluateReadiness(base({ isPushable: true, categoryConfirmed: true }))
+      expect(result.blockers.some((b) => b.code === "category_unconfirmed")).toBe(false)
+    })
+
+    it("does not block non-pushable documents even if category unconfirmed", () => {
+      const result = evaluateReadiness(base({ isPushable: false, categoryConfirmed: false }))
+      expect(result.blockers.some((b) => b.code === "category_unconfirmed")).toBe(false)
+    })
+
+    it("does not block when categoryConfirmed is undefined (legacy docs)", () => {
+      const result = evaluateReadiness(base({ isPushable: true }))
+      expect(result.blockers.some((b) => b.code === "category_unconfirmed")).toBe(false)
+    })
+  })
+
   describe("multiple blockers", () => {
     it("accumulates all blockers", () => {
       const result = evaluateReadiness(base({
