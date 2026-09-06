@@ -202,7 +202,17 @@ function applyTextGrounding(
     if (value === undefined || value === null) continue
 
     if (field.type === "number" && typeof value === "number") {
-      const found = numberVariants(value).some((variant) => haystack.includes(variant))
+      // Only a variant with enough digits to be an unlikely coincidence counts as a search term —
+      // "0" or "0.00" (value 0's own variants) are 1-2 significant digits, and a bare "0"
+      // matches almost any OCR text with a date, a pump number, or a phone digit in it. Confirmed
+      // live: a receipt whose total the model correctly doubted (confidence 0.4) was pushed to
+      // 0.95 because "0" happened to appear elsewhere in the text — the calibration overrode a
+      // correct doubt with a false one. A value with no sufficiently specific variant is simply
+      // unverifiable by this method: skip it in both directions and let the model's own
+      // confidence stand, rather than treating "can't check" as either evidence for or against.
+      const specificVariants = numberVariants(value).filter(isSpecificEnoughToSearchFor)
+      if (!specificVariants.length) continue
+      const found = specificVariants.some((variant) => haystack.includes(variant))
       if (found) boost(field.key, VERBATIM_CONFIDENCE)
       // A value the identities already vouch for is never dampened — arithmetic proof beats a
       // garbled printed form (the whole point of cross-checking).
@@ -214,6 +224,28 @@ function applyTextGrounding(
       if (haystack.includes(value.trim().toLowerCase())) boost(field.key, VERBATIM_CONFIDENCE)
     }
   }
+}
+
+/** Below this many digits, a plain substring search stops being meaningful evidence: a haystack
+ * of any real length (a date, a pump number, a phone digit, a zip code) will contain "0" or "10"
+ * by pure coincidence far more often than it will genuinely echo a printed amount. 3 digits is
+ * the natural floor for a monetary value — X.XX already clears it — while still excluding the
+ * single- and double-digit values where false positives live. */
+const MIN_GROUNDING_DIGITS = 3
+
+/** Whether a formatted variant has enough digits to be searched for at all — see
+ * MIN_GROUNDING_DIGITS. Punctuation (thousand separators, the decimal point, sign markers) does
+ * not count toward specificity; only the digits do.
+ *
+ * Also requires at least one non-zero digit: "0.00" clears a bare digit-count bar at exactly 3
+ * ("000"), but three identical zeros carry none of the specificity three arbitrary digits like
+ * "978" would — $0.00 is a common filler value on real documents (free shipping, a waived fee, a
+ * tax-exempt line) that appears elsewhere on a receipt without saying anything about whether THIS
+ * field is genuinely zero. Without this, a wrong total of 0 stayed falsely grounded whenever any
+ * other "0.00" happened to appear on the same document. */
+function isSpecificEnoughToSearchFor(variant: string): boolean {
+  const digits = variant.match(/\d/g) ?? []
+  return digits.length >= MIN_GROUNDING_DIGITS && digits.some((digit) => digit !== "0")
 }
 
 /** The formats a printed amount plausibly takes: 6610.95 → "6610.95", "6,610.95"; 400 → "400",
