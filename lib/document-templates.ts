@@ -286,11 +286,24 @@ export function findMissingRequiredFields(fields: DocumentFieldDefinition[], val
   return fields.filter((field) => field.required && (value[field.key] === undefined || value[field.key] === null || value[field.key] === "")).map((field) => field.key)
 }
 
-export function buildFreeFormPrompt() {
-  return [
-    "Extract ALL factual data from this document. You decide what fields exist based on the content.",
-    "Return a flat JSON object with snake_case keys for each header-level field you find (supplier, invoice_number, date, due_date, currency, subtotal, tax, total, etc.).",
+export function buildFreeFormPrompt(spec?: { label?: string; canonicalKeys?: { key: string; hint: string }[] } | null) {
+  const lines = [
+    `Extract ALL factual data from this ${spec?.label?.toLowerCase() ?? "document"}. You decide what fields exist based on the content.`,
+    "Return a flat JSON object with snake_case keys for each header-level field you find.",
     "If the document contains a table of line items (products, services, charges), return them as an array field called `line_items`. Each entry should have keys for every column in the table (description, quantity, unit_price, amount, tax_rate, etc.).",
+  ]
+  if (spec?.canonicalKeys?.length) {
+    lines.push(
+      "Where present, use exactly these snake_case keys:",
+      ...spec.canonicalKeys.map((ck) => `- ${ck.key}: ${ck.hint}`),
+      "You may add any additional fields you find beyond these.",
+    )
+  } else {
+    lines.push(
+      "Use descriptive snake_case keys (supplier, invoice_number, date, due_date, currency, subtotal, tax, total, etc.).",
+    )
+  }
+  lines.push(
     "Rules:",
     "- Dates use YYYY-MM-DD. Amounts are plain numbers. Never convert currencies.",
     "- Keep every string value short and factual (under 300 characters).",
@@ -299,7 +312,9 @@ export function buildFreeFormPrompt() {
     "- Do not invent values; omit unreadable values.",
     "- The document is supplied as markdown from a document-parsing service. Where a value looks garbled, extract the most plausible reading.",
     "Also return `_confidence`: an object with a 0-1 confidence score for each top-level key.",
-  ].join("\n")
+    "Also return a `_provenance` object: for each field, the 1-based page number the value appears on and a short verbatim quote (under 120 characters) of the text around it. For array fields, give one entry per row in the same order as the rows.",
+  )
+  return lines.join("\n")
 }
 
 export function buildFreeFormJsonSchema() {
@@ -307,6 +322,7 @@ export function buildFreeFormJsonSchema() {
     type: "object",
     properties: {
       _confidence: { type: "object", description: "A confidence score from 0 to 1 for each extracted field", additionalProperties: { type: "number" } },
+      _provenance: { type: "object", description: "For each field, an object with page (1-based integer) and quote (short verbatim text). For array fields, an array of such objects in row order.", additionalProperties: true },
     },
     additionalProperties: true,
   }

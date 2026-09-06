@@ -1,3 +1,4 @@
+import { EXPENSE_DOC_TYPES, docTypeToLegacyTemplateCode } from "@/lib/doc-types"
 import { prisma } from "@/lib/db"
 import { SUPPLIER_COLD_START_COUNT, SUPPLIER_TRUST_STREAK, supplierThreshold } from "@/lib/readiness/supplier-thresholds"
 import { getTaxProfile } from "@/models/tax-profiles"
@@ -24,7 +25,7 @@ export type Sql = { text: string; params: unknown[] }
  * summing. Matches the NOT IN list on every query below. */
 const POST_INTAKE_STATUSES = ["received", "queued", "failed"]
 
-const EXPENSE_TEMPLATE_CODES = ["invoice", "receipt", "expense_receipt"]
+const EXPENSE_TEMPLATE_CODES = [...new Set(EXPENSE_DOC_TYPES.map(docTypeToLegacyTemplateCode).concat(["expense_receipt"]))]
 
 export type PeriodKey = "30d" | "90d" | "12m" | "custom"
 export type Period = { key: PeriodKey; from: Date | null; to: Date | null }

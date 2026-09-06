@@ -2,18 +2,28 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const mockCreate = vi.fn()
 const mockUpdate = vi.fn()
+const mockUpdateMany = vi.fn()
 const mockFindMany = vi.fn()
 const mockFindUniqueOrThrow = vi.fn()
+const mockJobCreate = vi.fn()
+
+const mockPrisma = {
+  document: {
+    create: (...args: unknown[]) => mockCreate(...args),
+    update: (...args: unknown[]) => mockUpdate(...args),
+    updateMany: (...args: unknown[]) => mockUpdateMany(...args),
+    findMany: (...args: unknown[]) => mockFindMany(...args),
+    findUniqueOrThrow: (...args: unknown[]) => mockFindUniqueOrThrow(...args),
+  },
+  documentProcessingJob: {
+    create: (...args: unknown[]) => mockJobCreate(...args),
+    updateMany: (...args: unknown[]) => mockUpdateMany(...args),
+  },
+  $transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn(mockPrisma)),
+}
 
 vi.mock("@/lib/db", () => ({
-  prisma: {
-    document: {
-      create: (...args: unknown[]) => mockCreate(...args),
-      update: (...args: unknown[]) => mockUpdate(...args),
-      findMany: (...args: unknown[]) => mockFindMany(...args),
-      findUniqueOrThrow: (...args: unknown[]) => mockFindUniqueOrThrow(...args),
-    },
-  },
+  prisma: mockPrisma,
 }))
 
 const { createChildDocuments, listChildDocuments, markSplitStatus } = await import("@/models/document-splits")
@@ -30,9 +40,13 @@ describe("createChildDocuments", () => {
       storageKey: "key",
       templateId: null,
       templateVersionId: null,
+      uploadBatchId: null,
+      receivedAt: new Date(),
     })
     mockCreate.mockResolvedValue({})
     mockUpdate.mockResolvedValue({})
+    mockUpdateMany.mockResolvedValue({ count: 0 })
+    mockJobCreate.mockResolvedValue({})
 
     const ids = await createChildDocuments("ws1", "f1", "parent1", [
       { parentDocumentId: "parent1", pageRange: "1-2", filename: "part1.pdf" },
@@ -41,9 +55,10 @@ describe("createChildDocuments", () => {
 
     expect(ids).toHaveLength(2)
     expect(mockCreate).toHaveBeenCalledTimes(2)
+    expect(mockJobCreate).toHaveBeenCalledTimes(2)
     expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({
       where: { id: "parent1" },
-      data: { splitStatus: "split" },
+      data: { splitStatus: "split", status: "split" },
     }))
   })
 })

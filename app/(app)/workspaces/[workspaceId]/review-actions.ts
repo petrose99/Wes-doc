@@ -1,6 +1,7 @@
 "use server"
 
 import { ActionState } from "@/lib/actions"
+import { isPushableDocument } from "@/lib/doc-types"
 import { canDecideStage, findCurrentStage } from "@/lib/approvals/engine"
 import { maybeAutopublish } from "@/lib/automation/autopublish"
 import { refreshDocumentReadiness } from "@/lib/readiness/refresh"
@@ -96,7 +97,7 @@ export async function getReviewTaskDetailAction(workspaceId: string, taskId: str
   ])
   const activeConnection = connections.find((connection) => connection.status === "active") ?? null
   const canPush = task.document.status === "reviewed" && Boolean(activeConnection)
-    && Boolean(template?.code) && capabilities.pushableTemplateCodes.includes(template!.code)
+    && isPushableDocument({ docType: task.document.docType, template })
   const supplierValue = values.vendor ?? values.merchant
   const supplier = typeof supplierValue === "string" ? supplierValue.trim() : ""
 

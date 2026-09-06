@@ -402,6 +402,10 @@ model Document {
   pageRange         String?                  @map("page_range")
   parentDocumentId  String?                  @map("parent_document_id") @db.Uuid
   splitStatus       String?                  @map("split_status")
+  /// Canonical document type set by the classification pass (invoice, receipt, bank_statement, …).
+  /// Null for legacy documents that pre-date classification; resolveDocType() falls back to
+  /// template.code for those.
+  docType           String?                  @map("doc_type")
   receivedAt        DateTime                 @default(now()) @map("received_at")
   fieldSnapshot     Json                     @map("field_snapshot")
   rawExtraction     Json?                    @map("raw_extraction")
@@ -527,6 +531,7 @@ model Document {
   @@index([fileId, uploadBatchId])
   @@index([workspaceId, archivedAt])
   @@index([parentDocumentId])
+  @@index([workspaceId, docType])
   @@map("documents")
 }
 

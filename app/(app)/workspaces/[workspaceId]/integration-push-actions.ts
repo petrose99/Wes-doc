@@ -7,6 +7,7 @@
  * redeliverDeliveryAction kicks the webhook drain). */
 
 import { ActionState } from "@/lib/actions"
+import { isCategoryConfirmed, isPushableDocument } from "@/lib/doc-types"
 import { recordDocumentAudit } from "@/lib/audit"
 import { getCurrentUser } from "@/lib/auth"
 import config from "@/lib/config"
@@ -35,16 +36,17 @@ async function pushDocumentToConnection(
   const document = await getWorkspaceDocument(workspaceId, documentId)
   if (!document) throw new Error("Document not found")
   if (document.status !== "reviewed") throw new Error("Only reviewed documents can be pushed")
-  const templateCode = document.template?.code ?? null
-  const { pushableTemplateCodes } = await getWorkspaceCapabilities(workspaceId)
-  if (!templateCode || !pushableTemplateCodes.includes(templateCode)) {
+  if (!isPushableDocument(document)) {
     throw new Error("This document's type can't be pushed to accounting")
+  }
+  const coding = (document.codingData as Record<string, unknown> | null) ?? {}
+  if (!isCategoryConfirmed(coding)) {
+    throw new Error("Document category must be confirmed before pushing")
   }
   const connection = await prisma.integrationConnection.findFirst({ where: { id: connectionId, workspaceId }, select: { id: true, provider: true, defaultExpenseAccountId: true } })
   if (!connection) throw new Error("That connection no longer exists")
 
   const reviewedData = (document.reviewedData as Record<string, unknown> | null) ?? (document.rawExtraction as Record<string, unknown> | null) ?? {}
-  const coding = (document.codingData as Record<string, unknown> | null) ?? {}
   const category = (typeof coding.account === "string" && coding.account) || (typeof reviewedData.category === "string" && reviewedData.category) || null
   const documentType = coding.documentType === "expense" || coding.documentType === "sale" || coding.documentType === "bank_statement" ? coding.documentType : "expense"
 
@@ -61,7 +63,7 @@ async function pushDocumentToConnection(
     if (!cashflowAccountId || !creditAccountId) throw new Error("No bank account configured for statement push")
     payload = extractBankStatementPayload(document.id, reviewedData, cashflowAccountId, creditAccountId)
   } else {
-    const bill = normalizeBillFromDocument({ documentId: document.id, filename: document.filename, templateCode, reviewedData })
+    const bill = normalizeBillFromDocument({ documentId: document.id, filename: document.filename, templateCode: document.template?.code ?? null, reviewedData })
     const direction: "payable" | "receivable" = documentType === "sale" ? "receivable" : "payable"
     payload = { ...bill, documentType, direction, ...(resolvedAccountId ? { expenseAccountId: resolvedAccountId } : {}), ...(category ? { category } : {}) }
   }

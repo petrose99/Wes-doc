@@ -4,19 +4,10 @@
 import { auditEventData, getRequestAuditContext } from "@/lib/audit"
 import { suggestMatches, type BankTransaction, type MatchCandidateDocument } from "@/lib/bank-match/matcher"
 import { prisma } from "@/lib/db"
+import { DOC_TYPE_SPECS, DOC_TYPES, resolveDocType, type MatchCandidateFieldMap } from "@/lib/doc-types"
 import { matchSupplierStatementEntries, type SupplierStatementEntry } from "@/lib/reconciliation/supplier-statement"
 import { Prisma } from "@/prisma/client"
 import { cache } from "react"
-
-/** Which reviewedData keys carry the concepts the matchers need, per template — the same "per-
- * template field name" problem models/document-checks.ts's CHECK_FIELD_MAPS solves, kept as its
- * own small map here rather than importing that one: this needs different fields (amount/date
- * shapes for statement rows) that CHECK_FIELD_MAPS has no reason to carry. */
-const CANDIDATE_FIELD_MAPS: Record<string, { supplier: string; total: string; date: string; currency: string; invoiceNumber?: string }> = {
-  invoice: { supplier: "vendor", total: "total", date: "issue_date", currency: "currency_code", invoiceNumber: "invoice_number" },
-  receipt: { supplier: "merchant", total: "total", date: "purchase_date", currency: "currency_code", invoiceNumber: "receipt_number" },
-  expense_receipt: { supplier: "merchant", total: "total", date: "purchase_date", currency: "currency_code", invoiceNumber: "receipt_number" },
-}
 
 function asNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null
@@ -31,14 +22,14 @@ function asDate(value: unknown): Date | null {
 }
 
 async function loadCandidateDocuments(workspaceId: string, excludeDocumentId: string): Promise<MatchCandidateDocument[]> {
-  const templateCodes = Object.keys(CANDIDATE_FIELD_MAPS)
+  const matchableDocTypes = DOC_TYPES.filter((dt) => DOC_TYPE_SPECS[dt].matchCandidateFields)
   const documents = await prisma.document.findMany({
-    where: { workspaceId, id: { not: excludeDocumentId }, status: { notIn: ["received", "queued", "processing"] }, template: { code: { in: templateCodes } } },
-    select: { id: true, reviewedData: true, template: { select: { code: true } } },
+    where: { workspaceId, id: { not: excludeDocumentId }, status: { notIn: ["received", "queued", "processing"] }, OR: [{ docType: { in: matchableDocTypes } }, { template: { code: { in: ["invoice", "receipt", "expense_receipt"] } } }] },
+    select: { id: true, reviewedData: true, docType: true, template: { select: { code: true } } },
     take: 500,
   })
   return documents.flatMap((document) => {
-    const map = document.template ? CANDIDATE_FIELD_MAPS[document.template.code] : undefined
+    const map: MatchCandidateFieldMap | undefined = DOC_TYPE_SPECS[resolveDocType(document)].matchCandidateFields
     if (!map) return []
     const values = (document.reviewedData ?? {}) as Record<string, unknown>
     return [{

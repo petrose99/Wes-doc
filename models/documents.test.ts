@@ -141,7 +141,7 @@ describe("deleteWorkspaceDocuments", () => {
     vi.mocked(deleteDocumentSource).mockResolvedValue(undefined)
     findMany = vi.fn()
     Object.assign(db, {
-      document: { findMany, delete: vi.fn() },
+      document: { findMany, delete: vi.fn(), count: vi.fn().mockResolvedValue(0) },
       documentAuditEvent: { create: vi.fn() },
       // No subscribed endpoints → emitWorkspaceEvent queues nothing and never kicks the drain.
       webhookEndpoint: { findMany: vi.fn().mockResolvedValue([]) },

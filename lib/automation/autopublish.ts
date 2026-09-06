@@ -1,3 +1,4 @@
+import { isCategoryConfirmed, isPushableDocument } from "@/lib/doc-types"
 import { normalizeBillFromDocument, BillMappingError } from "@/lib/integration-bill-mapping"
 import { extractBankStatementPayload } from "@/lib/integrations/bigcapital/bank-statement-mapper"
 import { attemptIntegrationPush, kickIntegrationPushDrain } from "@/lib/integration-push"
@@ -11,14 +12,14 @@ import { getCategoryAccountMap, upsertWorkspaceIntegrationPush } from "@/models/
  * was created, false if skipped (not pushable, already pushed, no connection). Never throws. */
 async function enqueuePush(
   workspaceId: string,
-  document: { id: string; filename: string; reviewedData: unknown; rawExtraction: unknown; codingData: unknown; template: { code: string } | null },
+  document: { id: string; filename: string; reviewedData: unknown; rawExtraction: unknown; codingData: unknown; docType?: string | null; template: { code: string } | null },
   actorId: string | null,
   auditType: string,
 ): Promise<boolean> {
-  const templateCode = document.template?.code
   const caps = await getWorkspaceCapabilities(workspaceId)
   if (!caps.has("accounting-push")) return false
-  if (!templateCode || !caps.pushableTemplateCodes.includes(templateCode)) return false
+  if (!isPushableDocument(document)) return false
+  if (!isCategoryConfirmed((document.codingData as Record<string, unknown> | null))) return false
 
   const connection = await prisma.integrationConnection.findFirst({ where: { workspaceId, status: "active" }, orderBy: { createdAt: "asc" } })
   if (!connection) return false
@@ -41,7 +42,7 @@ async function enqueuePush(
     if (!cashflowAccountId) return false
     payload = extractBankStatementPayload(document.id, reviewedData, cashflowAccountId, connection.defaultExpenseAccountId!)
   } else {
-    const bill = normalizeBillFromDocument({ documentId: document.id, filename: document.filename, templateCode, reviewedData })
+    const bill = normalizeBillFromDocument({ documentId: document.id, filename: document.filename, templateCode: document.template?.code ?? null, reviewedData })
     const direction: "payable" | "receivable" = documentType === "sale" ? "receivable" : "payable"
     payload = { ...bill, documentType, direction, ...(resolvedAccountId ? { expenseAccountId: resolvedAccountId } : {}), ...(category ? { category } : {}) }
   }
@@ -66,7 +67,7 @@ export async function maybeAutopublish(workspaceId: string, documentId: string, 
   try {
     const document = await prisma.document.findUnique({
       where: { id: documentId },
-      select: { id: true, filename: true, reviewedData: true, rawExtraction: true, codingData: true, appliedRuleId: true, readinessStatus: true, template: { select: { code: true } } },
+      select: { id: true, filename: true, reviewedData: true, rawExtraction: true, codingData: true, appliedRuleId: true, readinessStatus: true, docType: true, template: { select: { code: true } } },
     })
     if (!document) return
 

@@ -1,4 +1,7 @@
 import { requestLLM } from "@/ai/providers/llmProvider"
+import { classifyDocument, type ClassificationResult } from "@/lib/classification"
+import { DOC_TYPE_SPECS, DOC_TYPES, isDocType, resolveDocType, docTypeToLegacyTemplateCode, type DocType, type DocCategory } from "@/lib/doc-types"
+import { inferFieldSnapshot, extractFreeFormProvenance } from "@/lib/extraction/infer-schema"
 import { deriveAdaptiveFields } from "@/lib/adaptive-extraction"
 import { track } from "@/lib/analytics"
 import { SUPPLIER_FIELD_BY_TEMPLATE } from "@/lib/automation/rules"
@@ -23,6 +26,7 @@ import { replaceDocumentFieldValues } from "@/models/document-field-values"
 import { buildBlocksSidecar, buildDocumentProvenance } from "@/lib/provenance"
 import { buildShapeSignature } from "@/lib/shape-match"
 import { upsertExtractionShape } from "@/models/extraction-shapes"
+import { createChildDocuments } from "@/models/document-splits"
 import { scanDocumentBuffer } from "@/lib/malware-scan"
 import { parseDocumentWithMineru } from "@/lib/mineru"
 import { parsePageRange } from "@/lib/page-range"
@@ -234,6 +238,32 @@ function stripMeta(output: Record<string, unknown>): Record<string, unknown> {
   return result
 }
 
+/** After classification + extraction, route the document to a worksheet that matches its docType.
+ * If the file already has one (by code), reassign; otherwise create one from canonical keys. */
+async function autoRouteToSheet(document: { id: string; workspaceId: string; fileId: string; templateId: string | null; template: { code: string } | null }, docType: DocType, inferredFields: DocumentFieldDefinition[] | null): Promise<void> {
+  if (!isDocType(docType) || docType === "other") return
+  const legacyCode = docTypeToLegacyTemplateCode(docType)
+  if (document.template?.code === docType || document.template?.code === legacyCode) return
+  const existing = await prisma.documentTemplate.findFirst({
+    where: { workspaceId: document.workspaceId, fileId: document.fileId, code: { in: [docType, legacyCode] } },
+    select: { id: true },
+  })
+  if (existing) {
+    await prisma.document.update({ where: { id: document.id }, data: { templateId: existing.id } })
+    return
+  }
+  const spec = DOC_TYPE_SPECS[docType]
+  const fields = inferredFields ?? spec.canonicalKeys.map((ck) => ({ key: ck.key, label: ck.hint, type: "string" as const }))
+  const created = await prisma.documentTemplate.create({
+    data: {
+      workspaceId: document.workspaceId, fileId: document.fileId, code: docType, name: spec.label,
+      documentType: docType, isSystem: false, multiRow: false,
+      versions: { create: { version: 1, fields: fields as unknown as Prisma.InputJsonValue } },
+    },
+  })
+  await prisma.document.update({ where: { id: document.id }, data: { templateId: created.id } })
+}
+
 export async function processDocumentJob(jobId: string) {
   const now = new Date()
   const claimed = await prisma.documentProcessingJob.updateMany({
@@ -337,6 +367,69 @@ export async function processDocumentJob(jobId: string) {
     // feature: a failure here must never fail the extraction that is the job's real purpose.
     if (config.embeddings.enabled) embedJobId = await enqueueEmbedJob(document, ocrText).catch(() => null)
 
+    // Classification pass: a cheap LLM call to determine document type, category, and split
+    // boundaries BEFORE extraction. Non-fatal: failure defaults to "other" with confidence 0.
+    let classificationData: ClassificationResult | null = null
+    try {
+      const classPageTexts = contents.map(({ page, text }) => ({ page, text }))
+      classificationData = await classifyDocument(
+        { providers: [{ provider: aiProvider, apiKey, model: modelName }] },
+        { filename: document.filename, pageTexts: classPageTexts, totalPages: contents.length },
+      )
+      const codingData = (document.codingData ?? {}) as Record<string, unknown>
+      const existingDocTypeSource = codingData.documentTypeSource as string | undefined
+      const aiCategoryUpdate: Record<string, unknown> = {}
+      if (existingDocTypeSource !== "human") {
+        const autoConfirm = classificationData.confidence >= 0.9 && classificationData.category !== "other"
+        aiCategoryUpdate.codingData = {
+          ...codingData,
+          documentType: classificationData.category === "other" ? "other" : classificationData.category,
+          documentTypeSource: "ai",
+          categoryConfirmed: autoConfirm,
+        }
+      }
+      await prisma.document.update({
+        where: { id: document.id },
+        data: {
+          docType: classificationData.docType,
+          classification: {
+            docType: classificationData.docType,
+            docTypeLabel: classificationData.docTypeLabel,
+            category: classificationData.category,
+            confidence: classificationData.confidence,
+            segments: classificationData.segments,
+          } as unknown as Prisma.InputJsonValue,
+          ...aiCategoryUpdate,
+        },
+      })
+    } catch (e) {
+      console.error("Classification failed (non-fatal):", e instanceof Error ? e.message : e)
+    }
+
+    // Auto-split: if classification detected multiple independent documents, split and exit.
+    // Each child is enqueued as its own extract job and re-enters this pipeline independently.
+    const SPLIT_CONFIDENCE_THRESHOLD = 0.7
+    if (
+      classificationData &&
+      classificationData.segments.length > 1 &&
+      classificationData.confidence >= SPLIT_CONFIDENCE_THRESHOLD &&
+      !document.parentDocumentId
+    ) {
+      const childInputs = classificationData.segments.map((seg, i) => ({
+        parentDocumentId: document.id,
+        pageRange: `${seg.startPage}-${seg.endPage}`,
+        filename: `${document.filename.replace(/\.[^.]+$/, "")}_part${i + 1}${document.filename.match(/\.[^.]+$/)?.[0] ?? ""}`,
+        docType: seg.docType,
+      }))
+      await createChildDocuments(document.workspaceId, document.fileId, document.id, childInputs)
+      await recordSystemAudit({
+        workspaceId: document.workspaceId, documentId: document.id,
+        type: "document_auto_split",
+        detail: { segments: classificationData.segments, confidence: classificationData.confidence } as Prisma.InputJsonValue,
+      })
+      return
+    }
+
     // Batch over the pages actually parsed rather than the estimate: pdfPageCount reads 0
     // on PDFs whose page tree sits in a compressed object stream, and batching on that would
     // leave every page past the first out of all batches and silently unextracted.
@@ -351,8 +444,9 @@ export async function processDocumentJob(jobId: string) {
     // throws — see lib/adaptive-extraction.ts.
     const fields = await deriveAdaptiveFields({ document, templateFields, contents })
     const freeForm = !fields.length
+    const freeFormSpec = freeForm ? (classificationData ? DOC_TYPE_SPECS[classificationData.docType] : null) : null
     const fewShotExamples = !freeForm && document.template?.code ? await getFewShotExamples(document.workspaceId, document.template.code).catch(() => []) : []
-    const prompt = freeForm ? buildFreeFormPrompt() : buildDocumentPrompt(document.template?.name || "document", fields, document.templateVersion?.prompt, fewShotExamples)
+    const prompt = freeForm ? buildFreeFormPrompt(freeFormSpec) : buildDocumentPrompt(document.template?.name || "document", fields, document.templateVersion?.prompt, fewShotExamples)
     const schema = freeForm ? buildFreeFormJsonSchema() : buildDocumentJsonSchema(fields)
     const passes: Array<Record<string, unknown>> = []
     const confidencePasses: Array<Record<string, number>> = []
@@ -366,7 +460,7 @@ export async function processDocumentJob(jobId: string) {
       else {
         passes.push(freeForm ? stripMeta(response.output) : validateDocumentValues(fields, response.output))
         confidencePasses.push(freeForm ? (response.output?._confidence as Record<string, number> ?? {}) : extractFieldConfidence(fields, response.output))
-        provenancePasses.push(freeForm ? { fields: {}, items: {} } : extractFieldProvenance(fields, response.output))
+        provenancePasses.push(freeForm ? extractFreeFormProvenance(response.output) : extractFieldProvenance(fields, response.output))
         classificationPasses.push(extractClassification(response.output))
       }
       const isLastBatch = index === batches.length - 1
@@ -376,10 +470,13 @@ export async function processDocumentJob(jobId: string) {
 
     const extraction = freeForm ? Object.assign({}, ...passes) : mergeExtractionPasses(fields, passes)
     const rawFieldConfidence = freeForm ? Object.assign({}, ...confidencePasses) : mergeFieldConfidence(fields, passes, confidencePasses)
+    const inferredFields = freeForm ? inferFieldSnapshot(extraction, freeFormSpec) : null
 
     // P1: merge continuation rows — string-only fragments at page boundaries onto the preceding
     // numeric row, and drop repeated headers/markers.
-    let mergedProvenance = freeForm ? { fields: {}, items: {} } as FieldProvenanceHints : mergeProvenancePasses(fields, passes, provenancePasses)
+    let mergedProvenance = freeForm
+      ? provenancePasses.reduce<FieldProvenanceHints>((acc, p) => ({ fields: { ...acc.fields, ...p.fields }, items: { ...acc.items, ...p.items } }), { fields: {}, items: {} })
+      : mergeProvenancePasses(fields, passes, provenancePasses)
     const mergeAuditDetail: Record<string, unknown> = {}
     if (!freeForm) {
       for (const field of fields) {
@@ -436,8 +533,12 @@ export async function processDocumentJob(jobId: string) {
 
     // Replace the LLM's self-reported confidence with evidence wherever the document corroborates
     // itself (arithmetic identities, verbatim presence in the OCR text) — see lib/extraction/calibrate.
-    let calibration = freeForm ? null : calibrateFieldConfidence({
-      templateCode: document.template?.code ?? null, fields, extraction, fieldConfidence: rawFieldConfidence, ocrText,
+    const effectiveFields = inferredFields ?? fields
+    const effectiveTemplateCode = freeForm
+      ? (classificationData ? docTypeToLegacyTemplateCode(classificationData.docType) : null)
+      : (document.template?.code ?? null)
+    let calibration = calibrateFieldConfidence({
+      templateCode: effectiveTemplateCode, fields: effectiveFields, extraction, fieldConfidence: rawFieldConfidence, ocrText,
     })
     let fieldConfidence = calibration?.fieldConfidence ?? rawFieldConfidence
     // Fields with concrete evidence of a misread get ONE focused re-read (lib/extraction/verify):
@@ -449,14 +550,14 @@ export async function processDocumentJob(jobId: string) {
       const verification = await verifySuspectFields({
         settings: { providers: [{ provider: aiProvider, apiKey, model: modelName }] },
         templateName: document.template?.name || "document",
-        fields, suspectKeys: calibration.suspect, extraction,
+        fields: effectiveFields, suspectKeys: calibration.suspect, extraction,
         textParts: buildBatchParts(contents, collectedPages).textParts,
       })
       if (verification && Object.keys(verification.values).length) {
         Object.assign(extraction, verification.values)
         Object.assign(fieldConfidence, verification.confidence)
         calibration = calibrateFieldConfidence({
-          templateCode: document.template?.code ?? null, fields, extraction, fieldConfidence, ocrText,
+          templateCode: effectiveTemplateCode, fields: effectiveFields, extraction, fieldConfidence, ocrText,
         })
         fieldConfidence = calibration.fieldConfidence
         if (verification.changed.length) {
@@ -464,8 +565,8 @@ export async function processDocumentJob(jobId: string) {
         }
       }
     }
-    const conflictingFields = freeForm ? [] : findConflictingScalarFields(fields, passes)
-    const missing = freeForm ? [] : findMissingRequiredFields(fields, extraction)
+    const conflictingFields = findConflictingScalarFields(effectiveFields, passes)
+    const missing = findMissingRequiredFields(effectiveFields, extraction)
     const classification = mergeClassification(classificationPasses)
     // Save this run's setup as a reusable shape and stamp the document with it, so the next
     // similar upload can be matched and this run can later be diffed against. Best effort: a
@@ -484,15 +585,16 @@ export async function processDocumentJob(jobId: string) {
     }
     // Resolve each merged value's source location against the parsed blocks, remapping pages back
     // to the original numbering when a page range narrowed the parse.
-    const provenance = freeForm ? null : buildDocumentProvenance(fields, mergedProvenance, extraction, parsed.blocks ?? null, parsed.pageSizes ?? null, pageRanges)
+    const provenance = buildDocumentProvenance(effectiveFields, mergedProvenance, extraction, parsed.blocks ?? null, parsed.pageSizes ?? null, pageRanges)
     const status = missing.length || batchFailures ? "needs_review" : "ready_for_review"
-    const fieldValues = freeForm ? [] : projectDocumentFields({ fields, values: extraction, confidence: fieldConfidence, provenance, source: "llm_structured" })
+    const snapshotFields = inferredFields ?? fields
+    const fieldValues = projectDocumentFields({ fields: effectiveFields, values: extraction, confidence: fieldConfidence, provenance, source: freeForm ? "llm_freeform" : "llm_structured" })
     // Interactive form (not the array form) because the projection is raw SQL and has to run on the
     // same tx client. Timeout raised over the 5s default: a long line-item table projects to a few
     // hundred rows, which is still only a handful of batched statements but not instant.
     const confidence = { missingRequiredFields: missing, partialFailure: batchFailures > 0, fieldConfidence, conflictingFields, corroboratedFields: calibration?.corroborated ?? [] }
     await prisma.$transaction(async (tx) => {
-      await tx.document.update({ where: { id: document.id }, data: { status, ocrText, fieldSnapshot: fields as unknown as Prisma.InputJsonValue, rawExtraction: extraction as Prisma.InputJsonValue, reviewedData: extraction as Prisma.InputJsonValue, provenance: provenance as Prisma.InputJsonValue, shapeId, classification: classification as Prisma.InputJsonValue, confidence: confidence as Prisma.InputJsonValue } })
+      await tx.document.update({ where: { id: document.id }, data: { status, ocrText, fieldSnapshot: snapshotFields as unknown as Prisma.InputJsonValue, rawExtraction: extraction as Prisma.InputJsonValue, reviewedData: extraction as Prisma.InputJsonValue, provenance: provenance as Prisma.InputJsonValue, shapeId, classification: classification as Prisma.InputJsonValue, confidence: confidence as Prisma.InputJsonValue } })
       await tx.documentProcessingJob.update({ where: { id: job.id }, data: { status: "completed", completedAt: new Date(), leaseUntil: null } })
       await recordSystemAudit({ workspaceId: document.workspaceId, documentId: document.id, type: "extraction_completed", detail: Object.keys(mergeAuditDetail).length ? { rowMerges: mergeAuditDetail } as Prisma.InputJsonValue : undefined }, tx)
       await replaceDocumentFieldValues({ workspaceId: document.workspaceId, documentId: document.id, fileId: document.fileId, templateCode: document.template?.code ?? null, rows: fieldValues }, tx)
@@ -508,6 +610,11 @@ export async function processDocumentJob(jobId: string) {
     }, { timeout: 20_000 })
     await track("document_extraction_completed", { documentId: document.id, templateCode: document.template?.code ?? "unknown", status: "success", durationMs: Date.now() - document.receivedAt.getTime() }, { workspaceId: document.workspaceId })
     await prisma.ingestionItem.updateMany({ where: { documentId: document.id }, data: { status: "extracted" } })
+    const classifiedDocType = classificationData?.docType ?? resolveDocType(document)
+    if (isDocType(classifiedDocType)) {
+      await autoRouteToSheet(document, classifiedDocType, inferredFields).catch((e) =>
+        console.error("[processing] auto-route failed (non-fatal):", e instanceof Error ? e.message : e))
+    }
     const templateCode = document.template?.code
     const supplierField = templateCode ? SUPPLIER_FIELD_BY_TEMPLATE[templateCode] : undefined
     if (templateCode && supplierField) {

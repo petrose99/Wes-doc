@@ -3,6 +3,7 @@
  * this document get coded that way" question always has one answer, not one that depends on
  * database row order. Run in the worker post-extraction (lib/document-processing.ts); nothing
  * here touches Prisma. */
+import { DOC_TYPE_SPECS, DOC_TYPES, docTypeToLegacyTemplateCode, legacyTemplateCodeToDocType } from "@/lib/doc-types"
 import { normalizeSupplierName } from "@/lib/suppliers/normalize"
 
 export type RuleMatcherType = "exact" | "contains"
@@ -50,17 +51,22 @@ export type RuleApplicationResult = {
   reviewReason: ReviewReason | null
 }
 
-/** Which field on each finance template (lib/domains/finance.ts) is the "supplier" a rule
- * matches against. Not every template has one — bank_statement has no counterparty field of that
- * shape, so it is deliberately absent and applyAutomationRules simply never matches on it. */
-export const SUPPLIER_FIELD_BY_TEMPLATE: Record<string, string> = {
-  invoice: "vendor",
-  receipt: "merchant",
-  expense_receipt: "merchant",
-  purchase_order: "supplier",
-  remittance_advice: "payee",
-  supplier_statement: "supplier",
-}
+/** Derived from DOC_TYPE_SPECS — keyed by both docType AND legacy template code so callers
+ * using either convention find the counterparty field. */
+export const SUPPLIER_FIELD_BY_TEMPLATE: Record<string, string> = (() => {
+  const m: Record<string, string> = {}
+  for (const dt of DOC_TYPES) {
+    const f = DOC_TYPE_SPECS[dt].counterpartyField
+    if (!f) continue
+    m[dt] = f
+    const legacy = docTypeToLegacyTemplateCode(dt)
+    if (legacy !== dt) m[legacy] = f
+  }
+  m["expense_receipt"] = m["receipt"]
+  m["remittance_advice"] = "payee"
+  m["supplier_statement"] = "supplier"
+  return m
+})()
 
 /** A5: rule matching goes through the shared supplier normalizer — case/punctuation folded and
  * legal-form suffixes stripped on BOTH the rule's matcher text and the extracted supplier, so a

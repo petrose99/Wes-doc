@@ -13,7 +13,7 @@ import type { DocumentProvenance, Ref } from "@/lib/provenance"
  * value that does not match its declared type produces no row rather than a wrong one. */
 
 /** How a stored fact was obtained. */
-export type FieldValueSource = "vlm_ocr" | "asr" | "llm_structured" | "manual"
+export type FieldValueSource = "vlm_ocr" | "asr" | "llm_structured" | "llm_freeform" | "manual"
 
 /** One row destined for document_field_values, before workspace/document/file ids are attached. */
 export type FieldValueRow = {

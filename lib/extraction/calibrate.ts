@@ -1,4 +1,6 @@
 import { amountsMatch } from "@/lib/checks/types"
+import { DOC_TYPE_SPECS, isDocType, legacyTemplateCodeToDocType } from "@/lib/doc-types"
+import type { AmountKeyMap } from "@/lib/doc-types"
 import { groupTransactionsByAccount } from "@/lib/extraction/balance-solver"
 
 /** Post-extraction confidence calibration — pure, no Prisma.
@@ -26,6 +28,7 @@ type FieldLite = { key: string; type: string }
 
 export type CalibrationInput = {
   templateCode: string | null
+  docType?: string | null
   fields: FieldLite[]
   extraction: Record<string, unknown>
   fieldConfidence: Record<string, number>
@@ -43,17 +46,10 @@ export type CalibrationResult = {
   suspect: string[]
 }
 
-/** Per-template key names for the arithmetic identities. Mirrors models/document-checks.ts's
- * CHECK_FIELD_MAPS (kept local: that module imports Prisma, this one must stay pure). */
-const AMOUNT_KEYS: Record<string, {
-  subtotal?: string; taxTotal?: string; shippingTotal?: string; otherCharges?: string; total?: string; lineItems?: string
-  openingBalance?: string; closingBalance?: string; transactions?: string; accounts?: string
-  currency?: string
-}> = {
-  invoice: { subtotal: "subtotal", taxTotal: "tax_total", shippingTotal: "shipping_total", otherCharges: "other_charges", total: "total", lineItems: "line_items", currency: "currency_code" },
-  receipt: { taxTotal: "tax_total", total: "total", lineItems: "line_items", currency: "currency_code" },
-  purchase_order: { total: "total", lineItems: "line_items", currency: "currency_code" },
-  bank_statement: { openingBalance: "opening_balance", closingBalance: "closing_balance", transactions: "transactions", accounts: "accounts", currency: "currency_code" },
+function resolveAmountKeys(input: CalibrationInput): AmountKeyMap | undefined {
+  if (input.docType && isDocType(input.docType)) return DOC_TYPE_SPECS[input.docType].amountKeys
+  if (input.templateCode) return DOC_TYPE_SPECS[legacyTemplateCodeToDocType(input.templateCode)].amountKeys
+  return undefined
 }
 
 export function calibrateFieldConfidence(input: CalibrationInput): CalibrationResult {
@@ -82,7 +78,7 @@ function applyArithmetic(
   suspect: Set<string>,
   boost: (key: string, floor: number) => void,
 ) {
-  const map = input.templateCode ? AMOUNT_KEYS[input.templateCode] : undefined
+  const map = resolveAmountKeys(input)
   if (!map) return
   const num = (key: string | undefined) => (key ? asNumber(input.extraction[key]) : null)
   const currency = map.currency ? asString(input.extraction[map.currency]) : null
