@@ -1,8 +1,10 @@
 import { getCurrentUser } from "@/lib/auth"
 import { getAutomationMetrics, getSupplierTrust, type SupplierTrustRow } from "@/lib/analytics/workspace-analytics"
-import { requireModule } from "@/lib/modules/capabilities"
+import { getWorkspaceCapabilities, requireModule } from "@/lib/modules/capabilities"
 import { SUPPLIER_COLD_START_COUNT, SUPPLIER_TRUST_STREAK } from "@/lib/readiness/supplier-thresholds"
+import { countOpenReviewTasks } from "@/models/review-tasks"
 import { requireWorkspaceRole } from "@/models/workspaces"
+import { AutomationTabs } from "@/components/automation/automation-tabs"
 import { Activity, CheckCircle2, GitCompareArrows, ShieldCheck, XCircle } from "lucide-react"
 
 export const dynamic = "force-dynamic"
@@ -70,15 +72,22 @@ export default async function AutomationDashboardPage({ params }: {
   await requireWorkspaceRole(workspaceId, user.id)
   await requireModule(workspaceId, "touchless-automation")
 
-  const [metrics, supplierTrust] = await Promise.all([getAutomationMetrics(workspaceId, 30), getSupplierTrust(workspaceId)])
+  const capabilities = await getWorkspaceCapabilities(workspaceId)
+  const reviewEnabled = capabilities.has("review-queue")
+  const [metrics, supplierTrust, reviewCount] = await Promise.all([
+    getAutomationMetrics(workspaceId, 30),
+    getSupplierTrust(workspaceId),
+    reviewEnabled ? countOpenReviewTasks(workspaceId) : 0,
+  ])
   const touchlessPercent = Math.round(metrics.touchless.touchlessRate * 100)
   const matchPercent = Math.round(metrics.matchCoverage.matchRate * 100)
 
   return <main className="mx-auto w-full max-w-5xl space-y-6 px-4 py-6 md:px-6">
     <header>
-      <h1 className="text-2xl font-bold text-slate-900">Automation metrics</h1>
-      <p className="mt-1 text-sm text-slate-500">Last 30 days of touchless automation performance.</p>
+      <h1 className="text-2xl font-bold text-slate-900">Automation</h1>
+      <p className="mt-1 text-sm text-slate-500">Touchless automation performance and review queue.</p>
     </header>
+    <AutomationTabs workspaceId={workspaceId} active="metrics" reviewCount={reviewCount} reviewEnabled={reviewEnabled} />
 
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
       <Stat icon={Activity} label="Touchless rate" value={`${touchlessPercent}%`} sub={`${metrics.touchless.totalPushedTouchless} of ${metrics.touchless.totalExtracted} documents`} color="bg-emerald-50 text-emerald-700" />

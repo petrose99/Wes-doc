@@ -2,6 +2,7 @@
 
 import type { SuggestResult } from "@/components/extract/types"
 import { ActionState } from "@/lib/actions"
+import { redirect } from "next/navigation"
 import { recordDocumentAudit } from "@/lib/audit"
 import config from "@/lib/config"
 import { DOC_TYPE_SPECS, isDocType } from "@/lib/doc-types"
@@ -205,7 +206,7 @@ export async function saveDocumentReviewAction(workspaceId: string, documentId: 
       if (field.type === "number") { data[field.key] = Number(raw); continue }
       data[field.key] = raw
     }
-    await updateDocumentReview({ workspaceId, documentId, reviewedData: data, actorId: user.id }); after(async () => { await refreshDocumentReadiness({ workspaceId, documentId }) }); revalidatePath(`${paths(workspaceId).documents}/${documentId}`); await revalidateSheet(workspaceId, document.fileId); return { success: true, data: null }
+    await updateDocumentReview({ workspaceId, documentId, reviewedData: data, actorId: user.id }); after(async () => { await refreshDocumentReadiness({ workspaceId, documentId }) }); revalidatePath(`${paths(workspaceId).documents}/${documentId}`); await revalidateSheet(workspaceId, document.fileId); redirect(paths(workspaceId).review)
   } catch { return { success: false, error: "Check the field values" } }
 }
 

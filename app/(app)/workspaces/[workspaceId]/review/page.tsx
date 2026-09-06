@@ -1,7 +1,8 @@
+import { AutomationTabs } from "@/components/automation/automation-tabs"
 import { ReviewInbox } from "@/components/workspace/review-inbox"
 import config from "@/lib/config"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
-import { listReviewTasks, parseReviewTaskStatus, type ReviewTaskStatus } from "@/models/review-tasks"
+import { countOpenReviewTasks, listReviewTasks, parseReviewTaskStatus, type ReviewTaskStatus } from "@/models/review-tasks"
 import { summarizeDocumentForReview } from "@/models/documents"
 import { getWorkspaceMembers, requireWorkspaceRole } from "@/models/workspaces"
 import { getCurrentUser } from "@/lib/auth"
@@ -33,16 +34,18 @@ export default async function ReviewQueuePage({ params, searchParams }: {
   if (!capabilities.has("review-queue")) notFound()
 
   const status = statusParam && statusParam !== "all" ? parseReviewTaskStatus(statusParam) ?? undefined : undefined
-  const [tasks, members] = await Promise.all([
+  const [tasks, members, reviewCount] = await Promise.all([
     listReviewTasks(workspaceId, status ? { status } : {}),
     getWorkspaceMembers(workspaceId),
+    countOpenReviewTasks(workspaceId),
   ])
 
   return <main className="mx-auto w-full max-w-6xl space-y-6 p-6">
     <header>
-      <h1 className="text-3xl font-bold text-slate-900">Review queue</h1>
+      <h1 className="text-2xl font-bold text-slate-900">Automation</h1>
       <p className="mt-1 text-sm text-slate-500">Documents that need a person to look at them before they&apos;re trusted.</p>
     </header>
+    <AutomationTabs workspaceId={workspaceId} active="review" reviewCount={reviewCount} reviewEnabled />
 
     <nav className="flex gap-1 border-b">
       {STATUS_TABS.map((tab) => {

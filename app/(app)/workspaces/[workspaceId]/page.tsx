@@ -14,7 +14,6 @@ import { getWorkspaceUsage, requireWorkspaceRole } from "@/models/workspaces"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { getWorkspaceAnalytics, resolvePeriod } from "@/lib/analytics/workspace-analytics"
 import { HeadlineCards } from "@/components/analytics/stat-cards"
-import { CashFlowChart } from "@/components/analytics/cash-flow-chart"
 import { SpendByCategoryChart } from "@/components/analytics/spend-by-category-chart"
 import { VendorSpendChart } from "@/components/analytics/vendor-spend-chart"
 import { MobileUploadButtons } from "@/components/shell/mobile-upload-buttons"
@@ -102,7 +101,8 @@ export default async function WorkspaceHomePage({ params }: {
           usage={usage}
           sheetCount={pipelineTemplates.length}
           documentSearchEnabled={documentSearchEnabled}
-          primary />
+          primary
+          redirectTo={`/workspaces/${workspaceId}/pipeline`} />
       </div>
     </header>
 
@@ -199,15 +199,9 @@ export default async function WorkspaceHomePage({ params }: {
         openReviewTasks={analytics.headline.openReviewTasks}
         formatMoney={formatMoney}
       />
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className="rounded-2xl border border-[#e6ebf1] bg-white p-5 shadow-panel">
-          <h2 className="mb-4 text-[15px] font-bold text-slate-900">Cash flow trend</h2>
-          <CashFlowChart months={analytics.cashFlow} formatMoney={formatMoney} />
-        </div>
-        <div className="rounded-2xl border border-[#e6ebf1] bg-white p-5 shadow-panel">
-          <h2 className="mb-4 text-[15px] font-bold text-slate-900">Spend by category</h2>
-          <SpendByCategoryChart workspaceId={workspaceId} rows={analytics.spend} formatMoney={formatMoney} />
-        </div>
+      <div className="rounded-2xl border border-[#e6ebf1] bg-white p-5 shadow-panel">
+        <h2 className="mb-4 text-[15px] font-bold text-slate-900">Spend by category</h2>
+        <SpendByCategoryChart workspaceId={workspaceId} rows={analytics.spend} formatMoney={formatMoney} />
       </div>
       <div className="rounded-2xl border border-[#e6ebf1] bg-white p-5 shadow-panel">
         <VendorSpendChart rows={analytics.vendorSpend} formatMoney={formatMoney} />

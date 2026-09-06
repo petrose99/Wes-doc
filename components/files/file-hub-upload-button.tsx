@@ -18,7 +18,7 @@ import { useState } from "react"
  * the page's search params), so a document queued right before someone closes the popup keeps
  * being polled and the underlying list keeps updating as it moves through extraction — closing
  * the popup no longer means losing track of it. */
-export function FileHubUploadButton({ workspaceId, fileId, fileName, template, templates, usage, sheetCount, documentSearchEnabled, primary = false }: {
+export function FileHubUploadButton({ workspaceId, fileId, fileName, template, templates, usage, sheetCount, documentSearchEnabled, primary = false, redirectTo }: {
   workspaceId: string
   fileId: string
   /** The file's current name — passed through so the overlay only auto-names a file still
@@ -34,6 +34,7 @@ export function FileHubUploadButton({ workspaceId, fileId, fileName, template, t
   /** The pipeline list has no other primary call-to-action on the page, so it renders this as the
    * emerald "main action" button rather than the file hub's secondary white one. */
   primary?: boolean
+  redirectTo?: string
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -56,6 +57,6 @@ export function FileHubUploadButton({ workspaceId, fileId, fileName, template, t
       sheetCount={sheetCount}
       statuses={statuses}
       track={track}
-      onClose={() => { setOpen(false); router.refresh() }} />}
+      onClose={() => { setOpen(false); redirectTo ? router.push(redirectTo) : router.refresh() }} />}
   </>
 }

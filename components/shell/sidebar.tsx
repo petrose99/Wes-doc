@@ -68,12 +68,11 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
     .filter((item) => !item.href.startsWith("settings/") && item.href !== "expenses" && item.href !== "dictation" && item.href !== "health")
     .map((item) => ({ href: `${base}/${item.href}`, label: item.label, icon: ICONS[item.icon] ?? Files, exact: false }))
 
-  // Review is registry-driven like every other module entry, but it does not sit with them at the
-  // bottom of the section: the queue is the step straight after extraction, so it reads there and
-  // nowhere else. Pulled out by href rather than declared inline so lib/modules stays the single
-  // source of its label, icon, and per-workspace gating.
-  const reviewItem = moduleWorkItems.find((item) => item.href === `${base}/review`)
-  const otherModuleItems = moduleWorkItems.filter((item) => item.href !== `${base}/review`)
+  // Review queue is part of the Automation section — not shown as a standalone sidebar entry.
+  // Badge the Automation entry with the review task count so the queue still advertises work.
+  const otherModuleItems = moduleWorkItems
+    .filter((item) => item.href !== `${base}/review`)
+    .map((item) => item.href === `${base}/automation` && reviewTaskCount > 0 ? { ...item, badge: reviewTaskCount } : item)
 
   // Home is every workspace's unconditional first entry — exact-matched so it doesn't stay lit on
   // every page under it, unlike Files (which stays lit through a file's hub and sheet too).
@@ -89,7 +88,6 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
   const workItems = [
     { href: base, label: "Dashboard", icon: BarChart3, exact: true },
     { href: `${base}/pipeline`, label: "Extraction", icon: ListChecks, exact: false, badge: pipelineReviewCount > 0 ? pipelineReviewCount : undefined, tourTarget: "extraction" as const },
-    ...(reviewItem ? [{ ...reviewItem, badge: reviewTaskCount > 0 ? reviewTaskCount : undefined }] : []),
     { href: `${base}/files`, label: "Sheets", icon: Table2, exact: false, tourTarget: "sheets" as const },
     { href: `${base}/library`, label: "Docu Library", icon: Library, exact: false, tourTarget: "library" as const },
     ...(accountingEnabled ? [{ href: `${base}/accounting`, label: "Accounting", icon: Landmark, exact: false }] : []),
@@ -104,7 +102,7 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
   const navLink = (item: { href: string; label: string; icon: typeof Files; exact: boolean; badge?: number; tourTarget?: string }) => {
     // Non-exact entries stay lit while you're inside a page under them — Settings while you're on
     // any settings leaf, a module item while you're on its own sub-pages.
-    const active = item.exact ? pathname === item.href : pathname === item.href || pathname.startsWith(`${item.href}/`) || (item.label === "Settings" && pathname.startsWith(`${base}/settings`))
+    const active = item.exact ? pathname === item.href : pathname === item.href || pathname.startsWith(`${item.href}/`) || (item.label === "Settings" && pathname.startsWith(`${base}/settings`)) || (item.label === "Automation" && pathname.startsWith(`${base}/review`))
     return <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined}
       {...(item.tourTarget ? { "data-tour-target": item.tourTarget } : {})}
       className={`flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors ${active ? "relative bg-white text-emerald-800 shadow-[0_1px_2px_rgba(15,23,42,0.07),inset_0_0_0_1px_rgba(4,120,87,0.10)]" : "text-slate-600 hover:bg-[rgba(148,163,184,0.16)] hover:text-slate-900"}`}>
