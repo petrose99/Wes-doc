@@ -8,7 +8,7 @@ const doc = (overrides: Partial<MatchCandidateDocument> = {}): MatchCandidateDoc
 describe("matchSupplierStatementEntries", () => {
   it("matches primarily on the invoice number cited in the description, regardless of amount", () => {
     const result = matchSupplierStatementEntries([entry({ amount: 999 })], [doc()])
-    expect(result).toEqual([{ transactionIndex: 0, documentId: "d1", confidence: 0.9, dateDeltaDays: 9 }])
+    expect(result).toEqual([expect.objectContaining({ transactionIndex: 0, documentId: "d1", confidence: 0.9, dateDeltaDays: 9 })])
   })
 
   it("does not primary-match a shorter invoice number that is only a substring of the cited one (falls back to amount+date instead)", () => {
@@ -19,7 +19,7 @@ describe("matchSupplierStatementEntries", () => {
 
   it("falls back to amount + date proximity when no invoice number is cited", () => {
     const result = matchSupplierStatementEntries([entry({ description: "Payment received", amount: 100 })], [doc({ invoiceNumber: null, date: new Date("2026-08-05") })])
-    expect(result).toEqual([{ transactionIndex: 0, documentId: "d1", confidence: 0.6, dateDeltaDays: 5 }])
+    expect(result).toEqual([expect.objectContaining({ transactionIndex: 0, documentId: "d1", confidence: 0.6, dateDeltaDays: 5 })])
   })
 
   it("excludes a fallback candidate whose currency differs from the statement's", () => {
@@ -41,6 +41,6 @@ describe("matchSupplierStatementEntries", () => {
   it("prefers the invoice-number match over a fallback match for a different entry on the same document", () => {
     const entries = [entry({ index: 0, description: "Payment", amount: 100 }), entry({ index: 1, description: "Invoice INV-1042", amount: 999 })]
     const result = matchSupplierStatementEntries(entries, [doc()])
-    expect(result).toEqual([{ transactionIndex: 1, documentId: "d1", confidence: 0.9, dateDeltaDays: expect.any(Number) }])
+    expect(result).toEqual([expect.objectContaining({ transactionIndex: 1, documentId: "d1", confidence: 0.9, dateDeltaDays: expect.any(Number) })])
   })
 })

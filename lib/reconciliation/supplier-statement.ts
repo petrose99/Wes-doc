@@ -46,11 +46,11 @@ export function matchSupplierStatementEntries(entries: SupplierStatementEntry[],
     usedEntries.add(entry.index)
     usedDocuments.add(match.documentId)
     const dateDeltaDays = entry.date && match.date ? daysBetween(entry.date, match.date) : null
-    suggestions.push({ transactionIndex: entry.index, documentId: match.documentId, confidence: PRIMARY_CONFIDENCE, dateDeltaDays })
+    suggestions.push({ transactionIndex: entry.index, documentId: match.documentId, confidence: PRIMARY_CONFIDENCE, dateDeltaDays, tier: "blue", amountDelta: 0 })
   }
 
   // Fallback pass: amount + date proximity, for entries the primary pass didn't resolve.
-  const scored: { transactionIndex: number; documentId: string; confidence: number; dateDeltaDays: number | null }[] = []
+  const scored: { transactionIndex: number; documentId: string; confidence: number; dateDeltaDays: number | null; tier: "green" | "blue"; amountDelta: number }[] = []
   for (const entry of entries) {
     if (usedEntries.has(entry.index) || entry.amount === null) continue
     for (const candidate of candidates) {
@@ -59,7 +59,7 @@ export function matchSupplierStatementEntries(entries: SupplierStatementEntry[],
       if (!amountsMatch(entry.amount, candidate.total, statementCurrency ?? candidate.currencyCode)) continue
       const dateDeltaDays = entry.date && candidate.date ? daysBetween(entry.date, candidate.date) : null
       if (dateDeltaDays !== null && dateDeltaDays > DATE_WINDOW_DAYS) continue
-      scored.push({ transactionIndex: entry.index, documentId: candidate.documentId, confidence: FALLBACK_CONFIDENCE, dateDeltaDays })
+      scored.push({ transactionIndex: entry.index, documentId: candidate.documentId, confidence: FALLBACK_CONFIDENCE, dateDeltaDays, tier: "blue", amountDelta: entry.amount - candidate.total })
     }
   }
   scored.sort((a, b) => (a.dateDeltaDays ?? Infinity) - (b.dateDeltaDays ?? Infinity))

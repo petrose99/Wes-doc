@@ -7,7 +7,8 @@ const doc = (overrides: Partial<MatchCandidateDocument> = {}): MatchCandidateDoc
 describe("suggestMatches", () => {
   it("matches an exact amount, date, and supplier with high confidence", () => {
     const result = suggestMatches([txn()], [doc()])
-    expect(result).toEqual([{ transactionIndex: 0, documentId: "d1", confidence: 1, dateDeltaDays: 0 }])
+    // A3.3: matcher now returns per-suggestion tier + amountDelta alongside the old fields.
+    expect(result).toEqual([expect.objectContaining({ transactionIndex: 0, documentId: "d1", confidence: 1, dateDeltaDays: 0, tier: "green", amountDelta: 0 })])
   })
 
   it("does not suggest a match when the amount differs", () => {

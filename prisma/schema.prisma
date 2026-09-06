@@ -161,6 +161,7 @@ model Workspace {
   suppliers          Supplier[]
   supplierAliases    SupplierAlias[]
   inboundEmailIntakes InboundEmailIntake[]
+  bankMatchMemory    BankMatchMemory[]
 
   @@map("workspaces")
 }
@@ -1967,4 +1968,27 @@ model InboundEmailIntake {
   @@index([workspaceId, createdAt])
   @@index([workspaceId, outcome])
   @@map("inbound_email_intakes")
+}
+
+/// A3.7 bank-match memory. When a reviewer confirms a bank line -> document (or supplier +
+/// coding) match, the DESCRIPTOR PATTERN (normalizeBankDescriptor's residue) is remembered so
+/// the next statement line with the same residue gets a priority hint. Cross-supplier hit
+/// counts drop rarely-confirmed patterns from the top of the queue. workspaceId is carried
+/// directly for RLS.
+model BankMatchMemory {
+  id             String    @id @default(uuid()) @db.Uuid
+  workspaceId    String    @map("workspace_id") @db.Uuid
+  descriptorKey  String    @map("descriptor_key")
+  supplierId     String?   @map("supplier_id") @db.Uuid
+  /// Free-text coding hint if the accepted match had one — replayed onto the next matching
+  /// document when the confidence is high enough.
+  codingHint     Json?     @map("coding_hint")
+  hitCount       Int       @default(1) @map("hit_count")
+  lastUsedAt     DateTime  @default(now()) @map("last_used_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, descriptorKey])
+  @@index([workspaceId, hitCount])
+  @@map("bank_match_memory")
 }
