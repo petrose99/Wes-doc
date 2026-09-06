@@ -1,6 +1,7 @@
 /** The health-check registry: every check the engine knows about, keyed by code. Mirrors
  * lib/modules/index.ts's shape — a flat array + pure lookups, no database. */
 import { bankReconciliationCheck } from "@/lib/health/checks/bank-reconciliation"
+import { benfordCheck } from "@/lib/health/checks/benford"
 import { confidenceDriftCheck } from "@/lib/health/checks/confidence-drift"
 import { pushFailuresCheck } from "@/lib/health/checks/push-failures"
 import { reviewBacklogCheck } from "@/lib/health/checks/review-backlog"
@@ -51,6 +52,9 @@ export const REGISTRY: CheckDefinition[] = [
   hidden(contactDefaultsMissingCheck),
   hidden(controlAccountPostingsCheck),
   hidden(uncodedTransactionsCheck),
+  // A2.9: Benford's law over ledger amounts — informational fraud signal, hidden from the nav
+  // like the other cleanup-category checks; a hit surfaces on the Overview.
+  hidden(benfordCheck),
   // Bank reconciliation: also a cleanup-category check, but unlike every other check in this
   // block it declares requiresLedger: false — it works off uploaded bank_statement documents and
   // existing BankMatch rows (lib/bank-match/matcher.ts), not synced ledger data, so it has

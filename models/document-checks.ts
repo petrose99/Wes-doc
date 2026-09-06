@@ -7,6 +7,8 @@ import { checkInvoiceArithmetic } from "@/lib/checks/arithmetic"
 import { checkAmountAnomaly } from "@/lib/checks/amount-anomaly"
 import { checkBankDetails } from "@/lib/checks/bank-details"
 import { checkPdfForensics, readPdfForensicSignals } from "@/lib/checks/pdf-forensics"
+import { checkSplitInvoices } from "@/lib/checks/split-invoices"
+import { checkVendorOnboarding } from "@/lib/checks/vendor-onboarding"
 import { documentStorageKey, readDocumentSource } from "@/lib/document-storage"
 import { resolveSupplier } from "@/lib/suppliers/alias"
 import { normalizeIban } from "@/lib/suppliers/normalize"
@@ -120,6 +122,31 @@ export async function runDeterministicChecks(input: { workspaceId: string; docum
       if (bankDetails) results.push(bankDetails)
     }
 
+    // A2.5 vendor-onboarding: only for first-sighting suppliers. Reads the extracted supplier
+    // fields (address, IBAN, VAT) directly; skips silently when nothing to check.
+    if (map.supplier) {
+      const supplierName = asString(get("supplier"))
+      if (supplierName) {
+        const onboarding = await checkVendorOnboardingForDocument(input.workspaceId, {
+          supplierName,
+          paymentIban: map.paymentIban ? asString(get("paymentIban")) : null,
+          vatNumber: map.supplierVatNumber ? asString(get("supplierVatNumber")) : null,
+          vatFormatPass: results.find((r) => r.checkCode === "vat_number_format")?.status === "pass"
+            ? true : results.find((r) => r.checkCode === "vat_number_format")?.status === "warn" ? false : null,
+          address: asString(values["supplier_address"]),
+          senderEmail: asString(values["supplier_email"]),
+        })
+        if (onboarding) results.push(onboarding)
+      }
+    }
+
+    // A2.8 split-invoice: same-supplier documents in a 7-day window whose totals sum near an
+    // approval threshold while each stays under it.
+    if (map.supplier && map.total) {
+      const split = await checkSplitInvoicesAgainstHistory(input.workspaceId, document.templateId, document.id, asString(get("supplier")), asNumber(get("total")), asDate(get("date")), map)
+      if (split) results.push(split)
+    }
+
     if (map.supplier && map.invoiceNumber && map.total) {
       const totalValue = asNumber(get("total"))
       // A2.3: infer credit-note-ness deterministically — negative total OR the template's own
@@ -229,6 +256,78 @@ async function runPdfForensicsCheck(workspaceId: string, documentId: string, mim
     return checkPdfForensics(readPdfForensicSignals(sample))
   } catch (error) {
     console.error("[checks] pdf forensics read failed:", error instanceof Error ? error.message : error)
+    return null
+  }
+}
+
+/** A2.5 wiring: resolves the supplier through the A5 registry to read its documentCount, then
+ * calls the pure onboarding checker. Silent on any registry hiccup (this is a warn-level check;
+ * a check failure to run must not block the pipeline). */
+async function checkVendorOnboardingForDocument(workspaceId: string, input: {
+  supplierName: string
+  paymentIban: string | null
+  vatNumber: string | null
+  vatFormatPass: boolean | null
+  address: string | null
+  senderEmail: string | null
+}): Promise<CheckResult | null> {
+  try {
+    const resolution = await resolveSupplier(workspaceId, input.supplierName)
+    const supplierRow = resolution.supplierId ? await prisma.supplier.findUnique({ where: { id: resolution.supplierId }, select: { documentCount: true } }) : null
+    return checkVendorOnboarding({
+      supplierName: input.supplierName,
+      senderEmail: input.senderEmail,
+      supplierAddress: input.address,
+      paymentIban: input.paymentIban,
+      vatNumber: input.vatNumber,
+      vatFormatPass: input.vatFormatPass,
+      supplierDocumentCount: supplierRow?.documentCount ?? 0,
+    })
+  } catch (error) {
+    console.error("[checks] vendor onboarding lookup failed:", error instanceof Error ? error.message : error)
+    return null
+  }
+}
+
+/** A2.8 wiring: pulls up to N same-template sibling documents in a 7-day window from the same
+ * supplier, then hands them to the pure split-invoice checker. Approval threshold comes from
+ * the smallest active ReviewRoutingRule.thresholdAmount above zero, or a 1000 default. */
+async function checkSplitInvoicesAgainstHistory(workspaceId: string, templateId: string | null, documentId: string, supplierName: string | null, amount: number | null, date: Date | null, _map: CheckFieldMap): Promise<CheckResult | null> {
+  if (!templateId || !supplierName?.trim() || amount === null || !date) return null
+  try {
+    const supplier = supplierName.trim().toLowerCase()
+    const windowStart = new Date(date.getTime() - 7 * 86400_000)
+    const siblings = await prisma.document.findMany({
+      where: { workspaceId, templateId, id: { not: documentId }, receivedAt: { gte: windowStart, lte: date } },
+      select: { id: true, reviewedData: true, receivedAt: true },
+      orderBy: { receivedAt: "desc" },
+      take: 50,
+    })
+    const map = Object.values(CHECK_FIELD_MAPS).find((c) => c.supplier && c.total)
+    if (!map?.supplier || !map.total) return null
+    const window: { documentId: string; amount: number; date: Date }[] = []
+    for (const sibling of siblings) {
+      const values = (sibling.reviewedData ?? {}) as Record<string, unknown>
+      const otherSupplier = asString(values[map.supplier as string])?.trim().toLowerCase() ?? null
+      const otherAmount = asNumber(values[map.total as string])
+      if (otherSupplier !== supplier || otherAmount === null) continue
+      window.push({ documentId: sibling.id, amount: otherAmount, date: sibling.receivedAt })
+    }
+    // Pull the smallest matcher.minAmount configured on any ReviewRoutingRule (approval
+    // trip-point), else the smallest active WorkspaceBudget amount, else 1000. The workspace's
+    // routing UI is what makes a rule's threshold a "real" approval boundary; a budget is a
+    // reasonable fallback.
+    const routing = await prisma.reviewRoutingRule.findMany({ where: { workspaceId, isActive: true }, select: { matcher: true } }).catch(() => [])
+    const routingThresholds = routing
+      .map((r) => (r.matcher as Record<string, unknown> | null)?.minAmount)
+      .filter((v): v is number => typeof v === "number" && v > 0)
+    const budgets = await prisma.workspaceBudget.findMany({ where: { workspaceId, isActive: true }, select: { amount: true } }).catch(() => [])
+    const budgetThresholds = budgets.map((b) => b.amount).filter((v): v is number => typeof v === "number" && v > 0)
+    const allThresholds = [...routingThresholds, ...budgetThresholds]
+    const approvalThreshold = allThresholds.length ? Math.min(...allThresholds) : 1000
+    return checkSplitInvoices({ candidateAmount: amount, candidateDate: date, siblings: window, approvalThreshold })
+  } catch (error) {
+    console.error("[checks] split-invoice lookup failed:", error instanceof Error ? error.message : error)
     return null
   }
 }
