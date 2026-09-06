@@ -3,8 +3,10 @@
 // and is the only caller.
 import { track } from "@/lib/analytics"
 import { auditEventData, getRequestAuditContext, recordSystemAudit } from "@/lib/audit"
+import { classifyIntent, extractOriginalSender, shouldSkipAttachment } from "@/lib/inbound/filter"
 import { htmlToText, looksInvoiceLike, renderEmailBodyPdf } from "@/lib/inbound/html-to-pdf"
 import { createIngestionItem } from "@/lib/ingestion"
+import { expandZipBuffer } from "@/lib/zip-ingestion"
 import { isSupportedDocumentBuffer } from "@/models/documents"
 import { EXTENSION_MIME_TYPES } from "@/lib/zip-ingestion"
 import { prisma } from "@/lib/db"
@@ -99,7 +101,15 @@ function inferMimeType(filename: string): string | null {
   return EXTENSION_MIME_TYPES[extension] ?? null
 }
 
-export type InboundEmailAttachment = { filename: string; contentType: string; base64Content: string }
+export type InboundEmailAttachment = {
+  filename: string
+  contentType: string
+  base64Content: string
+  /** A6.4: raw MIME headers so we can distinguish an inline signature image from a real
+   * attachment. Optional — a provider that doesn't surface these still ingests every attachment. */
+  contentDisposition?: string | null
+  contentId?: string | null
+}
 
 export type InboundEmailInput = {
   workspaceId: string
@@ -125,17 +135,23 @@ const BODY_PREVIEW_MAX = 500
 export async function processInboundEmail(input: InboundEmailInput): Promise<{ accepted: number; rejected: number }> {
   const bodyText = (input.textBody?.trim() || (input.htmlBody ? htmlToText(input.htmlBody) : "")).trim()
   const bodyPreview = bodyText ? bodyText.slice(0, BODY_PREVIEW_MAX) : null
+  // A6.5: if this is a forwarded email, prefer the original sender for allowlist checking and
+  // supplier attribution. The bookkeeper forwarding it isn't the vendor.
+  const originalSender = extractOriginalSender(bodyText)
+  const effectiveFrom = originalSender ?? input.from
   const recordIntake = (outcome: string, counts: { accepted: number; rejected: number }) =>
     prisma.inboundEmailIntake.create({
       data: {
-        workspaceId: input.workspaceId, fromAddress: input.from.trim().toLowerCase(),
+        workspaceId: input.workspaceId, fromAddress: effectiveFrom.trim().toLowerCase(),
         subject: input.subject?.trim() || null, bodyPreview,
         attachmentCount: input.attachments.length, acceptedCount: counts.accepted, rejectedCount: counts.rejected,
         outcome,
       },
     }).catch((error) => { console.error("[inbound-email] failed to record intake:", error instanceof Error ? error.message : error); return null })
 
-  if (!(await isSenderAllowed(input.workspaceId, input.from))) {
+  // Allowlist check runs against the ORIGINAL sender for a forwarded chain, so a bookkeeper's
+  // forward of a stranger's invoice is still refused.
+  if (!(await isSenderAllowed(input.workspaceId, effectiveFrom))) {
     await recordIntake("sender_rejected", { accepted: 0, rejected: input.attachments.length })
     throw new Error("sender_not_allowed")
   }
@@ -147,8 +163,37 @@ export async function processInboundEmail(input: InboundEmailInput): Promise<{ a
 
   let accepted = 0
   let rejected = 0
-  for (const attachment of input.attachments) {
+  // A6.3: classify the mail up front. A "noise" mail skips the OCR/LLM cost entirely (it
+  // still gets an intake row so the workspace can see what happened).
+  const intent = classifyIntent(input.subject, bodyText)
+  const attachmentsToProcess = intent === "noise"
+    ? []
+    : input.attachments.filter((attachment) => !shouldSkipAttachment({
+        filename: attachment.filename,
+        contentType: attachment.contentType,
+        sizeBytes: Math.floor((attachment.base64Content.length * 3) / 4),
+        contentDisposition: attachment.contentDisposition ?? null,
+        contentId: attachment.contentId ?? null,
+      }))
+  for (const attachment of attachmentsToProcess) {
     const buffer = Buffer.from(attachment.base64Content, "base64")
+    // A6.6: unpack zip attachments and ingest every supported entry.
+    if (attachment.filename.toLowerCase().endsWith(".zip")) {
+      try {
+        const expansion = expandZipBuffer(buffer)
+        for (const entry of expansion.entries) {
+          const outcome = await createIngestionItem({ workspaceId: input.workspaceId, fileId: file.id, templateId: template.id, source: "email", filename: entry.filename, mimeType: entry.mimeType, buffer: entry.buffer })
+          if (outcome.outcome === "accepted" || outcome.outcome === "duplicate") accepted++
+          else rejected++
+        }
+        rejected += expansion.skipped.length
+        continue
+      } catch (error) {
+        console.error("[inbound-email] zip expand failed:", error instanceof Error ? error.message : error)
+        rejected++
+        continue
+      }
+    }
     const mimeType = inferMimeType(attachment.filename)
     if (!mimeType || !buffer.length || !isSupportedDocumentBuffer(buffer, mimeType)) { rejected++; continue }
     const outcome = await createIngestionItem({ workspaceId: input.workspaceId, fileId: file.id, templateId: template.id, source: "email", filename: attachment.filename, mimeType, buffer })

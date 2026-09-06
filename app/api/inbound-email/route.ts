@@ -16,7 +16,7 @@ import { processInboundEmail, resolveWorkspaceByInboundToken } from "@/models/in
  * URL segment or Basic Auth for inbound instead. A bearer secret gets the same guarantee (only the
  * configured provider can call this route) without hard-coding one provider's URL convention. */
 
-type PostmarkAttachment = { Name?: string; ContentType?: string; Content?: string }
+type PostmarkAttachment = { Name?: string; ContentType?: string; Content?: string; ContentID?: string; ContentDisposition?: string }
 type PostmarkInboundPayload = { To?: string; From?: string; Subject?: string; TextBody?: string; HtmlBody?: string; Attachments?: PostmarkAttachment[] }
 
 /** Postmark's To/From are full mailbox strings ("Name <address@host>" or a bare address) — this
@@ -60,7 +60,10 @@ export async function POST(request: Request): Promise<Response> {
       htmlBody: body?.HtmlBody ?? null,
       attachments: (body?.Attachments ?? [])
         .filter((attachment): attachment is Required<PostmarkAttachment> => Boolean(attachment.Name && attachment.ContentType && attachment.Content))
-        .map((attachment) => ({ filename: attachment.Name, contentType: attachment.ContentType, base64Content: attachment.Content })),
+        .map((attachment) => ({
+          filename: attachment.Name, contentType: attachment.ContentType, base64Content: attachment.Content,
+          contentId: attachment.ContentID ?? null, contentDisposition: attachment.ContentDisposition ?? null,
+        })),
     })
     return Response.json(result)
   } catch (error) {
