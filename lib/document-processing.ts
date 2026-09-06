@@ -10,7 +10,9 @@ import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { refreshDocumentReadiness } from "@/lib/readiness/refresh"
 import { regenerateBankMatchSuggestions, regenerateSupplierStatementMatches } from "@/models/bank-matches"
 import config from "@/lib/config"
-import { buildDocumentJsonSchema, buildDocumentPrompt, buildFreeFormJsonSchema, buildFreeFormPrompt, DocumentClassification, DocumentFieldDefinition, extractClassification, extractFieldConfidence, extractFieldProvenance, FieldProvenanceHints, findMissingRequiredFields, parseTemplateFields, ProvenanceHint, validateDocumentValues } from "@/lib/document-templates"
+import { buildDocumentJsonSchema, buildDocumentPrompt, buildFreeFormJsonSchema, buildFreeFormPrompt, DocumentClassification, DocumentFieldDefinition, extractClassification, extractFieldConfidence, extractFieldProvenance, extractRemarks, FieldProvenanceHints, findMissingRequiredFields, parseTemplateFields, ProvenanceHint, validateDocumentValues } from "@/lib/document-templates"
+import { selectRelevantPages } from "@/lib/extraction/page-retrieval"
+import { embedTexts } from "@/lib/embeddings"
 import { documentBlocksKey, putDocumentSource, readDocumentSource } from "@/lib/document-storage"
 import { mergeContinuationRows } from "@/lib/extraction/merge-rows"
 import { solveRunningBalance, groupTransactionsByAccount } from "@/lib/extraction/balance-solver"
@@ -84,8 +86,15 @@ export function buildBatchParts(contents: PageContent[], pageNumbers: number[]) 
  * re-encoded to PNG first. `.rotate()` applies the EXIF orientation phone photos carry, which
  * a format conversion would otherwise drop and leave the page sideways. */
 export async function normalizeForMineru(source: Buffer, mimeType: string, filename: string): Promise<{ buffer: Buffer; filename: string }> {
-  if (MINERU_NATIVE_TYPES.has(mimeType)) return { buffer: source, filename }
-  return { buffer: await sharp(source).rotate().png().toBuffer(), filename: `${filename.replace(/\.[^.]*$/, "")}.png` }
+  const isImage = mimeType.startsWith("image/")
+  const preprocess = config.documents.preprocessImages && isImage
+  if (MINERU_NATIVE_TYPES.has(mimeType) && !preprocess) return { buffer: source, filename }
+  // Stage 3 (OCBC): a light re-normalization for images only — grayscale + contrast normalise +
+  // sharpen. Off by default: MinerU's VLM backend copes with messy scans on its own; enable via
+  // DOCUMENT_PREPROCESS_IMAGES when raw scan quality is provably hurting recall.
+  const pipeline = sharp(source).rotate()
+  if (preprocess) pipeline.grayscale().normalise().sharpen()
+  return { buffer: await pipeline.png().toBuffer(), filename: `${filename.replace(/\.[^.]*$/, "")}.png` }
 }
 
 function hasValue(value: unknown) {
@@ -345,7 +354,6 @@ export async function processDocumentJob(jobId: string) {
     // produces no blocks at all), so remap the 1..N batch positions onto the pages that
     // actually exist in `contents`.
     const collectedPages = contents.map((content) => content.page)
-    const batches = pageBatches(contents.length, config.documents.pagesPerBatch).map((batch) => batch.map((position) => collectedPages[position - 1]))
     // Discovers this document's real line-item columns and merges them into the template's array
     // field when adaptive extraction is on; otherwise returns templateFields unchanged. Never
     // throws — see lib/adaptive-extraction.ts.
@@ -354,25 +362,93 @@ export async function processDocumentJob(jobId: string) {
     const fewShotExamples = !freeForm && document.template?.code ? await getFewShotExamples(document.workspaceId, document.template.code).catch(() => []) : []
     const prompt = freeForm ? buildFreeFormPrompt() : buildDocumentPrompt(document.template?.name || "document", fields, document.templateVersion?.prompt, fewShotExamples)
     const schema = freeForm ? buildFreeFormJsonSchema() : buildDocumentJsonSchema(fields)
+    // OCBC Stage 1: score parsed pages against per-field structured queries and send only the
+    // union of the top-K to the LLM. Gated: with DOCUMENT_PAGE_RETRIEVAL off, or on a short doc
+    // (<= DOCUMENT_RETRIEVAL_MIN_PAGES), or on a free-form dictation, this returns full_sweep and
+    // the LLM sees every page exactly as before. See lib/extraction/page-retrieval.ts.
+    const pageSelection = config.documents.pageRetrievalEnabled && !freeForm
+      ? await selectRelevantPages({
+          contents, fields, templateName: document.template?.name || "document",
+          topKPerField: config.documents.retrievalTopK,
+          minPages: config.documents.retrievalMinPages,
+          ...(config.embeddings.enabled ? { embedPages: embedTexts, embedQueries: embedTexts } : {}),
+        }).catch((error) => {
+          console.error("[page-retrieval] failed, falling back to full sweep:", error instanceof Error ? error.message : error)
+          return { mode: "full_sweep" as const, selectedPages: collectedPages, skippedPages: [], perField: {}, dense: false, reason: "retrieval_error" }
+        })
+      : { mode: "full_sweep" as const, selectedPages: collectedPages, skippedPages: [], perField: {}, dense: false, reason: freeForm ? "free_form" : "disabled" }
+
     const passes: Array<Record<string, unknown>> = []
     const confidencePasses: Array<Record<string, number>> = []
     const provenancePasses: FieldProvenanceHints[] = []
     const classificationPasses: DocumentClassification[] = []
+    const remarkPasses: string[] = []
     let batchFailures = 0
-    for (let index = 0; index < batches.length; index++) {
-      const { textParts } = buildBatchParts(contents, batches[index])
-      const response = await requestLLM({ providers: [{ provider: aiProvider, apiKey, model: modelName }] }, { prompt, schema, textParts })
-      if (response.error) batchFailures++
-      else {
-        passes.push(freeForm ? stripMeta(response.output) : validateDocumentValues(fields, response.output))
-        confidencePasses.push(freeForm ? (response.output?._confidence as Record<string, number> ?? {}) : extractFieldConfidence(fields, response.output))
-        provenancePasses.push(freeForm ? { fields: {}, items: {} } : extractFieldProvenance(fields, response.output))
-        classificationPasses.push(extractClassification(response.output))
+
+    /** Runs the LLM extraction over an explicit list of page numbers, appending to the pass
+     * accumulators above. Exists so the required-field fallback can re-invoke it over the pages
+     * retrieval skipped, without duplicating the prompt/schema/lease/response-collection logic. */
+    const runBatches = async (pageNumbers: number[]) => {
+      if (!pageNumbers.length) return
+      // Slice contents to the requested pages, then batch by pagesPerBatch. Positions map back to
+      // real page numbers via the sliced contents' own `.page` values, so provenance is untouched.
+      const subset = contents.filter((c) => pageNumbers.includes(c.page))
+      const subsetPages = subset.map((c) => c.page)
+      const positionalBatches = pageBatches(subset.length, config.documents.pagesPerBatch)
+      const realBatches = positionalBatches.map((batch) => batch.map((position) => subsetPages[position - 1]))
+      for (let index = 0; index < realBatches.length; index++) {
+        const { textParts } = buildBatchParts(contents, realBatches[index])
+        const response = await requestLLM({ providers: [{ provider: aiProvider, apiKey, model: modelName }] }, { prompt, schema, textParts })
+        if (response.error) batchFailures++
+        else {
+          passes.push(freeForm ? stripMeta(response.output) : validateDocumentValues(fields, response.output))
+          confidencePasses.push(freeForm ? (response.output?._confidence as Record<string, number> ?? {}) : extractFieldConfidence(fields, response.output))
+          provenancePasses.push(freeForm ? { fields: {}, items: {} } : extractFieldProvenance(fields, response.output))
+          classificationPasses.push(extractClassification(response.output))
+          const remark = extractRemarks(response.output)
+          if (remark) remarkPasses.push(remark)
+        }
+        const isLastBatch = index === realBatches.length - 1
+        if (!isLastBatch) await renewLease()
       }
-      const isLastBatch = index === batches.length - 1
-      if (!isLastBatch) await renewLease()
     }
+
+    await runBatches(pageSelection.selectedPages)
     if (!passes.length) throw new Error("ai_extraction_failed")
+
+    // Required-field fallback: if retrieval mode dropped pages AND merging came back missing a
+    // required scalar field, sweep the skipped pages once with the full schema. Retrieval can
+    // never silently lose required data.
+    let fallbackRan = false
+    if (!freeForm && pageSelection.mode === "retrieval" && pageSelection.skippedPages.length) {
+      const partial = mergeExtractionPasses(fields, passes)
+      const missingSoFar = findMissingRequiredFields(fields, partial)
+      if (missingSoFar.length) {
+        fallbackRan = true
+        await renewLease()
+        await runBatches(pageSelection.skippedPages)
+      }
+    }
+
+    // Best-effort audit: makes retrieval misses diagnosable from the review UI / eval harness.
+    // Never awaited into the critical path — recordSystemAudit swallows its own failures.
+    if (!freeForm) {
+      await recordSystemAudit({
+        workspaceId: document.workspaceId, documentId: document.id, type: "page_retrieval_gated",
+        detail: {
+          mode: pageSelection.mode,
+          dense: pageSelection.dense,
+          reason: pageSelection.reason,
+          selectedPages: pageSelection.selectedPages,
+          skippedPages: pageSelection.skippedPages,
+          perField: pageSelection.perField,
+          fallbackRan,
+          batchesSaved: pageSelection.mode === "retrieval" && !fallbackRan
+            ? Math.max(0, pageBatches(contents.length, config.documents.pagesPerBatch).length - pageBatches(pageSelection.selectedPages.length, config.documents.pagesPerBatch).length)
+            : 0,
+        } as Prisma.InputJsonValue,
+      }).catch(() => {})
+    }
 
     const extraction = freeForm ? Object.assign({}, ...passes) : mergeExtractionPasses(fields, passes)
     const rawFieldConfidence = freeForm ? Object.assign({}, ...confidencePasses) : mergeFieldConfidence(fields, passes, confidencePasses)
@@ -490,7 +566,10 @@ export async function processDocumentJob(jobId: string) {
     // Interactive form (not the array form) because the projection is raw SQL and has to run on the
     // same tx client. Timeout raised over the 5s default: a long line-item table projects to a few
     // hundred rows, which is still only a handful of batched statements but not instant.
-    const confidence = { missingRequiredFields: missing, partialFailure: batchFailures > 0, fieldConfidence, conflictingFields, corroboratedFields: calibration?.corroborated ?? [] }
+    // Dedupe and join the model's per-batch _remarks into one short note, capped so it can't blow
+    // out the confidence payload. Empty when no batch reported one.
+    const remarks = [...new Set(remarkPasses.map((r) => r.trim()).filter(Boolean))].join(" | ").slice(0, 600)
+    const confidence = { missingRequiredFields: missing, partialFailure: batchFailures > 0, fieldConfidence, conflictingFields, corroboratedFields: calibration?.corroborated ?? [], ...(remarks ? { remarks } : {}) }
     await prisma.$transaction(async (tx) => {
       await tx.document.update({ where: { id: document.id }, data: { status, ocrText, fieldSnapshot: fields as unknown as Prisma.InputJsonValue, rawExtraction: extraction as Prisma.InputJsonValue, reviewedData: extraction as Prisma.InputJsonValue, provenance: provenance as Prisma.InputJsonValue, shapeId, classification: classification as Prisma.InputJsonValue, confidence: confidence as Prisma.InputJsonValue } })
       await tx.documentProcessingJob.update({ where: { id: job.id }, data: { status: "completed", completedAt: new Date(), leaseUntil: null } })

@@ -28,6 +28,12 @@ export const documentItemFieldSchema = z.object({
   instruction: z.string().max(500).default(""),
   required: z.boolean().default(false),
   options: z.array(z.string().min(1).max(80)).max(50).optional(),
+  /** "Do not extract" cue appended to the prompt: what shape/context looks similar but is wrong
+   * (OCBC-style structured per-field negative). Purely additive on top of `instruction`. */
+  negative: z.string().max(300).optional(),
+  /** Keywords used only by page retrieval (Stage 1) to score which pages are most likely to
+   * carry this field. Never rendered in the extraction prompt. */
+  retrievalHints: z.array(z.string().min(1).max(60)).max(12).optional(),
 }).superRefine((field, ctx) => {
   if (field.type === "enum" && !field.options?.length) {
     ctx.addIssue({ code: "custom", path: ["options"], message: "Enum fields need at least one option" })
@@ -50,6 +56,12 @@ export const documentFieldSchema = z.object({
   options: z.array(z.string().min(1).max(80)).max(50).optional(),
   itemFields: documentItemFieldsSchema.optional(),
   mergeStrategy: fieldMergeStrategies.optional(),
+  /** "Do not extract" cue appended to the prompt for this field (OCBC-style structured per-field
+   * negative). Additive on top of `instruction`. */
+  negative: z.string().max(300).optional(),
+  /** Keywords used only by page retrieval (Stage 1) to score which pages carry this field. Never
+   * shown in the extraction prompt. */
+  retrievalHints: z.array(z.string().min(1).max(60)).max(12).optional(),
 }).superRefine((field, ctx) => {
   if (field.type === "enum" && !field.options?.length) {
     ctx.addIssue({ code: "custom", path: ["options"], message: "Enum fields need at least one option" })
@@ -103,6 +115,16 @@ export function validateDocumentValues(fields: DocumentFieldDefinition[] | Docum
     if (field.type === "date" && typeof raw === "string" && /^\d{4}-\d{2}-\d{2}$/.test(raw) && !Number.isNaN(Date.parse(`${raw}T00:00:00Z`))) value[field.key] = raw
   }
   return value
+}
+
+/** Reads the model's `_remarks` string. Returns a trimmed value capped at 300 characters, or "" if
+ * nothing was set. Aggregated across per-batch passes by the orchestrator (dedup + join) so a
+ * reviewer sees one consolidated note in the confidence payload. */
+export function extractRemarks(candidate: unknown): string {
+  if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) return ""
+  const raw = (candidate as Record<string, unknown>)._remarks
+  if (typeof raw !== "string") return ""
+  return raw.trim().slice(0, 300)
 }
 
 /** Reads the model's `_confidence` object, clamped to [0, 1] per field key that exists in the schema. */
@@ -219,6 +241,7 @@ export function buildDocumentJsonSchema(fields: DocumentFieldDefinition[]) {
     properties: {
       ...Object.fromEntries(fields.map((field) => [field.key, jsonSchemaProperty(field)])),
       ...(fields.length ? {
+        _remarks: { type: "string", description: "Short note (under 300 chars) about ambiguities, layout oddities, likely OCR errors, or fields you were unsure about. Empty if nothing stood out." },
         _confidence: {
           type: "object",
           properties: Object.fromEntries(fields.map((field) => [field.key, { type: "number", description: "Confidence from 0 to 1 that this value is correct" }])),
@@ -273,10 +296,15 @@ export function buildDocumentPrompt(templateName: string, fields: DocumentFieldD
     "Fields:",
     ...fields.flatMap((field) => [
       `- ${field.key} (${field.type}${field.required ? ", required" : ""}): ${field.instruction || field.label}`,
-      ...(field.itemFields?.length ? field.itemFields.map((item) => `  - ${item.key} (${item.type}${item.required ? ", required" : ""}): ${item.instruction || item.label}`) : []),
+      ...(field.negative?.trim() ? [`    Do NOT extract: ${field.negative.trim()}`] : []),
+      ...(field.itemFields?.length ? field.itemFields.flatMap((item) => [
+        `  - ${item.key} (${item.type}${item.required ? ", required" : ""}): ${item.instruction || item.label}`,
+        ...(item.negative?.trim() ? [`      Do NOT extract: ${item.negative.trim()}`] : []),
+      ]) : []),
     ]),
     "Also return a `_confidence` object with a 0-1 confidence score for each top-level field, reflecting how certain you are that the extracted value is correct.",
     "Also return a `_provenance` object: for each field, the 1-based page number the value appears on and a short verbatim quote (under 120 characters) of the text around it. For array fields, give one entry per row in the same order as the rows.",
+    "Also return a short `_remarks` string (under 300 characters) noting any ambiguities, unusual layout, likely OCR errors, or fields you were unsure about. Leave it empty if nothing stood out.",
     customPrompt?.trim() ? `Workspace instructions:\n${customPrompt.trim()}` : "",
     fewShotExamples?.length ? buildFewShotBlock(fewShotExamples) : "",
   ].filter(Boolean).join("\n")

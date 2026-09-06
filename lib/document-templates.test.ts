@@ -1,4 +1,4 @@
-import { buildDocumentJsonSchema, buildDocumentPrompt, DEFAULT_DOCUMENT_TEMPLATES, extractClassification, extractFieldConfidence, extractFieldProvenance, findMissingRequiredFields, parseTemplateFields, validateDocumentValues } from "@/lib/document-templates"
+import { buildDocumentJsonSchema, buildDocumentPrompt, DEFAULT_DOCUMENT_TEMPLATES, extractClassification, extractFieldConfidence, extractFieldProvenance, extractRemarks, findMissingRequiredFields, parseTemplateFields, validateDocumentValues } from "@/lib/document-templates"
 import { describe, expect, it } from "vitest"
 
 describe("document templates", () => {
@@ -218,7 +218,7 @@ describe("document templates", () => {
     it("declares a _provenance property listed after the value fields and _confidence", () => {
       const schema = buildDocumentJsonSchema(provFields)
       const keys = Object.keys(schema.properties)
-      expect(keys).toEqual(["vendor", "line_items", "_confidence", "_provenance"])
+      expect(keys).toEqual(["vendor", "line_items", "_remarks", "_confidence", "_provenance"])
     })
 
     it("gives scalar fields a page+quote object and array fields a list of them", () => {
@@ -266,6 +266,63 @@ describe("document templates", () => {
     it("returns empty maps when _provenance is absent or malformed", () => {
       expect(extractFieldProvenance(provFields, {})).toEqual({ fields: {}, items: {} })
       expect(extractFieldProvenance(provFields, { _provenance: "nope" })).toEqual({ fields: {}, items: {} })
+    })
+  })
+
+  describe("retrievalHints and negative (OCBC structured querying)", () => {
+    it("round-trips retrievalHints and negative on scalar and item fields", () => {
+      const parsed = parseTemplateFields([
+        { key: "total", label: "Total", type: "number", required: true, instruction: "Total payable", retrievalHints: ["total", "amount due"], negative: "not the subtotal" },
+        { key: "line_items", label: "Line items", type: "array", required: false, instruction: "", itemFields: [
+          { key: "amount", label: "Amount", type: "number", required: false, instruction: "", negative: "not the running total" },
+        ] },
+      ])
+      expect(parsed[0].retrievalHints).toEqual(["total", "amount due"])
+      expect(parsed[0].negative).toBe("not the subtotal")
+      expect(parsed[1].itemFields![0].negative).toBe("not the running total")
+    })
+
+    it("still parses a legacy snapshot without retrievalHints or negative", () => {
+      const parsed = parseTemplateFields([
+        { key: "vendor", label: "Vendor", type: "string", required: true, instruction: "" },
+      ])
+      expect(parsed[0].retrievalHints).toBeUndefined()
+      expect(parsed[0].negative).toBeUndefined()
+    })
+
+    it("emits negative as a 'Do NOT extract' line in the prompt", () => {
+      const parsed = parseTemplateFields([
+        { key: "total", label: "Total", type: "number", required: true, instruction: "Total payable", negative: "not the subtotal" },
+      ])
+      const prompt = buildDocumentPrompt("Invoice", parsed)
+      expect(prompt).toContain("Do NOT extract: not the subtotal")
+    })
+
+    it("never puts retrievalHints in the prompt (retrieval-only)", () => {
+      const parsed = parseTemplateFields([
+        { key: "total", label: "Total", type: "number", required: true, instruction: "Total payable", retrievalHints: ["hint-only-marker"] },
+      ])
+      expect(buildDocumentPrompt("Invoice", parsed)).not.toContain("hint-only-marker")
+    })
+  })
+
+  describe("_remarks channel", () => {
+    it("declares _remarks in the JSON schema for keyed fields", () => {
+      const schema = buildDocumentJsonSchema(fields)
+      expect(schema.properties).toHaveProperty("_remarks")
+      expect(schema.properties._remarks).toMatchObject({ type: "string" })
+    })
+
+    it("asks for _remarks in the prompt", () => {
+      expect(buildDocumentPrompt("Invoice", fields)).toContain("_remarks")
+    })
+
+    it("extractRemarks trims and caps to 300 chars", () => {
+      expect(extractRemarks({ _remarks: "  low contrast on page 2  " })).toBe("low contrast on page 2")
+      expect(extractRemarks({ _remarks: "x".repeat(500) }).length).toBe(300)
+      expect(extractRemarks({})).toBe("")
+      expect(extractRemarks({ _remarks: 42 })).toBe("")
+      expect(extractRemarks(null)).toBe("")
     })
   })
 
