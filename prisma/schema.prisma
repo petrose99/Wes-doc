@@ -165,6 +165,7 @@ model Workspace {
   goldenDocuments    GoldenDocument[]
   reviewerActivity   ReviewerActivity[]
   supplierMergeEvents SupplierMergeEvent[]
+  supplierMatchLabels SupplierMatchLabel[]
 
   @@map("workspaces")
 }
@@ -2062,4 +2063,23 @@ model SupplierMergeEvent {
   @@index([workspaceId, winnerId])
   @@index([workspaceId, loserId])
   @@map("supplier_merge_events")
+}
+
+/// A5.9 active-learning: reviewer labels for the pair (supplierA|supplierB). pairId is a
+/// stable string ordered by supplier id, so a re-shown pair upserts onto its previous label
+/// rather than creating a second row.
+model SupplierMatchLabel {
+  id             String    @id @default(uuid()) @db.Uuid
+  workspaceId    String    @map("workspace_id") @db.Uuid
+  pairId         String    @map("pair_id")
+  sameSupplier   Boolean   @map("same_supplier")
+  score          Float
+  labelledById   String?   @map("labelled_by_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, pairId])
+  @@index([workspaceId, sameSupplier])
+  @@map("supplier_match_labels")
 }

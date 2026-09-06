@@ -4,6 +4,7 @@
 import { track } from "@/lib/analytics"
 import { auditEventData, getRequestAuditContext, recordSystemAudit } from "@/lib/audit"
 import { classifyIntent, extractOriginalSender, shouldSkipAttachment } from "@/lib/inbound/filter"
+import { fetchPortalPdfs } from "@/lib/inbound/portal-links"
 import { htmlToText, looksInvoiceLike, renderEmailBodyPdf } from "@/lib/inbound/html-to-pdf"
 import { createIngestionItem } from "@/lib/ingestion"
 import { expandZipBuffer } from "@/lib/zip-ingestion"
@@ -199,6 +200,18 @@ export async function processInboundEmail(input: InboundEmailInput): Promise<{ a
     const outcome = await createIngestionItem({ workspaceId: input.workspaceId, fileId: file.id, templateId: template.id, source: "email", filename: attachment.filename, mimeType, buffer })
     if (outcome.outcome === "accepted" || outcome.outcome === "duplicate") accepted++
     else rejected++
+  }
+
+  // A6.8: no attachment worked, but the body carries a direct https .pdf link — fetch it
+  // through the SSRF-safe channel and ingest. Only unauthenticated direct-PDF portals; a
+  // supplier that gates behind a login is out of scope for this pass.
+  if (accepted === 0 && intent !== "noise") {
+    const portals = await fetchPortalPdfs(bodyText)
+    for (const portal of portals) {
+      const outcome = await createIngestionItem({ workspaceId: input.workspaceId, fileId: file.id, templateId: template.id, source: "email", filename: portal.filename, mimeType: "application/pdf", buffer: portal.buffer })
+      if (outcome.outcome === "accepted" || outcome.outcome === "duplicate") accepted++
+      else rejected++
+    }
   }
 
   // A6.2: nothing ingestable attached, but the body itself reads like a billing document — render

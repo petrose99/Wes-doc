@@ -7,6 +7,8 @@ import { checkInvoiceArithmetic } from "@/lib/checks/arithmetic"
 import { checkAmountAnomaly } from "@/lib/checks/amount-anomaly"
 import { checkBankDetails } from "@/lib/checks/bank-details"
 import { checkPdfForensics, readPdfForensicSignals } from "@/lib/checks/pdf-forensics"
+import { checkTextLayerDivergence } from "@/lib/checks/text-layer-divergence"
+import { extractPdfTextLayer } from "@/lib/pdf/text-layer"
 import { checkSplitInvoices } from "@/lib/checks/split-invoices"
 import { checkVendorOnboarding } from "@/lib/checks/vendor-onboarding"
 import { documentStorageKey, readDocumentSource } from "@/lib/document-storage"
@@ -70,7 +72,7 @@ export async function runDeterministicChecks(input: { workspaceId: string; docum
   try {
     const document = await prisma.document.findFirst({
       where: { id: input.documentId, workspaceId: input.workspaceId },
-      select: { id: true, templateId: true, reviewedData: true, mimeType: true, template: { select: { code: true } } },
+      select: { id: true, templateId: true, reviewedData: true, mimeType: true, ocrText: true, template: { select: { code: true } } },
     })
     if (!document?.template) return
     const map = CHECK_FIELD_MAPS[document.template.code]
@@ -166,6 +168,10 @@ export async function runDeterministicChecks(input: { workspaceId: string; docum
     const forensics = await runPdfForensicsCheck(input.workspaceId, document.id, document.mimeType ?? null)
     if (forensics) results.push(forensics)
 
+    // A2.6 text-layer vs OCR divergence: only meaningful for PDFs with both signals.
+    const divergence = await runTextLayerDivergenceCheck(input.workspaceId, document.id, document.mimeType ?? null, document.ocrText ?? null)
+    if (divergence) results.push(divergence)
+
     if (map.accountNumber && map.periodStart && map.periodEnd) {
       const accountNumber = asString(get("accountNumber"))
       if (accountNumber) {
@@ -245,6 +251,22 @@ async function checkAmountAnomalyAgainstHistory(workspaceId: string, templateId:
 /** A2.1 wiring: reads the first 64KB and last 64KB of the source PDF (metadata clusters near
  * the trailer, XMP earlier) and runs the pure forensic check. Never throws; a storage read
  * miss simply skips the check. */
+/** A2.6 wiring: reads the source PDF's embedded text layer via pdfjs and hands it to the pure
+ * divergence check alongside the ocrText we already have. Never throws; a scanned PDF with no
+ * text layer returns silently. */
+async function runTextLayerDivergenceCheck(workspaceId: string, documentId: string, mimeType: string | null, ocrText: string | null): Promise<CheckResult | null> {
+  if (mimeType !== "application/pdf" || !ocrText?.trim()) return null
+  try {
+    const buffer = await readDocumentSource(documentStorageKey(workspaceId, documentId))
+    const textLayer = await extractPdfTextLayer(buffer)
+    if (!textLayer) return null
+    return checkTextLayerDivergence({ textLayer, ocrText })
+  } catch (error) {
+    console.error("[checks] text-layer read failed:", error instanceof Error ? error.message : error)
+    return null
+  }
+}
+
 async function runPdfForensicsCheck(workspaceId: string, documentId: string, mimeType: string | null): Promise<CheckResult | null> {
   if (mimeType !== "application/pdf") return null
   try {
