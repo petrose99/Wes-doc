@@ -14,11 +14,12 @@ import { usePathname } from "next/navigation"
  * dependency — it's read by server code (capabilities, seeds) that has no business importing icons.
  * Settings-tagged module items (Rules, Tax, Approvals) don't render here at all — they show up in
  * components/shell/settings-nav.tsx instead, next to the settings pages they actually lead to.
- * The review-queue module's own "Review" entry is filtered out below the same way: the pipeline's
- * Approvals tab is that surface now, and /review/[reviewTaskId] itself stays reachable from the
- * document detail page's "Send for review" / "view review task" link — it just no longer needs a
- * standing rail entry of its own. Expenses is filtered out the same way — still reachable at its
- * own route, just no longer a standing rail entry. */
+ * The review-queue module's "Review" entry used to be filtered out here on the grounds that the
+ * pipeline's Approvals tab had replaced it. That tab was never built — PIPELINE_STAGES is
+ * ["inbox", "to_review", "ready"] — so the queue ended up with no navigation at all, reachable
+ * only from a dashboard stat card or a link on a document. It is a rail entry again, positioned
+ * after Extraction because that is where it falls in the work, and badged with its open-task
+ * count. Expenses IS still filtered out — reachable at its own route, just not a standing entry. */
 const ICONS: Record<string, typeof Files> = {
   inbox: ClipboardCheck,
   mic: Mic,
@@ -37,7 +38,7 @@ const ICONS: Record<string, typeof Files> = {
  * this rail doesn't scroll. Module nav entries (Dictate) come from
  * `enabledModuleKeys` — the workspace's resolved capability set (lib/modules/capabilities.ts) —
  * rather than ad-hoc per-feature booleans. */
-export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, accountingEnabled = false, pipelineReviewCount = 0 }: {
+export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, accountingEnabled = false, pipelineReviewCount = 0, reviewTaskCount = 0 }: {
   workspaceId: string
   workspaces: SwitchableWorkspace[]
   user: { name: string; email: string }
@@ -52,6 +53,9 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
    * now. Surfaced as a badge on the Pipeline entry so "something needs you" is visible from every
    * page, not just after clicking into Pipeline's own To review tab. */
   pipelineReviewCount?: number
+  /** countOpenReviewTasks — open + in_review tasks, badged on the Review entry so the queue
+   * advertises that it has work rather than waiting to be discovered. */
+  reviewTaskCount?: number
 }) {
   const pathname = usePathname()
   if (pathname.endsWith("/sheet") || pathname.includes("/documents/")) return null
@@ -61,8 +65,15 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
   const moduleWorkItems = MODULES
     .filter((module) => enabled.has(module.key))
     .flatMap((module) => module.navItems ?? [])
-    .filter((item) => !item.href.startsWith("settings/") && item.href !== "review" && item.href !== "expenses" && item.href !== "dictation" && item.href !== "health")
+    .filter((item) => !item.href.startsWith("settings/") && item.href !== "expenses" && item.href !== "dictation" && item.href !== "health")
     .map((item) => ({ href: `${base}/${item.href}`, label: item.label, icon: ICONS[item.icon] ?? Files, exact: false }))
+
+  // Review is registry-driven like every other module entry, but it does not sit with them at the
+  // bottom of the section: the queue is the step straight after extraction, so it reads there and
+  // nowhere else. Pulled out by href rather than declared inline so lib/modules stays the single
+  // source of its label, icon, and per-workspace gating.
+  const reviewItem = moduleWorkItems.find((item) => item.href === `${base}/review`)
+  const otherModuleItems = moduleWorkItems.filter((item) => item.href !== `${base}/review`)
 
   // Home is every workspace's unconditional first entry — exact-matched so it doesn't stay lit on
   // every page under it, unlike Files (which stays lit through a file's hub and sheet too).
@@ -78,10 +89,11 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
   const workItems = [
     { href: base, label: "Dashboard", icon: BarChart3, exact: true },
     { href: `${base}/pipeline`, label: "Extraction", icon: ListChecks, exact: false, badge: pipelineReviewCount > 0 ? pipelineReviewCount : undefined, tourTarget: "extraction" as const },
+    ...(reviewItem ? [{ ...reviewItem, badge: reviewTaskCount > 0 ? reviewTaskCount : undefined }] : []),
     { href: `${base}/files`, label: "Sheets", icon: Table2, exact: false, tourTarget: "sheets" as const },
     { href: `${base}/library`, label: "Docu Library", icon: Library, exact: false, tourTarget: "library" as const },
     ...(accountingEnabled ? [{ href: `${base}/accounting`, label: "Accounting", icon: Landmark, exact: false }] : []),
-    ...moduleWorkItems,
+    ...otherModuleItems,
   ]
   const bottomItems = [
     { href: `${base}/settings/workspace`, label: "Settings", icon: Settings, exact: false },

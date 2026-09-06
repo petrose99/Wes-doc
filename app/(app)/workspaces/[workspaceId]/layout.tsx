@@ -6,6 +6,7 @@ import config from "@/lib/config"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { createClient } from "@/lib/supabase/server"
 import { countDocumentsByStage } from "@/models/documents"
+import { countOpenReviewTasks } from "@/models/review-tasks"
 import { getWorkspaceMembership, getWorkspacesForUser } from "@/models/workspaces"
 import { redirect } from "next/navigation"
 
@@ -47,6 +48,11 @@ export default async function WorkspaceLayout({ children, params }: { children: 
     countDocumentsByStage(workspaceId),
   ])
 
+  // The Review rail entry carries an open-task badge for the same reason Extraction does: the
+  // queue is where work waits on a person, and it is only worth walking to when something is in
+  // it. Fetched after capabilities so a workspace without the review-queue module pays nothing.
+  const reviewTaskCount = capabilities.has("review-queue") ? await countOpenReviewTasks(workspaceId) : 0
+
   const switchable = workspaces.map((workspace) => ({ id: workspace.id, name: workspace.name, kind: workspace.kind, role: workspace.members[0]?.role }))
 
   return <div className="flex min-h-screen bg-white text-slate-900">
@@ -56,7 +62,8 @@ export default async function WorkspaceLayout({ children, params }: { children: 
       user={{ name: user.name, email: user.email }}
       enabledModuleKeys={[...capabilities.enabled]}
       accountingEnabled={config.integrations.bigcapital.enabled}
-      pipelineReviewCount={pipelineCounts.to_review} />
+      pipelineReviewCount={pipelineCounts.to_review}
+      reviewTaskCount={reviewTaskCount} />
     <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-[radial-gradient(1200px_480px_at_100%_-10%,rgba(4,120,87,0.05),transparent_60%),#fafbfc]">
       <MobileHeader workspaceId={workspaceId} workspaces={switchable} user={{ name: user.name, email: user.email }} />
       <div className="flex min-h-0 flex-1 flex-col pb-[72px] md:pb-0">{children}</div>
