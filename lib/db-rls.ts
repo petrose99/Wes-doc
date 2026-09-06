@@ -36,6 +36,18 @@ export async function withWorkspace<T>(workspaceId: string, fn: (tx: Prisma.Tran
   })
 }
 
+/** Same contract as withWorkspace but ALWAYS sets the session variable, regardless of the
+ * DB_RLS_ENABLED flag — the cross-tenant probe test uses this to exercise the policies even
+ * on a dev DB with the flag off, so a broken policy shows up in CI without needing the flag
+ * flipped in every environment. Not for production code (which should keep gating on the flag);
+ * exported so `tests/security/*.db.test.ts` can rely on real enforcement in isolation. */
+export async function withWorkspaceForced<T>(workspaceId: string, fn: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+  return prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT set_config('app.workspace_id', ${workspaceId}::text, true)`
+    return fn(tx)
+  })
+}
+
 /** Reports whether RLS scoping is actually in force, for a health check or an admin screen — so
  * "we have RLS" can be verified rather than assumed. */
 export async function isRlsActive(): Promise<{ enabled: boolean; policies: number; forcedTables: number }> {

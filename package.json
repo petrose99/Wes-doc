@@ -20,7 +20,9 @@
     "db:studio": "prisma studio",
     "test": "vitest run",
     "test:watch": "vitest",
-    "eval:extraction": "tsx --env-file .env scripts/eval-extraction.ts"
+    "test:db": "vitest --env-file .env run --config vitest.db.config.ts",
+    "eval:extraction": "tsx --env-file .env scripts/eval-extraction.ts",
+    "eval:promptfoo": "tsx --env-file .env scripts/eval-promptfoo.ts"
   },
   "dependencies": {
     "@ai-sdk/google": "^2.0.88",
