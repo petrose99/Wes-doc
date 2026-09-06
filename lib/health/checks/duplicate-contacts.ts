@@ -4,10 +4,11 @@
  * field every provider's vendor/contact sync actually caches today (see
  * lib/integrations/sync.ts's SyncRow — no address/tax-id is stored). */
 import type { CheckDefinition, CheckRunResult, LedgerAccountingEntitySlice } from "@/lib/health/types"
+// A5: the shared supplier normalizer also strips legal-form suffixes, so "Acme Ltd" and
+// "Acme Limited" now group as the same vendor — strictly broader than the old local fold.
+import { normalizeSupplierName } from "@/lib/suppliers/normalize"
 
-function normalize(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()
-}
+const normalize = normalizeSupplierName
 
 export const duplicateContactsCheck: CheckDefinition = {
   code: "duplicate_contacts",

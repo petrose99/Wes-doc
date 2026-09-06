@@ -2,6 +2,7 @@
  *
  * Matches purchase orders → invoices → receipts by vendor name, amount (within tolerance),
  * date proximity, and PO number. Returns a confidence score and any discrepancies found. */
+import { normalizeSupplierName, SUPPLIER_MATCH_AUTO_THRESHOLD, SUPPLIER_MATCH_REVIEW_THRESHOLD, tokenSetRatio } from "@/lib/suppliers/normalize"
 
 export type MatchableDocument = {
   id: string
@@ -56,10 +57,18 @@ function getMatchType(sourceRole: string, targetRole: string): MatchResult["matc
 
 export function scoreVendorMatch(a: string | null, b: string | null): number {
   if (!a || !b) return 0
-  const na = a.toLowerCase().trim()
-  const nb = b.toLowerCase().trim()
+  // A5: compare through the shared supplier normalizer, so "Acme Ltd." vs "ACME Limited" is an
+  // exact match, not a lucky substring. Fuzzy grades follow the shared thresholds: auto-band
+  // similarity is near-certain (0.9), containment keeps its historical 0.8, review-band
+  // similarity is a weak-but-real signal (0.6).
+  const na = normalizeSupplierName(a)
+  const nb = normalizeSupplierName(b)
+  if (!na || !nb) return 0
   if (na === nb) return 1
+  const ratio = tokenSetRatio(na, nb)
+  if (ratio >= SUPPLIER_MATCH_AUTO_THRESHOLD) return 0.9
   if (na.includes(nb) || nb.includes(na)) return 0.8
+  if (ratio >= SUPPLIER_MATCH_REVIEW_THRESHOLD) return 0.6
   return 0
 }
 

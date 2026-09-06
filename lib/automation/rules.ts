@@ -3,6 +3,7 @@
  * this document get coded that way" question always has one answer, not one that depends on
  * database row order. Run in the worker post-extraction (lib/document-processing.ts); nothing
  * here touches Prisma. */
+import { normalizeSupplierName } from "@/lib/suppliers/normalize"
 
 export type RuleMatcherType = "exact" | "contains"
 
@@ -61,8 +62,13 @@ export const SUPPLIER_FIELD_BY_TEMPLATE: Record<string, string> = {
   supplier_statement: "supplier",
 }
 
+/** A5: rule matching goes through the shared supplier normalizer — case/punctuation folded and
+ * legal-form suffixes stripped on BOTH the rule's matcher text and the extracted supplier, so a
+ * rule written as "Acme Ltd" matches "ACME Limited" without the workspace needing one rule per
+ * spelling. Falls back to the plain fold when a matcher normalizes to nothing (e.g. a rule whose
+ * whole value is "Ltd" — pathological, but it must not silently become a match-everything key). */
 function normalize(value: string): string {
-  return value.trim().toLowerCase()
+  return normalizeSupplierName(value) || value.trim().toLowerCase()
 }
 
 function isEligible(rule: AutomationRuleInput, templateCode: string): boolean {

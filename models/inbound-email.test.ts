@@ -20,7 +20,9 @@ beforeEach(() => {
   vi.clearAllMocks()
   for (const key of Object.keys(db)) delete db[key]
   db.inboundEmailAllowedSender = { findMany: vi.fn().mockResolvedValue([]), upsert: vi.fn(), findFirst: vi.fn(), delete: vi.fn() }
-  db.documentAuditEvent = { create: vi.fn() }
+  db.inboundEmailIntake = { create: vi.fn().mockResolvedValue({}) }
+  db.documentAuditEvent = { create: vi.fn().mockResolvedValue({}) }
+  db.productEvent = { create: vi.fn().mockResolvedValue({}) }
   db.$transaction = vi.fn((ops: unknown[]) => Promise.all(ops as Promise<unknown>[]))
 })
 
@@ -180,5 +182,51 @@ describe("processInboundEmail", () => {
     vi.mocked(createIngestionItem).mockResolvedValue({ outcome: "accepted" } as never)
     await processInboundEmail({ workspaceId: "w1", from: "owner@example.com", attachments: [attachment] })
     expect(vi.mocked(createIngestionItem).mock.calls[0][0].source).toBe("email")
+  })
+
+  // A6.1: every processed mail leaves an intake row; a zero-document one also audits.
+  it("records an intake row with outcome ingested when something was accepted", async () => {
+    vi.mocked(createIngestionItem).mockResolvedValue({ outcome: "accepted" } as never)
+    await processInboundEmail({ workspaceId: "w1", from: "owner@example.com", subject: "Inv", attachments: [attachment] })
+    expect(db.inboundEmailIntake.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ workspaceId: "w1", fromAddress: "owner@example.com", subject: "Inv", outcome: "ingested", acceptedCount: 1 }),
+    })
+  })
+
+  it("records a no_document intake and an audit event when a mail yields nothing", async () => {
+    const result = await processInboundEmail({ workspaceId: "w1", from: "owner@example.com", subject: "FYI", textBody: "see you at lunch", attachments: [] })
+    expect(result).toEqual({ accepted: 0, rejected: 0 })
+    expect(db.inboundEmailIntake.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ outcome: "no_document", bodyPreview: "see you at lunch" }),
+    })
+    expect(db.documentAuditEvent.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ type: "inbound_email.no_document" }),
+    }))
+  })
+
+  it("records a sender_rejected intake before refusing a disallowed sender", async () => {
+    await expect(processInboundEmail({ workspaceId: "w1", from: "stranger@example.com", attachments: [attachment] })).rejects.toThrow("sender_not_allowed")
+    expect(db.inboundEmailIntake.create).toHaveBeenCalledWith({ data: expect.objectContaining({ outcome: "sender_rejected" }) })
+  })
+
+  // A6.2: an invoice-shaped BODY with no usable attachment gets rendered to a PDF and ingested.
+  it("ingests an invoice-like body as a rendered PDF when no attachment was accepted", async () => {
+    vi.mocked(createIngestionItem).mockResolvedValue({ outcome: "accepted" } as never)
+    const result = await processInboundEmail({
+      workspaceId: "w1", from: "owner@example.com", subject: "Invoice #77",
+      htmlBody: "<p>Amount due: $120.00</p>", attachments: [],
+    })
+    expect(result.accepted).toBe(1)
+    const call = vi.mocked(createIngestionItem).mock.calls[0][0]
+    expect(call.mimeType).toBe("application/pdf")
+    expect(call.filename).toMatch(/\.pdf$/)
+    expect(call.buffer.toString("latin1").startsWith("%PDF-")).toBe(true)
+    expect(db.inboundEmailIntake.create).toHaveBeenCalledWith({ data: expect.objectContaining({ outcome: "ingested" }) })
+  })
+
+  it("does not render a body that does not look like a billing document", async () => {
+    const result = await processInboundEmail({ workspaceId: "w1", from: "owner@example.com", subject: "Hello", textBody: "lunch tomorrow?", attachments: [] })
+    expect(result.accepted).toBe(0)
+    expect(createIngestionItem).not.toHaveBeenCalled()
   })
 })

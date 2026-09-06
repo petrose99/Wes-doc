@@ -4,7 +4,14 @@ import { findMatches, scoreAmountMatch, scoreDateMatch, scorePoNumberMatch, scor
 describe("scoreVendorMatch", () => {
   it("exact match scores 1", () => expect(scoreVendorMatch("Acme Corp", "Acme Corp")).toBe(1))
   it("case insensitive", () => expect(scoreVendorMatch("acme corp", "ACME CORP")).toBe(1))
-  it("substring match scores 0.8", () => expect(scoreVendorMatch("Acme", "Acme Corp")).toBe(0.8))
+  // A5: "Corp" is a legal-form suffix the shared normalizer strips, so these are now the SAME
+  // vendor (1); one name fully contained in the other is token_set_ratio's auto band (0.9),
+  // slightly stronger than the old flat substring 0.8; partial-word overlap lands in the review
+  // band (0.6).
+  it("suffix-only difference scores 1", () => expect(scoreVendorMatch("Acme", "Acme Corp")).toBe(1))
+  it("containment scores 0.9", () => expect(scoreVendorMatch("Acme", "Acme Europe")).toBe(0.9))
+  it("close-but-not-identical names score in the review band", () =>
+    expect(scoreVendorMatch("Acme Digital Trading", "Acme Digital Traders")).toBe(0.6))
   it("no match scores 0", () => expect(scoreVendorMatch("Acme", "Globex")).toBe(0))
   it("null scores 0", () => expect(scoreVendorMatch(null, "Acme")).toBe(0))
 })

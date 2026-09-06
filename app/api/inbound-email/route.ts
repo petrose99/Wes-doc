@@ -17,7 +17,7 @@ import { processInboundEmail, resolveWorkspaceByInboundToken } from "@/models/in
  * configured provider can call this route) without hard-coding one provider's URL convention. */
 
 type PostmarkAttachment = { Name?: string; ContentType?: string; Content?: string }
-type PostmarkInboundPayload = { To?: string; From?: string; Attachments?: PostmarkAttachment[] }
+type PostmarkInboundPayload = { To?: string; From?: string; Subject?: string; TextBody?: string; HtmlBody?: string; Attachments?: PostmarkAttachment[] }
 
 /** Postmark's To/From are full mailbox strings ("Name <address@host>" or a bare address) — this
  * pulls out just the address either way. */
@@ -55,6 +55,9 @@ export async function POST(request: Request): Promise<Response> {
     const result = await processInboundEmail({
       workspaceId: workspace.id,
       from: fromAddress,
+      subject: body?.Subject ?? null,
+      textBody: body?.TextBody ?? null,
+      htmlBody: body?.HtmlBody ?? null,
       attachments: (body?.Attachments ?? [])
         .filter((attachment): attachment is Required<PostmarkAttachment> => Boolean(attachment.Name && attachment.ContentType && attachment.Content))
         .map((attachment) => ({ filename: attachment.Name, contentType: attachment.ContentType, base64Content: attachment.Content })),

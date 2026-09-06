@@ -26,8 +26,16 @@ describe("applyRules — matching", () => {
     expect(result.codingData).toEqual({ account: "6000" })
   })
 
-  it("does not match an exact rule on a partial supplier name", () => {
+  // A5: matching runs through the shared supplier normalizer, so a legal-form suffix no longer
+  // defeats an exact rule — "Acme Supplies Ltd" IS "acme supplies" — while a genuinely partial
+  // name (an extra real word) still does not exact-match.
+  it("matches an exact rule when the supplier differs only by a legal suffix", () => {
     const result = applyRules([rule()], extraction({ supplierValue: "Acme Supplies Ltd" }))
+    expect(result.ruleId).toBe("r1")
+  })
+
+  it("does not match an exact rule on a partial supplier name", () => {
+    const result = applyRules([rule()], extraction({ supplierValue: "Acme Supplies Europe" }))
     expect(result.ruleId).toBeNull()
   })
 

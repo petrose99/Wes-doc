@@ -1,7 +1,9 @@
 // Deliberately NOT a "use server" module, matching every other models/*.ts helper here: this
 // trusts the token/sender it is handed. app/api/inbound-email/route.ts does the signature check
 // and is the only caller.
-import { auditEventData, getRequestAuditContext } from "@/lib/audit"
+import { track } from "@/lib/analytics"
+import { auditEventData, getRequestAuditContext, recordSystemAudit } from "@/lib/audit"
+import { htmlToText, looksInvoiceLike, renderEmailBodyPdf } from "@/lib/inbound/html-to-pdf"
 import { createIngestionItem } from "@/lib/ingestion"
 import { isSupportedDocumentBuffer } from "@/models/documents"
 import { EXTENSION_MIME_TYPES } from "@/lib/zip-ingestion"
@@ -99,13 +101,44 @@ function inferMimeType(filename: string): string | null {
 
 export type InboundEmailAttachment = { filename: string; contentType: string; base64Content: string }
 
+export type InboundEmailInput = {
+  workspaceId: string
+  from: string
+  attachments: InboundEmailAttachment[]
+  subject?: string | null
+  textBody?: string | null
+  htmlBody?: string | null
+}
+
+const BODY_PREVIEW_MAX = 500
+
 /** One inbound email, already authenticated by the route (signature + token resolved to a
  * workspace) — this is the business logic: is the sender allowed, and if so, ingest every
  * attachment through the exact same pipeline every other intake channel uses. Attachments land in
  * a dedicated "Email intake" file (auto-created, mirroring ensureDictationFile's pattern) rather
- * than a file the sender has no way to specify. */
-export async function processInboundEmail(input: { workspaceId: string; from: string; attachments: InboundEmailAttachment[] }): Promise<{ accepted: number; rejected: number }> {
-  if (!(await isSenderAllowed(input.workspaceId, input.from))) throw new Error("sender_not_allowed")
+ * than a file the sender has no way to specify.
+ *
+ * A6.1/A6.2 additions: every processed mail leaves an InboundEmailIntake row (including one that
+ * produced zero documents, which previously vanished without a trace — that case also emits an
+ * audit event so a person can find out); a mail with no ingestable attachment whose BODY looks
+ * like a billing document gets the body rendered to a small PDF and ingested like any file. */
+export async function processInboundEmail(input: InboundEmailInput): Promise<{ accepted: number; rejected: number }> {
+  const bodyText = (input.textBody?.trim() || (input.htmlBody ? htmlToText(input.htmlBody) : "")).trim()
+  const bodyPreview = bodyText ? bodyText.slice(0, BODY_PREVIEW_MAX) : null
+  const recordIntake = (outcome: string, counts: { accepted: number; rejected: number }) =>
+    prisma.inboundEmailIntake.create({
+      data: {
+        workspaceId: input.workspaceId, fromAddress: input.from.trim().toLowerCase(),
+        subject: input.subject?.trim() || null, bodyPreview,
+        attachmentCount: input.attachments.length, acceptedCount: counts.accepted, rejectedCount: counts.rejected,
+        outcome,
+      },
+    }).catch((error) => { console.error("[inbound-email] failed to record intake:", error instanceof Error ? error.message : error); return null })
+
+  if (!(await isSenderAllowed(input.workspaceId, input.from))) {
+    await recordIntake("sender_rejected", { accepted: 0, rejected: input.attachments.length })
+    throw new Error("sender_not_allowed")
+  }
 
   const file = await ensureEmailIntakeFile(input.workspaceId)
   const templates = await getFileTemplates(input.workspaceId, file.id)
@@ -121,6 +154,31 @@ export async function processInboundEmail(input: { workspaceId: string; from: st
     const outcome = await createIngestionItem({ workspaceId: input.workspaceId, fileId: file.id, templateId: template.id, source: "email", filename: attachment.filename, mimeType, buffer })
     if (outcome.outcome === "accepted" || outcome.outcome === "duplicate") accepted++
     else rejected++
+  }
+
+  // A6.2: nothing ingestable attached, but the body itself reads like a billing document — render
+  // it to a PDF and send it down the same pipeline. Never lets a render problem fail the mail.
+  if (accepted === 0 && bodyText && looksInvoiceLike(input.subject, bodyText)) {
+    try {
+      const buffer = renderEmailBodyPdf({ subject: input.subject ?? null, from: input.from, bodyText })
+      const filename = `${(input.subject?.trim() || "email-body").replace(/[^\w.-]+/g, "-").slice(0, 60)}.pdf`
+      const outcome = await createIngestionItem({ workspaceId: input.workspaceId, fileId: file.id, templateId: template.id, source: "email", filename, mimeType: "application/pdf", buffer })
+      if (outcome.outcome === "accepted" || outcome.outcome === "duplicate") accepted++
+    } catch (error) {
+      console.error("[inbound-email] body-to-pdf ingestion failed:", error instanceof Error ? error.message : error)
+    }
+  }
+
+  await recordIntake(accepted > 0 ? "ingested" : "no_document", { accepted, rejected })
+  if (accepted === 0) {
+    // A6.1: the silent-zero case someone should hear about — auditable and countable, keyed to
+    // the workspace (there is no document to hang a ReviewTask on). recordSystemAudit never
+    // throws and needs no request context.
+    await recordSystemAudit({
+      workspaceId: input.workspaceId, type: "inbound_email.no_document",
+      detail: { from: input.from, subject: input.subject ?? null, attachmentCount: input.attachments.length, rejected, bodyPreview },
+    })
+    await track("inbound_email_no_document", { attachmentCount: input.attachments.length, rejected }, { workspaceId: input.workspaceId })
   }
   return { accepted, rejected }
 }

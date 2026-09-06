@@ -4,6 +4,7 @@ import { track } from "@/lib/analytics"
 import { SUPPLIER_FIELD_BY_TEMPLATE } from "@/lib/automation/rules"
 import { applyAutomationRules } from "@/models/automation-rules"
 import { runDeterministicChecks } from "@/models/document-checks"
+import { recordSupplierObservation } from "@/lib/suppliers/alias"
 import { getFewShotExamples } from "@/models/field-corrections"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { refreshDocumentReadiness } from "@/lib/readiness/refresh"
@@ -511,6 +512,16 @@ export async function processDocumentJob(jobId: string) {
     const supplierField = templateCode ? SUPPLIER_FIELD_BY_TEMPLATE[templateCode] : undefined
     if (templateCode && supplierField) {
       const supplierValue = extraction[supplierField]
+      // A5: keep the canonical supplier registry current — resolves the raw name through
+      // normalize/alias/fuzzy and learns new spellings. Never throws (its own contract).
+      if (typeof supplierValue === "string" && supplierValue.trim()) {
+        const vatValue = extraction["supplier_vat_number"]
+        await recordSupplierObservation({
+          workspaceId: document.workspaceId,
+          rawName: supplierValue,
+          vatNumber: typeof vatValue === "string" && vatValue.trim() ? vatValue.trim() : null,
+        })
+      }
       await applyAutomationRules({
         workspaceId: document.workspaceId, documentId: document.id, templateCode,
         extraction: {

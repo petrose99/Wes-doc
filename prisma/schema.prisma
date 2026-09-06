@@ -158,6 +158,9 @@ model Workspace {
   reviewRoutingRules ReviewRoutingRule[]
   budgets            WorkspaceBudget[]
   documentMatches    DocumentMatch[]
+  suppliers          Supplier[]
+  supplierAliases    SupplierAlias[]
+  inboundEmailIntakes InboundEmailIntake[]
 
   @@map("workspaces")
 }
@@ -1858,4 +1861,76 @@ model DocumentMatch {
   @@index([workspaceId, matchType])
   @@index([workspaceId, status])
   @@map("document_matches")
+}
+
+/// Quality-roadmap A5 (supplier identity): one canonical supplier per workspace, keyed by the
+/// normalized form of its name (lib/suppliers/normalize.ts). Documents keep storing the raw
+/// extracted vendor text — this table is the resolution layer consumers (automation rules, bank
+/// matching, dedup, stats) look names up through, never a rewrite of what the document said.
+/// `bankDetails` is the remembered remittance identity (iban/account/sortCode…) the A2.2
+/// bank-detail-change freeze will compare against; `iban` is denormalized out of it as the
+/// cross-supplier dedup anchor (same IBAN ⇒ same real-world payee, whatever the name says).
+model Supplier {
+  id            String    @id @default(uuid()) @db.Uuid
+  workspaceId   String    @map("workspace_id") @db.Uuid
+  canonicalName String    @map("canonical_name")
+  normalizedKey String    @map("normalized_key")
+  bankDetails   Json?     @map("bank_details")
+  domain        String?
+  vatNumber     String?   @map("vat_number")
+  iban          String?
+  /// Rolling counters the per-supplier automation thresholds (A1.1) and anomaly checks (A2.7)
+  /// will read; maintained by models/suppliers.ts's touchSupplier, not derived on read.
+  documentCount Int       @default(0) @map("document_count")
+  lastSeenAt    DateTime? @map("last_seen_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  aliases       SupplierAlias[]
+
+  @@unique([workspaceId, normalizedKey])
+  @@index([workspaceId, iban])
+  @@map("suppliers")
+}
+
+/// A5.4: one known alternative spelling of a supplier, stored pre-normalized so lookup is a
+/// single equality. `source` records how it was learned: "mined" (from FieldCorrection /
+/// CodingCorrection override pairs, lib/suppliers/mine-aliases.ts), "manual", or later phases'
+/// "vies" | "registry" | "bank".
+model SupplierAlias {
+  id              String   @id @default(uuid()) @db.Uuid
+  workspaceId     String   @map("workspace_id") @db.Uuid
+  supplierId      String   @map("supplier_id") @db.Uuid
+  aliasNormalized String   @map("alias_normalized")
+  source          String   @default("mined")
+  createdAt       DateTime @default(now()) @map("created_at")
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  supplier        Supplier  @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, aliasNormalized])
+  @@index([supplierId])
+  @@map("supplier_aliases")
+}
+
+/// A6.1: one row per inbound email processed for a workspace — including mail that produced zero
+/// documents, which previously vanished without a trace. `outcome` is "ingested" (≥1 attachment
+/// or body accepted), "no_document" (nothing ingestable — the case a person should hear about),
+/// or "sender_rejected". `bodyPreview` is a short plain-text excerpt kept so a no_document alert
+/// can show what the mail actually said without re-fetching anything from the provider.
+model InboundEmailIntake {
+  id              String    @id @default(uuid()) @db.Uuid
+  workspaceId     String    @map("workspace_id") @db.Uuid
+  fromAddress     String    @map("from_address")
+  subject         String?
+  bodyPreview     String?   @map("body_preview")
+  attachmentCount Int       @default(0) @map("attachment_count")
+  acceptedCount   Int       @default(0) @map("accepted_count")
+  rejectedCount   Int       @default(0) @map("rejected_count")
+  outcome         String
+  createdAt       DateTime  @default(now()) @map("created_at")
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, createdAt])
+  @@index([workspaceId, outcome])
+  @@map("inbound_email_intakes")
 }

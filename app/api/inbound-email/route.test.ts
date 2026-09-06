@@ -83,6 +83,7 @@ describe("POST /api/inbound-email", () => {
     expect(await response.json()).toEqual({ accepted: 1, rejected: 0 })
     expect(vi.mocked(processInboundEmail).mock.calls[0][0]).toEqual({
       workspaceId: "w1", from: "owner@example.com",
+      subject: "Invoice attached", textBody: null, htmlBody: null,
       attachments: [{ filename: "invoice.pdf", contentType: "application/pdf", base64Content: Buffer.from("%PDF-1.4\n").toString("base64") }],
     })
   })

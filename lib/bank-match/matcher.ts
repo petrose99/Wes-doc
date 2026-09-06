@@ -1,4 +1,5 @@
 import { amountsMatch } from "@/lib/checks/types"
+import { supplierTokens as supplierNameTokens } from "@/lib/suppliers/normalize"
 
 export type BankTransaction = {
   index: number
@@ -47,7 +48,11 @@ function tokenize(value: string | null): Set<string> {
  * without any external entity-resolution step. Ratio is over the supplier's own token count: a
  * short supplier name fully present in a long description should score as a full match. */
 function supplierOverlapRatio(supplier: string | null, description: string | null): number {
-  const supplierTokens = tokenize(supplier)
+  // A5: the supplier side tokenizes through the shared normalizer, so legal-form suffixes
+  // ("Ltd", "GmbH") never count as evidence — "PAYMENT TO WIDGET LTD" matching supplier
+  // "Gadget Ltd" must not score on "ltd" alone. The description keeps the plain tokenizer:
+  // it is free text, not a company name.
+  const supplierTokens = new Set(supplierNameTokens(supplier).filter((token) => token.length >= 3))
   if (!supplierTokens.size) return 0
   const descriptionTokens = tokenize(description)
   let hits = 0
