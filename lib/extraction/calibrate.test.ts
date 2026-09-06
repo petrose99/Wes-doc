@@ -200,6 +200,72 @@ describe("suspect tracking", () => {
   })
 })
 
+// Found via a 40-document load test: a receipt's total extracted as 0 (wrong — the model itself
+// only gave it 0.4), then got boosted to VERBATIM_CONFIDENCE because a bare "0" coincidentally
+// appears in almost any OCR text with a date, a pump number, or a phone digit in it. The
+// calibration layer was overriding the model's correct doubt with a false one.
+describe("short/generic-number grounding", () => {
+  it("does not ground a wrong zero total on a coincidental digit elsewhere in the text", () => {
+    const result = calibrateFieldConfidence({
+      templateCode: "receipt",
+      fields: [{ key: "total", type: "number" }],
+      extraction: { total: 0 },
+      fieldConfidence: { total: 0.4 },
+      ocrText: "SPEEDWAY #4471 03/10/2019 PUMP 05 GALLONS 8.201 PRICE/GAL 3.199 FUEL TOTAL 26.09 TAX 1.61",
+    })
+    expect(result.fieldConfidence.total).toBe(0.4)
+  })
+
+  // "0.00" clears a bare digit-count bar (three digits), but three identical zeros are not the
+  // same kind of evidence as three arbitrary digits — $0.00 is a common filler value (free
+  // shipping, a waived fee, a tax-exempt line) that says nothing about whether THIS field is
+  // genuinely zero just because it appears somewhere else on the document.
+  it("does not ground a wrong zero total even when a real '0.00' appears elsewhere", () => {
+    const result = calibrateFieldConfidence({
+      templateCode: "receipt",
+      fields: [{ key: "total", type: "number" }],
+      extraction: { total: 0 },
+      fieldConfidence: { total: 0.4 },
+      ocrText: "DISCOUNT 0.00 GRAND TOTAL 27.70",
+    })
+    expect(result.fieldConfidence.total).toBe(0.4)
+  })
+
+  // A value this method cannot check is left alone in both directions — the model's own
+  // confidence stands, rather than being punished with the ungrounded cap for a check that
+  // never had enough evidence to run.
+  it("passes a zero value through unchanged when no digits at all appear in the text", () => {
+    const result = calibrateFieldConfidence({
+      templateCode: "receipt",
+      fields: [{ key: "total", type: "number" }],
+      extraction: { total: 0 },
+      fieldConfidence: { total: 0.9 },
+      ocrText: "COMPED MEAL BALANCE DUE ZERO",
+    })
+    expect(result.fieldConfidence.total).toBe(0.9)
+  })
+
+  it("still grounds a genuinely correct amount normally, short or not", () => {
+    const tenDollar = calibrateFieldConfidence({
+      templateCode: "receipt",
+      fields: [{ key: "total", type: "number" }],
+      extraction: { total: 10 },
+      fieldConfidence: { total: 0.5 },
+      ocrText: "SERVICE FEE 10.00",
+    })
+    expect(tenDollar.fieldConfidence.total).toBe(VERBATIM_CONFIDENCE)
+
+    const multiDigit = calibrateFieldConfidence({
+      templateCode: "receipt",
+      fields: [{ key: "total", type: "number" }],
+      extraction: { total: 27.70 },
+      fieldConfidence: { total: 0.6 },
+      ocrText: "SPEEDWAY GRAND TOTAL 27.70",
+    })
+    expect(multiDigit.fieldConfidence.total).toBe(VERBATIM_CONFIDENCE)
+  })
+})
+
 describe("numberVariants", () => {
   it("covers plain, fixed-2, and comma-grouped forms", () => {
     const variants = numberVariants(6610.95)
