@@ -162,6 +162,8 @@ model Workspace {
   supplierAliases    SupplierAlias[]
   inboundEmailIntakes InboundEmailIntake[]
   bankMatchMemory    BankMatchMemory[]
+  goldenDocuments    GoldenDocument[]
+  reviewerActivity   ReviewerActivity[]
 
   @@map("workspaces")
 }
@@ -1991,4 +1993,48 @@ model BankMatchMemory {
   @@unique([workspaceId, descriptorKey])
   @@index([workspaceId, hitCount])
   @@map("bank_match_memory")
+}
+
+/// A4.4 golden-task injection. A GoldenDocument is a document whose ground-truth fields are
+/// known (typically seeded from the extraction-eval fixtures) with one or more DELIBERATELY
+/// wrong fields planted. When the review queue serves the workspace's next task, ~5-10% of
+/// the time a golden is served instead — the reviewer's correction rate on it is a per-reviewer
+/// quality signal (A4.6 dashboard).
+model GoldenDocument {
+  id             String    @id @default(uuid()) @db.Uuid
+  workspaceId    String    @map("workspace_id") @db.Uuid
+  documentId     String    @unique @map("document_id") @db.Uuid
+  /// Field key -> expected correct value. What the reviewer SHOULD land on.
+  expectedValues Json      @map("expected_values")
+  /// Field key -> the deliberately-wrong value the extraction was overridden to. A subset of
+  /// expectedValues' keys; anything not overridden is a straight ground-truth check, not a
+  /// planted error.
+  plantedErrors  Json      @map("planted_errors")
+  isActive       Boolean   @default(true) @map("is_active")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, isActive])
+  @@map("golden_documents")
+}
+
+/// A4.6 reviewer-quality dashboard. One row per (reviewer, day, action). Rolled up in the
+/// dashboard rather than joined against every ReviewTask history entry every render. `outcome`
+/// captures the verdict for a golden task (correct/partial/miss) or "reviewed" for a real
+/// document; `fieldCount` is how many fields the reviewer changed on this action.
+model ReviewerActivity {
+  id             String    @id @default(uuid()) @db.Uuid
+  workspaceId    String    @map("workspace_id") @db.Uuid
+  reviewerId     String    @map("reviewer_id") @db.Uuid
+  documentId     String?   @map("document_id") @db.Uuid
+  goldenId       String?   @map("golden_id") @db.Uuid
+  outcome        String
+  fieldCount     Int       @default(0) @map("field_count")
+  durationMs     Int?      @map("duration_ms")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, reviewerId, createdAt])
+  @@index([workspaceId, outcome])
+  @@map("reviewer_activity")
 }
