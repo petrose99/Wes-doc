@@ -1810,6 +1810,15 @@ model WorkspaceAutomationConfig {
   /// sample review — the workspace-level control on the trust-but-verify safety net that
   /// keeps a step-down threshold from silently drifting into a bad regime. Default 0.05.
   qaSampleRate      Float     @default(0.05) @map("qa_sample_rate")
+  /// A1.2: amount-band routing. JSON array of AmountBand rows
+  /// ({min,max,minConfidence,requireVerifiedSupplier?}) — a small verified-supplier invoice
+  /// can be released to touchless with a laxer floor than the workspace default. Empty array
+  /// = no band routing (workspace floor applies to every document).
+  amountBands       Json      @default("[]") @map("amount_bands")
+  /// A1.6: per-template critical-field maps. `{templateCode: [fieldKey, ...]}` — only these
+  /// fields' low confidence block touchless for that template. Empty object = every field
+  /// gates (historic behaviour), so opting in is a deliberate one-workspace change.
+  criticalFieldsByTemplate Json @default("{}") @map("critical_fields_by_template")
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
   workspace         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)

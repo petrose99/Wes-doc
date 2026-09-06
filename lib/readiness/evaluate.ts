@@ -24,6 +24,9 @@ export type BlockerCode =
   /// A1.3: this document was picked into the QA sample. Kept as a blocker, not a "warn",
   /// because the review is the whole point — bypassing it defeats the check.
   | "qa_sample"
+  /// A4.3: a hard business-rule invariant fired (duplicate, arithmetic fail, bank-detail
+  /// change, split invoice) — these never go touchless whatever the confidence.
+  | "business_rule_backstop"
 
 export type Blocker = {
   code: BlockerCode
@@ -48,6 +51,16 @@ export type PolicyVerdict = "pass" | "violation" | "error" | "disabled"
  * of WorkspaceAutomationConfig — a fixed bar keeps "touchless" meaning the same thing everywhere. */
 export const AI_CODING_MIN_CONFIDENCE = 0.9
 
+/** A4.3: the check codes that always block touchless regardless of the workspace's other
+ * settings. These are the roadmap's hard invariants — a duplicate must never sync to the
+ * accounting provider unattended even if a workspace has cranked minConfidence to 0.5. */
+export const ALWAYS_BLOCKING_CHECKS = new Set([
+  "duplicate",
+  "invoice_arithmetic",
+  "bank_detail_change",
+  "split_invoice",
+])
+
 export type ReadinessInput = {
   fieldConfidences: Record<string, number> | null
   minConfidence: number
@@ -68,6 +81,14 @@ export type ReadinessInput = {
   supplierColdStart?: boolean
   /** A1.3: true when this document was picked into the workspace QA sample. */
   qaSample?: boolean
+  /** A1.6: field keys that MUST clear minConfidence for touchless. Non-critical fields at low
+   * confidence never block on their own — a wrong-looking "notes" field shouldn't hold up a
+   * clean-total invoice. Empty/absent falls back to the historic behaviour (every field gates). */
+  criticalFieldKeys?: string[]
+  /** A1.5: when true, the document matches a recurring pattern for this supplier — a strong
+   * business-as-usual signal. Doesn't override checks or policy, but lets the caller relax the
+   * minConfidence input to the workspace floor even inside cold-start. */
+  isRecurring?: boolean
 }
 
 export function evaluateReadiness(input: ReadinessInput): ReadinessResult {
@@ -79,7 +100,13 @@ export function evaluateReadiness(input: ReadinessInput): ReadinessResult {
   }
 
   if (input.fieldConfidences) {
+    // A1.6: when a critical-field set is configured, only THOSE fields' low confidence blocks —
+    // a low-confidence "notes" doesn't hold up a clean-total invoice. Empty/absent set keeps
+    // the historic behaviour (every field gates), so a workspace that hasn't opted in is
+    // unaffected.
+    const criticalSet = input.criticalFieldKeys?.length ? new Set(input.criticalFieldKeys) : null
     for (const [field, confidence] of Object.entries(input.fieldConfidences)) {
+      if (criticalSet && !criticalSet.has(field)) continue
       if (confidence < input.minConfidence) {
         blockers.push({
           code: `low_confidence:${field}`,
@@ -94,6 +121,19 @@ export function evaluateReadiness(input: ReadinessInput): ReadinessResult {
       blockers.push({ code: "check_failed", detail: `Check "${check.checkCode}" failed.` })
     } else if (check.status === "warn" && input.blockOnWarnChecks) {
       blockers.push({ code: "check_warned", detail: `Check "${check.checkCode}" warned (workspace blocks on warnings).` })
+    }
+  }
+
+  // A4.3 business-rule backstop: a handful of check codes ALWAYS block regardless of
+  // confidence, coding, or workspace toggle — invariants that must never go touchless.
+  // Duplicate/arithmetic-fail/bank-change/split-invoice: the roadmap's non-negotiables.
+  for (const check of input.checkResults) {
+    if (check.status === "fail" && ALWAYS_BLOCKING_CHECKS.has(check.checkCode)) {
+      // Already emitted as check_failed above; the emphasised code makes it visible in
+      // audit/UI as a first-class backstop rather than a generic check failure.
+      if (!blockers.some((blocker) => blocker.code === "business_rule_backstop" && blocker.detail.includes(check.checkCode))) {
+        blockers.push({ code: "business_rule_backstop", detail: `Check "${check.checkCode}" is a hard invariant — always requires review.` })
+      }
     }
   }
 

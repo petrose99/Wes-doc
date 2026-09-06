@@ -13,6 +13,8 @@ import { SUPPLIER_FIELD_BY_TEMPLATE } from "@/lib/automation/rules"
 import { resolveSupplier } from "@/lib/suppliers/alias"
 import { evaluateReadiness, type CheckInput, type PolicyVerdict, type ReadinessResult } from "./evaluate"
 import { shouldSampleForQa, supplierThreshold, type SupplierThresholdInput } from "./supplier-thresholds"
+import { bandFor, parseBands } from "./amount-band"
+import { detectRecurrence } from "./recurrence"
 
 type RefreshInput = {
   workspaceId: string
@@ -43,12 +45,17 @@ export async function refreshDocumentReadiness(input: RefreshInput): Promise<Rea
 
     const automationConfig = await prisma.workspaceAutomationConfig.findUnique({
       where: { workspaceId: input.workspaceId },
-      select: { minConfidence: true, blockOnWarnChecks: true, requirePolicyPass: true, policyText: true, qaSampleRate: true },
+      select: { minConfidence: true, blockOnWarnChecks: true, requirePolicyPass: true, policyText: true, qaSampleRate: true, amountBands: true, criticalFieldsByTemplate: true },
     })
     const workspaceMinConfidence = automationConfig?.minConfidence ?? 0.85
     const blockOnWarnChecks = automationConfig?.blockOnWarnChecks ?? false
     const requirePolicyPass = automationConfig?.requirePolicyPass ?? false
     const qaSampleRate = automationConfig?.qaSampleRate ?? 0.05
+    const bands = parseBands((automationConfig?.amountBands ?? []) as unknown)
+    const criticalMap = (automationConfig?.criticalFieldsByTemplate ?? {}) as Record<string, unknown>
+    const criticalFieldKeys = document.template?.code && Array.isArray(criticalMap[document.template.code])
+      ? (criticalMap[document.template.code] as unknown[]).filter((entry): entry is string => typeof entry === "string")
+      : undefined
 
     // A1.1 + A1.4: resolve the extracted supplier and read its rolling stats to pick a
     // per-document floor. Unknown supplier (no field, extraction failed, empty registry) treats
@@ -77,9 +84,59 @@ export async function refreshDocumentReadiness(input: RefreshInput): Promise<Rea
       console.error("[readiness] supplier-threshold lookup failed, using workspace default:", error instanceof Error ? error.message : error)
     }
     const supplierVerdict = supplierThreshold(supplierStats)
-    const minConfidence = supplierVerdict.effectiveMinConfidence
+    // A1.2: an amount band may relax the per-supplier floor for small, low-risk documents.
+    const totalRaw = ((document.rawExtraction as Record<string, unknown> | null) ?? {})?.total
+    const amountForBand = typeof totalRaw === "number" ? totalRaw : null
+    const bandVerdict = bandFor({
+      amount: amountForBand,
+      supplierVerified: (supplierStats.touchlessSeen ?? 0) >= 10,
+      workspaceMinConfidence: supplierVerdict.effectiveMinConfidence,
+      bands,
+    })
+    const minConfidence = bandVerdict.minConfidence
     // A1.3: pick this document into the QA sample deterministically by its own id.
     const qaSample = shouldSampleForQa(document.id, qaSampleRate)
+
+    // A1.5: recurrence match — pull this supplier's history for the same template and check
+    // the cadence/amount pattern. Best-effort; silent on any failure.
+    let isRecurring = false
+    try {
+      const extractedData = (document.rawExtraction as Record<string, unknown> | null) ?? {}
+      const supplierField = document.template?.code ? SUPPLIER_FIELD_BY_TEMPLATE[document.template.code] : undefined
+      const rawSupplier = supplierField ? extractedData[supplierField] : null
+      const dateField = document.template?.code === "invoice" ? "issue_date" : "purchase_date"
+      const dateRaw = extractedData[dateField]
+      const amount = typeof extractedData.total === "number" ? extractedData.total : null
+      const date = typeof dateRaw === "string" ? new Date(dateRaw) : null
+      if (typeof rawSupplier === "string" && rawSupplier.trim() && amount !== null && date && !Number.isNaN(date.getTime())) {
+        const resolution = await resolveSupplier(input.workspaceId, rawSupplier)
+        if (resolution.supplierId) {
+          const siblings = await prisma.document.findMany({
+            where: { workspaceId: input.workspaceId, template: { code: document.template?.code }, id: { not: document.id } },
+            select: { rawExtraction: true },
+            orderBy: { receivedAt: "desc" },
+            take: 24,
+          })
+          const history: { date: Date; amount: number }[] = []
+          for (const sibling of siblings) {
+            const values = (sibling.rawExtraction as Record<string, unknown> | null) ?? {}
+            const otherSupplier = supplierField ? values[supplierField] : null
+            if (typeof otherSupplier !== "string") continue
+            const otherResolution = await resolveSupplier(input.workspaceId, otherSupplier)
+            if (otherResolution.supplierId !== resolution.supplierId) continue
+            const otherAmount = typeof values.total === "number" ? values.total : null
+            const otherDateRaw = values[dateField]
+            const otherDate = typeof otherDateRaw === "string" ? new Date(otherDateRaw) : null
+            if (otherAmount === null || !otherDate || Number.isNaN(otherDate.getTime())) continue
+            history.push({ date: otherDate, amount: otherAmount })
+            if (history.length >= 12) break
+          }
+          isRecurring = detectRecurrence({ amount, date, history }).isRecurring
+        }
+      }
+    } catch (error) {
+      console.error("[readiness] recurrence check failed:", error instanceof Error ? error.message : error)
+    }
 
     const hasActiveRules = await prisma.automationRule.count({
       where: { workspaceId: input.workspaceId, isActive: true },
@@ -145,8 +202,12 @@ export async function refreshDocumentReadiness(input: RefreshInput): Promise<Rea
       // the document blocks on no_rule_match as if the suggestion never happened.
       codingSource: document.codingSource === "ai" && !capabilities.has("ai-coding") ? null : document.codingSource,
       codingConfidence: document.codingConfidence,
-      supplierColdStart: supplierVerdict.coldStart,
+      // A1.5: a recurring pattern releases the cold-start block — a supplier's twelfth known-good
+      // monthly bill isn't "new" in any meaningful sense.
+      supplierColdStart: supplierVerdict.coldStart && !isRecurring,
       qaSample,
+      criticalFieldKeys,
+      isRecurring,
     })
 
     const previousStatus = document.readinessStatus
