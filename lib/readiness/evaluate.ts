@@ -91,6 +91,22 @@ export type ReadinessInput = {
   isRecurring?: boolean
 }
 
+/** Blockers that route a document to a human WITHOUT saying anything is wrong with it: the
+ * supplier's cold-start window and the QA sample both deliberately hold back documents that
+ * already cleared every substantive gate. A document blocked only by these was touchless-eligible.
+ *
+ * This distinction is what makes cold start escapable. touchlessSeen used to be incremented only
+ * when a document reached "ready", but supplier_cold_start blocks "ready" until touchlessSeen
+ * reaches SUPPLIER_COLD_START_COUNT — so the counter could never leave 0 and no supplier ever
+ * graduated. Counting eligibility instead of outcome breaks that cycle. */
+export const NON_DISQUALIFYING_BLOCKERS: ReadonlySet<string> = new Set(["supplier_cold_start", "qa_sample"])
+
+/** True when nothing but a deliberate hold-back stands between this document and a touchless push.
+ * An empty blocker list (the "ready" case) is eligible by definition. */
+export function isTouchlessEligible(blockers: Blocker[]): boolean {
+  return blockers.every((blocker) => NON_DISQUALIFYING_BLOCKERS.has(blocker.code))
+}
+
 export function evaluateReadiness(input: ReadinessInput): ReadinessResult {
   const blockers: Blocker[] = []
 

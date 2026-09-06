@@ -4,6 +4,7 @@ import { ActionState } from "@/lib/actions"
 import { canDecideStage, findCurrentStage } from "@/lib/approvals/engine"
 import { maybeAutopublish } from "@/lib/automation/autopublish"
 import { refreshDocumentReadiness } from "@/lib/readiness/refresh"
+import { creditSupplierForCleanApproval } from "@/models/suppliers"
 import { getCurrentUser } from "@/lib/auth"
 import { parseTemplateFields } from "@/lib/document-templates"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
@@ -43,6 +44,10 @@ export async function updateReviewTaskStatusAction(workspaceId: string, taskId: 
   try {
     const task = await updateReviewTaskStatus({ workspaceId, taskId, status: parsed, actorId: user.id })
     if (parsed === "approved") await maybeConfirmAiCoding(workspaceId, task.documentId, user.id)
+    // A1.1: an approval the reviewer made no corrections on is the signal the clean streak is
+    // meant to measure. Credited before readiness re-runs so this document is judged against the
+    // threshold its own approval just earned.
+    if (parsed === "approved") await creditSupplierForCleanApproval(workspaceId, task.documentId)
     await refreshDocumentReadiness({ workspaceId, documentId: task.documentId })
     if (parsed === "approved") await maybeAutopublish(workspaceId, task.documentId, user.id)
     revalidatePath(paths(workspaceId).review)
@@ -59,6 +64,7 @@ export async function bulkUpdateReviewTaskStatusAction(workspaceId: string, task
   try {
     const result = await bulkUpdateReviewTaskStatus({ workspaceId, taskIds, status: parsed, actorId: user.id })
     if (parsed === "approved") await Promise.all(result.documentIds.map((documentId) => maybeConfirmAiCoding(workspaceId, documentId, user.id)))
+    if (parsed === "approved") await Promise.all(result.documentIds.map((documentId) => creditSupplierForCleanApproval(workspaceId, documentId)))
     await Promise.all(result.documentIds.map((documentId) => refreshDocumentReadiness({ workspaceId, documentId })))
     if (parsed === "approved") await Promise.all(result.documentIds.map((documentId) => maybeAutopublish(workspaceId, documentId, user.id)))
     revalidatePath(paths(workspaceId).review)

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { AI_CODING_MIN_CONFIDENCE, evaluateReadiness, type ReadinessInput } from "./evaluate"
+import { AI_CODING_MIN_CONFIDENCE, evaluateReadiness, isTouchlessEligible, type ReadinessInput } from "./evaluate"
 
 function base(overrides: Partial<ReadinessInput> = {}): ReadinessInput {
   return {
@@ -235,5 +235,27 @@ describe("AI coding fallback", () => {
 
   it("pins the threshold at 0.9", () => {
     expect(AI_CODING_MIN_CONFIDENCE).toBe(0.9)
+  })
+})
+
+describe("isTouchlessEligible", () => {
+  it("treats a clean document (no blockers) as eligible", () => {
+    expect(isTouchlessEligible([])).toBe(true)
+  })
+
+  // The deadlock this exists to break: a cold-started supplier's document cleared every real gate,
+  // so it must count toward the supplier's trust even though it still routes to a reviewer.
+  it("treats a document held back only by cold start or the QA sample as eligible", () => {
+    expect(isTouchlessEligible([{ code: "supplier_cold_start", detail: "" }])).toBe(true)
+    expect(isTouchlessEligible([{ code: "qa_sample", detail: "" }])).toBe(true)
+    expect(isTouchlessEligible([{ code: "qa_sample", detail: "" }, { code: "supplier_cold_start", detail: "" }])).toBe(true)
+  })
+
+  it("does not treat a document with a substantive blocker as eligible", () => {
+    expect(isTouchlessEligible([{ code: "low_confidence:vendor", detail: "" }])).toBe(false)
+    expect(isTouchlessEligible([{ code: "duplicate", detail: "" }])).toBe(false)
+    expect(isTouchlessEligible([{ code: "business_rule_backstop", detail: "" }])).toBe(false)
+    // One real blocker alongside a hold-back still disqualifies.
+    expect(isTouchlessEligible([{ code: "supplier_cold_start", detail: "" }, { code: "policy_violation", detail: "" }])).toBe(false)
   })
 })
