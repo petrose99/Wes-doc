@@ -64,3 +64,17 @@ docker compose -f docker-compose.prod.yml logs -f web
 git pull
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
 ```
+
+## Connecting from another machine
+
+`scripts/vps-ssh.sh` holds the host/user for the instance — safe to commit, no secret in it.
+The private key itself is never committed; it lives only on machines you've deliberately
+authorized. On a new machine, either copy an already-authorized key to the default path the
+script expects, or generate a new one and add its public half via the Lightsail browser SSH
+console (AWS console → instance → Connect tab; no key needed for that). See the comment at the
+top of the script for exact commands.
+
+```bash
+./scripts/vps-ssh.sh                     # interactive shell
+./scripts/vps-ssh.sh 'docker compose -f ~/docubite/docker-compose.prod.yml --env-file ~/docubite/.env.production ps'
+```
