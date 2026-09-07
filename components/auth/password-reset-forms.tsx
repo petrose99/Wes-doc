@@ -10,7 +10,14 @@ import { MailCheck } from "lucide-react"
 import Link from "next/link"
 import { useState } from "react"
 
-const MIN_PASSWORD_LENGTH = 12
+const MIN_PASSWORD_LENGTH = 8
+
+const passwordProblem = (value: string): string | null => {
+  if (value.length < MIN_PASSWORD_LENGTH) return `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`
+  if (!/[0-9]/.test(value)) return "Password must include at least one number."
+  if (!/[^A-Za-z0-9]/.test(value)) return "Password must include at least one special character."
+  return null
+}
 
 export function ForgotPasswordForm() {
   const [email, setEmail] = useState("")
@@ -78,6 +85,11 @@ export function ResetPasswordForm() {
 
   const onSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
+    const problem = passwordProblem(password)
+    if (problem) {
+      setError(problem)
+      return
+    }
     setBusy(true)
     setError(null)
     try {
@@ -101,7 +113,7 @@ export function ResetPasswordForm() {
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4">
       <PasswordField label="New password" name="password" value={password} onChange={setPassword} autoComplete="new-password" minLength={MIN_PASSWORD_LENGTH} />
-      <p className="-mt-2 text-xs text-slate-500">At least {MIN_PASSWORD_LENGTH} characters.</p>
+      <p className="-mt-2 text-xs text-slate-500">At least {MIN_PASSWORD_LENGTH} characters, including a number and a special character.</p>
       <SubmitButton busy={busy}>{busy ? "Savingâ€¦" : "Set new password"}</SubmitButton>
       {error && <FormError>{error}</FormError>}
     </form>

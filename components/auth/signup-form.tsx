@@ -10,7 +10,14 @@ import type { Route } from "next"
 import Link from "next/link"
 import { useState } from "react"
 
-const MIN_PASSWORD_LENGTH = 12
+const MIN_PASSWORD_LENGTH = 8
+
+const passwordProblem = (value: string): string | null => {
+  if (value.length < MIN_PASSWORD_LENGTH) return `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`
+  if (!/[0-9]/.test(value)) return "Password must include at least one number."
+  if (!/[^A-Za-z0-9]/.test(value)) return "Password must include at least one special character."
+  return null
+}
 
 /** Surfaces signUpAction's typed error codes as something a person can act on â€” a stable mapping,
  * unlike the regex this replaced, which string-matched better-auth's raw message text and could
@@ -36,6 +43,11 @@ export function SignupForm({ defaultEmail, redirectTo = "/workspaces", googleEna
 
   const onSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
+    const problem = passwordProblem(password)
+    if (problem) {
+      setError(problem)
+      return
+    }
     setBusy(true)
     setError(null)
     try {
@@ -85,7 +97,7 @@ export function SignupForm({ defaultEmail, redirectTo = "/workspaces", googleEna
         </AuthField>
 
         <PasswordField label="Password" name="password" value={password} onChange={setPassword} autoComplete="new-password" minLength={MIN_PASSWORD_LENGTH} />
-        <p className="-mt-2 text-xs text-slate-500">At least {MIN_PASSWORD_LENGTH} characters.</p>
+        <p className="-mt-2 text-xs text-slate-500">At least {MIN_PASSWORD_LENGTH} characters, including a number and a special character.</p>
 
         <SubmitButton busy={busy}>{busy ? "Creating your workspaceâ€¦" : "Start free trial"}</SubmitButton>
 
