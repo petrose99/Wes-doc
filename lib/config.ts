@@ -217,7 +217,13 @@ const env = envSchema.parse(Object.fromEntries(Object.entries(process.env).filte
 // The placeholders are long enough to satisfy the schema, so without this a production deploy
 // missing these variables would boot happily with a publicly known session signing key and a
 // known bearer token for the internal job endpoint.
-if (process.env.NODE_ENV === "production") {
+//
+// Skipped during `next build` itself (NEXT_PHASE === "phase-production-build"): Next always runs
+// that phase with NODE_ENV forced to "production" while it statically imports route modules for
+// page-data collection, well before the container has its real runtime secrets — those only
+// arrive via env_file at `docker run`/`docker compose up`. Checking here too would fail every
+// production build regardless of what the deployed container is actually configured with.
+if (process.env.NODE_ENV === "production" && process.env.NEXT_PHASE !== "phase-production-build") {
   const unset = [
     env.INTERNAL_WORKER_SECRET === PLACEHOLDER_WORKER_SECRET && "INTERNAL_WORKER_SECRET",
     !env.DATABASE_URL && "DATABASE_URL",
