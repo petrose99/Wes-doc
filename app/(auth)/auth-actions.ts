@@ -32,7 +32,7 @@ export async function signUpAction(input: { name: string; email: string; passwor
   }
 
   const supabase = await createClient()
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email,
     password: input.password,
     options: {
@@ -47,6 +47,13 @@ export async function signUpAction(input: { name: string; email: string; passwor
     if (error.code === "user_already_exists") return { success: false, error: "account_exists" }
     return { success: false, error: "signup_failed" }
   }
+  // Supabase's anti-enumeration behavior: signing up with an email that already has a *confirmed*
+  // account returns a fake success (no `error`) instead of user_already_exists — a synthetic user
+  // object with an empty identities array, no real row created, no email sent. Left undetected,
+  // the caller shows "check your email" for an address that will never receive anything. This
+  // product deliberately trades that protection for clarity elsewhere (account_exists above), so
+  // catch the synthetic-response case the same way.
+  if (data.user?.identities?.length === 0) return { success: false, error: "account_exists" }
   // actorId is null: there is no authenticated user yet at the moment of sign-up.
   await recordAdminAudit({ type: "auth_signup", detail: { email } })
   return { success: true, data: null }
