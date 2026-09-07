@@ -65,8 +65,15 @@ export function WelcomeTour({ workspaceId, tourSeen }: { workspaceId: string; to
       <rect x="0" y="0" width="100%" height="100%" fill="rgba(15,23,42,0.45)" mask="url(#tour-mask)" />
     </svg>
 
-    {sr && <div className="absolute z-[101] rounded-lg border border-[#e6ebf1] bg-white px-4 py-3 shadow-xl"
-      style={{ top: sr.bottom + pad + 12, left: Math.max(12, sr.left), maxWidth: 280 }}>
+    {/* Rendered whether or not the spotlight could be measured. A step whose target is missing from
+        the DOM — not yet built, renamed, or just hidden at this breakpoint — used to render the
+        full-screen backdrop above with no tooltip, and therefore no Skip or Done button: every
+        click in the app was swallowed with no way out but Escape, and reloading only restarted the
+        tour, since markTourSeenAction runs in close(). Falls back to a centred card instead. */}
+    <div className="absolute z-[101] rounded-lg border border-[#e6ebf1] bg-white px-4 py-3 shadow-xl"
+      style={sr
+        ? { top: sr.bottom + pad + 12, left: Math.max(12, sr.left), maxWidth: 280 }
+        : { top: "50%", left: "50%", transform: "translate(-50%, -50%)", maxWidth: 280 }}>
       <p className="text-[14px] font-bold text-slate-900">{current.title}</p>
       <p className="mt-1 text-[13px] text-slate-600">{current.description}</p>
       <div className="mt-3 flex items-center justify-between">
@@ -78,6 +85,6 @@ export function WelcomeTour({ workspaceId, tourSeen }: { workspaceId: string; to
           </button>
         </div>
       </div>
-    </div>}
+    </div>
   </div>
 }
