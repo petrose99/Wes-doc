@@ -1,4 +1,5 @@
 import { AccountingDashboard } from "@/components/accounting/accounting-dashboard"
+import { AccountingErrorBanner } from "@/components/accounting/error-banner"
 import { getCurrentUser } from "@/lib/auth"
 import config from "@/lib/config"
 import { getEntityCounts, getLastSyncedAt } from "@/models/accounting-entities"
@@ -11,9 +12,10 @@ import { notFound } from "next/navigation"
 
 /** The accounting bridge surface: connection status, chart-of-accounts/vendor sync, and the default
  * expense account picker. Hard-gated on the deployment having accounting configured. */
-export default async function AccountingPage({ params }: { params: Promise<{ workspaceId: string }> }) {
+export default async function AccountingPage({ params, searchParams }: { params: Promise<{ workspaceId: string }>; searchParams: Promise<{ error?: string }> }) {
   if (!config.integrations.bigcapital.enabled) notFound()
   const { workspaceId } = await params
+  const { error } = await searchParams
   const user = await getCurrentUser()
   const membership = await requireWorkspaceRole(workspaceId, user.id)
 
@@ -35,6 +37,7 @@ export default async function AccountingPage({ params }: { params: Promise<{ wor
   for (const m of explicitMappings) { categoryAccountMap[m.category] = m.accountExternalId }
 
   return <main className="space-y-8">
+    {error && <AccountingErrorBanner workspaceId={workspaceId} error={error} isOwner={membership.role === "owner"} />}
     <header className="flex items-start justify-between gap-4">
       <div>
         <h1 className="text-2xl font-bold text-slate-900">Accounting</h1>
