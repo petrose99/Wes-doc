@@ -78,4 +78,24 @@ describe("resolveOrProvisionUser", () => {
 
     expect(prisma.user.create).toHaveBeenCalledWith({ data: { supabaseUserId: "sb5", email: "noname@example.com", name: "noname" } })
   })
+
+  it("adopts the winner's row when a concurrent request created it first", async () => {
+    const winner = { id: "u5", supabaseUserId: "sb6", email: "raced@example.com" }
+    vi.mocked(prisma.user.findUnique)
+      .mockResolvedValueOnce(null) // by supabaseUserId — nothing yet
+      .mockResolvedValueOnce(null) // by email — nothing yet
+      .mockResolvedValueOnce(winner as never) // re-lookup after P2002 finds the winner's row
+    vi.mocked(prisma.user.create).mockRejectedValueOnce(Object.assign(new Error("Unique constraint failed"), { code: "P2002" }))
+
+    const result = await resolveOrProvisionUser({ supabaseUserId: "sb6", email: "raced@example.com" })
+
+    expect(result).toBe(winner)
+  })
+
+  it("rethrows a create failure that is not a unique-violation race", async () => {
+    vi.mocked(prisma.user.findUnique).mockResolvedValueOnce(null).mockResolvedValueOnce(null)
+    vi.mocked(prisma.user.create).mockRejectedValueOnce(Object.assign(new Error("connection lost"), { code: "P1001" }))
+
+    await expect(resolveOrProvisionUser({ supabaseUserId: "sb7", email: "boom@example.com" })).rejects.toThrow("connection lost")
+  })
 })

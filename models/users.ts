@@ -24,27 +24,52 @@ export const updateUser = (userId: string, data: Prisma.UserUpdateInput) => pris
  * Supabase ever created the identity this function is now looking at. It exists because that
  * hook's rejection has open reports of not always being honored; see lib/signup-gate.ts. */
 export async function resolveOrProvisionUser(input: { supabaseUserId: string; email: string; name?: string | null }): Promise<User> {
-  const bySupabaseId = await prisma.user.findUnique({ where: { supabaseUserId: input.supabaseUserId } })
-  if (bySupabaseId) return bySupabaseId
-
   const email = input.email.trim().toLowerCase()
-  const byEmail = await prisma.user.findUnique({ where: { email } })
-  if (byEmail) {
-    // A byEmail row already carrying a DIFFERENT supabaseUserId would mean two Supabase identities
-    // are racing to claim one local account — Supabase enforces unique email per project, so this
-    // should never happen, but silently overwriting the link here would reassign someone else's
-    // account if it somehow did. Fail loudly instead of trusting it.
-    if (byEmail.supabaseUserId && byEmail.supabaseUserId !== input.supabaseUserId) throw new Error("email_already_linked_to_different_identity")
-    return prisma.user.update({ where: { id: byEmail.id }, data: { supabaseUserId: input.supabaseUserId } })
-  }
+
+  const existing = await findLinkedUser(input.supabaseUserId, email)
+  if (existing) return existing
 
   const allowed = await assertSignupAllowed(email).then(() => true).catch(() => false)
-  return prisma.user.create({
-    data: {
-      supabaseUserId: input.supabaseUserId,
-      email,
-      name: input.name?.trim() || email.split("@")[0],
-      ...(allowed ? {} : { suspendedAt: new Date() }),
-    },
-  })
+  try {
+    return await prisma.user.create({
+      data: {
+        supabaseUserId: input.supabaseUserId,
+        email,
+        name: input.name?.trim() || email.split("@")[0],
+        ...(allowed ? {} : { suspendedAt: new Date() }),
+      },
+    })
+  } catch (error) {
+    // P2002 (unique violation) here means a concurrent request for this same visitor created the
+    // row between our lookup above and this insert. getViewerUser() calls this on EVERY request,
+    // so the first authenticated page load fires several of these in parallel (page, RSC payload,
+    // prefetches) — they all miss the lookup, all insert, one wins, and the losers used to throw
+    // P2002 straight through to the global error boundary: a brand new user confirming their email
+    // saw "Oops! Something went wrong" on their very first page. The loser adopts the winner's row.
+    //
+    // Checked by shape rather than `instanceof Prisma.PrismaClientKnownRequestError` on purpose:
+    // that turns this module's type-only Prisma import into a runtime one, which breaks vitest
+    // resolution of @/prisma/client for everything that imports this file.
+    if ((error as { code?: string } | null)?.code !== "P2002") throw error
+    const raced = await findLinkedUser(input.supabaseUserId, email)
+    if (raced) return raced
+    throw error
+  }
+}
+
+/** The lookup half of resolveOrProvisionUser, split out so the loser of a create race can re-run
+ * it — including the different-identity guard — instead of blindly trusting the row it finds. */
+async function findLinkedUser(supabaseUserId: string, email: string): Promise<User | null> {
+  const bySupabaseId = await prisma.user.findUnique({ where: { supabaseUserId } })
+  if (bySupabaseId) return bySupabaseId
+
+  const byEmail = await prisma.user.findUnique({ where: { email } })
+  if (!byEmail) return null
+
+  // A byEmail row already carrying a DIFFERENT supabaseUserId would mean two Supabase identities
+  // are racing to claim one local account — Supabase enforces unique email per project, so this
+  // should never happen, but silently overwriting the link here would reassign someone else's
+  // account if it somehow did. Fail loudly instead of trusting it.
+  if (byEmail.supabaseUserId && byEmail.supabaseUserId !== supabaseUserId) throw new Error("email_already_linked_to_different_identity")
+  return prisma.user.update({ where: { id: byEmail.id }, data: { supabaseUserId } })
 }
