@@ -57,7 +57,6 @@ export function GlobalSearch({ workspaceId }: { workspaceId: string }) {
     return (
       <button
         onClick={() => setOpen(true)}
-        data-tour-target="search"
         className="flex w-full items-center gap-2 rounded-lg border border-slate-200 bg-white/60 px-3 py-1.5 text-sm text-slate-400 transition-colors hover:border-slate-300 hover:bg-white"
       >
         <Search className="h-3.5 w-3.5" />

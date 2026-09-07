@@ -42,8 +42,12 @@ describe("ONBOARDING_STEPS", () => {
 })
 
 describe("TOUR_STEPS", () => {
-  it("has 4 steps", () => {
-    expect(TOUR_STEPS).toHaveLength(4)
+  // A bare length assertion did not catch the bug this replaces: a fourth "search" step pointed at
+  // components/shell/global-search.tsx, which is never imported anywhere, so the tour reached a
+  // final step with nothing to spotlight. Pin the targets themselves — they must each match a
+  // tourTarget rendered in components/shell/sidebar.tsx.
+  it("spotlights only targets the shell actually renders", () => {
+    expect(TOUR_STEPS.map((step) => step.target)).toEqual(["extraction", "library", "sheets"])
   })
 
   it("every step has a target, title, and description", () => {

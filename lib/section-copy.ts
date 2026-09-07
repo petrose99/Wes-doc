@@ -53,9 +53,13 @@ export const ONBOARDING_STEPS = [
 
 export type OnboardingStepKey = (typeof ONBOARDING_STEPS)[number]["key"]
 
+/** Every target here must match a live `data-tour-target` in the rendered shell (see sidebar.tsx).
+ * A step pointing at something that never renders leaves the tour with nothing to spotlight — it
+ * still works, since welcome-tour.tsx falls back to a centred card, but it describes UI the visitor
+ * cannot see. A "search" step lived here for exactly that reason: components/shell/global-search.tsx
+ * is written but never imported anywhere, so the launcher it describes is not in the app. */
 export const TOUR_STEPS = [
   { target: "extraction", title: "Extraction", description: "Add and review documents here." },
   { target: "library", title: "Docu Library", description: "Your permanent, searchable document library." },
   { target: "sheets", title: "Sheets", description: "Spreadsheets with AI — pull documents in and compute." },
-  { target: "search", title: "Search", description: "Find any document from anywhere, or ask a question." },
 ] as const
