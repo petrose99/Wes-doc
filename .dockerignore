@@ -1,6 +1,12 @@
 .git
 .github
 .next
+# Local Claude Code state (plugins, caches, transcripts) — multi-GB and never part of a build.
+.claude
+.vscode
+.idea
+test-results
+playwright-report
 .DS_Store
 .env*
 .prettierrc

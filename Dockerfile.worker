@@ -1,20 +1,27 @@
 FROM node:26-slim
 
-ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates openssl && rm -rf /var/lib/apt/lists/*
 COPY package*.json ./
 COPY prisma ./prisma/
+# postinstall runs `node scripts/fix-next-admin-paths.mjs`, so scripts/ must be present
+# before npm ci or the install fails with MODULE_NOT_FOUND.
+COPY scripts ./scripts/
 # The cache mount keeps npm's package cache across build attempts, so an install interrupted
 # by a network drop resumes instead of redownloading everything; the retry flags stop a single
 # flaky fetch from failing the whole install. Together these make the build usable on
 # unreliable links, and the mount also speeds up clean rebuilds everywhere else.
+# --include=dev is required: the postinstall `prisma generate` needs next-admin-generator-prisma,
+# and the prisma CLI itself, both of which are devDependencies. With NODE_ENV=production set
+# before this line npm omitted them and the build failed with "next-admin-generator-prisma: not found".
 RUN --mount=type=cache,target=/root/.npm \
-    npm ci --fetch-retries=10 --fetch-retry-mintimeout=2000 --fetch-retry-maxtimeout=60000 --fetch-timeout=300000
+    npm ci --include=dev --fetch-retries=10 --fetch-retry-mintimeout=2000 --fetch-retry-maxtimeout=60000 --fetch-timeout=300000
 COPY . .
 RUN npx prisma generate
+
+ENV NODE_ENV=production
 
 # ECS runs the long-polling document processing worker. Document parsing itself happens in
 # MinerU's cloud, so this task mostly waits on network — it needs MINERU_API_TOKEN in its

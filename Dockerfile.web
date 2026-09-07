@@ -1,0 +1,37 @@
+FROM node:26-slim
+
+ENV NEXT_TELEMETRY_DISABLED=1
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates openssl && rm -rf /var/lib/apt/lists/*
+COPY package*.json ./
+COPY prisma ./prisma/
+# postinstall is `prisma generate && node scripts/fix-next-admin-paths.mjs`, so the scripts
+# directory has to exist before npm ci — without it the install dies with MODULE_NOT_FOUND.
+COPY scripts ./scripts/
+# NODE_ENV is deliberately NOT set to production here: npm would then skip devDependencies, and
+# the postinstall hook (`prisma generate`) needs next-admin-generator-prisma from that set — it
+# fails with "next-admin-generator-prisma: not found". devDeps also stay in the final image on
+# purpose: `npm start` runs `prisma migrate deploy`, and the prisma CLI is itself a devDependency.
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --include=dev --fetch-retries=10 --fetch-retry-mintimeout=2000 --fetch-retry-maxtimeout=60000 --fetch-timeout=300000
+COPY . .
+RUN npx prisma generate
+
+# Next.js inlines NEXT_PUBLIC_* vars into the client bundle at build time, so they must be
+# supplied as build args (docker compose build --build-arg / `args:` in compose), not just as
+# runtime environment — setting them only at `docker run` time would ship a bundle with blank values.
+ARG NEXT_PUBLIC_SUPABASE_URL
+ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
+ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
+ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+# Migrations run against the real DATABASE_URL at container start (see `start` script), not here,
+# since the DB isn't reachable during image build.
+RUN npx next build
+
+# Set only now that the build is done — see the npm ci note above.
+ENV NODE_ENV=production
+
+EXPOSE 7331
+CMD ["npm", "start"]

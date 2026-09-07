@@ -1,0 +1,13 @@
+{$DOCUBITE_DOMAIN} {
+	reverse_proxy web:7331
+}
+
+# www is a redirect, not a second origin — keeps one canonical host so
+# auth cookies and Supabase redirect URLs only ever see the apex domain.
+{$DOCUBITE_WWW_DOMAIN} {
+	redir https://{$DOCUBITE_DOMAIN}{uri} permanent
+}
+
+{$BIGCAPITAL_DOMAIN} {
+	reverse_proxy bigcapital-webapp:80
+}
