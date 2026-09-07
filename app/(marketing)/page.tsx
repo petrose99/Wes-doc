@@ -1,18 +1,15 @@
-import { AiBand } from "@/components/marketing/sections/ai-band"
-import { CtaBand } from "@/components/marketing/sections/cta-band"
-import { ExtractionCore } from "@/components/marketing/sections/extraction-core"
-import { Faq } from "@/components/marketing/sections/faq"
-import { FolderReport } from "@/components/marketing/sections/folder-report"
-import { Hero } from "@/components/marketing/sections/hero"
-import { IntegrationsApi } from "@/components/marketing/sections/integrations-api"
-import { Provenance } from "@/components/marketing/sections/provenance"
-import { RepeatingDocs } from "@/components/marketing/sections/repeating-docs"
-import { Repositioning } from "@/components/marketing/sections/repositioning"
-import { Security } from "@/components/marketing/sections/security"
-import { Sharing } from "@/components/marketing/sections/sharing"
-import { SolutionsTeaser } from "@/components/marketing/sections/solutions-teaser"
-import { TrustStrip } from "@/components/marketing/sections/trust-strip"
-import { Workflow } from "@/components/marketing/sections/workflow"
+import { Accounting } from "@/components/marketing/landing/accounting"
+import { Comparison } from "@/components/marketing/landing/comparison"
+import { Faq } from "@/components/marketing/landing/faq"
+import { FolderChecks } from "@/components/marketing/landing/folder-checks"
+import { Hero } from "@/components/marketing/landing/hero"
+import { HowItWorks } from "@/components/marketing/landing/how-it-works"
+import { Library } from "@/components/marketing/landing/library"
+import { Pipeline } from "@/components/marketing/landing/pipeline"
+import { Provenance } from "@/components/marketing/landing/provenance"
+import { ReadsStrip } from "@/components/marketing/landing/reads-strip"
+import { Sheets } from "@/components/marketing/landing/sheets"
+import { TrialCta } from "@/components/marketing/landing/trial-cta"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
@@ -20,24 +17,19 @@ export const metadata: Metadata = {
   description: "DocuBite reads invoices, receipts and bank statements — scans, photos and handwriting included — into a live sheet where every value traces to its source. Self-serve, no credit card required.",
 }
 
-/** The app is finance-only, so the homepage carries the same pitch the old /accounting page did —
- * there is no other mode to choose. */
 export default function Home() {
   return <>
-    <Hero variant="accounting" />
-    <TrustStrip />
-    <ExtractionCore />
-    <Repositioning />
-    <AiBand />
-    <RepeatingDocs />
-    <FolderReport />
-    <Workflow />
+    <Hero />
+    <ReadsStrip />
+    <HowItWorks />
     <Provenance />
-    <Sharing />
-    <IntegrationsApi />
-    <SolutionsTeaser />
-    <Security />
+    <FolderChecks />
+    <Pipeline />
+    <Sheets />
+    <Accounting />
+    <Library />
+    <Comparison />
     <Faq />
-    <CtaBand />
+    <TrialCta />
   </>
 }

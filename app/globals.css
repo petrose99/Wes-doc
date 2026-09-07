@@ -197,6 +197,21 @@
   }
 }
 
+/* Reveal/replay vocabulary for components/marketing/landing/* — driven by
+ * components/marketing/landing/_lib/use-play-on-scroll.ts. Each keyframe *ends* at the element's
+ * normal resting style, so with no animation-name applied (the default, pre-play state) the
+ * element already renders at rest — nothing needs opacity:0 as a base style, and there's no
+ * flash-of-hidden-content for no-JS or pre-hydration paints. */
+@keyframes db-in { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: none; } }
+@keyframes db-pop { from { opacity: 0; transform: scale(.94); } to { opacity: 1; transform: none; } }
+@keyframes db-sweep { 0% { transform: translateY(-40%); opacity: 0; } 10% { opacity: 1; } 70% { transform: translateY(300%); opacity: 1; } 100% { transform: translateY(300%); opacity: 0; } }
+@keyframes db-pulse { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .db-pulse-dot, .db-sweep-bar {
+    animation: none !important;
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

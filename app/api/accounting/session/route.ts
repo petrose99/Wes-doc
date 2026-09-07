@@ -22,8 +22,17 @@ export async function GET(req: NextRequest) {
     }
 
     const memberAccount = await getMemberAccount(workspaceId, user.id)
-    const loginEmail = memberAccount?.status === "active" ? memberAccount.email : account.email
-    const loginPassword = memberAccount?.status === "active" ? decryptSecret(memberAccount.passwordEnc) : decryptSecret(account.passwordEnc)
+    const useMember = memberAccount?.status === "active"
+    const loginEmail = useMember ? memberAccount.email : account.email
+    let loginPassword: string
+    try {
+      loginPassword = decryptSecret(useMember ? memberAccount.passwordEnc : account.passwordEnc)
+    } catch {
+      // The stored password was encrypted with an old SECRETS_ENCRYPTION_KEY that no longer decrypts —
+      // the connection row still says "active" but signing in from it is now impossible. Surface the
+      // real reason instead of the generic sign_in_failed so the page can offer a Reset action.
+      return NextResponse.redirect(new URL(`/workspaces/${workspaceId}/accounting?error=stale_credentials`, req.url))
+    }
     const session = await bigcapital.signIn(loginEmail, loginPassword)
 
     const redirectPath = req.nextUrl.searchParams.get("redirectPath")
