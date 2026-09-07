@@ -28,7 +28,12 @@ ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
 
 # Migrations run against the real DATABASE_URL at container start (see `start` script), not here,
 # since the DB isn't reachable during image build.
-RUN npx next build
+#
+# V8's default old-space limit is ~2GB regardless of how much physical memory (or swap) the host
+# has — that's a heap-size cap, not an OOM from exhausted RAM, so swap alone doesn't fix a build
+# that dies with "JavaScript heap out of memory". Raise the limit explicitly, scoped to this one
+# RUN so runtime containers don't inherit an oversized heap.
+RUN NODE_OPTIONS=--max-old-space-size=4096 npx next build
 
 # Set only now that the build is done — see the npm ci note above.
 ENV NODE_ENV=production
