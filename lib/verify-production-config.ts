@@ -13,11 +13,6 @@ function hardChecks(): ConfigCheck[] {
       ok: config.isolation.scopeGuard === "throw",
       detail: 'must be "throw" in production — a query missing a workspaceId filter would otherwise only log a warning instead of failing, and could return another tenant\'s rows',
     },
-    {
-      name: "MALWARE_SCAN_URL",
-      ok: Boolean(config.aws.malwareScanUrl),
-      detail: "unset — uploaded documents are accepted without a malware scan",
-    },
   ]
   return checks
 }
@@ -31,6 +26,15 @@ function softChecks(): ConfigCheck[] {
       name: "NEXT_PUBLIC_SENTRY_DSN",
       ok: Boolean(process.env.NEXT_PUBLIC_SENTRY_DSN),
       detail: "unset — production errors will not be reported to Sentry",
+    },
+    // Downgraded from a hard check to a warning for the self-hosted (Lightsail) deploy, which has
+    // no ClamAV-compatible scanner endpoint of its own — see lib/malware-scan.ts for the matching
+    // change (skip rather than throw when unset). An operator decision to accept the risk, not an
+    // oversight: re-enable by setting MALWARE_SCAN_URL and reverting both changes.
+    {
+      name: "MALWARE_SCAN_URL",
+      ok: Boolean(config.aws.malwareScanUrl),
+      detail: "unset — uploaded documents are accepted without a malware scan",
     },
   ]
 }

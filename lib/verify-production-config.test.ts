@@ -41,9 +41,12 @@ describe("verifyProductionConfig", () => {
     expect(() => verifyProductionConfig()).toThrow(/DB_SCOPE_GUARD/)
   })
 
-  it("refuses to start with no malware scan URL", () => {
+  it("warns instead of throwing when no malware scan URL is set", () => {
     config.aws.malwareScanUrl = ""
-    expect(() => verifyProductionConfig()).toThrow(/MALWARE_SCAN_URL/)
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    expect(() => verifyProductionConfig()).not.toThrow()
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("MALWARE_SCAN_URL"))
+    warn.mockRestore()
   })
 
   it("warns instead of throwing when Sentry is unconfigured", () => {
