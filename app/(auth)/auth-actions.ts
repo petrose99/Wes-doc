@@ -35,7 +35,13 @@ export async function signUpAction(input: { name: string; email: string; passwor
   const { error } = await supabase.auth.signUp({
     email,
     password: input.password,
-    options: { data: { name: input.name.trim() } },
+    options: {
+      data: { name: input.name.trim() },
+      // Pin the confirmation link to this deployment's own base URL. Without this, Supabase falls
+      // back to the project's Site URL from the dashboard, which is easy to leave pointing at
+      // localhost across environments.
+      emailRedirectTo: `${config.app.baseURL}/auth/callback?next=${encodeURIComponent("/workspaces")}`,
+    },
   })
   if (error) {
     if (error.code === "user_already_exists") return { success: false, error: "account_exists" }
