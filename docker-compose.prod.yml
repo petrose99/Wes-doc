@@ -143,6 +143,10 @@ services:
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
+    # The Caddyfile interpolates {$DOCUBITE_DOMAIN} etc. — without these, each expands to empty,
+    # Caddy reads "{ }" as an empty site address opening a global-options block instead, and every
+    # directive after it fails to parse ("unrecognized global option: reverse_proxy").
+    env_file: .env.production
     ports:
       - "80:80"
       - "443:443"
