@@ -13,9 +13,11 @@ if [[ ! -f .env.production ]]; then
   exit 1
 fi
 
-# Fail loudly on placeholders rather than booting a half-configured stack that 500s later.
-if grep -qE '=(REPLACE_ME|REPLACE_[a-z_]+)?$|REPLACE_' .env.production; then
-  echo "WARNING: .env.production still contains REPLACE_/empty placeholders:" >&2
+# Fail loudly on literal REPLACE_ placeholders rather than booting a half-configured stack
+# that 500s later. Deliberately blank optional keys (STRIPE_*, RESEND_API_KEY, etc.) are fine
+# and must not trip this — only match the actual placeholder token, not "any empty value".
+if grep -qE 'REPLACE_' .env.production; then
+  echo "WARNING: .env.production still contains REPLACE_ placeholders:" >&2
   grep -nE 'REPLACE_' .env.production >&2 || true
   read -rp "Continue anyway? [y/N] " ans
   [[ "$ans" == "y" || "$ans" == "Y" ]] || exit 1
