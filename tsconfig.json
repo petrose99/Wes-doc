@@ -42,6 +42,7 @@
     "node_modules",
     "vitest.config.ts",
     "**/*.test.ts",
-    "**/*.test.tsx"
+    "**/*.test.tsx",
+    "scripts/**"
   ]
 }
