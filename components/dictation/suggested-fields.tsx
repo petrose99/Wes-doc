@@ -29,14 +29,14 @@ const draftFor = (suggestion: PendingFieldSuggestion): Draft => ({
 })
 
 /** Fields the model noticed had nowhere to go (a supplement-mode proposal against a fixed
- * template) or discovered from scratch (discover mode â€” no template fields at all, see
- * lib/field-suggestions.ts). Shown separately from Extracted fields â€” these are not yet part of
+ * template) or discovered from scratch (discover mode — no template fields at all, see
+ * lib/field-suggestions.ts). Shown separately from Extracted fields — these are not yet part of
  * the template, so mixing them in would claim a schema decision nobody has made.
  *
  * Each suggestion is editable before accepting: discover mode can propose a dozen fields in one
  * pass, and requiring a template-editor round trip to fix a label or reclassify a type before it's
  * even real would make bulk review unusable. The review a proposal still needs is "is this real,
- * and is this the right shape" â€” nothing more; a deeper rename after acceptance is an ordinary
+ * and is this the right shape" — nothing more; a deeper rename after acceptance is an ordinary
  * template edit. */
 export function SuggestedFields({ workspaceId, documentId, suggestions }: { workspaceId: string; documentId: string; suggestions: PendingFieldSuggestion[] }) {
   const router = useRouter()

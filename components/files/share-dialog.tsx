@@ -108,7 +108,7 @@ export function ShareDialog({ workspaceId, fileId, fileName, open, onClose }: {
 
   return <Dialog open={open} onClose={onClose} title={`Share "${fileName}"`} width="max-w-lg">
     {loading || !sharing
-      ? <div className="flex items-center justify-center gap-2 px-5 py-12 text-sm text-slate-400"><Loader2 className="h-4 w-4 animate-spin" />Loading sharingâ€¦</div>
+      ? <div className="flex items-center justify-center gap-2 px-5 py-12 text-sm text-slate-400"><Loader2 className="h-4 w-4 animate-spin" />Loading sharing…</div>
       : <div className="divide-y">
           <section className="space-y-3 px-5 py-4">
             <h3 className="text-sm font-semibold text-slate-900">People with access</h3>

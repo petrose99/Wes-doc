@@ -10,8 +10,8 @@ import { ShieldCheck, Trash2 } from "lucide-react"
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
 
-/** F1: TOTP enrollment on /settings/security. Three states â€” no factor, enrolling (QR + code
- * shown, unverified until the first correct code), enrolled â€” with an unenroll action once one
+/** F1: TOTP enrollment on /settings/security. Three states — no factor, enrolling (QR + code
+ * shown, unverified until the first correct code), enrolled — with an unenroll action once one
  * exists. Supabase supports multiple factors per user; this UI only ever shows one at a time,
  * which matches how the app enforces hipaaMode's aal2 requirement (any verified factor clears it,
  * so there's no product reason to juggle several). */
@@ -95,7 +95,7 @@ export function MfaEnroll() {
         <Input value={code} onChange={(event) => setCode(event.target.value)} inputMode="numeric" pattern="[0-9]*" maxLength={6} required autoFocus />
       </AuthField>
       <div className="flex gap-2">
-        <SubmitButton busy={busy}>{busy ? "Verifyingâ€¦" : "Confirm"}</SubmitButton>
+        <SubmitButton busy={busy}>{busy ? "Verifying…" : "Confirm"}</SubmitButton>
         <button type="button" className="rounded-md border px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50" onClick={() => { setEnrolling(null); setCode("") }}>Cancel</button>
       </div>
       {error && <FormError>{error}</FormError>}
@@ -108,7 +108,7 @@ export function MfaEnroll() {
       <span className="text-sm text-muted-foreground">Add an authenticator app as a second sign-in step. Required for workspaces with HIPAA mode on.</span>
     </span>
     <button type="button" className="shrink-0 rounded-md bg-emerald-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50" disabled={busy} onClick={() => void startEnroll()}>
-      {busy ? "Startingâ€¦" : "Turn on"}
+      {busy ? "Starting…" : "Turn on"}
     </button>
   </div>
 }

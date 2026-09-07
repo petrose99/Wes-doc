@@ -32,13 +32,13 @@ export function ForgotPasswordForm() {
     try {
       // Routed through a server action, not the browser client directly, so the F14 rate-limit
       // backstop (lib/rate-limit.ts) can run first. /auth/callback exchanges the code the email
-      // link carries for a recovery session, then forwards here â€” see that route and
+      // link carries for a recovery session, then forwards here — see that route and
       // ResetPasswordForm below, which expects that session to already exist rather than taking a
       // bare token the way better-auth's reset did.
       await requestPasswordResetAction(email)
       // Shown whatever came back. A distinct "no such account" response would let anyone test
       // which addresses are registered, and requestPasswordResetAction already answers uniformly
-      // for that reason â€” success regardless of whether the account exists or the limit was hit.
+      // for that reason — success regardless of whether the account exists or the limit was hit.
       setSent(true)
     } catch {
       setError("Could not send the reset link. Please try again.")
@@ -65,7 +65,7 @@ export function ForgotPasswordForm() {
       <AuthField label="Email">
         <Input name="email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required autoComplete="email" autoFocus />
       </AuthField>
-      <SubmitButton busy={busy}>{busy ? "Sendingâ€¦" : "Email me a reset link"}</SubmitButton>
+      <SubmitButton busy={busy}>{busy ? "Sending…" : "Email me a reset link"}</SubmitButton>
       {error && <FormError>{error}</FormError>}
       <p className="text-center text-sm text-slate-500">
         Remembered it? <Link href="/login" className="font-semibold text-emerald-800 hover:underline">Sign in</Link>
@@ -76,7 +76,7 @@ export function ForgotPasswordForm() {
 
 /** No `token` prop, unlike the better-auth version: this page only ever renders after
  * /auth/callback has already exchanged the email link's code for a recovery session (cookies are
- * already set by the time this component mounts), so there is nothing left to pass in â€” the
+ * already set by the time this component mounts), so there is nothing left to pass in — the
  * updateUser call below reads that session the same way any other authenticated request would. */
 export function ResetPasswordForm() {
   const [password, setPassword] = useState("")
@@ -101,7 +101,7 @@ export function ResetPasswordForm() {
       }
       reportAuthEvent("auth_password_changed")
       // Straight to sign-in, not the workspace: updateUser leaves the recovery-scoped session in
-      // place, which is narrower than a normal sign-in â€” going through /login mints an ordinary one.
+      // place, which is narrower than a normal sign-in — going through /login mints an ordinary one.
       window.location.href = "/login"
     } catch {
       setError("Could not set that password. Please try again.")
@@ -114,7 +114,7 @@ export function ResetPasswordForm() {
     <form onSubmit={onSubmit} className="flex flex-col gap-4">
       <PasswordField label="New password" name="password" value={password} onChange={setPassword} autoComplete="new-password" minLength={MIN_PASSWORD_LENGTH} />
       <p className="-mt-2 text-xs text-slate-500">At least {MIN_PASSWORD_LENGTH} characters, including a number and a special character.</p>
-      <SubmitButton busy={busy}>{busy ? "Savingâ€¦" : "Set new password"}</SubmitButton>
+      <SubmitButton busy={busy}>{busy ? "Saving…" : "Set new password"}</SubmitButton>
       {error && <FormError>{error}</FormError>}
     </form>
   )

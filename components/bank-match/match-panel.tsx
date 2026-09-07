@@ -1,6 +1,6 @@
 ﻿"use client"
 
-/** Shown on a bank_statement or supplier_statement document view (the caller enforces that â€” see
+/** Shown on a bank_statement or supplier_statement document view (the caller enforces that — see
  * the document page). One row per suggested/decided BankMatch, kind-aware labels so the same panel
  * serves both WP2.1 (bank) and WP2.3 (supplier_statement) reconciliation. */
 
@@ -68,7 +68,7 @@ export function MatchPanel({ workspaceId, statementDocumentId, kind, matches }: 
                 <li key={match.id} className="flex items-center justify-between gap-3 py-2 text-sm">
                   <span className="min-w-0">
                     <span className="font-medium">#{match.transactionIndex + 1}</span>{" "}
-                    <span className="text-slate-600">â†’ {match.matchedDocument.filename}</span>
+                    <span className="text-slate-600">→ {match.matchedDocument.filename}</span>
                     {match.dateDeltaDays !== null && <span className="ml-2 text-xs text-slate-500">{Math.round(match.dateDeltaDays)}d apart</span>}
                   </span>
                   <span className="flex shrink-0 items-center gap-2">

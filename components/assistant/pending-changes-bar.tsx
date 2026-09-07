@@ -6,7 +6,7 @@ import { Check, Loader2, Undo2 } from "lucide-react"
  *
  * Lido's arrangement, and the reason for it is that the writes land immediately: the user sees
  * the new column appear and needs a way to say "no" that does not depend on finding Ctrl+Z
- * before touching anything else. Nothing here blocks â€” the changes are already in the sheet and
+ * before touching anything else. Nothing here blocks — the changes are already in the sheet and
  * already saving; this only decides whether they keep the green on them. */
 export function PendingChangesBar({ count, busy, onUndo, onAccept }: {
   count: number

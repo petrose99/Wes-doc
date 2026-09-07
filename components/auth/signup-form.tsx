@@ -19,12 +19,12 @@ const passwordProblem = (value: string): string | null => {
   return null
 }
 
-/** Surfaces signUpAction's typed error codes as something a person can act on â€” a stable mapping,
+/** Surfaces signUpAction's typed error codes as something a person can act on — a stable mapping,
  * unlike the regex this replaced, which string-matched better-auth's raw message text and could
  * not survive a provider swap. */
 const friendlyError = (code?: string) => {
   if (code === "signup_disabled") return "Sign-up is closed right now. Ask for an invitation, or contact us for access."
-  if (code === "account_exists") return "An account with that email already exists â€” sign in instead."
+  if (code === "account_exists") return "An account with that email already exists — sign in instead."
   return "Could not create your account. Please try again."
 }
 
@@ -56,7 +56,7 @@ export function SignupForm({ defaultEmail, redirectTo = "/workspaces", googleEna
         setError(friendlyError(result.error))
         return
       }
-      // Supabase requires a confirmed email before it issues a session (F4) â€” there is no session
+      // Supabase requires a confirmed email before it issues a session (F4) — there is no session
       // cookie yet to navigate against, unlike the sign-in and reset flows. Once they click the
       // confirmation link, /auth/callback exchanges it for a session and lands them on redirectTo.
       setSent(true)
@@ -99,7 +99,7 @@ export function SignupForm({ defaultEmail, redirectTo = "/workspaces", googleEna
         <PasswordField label="Password" name="password" value={password} onChange={setPassword} autoComplete="new-password" minLength={MIN_PASSWORD_LENGTH} />
         <p className="-mt-2 text-xs text-slate-500">At least {MIN_PASSWORD_LENGTH} characters, including a number and a special character.</p>
 
-        <SubmitButton busy={busy}>{busy ? "Creating your workspaceâ€¦" : "Start free trial"}</SubmitButton>
+        <SubmitButton busy={busy}>{busy ? "Creating your workspace…" : "Start free trial"}</SubmitButton>
 
         {error && <FormError>{error}</FormError>}
       </form>

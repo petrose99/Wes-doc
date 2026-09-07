@@ -41,7 +41,7 @@ function toHits(results: unknown): SourceHit[] {
     .slice(0, MAX_ROWS)
 }
 
-/** Keeps the start of a filename and its extension, eliding the middle â€” so a long
+/** Keeps the start of a filename and its extension, eliding the middle — so a long
  * "2024-acme-quarterly-invoice-final.pdf" still shows what kind of file it is at a glance. The CSS
  * `truncate` on the row is the backstop; this is what preserves the extension when it does bite. */
 export function middleTruncate(name: string, max = 42): string {
@@ -49,12 +49,12 @@ export function middleTruncate(name: string, max = 42): string {
   const dot = name.lastIndexOf(".")
   const ext = dot > 0 && name.length - dot <= 6 ? name.slice(dot) : ""
   const head = Math.max(4, max - ext.length - 1)
-  return `${name.slice(0, head)}â€¦${ext}`
+  return `${name.slice(0, head)}…${ext}`
 }
 
 /** Renders the `search_documents` tool part in the assistant transcript, by AI SDK part state.
- * Running â†’ a shimmer with the query; degraded â†’ one quiet stone line (the turn still answered
- * from the grid); empty â†’ a one-liner, tuned when documents are still indexing; results â†’ the
+ * Running → a shimmer with the query; degraded → one quiet stone line (the turn still answered
+ * from the grid); empty → a one-liner, tuned when documents are still indexing; results → the
  * Sources card, white with a stone border because these are evidence, not a change the assistant
  * made. Every row is click-through into the document viewer via `onOpenSource`. */
 export function DocumentSearchPart({ state, input, output, onOpenSource }: {
@@ -70,7 +70,7 @@ export function DocumentSearchPart({ state, input, output, onOpenSource }: {
     return (
       <p className="flex items-center gap-1.5 text-xs text-slate-500">
         <Loader2 className="h-3 w-3 animate-spin" />
-        {query ? `Searching documents for â€œ${query}â€` : "Searching documentsâ€¦"}
+        {query ? `Searching documents for “${query}”` : "Searching documents…"}
       </p>
     )
   }
@@ -79,7 +79,7 @@ export function DocumentSearchPart({ state, input, output, onOpenSource }: {
     return (
       <p className="flex items-center gap-1.5 text-xs text-slate-500">
         <FileSearch className="h-3 w-3 shrink-0" />
-        Document search is unavailable right now â€” answering from the sheet only.
+        Document search is unavailable right now — answering from the sheet only.
       </p>
     )
   }
@@ -93,10 +93,10 @@ export function DocumentSearchPart({ state, input, output, onOpenSource }: {
         <FileSearch className="mt-0.5 h-3 w-3 shrink-0" />
         <span>
           {pending
-            ? "No matches yet â€” some documents are still being indexed. Try again in a minute."
+            ? "No matches yet — some documents are still being indexed. Try again in a minute."
             : query
-              ? `Searched documents for â€œ${query}â€ â€” no matching passages.`
-              : "Searched documents â€” no matching passages."}
+              ? `Searched documents for “${query}” — no matching passages.`
+              : "Searched documents — no matching passages."}
         </span>
       </p>
     )

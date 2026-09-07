@@ -6,7 +6,7 @@ import { Download, ExternalLink } from "lucide-react"
  *
  * Deliberately an <iframe> and not an <object>: where the browser has no built-in PDF viewer,
  * <object> falls back to *downloading* the file, which pops a save dialog over the app. The
- * iframe just renders empty there, so the footer below is the escape hatch â€” always visible,
+ * iframe just renders empty there, so the footer below is the escape hatch — always visible,
  * because there is no reliable way to detect that the embedded viewer drew nothing. */
 export function DocumentPreview({ src, filename, mimeType, className = "" }: {
   src: string

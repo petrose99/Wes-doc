@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client"
 import { useState } from "react"
 import { toast } from "sonner"
 
-/** F13: ends every session on the account, not just this one â€” supabase.auth.signOut({ scope:
+/** F13: ends every session on the account, not just this one — supabase.auth.signOut({ scope:
  * 'global' }) revokes every refresh token for the user, so a browser signed in elsewhere is
  * logged out on its next request. This browser included: it also clears the local session, same
  * as the sidebar's ordinary sign-out, so the redirect afterward is unconditional. */
@@ -28,6 +28,6 @@ export function SignOutEverywhereButton() {
       }
     }}
   >
-    {busy ? "Signing outâ€¦" : "Sign out everywhere"}
+    {busy ? "Signing out…" : "Sign out everywhere"}
   </button>
 }
