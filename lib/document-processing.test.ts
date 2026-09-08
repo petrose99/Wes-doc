@@ -9,7 +9,7 @@ vi.mock("@/ai/providers/llmProvider", () => ({ requestLLM: vi.fn() }))
 vi.mock("@/lib/mineru", () => ({ parseDocumentWithMineru: vi.fn() }))
 vi.mock("@/lib/document-embedding", () => ({ processEmbedJob: vi.fn() }))
 
-const { buildBatchParts, findConflictingScalarFields, mergeClassification, mergeExtractionPasses, mergeFieldConfidence, mergeProvenancePasses, pageBatches, PERMANENT_ERROR_CODES, processDocumentJob } = await import("@/lib/document-processing")
+const { buildBatchParts, findConflictingScalarFields, mergeClassification, mergeExtractionPasses, mergeFieldConfidence, mergeProvenancePasses, pageBatches, PERMANENT_ERROR_CODES, processDocumentJob, shouldReassignWorksheet, WORKSHEET_REASSIGN_CONFIDENCE } = await import("@/lib/document-processing")
 const { parseTemplateFields } = await import("@/lib/document-templates")
 const { prisma } = await import("@/lib/db")
 const { processEmbedJob } = await import("@/lib/document-embedding")
@@ -368,5 +368,43 @@ describe("processDocumentJob dispatch by type", () => {
     await processDocumentJob("job3")
     expect(processEmbedJob).not.toHaveBeenCalled()
     expect(prisma.documentProcessingJob.findUnique).not.toHaveBeenCalled()
+  })
+})
+
+describe("shouldReassignWorksheet", () => {
+  const confident = { docType: "purchase_order", confidence: 0.95 }
+
+  it("re-points a worksheet the intake channel only guessed at", () => {
+    expect(shouldReassignWorksheet({ codingData: { worksheetSource: "auto" }, classification: confident, currentTemplateCode: "invoice" })).toBe(true)
+  })
+
+  /** The whole point of the marker: an upload-modal pick is a human saying what this document is,
+   * and no amount of classifier confidence should quietly overrule it. */
+  it("never overrides a human's pick, however confident the classifier", () => {
+    expect(shouldReassignWorksheet({ codingData: {}, classification: confident, currentTemplateCode: "invoice" })).toBe(false)
+    expect(shouldReassignWorksheet({ codingData: null, classification: confident, currentTemplateCode: "invoice" })).toBe(false)
+    expect(shouldReassignWorksheet({ codingData: { worksheetSource: "human" }, classification: confident, currentTemplateCode: "invoice" })).toBe(false)
+  })
+
+  it("holds its nerve below the confidence threshold", () => {
+    const justUnder = { docType: "purchase_order", confidence: WORKSHEET_REASSIGN_CONFIDENCE - 0.01 }
+    expect(shouldReassignWorksheet({ codingData: { worksheetSource: "auto" }, classification: justUnder, currentTemplateCode: "invoice" })).toBe(false)
+    const atThreshold = { docType: "purchase_order", confidence: WORKSHEET_REASSIGN_CONFIDENCE }
+    expect(shouldReassignWorksheet({ codingData: { worksheetSource: "auto" }, classification: atThreshold, currentTemplateCode: "invoice" })).toBe(true)
+  })
+
+  it("does nothing when the classifier agrees with the worksheet already in use", () => {
+    expect(shouldReassignWorksheet({ codingData: { worksheetSource: "auto" }, classification: { docType: "invoice", confidence: 0.99 }, currentTemplateCode: "invoice" })).toBe(false)
+  })
+
+  it("does nothing when classification failed outright", () => {
+    expect(shouldReassignWorksheet({ codingData: { worksheetSource: "auto" }, classification: null, currentTemplateCode: "invoice" })).toBe(false)
+  })
+
+  /** A document created before the marker existed has no template code recorded on the join;
+   * "auto" plus a confident classification should still route it rather than crash. */
+  it("routes a document with no current worksheet code", () => {
+    expect(shouldReassignWorksheet({ codingData: { worksheetSource: "auto" }, classification: confident, currentTemplateCode: null })).toBe(true)
+    expect(shouldReassignWorksheet({ codingData: { worksheetSource: "auto" }, classification: confident, currentTemplateCode: undefined })).toBe(true)
   })
 })

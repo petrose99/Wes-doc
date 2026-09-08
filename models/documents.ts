@@ -78,6 +78,11 @@ export function searchableText(data: Record<string, unknown>, filename: string) 
 
 export async function createDocumentFromBuffer(input: {
   workspaceId: string; fileId: string; templateId: string; source: DocumentSource; filename: string; mimeType: string; buffer: Buffer; receivedAt?: Date; pageRange?: string | null; uploadBatchId?: string | null
+  /** True when nothing human chose this worksheet — an intake channel guessed it (email infers
+   * one from the subject line). Recorded as codingData.worksheetSource so the classification
+   * pass may re-point it once the document's actual content is known; an explicit pick from the
+   * upload modal's document-type picker is left unmarked and is never overridden. */
+  worksheetAutoAssigned?: boolean
 }) {
   validateDocumentInput(input.buffer, input.mimeType)
   // Scoped by fileId as well as workspaceId: worksheet codes are only unique within a file, so
@@ -110,6 +115,7 @@ export async function createDocumentFromBuffer(input: {
         status: "queued", filename: cleanFilename(input.filename), mimeType: input.mimeType, sizeBytes: input.buffer.length,
         sha256, storageKey, receivedAt, pageRange: input.pageRange?.trim() || null, uploadBatchId: input.uploadBatchId || null,
         fieldSnapshot: version.fields as Prisma.InputJsonValue, searchText: cleanFilename(input.filename),
+        ...(input.worksheetAutoAssigned ? { codingData: { worksheetSource: "auto" } as Prisma.InputJsonValue } : {}),
       } })
       // Audio goes to the transcribe handler, everything else to MinerU extraction. This is the
       // only place the two ingestion paths diverge — from the job onwards they are the same code.

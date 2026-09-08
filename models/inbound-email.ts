@@ -105,10 +105,15 @@ async function ensureEmailTargetFile(workspaceId: string) {
   return ensurePipelineFile(workspaceId, owner.userId)
 }
 
-/** Which worksheet a classified mail is extracted against. Only the unambiguous intents map:
- * "statement" deliberately does not, because classifyIntent's keywords for it span both bank
- * statements and supplier statements, and picking the wrong one costs a reviewer more than
- * falling through to the generic worksheet does. */
+/** The *provisional* worksheet for a mail, from its subject line. Provisional because a document
+ * must have a template the moment it is created, long before anything has read it — so this is a
+ * guess from the one signal available at that point. The subject is a weak signal ("Invoice
+ * attached" on a vehicle order), so it is deliberately not the last word: the document is marked
+ * worksheetAutoAssigned, and lib/document-processing.ts re-points it once the classifier has read
+ * the actual content. This only has to be a decent starting point.
+ *
+ * Only the unambiguous intents map: "statement" deliberately does not, because classifyIntent's
+ * keywords for it span both bank and supplier statements. */
 const INTENT_TEMPLATE_CODE: Partial<Record<EmailIntent, string>> = {
   invoice: "invoice",
   receipt: "receipt",
@@ -209,7 +214,7 @@ export async function processInboundEmail(input: InboundEmailInput): Promise<{ a
       try {
         const expansion = expandZipBuffer(buffer)
         for (const entry of expansion.entries) {
-          const outcome = await createIngestionItem({ workspaceId: input.workspaceId, fileId: file.id, templateId: template.id, source: "email", filename: entry.filename, mimeType: entry.mimeType, buffer: entry.buffer })
+          const outcome = await createIngestionItem({ workspaceId: input.workspaceId, fileId: file.id, templateId: template.id, source: "email", worksheetAutoAssigned: true, filename: entry.filename, mimeType: entry.mimeType, buffer: entry.buffer })
           if (outcome.outcome === "accepted" || outcome.outcome === "duplicate") accepted++
           else rejected++
         }
@@ -223,7 +228,7 @@ export async function processInboundEmail(input: InboundEmailInput): Promise<{ a
     }
     const mimeType = inferMimeType(attachment.filename)
     if (!mimeType || !buffer.length || !isSupportedDocumentBuffer(buffer, mimeType)) { rejected++; continue }
-    const outcome = await createIngestionItem({ workspaceId: input.workspaceId, fileId: file.id, templateId: template.id, source: "email", filename: attachment.filename, mimeType, buffer })
+    const outcome = await createIngestionItem({ workspaceId: input.workspaceId, fileId: file.id, templateId: template.id, source: "email", worksheetAutoAssigned: true, filename: attachment.filename, mimeType, buffer })
     if (outcome.outcome === "accepted" || outcome.outcome === "duplicate") accepted++
     else rejected++
   }
@@ -234,7 +239,7 @@ export async function processInboundEmail(input: InboundEmailInput): Promise<{ a
   if (accepted === 0 && intent !== "noise") {
     const portals = await fetchPortalPdfs(bodyText)
     for (const portal of portals) {
-      const outcome = await createIngestionItem({ workspaceId: input.workspaceId, fileId: file.id, templateId: template.id, source: "email", filename: portal.filename, mimeType: "application/pdf", buffer: portal.buffer })
+      const outcome = await createIngestionItem({ workspaceId: input.workspaceId, fileId: file.id, templateId: template.id, source: "email", worksheetAutoAssigned: true, filename: portal.filename, mimeType: "application/pdf", buffer: portal.buffer })
       if (outcome.outcome === "accepted" || outcome.outcome === "duplicate") accepted++
       else rejected++
     }
@@ -246,7 +251,7 @@ export async function processInboundEmail(input: InboundEmailInput): Promise<{ a
     try {
       const buffer = renderEmailBodyPdf({ subject: input.subject ?? null, from: input.from, bodyText })
       const filename = `${(input.subject?.trim() || "email-body").replace(/[^\w.-]+/g, "-").slice(0, 60)}.pdf`
-      const outcome = await createIngestionItem({ workspaceId: input.workspaceId, fileId: file.id, templateId: template.id, source: "email", filename, mimeType: "application/pdf", buffer })
+      const outcome = await createIngestionItem({ workspaceId: input.workspaceId, fileId: file.id, templateId: template.id, source: "email", worksheetAutoAssigned: true, filename, mimeType: "application/pdf", buffer })
       if (outcome.outcome === "accepted" || outcome.outcome === "duplicate") accepted++
     } catch (error) {
       console.error("[inbound-email] body-to-pdf ingestion failed:", error instanceof Error ? error.message : error)

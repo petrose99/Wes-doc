@@ -76,6 +76,33 @@ export function pageBatches(pageCount: number, batchSize: number) {
   return batches
 }
 
+/** Higher than SPLIT_CONFIDENCE_THRESHOLD: re-pointing the worksheet changes which fields are
+ * even asked for, so a wrong call costs more than a wrong split (which a reviewer sees as an
+ * extra document) — but lower than the 0.9 that auto-confirms a category without review, since
+ * this outcome is still reviewed before it goes anywhere. */
+export const WORKSHEET_REASSIGN_CONFIDENCE = 0.8
+
+/** Whether the classification pass should re-point this document at the worksheet its content
+ * names, rather than the one it was created with.
+ *
+ * Split out of processDocumentJob so the rule is testable on its own — the surrounding function
+ * needs OCR, an LLM and storage to reach this point. The rule itself is four conditions:
+ * somebody must have *guessed* the worksheet (only an intake channel with no human to ask marks
+ * it "auto" — an upload-modal pick is never marked, and so is never overridden), the classifier
+ * must have run, it must be confident, and it must actually disagree with the current worksheet.
+ */
+export function shouldReassignWorksheet(input: {
+  codingData: unknown
+  classification: { docType: string; confidence: number } | null
+  currentTemplateCode: string | null | undefined
+}): boolean {
+  const coding = (input.codingData as Record<string, unknown> | null) ?? {}
+  if (coding.worksheetSource !== "auto") return false
+  if (!input.classification) return false
+  if (input.classification.confidence < WORKSHEET_REASSIGN_CONFIDENCE) return false
+  return input.classification.docType !== input.currentTemplateCode
+}
+
 /** One page of the document as parsed markdown. */
 export type PageContent = { page: number; text: string }
 
@@ -334,7 +361,9 @@ export async function processDocumentJob(jobId: string) {
     if (!PROCESSABLE_TYPES.has(document.mimeType)) throw new Error("unsupported_document_type")
     const source = await readDocumentSource(document.storageKey)
     await scanDocumentBuffer(source, document.mimeType)
-    const templateFields = parseTemplateFields(document.fieldSnapshot)
+    // `let`, not `const`: an auto-assigned worksheet can be re-pointed by the classification pass
+    // below, and the fields must follow it. See the reassignment block after auto-split.
+    let templateFields = parseTemplateFields(document.fieldSnapshot)
     if (!document.workspace.aiEnabled) {
       await prisma.$transaction([
         prisma.document.update({ where: { id: document.id }, data: { status: "ready_for_review", reviewedData: {}, confidence: { aiEnabled: false } } }),
@@ -446,6 +475,49 @@ export async function processDocumentJob(jobId: string) {
         detail: { segments: classificationData.segments, confidence: classificationData.confidence } as Prisma.InputJsonValue,
       })
       return
+    }
+
+    // The document's own content beats whatever the intake channel guessed. A worksheet marked
+    // auto-assigned (codingData.worksheetSource === "auto") was picked with nobody to ask — email
+    // intake infers one from the subject line, which is a weak signal and mis-routes a document
+    // whose subject says "invoice" but whose body is an order. A human's pick is never touched:
+    // the upload modal's document-type picker is an explicit choice, and nothing marks it "auto".
+    //
+    // DocType and worksheet codes share a vocabulary for the overlapping set (invoice, receipt,
+    // bank_statement, purchase_order), so the match is by code — a docType with no worksheet in
+    // this file (contract, payslip, …) simply leaves the original in place.
+    // The `classificationData &&` is redundant with shouldReassignWorksheet's own null check and
+    // is here only to narrow the type for the confidence read in the audit detail below.
+    if (classificationData && shouldReassignWorksheet({
+      codingData: document.codingData,
+      classification: classificationData,
+      currentTemplateCode: document.template?.code,
+    })) {
+      const candidate = await prisma.documentTemplate.findFirst({
+        where: { workspaceId: document.workspaceId, fileId: document.fileId, code: classificationData.docType },
+        include: { versions: { orderBy: { version: "desc" }, take: 1 } },
+      })
+      const candidateVersion = candidate?.versions[0]
+      if (candidate && candidateVersion) {
+        const from = document.template?.code ?? null
+        await prisma.document.update({
+          where: { id: document.id },
+          data: { templateId: candidate.id, templateVersionId: candidateVersion.id, fieldSnapshot: candidateVersion.fields as Prisma.InputJsonValue },
+        })
+        // Mutated in place so the ten downstream reads of document.template / templateVersion /
+        // templateId (prompt, few-shot lookup, bank-statement branch, shape write) all see the
+        // worksheet actually being extracted against, rather than the one it arrived with.
+        document.templateId = candidate.id
+        document.template = candidate
+        document.templateVersionId = candidateVersion.id
+        document.templateVersion = candidateVersion
+        templateFields = parseTemplateFields(candidateVersion.fields)
+        await recordSystemAudit({
+          workspaceId: document.workspaceId, documentId: document.id,
+          type: "document_worksheet_reassigned",
+          detail: { from, to: candidate.code, confidence: classificationData.confidence } as Prisma.InputJsonValue,
+        }).catch(() => {})
+      }
     }
 
     // Batch over the pages actually parsed rather than the estimate: pdfPageCount reads 0
