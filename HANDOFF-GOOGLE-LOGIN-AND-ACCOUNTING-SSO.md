@@ -1,12 +1,12 @@
 # Handoff — Google sign-in, worker queues, Bigcapital provisioning
 
 Session of 2026-09-08. Everything below is deployed to production (`docubite.app`, Lightsail
-`16.60.212.8`, repo at `~/docubite`). Local master and the VPS are both at `751deb4`.
+`16.60.212.8`, repo at `~/docubite`). Local master and the VPS are both at `bbd4929`.
 
 ## Where to pick up
 
-Items 1 and 2 are fixed and deployed. Item 3 is fixed but unconfirmed — check it first. Item 4
-is unchanged.
+Items 1-3 are fixed, deployed and confirmed in production. Item 4 is unchanged — it is the
+only thing still open, and the PAT rotation there needs a human.
 
 ### 1. "Open accounting" login loop — FIXED (`caca601`)
 
@@ -43,7 +43,7 @@ rejected (watch the first `/api/` call for a 401), which is a different bug.
 Verified: `curl https://books.docubite.app/` serves the new title. Note the image is pinned to
 `latest`, so both this filter and the cookie names above can move under us on a pull.
 
-### 3. Ledger sync never worked — FIXED (`fcf615a`, `751deb4`, `dd18e9e`)
+### 3. Ledger sync never worked — FIXED (`fcf615a`, `751deb4`, `578de1a`)
 
 Three stacked faults, all invisible because the drain logs one line per failure and carries on.
 Worth reading before touching `syncDueLedgerConnections`, because two of the three are the same
