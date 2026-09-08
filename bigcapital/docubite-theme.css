@@ -2,6 +2,30 @@
  * The dark bp4-dark body class is stripped by docubite-theme.js, so these rules restyle the
  * stock light theme: DocuBite's light-grey sidebar, slate text and emerald accents. */
 
+/* The brand mark, inline. It is also a file (docubite-mark.svg) because a favicon has to be one,
+ * but the boot screens below must paint the instant this stylesheet parses — fetching an image
+ * for them costs a round trip during which the splash is a blank box, which is the flicker this
+ * whole section exists to remove. Keep the two in sync; the file carries the same note. */
+:root {
+  --docubite-mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath fill='%23047857' d='M9 3 L20.5 3 A6.5 6.5 0 0 0 27 9.5 L27 25 A4 4 0 0 1 23 29 L9 29 A4 4 0 0 1 5 25 L5 7 A4 4 0 0 1 9 3 Z'/%3E%3Ccircle fill='%23047857' cx='29.4' cy='13.6' r='1.5'/%3E%3Crect fill='%23fff' x='9.5' y='14' width='13' height='2.4' rx='1.2'/%3E%3Crect fill='%23fff' x='9.5' y='19.5' width='8.5' height='2.4' rx='1.2'/%3E%3C/svg%3E");
+}
+
+/* Paint the app's own background from the very first frame. Without this the browser shows its
+ * default white behind an empty #root, which reads as a flash between two grey-white screens. */
+body {
+  background: #fafbfc;
+}
+
+/* The gap nobody owns: index.html has parsed and painted, but the 2.5MB bundle has not finished
+ * evaluating, so React has not mounted and its splash does not exist yet. #root is empty for that
+ * whole stretch. :empty stops matching the moment React renders anything, so this needs no script
+ * and no teardown. */
+#root:empty {
+  position: fixed;
+  inset: 0;
+  background: #fafbfc var(--docubite-mark) center / 52px no-repeat;
+}
+
 body {
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
@@ -112,7 +136,7 @@ body {
   width: 52px;
   height: 52px;
   margin: 0 auto;
-  background: url("/docubite-mark.svg") center / contain no-repeat;
+  background: var(--docubite-mark) center / contain no-repeat;
 }
 .bigcapital-loading .center::after {
   content: "DocuBite";

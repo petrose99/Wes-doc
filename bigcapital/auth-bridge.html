@@ -16,14 +16,16 @@ body {
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 .center { margin: auto; display: flex; flex-direction: column; text-align: center; }
-.center img { width: 52px; height: 52px; margin: 0 auto; }
+/* Inline, not <img src="/docubite-mark.svg">: this page lives for one network hop, so an image
+ * request is long enough to show an empty box first. Same mark as docubite-theme.css. */
+.mark { width: 52px; height: 52px; margin: 0 auto; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath fill='%23047857' d='M9 3 L20.5 3 A6.5 6.5 0 0 0 27 9.5 L27 25 A4 4 0 0 1 23 29 L9 29 A4 4 0 0 1 5 25 L5 7 A4 4 0 0 1 9 3 Z'/%3E%3Ccircle fill='%23047857' cx='29.4' cy='13.6' r='1.5'/%3E%3Crect fill='%23fff' x='9.5' y='14' width='13' height='2.4' rx='1.2'/%3E%3Crect fill='%23fff' x='9.5' y='19.5' width='8.5' height='2.4' rx='1.2'/%3E%3C/svg%3E") center / contain no-repeat; }
 .wordmark { margin-top: 10px; color: #0f172a; font-size: 17px; font-weight: 700; letter-spacing: -0.03em; }
 .status { margin-top: 6px; color: #64748b; font-size: 13px; }
 </style>
 </head>
 <body>
 <div class="center">
-  <img src="/docubite-mark.svg" alt="">
+  <div class="mark"></div>
   <div class="wordmark">DocuBite</div>
   <div class="status" id="status">Signing you in…</div>
 </div>

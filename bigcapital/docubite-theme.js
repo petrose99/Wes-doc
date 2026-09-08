@@ -4,10 +4,10 @@
 (function () {
   var DARK = "bp4-dark";
 
-  /* preload-theme.js reads localStorage["theme"] before the app boots and adds bp4-dark when it
-   * says "dark" or when the OS prefers dark, and the app's own theme control writes the same key.
-   * Pinning it is what actually keeps accounting light; stripping the class below is the fallback
-   * for a page that got it anyway. */
+  /* Belt to nginx.conf's braces. The app bundle reads localStorage["theme"] at module-evaluation
+   * time, which is well before this file runs, so the pin that actually prevents a dark flash is
+   * the inline <head> script nginx injects. This one only matters if that filter ever stops
+   * matching — and it still fixes the NEXT load. */
   function pinLightTheme() {
     try {
       localStorage.setItem("theme", "light");
