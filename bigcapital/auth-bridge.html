@@ -1,8 +1,32 @@
 <!DOCTYPE html>
 <html>
-<head><title>Signing in…</title></head>
+<head>
+<meta charset="utf-8">
+<title>Signing in…</title>
+<link rel="icon" href="/docubite-mark.svg" type="image/svg+xml">
+<style>
+/* Deliberately identical to the SPA's boot splash (see docubite-theme.css) — this page is on
+ * screen for one network hop between DocuBite and the accounting app, and anything that isn't a
+ * pixel match reads as a flash of a broken page. */
+html, body { height: 100%; }
+body {
+  margin: 0;
+  display: flex;
+  background: #fafbfc;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+.center { margin: auto; display: flex; flex-direction: column; text-align: center; }
+.center img { width: 52px; height: 52px; margin: 0 auto; }
+.wordmark { margin-top: 10px; color: #0f172a; font-size: 17px; font-weight: 700; letter-spacing: -0.03em; }
+.status { margin-top: 6px; color: #64748b; font-size: 13px; }
+</style>
+</head>
 <body>
-<p>Signing you in…</p>
+<div class="center">
+  <img src="/docubite-mark.svg" alt="">
+  <div class="wordmark">DocuBite</div>
+  <div class="status" id="status">Signing you in…</div>
+</div>
 <script>
 /* Hands a server-minted Bigcapital session to the Bigcapital SPA.
  *
@@ -32,7 +56,8 @@
   }
 
   var hash = window.location.hash.slice(1);
-  if (!hash) { document.body.textContent = "Missing credentials."; return; }
+  var status = document.getElementById("status");
+  if (!hash) { status.textContent = "Missing credentials."; return; }
   try {
     var params = JSON.parse(decodeURIComponent(hash));
     if (!params.token || !params.organizationId) throw new Error("incomplete session");
@@ -54,7 +79,7 @@
     // replace(), so the token-bearing fragment leaves the history stack behind.
     window.location.replace(params.redirectPath || "/");
   } catch (e) {
-    document.body.textContent = "Sign-in failed: " + e.message;
+    status.textContent = "Sign-in failed: " + e.message;
   }
 })();
 </script>

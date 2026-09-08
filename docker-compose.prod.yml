@@ -133,11 +133,15 @@ services:
     restart: unless-stopped
     environment:
       API_BASE_URL: ${BIGCAPITAL_API_BASE}
+    # These are single-FILE bind mounts, which bind an inode, not a path. `git pull` replaces a
+    # changed file by rename, so the container keeps serving the old contents until it is
+    # restarted — a pull alone deploys nothing here, however convincing the host file looks.
     volumes:
       - ./bigcapital/nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - ./bigcapital/auth-bridge.html:/usr/share/nginx/html/auth-bridge.html:ro
       - ./bigcapital/docubite-theme.css:/usr/share/nginx/html/docubite-theme.css:ro
       - ./bigcapital/docubite-theme.js:/usr/share/nginx/html/docubite-theme.js:ro
+      - ./bigcapital/docubite-mark.svg:/usr/share/nginx/html/docubite-mark.svg:ro
     depends_on:
       - bigcapital-server
 

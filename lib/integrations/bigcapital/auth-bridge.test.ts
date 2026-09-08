@@ -12,7 +12,7 @@ import { describe, expect, it } from "vitest"
 
 const BRIDGE = path.join(process.cwd(), "bigcapital", "auth-bridge.html")
 
-type Run = { cookies: Map<string, string>; attrs: string[]; storage: Map<string, string>; replaced: string | null; body: string }
+type Run = { cookies: Map<string, string>; attrs: string[]; storage: Map<string, string>; replaced: string | null; status: string }
 
 function runBridge(payload: unknown, { protocol = "https:" } = {}): Run {
   const html = readFileSync(BRIDGE, "utf8")
@@ -21,15 +21,16 @@ function runBridge(payload: unknown, { protocol = "https:" } = {}): Run {
   const cookies = new Map<string, string>()
   const attrs: string[] = []
   const storage = new Map<string, string>()
-  const run: Run = { cookies, attrs, storage, replaced: null, body: "" }
+  const run: Run = { cookies, attrs, storage, replaced: null, status: "" }
 
   const location = {
     hash: "#" + encodeURIComponent(JSON.stringify(payload)),
     protocol,
     replace: (url: string) => { run.replaced = url },
   }
+  const status = { set textContent(value: string) { run.status = value }, get textContent() { return run.status } }
   const document = {
-    body: { set textContent(value: string) { run.body = value }, get textContent() { return run.body } },
+    getElementById: (id: string) => (id === "status" ? status : null),
     set cookie(value: string) {
       const [pair, ...rest] = value.split("; ")
       const eq = pair.indexOf("=")
@@ -95,9 +96,9 @@ describe("auth-bridge.html", () => {
   })
 
   it("refuses a payload with no token rather than landing on a signed-out app", () => {
-    const { cookies, replaced, body } = runBridge({ organizationId: "org-1" })
+    const { cookies, replaced, status } = runBridge({ organizationId: "org-1" })
     expect(cookies.size).toBe(0)
     expect(replaced).toBeNull()
-    expect(body).toContain("Sign-in failed")
+    expect(status).toContain("Sign-in failed")
   })
 })

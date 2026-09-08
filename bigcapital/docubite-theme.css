@@ -93,3 +93,33 @@ body {
   color: #fff;
   text-decoration: none;
 }
+
+/* Boot splash. The SPA paints its own vendor wordmark here for as long as the dashboard takes to
+ * load, which reads as a flash of someone else's brand in the middle of a DocuBite session. The
+ * splash itself is worth keeping — without it the wait is a bare white page — so the mark is
+ * swapped rather than the whole element hidden. */
+:root {
+  --color-splash-screen-background: #fafbfc;
+}
+.bigcapital-loading {
+  background: #fafbfc !important;
+}
+.bigcapital-loading .center > * {
+  display: none !important;
+}
+.bigcapital-loading .center::before {
+  content: "";
+  width: 52px;
+  height: 52px;
+  margin: 0 auto;
+  background: url("/docubite-mark.svg") center / contain no-repeat;
+}
+.bigcapital-loading .center::after {
+  content: "DocuBite";
+  margin-top: 10px;
+  color: #0f172a;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  text-align: center;
+}
