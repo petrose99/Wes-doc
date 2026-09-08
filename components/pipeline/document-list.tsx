@@ -74,6 +74,10 @@ export function DocumentList({ workspaceId, stage, rows, contentMatches, query }
   const { marked, markRow, toggleAll, clear } = useRowSelection(rows)
   const selected = [...marked]
   const selectedFileId = selected.length > 0 ? rows.find((r) => r.id === selected[0])?.fileId : undefined
+  // Re-extract is per (fileId, documentId), and a selection can span files, so it needs each
+  // row's own file rather than selectedFileId's "first one wins" (which is only sound for the
+  // Sheets link, where a cross-file selection is already meaningless).
+  const selectedRows = rows.filter((row) => marked.has(row.id)).map((row) => ({ id: row.id, fileId: row.fileId }))
   const isReview = stage === "ready"
   const columnCount = isReview ? 7 : 5
 
@@ -99,7 +103,7 @@ export function DocumentList({ workspaceId, stage, rows, contentMatches, query }
   }
 
   return <div className="flex min-h-0 flex-1 flex-col">
-    <BulkActionBar workspaceId={workspaceId} stage={stage} selectedIds={selected} selectedFileId={selectedFileId} onDone={clear} />
+    <BulkActionBar workspaceId={workspaceId} stage={stage} selectedIds={selected} selectedFileId={selectedFileId} selectedRows={selectedRows} onDone={clear} />
     <div className="min-h-0 flex-1 overflow-auto px-6 pb-4">
       <table className="w-full border-collapse text-sm">
         <thead className="sticky top-0 z-10 bg-white text-left text-xs font-semibold uppercase tracking-wide text-slate-500">

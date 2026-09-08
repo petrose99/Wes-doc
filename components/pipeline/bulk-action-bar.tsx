@@ -4,9 +4,10 @@ import {
   archiveDocumentsAction, deletePipelineDocumentsAction,
   mergeDocumentsAction,
 } from "@/app/(app)/workspaces/[workspaceId]/pipeline-actions"
+import { reextractAdaptivelyAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import type { PipelineStage } from "@/lib/documents/stages"
-import { Archive, Combine, Loader2, Table2, Trash2 } from "lucide-react"
+import { Archive, Combine, Loader2, Sparkles, Table2, Trash2 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
@@ -15,7 +16,7 @@ import { toast } from "sonner"
 /** The N-selected action bar. Which actions make sense depends on the stage being viewed: you
  * can't "Move to Ready" from Archive (restore is the equivalent there), and Merge only ever
  * applies to exactly two rows. */
-export function BulkActionBar({ workspaceId, stage, selectedIds, selectedFileId, onDone }: { workspaceId: string; stage: PipelineStage; selectedIds: string[]; selectedFileId?: string; onDone: () => void }) {
+export function BulkActionBar({ workspaceId, stage, selectedIds, selectedFileId, selectedRows = [], onDone }: { workspaceId: string; stage: PipelineStage; selectedIds: string[]; selectedFileId?: string; selectedRows?: { id: string; fileId: string }[]; onDone: () => void }) {
   const router = useRouter()
   const [busy, setBusy] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
@@ -29,6 +30,29 @@ export function BulkActionBar({ workspaceId, stage, selectedIds, selectedFileId,
       const result = await action()
       if (!result.success) { toast.error(result.error || `${label} failed`); return }
       toast.success(label)
+      onDone()
+      router.refresh()
+    } catch {
+      toast.error("Could not reach the server")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /** Re-extract with adaptive line-item discovery. Previously reachable only from the upload
+   * modal's staged-file list, which meant a document that didn't arrive through that modal — an
+   * emailed one, or anything from a past session — could never be repaired when its template's
+   * fixed line-item columns didn't fit it. Runs per document because the underlying action is
+   * single-document; a document already queued/processing rejects, so those are counted rather
+   * than surfaced as N separate error toasts. */
+  const reextract = async () => {
+    setBusy(true)
+    try {
+      const results = await Promise.all(selectedRows.map((row) =>
+        reextractAdaptivelyAction(workspaceId, row.fileId, row.id).catch(() => ({ success: false as const }))))
+      const queued = results.filter((result) => result.success).length
+      if (!queued) { toast.error("Could not re-extract — already processing, or the document has no template"); return }
+      toast.success(queued === results.length ? `Re-extracting ${queued}` : `Re-extracting ${queued} of ${results.length}`)
       onDone()
       router.refresh()
     } catch {
@@ -66,6 +90,12 @@ export function BulkActionBar({ workspaceId, stage, selectedIds, selectedFileId,
         <Combine className="h-3.5 w-3.5" />Merge
       </button>}
     </>}
+
+    <button type="button" disabled={dis || selectedRows.length === 0} title="Re-extract with adaptive line-item discovery — for a document whose line items came out empty or wrong under its worksheet's fixed columns"
+      className="inline-flex items-center gap-1.5 rounded-md border bg-white px-2.5 py-1 font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+      onClick={() => void reextract()}>
+      {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}Re-extract
+    </button>
 
     <button type="button" disabled={dis} className="inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-white px-2.5 py-1 font-medium text-red-600 hover:bg-red-50 disabled:opacity-50" onClick={() => setConfirmingDelete(true)}>
       <Trash2 className="h-3.5 w-3.5" />Delete
