@@ -31,7 +31,20 @@ import type { NextAdminOptions } from "@premieroctet/next-admin"
  * Components". next-admin's own docs show `toString` because the Pages Router serialised
  * differently; under the App Router it has to go.
  */
-export const options: NextAdminOptions = {
+// Deliberately NOT `: NextAdminOptions` here. `ModelOptions<ModelName>` is a mapped type over
+// EVERY model in the schema (~80 and growing), and for each one resolves `Field<P> = keyof
+// Model<P>` — a conditional type over that model's own full column set. Checking a big object
+// literal against that annotation makes TypeScript walk the whole schema's type graph at once;
+// past a certain total column count (crossed by Document.paymentStatus and its two companions)
+// the checker gives up with "Expression produces a union type that is too complex to represent"
+// — on fields belonging to unrelated models (User, Workspace) that hadn't changed at all, purely
+// because they happen to be resolved in the same pass. `next build` treats that as fatal.
+//
+// Left untyped, TypeScript infers this object's own (cheap) literal shape instead of checking it
+// against the expensive generic one. The `as unknown as NextAdminOptions` below hands the intended
+// type to <NextAdmin> and the API route without ever performing that structural check — this file
+// is a plain object at runtime regardless, so nothing here changes what mounts at /admin-next.
+const rawOptions = {
   title: "DocuBite data",
   model: {
     User: {
@@ -139,3 +152,5 @@ export const options: NextAdminOptions = {
     },
   },
 }
+
+export const options = rawOptions as unknown as NextAdminOptions
