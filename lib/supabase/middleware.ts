@@ -2,11 +2,17 @@ import config from "@/lib/config"
 import { createServerClient } from "@supabase/ssr"
 import { NextRequest, NextResponse } from "next/server"
 
-/** F2/§164.312(a)(2)(iii) automatic logoff, enforced here rather than left to Supabase's own
- * Inactivity Timeout setting — that setting exists, but is gated to the Pro plan and above, and a
- * Free-plan project (the one this migration was verified against) has no dashboard control for it
- * at all. This cookie is the app-level equivalent: unencrypted since it holds nothing but a
- * timestamp, and readable only from this middleware and never from client JS (httpOnly).
+/** Rolling inactivity logoff, sized by config.auth.idleTimeoutMinutes — an ordinary-SaaS 30 days by
+ * default, refreshed on every request (touchLastSeen), so it measures time since the last click,
+ * not session age. Built rather than left to Supabase's own Inactivity Timeout setting because that
+ * one is gated to the Pro plan and above, and a Free-plan project (the one this was verified
+ * against) has no dashboard control for it at all. This cookie is the app-level equivalent:
+ * unencrypted since it holds nothing but a timestamp, and readable only from this middleware and
+ * never from client JS (httpOnly).
+ *
+ * Originally sized to §164.312(a)(2)(iii) automatic logoff (15 minutes) — see
+ * config.auth.idleTimeoutMinutes's own comment for why that default changed and what a
+ * hipaaMode workspace needs instead; the mechanism here is unchanged, only the number is.
  *
  * If the Supabase project is later upgraded to Pro and its own Inactivity Timeout is configured,
  * the two enforce the same policy redundantly — harmless, and worth keeping this one regardless
@@ -34,6 +40,10 @@ function touchLastSeen(response: NextResponse) {
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
+    // Without an explicit maxAge this is a browser-session cookie, and most browsers restore those
+    // across a restart anyway — so it costs nothing to also expire it outright at the same instant
+    // isIdle would start rejecting it, rather than lean on that implicit, browser-dependent behavior.
+    maxAge: config.auth.idleTimeoutMinutes * 60,
   })
 }
 

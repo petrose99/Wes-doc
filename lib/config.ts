@@ -36,11 +36,20 @@ const envSchema = z.object({
   // (Authentication → Hooks). Verifies the Standard Webhooks HMAC signature on incoming hook
   // requests — see app/api/internal/auth/signup-allowed/route.ts.
   SUPABASE_AUTH_HOOK_SECRET: z.string().optional(),
-  // §164.312(a)(2)(iii) automatic logoff. Supabase Auth has a native Inactivity Timeout setting
-  // (Authentication → Sessions), but it's gated to the Pro plan and above — a Free-plan project
-  // (like this one, as of the HIPAA migration) has no dashboard control for it at all. This is the
-  // app-level fallback enforced in lib/supabase/middleware.ts regardless of plan tier.
-  SESSION_IDLE_TIMEOUT_MINUTES: z.coerce.number().int().positive().default(15),
+  // Rolling inactivity window enforced in lib/supabase/middleware.ts: refreshed on every request
+  // (touchLastSeen), so it is a "how long since your last click", not a fixed session length.
+  //
+  // 30 days is the ordinary-SaaS default — sign in once, stay in until you're genuinely away for a
+  // month. It was 15 MINUTES until this default, sized for §164.312(a)(2)(iii) automatic logoff
+  // and applied globally regardless of whether any workspace actually needed it, which is what
+  // made every session feel like it logged out mid-task.
+  //
+  // A deployment running any workspace with hipaaMode on needs SESSION_IDLE_TIMEOUT_MINUTES set
+  // back down explicitly (15-30 is the usual HIPAA-aligned range) — this one value is process-wide
+  // and cannot vary per workspace, so raising the default here raises it for a HIPAA workspace too.
+  // Supabase's own Inactivity Timeout (Authentication → Sessions, Pro plan and above) is the
+  // proper per-project control if that ever needs to be more than one number for one deployment.
+  SESSION_IDLE_TIMEOUT_MINUTES: z.coerce.number().int().positive().default(30 * 24 * 60),
   DISABLE_SIGNUP: z.enum(["true", "false"]).default("false"),
   RESEND_API_KEY: z.string().default("please-set-your-resend-api-key-here"),
   RESEND_FROM_EMAIL: z.string().default("DocuBite <user@localhost>"),
