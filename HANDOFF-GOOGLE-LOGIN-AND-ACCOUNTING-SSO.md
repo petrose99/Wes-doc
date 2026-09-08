@@ -1,7 +1,7 @@
 # Handoff — Google sign-in, worker queues, Bigcapital provisioning
 
 Session of 2026-09-08. Everything below is deployed to production (`docubite.app`, Lightsail
-`16.60.212.8`, repo at `~/docubite`). Local master and the VPS are both at `bbd4929`.
+`16.60.212.8`, repo at `~/docubite`). Local master and the VPS are both at `6fda064`.
 
 ## Where to pick up
 
@@ -79,7 +79,21 @@ traffic went from ~99 calls/minute to 0, and the worker logs a single
   `lib/finance/actions.test.ts` fails. Pre-existing, unrelated to this session's work.
   `npm run db:generate` should clear it.
 
-## What was done this session
+## Accounting, second pass — all fixed and deployed
+
+Everything below was found by following the first fix through, not from the original list. Fixing
+the SSO let people into the SPA for the first time, and everything downstream of it turned out to
+be broken too.
+
+| Commit | What |
+|---|---|
+| `003cc85` | The skin locked the tab up. `classList.remove()` inside a MutationObserver on the class attribute re-triggers itself forever — see the gotcha below |
+| `2ab35cf` | Vendor branding on the way in: bare white bridge page, vendor wordmark on the boot splash, vendor favicon. `bigcapital/docubite-mark.svg` plus a bridge that matches the splash it hands over to |
+| `b5ba55e` | The two remaining flashes. Dark-theme flash (the bundle picks its theme before React mounts, so the pin has to be an inline `<head>` script, not `docubite-theme.js`); and the white gap while 2.5MB of bundle evaluates and `#root` is still empty, now covered by `#root:empty` |
+| `9e9678b` | `/socket/` had no proxy rule and fell through to `try_files`, so socket.io's handshake was answered with index.html. It had never once connected |
+| `6fda064` | "Back to DocuBite" pointed at `localhost:7331`: the route built its URLs from `req.url`, which behind Caddy is the container's own address. Now `config.app.baseURL`, like every other outbound URL in the app |
+
+## What was done in the session before that
 
 Commits, oldest first — all on `master`, all deployed:
 
