@@ -1,58 +1,103 @@
-﻿"use client"
+"use client"
 
+import { postSignInDestination } from "@/lib/auth-post-sign-in"
+import { reportAuthEvent } from "@/lib/auth-audit-client"
+import { buttonWidthFor, createNonce, loadGoogleIdentityScript, type GoogleCredentialResponse } from "@/lib/google-identity"
 import { createClient } from "@/lib/supabase/client"
-import { useState } from "react"
-
-function GoogleGlyph() {
-  return (
-    <svg viewBox="0 0 18 18" aria-hidden className="h-4 w-4">
-      <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62Z" />
-      <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18Z" />
-      <path fill="#FBBC05" d="M3.97 10.72a5.4 5.4 0 0 1 0-3.44V4.95H.96a9 9 0 0 0 0 8.1l3.01-2.33Z" />
-      <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.9 11.43 0 9 0A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58Z" />
-    </svg>
-  )
-}
+import { useEffect, useRef, useState } from "react"
 
 /** Rendered only where the server has told the page that Google is configured — see
- * isGoogleAuthEnabled in lib/config.ts. That flag tracks GOOGLE_CLIENT_ID/SECRET being set in this
- * app's own env, which is a UI-only signal now — the actual Google provider registration lives on
- * the Supabase project's dashboard, not in this codebase, so the two have to be kept in sync by
- * hand (see the comment on isGoogleAuthEnabled). If they drift, this button sends someone to a
- * Supabase-side error page rather than a 404, but it still fails visibly either way. */
-export function GoogleButton({ callbackURL = "/workspaces", label = "Continue with Google", onError }: {
-  callbackURL?: string
-  label?: string
+ * isGoogleAuthEnabled in lib/config.ts, which tracks NEXT_PUBLIC_GOOGLE_CLIENT_ID. That is a
+ * UI-only signal: the client ID must also be listed under the Google provider's "Authorized Client
+ * IDs" on the Supabase dashboard, which this app cannot read back, so the two are kept in sync by
+ * hand. If they drift the button renders and the token exchange fails with a visible error rather
+ * than signing anyone in.
+ *
+ * The visible button is drawn by Google, not by us — GIS only issues credentials to a button it
+ * rendered itself, so the styling here is confined to the slot it is placed in. */
+export function GoogleButton({ redirectTo = "/workspaces", intent = "signin", onError }: {
+  redirectTo?: string
+  intent?: "signin" | "signup"
   onError?: (message: string) => void
 }) {
-  const [busy, setBusy] = useState(false)
+  const slot = useRef<HTMLDivElement>(null)
+  const [ready, setReady] = useState(false)
+  // Read through a ref inside the GIS callback: initialize() is called once on mount, so the
+  // callback it closes over would otherwise keep the first render's redirectTo forever — wrong for
+  // /login?invite=…, where the destination is resolved from the URL. Written in an effect rather
+  // than during render, which React forbids for refs.
+  const destination = useRef(redirectTo)
+  useEffect(() => { destination.current = redirectTo }, [redirectTo])
 
-  const signIn = async () => {
-    setBusy(true)
-    onError?.("")
-    try {
-      // Resolves into a redirect to Google, so there is no success path to handle here — only
-      // the failure to start it, in which case the button has to become usable again. The
-      // destination after Google redirects back is always /auth/callback, which exchanges the
-      // code for a session and then forwards to callbackURL — see that route for why.
-      const supabase = createClient()
-      const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(callbackURL)}`
-      const { error } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo } })
-      if (error) throw error
-    } catch {
-      onError?.("Could not reach Google just now. Please try again.")
-      setBusy(false)
+  useEffect(() => {
+    let cancelled = false
+
+    const start = async () => {
+      try {
+        const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
+        if (!clientId) throw new Error("google_client_id_missing")
+
+        const [nonce] = await Promise.all([createNonce(), loadGoogleIdentityScript()])
+        if (cancelled || !slot.current) return
+        const google = window.google
+        if (!google) throw new Error("google_identity_unavailable")
+
+        google.accounts.id.initialize({
+          client_id: clientId,
+          nonce: nonce.hashed,
+          callback: (response: GoogleCredentialResponse) => { void signIn(response, nonce.raw) },
+        })
+        google.accounts.id.renderButton(slot.current, {
+          type: "standard",
+          theme: "outline",
+          size: "large",
+          shape: "rectangular",
+          text: intent === "signup" ? "signup_with" : "continue_with",
+          logo_alignment: "center",
+          width: buttonWidthFor(slot.current),
+        })
+        setReady(true)
+      } catch {
+        if (!cancelled) onError?.("Google sign-in is unavailable right now. Use your email and password instead.")
+      }
     }
-  }
+
+    const signIn = async (response: GoogleCredentialResponse, rawNonce: string) => {
+      if (!response.credential) {
+        onError?.("Google did not return a sign-in token. Please try again.")
+        return
+      }
+      onError?.("")
+      try {
+        const supabase = createClient()
+        const { error } = await supabase.auth.signInWithIdToken({ provider: "google", token: response.credential, nonce: rawNonce })
+        if (error) throw error
+
+        reportAuthEvent("auth_login_success", { method: "google" })
+        const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+        // A hard navigation, not router.push: the session cookie was minted a moment ago, and a
+        // client-side push would render the destination against the session-less cached payload —
+        // which on /invite/[token] shows "Invitation unavailable" to someone who just signed in.
+        window.location.href = postSignInDestination(aal, destination.current)
+      } catch {
+        reportAuthEvent("auth_login_failed", { method: "google" })
+        onError?.("Could not sign you in with Google. Please try again.")
+      }
+    }
+
+    void start()
+    return () => { cancelled = true }
+    // onError is a fresh closure on every render of the parent form; re-running this effect for it
+    // would tear down and redraw Google's button on each keystroke in the email field.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [intent])
 
   return (
-    <button
-      type="button"
-      onClick={() => void signIn()}
-      disabled={busy}
-      className="inline-flex h-11 w-full items-center justify-center gap-2.5 rounded-lg border border-slate-300 bg-white text-sm font-semibold text-slate-800 shadow-sm transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600/40 focus-visible:ring-offset-2 disabled:opacity-60"
-    >
-      <GoogleGlyph />{busy ? "Redirecting…" : label}
-    </button>
+    <div className="min-h-11">
+      {/* Google draws into this element. The placeholder keeps the form from jumping as the
+          script loads, and disappears rather than lingering behind the rendered button. */}
+      <div ref={slot} className="flex justify-center [&>div]:!w-full" />
+      {!ready && <div className="h-11 w-full animate-pulse rounded-lg bg-slate-100" aria-hidden />}
+    </div>
   )
 }

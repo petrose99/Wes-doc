@@ -23,8 +23,11 @@ RUN npx prisma generate
 # runtime environment — setting them only at `docker run` time would ship a bundle with blank values.
 ARG NEXT_PUBLIC_SUPABASE_URL
 ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
+# Optional: unset simply omits the Google button (see isGoogleAuthEnabled in lib/config.ts).
+ARG NEXT_PUBLIC_GOOGLE_CLIENT_ID
 ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
 ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
+ENV NEXT_PUBLIC_GOOGLE_CLIENT_ID=$NEXT_PUBLIC_GOOGLE_CLIENT_ID
 
 # Migrations run against the real DATABASE_URL at container start (see `start` script), not here,
 # since the DB isn't reachable during image build.

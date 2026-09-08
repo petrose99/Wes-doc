@@ -44,10 +44,12 @@ const envSchema = z.object({
   DISABLE_SIGNUP: z.enum(["true", "false"]).default("false"),
   RESEND_API_KEY: z.string().default("please-set-your-resend-api-key-here"),
   RESEND_FROM_EMAIL: z.string().default("DocuBite <user@localhost>"),
-  // Both halves or nothing — a UI-only flag now (see isGoogleAuthEnabled); a half-set pair would
-  // advertise a Google button whose provider isn't actually registered on the Supabase side.
-  GOOGLE_CLIENT_ID: z.string().optional(),
-  GOOGLE_CLIENT_SECRET: z.string().optional(),
+  // NEXT_PUBLIC_ because components/auth/google-button.tsx reads it in the browser — Google
+  // Identity Services needs the client ID client-side to request an ID token, and an OAuth client
+  // ID is public by design (it is visible in every sign-in request Google serves). The matching
+  // client *secret* is deliberately absent: the GIS flow never performs a code exchange from this
+  // app, and the secret is only ever pasted into the Supabase dashboard.
+  NEXT_PUBLIC_GOOGLE_CLIENT_ID: z.string().optional(),
   AWS_REGION: z.string().default("eu-west-1"),
   AWS_S3_DOCUMENTS_BUCKET: z.string().default(""),
   AWS_S3_KMS_KEY_ID: z.string().default(""),
@@ -234,13 +236,13 @@ if (process.env.NODE_ENV === "production" && process.env.NEXT_PHASE !== "phase-p
   if (unset.length) throw new Error(`Refusing to start in production with default or missing secrets — set ${unset.join(", ")}.`)
 }
 
-/** The Google sign-in button is rendered from this env-var pair, not from whether Google is
- * actually configured as a provider on the Supabase project — that's set separately in the
- * Supabase dashboard, and this app has no way to read it back. An install without these two set
- * still boots and simply omits the button; one with them set but Google not configured on the
- * Supabase side will show the button and fail at the OAuth redirect, so keep the two in lockstep
- * by hand. */
-export const isGoogleAuthEnabled = Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET)
+/** The Google sign-in button is rendered from this env var, not from whether Google is actually
+ * configured as a provider on the Supabase project — that's set separately in the Supabase
+ * dashboard, and this app has no way to read it back. An install without it set still boots and
+ * simply omits the button; one with it set but the same client ID not listed under the Supabase
+ * provider's "Authorized Client IDs" will show the button and fail when the ID token is exchanged,
+ * so keep the two in lockstep by hand. */
+export const isGoogleAuthEnabled = Boolean(env.NEXT_PUBLIC_GOOGLE_CLIENT_ID)
 
 const config = {
   app: { title: "DocuBite", description: "Take a bite out of document busywork. DocuBite reads invoices, receipts and bank statements — even handwritten and scanned ones — into a live sheet where every value traces to its source, and reports on whole folders: what's missing, what's duplicated, what needs a look.", version: packageJson.version || "0.0.1", baseURL: env.BASE_URL, supportEmail: "support@docubite.com" },
@@ -301,7 +303,7 @@ const config = {
     language: env.ASR_LANGUAGE.trim() || null,
   },
   aws: { region: env.AWS_REGION, documentsBucket: env.AWS_S3_DOCUMENTS_BUCKET, kmsKeyId: env.AWS_S3_KMS_KEY_ID, internalWorkerSecret: env.INTERNAL_WORKER_SECRET, malwareScanUrl: env.MALWARE_SCAN_URL },
-  auth: { loginUrl: "/login", disableSignup: env.DISABLE_SIGNUP === "true", idleTimeoutMinutes: env.SESSION_IDLE_TIMEOUT_MINUTES, google: { clientId: env.GOOGLE_CLIENT_ID || "", clientSecret: env.GOOGLE_CLIENT_SECRET || "" } },
+  auth: { loginUrl: "/login", disableSignup: env.DISABLE_SIGNUP === "true", idleTimeoutMinutes: env.SESSION_IDLE_TIMEOUT_MINUTES },
   // The project itself, plus the two keys: anonKey is safe in the browser (Postgres RLS is what
   // actually protects data reached through it — irrelevant here since this project is Auth-only
   // and holds no application tables), serviceRoleKey bypasses RLS entirely and is used only from

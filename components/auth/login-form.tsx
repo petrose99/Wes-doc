@@ -3,6 +3,7 @@
 import { AuthDivider, AuthField, PasswordField, SubmitButton } from "@/components/auth/fields"
 import { GoogleButton } from "@/components/auth/google-button"
 import { FormError } from "@/components/forms/error"
+import { postSignInDestination } from "@/lib/auth-post-sign-in"
 import { Input } from "@/components/ui/input"
 import { reportAuthEvent } from "@/lib/auth-audit-client"
 import { createClient } from "@/lib/supabase/client"
@@ -41,11 +42,10 @@ export function LoginForm({ defaultEmail, redirectTo = "/workspaces", googleEnab
       // needs a second step before it has a session hipaaMode workspaces will accept — see
       // /mfa/challenge, which this sends them to instead of redirectTo when one is pending.
       const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
-      const needsChallenge = aal?.nextLevel === "aal2" && aal.nextLevel !== aal.currentLevel
       // A hard navigation, not router.push: the session cookie was minted a moment ago, and a
       // client-side push would render the destination against the session-less cached payload —
       // which on /invite/[token] shows "Invitation unavailable" to someone who just signed in.
-      window.location.href = needsChallenge ? `/mfa/challenge?next=${encodeURIComponent(redirectTo)}` : redirectTo
+      window.location.href = postSignInDestination(aal, redirectTo)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not sign you in. Please try again.")
     } finally {
@@ -56,7 +56,7 @@ export function LoginForm({ defaultEmail, redirectTo = "/workspaces", googleEnab
   return (
     <div className="flex flex-col gap-4">
       {googleEnabled && <>
-        <GoogleButton callbackURL={redirectTo} onError={(message) => setError(message || null)} />
+        <GoogleButton redirectTo={redirectTo} onError={(message) => setError(message || null)} />
         <AuthDivider />
       </>}
 

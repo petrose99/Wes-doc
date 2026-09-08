@@ -83,7 +83,7 @@ export function SignupForm({ defaultEmail, redirectTo = "/workspaces", googleEna
   return (
     <div className="flex flex-col gap-4">
       {googleEnabled && <>
-        <GoogleButton callbackURL={redirectTo} label="Sign up with Google" onError={(message) => setError(message || null)} />
+        <GoogleButton redirectTo={redirectTo} intent="signup" onError={(message) => setError(message || null)} />
         <AuthDivider />
       </>}
 
