@@ -8,6 +8,16 @@ import { isValidRedirectPath } from "@/lib/integrations/bigcapital/redirect-vali
 import { requireWorkspaceRole } from "@/models/workspaces"
 import { getMemberAccount } from "@/models/bigcapital-members"
 
+/** Every URL this route hands out has to be built from the configured base URL, never from
+ * `req.url`. Behind Caddy the request Next actually sees is the container's own
+ * http://localhost:7331/… — fine for a same-origin redirect the browser resolves itself, useless
+ * the moment the value is handed to another origin. The bridge stores returnUrl for the accounting
+ * app's "Back to DocuBite" link, so a req.url-derived one sent every user to localhost. Matches
+ * how invites, share links and the OAuth callbacks all build their URLs. */
+function appUrl(path: string): string {
+  return new URL(path, config.app.baseURL).toString()
+}
+
 export async function GET(req: NextRequest) {
   const workspaceId = req.nextUrl.searchParams.get("workspaceId")
   if (!workspaceId) return NextResponse.json({ error: "missing workspaceId" }, { status: 400 })
@@ -18,7 +28,7 @@ export async function GET(req: NextRequest) {
 
     const account = await prisma.bigcapitalAccount.findUnique({ where: { workspaceId } })
     if (!account || !account.organizationId) {
-      return NextResponse.redirect(new URL(`/workspaces/${workspaceId}/accounting?error=no_connection`, req.url))
+      return NextResponse.redirect(appUrl(`/workspaces/${workspaceId}/accounting?error=no_connection`))
     }
 
     const memberAccount = await getMemberAccount(workspaceId, user.id)
@@ -31,7 +41,7 @@ export async function GET(req: NextRequest) {
       // The stored password was encrypted with an old SECRETS_ENCRYPTION_KEY that no longer decrypts —
       // the connection row still says "active" but signing in from it is now impossible. Surface the
       // real reason instead of the generic sign_in_failed so the page can offer a Reset action.
-      return NextResponse.redirect(new URL(`/workspaces/${workspaceId}/accounting?error=stale_credentials`, req.url))
+      return NextResponse.redirect(appUrl(`/workspaces/${workspaceId}/accounting?error=stale_credentials`))
     }
     const session = await bigcapital.signIn(loginEmail, loginPassword)
 
@@ -39,7 +49,7 @@ export async function GET(req: NextRequest) {
     const safeRedirectPath = redirectPath && isValidRedirectPath(redirectPath) ? redirectPath : null
 
     const webappUrl = config.integrations.bigcapital.webappUrl
-    const returnUrl = new URL(`/workspaces/${workspaceId}`, req.url).toString()
+    const returnUrl = appUrl(`/workspaces/${workspaceId}`)
     // The bridge turns these into the same cookies the Bigcapital SPA writes for itself at login
     // (token / organization_id / authenticated_user_id / tenant_id) — see bigcapital/auth-bridge.html.
     // It stays in the fragment so the token never reaches a server or a log.
@@ -54,6 +64,6 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.redirect(`${webappUrl}/auth-bridge.html#${payload}`)
   } catch {
-    return NextResponse.redirect(new URL(`/workspaces/${workspaceId}/accounting?error=sign_in_failed`, req.url))
+    return NextResponse.redirect(appUrl(`/workspaces/${workspaceId}/accounting?error=sign_in_failed`))
   }
 }
