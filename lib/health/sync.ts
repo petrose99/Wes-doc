@@ -58,24 +58,31 @@ export async function syncLedgerTransactions(connectionId: string): Promise<void
 const LEDGER_SYNC_STALE_MS = 24 * 60 * 60 * 1000
 const BIGCAPITAL_SYNC_STALE_MS = 1 * 60 * 60 * 1000
 
-/** Backoff after a failed sync, doubling per consecutive failure up to the cap.
+/** When each connection may next be attempted, and how many times in a row it has failed.
  *
- * "Due" is derived from the newest LedgerTransaction.syncedAt, so a sync that fails writes nothing
- * and the connection is due again on the very next worker tick — a few seconds later. That turns
- * any lasting failure (a lapsed token, a provider outage, a bug in the write path) into an
- * unbounded retry loop against someone else's API: it is what got this deployment rate-limited to
- * a standstill, on top of the scope bug that started it. A failure now has to wait.
+ * This exists because "due" below is derived from the newest LedgerTransaction.syncedAt, which is
+ * absent in the two cases that matter most:
+ *
+ *   - the sync FAILED, so it wrote nothing — a lapsed token, a provider outage, a bug in the write
+ *     path. The connection is due again on the very next tick, seconds later, so any lasting
+ *     failure becomes an unbounded retry loop against someone else's API.
+ *   - the sync SUCCEEDED and the provider genuinely has no bills, expenses or invoices yet. A
+ *     brand-new organization writes zero rows, so there is no syncedAt to age and the connection is
+ *     permanently due — a full three-endpoint refetch every tick, forever, for an empty ledger.
+ *
+ * Between them those two kept this deployment rate-limited to a standstill. A failure now backs off
+ * exponentially; a success waits out the same staleness window a connection with rows gets.
  *
  * Held in memory rather than on IntegrationConnection because it is a throttle, not a fact about
- * the connection: losing it on a worker restart costs one extra attempt, which is the behaviour a
- * restart should have anyway. */
+ * the connection: losing it on a worker restart costs one extra attempt per connection, which is
+ * the behaviour a restart should have anyway. */
 const SYNC_RETRY_BASE_MS = 5 * 60 * 1000
 const SYNC_RETRY_MAX_MS = 6 * 60 * 60 * 1000
-const syncFailures = new Map<string, { failures: number; nextAttemptAt: number }>()
+const syncHolds = new Map<string, { failures: number; nextAttemptAt: number }>()
 
-/** Test seam: a fresh process starts with no backoff, and each test needs the same. */
+/** Test seam: a fresh process starts with nothing held, and each test needs the same. */
 export function resetLedgerSyncBackoff() {
-  syncFailures.clear()
+  syncHolds.clear()
 }
 
 /** Drains every active IntegrationConnection whose ledger sync is due — more than 24h since its
@@ -112,16 +119,18 @@ export async function syncDueLedgerConnections(): Promise<number> {
     const staleMs = connection.provider === "bigcapital" ? BIGCAPITAL_SYNC_STALE_MS : LEDGER_SYNC_STALE_MS
     const due = !latestSyncedAt || now - latestSyncedAt.getTime() > staleMs
     if (!due) continue
-    const backoff = syncFailures.get(connection.id)
-    if (backoff && now < backoff.nextAttemptAt) continue
+    const hold = syncHolds.get(connection.id)
+    if (hold && now < hold.nextAttemptAt) continue
     try {
       await syncLedgerTransactions(connection.id)
-      syncFailures.delete(connection.id)
+      // Held for the staleness window even on success: if the provider returned nothing there is no
+      // row to carry a syncedAt, and the check above would call this connection due again instantly.
+      syncHolds.set(connection.id, { failures: 0, nextAttemptAt: now + staleMs })
       synced++
     } catch (error) {
-      const failures = (backoff?.failures ?? 0) + 1
+      const failures = (hold?.failures ?? 0) + 1
       const delay = Math.min(SYNC_RETRY_BASE_MS * 2 ** (failures - 1), SYNC_RETRY_MAX_MS)
-      syncFailures.set(connection.id, { failures, nextAttemptAt: now + delay })
+      syncHolds.set(connection.id, { failures, nextAttemptAt: now + delay })
       console.error(
         `[health] failed to sync ledger for connection ${connection.id} (attempt ${failures}, next in ${Math.round(delay / 60000)}m):`,
         error instanceof Error ? error.message : error,

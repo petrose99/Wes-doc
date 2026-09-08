@@ -1,12 +1,12 @@
 # Handoff — Google sign-in, worker queues, Bigcapital provisioning
 
 Session of 2026-09-08. Everything below is deployed to production (`docubite.app`, Lightsail
-`16.60.212.8`, repo at `~/docubite`). Local master and the VPS are both at `c034892`.
+`16.60.212.8`, repo at `~/docubite`). Local master and the VPS are both at `751deb4`.
 
 ## Where to pick up
 
-One open item — item 3 below. Items 1 and 2 are fixed and deployed (`caca601`, `2300dfa`,
-`c034892`).
+Items 1 and 2 are fixed and deployed. Item 3 is fixed but unconfirmed — check it first. Item 4
+is unchanged.
 
 ### 1. "Open accounting" login loop — FIXED (`caca601`)
 
@@ -43,7 +43,27 @@ rejected (watch the first `/api/` call for a 401), which is a different bug.
 Verified: `curl https://books.docubite.app/` serves the new title. Note the image is pinned to
 `latest`, so both this filter and the cookie names above can move under us on a pull.
 
-### 3. Smaller loose ends
+### 3. Ledger sync is rate-limited (`http_429`) — watch it
+
+Fixed on the way past, but not yet seen to succeed. Two stacked faults, both invisible because the
+drain logs one line per failure and carries on:
+
+- `syncLedgerTransactions`'s soft-retire `updateMany` filtered only by `connectionId`, so the scope
+  guard threw, the whole `$transaction` rolled back, and no row ever recorded a `syncedAt`
+  (`fcf615a`). Same class as `145b06f`.
+- "Due" is derived from the newest `LedgerTransaction.syncedAt`, so a failed sync is due again on
+  the next worker tick. Every failure was therefore an unbounded retry loop: both connections
+  refetched every bill, expense and invoice roughly every five seconds, around the clock, until
+  Bigcapital's throttler started answering 429. `751deb4` adds a 5-minute backoff doubling to 6
+  hours, cleared on success.
+
+Traffic went from ~99 provider calls/minute to 0 and the log now reads
+`(attempt 1, next in 5m): http_429`. **Still to confirm: that a retry eventually gets a 200 and
+writes rows.** If 429 persists once the throttler's window has long passed, the sync is simply
+asking for more than the instance allows in one pass (three endpoints, each paged) and needs to be
+spread out, not retried harder.
+
+### 4. Smaller loose ends
 
 - **Rotate the GitHub PAT.** The VPS git remote embeds a token in the URL
   (`https://github_pat_…@github.com/petrose99/docubite.git`) and it was printed into a session
@@ -106,6 +126,16 @@ Worth reading before touching the worker again:
    creation). **The CLI never exits** — always wrap it in `timeout`, or it hangs the caller.
 
 ## Gotchas that cost time
+
+- **A `git pull` deploys nothing under `bigcapital/`.** Those are single-FILE bind mounts, which
+  bind an inode. `git pull` replaces a changed file by rename, so the container keeps serving the
+  old contents — the host file looks right and the running app disagrees. Restart
+  `bigcapital-webapp` after every skin change; `up -d` if a mount was added.
+- **Never call `classList.remove()` unguarded inside a MutationObserver.** It writes the class
+  attribute even when the token was already absent, and an attribute write queues a mutation record
+  whether or not the value changed — so the observer re-triggers itself forever and Chrome puts up
+  "page isn't responding". `docubite-theme.js` did exactly this and locked the accounting tab up
+  the moment the SSO fix let anyone reach it (`003cc85`).
 
 - **Local is not a proxy for production here.** `BIGCAPITAL_ENABLED=true` exists only in
   `.env.production` — locally Bigcapital is off entirely. Both set

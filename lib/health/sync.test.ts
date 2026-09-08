@@ -103,16 +103,41 @@ describe("syncDueLedgerConnections", () => {
     expect(listBills).toHaveBeenCalledTimes(2)
   })
 
-  it("clears the backoff once a sync succeeds", async () => {
+  it("drops the failure count once a sync succeeds", async () => {
     const listBills = vi.fn().mockRejectedValueOnce(new Error("http_429")).mockResolvedValue([])
     stubDueConnection(listBills)
     await syncDueLedgerConnections()
 
     vi.useFakeTimers()
+    // Past the 5-minute first-failure backoff, so the retry runs and succeeds.
     vi.setSystemTime(Date.now() + 6 * 60 * 1000)
     await expect(syncDueLedgerConnections()).resolves.toBe(1)
-    // Still "due" (the stub reports no rows), so a cleared backoff means an immediate third call.
+
+    // A failure straight after a success is attempt 1 again, not attempt 3 — so it waits 5 minutes,
+    // not 20.
+    vi.setSystemTime(Date.now() + 2 * 60 * 60 * 1000)
+    listBills.mockRejectedValue(new Error("http_429"))
+    await syncDueLedgerConnections()
+    vi.setSystemTime(Date.now() + 6 * 60 * 1000)
+    await syncDueLedgerConnections()
+    expect(listBills).toHaveBeenCalledTimes(4)
+  })
+
+  it("holds a connection whose provider returned nothing at all", async () => {
+    // An organization with no bills, expenses or invoices writes zero LedgerTransaction rows, so
+    // there is no syncedAt to age and the staleness check calls it due forever. Without a hold on
+    // success that is a full three-endpoint refetch every tick, for an empty ledger.
+    const listBills = vi.fn().mockResolvedValue([])
+    stubDueConnection(listBills)
+
     await expect(syncDueLedgerConnections()).resolves.toBe(1)
-    expect(listBills).toHaveBeenCalledTimes(3)
+    await expect(syncDueLedgerConnections()).resolves.toBe(0)
+    expect(listBills).toHaveBeenCalledTimes(1)
+
+    vi.useFakeTimers()
+    // BIGCAPITAL_SYNC_STALE_MS is an hour; just past it the connection is attempted again.
+    vi.setSystemTime(Date.now() + 61 * 60 * 1000)
+    await expect(syncDueLedgerConnections()).resolves.toBe(1)
+    expect(listBills).toHaveBeenCalledTimes(2)
   })
 })
