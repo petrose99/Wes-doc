@@ -42,7 +42,7 @@ export async function getExtractionRowsAction(workspaceId: string, fileId: strin
   if (!documents.length) return { success: true, data: [] }
 
   const templates = await prisma.documentTemplate.findMany({
-    where: { fileId, id: { in: [...new Set(documents.map((document) => document.templateId).filter((id): id is string => !!id))] } },
+    where: { workspaceId, fileId, id: { in: [...new Set(documents.map((document) => document.templateId).filter((id): id is string => !!id))] } },
     include: { versions: { orderBy: { version: "desc" }, take: 1 } },
   })
 

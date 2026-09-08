@@ -83,9 +83,9 @@ export async function createChildDocuments(
   return ids
 }
 
-export async function listChildDocuments(parentDocumentId: string): Promise<{ id: string; filename: string; pageRange: string | null; status: string }[]> {
+export async function listChildDocuments(workspaceId: string, parentDocumentId: string): Promise<{ id: string; filename: string; pageRange: string | null; status: string }[]> {
   return await prisma.document.findMany({
-    where: { parentDocumentId },
+    where: { workspaceId, parentDocumentId },
     select: { id: true, filename: true, pageRange: true, status: true },
     orderBy: { receivedAt: "asc" },
   })

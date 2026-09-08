@@ -93,7 +93,7 @@ export async function createDocumentFromBuffer(input: {
   // different files with two different column sets.
   const existing = await prisma.document.findUnique({ where: { fileId_sha256: { fileId: input.fileId, sha256 } } })
   if (existing) {
-    const job = await prisma.documentProcessingJob.findFirst({ where: { documentId: existing.id, status: "queued" }, orderBy: { createdAt: "desc" } })
+    const job = await prisma.documentProcessingJob.findFirst({ where: { workspaceId: input.workspaceId, documentId: existing.id, status: "queued" }, orderBy: { createdAt: "desc" } })
     return { document: existing, job, duplicate: true }
   }
 
@@ -640,7 +640,7 @@ export async function requeueDocumentExtraction(workspaceId: string, documentId:
   const document = await prisma.document.findFirst({ where: { id: documentId, workspaceId }, select: { id: true, storageKey: true, templateVersion: { select: { fields: true } } } })
   if (!document) throw new Error("document_not_found")
   if (!document.storageKey) throw new Error("document_source_missing")
-  const active = await prisma.documentProcessingJob.findFirst({ where: { documentId: document.id, status: { in: ["queued", "processing"] } }, select: { id: true } })
+  const active = await prisma.documentProcessingJob.findFirst({ where: { workspaceId, documentId: document.id, status: { in: ["queued", "processing"] } }, select: { id: true } })
   if (active) throw new Error("document_already_processing")
   const context = await getRequestAuditContext()
   const [, job] = await prisma.$transaction([
@@ -660,7 +660,7 @@ export async function requeueAdaptiveExtraction(workspaceId: string, documentId:
   if (!document) throw new Error("document_not_found")
   if (!document.storageKey) throw new Error("document_source_missing")
   if (!document.templateVersion) throw new Error("document_has_no_template")
-  const active = await prisma.documentProcessingJob.findFirst({ where: { documentId: document.id, status: { in: ["queued", "processing"] } }, select: { id: true } })
+  const active = await prisma.documentProcessingJob.findFirst({ where: { workspaceId, documentId: document.id, status: { in: ["queued", "processing"] } }, select: { id: true } })
   if (active) throw new Error("document_already_processing")
   const context = await getRequestAuditContext()
   const [, job] = await prisma.$transaction([

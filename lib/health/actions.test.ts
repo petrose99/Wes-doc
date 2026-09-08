@@ -122,7 +122,7 @@ describe("executeRetryPush", () => {
     const result = await executeRetryPush({ workspaceId: "ws1", findingId: "f2", actorId: "u1", dryRun: false })
 
     expect(db.integrationPush.updateMany).toHaveBeenCalledWith({
-      where: { id: { in: ["p1"] } },
+      where: { workspaceId: "ws1", id: { in: ["p1"] } },
       data: { status: "pending", attempts: 0, leaseUntil: null, nextAttemptAt: expect.any(Date), errorCode: null },
     })
     expect(attemptIntegrationPush).toHaveBeenCalledWith("p1")

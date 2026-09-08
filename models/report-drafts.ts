@@ -116,7 +116,7 @@ export async function createReportDraft(input: { workspaceId: string; documentId
   const completeness = buildCompletenessReport(synoptic, narrative, Object.fromEntries(sections.map((section) => [section.key, section.title])))
   const renderedText = renderReportText({ signed: false, title: document.filename, synopticText: synoptic.text, narrative, sections })
 
-  const previous = await prisma.documentReportDraft.findFirst({ where: { documentId: document.id }, orderBy: { version: "desc" }, select: { version: true } })
+  const previous = await prisma.documentReportDraft.findFirst({ where: { workspaceId: input.workspaceId, documentId: document.id }, orderBy: { version: "desc" }, select: { version: true } })
   const draft = await prisma.documentReportDraft.create({
     data: {
       workspaceId: input.workspaceId,

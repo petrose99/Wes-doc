@@ -83,6 +83,6 @@ describe("ensureFileWorkbook", () => {
     // First-ever load takes every finished document — no `sheetAppliedAt: null` filter, since
     // there is no existing workbook yet for anything to have been applied to.
     expect(db.document.findMany.mock.calls[0][0].where.sheetAppliedAt).toBeUndefined()
-    expect(db.document.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: { id: { in: ["doc1"] } } }))
+    expect(db.document.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: { workspaceId: "ws", id: { in: ["doc1"] } } }))
   })
 })

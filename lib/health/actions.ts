@@ -159,7 +159,7 @@ export async function executeRetryPush(input: { workspaceId: string; findingId: 
   // shape rather than reimplementing its retry/backoff decisions; the actual attempt below reuses
   // attemptIntegrationPush directly instead of re-deriving success/failure logic here.
   await prisma.integrationPush.updateMany({
-    where: { id: { in: stillFailed.map((push) => push.id) } },
+    where: { workspaceId, id: { in: stillFailed.map((push) => push.id) } },
     data: { status: "pending", attempts: 0, leaseUntil: null, nextAttemptAt: new Date(), errorCode: null },
   })
 

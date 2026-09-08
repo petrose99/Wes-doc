@@ -376,7 +376,7 @@ async function checkSuspiciousResubmission(workspaceId: string, documentId: stri
   if (!rejectedTasks.length) return null
 
   const rejectedDocuments = await prisma.document.findMany({
-    where: { id: { in: rejectedTasks.map((task) => task.documentId) } },
+    where: { workspaceId, id: { in: rejectedTasks.map((task) => task.documentId) } },
     select: { id: true, reviewedData: true, docType: true, template: { select: { code: true } } },
   })
   const supplier = identity.supplier.trim().toLowerCase()

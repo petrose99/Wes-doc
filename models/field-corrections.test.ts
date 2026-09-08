@@ -26,7 +26,7 @@ describe("recordFieldCorrection", () => {
     const rows = Array.from({ length: 25 }, (_, i) => ({ id: `row-${i}` }))
     db.fieldCorrection.findMany.mockResolvedValue(rows)
     await recordFieldCorrection({ workspaceId: "w1", templateCode: "invoice", fieldKey: "vendor", supplier: null, wrongValue: "a", correctedValue: "b" })
-    expect(db.fieldCorrection.deleteMany).toHaveBeenCalledWith({ where: { id: { in: rows.slice(20).map((r) => r.id) } } })
+    expect(db.fieldCorrection.deleteMany).toHaveBeenCalledWith({ where: { workspaceId: "w1", id: { in: rows.slice(20).map((r) => r.id) } } })
   })
 
   it("does not evict when under the cap", async () => {

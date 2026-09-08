@@ -181,9 +181,9 @@ export async function addDomainPackToWorkspace(workspaceId: string, domain: stri
 /** Slugifies a name into a template code, appending -2, -3, … on collision within the file. Codes
  * are the join key DocumentTemplate is @@unique on ([fileId, code]), so this has to actually avoid
  * a collision rather than just look tidy. */
-async function uniqueTemplateCode(fileId: string, name: string): Promise<string> {
+async function uniqueTemplateCode(workspaceId: string, fileId: string, name: string): Promise<string> {
   const base = name.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40) || "template"
-  const existing = new Set((await prisma.documentTemplate.findMany({ where: { fileId }, select: { code: true } })).map((row) => row.code))
+  const existing = new Set((await prisma.documentTemplate.findMany({ where: { workspaceId, fileId }, select: { code: true } })).map((row) => row.code))
   if (!existing.has(base)) return base
   for (let suffix = 2; ; suffix++) {
     const candidate = `${base}_${suffix}`
@@ -211,7 +211,7 @@ export async function saveDocumentAsTemplate(input: { workspaceId: string; docum
   if (!fields.length) throw new Error("no_fields_to_save")
 
   const name = cleanName(input.name, "Untitled template")
-  const code = await uniqueTemplateCode(document.fileId, name)
+  const code = await uniqueTemplateCode(input.workspaceId, document.fileId, name)
   return prisma.documentTemplate.create({
     data: {
       workspaceId: input.workspaceId, fileId: document.fileId, code, name, documentType: code,
@@ -336,7 +336,7 @@ export async function duplicateFile(input: { workspaceId: string; userId: string
     }
   }
 
-  const documents = await prisma.document.findMany({ where: { fileId: source.id }, orderBy: { receivedAt: "asc" }, take: MAX_DUPLICATED_DOCUMENTS })
+  const documents = await prisma.document.findMany({ where: { workspaceId: input.workspaceId, fileId: source.id }, orderBy: { receivedAt: "asc" }, take: MAX_DUPLICATED_DOCUMENTS })
   const writtenKeys: string[] = []
   try {
     for (const document of documents) {
@@ -422,7 +422,7 @@ export async function deleteFolder(workspaceId: string, folderId: string, actorI
   const folder = await prisma.documentFolder.findFirst({ where: { id: folderId, workspaceId }, select: { id: true } })
   if (!folder) throw new Error("folder_not_found")
   if (depth < 20) {
-    const children = await prisma.documentFolder.findMany({ where: { parentId: folder.id }, select: { id: true } })
+    const children = await prisma.documentFolder.findMany({ where: { workspaceId, parentId: folder.id }, select: { id: true } })
     for (const child of children) await deleteFolder(workspaceId, child.id, actorId, depth + 1)
   }
   const files = await prisma.documentFile.findMany({ where: { workspaceId, folderId: folder.id }, select: { id: true } })

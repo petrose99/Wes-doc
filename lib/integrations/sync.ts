@@ -27,8 +27,12 @@ export async function syncAccountingEntities(connectionId: string): Promise<void
       create: { workspaceId: connection.workspaceId, connectionId: connection.id, entityType: row.entityType, externalId: row.externalId, code: row.code, name: row.name, active: row.active, raw: row.raw as Prisma.InputJsonValue, syncedAt },
       update: { code: row.code, name: row.name, active: row.active, raw: row.raw as Prisma.InputJsonValue, syncedAt },
     })),
+    // workspaceId is redundant next to connectionId — a connection belongs to one workspace — but
+    // the scope guard reads the `where` and does not know that. Same fault, same fix, as the ledger
+    // sync in lib/health/sync.ts: without it the whole $transaction rolls back and no entity is
+    // ever synced.
     prisma.accountingEntity.updateMany({
-      where: { connectionId: connection.id, syncedAt: { lt: syncedAt } },
+      where: { workspaceId: connection.workspaceId, connectionId: connection.id, syncedAt: { lt: syncedAt } },
       data: { active: false },
     }),
   ])

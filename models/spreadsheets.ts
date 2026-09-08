@@ -111,7 +111,7 @@ export async function ensureFileWorkbook(workspaceId: string, fileId: string): P
         ? null
         : prisma.documentTemplate.update({ where: { id: template.id }, data: { univerSheetId: seeds[index].sheetId } }))
     await Promise.all(links.filter((link) => link !== null))
-    if (appliedIds.length) await prisma.document.updateMany({ where: { id: { in: appliedIds } }, data: { sheetAppliedAt: new Date() } })
+    if (appliedIds.length) await prisma.document.updateMany({ where: { workspaceId, id: { in: appliedIds } }, data: { sheetAppliedAt: new Date() } })
   }
 
   try {

@@ -34,7 +34,7 @@ export async function recordFieldCorrection(input: {
       select: { id: true },
     })
     const excess = rows.slice(MAX_CORRECTIONS_PER_FIELD)
-    if (excess.length) await prisma.fieldCorrection.deleteMany({ where: { id: { in: excess.map((row) => row.id) } } })
+    if (excess.length) await prisma.fieldCorrection.deleteMany({ where: { workspaceId: input.workspaceId, id: { in: excess.map((row) => row.id) } } })
   } catch (error) {
     console.error("[field-corrections] failed to record correction:", error instanceof Error ? error.message : error)
   }

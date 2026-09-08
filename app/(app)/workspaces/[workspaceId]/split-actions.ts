@@ -83,5 +83,5 @@ export async function listChildDocumentsAction(
 ): Promise<{ id: string; filename: string; pageRange: string | null; status: string }[]> {
   const user = await getCurrentUser()
   await requireWorkspaceRole(workspaceId, user.id)
-  return listChildDocuments(parentDocumentId)
+  return listChildDocuments(workspaceId, parentDocumentId)
 }

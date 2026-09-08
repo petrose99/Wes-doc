@@ -68,10 +68,10 @@ describe("listChildDocuments", () => {
     mockFindMany.mockResolvedValue([
       { id: "c1", filename: "part1.pdf", pageRange: "1-2", status: "received" },
     ])
-    const result = await listChildDocuments("parent1")
+    const result = await listChildDocuments("ws1", "parent1")
     expect(result).toHaveLength(1)
     expect(mockFindMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: { parentDocumentId: "parent1" },
+      where: { workspaceId: "ws1", parentDocumentId: "parent1" },
     }))
   })
 })

@@ -725,11 +725,11 @@ export async function deleteWorksheetAction(workspaceId: string, fileId: string,
   const user = await getCurrentUser()
   if (!(await requireMember(workspaceId, user.id, ["owner"]))) return { success: false, error: NO_ACCESS }
   try {
-    const remaining = await prisma.documentTemplate.count({ where: { fileId } })
+    const remaining = await prisma.documentTemplate.count({ where: { workspaceId, fileId } })
     if (remaining <= 1) return { success: false, error: "A file needs at least one worksheet" }
     // Documents cascade with the worksheet, so their stored sources have to go first or they
     // are orphaned in the blob store.
-    const documents = await prisma.document.findMany({ where: { fileId, templateId }, select: { id: true } })
+    const documents = await prisma.document.findMany({ where: { workspaceId, fileId, templateId }, select: { id: true } })
     if (documents.length) await deleteWorkspaceDocuments(workspaceId, documents.map((document) => document.id), user.id)
     const deleted = await prisma.documentTemplate.deleteMany({ where: { id: templateId, workspaceId, fileId } })
     if (!deleted.count) return { success: false, error: "Worksheet not found" }

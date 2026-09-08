@@ -87,7 +87,7 @@ async function preflightAgainstCache(push: { workspaceId: string; documentId: st
   let verdict: ReturnType<typeof preflightPush>
   try {
     const entities = await prisma.accountingEntity.findMany({
-      where: { connectionId, entityType: { in: ["account", "vendor"] } },
+      where: { workspaceId: push.workspaceId, connectionId, entityType: { in: ["account", "vendor"] } },
       select: { entityType: true, externalId: true, code: true, name: true, active: true },
     })
     verdict = preflightPush({ expenseAccountId, vendorName, entities })
