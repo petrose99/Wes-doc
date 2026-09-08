@@ -43,25 +43,27 @@ rejected (watch the first `/api/` call for a 401), which is a different bug.
 Verified: `curl https://books.docubite.app/` serves the new title. Note the image is pinned to
 `latest`, so both this filter and the cookie names above can move under us on a pull.
 
-### 3. Ledger sync is rate-limited (`http_429`) — watch it
+### 3. Ledger sync never worked — FIXED (`fcf615a`, `751deb4`, `dd18e9e`)
 
-Fixed on the way past, but not yet seen to succeed. Two stacked faults, both invisible because the
-drain logs one line per failure and carries on:
+Three stacked faults, all invisible because the drain logs one line per failure and carries on.
+Worth reading before touching `syncDueLedgerConnections`, because two of the three are the same
+mistake in different clothes: **"due" is derived from the newest `LedgerTransaction.syncedAt`, and
+that timestamp is absent in more cases than it looks.**
 
-- `syncLedgerTransactions`'s soft-retire `updateMany` filtered only by `connectionId`, so the scope
-  guard threw, the whole `$transaction` rolled back, and no row ever recorded a `syncedAt`
-  (`fcf615a`). Same class as `145b06f`.
-- "Due" is derived from the newest `LedgerTransaction.syncedAt`, so a failed sync is due again on
-  the next worker tick. Every failure was therefore an unbounded retry loop: both connections
-  refetched every bill, expense and invoice roughly every five seconds, around the clock, until
-  Bigcapital's throttler started answering 429. `751deb4` adds a 5-minute backoff doubling to 6
-  hours, cleared on success.
+1. `syncLedgerTransactions`'s soft-retire `updateMany` filtered only by `connectionId`. The scope
+   guard threw, the whole `$transaction` rolled back, no row ever got a `syncedAt`. Same class as
+   `145b06f`.
+2. A failed sync writes nothing, so it was due again on the next tick — seconds later. Both
+   connections refetched every bill, expense and invoice roughly every five seconds, around the
+   clock, until Bigcapital's throttler answered 429, which then sustained itself.
+3. With the backoff in, syncs started succeeding — and immediately storming again, because these
+   organizations have no transactions yet. A successful sync of an empty ledger writes zero rows,
+   so there is still no `syncedAt` to age, so it was still permanently due.
 
-Traffic went from ~99 provider calls/minute to 0 and the log now reads
-`(attempt 1, next in 5m): http_429`. **Still to confirm: that a retry eventually gets a 200 and
-writes rows.** If 429 persists once the throttler's window has long passed, the sync is simply
-asking for more than the instance allows in one pass (three endpoints, each paged) and needs to be
-spread out, not retried harder.
+A failure now backs off 5 minutes doubling to 6 hours; a success waits out the same staleness
+window (1h for bigcapital) whether or not it wrote anything. Confirmed in production: provider
+traffic went from ~99 calls/minute to 0, and the worker logs a single
+`Synced ledger connections 3` then goes quiet.
 
 ### 4. Smaller loose ends
 
