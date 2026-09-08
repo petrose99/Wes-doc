@@ -58,13 +58,34 @@ export async function syncLedgerTransactions(connectionId: string): Promise<void
 const LEDGER_SYNC_STALE_MS = 24 * 60 * 60 * 1000
 const BIGCAPITAL_SYNC_STALE_MS = 1 * 60 * 60 * 1000
 
+/** Backoff after a failed sync, doubling per consecutive failure up to the cap.
+ *
+ * "Due" is derived from the newest LedgerTransaction.syncedAt, so a sync that fails writes nothing
+ * and the connection is due again on the very next worker tick — a few seconds later. That turns
+ * any lasting failure (a lapsed token, a provider outage, a bug in the write path) into an
+ * unbounded retry loop against someone else's API: it is what got this deployment rate-limited to
+ * a standstill, on top of the scope bug that started it. A failure now has to wait.
+ *
+ * Held in memory rather than on IntegrationConnection because it is a throttle, not a fact about
+ * the connection: losing it on a worker restart costs one extra attempt, which is the behaviour a
+ * restart should have anyway. */
+const SYNC_RETRY_BASE_MS = 5 * 60 * 1000
+const SYNC_RETRY_MAX_MS = 6 * 60 * 60 * 1000
+const syncFailures = new Map<string, { failures: number; nextAttemptAt: number }>()
+
+/** Test seam: a fresh process starts with no backoff, and each test needs the same. */
+export function resetLedgerSyncBackoff() {
+  syncFailures.clear()
+}
+
 /** Drains every active IntegrationConnection whose ledger sync is due — more than 24h since its
  * newest LedgerTransaction.syncedAt, or a connection with no LedgerTransaction rows at all yet
  * (synced unconditionally, once). Called from app/api/internal/jobs/process/route.ts's cron drain,
  * same "never throw past the caller" posture as drainIntegrationPushes/drainProvisionJobs: one
  * connection's sync failure (a lapsed token, a provider outage) is logged and skipped, never lets
- * a bad connection block every other workspace's drain. Returns how many connections were synced,
- * for the route's response body. */
+ * a bad connection block every other workspace's drain. A connection that fails is then held off
+ * for a growing interval (see SYNC_RETRY_BASE_MS) rather than retried on the next tick. Returns
+ * how many connections were synced, for the route's response body. */
 export async function syncDueLedgerConnections(): Promise<number> {
   // Draining across every workspace's connections at once is the same shape as
   // IntegrationPush/WebhookDelivery's global drains — deliberately unscoped, per
@@ -91,11 +112,20 @@ export async function syncDueLedgerConnections(): Promise<number> {
     const staleMs = connection.provider === "bigcapital" ? BIGCAPITAL_SYNC_STALE_MS : LEDGER_SYNC_STALE_MS
     const due = !latestSyncedAt || now - latestSyncedAt.getTime() > staleMs
     if (!due) continue
+    const backoff = syncFailures.get(connection.id)
+    if (backoff && now < backoff.nextAttemptAt) continue
     try {
       await syncLedgerTransactions(connection.id)
+      syncFailures.delete(connection.id)
       synced++
     } catch (error) {
-      console.error(`[health] failed to sync ledger for connection ${connection.id}:`, error instanceof Error ? error.message : error)
+      const failures = (backoff?.failures ?? 0) + 1
+      const delay = Math.min(SYNC_RETRY_BASE_MS * 2 ** (failures - 1), SYNC_RETRY_MAX_MS)
+      syncFailures.set(connection.id, { failures, nextAttemptAt: now + delay })
+      console.error(
+        `[health] failed to sync ledger for connection ${connection.id} (attempt ${failures}, next in ${Math.round(delay / 60000)}m):`,
+        error instanceof Error ? error.message : error,
+      )
     }
   }
   return synced
