@@ -236,7 +236,7 @@ async function failDocumentJob(
   if (permanent) {
     const failed = await prisma.document.findUnique({ where: { id: job.documentId }, select: { receivedAt: true, template: { select: { code: true } } } })
     if (failed) await track("document_extraction_completed", { documentId: job.documentId, templateCode: failed.template?.code ?? "unknown", status: "failed", durationMs: Date.now() - failed.receivedAt.getTime() }, { workspaceId: job.workspaceId })
-    await prisma.ingestionItem.updateMany({ where: { documentId: job.documentId }, data: { status: "failed" } })
+    await prisma.ingestionItem.updateMany({ where: { workspaceId: job.workspaceId, documentId: job.documentId }, data: { status: "failed" } })
   }
 }
 
@@ -276,10 +276,18 @@ async function autoRouteToSheet(document: { id: string; workspaceId: string; fil
 
 export async function processDocumentJob(jobId: string) {
   const now = new Date()
-  const claimed = await prisma.documentProcessingJob.updateMany({
+  // The compare-and-set that claims this job. It addresses ONE row by its unique id — the extra
+  // conditions are the claim, not the addressing — and only uses updateMany because update() cannot
+  // express "…and only if it is still queued". The guard rejects updateMany regardless of how
+  // unique the id is, so this is unscoped() for the same reason the webhook and integration-push
+  // claims are, and no other statement in this function is.
+  //
+  // Getting this wrong is not subtle: it is the first statement here, so every job died on it and
+  // every upload sat in "processing" forever, whichever of the three drivers called it.
+  const claimed = await unscoped(() => prisma.documentProcessingJob.updateMany({
     where: { id: jobId, status: "queued", scheduledAt: { lte: now } },
     data: { status: "processing", attempts: { increment: 1 }, startedAt: now, leaseUntil: new Date(now.getTime() + JOB_LEASE_MS), errorCode: null },
-  })
+  }))
   if (!claimed.count) return
   const job = await prisma.documentProcessingJob.findUnique({ where: { id: jobId }, include: { document: { include: { workspace: true, template: true, templateVersion: true } } } })
   if (!job?.document) throw new Error("document_job_not_found")
@@ -687,7 +695,7 @@ export async function processDocumentJob(jobId: string) {
       webhookQueued = emitted.queued > 0
     }, { timeout: 20_000 })
     await track("document_extraction_completed", { documentId: document.id, templateCode: document.template?.code ?? "unknown", status: "success", durationMs: Date.now() - document.receivedAt.getTime() }, { workspaceId: document.workspaceId })
-    await prisma.ingestionItem.updateMany({ where: { documentId: document.id }, data: { status: "extracted" } })
+    await prisma.ingestionItem.updateMany({ where: { workspaceId: document.workspaceId, documentId: document.id }, data: { status: "extracted" } })
     const classifiedDocType = classificationData?.docType ?? resolveDocType(document)
     if (isDocType(classifiedDocType)) {
       await autoRouteToSheet(document, classifiedDocType, inferredFields).catch((e) =>
@@ -779,7 +787,7 @@ async function kickEmbedJob(jobId: string): Promise<void> {
  * MinerU): the content-hash skip makes a real duplicate free, this just keeps the queue clean.
  * Returns the embed job's id so the caller can kick it in-process. */
 async function enqueueEmbedJob(document: { id: string; workspaceId: string }, ocrText: string): Promise<string> {
-  const existing = await prisma.documentProcessingJob.findFirst({ where: { documentId: document.id, type: "embed", status: { in: ["queued", "processing"] } }, select: { id: true } })
+  const existing = await prisma.documentProcessingJob.findFirst({ where: { workspaceId: document.workspaceId, documentId: document.id, type: "embed", status: { in: ["queued", "processing"] } }, select: { id: true } })
   if (existing) {
     await prisma.document.update({ where: { id: document.id }, data: { ocrText } })
     return existing.id
@@ -798,7 +806,8 @@ async function enqueueEmbedJob(document: { id: string; workspaceId: string }, oc
  * "Job worker failed …ran without a workspaceId filter" repeating in the worker log.
  *
  * processDocumentJob is deliberately left outside the unscoped block: it works on one job in one
- * workspace and must keep the guard that proves it. */
+ * workspace and must keep the guard that proves it — with the single exception of its own claim,
+ * which is unscoped for its own stated reason. */
 export async function processNextQueuedDocumentJob() {
   const now = new Date()
   const job = await unscoped(async () => {
