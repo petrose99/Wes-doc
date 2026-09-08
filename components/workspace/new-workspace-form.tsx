@@ -36,6 +36,7 @@ const CURRENCIES = [
   { value: "CAD", label: "CAD — Canadian Dollar" },
   { value: "AUD", label: "AUD — Australian Dollar" },
   { value: "ZAR", label: "ZAR — South African Rand" },
+  { value: "LSL", label: "LSL — Lesotho Loti" },
   { value: "INR", label: "INR — Indian Rupee" },
   { value: "BRL", label: "BRL — Brazilian Real" },
   { value: "JPY", label: "JPY — Japanese Yen" },
