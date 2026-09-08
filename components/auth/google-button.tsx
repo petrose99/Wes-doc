@@ -1,5 +1,6 @@
 "use client"
 
+import { AuthDivider } from "@/components/auth/fields"
 import { postSignInDestination } from "@/lib/auth-post-sign-in"
 import { reportAuthEvent } from "@/lib/auth-audit-client"
 import { buttonWidthFor, createNonce, loadGoogleIdentityScript, type GoogleCredentialResponse } from "@/lib/google-identity"
@@ -21,7 +22,9 @@ export function GoogleButton({ redirectTo = "/workspaces", intent = "signin", on
   onError?: (message: string) => void
 }) {
   const slot = useRef<HTMLDivElement>(null)
-  const [ready, setReady] = useState(false)
+  // "loading" holds the placeholder; "ready" means Google drew its button; "failed" means it never
+  // will, and the placeholder has to go — a permanent shimmer reads as a button still on its way.
+  const [status, setStatus] = useState<"loading" | "ready" | "failed">("loading")
   // Read through a ref inside the GIS callback: initialize() is called once on mount, so the
   // callback it closes over would otherwise keep the first render's redirectTo forever — wrong for
   // /login?invite=…, where the destination is resolved from the URL. Written in an effect rather
@@ -56,9 +59,11 @@ export function GoogleButton({ redirectTo = "/workspaces", intent = "signin", on
           logo_alignment: "center",
           width: buttonWidthFor(slot.current),
         })
-        setReady(true)
+        setStatus("ready")
       } catch {
-        if (!cancelled) onError?.("Google sign-in is unavailable right now. Use your email and password instead.")
+        if (cancelled) return
+        setStatus("failed")
+        onError?.("Google sign-in is unavailable right now. Use your email and password instead.")
       }
     }
 
@@ -92,12 +97,21 @@ export function GoogleButton({ redirectTo = "/workspaces", intent = "signin", on
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [intent])
 
+  // Nothing at all once it has failed: the form still has email and password, and the error
+  // message says why Google is missing. An empty slot beats a dead control.
+  if (status === "failed") return null
+
+  // The "or" divider lives here rather than in the forms so it cannot outlive the button it
+  // separates — a lone divider above the email field is a rule with nothing on one side of it.
   return (
-    <div className="min-h-11">
-      {/* Google draws into this element. The placeholder keeps the form from jumping as the
-          script loads, and disappears rather than lingering behind the rendered button. */}
-      <div ref={slot} className="flex justify-center [&>div]:!w-full" />
-      {!ready && <div className="h-11 w-full animate-pulse rounded-lg bg-slate-100" aria-hidden />}
-    </div>
+    <>
+      <div className="min-h-11">
+        {/* Google draws into this element. The placeholder keeps the form from jumping as the
+            script loads, and disappears rather than lingering behind the rendered button. */}
+        <div ref={slot} className="flex justify-center [&>div]:!w-full" />
+        {status === "loading" && <div className="h-11 w-full animate-pulse rounded-lg bg-slate-100" aria-hidden />}
+      </div>
+      <AuthDivider />
+    </>
   )
 }

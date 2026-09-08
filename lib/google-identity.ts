@@ -62,6 +62,15 @@ export async function createNonce(): Promise<{ raw: string; hashed: string }> {
 
 let scriptPromise: Promise<void> | null = null
 
+/** How long to wait for accounts.google.com before giving up on it.
+ *
+ * A timeout is needed on top of the error event, not instead of it: a network that blocks or
+ * black-holes the host (rather than refusing the connection) leaves the request pending
+ * indefinitely and fires no "error" at all — observed on a connection where accounts.google.com
+ * hung for 25s+ while www.google.com answered in under a second. Without this the button would
+ * show its loading placeholder forever and never tell the user anything went wrong. */
+const GIS_LOAD_TIMEOUT_MS = 10_000
+
 /** Loads the GIS script once per page, however many buttons ask for it. Memoized on the promise
  * rather than on a "loaded" boolean so two buttons mounting in the same tick share one request
  * instead of racing two <script> tags in. A rejection clears the memo so a later retry — the user
@@ -73,8 +82,10 @@ export function loadGoogleIdentityScript(): Promise<void> {
   scriptPromise = new Promise<void>((resolve, reject) => {
     const existing = document.querySelector<HTMLScriptElement>(`script[src="${GIS_SRC}"]`)
     const script = existing ?? document.createElement("script")
-    script.addEventListener("load", () => resolve(), { once: true })
-    script.addEventListener("error", () => reject(new Error("google_identity_script_failed")), { once: true })
+    const timer = setTimeout(() => reject(new Error("google_identity_script_timeout")), GIS_LOAD_TIMEOUT_MS)
+    const settle = (outcome: () => void) => { clearTimeout(timer); outcome() }
+    script.addEventListener("load", () => settle(resolve), { once: true })
+    script.addEventListener("error", () => settle(() => reject(new Error("google_identity_script_failed"))), { once: true })
     if (!existing) {
       script.src = GIS_SRC
       script.async = true

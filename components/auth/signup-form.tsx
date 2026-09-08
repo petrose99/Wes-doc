@@ -1,7 +1,7 @@
 ﻿"use client"
 
 import { signUpAction } from "@/app/(auth)/auth-actions"
-import { AuthDivider, AuthField, PasswordField, SubmitButton } from "@/components/auth/fields"
+import { AuthField, PasswordField, SubmitButton } from "@/components/auth/fields"
 import { GoogleButton } from "@/components/auth/google-button"
 import { FormError } from "@/components/forms/error"
 import { Input } from "@/components/ui/input"
@@ -82,10 +82,7 @@ export function SignupForm({ defaultEmail, redirectTo = "/workspaces", googleEna
 
   return (
     <div className="flex flex-col gap-4">
-      {googleEnabled && <>
-        <GoogleButton redirectTo={redirectTo} intent="signup" onError={(message) => setError(message || null)} />
-        <AuthDivider />
-      </>}
+      {googleEnabled && <GoogleButton redirectTo={redirectTo} intent="signup" onError={(message) => setError(message || null)} />}
 
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
         <AuthField label="Your name">

@@ -1,6 +1,6 @@
 ﻿"use client"
 
-import { AuthDivider, AuthField, PasswordField, SubmitButton } from "@/components/auth/fields"
+import { AuthField, PasswordField, SubmitButton } from "@/components/auth/fields"
 import { GoogleButton } from "@/components/auth/google-button"
 import { FormError } from "@/components/forms/error"
 import { postSignInDestination } from "@/lib/auth-post-sign-in"
@@ -55,10 +55,7 @@ export function LoginForm({ defaultEmail, redirectTo = "/workspaces", googleEnab
 
   return (
     <div className="flex flex-col gap-4">
-      {googleEnabled && <>
-        <GoogleButton redirectTo={redirectTo} onError={(message) => setError(message || null)} />
-        <AuthDivider />
-      </>}
+      {googleEnabled && <GoogleButton redirectTo={redirectTo} onError={(message) => setError(message || null)} />}
 
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
         <AuthField label="Email">
