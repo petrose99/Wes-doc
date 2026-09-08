@@ -1,0 +1,24 @@
+name = "docubite-email-worker"
+main = "src/index.ts"
+compatibility_date = "2024-09-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Set with: wrangler secret put APP_INBOUND_SECRET
+# Must equal the app's EMAIL_INBOUND_SECRET (lib/config.ts) — this is what lets the app's
+# /api/inbound-email route trust mail this worker forwards to it.
+#
+# APP_INBOUND_URL is not a secret; set it as a plain var (per environment, below) or override
+# with: wrangler deploy --var APP_INBOUND_URL:https://<app-domain>/api/inbound-email
+#
+# docubite.com is not a zone on this Cloudflare account — the only zone present is docubite.app,
+# which is also DOCUBITE_DOMAIN on the production Lightsail VPS (Caddyfile, .env.production). So
+# this points at the real prod host, and EMAIL_INBOUND_DOMAIN (app side, lib/config.ts) should be
+# set to inbound.docubite.app to match — not the inbound.docubite.com default baked into
+# lib/config.ts's zod schema.
+
+[vars]
+APP_INBOUND_URL = "https://docubite.app/api/inbound-email"
+
+# Cloudflare Email Routing itself (which addresses route to this worker) is configured in the
+# Cloudflare dashboard / via the Email Routing API against the zone — not in this file. See
+# README.md in this directory for the one-time setup steps.

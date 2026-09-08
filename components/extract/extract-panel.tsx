@@ -12,6 +12,7 @@ import type { TrackedDocumentStatus } from "@/components/extract/use-extraction-
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import type { DocumentFieldDefinition } from "@/lib/document-templates"
 import { CloudOff, Files, FileUp, Loader2, Mail, Sparkles, X } from "lucide-react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
@@ -481,10 +482,15 @@ export function ExtractPanel({ workspaceId, fileId, fileName, template, template
   // this session, and a ZIP/photo attempt can force the section open with nothing staged either —
   // both count as "there's a file" too, just not one sitting in the upload list.
   const hasFile = staged.length > 0 || fields.length > 0 || setupRevealed
+  // Email intake is a real channel now (WP13 + Cloudflare Email Routing), not a "coming soon"
+  // placeholder — but there's nothing to do about it *inside* this modal, since a mail arrives on
+  // its own schedule. So it links to the workspace's own inbound address instead of pretending to
+  // be a tab. That page states whether the feature is actually live on this deployment (it's gated
+  // on EMAIL_INBOUND_SECRET — see lib/config.ts), which is why this doesn't need to know itself.
   const sourceTabs = [
-    { label: "Upload", icon: FileUp, active: true },
-    { label: "Google Drive", icon: CloudOff, active: false },
-    { label: "Email", icon: Mail, active: false },
+    { label: "Upload", icon: FileUp, active: true, href: undefined },
+    { label: "Google Drive", icon: CloudOff, active: false, href: undefined },
+    { label: "Email", icon: Mail, active: true, href: `/workspaces/${workspaceId}/settings/email` },
   ]
 
   return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-8 backdrop-blur-[3px]" onClick={onClose}>
@@ -504,9 +510,13 @@ export function ExtractPanel({ workspaceId, fileId, fileName, template, template
           <div className="mb-3 flex items-center justify-between">
             <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Sources</div>
             <div className="flex gap-3">
-              {sourceTabs.map((tab) => <span key={tab.label} title={tab.active ? undefined : "Coming soon"} className={`inline-flex items-center gap-1 text-xs font-medium ${tab.active ? "text-emerald-700" : "text-slate-300"}`}>
-                <tab.icon className="h-3.5 w-3.5" />{tab.label}
-              </span>)}
+              {sourceTabs.map((tab) => tab.href
+                ? <Link key={tab.label} href={tab.href} title="Get this workspace's inbound email address" className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 hover:underline">
+                    <tab.icon className="h-3.5 w-3.5" />{tab.label}
+                  </Link>
+                : <span key={tab.label} title={tab.active ? undefined : "Coming soon"} className={`inline-flex items-center gap-1 text-xs font-medium ${tab.active ? "text-emerald-700" : "text-slate-300"}`}>
+                    <tab.icon className="h-3.5 w-3.5" />{tab.label}
+                  </span>)}
             </div>
           </div>
 

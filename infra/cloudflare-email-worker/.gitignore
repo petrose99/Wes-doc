@@ -1,0 +1,4 @@
+# The root .gitignore only ignores /node_modules at the repo root, so this worker — which has its
+# own package.json and is installed separately — needs its own.
+node_modules
+.wrangler

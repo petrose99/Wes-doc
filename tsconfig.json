@@ -43,6 +43,7 @@
     "vitest.config.ts",
     "**/*.test.ts",
     "**/*.test.tsx",
-    "scripts/**"
+    "scripts/**",
+    "infra/**"
   ]
 }
