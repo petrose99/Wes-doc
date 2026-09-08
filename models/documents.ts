@@ -10,6 +10,7 @@ import { projectDocumentFields } from "@/lib/field-projection"
 import { LOW_CONFIDENCE, PIPELINE_STAGES, stageToStatusFilter, type PipelineStage } from "@/lib/documents/stages"
 import { normalizeBillFromDocument } from "@/lib/integration-bill-mapping"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
+import { unscoped } from "@/lib/workspace-scope"
 import type { DocumentProvenance } from "@/lib/provenance"
 import { replaceDocumentFieldValues } from "@/models/document-field-values"
 import { recordCodingCorrection } from "@/models/coding-corrections"
@@ -603,7 +604,11 @@ export async function deleteWorkspaceDocuments(workspaceId: string, documentIds:
   const deletingIds = new Set(documents.map((d) => d.id))
   for (const document of documents) {
     if (document.storageKey) {
-      const otherRefs = await prisma.document.count({ where: { storageKey: document.storageKey, id: { notIn: [...deletingIds] } } })
+      // Deliberately across every workspace: the question is whether this stored object is still
+      // referenced by ANY document, and scoping it to this one would delete a blob another
+      // workspace's document still points at. unscoped() is what says so — without it the guard
+      // throws and takes the whole delete with it.
+      const otherRefs = await unscoped(() => prisma.document.count({ where: { storageKey: document.storageKey, id: { notIn: [...deletingIds] } } }))
       if (otherRefs === 0) await deleteDocumentSource(document.storageKey).catch(() => {})
     }
     // The blocks sidecar (if any) sits under the same document prefix; drop it too. Best effort —

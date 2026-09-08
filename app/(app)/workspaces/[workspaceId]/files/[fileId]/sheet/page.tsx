@@ -57,8 +57,8 @@ export default async function SheetPage({ params, searchParams }: {
   }
 
   const [documentCount, queued] = await Promise.all([
-    prisma.document.count({ where: { fileId } }),
-    prisma.document.findMany({ where: { fileId, status: { in: ["received", "queued", "processing"] } }, select: { id: true }, take: 100 }),
+    prisma.document.count({ where: { workspaceId, fileId } }),
+    prisma.document.findMany({ where: { workspaceId, fileId, status: { in: ["received", "queued", "processing"] } }, select: { id: true }, take: 100 }),
   ])
 
   return <SheetView
