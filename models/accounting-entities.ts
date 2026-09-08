@@ -9,18 +9,23 @@ export const listAccountingEntities = cache(async (workspaceId: string, entityTy
 }))
 
 /** The most recent sync across every entity type for this workspace's connection, or null if it
- * has never been synced — the settings card's "last synced" timestamp. */
-export const getLastSyncedAt = cache(async (connectionId: string): Promise<Date | null> => {
-  const row = await prisma.accountingEntity.findFirst({ where: { connectionId }, orderBy: { syncedAt: "desc" }, select: { syncedAt: true } })
+ * has never been synced — the settings card's "last synced" timestamp.
+ *
+ * Takes the workspaceId even though connectionId already identifies one workspace's connection:
+ * AccountingEntity is workspace-scoped, so the guard requires the filter to be stated rather than
+ * implied through a join key. Without it this throws and takes the whole Accounting page down with
+ * it — the page has no data to fall back to. */
+export const getLastSyncedAt = cache(async (workspaceId: string, connectionId: string): Promise<Date | null> => {
+  const row = await prisma.accountingEntity.findFirst({ where: { workspaceId, connectionId }, orderBy: { syncedAt: "desc" }, select: { syncedAt: true } })
   return row?.syncedAt ?? null
 })
 
 /** Active account/vendor counts for the Accounting tab's "Sync & coding" card — how much a "Sync
  * now" actually pulled in, without the caller loading every row. */
-export const getEntityCounts = cache(async (connectionId: string): Promise<{ accounts: number; vendors: number }> => {
+export const getEntityCounts = cache(async (workspaceId: string, connectionId: string): Promise<{ accounts: number; vendors: number }> => {
   const [accounts, vendors] = await Promise.all([
-    prisma.accountingEntity.count({ where: { connectionId, entityType: "account", active: true } }),
-    prisma.accountingEntity.count({ where: { connectionId, entityType: "vendor", active: true } }),
+    prisma.accountingEntity.count({ where: { workspaceId, connectionId, entityType: "account", active: true } }),
+    prisma.accountingEntity.count({ where: { workspaceId, connectionId, entityType: "vendor", active: true } }),
   ])
   return { accounts, vendors }
 })

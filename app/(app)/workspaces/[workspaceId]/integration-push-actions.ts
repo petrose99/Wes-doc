@@ -52,7 +52,7 @@ async function pushDocumentToConnection(
 
   let resolvedAccountId = expenseAccountId
   if (!resolvedAccountId && category && connection.defaultExpenseAccountId) {
-    const [mappings, inferredMap] = await Promise.all([listCategoryAccountMappings(connectionId), getCategoryAccountMap(connectionId)])
+    const [mappings, inferredMap] = await Promise.all([listCategoryAccountMappings(connectionId), getCategoryAccountMap(workspaceId, connectionId)])
     resolvedAccountId = resolveCategoryAccount(mappings, category, inferredMap, connection.defaultExpenseAccountId)
   }
 

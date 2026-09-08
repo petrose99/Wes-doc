@@ -28,7 +28,7 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ w
     listWorkspaceWebhookDeliveries(workspaceId, 50),
     listWorkspaceIntegrationConnections(workspaceId),
   ])
-  const connectionsWithSync = await Promise.all(connections.map(async (connection) => ({ ...connection, lastSyncedAt: await getLastSyncedAt(connection.id) })))
+  const connectionsWithSync = await Promise.all(connections.map(async (connection) => ({ ...connection, lastSyncedAt: await getLastSyncedAt(workspaceId, connection.id) })))
 
   return <main className="space-y-6">
     <header>

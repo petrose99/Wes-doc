@@ -285,9 +285,9 @@ export async function listWorkspaceIntegrationPushes(workspaceId: string, docume
  * for this connection, extracts the (category, expenseAccountId) pair, and returns the most recent
  * account for each category. Only pushes that recorded both fields contribute — historical pushes
  * from before per-document account selection are silently skipped. */
-export async function getCategoryAccountMap(connectionId: string): Promise<Record<string, string>> {
+export async function getCategoryAccountMap(workspaceId: string, connectionId: string): Promise<Record<string, string>> {
   const pushes = await prisma.integrationPush.findMany({
-    where: { connectionId, status: "succeeded" },
+    where: { workspaceId, connectionId, status: "succeeded" },
     orderBy: { completedAt: "desc" },
     select: { payload: true },
   })
