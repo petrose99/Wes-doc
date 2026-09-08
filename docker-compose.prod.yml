@@ -26,6 +26,16 @@ services:
         NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}
     restart: unless-stopped
     env_file: .env.production
+    # Uploaded document sources. With no S3 bucket configured, lib/document-storage.ts writes them
+    # to DOCUMENT_SOURCE_PATH on local disk — so without this volume they landed in the web
+    # container's own writable layer, where the worker could not see them (every extraction failed
+    # with ENOENT) and where `docker compose up -d web` destroyed them outright. The path is set
+    # explicitly rather than left to the code's ./data default so the mount point and the code
+    # cannot drift apart if WORKDIR ever changes.
+    environment:
+      DOCUMENT_SOURCE_PATH: /app/data/document-sources
+    volumes:
+      - document_sources:/app/data/document-sources
     ports:
       - "127.0.0.1:7331:7331"
     depends_on:
@@ -38,6 +48,16 @@ services:
       dockerfile: Dockerfile.worker
     restart: unless-stopped
     env_file: .env.production
+    # Uploaded document sources. With no S3 bucket configured, lib/document-storage.ts writes them
+    # to DOCUMENT_SOURCE_PATH on local disk — so without this volume they landed in the web
+    # container's own writable layer, where the worker could not see them (every extraction failed
+    # with ENOENT) and where `docker compose up -d web` destroyed them outright. The path is set
+    # explicitly rather than left to the code's ./data default so the mount point and the code
+    # cannot drift apart if WORKDIR ever changes.
+    environment:
+      DOCUMENT_SOURCE_PATH: /app/data/document-sources
+    volumes:
+      - document_sources:/app/data/document-sources
     depends_on:
       db:
         condition: service_healthy
@@ -164,6 +184,7 @@ services:
       - bigcapital-webapp
 
 volumes:
+  document_sources:
   pgdata:
   mysql_data:
   minio_data:
