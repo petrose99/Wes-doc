@@ -27,18 +27,45 @@
     if (document.body && document.body.classList.contains(DARK)) document.body.classList.remove(DARK);
   }
 
+  /* The workspace URL auth-bridge.html stored on the way in. Rejected if it points at a loopback
+   * address while this page is not itself served from one: that is a URL built from the app
+   * container's own request rather than the site's public address, and it would otherwise sit in
+   * storage sending people to localhost:7331 until their next sign-in overwrote it. Dropping it
+   * here makes the next sign-in unnecessary. */
+  function storedReturnUrl() {
+    var raw;
+    try {
+      raw = localStorage.getItem("docubite:return-url");
+    } catch (e) {
+      return null;
+    }
+    if (!raw) return null;
+    var url;
+    try {
+      url = new URL(raw);
+    } catch (e) {
+      return null;
+    }
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    var loopback = url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname === "[::1]";
+    var pageIsLocal = location.hostname === "localhost" || location.hostname === "127.0.0.1";
+    if (loopback && !pageIsLocal) {
+      try { localStorage.removeItem("docubite:return-url"); } catch (e) { /* nothing to clear */ }
+      return null;
+    }
+    return raw;
+  }
+
   function addBackButton() {
     if (document.getElementById("db-back")) return;
     if (!document.body) return;
-    var url;
-    try {
-      url = localStorage.getItem("docubite:return-url");
-    } catch (e) {
-      /* storage unavailable — fall through to default */
-    }
+    var url = storedReturnUrl();
+    // No usable target: a pill labelled "Back to DocuBite" that lands on the accounting app's own
+    // home page is worse than no pill, so it is left off until a sign-in stores a real one.
+    if (!url) return;
     var a = document.createElement("a");
     a.id = "db-back";
-    a.href = url || "/";
+    a.href = url;
     a.textContent = "← Back to DocuBite";
     document.body.appendChild(a);
   }
