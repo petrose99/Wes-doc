@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { fetchReportTable, voidBill } from "@/lib/integrations/bigcapital/client"
+import { fetchReportTable, signIn, voidBill } from "@/lib/integrations/bigcapital/client"
 
 const jsonResponse = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } })
 
@@ -94,5 +94,46 @@ describe("fetchReportTable", () => {
   it("throws on 500", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({}, 500))
     await expect(fetchReportTable("k", "o", "/api/reports/trial-balance-sheet")).rejects.toThrow()
+  })
+})
+
+describe("signIn", () => {
+  const originalFetch = global.fetch
+  beforeEach(() => { vi.stubGlobal("fetch", vi.fn()) })
+  afterEach(() => { global.fetch = originalFetch })
+
+  it("returns the ids the SPA's own login writes as cookies", async () => {
+    // Shape of a real POST /api/auth/signin body: camelCase in the controller, snake_case on the
+    // wire. authenticated_user_id and tenant_id are stringified because the SPA stores them as
+    // cookie text, and the server sends them as numbers.
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse({ access_token: "jwt-1", organization_id: "org-1", user_id: 7, tenant_id: 3 })
+    )
+    await expect(signIn("a@b.test", "pw")).resolves.toEqual({
+      token: "jwt-1",
+      organizationId: "org-1",
+      userId: "7",
+      tenantId: "3",
+    })
+  })
+
+  it("nulls the optional ids when the instance omits them", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ access_token: "jwt-1", organization_id: "org-1" }))
+    await expect(signIn("a@b.test", "pw")).resolves.toEqual({
+      token: "jwt-1",
+      organizationId: "org-1",
+      userId: null,
+      tenantId: null,
+    })
+  })
+
+  it("sends no auth headers — the caller has no session yet", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ access_token: "jwt-1", organization_id: "org-1" }))
+    await signIn("a@b.test", "pw")
+
+    const [url, init] = vi.mocked(fetch).mock.calls[0]
+    expect(url).toContain("/api/auth/signin")
+    const headers = (init as RequestInit).headers as Record<string, string>
+    expect(headers.authorization).toBeUndefined()
   })
 })

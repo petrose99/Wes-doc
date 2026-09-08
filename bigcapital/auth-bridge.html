@@ -4,20 +4,56 @@
 <body>
 <p>Signing you in…</p>
 <script>
-(function() {
+/* Hands a server-minted Bigcapital session to the Bigcapital SPA.
+ *
+ * The SPA's authentication slice is persisted with `whitelist: []`, so redux-persist stores
+ * nothing of it — its localStorage key holds only `_persist`. The slice's initial state is read
+ * back from COOKIES instead:
+ *
+ *   token: getCookie("token") | organizationId: getCookie("organization_id")
+ *   userId: getCookie("authenticated_user_id")
+ *
+ * and `isAuthenticated = !!state.authentication.token`. Its own login page writes exactly these
+ * four cookies from the snake_case /api/auth/signin body (token, authenticated_user_id,
+ * organization_id, tenant_id) at path "/", 1 day, or 30 with "remember me". Writing them here is
+ * therefore the whole handover: the SPA cannot tell this apart from a login it performed itself.
+ *
+ * Do NOT go back to writing `persist:bigcapital:authentication` — with an empty whitelist nothing
+ * rehydrates from it, so the SPA boots with a null token and bounces to /auth/login. */
+(function () {
+  var SESSION_DAYS = 1; // matches the SPA's own non-"remember me" login
+
+  function setCookie(name, value) {
+    var expires = new Date(Date.now() + SESSION_DAYS * 86400000).toUTCString();
+    // js-cookie decodes %XX on read, so encoding here round-trips (and is a no-op for the
+    // base64url/JWT and id charsets these values actually use).
+    document.cookie = name + "=" + encodeURIComponent(value) + "; path=/; expires=" + expires +
+      "; samesite=lax" + (location.protocol === "https:" ? "; secure" : "");
+  }
+
   var hash = window.location.hash.slice(1);
   if (!hash) { document.body.textContent = "Missing credentials."; return; }
   try {
     var params = JSON.parse(decodeURIComponent(hash));
-    var store = JSON.stringify({
-      token: JSON.stringify(params.token),
-      organizationId: JSON.stringify(params.organizationId),
-      _persist: JSON.stringify({ version: -1, rehydrated: true })
-    });
-    localStorage.setItem("persist:bigcapital:authentication", store);
-    if (params.returnUrl) localStorage.setItem("docubite:return-url", params.returnUrl);
+    if (!params.token || !params.organizationId) throw new Error("incomplete session");
+
+    setCookie("token", params.token);
+    setCookie("organization_id", params.organizationId);
+    if (params.userId) setCookie("authenticated_user_id", params.userId);
+    if (params.tenantId) setCookie("tenant_id", params.tenantId);
+
+    try {
+      // An earlier version of this bridge wrote the session here. It never worked, and a leftover
+      // value would keep a stale token on disk long after its cookie expired.
+      localStorage.removeItem("persist:bigcapital:authentication");
+      if (params.returnUrl) localStorage.setItem("docubite:return-url", params.returnUrl);
+    } catch (e) {
+      /* storage unavailable — the back pill just falls back to "/" */
+    }
+
+    // replace(), so the token-bearing fragment leaves the history stack behind.
     window.location.replace(params.redirectPath || "/");
-  } catch(e) {
+  } catch (e) {
     document.body.textContent = "Sign-in failed: " + e.message;
   }
 })();

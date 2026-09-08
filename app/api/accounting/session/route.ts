@@ -40,9 +40,14 @@ export async function GET(req: NextRequest) {
 
     const webappUrl = config.integrations.bigcapital.webappUrl
     const returnUrl = new URL(`/workspaces/${workspaceId}`, req.url).toString()
+    // The bridge turns these into the same cookies the Bigcapital SPA writes for itself at login
+    // (token / organization_id / authenticated_user_id / tenant_id) — see bigcapital/auth-bridge.html.
+    // It stays in the fragment so the token never reaches a server or a log.
     const payload = encodeURIComponent(JSON.stringify({
       token: session.token,
       organizationId: session.organizationId,
+      ...(session.userId ? { userId: session.userId } : {}),
+      ...(session.tenantId ? { tenantId: session.tenantId } : {}),
       returnUrl,
       ...(safeRedirectPath ? { redirectPath: safeRedirectPath } : {}),
     }))

@@ -76,15 +76,33 @@ export async function signup(input: BigcapitalSignupInput): Promise<BigcapitalSi
   return { userId: String(result.user_id), organizationId: result.organization_id }
 }
 
-export type BigcapitalSession = { token: string; organizationId: string }
+export type BigcapitalSession = {
+  token: string
+  organizationId: string
+  /** Ids the SPA stores alongside the token when it signs in itself. Only the token and the
+   * organization id authenticate a request, so these are optional — they exist so the auth bridge
+   * can reproduce the SPA's cookie set exactly. */
+  userId: string | null
+  tenantId: string | null
+}
 
 /** Signs in for a JWT plus the account's organization id. */
 export async function signIn(email: string, password: string): Promise<BigcapitalSession> {
-  const result = await publicRequest<{ access_token: string; organization_id: string }>("/api/auth/signin", {
+  const result = await publicRequest<{
+    access_token: string
+    organization_id: string
+    user_id?: number | string | null
+    tenant_id?: number | string | null
+  }>("/api/auth/signin", {
     method: "POST",
     body: JSON.stringify({ email, password }),
   })
-  return { token: result.access_token, organizationId: result.organization_id }
+  return {
+    token: result.access_token,
+    organizationId: result.organization_id,
+    userId: result.user_id == null ? null : String(result.user_id),
+    tenantId: result.tenant_id == null ? null : String(result.tenant_id),
+  }
 }
 
 export type BuildOrganizationInput = {
