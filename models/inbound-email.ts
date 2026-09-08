@@ -60,6 +60,21 @@ export const listAllowedSenders = cache(async (workspaceId: string) => prisma.in
   orderBy: { createdAt: "desc" },
 }))
 
+/** Every processed mail already left an InboundEmailIntake row, but until now nothing read them,
+ * so the one question this channel raises — "I sent a mail, where did it go?" — had no answer
+ * short of a database query. A mail that was deduplicated, refused for its sender, or carried
+ * nothing ingestable all look identical from the sender's side: no bounce, nothing in the
+ * pipeline. This is what the settings page renders to tell those apart.
+ *
+ * Ordered on the (workspaceId, createdAt) index, capped rather than paged: this answers "what
+ * just happened", and anyone needing history further back is doing forensics, not checking a
+ * send. */
+export const listRecentIntakes = cache(async (workspaceId: string, limit = 20) => prisma.inboundEmailIntake.findMany({
+  where: { workspaceId },
+  orderBy: { createdAt: "desc" },
+  take: limit,
+}))
+
 export async function addAllowedSender(input: { workspaceId: string; pattern: string; createdById: string }) {
   const pattern = input.pattern.trim().toLowerCase()
   if (!pattern) throw new Error("pattern_required")

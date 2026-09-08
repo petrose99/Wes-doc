@@ -1,3 +1,4 @@
+import { ArrivalPoller } from "@/components/pipeline/arrival-poller"
 import { DocumentList, type ContentMatchRow, type PipelineDocumentRow } from "@/components/pipeline/document-list"
 import { FilterPanel } from "@/components/pipeline/filter-panel"
 import { StageTabs } from "@/components/pipeline/stage-tabs"
@@ -24,6 +25,8 @@ export function PipelineShell({ workspaceId, stage, counts, rows, contentMatches
   touchlessStats?: TouchlessRateStats | null
 }) {
   return <div className="flex min-h-0 flex-1 flex-col">
+    {/* Documents can arrive without anyone touching this page — see ArrivalPoller. */}
+    <ArrivalPoller />
     <div className="flex flex-wrap items-center gap-3 border-b px-6 py-4">
       <div>
         <div className="flex items-center gap-2">
