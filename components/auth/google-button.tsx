@@ -49,6 +49,14 @@ export function GoogleButton({ redirectTo = "/workspaces", intent = "signin", on
           client_id: clientId,
           nonce: nonce.hashed,
           callback: (response: GoogleCredentialResponse) => { void signIn(response, nonce.raw) },
+          // FedCM, not the legacy popup. Without these the button opens a Google-hosted popup that
+          // hands the credential back through third-party cookies on accounts.google.com; where
+          // the browser restricts those the popup lands on accounts.google.com/gsi/transform,
+          // renders blank and never returns — the sign-in simply stops, with no error anywhere.
+          // FedCM has the browser itself mediate the account chooser, so no popup and no
+          // third-party cookie is involved. Chrome is also retiring the non-FedCM path outright.
+          use_fedcm_for_prompt: true,
+          use_fedcm_for_button: true,
         })
         google.accounts.id.renderButton(slot.current, {
           type: "standard",

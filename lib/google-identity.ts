@@ -25,6 +25,7 @@ type GoogleIdentityApi = {
         auto_select?: boolean
         cancel_on_tap_outside?: boolean
         use_fedcm_for_prompt?: boolean
+        use_fedcm_for_button?: boolean
       }) => void
       renderButton: (parent: HTMLElement, options: {
         type?: "standard" | "icon"
@@ -68,8 +69,12 @@ let scriptPromise: Promise<void> | null = null
  * black-holes the host (rather than refusing the connection) leaves the request pending
  * indefinitely and fires no "error" at all — observed on a connection where accounts.google.com
  * hung for 25s+ while www.google.com answered in under a second. Without this the button would
- * show its loading placeholder forever and never tell the user anything went wrong. */
-const GIS_LOAD_TIMEOUT_MS = 10_000
+ * show its loading placeholder forever and never tell the user anything went wrong.
+ *
+ * Generous rather than snappy, and deliberately so: this network has been seen serving the script
+ * in two seconds on one load and well past ten on the next, and a cutoff that fires early is worse
+ * than a slow button — it removes Google sign-in from a page where it would have worked. */
+const GIS_LOAD_TIMEOUT_MS = 25_000
 
 /** Loads the GIS script once per page, however many buttons ask for it. Memoized on the promise
  * rather than on a "loaded" boolean so two buttons mounting in the same tick share one request
