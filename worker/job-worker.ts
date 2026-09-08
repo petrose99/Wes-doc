@@ -44,14 +44,18 @@ async function run() {
     // staleness, health checks once per calendar day), so a hot loop costs a cheap query, not
     // repeated work. Each is caught separately — one failing queue must not stop the others, and
     // must not kill the loop.
-    const drained = await Promise.all([
+    // sendDueReminders answers {reviewTasks, expenseClaims} where the rest answer a count, so it is
+    // reduced to one here. An object is always truthy: left as-is it would report work on every
+    // idle tick and, worse, keep `didWork` permanently true so the loop never slept.
+    const [provisionJobs, integrationPushes, reminders, ledgerSyncs, healthChecks] = await Promise.all([
       drainProvisionJobs().catch((error) => { console.error("Provision drain failed", error instanceof Error ? error.message : "unknown_error"); return 0 }),
       drainIntegrationPushes().catch((error) => { console.error("Integration push drain failed", error instanceof Error ? error.message : "unknown_error"); return 0 }),
-      sendDueReminders().catch((error) => { console.error("Reminder drain failed", error instanceof Error ? error.message : "unknown_error"); return 0 }),
+      sendDueReminders().then(({ reviewTasks, expenseClaims }) => reviewTasks + expenseClaims)
+        .catch((error) => { console.error("Reminder drain failed", error instanceof Error ? error.message : "unknown_error"); return 0 }),
       syncDueLedgerConnections().catch((error) => { console.error("Ledger sync failed", error instanceof Error ? error.message : "unknown_error"); return 0 }),
       runDueHealthChecks().catch((error) => { console.error("Health checks failed", error instanceof Error ? error.message : "unknown_error"); return 0 }),
     ])
-    const [provisionJobs, integrationPushes, reminders, ledgerSyncs, healthChecks] = drained
+    const drainedCount = provisionJobs + integrationPushes + reminders + ledgerSyncs + healthChecks
     if (provisionJobs) console.log("Provisioned integrations", provisionJobs)
     if (integrationPushes) console.log("Pushed to integrations", integrationPushes)
     if (reminders) console.log("Sent reminders", reminders)
@@ -64,7 +68,7 @@ async function run() {
       await sweepOldProductEvents().then((deleted) => { if (deleted) console.log("Swept stale analytics events", deleted) })
         .catch((error) => console.error("Analytics sweep failed", error instanceof Error ? error.message : "unknown_error"))
     }
-    if (!jobId && !deliveryId && !drained.some(Boolean)) await sleep(IDLE_DELAY_MS)
+    if (!jobId && !deliveryId && !drainedCount) await sleep(IDLE_DELAY_MS)
   }
 }
 
