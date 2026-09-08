@@ -43,8 +43,13 @@ export async function syncLedgerTransactions(connectionId: string): Promise<void
         syncedAt,
       },
     })),
+    // workspaceId is redundant next to connectionId — a connection belongs to one workspace — but
+    // the scope guard reads the `where` and does not know that. Without it this throws, the whole
+    // $transaction rolls back, no row ever gets a syncedAt, and syncDueLedgerConnections finds the
+    // connection due again on the very next worker tick: every sync failed forever while refetching
+    // the provider's bills, expenses and invoices every few seconds.
     prisma.ledgerTransaction.updateMany({
-      where: { connectionId: connection.id, syncedAt: { lt: syncedAt } },
+      where: { workspaceId: connection.workspaceId, connectionId: connection.id, syncedAt: { lt: syncedAt } },
       data: { active: false },
     }),
   ])
