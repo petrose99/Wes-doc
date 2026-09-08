@@ -3,7 +3,7 @@
 // and is the only caller.
 import { track } from "@/lib/analytics"
 import { auditEventData, getRequestAuditContext, recordSystemAudit } from "@/lib/audit"
-import { classifyIntent, extractOriginalSender, shouldSkipAttachment } from "@/lib/inbound/filter"
+import { classifyIntent, extractOriginalSender, shouldSkipAttachment, type EmailIntent } from "@/lib/inbound/filter"
 import { fetchPortalPdfs } from "@/lib/inbound/portal-links"
 import { htmlToText, looksInvoiceLike, renderEmailBodyPdf } from "@/lib/inbound/html-to-pdf"
 import { createIngestionItem } from "@/lib/ingestion"
@@ -11,8 +11,7 @@ import { expandZipBuffer } from "@/lib/zip-ingestion"
 import { isSupportedDocumentBuffer } from "@/models/documents"
 import { EXTENSION_MIME_TYPES } from "@/lib/zip-ingestion"
 import { prisma } from "@/lib/db"
-import { DEFAULT_DOCUMENT_TEMPLATES } from "@/lib/document-templates"
-import { createFile, getFileTemplates } from "@/models/files"
+import { ensurePipelineFile, getFileTemplates } from "@/models/files"
 import { getWorkspaceMembers } from "@/models/workspaces"
 import crypto from "crypto"
 import { cache } from "react"
@@ -89,12 +88,31 @@ export async function removeAllowedSender(input: { workspaceId: string; id: stri
   ])
 }
 
-async function ensureEmailIntakeFile(workspaceId: string) {
-  const existing = await prisma.documentFile.findFirst({ where: { workspaceId, name: "Email intake" } })
-  if (existing) return existing
+/** An emailed document belongs in the same container the Extraction page's own upload button
+ * targets, not a channel-specific file of its own. The pipeline list is workspace-wide either way
+ * (models/documents.ts::listWorkspaceDocuments is not filtered by fileId), so this is not about
+ * whether the document is *visible* there — it's about which worksheets it can be extracted
+ * against. The pipeline container carries the full finance set (invoice, receipt, bank statement,
+ * purchase order, remittance advice, supplier statement); a file seeded with only
+ * DEFAULT_DOCUMENT_TEMPLATES cannot offer those, which is what used to force every emailed
+ * invoice through the "generic" worksheet.
+ *
+ * ensurePipelineFile needs a userId for the create path, and email has no acting user, so the
+ * workspace's earliest owner stands in — the same stand-in the old per-channel file used. */
+async function ensureEmailTargetFile(workspaceId: string) {
   const owner = await prisma.workspaceMember.findFirst({ where: { workspaceId, role: "owner" }, orderBy: { createdAt: "asc" }, select: { userId: true } })
   if (!owner) throw new Error("workspace_has_no_owner")
-  return createFile({ workspaceId, userId: owner.userId, name: "Email intake", templates: DEFAULT_DOCUMENT_TEMPLATES })
+  return ensurePipelineFile(workspaceId, owner.userId)
+}
+
+/** Which worksheet a classified mail is extracted against. Only the unambiguous intents map:
+ * "statement" deliberately does not, because classifyIntent's keywords for it span both bank
+ * statements and supplier statements, and picking the wrong one costs a reviewer more than
+ * falling through to the generic worksheet does. */
+const INTENT_TEMPLATE_CODE: Partial<Record<EmailIntent, string>> = {
+  invoice: "invoice",
+  receipt: "receipt",
+  remittance: "remittance_advice",
 }
 
 function inferMimeType(filename: string): string | null {
@@ -126,8 +144,9 @@ const BODY_PREVIEW_MAX = 500
 /** One inbound email, already authenticated by the route (signature + token resolved to a
  * workspace) — this is the business logic: is the sender allowed, and if so, ingest every
  * attachment through the exact same pipeline every other intake channel uses. Attachments land in
- * a dedicated "Email intake" file (auto-created, mirroring ensureDictationFile's pattern) rather
- * than a file the sender has no way to specify.
+ * the workspace's pipeline container — the same one the Extraction page uploads into — so an
+ * emailed document is indistinguishable from a dragged-in one once it lands, and is extracted
+ * against the worksheet its classified intent calls for. See ensureEmailTargetFile.
  *
  * A6.1/A6.2 additions: every processed mail leaves an InboundEmailIntake row (including one that
  * produced zero documents, which previously vanished without a trace — that case also emits an
@@ -157,16 +176,23 @@ export async function processInboundEmail(input: InboundEmailInput): Promise<{ a
     throw new Error("sender_not_allowed")
   }
 
-  const file = await ensureEmailIntakeFile(input.workspaceId)
+  // A6.3: classify the mail up front. A "noise" mail skips the OCR/LLM cost entirely (it
+  // still gets an intake row so the workspace can see what happened). Classified before the
+  // worksheet is chosen, since it's what decides which one.
+  const intent = classifyIntent(input.subject, bodyText)
+
+  const file = await ensureEmailTargetFile(input.workspaceId)
   const templates = await getFileTemplates(input.workspaceId, file.id)
-  const template = templates.find((candidate) => candidate.code === "generic") ?? templates[0]
+  const generic = templates.find((candidate) => candidate.code === "generic")
+  const intended = INTENT_TEMPLATE_CODE[intent]
+  // Falls back rather than failing when the mapped worksheet is missing: a workspace whose
+  // pipeline container predates the finance top-up in ensurePipelineFile may not have every
+  // code yet, and extracting as generic beats refusing the mail outright.
+  const template = (intended ? templates.find((candidate) => candidate.code === intended) : undefined) ?? generic ?? templates[0]
   if (!template) throw new Error("no_template_available")
 
   let accepted = 0
   let rejected = 0
-  // A6.3: classify the mail up front. A "noise" mail skips the OCR/LLM cost entirely (it
-  // still gets an intake row so the workspace can see what happened).
-  const intent = classifyIntent(input.subject, bodyText)
   const attachmentsToProcess = intent === "noise"
     ? []
     : input.attachments.filter((attachment) => !shouldSkipAttachment({

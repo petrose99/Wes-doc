@@ -115,7 +115,7 @@ describe("createIngestionItem", () => {
   })
 
   // The retry case the key exists for: every automated intake path resolves to a fixed fileId (a
-  // re-sent email always lands in the workspace's "Email intake" file), so a provider redelivery
+  // re-sent email always lands in the workspace's pipeline container), so a provider redelivery
   // still collides and is recognised at the door, before the malware scan and extraction.
   it("still short-circuits a provider retry of the same bytes into the same file", async () => {
     db.ingestionItem.findUnique.mockResolvedValue({ id: "i6", documentId: "d6", workspaceId: "w1", fileId: "f1" })

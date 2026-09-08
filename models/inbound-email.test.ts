@@ -2,13 +2,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 vi.mock("@/lib/db", () => ({ prisma: {} }))
 vi.mock("@/lib/ingestion", () => ({ createIngestionItem: vi.fn() }))
-vi.mock("@/models/files", () => ({ createFile: vi.fn(), getFileTemplates: vi.fn() }))
+vi.mock("@/models/files", () => ({ ensurePipelineFile: vi.fn(), getFileTemplates: vi.fn() }))
 vi.mock("@/models/workspaces", () => ({ getWorkspaceMembers: vi.fn() }))
 
 const { addAllowedSender, ensureInboundEmailToken, isSenderAllowed, matchesAllowPattern, processInboundEmail, removeAllowedSender } = await import("@/models/inbound-email")
 const { prisma } = await import("@/lib/db")
 const { createIngestionItem } = await import("@/lib/ingestion")
-const { createFile, getFileTemplates } = await import("@/models/files")
+const { ensurePipelineFile, getFileTemplates } = await import("@/models/files")
 const { getWorkspaceMembers } = await import("@/models/workspaces")
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -128,30 +128,51 @@ describe("processInboundEmail", () => {
 
   beforeEach(() => {
     vi.mocked(getWorkspaceMembers).mockResolvedValue([{ user: { email: "owner@example.com" } }] as never)
-    db.documentFile = { findFirst: vi.fn().mockResolvedValue({ id: "f1" }) }
+    db.workspaceMember = { findFirst: vi.fn().mockResolvedValue({ userId: "owner-1" }) }
+    vi.mocked(ensurePipelineFile).mockResolvedValue({ id: "f1" } as never)
     vi.mocked(getFileTemplates).mockResolvedValue([{ id: "t1", code: "generic" }] as never)
   })
 
   it("refuses a sender who is not a workspace member, before touching any file", async () => {
     await expect(processInboundEmail({ workspaceId: "w1", from: "stranger@example.com", attachments: [attachment] })).rejects.toThrow("sender_not_allowed")
-    expect(db.documentFile.findFirst).not.toHaveBeenCalled()
+    expect(ensurePipelineFile).not.toHaveBeenCalled()
   })
 
-  it("reuses the existing email intake file rather than creating a second one", async () => {
-    vi.mocked(createIngestionItem).mockResolvedValue({ outcome: "accepted" } as never)
-    await processInboundEmail({ workspaceId: "w1", from: "owner@example.com", attachments: [attachment] })
-    expect(createFile).not.toHaveBeenCalled()
-  })
-
-  it("creates the email intake file on first use, owned by the workspace's earliest owner", async () => {
-    db.documentFile = { findFirst: vi.fn().mockResolvedValue(null) }
-    db.workspaceMember = { findFirst: vi.fn().mockResolvedValue({ userId: "owner-1" }) }
-    vi.mocked(createFile).mockResolvedValue({ id: "f2" } as never)
+  /** The channel-specific "Email intake" file is gone: an emailed document goes to the same
+   * container the Extraction page uploads into, so it is extractable against the full finance
+   * worksheet set rather than only DEFAULT_DOCUMENT_TEMPLATES. */
+  it("routes into the workspace's pipeline container, standing in the earliest owner", async () => {
     vi.mocked(createIngestionItem).mockResolvedValue({ outcome: "accepted" } as never)
 
     await processInboundEmail({ workspaceId: "w1", from: "owner@example.com", attachments: [attachment] })
 
-    expect(createFile).toHaveBeenCalledWith(expect.objectContaining({ workspaceId: "w1", userId: "owner-1", name: "Email intake" }))
+    expect(ensurePipelineFile).toHaveBeenCalledWith("w1", "owner-1")
+    expect(createIngestionItem).toHaveBeenCalledWith(expect.objectContaining({ fileId: "f1", source: "email" }))
+  })
+
+  it("refuses the mail when the workspace has no owner to stand in for", async () => {
+    db.workspaceMember = { findFirst: vi.fn().mockResolvedValue(null) }
+    await expect(processInboundEmail({ workspaceId: "w1", from: "owner@example.com", attachments: [attachment] })).rejects.toThrow("workspace_has_no_owner")
+  })
+
+  it("extracts against the worksheet the subject's intent calls for", async () => {
+    vi.mocked(getFileTemplates).mockResolvedValue([{ id: "t1", code: "generic" }, { id: "t2", code: "invoice" }] as never)
+    vi.mocked(createIngestionItem).mockResolvedValue({ outcome: "accepted" } as never)
+
+    await processInboundEmail({ workspaceId: "w1", from: "owner@example.com", subject: "Tax invoice 4021 attached", attachments: [attachment] })
+
+    expect(createIngestionItem).toHaveBeenCalledWith(expect.objectContaining({ templateId: "t2" }))
+  })
+
+  /** "statement" is deliberately unmapped — its keywords span bank and supplier statements — and
+   * an intent with no worksheet in the container must fall back rather than refuse the mail. */
+  it("falls back to the generic worksheet for an unmapped or missing intent", async () => {
+    vi.mocked(getFileTemplates).mockResolvedValue([{ id: "t1", code: "generic" }, { id: "t2", code: "invoice" }] as never)
+    vi.mocked(createIngestionItem).mockResolvedValue({ outcome: "accepted" } as never)
+
+    await processInboundEmail({ workspaceId: "w1", from: "owner@example.com", subject: "Monthly statement of account", attachments: [attachment] })
+
+    expect(createIngestionItem).toHaveBeenCalledWith(expect.objectContaining({ templateId: "t1" }))
   })
 
   it("rejects an attachment whose content doesn't match its claimed type", async () => {

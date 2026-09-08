@@ -44,7 +44,7 @@ export async function createIngestionItem(input: {
   // Scoped to the file, not the whole workspace: Document's own (fileId, sha256) constraint says
   // the same PDF may deliberately be extracted into two sheets with different columns, and a
   // workspace-wide key here ran first and made that unreachable. Provider retries still collide —
-  // they never vary fileId (a re-sent email always resolves to the "Email intake" file).
+  // they never vary fileId (a re-sent email always resolves to the same pipeline container).
   const key = { workspaceId_fileId_idempotencyKey: { workspaceId: input.workspaceId, fileId: input.fileId, idempotencyKey } } as const
 
   const existing = await prisma.ingestionItem.findUnique({ where: key })
