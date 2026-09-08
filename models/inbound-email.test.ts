@@ -178,17 +178,19 @@ describe("processInboundEmail", () => {
   it("rejects an attachment whose content doesn't match its claimed type", async () => {
     const fake = { filename: "invoice.pdf", contentType: "application/pdf", base64Content: Buffer.from("not a pdf").toString("base64") }
     const result = await processInboundEmail({ workspaceId: "w1", from: "owner@example.com", attachments: [fake] })
-    expect(result).toEqual({ accepted: 0, rejected: 1 })
+    expect(result).toEqual({ accepted: 0, rejected: 1, duplicated: 0 })
     expect(createIngestionItem).not.toHaveBeenCalled()
   })
 
   it("rejects an attachment with an unrecognised extension", async () => {
     const unknown = { filename: "notes.txt", contentType: "text/plain", base64Content: Buffer.from("hello").toString("base64") }
     const result = await processInboundEmail({ workspaceId: "w1", from: "owner@example.com", attachments: [unknown] })
-    expect(result).toEqual({ accepted: 0, rejected: 1 })
+    expect(result).toEqual({ accepted: 0, rejected: 1, duplicated: 0 })
   })
 
-  it("counts an accepted and a duplicate outcome as accepted, and a rejected outcome as rejected", async () => {
+  /** Counts each outcome as itself. This previously folded "duplicate" into `accepted`, which is
+   * what let a re-sent attachment report itself as a fresh ingestion. */
+  it("counts accepted, duplicate and rejected outcomes separately", async () => {
     vi.mocked(createIngestionItem)
       .mockResolvedValueOnce({ outcome: "accepted" } as never)
       .mockResolvedValueOnce({ outcome: "duplicate" } as never)
@@ -196,7 +198,22 @@ describe("processInboundEmail", () => {
 
     const result = await processInboundEmail({ workspaceId: "w1", from: "owner@example.com", attachments: [attachment, attachment, attachment] })
 
-    expect(result).toEqual({ accepted: 2, rejected: 1 })
+    expect(result).toEqual({ accepted: 1, rejected: 1, duplicated: 1 })
+  })
+
+  /** A mail carrying both something new and something already held is an ingestion, not a
+   * duplicate — the outcome reflects the best thing that happened, so a partly-new mail is never
+   * filed as though nothing arrived. */
+  it("reports a mail with both new and duplicate attachments as ingested", async () => {
+    vi.mocked(createIngestionItem)
+      .mockResolvedValueOnce({ outcome: "duplicate" } as never)
+      .mockResolvedValueOnce({ outcome: "accepted" } as never)
+
+    await processInboundEmail({ workspaceId: "w1", from: "owner@example.com", attachments: [attachment, attachment] })
+
+    expect(db.inboundEmailIntake.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ outcome: "ingested", acceptedCount: 1 }),
+    })
   })
 
   it("tags every ingested attachment with source \"email\"", async () => {
@@ -216,7 +233,7 @@ describe("processInboundEmail", () => {
 
   it("records a no_document intake and an audit event when a mail yields nothing", async () => {
     const result = await processInboundEmail({ workspaceId: "w1", from: "owner@example.com", subject: "FYI", textBody: "see you at lunch", attachments: [] })
-    expect(result).toEqual({ accepted: 0, rejected: 0 })
+    expect(result).toEqual({ accepted: 0, rejected: 0, duplicated: 0 })
     expect(db.inboundEmailIntake.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ outcome: "no_document", bodyPreview: "see you at lunch" }),
     })
@@ -249,5 +266,38 @@ describe("processInboundEmail", () => {
     const result = await processInboundEmail({ workspaceId: "w1", from: "owner@example.com", subject: "Hello", textBody: "lunch tomorrow?", attachments: [] })
     expect(result.accepted).toBe(0)
     expect(createIngestionItem).not.toHaveBeenCalled()
+  })
+})
+
+/** The failure that prompted this: re-sending the same attachment recorded outcome "ingested"
+ * with acceptedCount 1, so it looked identical to a fresh ingestion while nothing new appeared in
+ * the pipeline — and re-sending is exactly what someone tries when a mail seems not to arrive. */
+describe("processInboundEmail — a re-sent attachment", () => {
+  const attachment = { filename: "invoice.pdf", contentType: "application/pdf", base64Content: PDF_BASE64 }
+
+  beforeEach(() => {
+    vi.mocked(getWorkspaceMembers).mockResolvedValue([{ user: { email: "owner@example.com" } }] as never)
+    db.workspaceMember = { findFirst: vi.fn().mockResolvedValue({ userId: "owner-1" }) }
+    vi.mocked(ensurePipelineFile).mockResolvedValue({ id: "f1" } as never)
+    vi.mocked(getFileTemplates).mockResolvedValue([{ id: "t1", code: "generic" }] as never)
+    vi.mocked(createIngestionItem).mockResolvedValue({ outcome: "duplicate" } as never)
+  })
+
+  it("is reported as a duplicate, not as an ingestion", async () => {
+    const result = await processInboundEmail({ workspaceId: "w1", from: "owner@example.com", attachments: [attachment] })
+
+    expect(result).toEqual({ accepted: 0, rejected: 0, duplicated: 1 })
+    expect(db.inboundEmailIntake.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ outcome: "duplicate", acceptedCount: 0, rejectedCount: 0 }),
+    })
+  })
+
+  /** A duplicate is a success for the sender — the workspace already holds the document — so it
+   * must not raise the silent-zero audit event that a mail yielding nothing does. */
+  it("raises no no_document audit event", async () => {
+    await processInboundEmail({ workspaceId: "w1", from: "owner@example.com", attachments: [attachment] })
+    expect(db.documentAuditEvent.create).not.toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ type: "inbound_email.no_document" }),
+    }))
   })
 })

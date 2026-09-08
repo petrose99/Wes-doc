@@ -157,7 +157,7 @@ const BODY_PREVIEW_MAX = 500
  * produced zero documents, which previously vanished without a trace — that case also emits an
  * audit event so a person can find out); a mail with no ingestable attachment whose BODY looks
  * like a billing document gets the body rendered to a small PDF and ingested like any file. */
-export async function processInboundEmail(input: InboundEmailInput): Promise<{ accepted: number; rejected: number }> {
+export async function processInboundEmail(input: InboundEmailInput): Promise<{ accepted: number; rejected: number; duplicated: number }> {
   const bodyText = (input.textBody?.trim() || (input.htmlBody ? htmlToText(input.htmlBody) : "")).trim()
   const bodyPreview = bodyText ? bodyText.slice(0, BODY_PREVIEW_MAX) : null
   // A6.5: if this is a forwarded email, prefer the original sender for allowlist checking and
@@ -198,6 +198,13 @@ export async function processInboundEmail(input: InboundEmailInput): Promise<{ a
 
   let accepted = 0
   let rejected = 0
+  // Counted apart from `accepted`, which it used to be folded into. createIngestionItem returns
+  // "duplicate" when these exact bytes already produced a document in this file, and lumping that
+  // in made a re-sent attachment indistinguishable from a fresh one: the intake row read
+  // "ingested", the sender got no bounce, and nothing new ever appeared in the pipeline. That is
+  // the single most confusing thing this channel can do, because re-sending is the natural thing
+  // to try when a mail seems not to have arrived.
+  let duplicated = 0
   const attachmentsToProcess = intent === "noise"
     ? []
     : input.attachments.filter((attachment) => !shouldSkipAttachment({
@@ -215,7 +222,8 @@ export async function processInboundEmail(input: InboundEmailInput): Promise<{ a
         const expansion = expandZipBuffer(buffer)
         for (const entry of expansion.entries) {
           const outcome = await createIngestionItem({ workspaceId: input.workspaceId, fileId: file.id, templateId: template.id, source: "email", worksheetAutoAssigned: true, filename: entry.filename, mimeType: entry.mimeType, buffer: entry.buffer })
-          if (outcome.outcome === "accepted" || outcome.outcome === "duplicate") accepted++
+          if (outcome.outcome === "accepted") accepted++
+          else if (outcome.outcome === "duplicate") duplicated++
           else rejected++
         }
         rejected += expansion.skipped.length
@@ -229,7 +237,8 @@ export async function processInboundEmail(input: InboundEmailInput): Promise<{ a
     const mimeType = inferMimeType(attachment.filename)
     if (!mimeType || !buffer.length || !isSupportedDocumentBuffer(buffer, mimeType)) { rejected++; continue }
     const outcome = await createIngestionItem({ workspaceId: input.workspaceId, fileId: file.id, templateId: template.id, source: "email", worksheetAutoAssigned: true, filename: attachment.filename, mimeType, buffer })
-    if (outcome.outcome === "accepted" || outcome.outcome === "duplicate") accepted++
+    if (outcome.outcome === "accepted") accepted++
+          else if (outcome.outcome === "duplicate") duplicated++
     else rejected++
   }
 
@@ -240,7 +249,8 @@ export async function processInboundEmail(input: InboundEmailInput): Promise<{ a
     const portals = await fetchPortalPdfs(bodyText)
     for (const portal of portals) {
       const outcome = await createIngestionItem({ workspaceId: input.workspaceId, fileId: file.id, templateId: template.id, source: "email", worksheetAutoAssigned: true, filename: portal.filename, mimeType: "application/pdf", buffer: portal.buffer })
-      if (outcome.outcome === "accepted" || outcome.outcome === "duplicate") accepted++
+      if (outcome.outcome === "accepted") accepted++
+          else if (outcome.outcome === "duplicate") duplicated++
       else rejected++
     }
   }
@@ -252,14 +262,18 @@ export async function processInboundEmail(input: InboundEmailInput): Promise<{ a
       const buffer = renderEmailBodyPdf({ subject: input.subject ?? null, from: input.from, bodyText })
       const filename = `${(input.subject?.trim() || "email-body").replace(/[^\w.-]+/g, "-").slice(0, 60)}.pdf`
       const outcome = await createIngestionItem({ workspaceId: input.workspaceId, fileId: file.id, templateId: template.id, source: "email", worksheetAutoAssigned: true, filename, mimeType: "application/pdf", buffer })
-      if (outcome.outcome === "accepted" || outcome.outcome === "duplicate") accepted++
+      if (outcome.outcome === "accepted") accepted++
+          else if (outcome.outcome === "duplicate") duplicated++
     } catch (error) {
       console.error("[inbound-email] body-to-pdf ingestion failed:", error instanceof Error ? error.message : error)
     }
   }
 
-  await recordIntake(accepted > 0 ? "ingested" : "no_document", { accepted, rejected })
-  if (accepted === 0) {
+  // "duplicate" ranks between the two: nothing new arrived, but nothing went wrong either, so it
+  // is neither an ingestion to celebrate nor a silent-zero to raise an audit event about.
+  const outcome = accepted > 0 ? "ingested" : duplicated > 0 ? "duplicate" : "no_document"
+  await recordIntake(outcome, { accepted, rejected })
+  if (accepted === 0 && duplicated === 0) {
     // A6.1: the silent-zero case someone should hear about — auditable and countable, keyed to
     // the workspace (there is no document to hang a ReviewTask on). recordSystemAudit never
     // throws and needs no request context.
@@ -269,5 +283,8 @@ export async function processInboundEmail(input: InboundEmailInput): Promise<{ a
     })
     await track("inbound_email_no_document", { attachmentCount: input.attachments.length, rejected }, { workspaceId: input.workspaceId })
   }
-  return { accepted, rejected }
+  // `duplicated` rides along so the route's JSON — and anything reading a provider's delivery log
+  // — can tell "we already had this" from "nothing was taken". Still a 200 either way: a
+  // duplicate is a successful outcome for the sender and must not bounce.
+  return { accepted, rejected, duplicated }
 }
