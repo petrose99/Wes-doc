@@ -1,7 +1,7 @@
 # Handoff — Google sign-in, worker queues, Bigcapital provisioning
 
 Session of 2026-09-08. Everything below is deployed to production (`docubite.app`, Lightsail
-`16.60.212.8`, repo at `~/docubite`). Local master and the VPS are both at `6fda064`.
+`16.60.212.8`, repo at `~/docubite`). Local master and the VPS are both at `7074f22`.
 
 ## Where to pick up
 
@@ -78,6 +78,37 @@ traffic went from ~99 calls/minute to 0, and the worker logs a single
   but not in `prisma/client`, so `review-actions.ts:100` fails typecheck and
   `lib/finance/actions.test.ts` fails. Pre-existing, unrelated to this session's work.
   `npm run db:generate` should clear it.
+
+## The two defects worth knowing before touching anything else
+
+### Workspace-scope failures are silent until someone walks into one
+
+Four separate outages in one day were the same thing: a guarded Prisma operation
+(`findFirst/findMany/count/aggregate/groupBy/updateMany/deleteMany`) on a workspace-scoped model,
+with no `workspaceId` in its `where`. `lib/workspace-scope.ts` turns that into a thrown error, so
+the symptom is never a leak — it is a 500, or a job that never finishes, or a sync that retries
+forever. Nothing catches it before production: the guard is a runtime extension, so `tsc` is happy,
+and tests mock `prisma` wholesale so they never see it.
+
+The sweep is written down — walk every `prisma.<model>.<op>(` on a model in
+`WORKSPACE_SCOPED_MODELS`, extract the balanced call argument, and flag any that neither contains
+`workspaceId` nor sits under an `unscoped(`. It found 25 candidates and 17 real ones, all fixed in
+one pass. Re-run it after any batch of new queries; the eight non-findings are a `where` built in a
+variable, which has to be read by hand.
+
+Two shapes, two different fixes. Most of the time `workspaceId` is already in scope a line above and
+simply belongs in the `where`. But a genuine cross-workspace read wants `unscoped()` instead —
+the blob refcount in `deleteWorkspaceDocuments` asks whether ANY document still references a stored
+object, and scoping it would delete a file another workspace points at. Adding `workspaceId` there
+would be a data-loss bug that looks like a fix.
+
+### Uploaded documents had no volume at all
+
+No S3 bucket is configured, so sources go to local disk — and neither `web` nor `worker` had a
+volume, so uploads sat in the web container's writable layer. The worker could not read them
+(every extraction that got that far died on `ENOENT`), and `docker compose up -d web` destroyed
+them. Fixed in `658a84d`; both services now share `document_sources`. Anything uploaded before
+that is gone.
 
 ## Accounting, second pass — all fixed and deployed
 
