@@ -1,83 +1,47 @@
 # Handoff — Google sign-in, worker queues, Bigcapital provisioning
 
 Session of 2026-09-08. Everything below is deployed to production (`docubite.app`, Lightsail
-`16.60.212.8`, repo at `~/docubite`). Local master and the VPS are both at `1927347`.
+`16.60.212.8`, repo at `~/docubite`). Local master and the VPS are both at `c034892`.
 
 ## Where to pick up
 
-Three open items, in priority order. Item 1 is the live blocker.
+One open item — item 3 below. Items 1 and 2 are fixed and deployed (`caca601`, `2300dfa`,
+`c034892`).
 
-### 1. "Open accounting" lands on a login loop (BLOCKER)
+### 1. "Open accounting" login loop — FIXED (`caca601`)
 
-Pressing **Open accounting** sends the browser to `https://books.docubite.app/auth/login` and loops
-there. It should sign the user straight into Bigcapital with no credentials, the way it did on
-localhost.
+The bridge was handing the session to the SPA in the wrong place. Reading the shipped
+`bigcapitalhq/webapp:latest` bundle settled it: the authentication slice is persisted with
+`whitelist: []`, so redux-persist writes and rehydrates nothing but `_persist` — the localStorage
+key the bridge wrote was inert. The slice's initial state comes from **cookies**:
 
-How the SSO is meant to work:
-
-1. `app/api/accounting/session/route.ts` — signs in to Bigcapital server-side using the stored
-   per-workspace (or per-member) email + decrypted password, then redirects to
-   `${BIGCAPITAL_WEBAPP_URL}/auth-bridge.html#<urlencoded JSON>`.
-2. `bigcapital/auth-bridge.html` — reads the JSON from the URL hash, writes
-   `localStorage["persist:bigcapital:authentication"] = { token, organizationId, _persist }`,
-   then `location.replace(redirectPath || "/")`.
-3. The Bigcapital SPA is supposed to rehydrate from that key and consider itself signed in.
-
-**Already verified — these are NOT the problem:**
-
-| Check | Result |
-|---|---|
-| `https://books.docubite.app/auth-bridge.html` | HTTP 200 (file is mounted and served) |
-| `BIGCAPITAL_WEBAPP_URL` / `BIGCAPITAL_API_BASE` | both `https://books.docubite.app` |
-| `bigcapital_accounts` rows | 2 rows, both with `email` set and an `organization_id` |
-| `integration_connections` | 2 rows, both `status = active` |
-| Bigcapital tenant DBs | `bigcapital_tenant_55oj1mtsi333q`, `bigcapital_tenant_55oj1mtsi3f9t` |
-
-So credentials, org ids, and the bridge file all exist. The failure is downstream of the redirect.
-
-**Prime suspect:** the shape or key name written to `localStorage` no longer matches what the
-running `bigcapitalhq/webapp:latest` expects — the image is pinned to `latest`, so it can move under
-us — or the token returned by `bigcapital.signIn` is rejected by the API and the SPA bounces to
-`/auth/login`.
-
-**How to diagnose (do this first, don't guess):**
-
-- Open DevTools on `books.docubite.app`, run **Open accounting**, and watch: does
-  `persist:bigcapital:authentication` appear in localStorage? With what shape?
-- Compare against the shape the SPA writes after a *manual* login at
-  `https://books.docubite.app/auth/login` (credentials are in `bigcapital_accounts.email` +
-  `password_enc`, decryptable with `SECRETS_ENCRYPTION_KEY`). Diff the two — that difference is
-  almost certainly the bug.
-- Check the Network tab for the first `/api/` call after the bridge redirect: a 401 there means the
-  token is bad, not the storage shape.
-
-Relevant files: `app/api/accounting/session/route.ts`, `bigcapital/auth-bridge.html`,
-`lib/integrations/bigcapital/client.ts`, `models/bigcapital-members.ts`.
-
-### 2. Rename "Bigcapital" in the UI to something neutral
-
-`curl https://books.docubite.app/` currently serves `<title>Bigcapital</title>`. That is the
-vendor's own SPA title, not ours — no user-visible "Bigcapital" string exists in our `.tsx` files
-(only internal function names like `repairBigcapitalConnectionAction`).
-
-Fix in `bigcapital/nginx.conf`, which already rewrites the page via `sub_filter` in the
-`location = /index.html` block. Add alongside the existing filters:
-
-```nginx
-sub_filter '<title>Bigcapital</title>' '<title>Accounting</title>';
+```js
+initialState = {
+  token: getCookie("token"), organizationId: getCookie("organization_id"),
+  userId: getCookie("authenticated_user_id"), locale: getCookie("locale"), ...
+}
+isAuthenticated = (s) => !!s.authentication.token
 ```
 
-Note `sub_filter_once` defaults to `on`, so each directive replaces only its first match — fine
-here since the strings are distinct. After editing, the change is picked up by restarting the
-webapp container (the file is a read-only bind mount, no rebuild needed):
+and the SPA's own login page (in the `queries-*.js` chunk, not `index-*.js`, which is why a first
+grep of the main bundle found nothing writing them) sets exactly `token`,
+`authenticated_user_id`, `organization_id`, `tenant_id` from the snake_case `/api/auth/signin`
+body, at `path=/`, for 1 day (30 with "remember me").
 
-```bash
-bash scripts/vps-ssh.sh 'cd ~/docubite && docker compose -f docker-compose.prod.yml --env-file .env.production restart bigcapital-webapp'
-```
+So `auth-bridge.html` now writes those four cookies, `signIn()` carries `user_id`/`tenant_id`
+through for it, and `lib/integrations/bigcapital/auth-bridge.test.ts` pins the names by running
+the shipped file's own script.
 
-This aligns with the existing project rule that vendor names stay out of the UI. Check
-`docubite-theme.js` too — it is injected on every SPA page and can rewrite anything `sub_filter`
-cannot reach (text rendered by JS after load).
+**Not verified by a click-through** — the Chrome extension was not connected in that session. If
+"Open accounting" still loops, check in DevTools on `books.docubite.app` that a `token` cookie
+exists after the bridge runs; if it does and the SPA still bounces, the token itself is being
+rejected (watch the first `/api/` call for a 401), which is a different bug.
+
+### 2. Vendor name in the accounting tab title — FIXED (`2300dfa`)
+
+`bigcapital/nginx.conf` rewrites `<title>Bigcapital</title>` → `<title>Accounting</title>`.
+Verified: `curl https://books.docubite.app/` serves the new title. Note the image is pinned to
+`latest`, so both this filter and the cookie names above can move under us on a pull.
 
 ### 3. Smaller loose ends
 
