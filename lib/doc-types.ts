@@ -337,6 +337,22 @@ export function isPushableDocument(doc: { docType?: string | null; template?: { 
   return (PUSHABLE_DOC_TYPES as string[]).includes(resolveDocType(doc))
 }
 
+export const PAID_STATUSES = ["paid", "unpaid"] as const
+export type PaidStatus = (typeof PAID_STATUSES)[number]
+
+export function isPaidStatus(value: unknown): value is PaidStatus {
+  return typeof value === "string" && (PAID_STATUSES as readonly string[]).includes(value)
+}
+
+/** Whether a document's review task requires a person to have confirmed paid/unpaid before it can
+ * be approved. Reuses the expense/sale/other split rather than a new list: every doc type that is
+ * itself a bill somebody owes money on (invoice, receipt, purchase_order, payslip) is "expense" for
+ * exactly this reason, and a bank statement or contract has no payment state of its own to confirm.
+ * See models/review-tasks.ts for where this actually gates approval. */
+export function isPaymentConfirmationRequired(doc: { docType?: string | null; template?: { code: string } | null }): boolean {
+  return isExpenseDocType(resolveDocType(doc))
+}
+
 export function isCategoryConfirmed(codingData: Record<string, unknown> | null): boolean {
   if (!codingData) return false
   if (codingData.categoryConfirmed === true) return true

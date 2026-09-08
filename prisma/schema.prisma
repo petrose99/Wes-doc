@@ -46,6 +46,7 @@ model User {
   signedReports         DocumentReportDraft[]
   editedTranscripts     Document[]            @relation("TranscriptEditor")
   flaggedDocuments      Document[]            @relation("DocumentFlagger")
+  paymentConfirmedDocuments Document[]        @relation("DocumentPaymentConfirmer")
   listPreferences       UserListPreference[]
   sheetPlacements       DocumentSheetPlacement[] @relation("PlacementPlacer")
   decidedFieldSuggestions FieldSuggestion[]   @relation("FieldSuggestionDecider")
@@ -492,6 +493,16 @@ model Document {
   /// Free-text reviewer note on the pipeline's split-pane detail view — separate from
   /// reviewedData/codingData, which are both values read off (or coded onto) the document itself.
   note              String?
+  /// A reviewer's confirmation of whether this bill/invoice has been paid — "paid" | "unpaid".
+  /// Null until confirmed. NOT inferred from ledger sync: LedgerTransaction.paymentStatus (Data
+  /// Health Phase B) is a provider's own answer for a document already pushed to accounting, which
+  /// is a different fact answered a different way and may not exist for months. This is the
+  /// person's own answer, gathered at review time, and is what
+  /// lib/doc-types.ts's isExpenseDocType() requires before an invoice/receipt/purchase_order/
+  /// payslip's review task can be approved — see models/review-tasks.ts.
+  paymentStatus       String?   @map("payment_status")
+  paymentConfirmedAt  DateTime? @map("payment_confirmed_at")
+  paymentConfirmedById String?  @map("payment_confirmed_by_id") @db.Uuid
   createdAt         DateTime                 @default(now()) @map("created_at")
   updatedAt         DateTime                 @updatedAt @map("updated_at")
   workspace         Workspace                @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -503,6 +514,7 @@ model Document {
   checkResults      DocumentCheckResult[]
   transcriptEditedBy User?                   @relation("TranscriptEditor", fields: [transcriptEditedById], references: [id], onDelete: SetNull)
   flaggedBy         User?                    @relation("DocumentFlagger", fields: [flaggedById], references: [id], onDelete: SetNull)
+  paymentConfirmedBy User?                   @relation("DocumentPaymentConfirmer", fields: [paymentConfirmedById], references: [id], onDelete: SetNull)
   parentDocument    Document?                @relation("DocumentSplit", fields: [parentDocumentId], references: [id], onDelete: SetNull)
   childDocuments    Document[]               @relation("DocumentSplit")
   jobs              DocumentProcessingJob[]

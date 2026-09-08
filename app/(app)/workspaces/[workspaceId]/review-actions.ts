@@ -1,13 +1,14 @@
 "use server"
 
 import { ActionState } from "@/lib/actions"
-import { isPushableDocument } from "@/lib/doc-types"
+import { isPaidStatus, isPaymentConfirmationRequired, isPushableDocument } from "@/lib/doc-types"
 import { canDecideStage, findCurrentStage } from "@/lib/approvals/engine"
 import { maybeAutopublish } from "@/lib/automation/autopublish"
 import { refreshDocumentReadiness } from "@/lib/readiness/refresh"
 import { creditSupplierForCleanApproval } from "@/models/suppliers"
 import { getCurrentUser } from "@/lib/auth"
 import { parseTemplateFields } from "@/lib/document-templates"
+import { setDocumentPaymentStatus } from "@/models/documents"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { prisma } from "@/lib/db"
 import { listApprovalWorkflows, startWorkflowOnReviewTask } from "@/models/approval-workflows"
@@ -56,21 +57,38 @@ export async function updateReviewTaskStatusAction(workspaceId: string, taskId: 
   } catch (error) { return { success: false, error: errorMessage(error, "Could not update the review task") } }
 }
 
-export async function bulkUpdateReviewTaskStatusAction(workspaceId: string, taskIds: string[], status: string): Promise<ActionState<{ updated: number }>> {
+export async function bulkUpdateReviewTaskStatusAction(workspaceId: string, taskIds: string[], status: string): Promise<ActionState<{ updated: number; blockedTaskIds: string[] }>> {
   const user = await getCurrentUser()
   if (!(await requireAccountingMember(workspaceId, user.id))) return { success: false, error: NO_ACCESS }
   const parsed = parseReviewTaskStatus(status)
   if (!parsed) return { success: false, error: "Invalid status" }
   if (!taskIds.length) return { success: false, error: "Nothing selected" }
   try {
+    // A bulk approve withholds one document at a time for a missing payment confirmation rather
+    // than failing outright — see bulkUpdateReviewTaskStatus. blockedTaskIds is what lets the
+    // client revert its optimistic state for exactly the rows that did not move.
     const result = await bulkUpdateReviewTaskStatus({ workspaceId, taskIds, status: parsed, actorId: user.id })
     if (parsed === "approved") await Promise.all(result.documentIds.map((documentId) => maybeConfirmAiCoding(workspaceId, documentId, user.id)))
     if (parsed === "approved") await Promise.all(result.documentIds.map((documentId) => creditSupplierForCleanApproval(workspaceId, documentId)))
     await Promise.all(result.documentIds.map((documentId) => refreshDocumentReadiness({ workspaceId, documentId })))
     if (parsed === "approved") await Promise.all(result.documentIds.map((documentId) => maybeAutopublish(workspaceId, documentId, user.id)))
     revalidatePath(paths(workspaceId).review)
-    return { success: true, data: { updated: result.updated } }
+    return { success: true, data: { updated: result.updated, blockedTaskIds: result.blockedTaskIds } }
   } catch (error) { return { success: false, error: errorMessage(error, "Could not update the selected review tasks") } }
+}
+
+/** A reviewer's paid/unpaid confirmation, separate from the status-change action above so setting
+ * it never has to also be a status change — it can happen well before the task is decided, or
+ * after, to correct an earlier answer. */
+export async function setDocumentPaymentStatusAction(workspaceId: string, documentId: string, status: string): Promise<ActionState<null>> {
+  const user = await getCurrentUser()
+  if (!(await requireAccountingMember(workspaceId, user.id))) return { success: false, error: NO_ACCESS }
+  if (!isPaidStatus(status)) return { success: false, error: "Invalid payment status" }
+  try {
+    await setDocumentPaymentStatus({ workspaceId, documentId, status, actorId: user.id })
+    revalidatePath(paths(workspaceId).review)
+    return { success: true, data: null }
+  } catch (error) { return { success: false, error: errorMessage(error, "Could not record payment status") } }
 }
 
 /** Everything the split-view detail pane (components/workspace/review-inbox.tsx) needs for one
@@ -127,6 +145,10 @@ export async function getReviewTaskDetailAction(workspaceId: string, taskId: str
       supplier,
       codingSource,
       codingConfidence,
+      paymentStatus: task.document.paymentStatus as "paid" | "unpaid" | null,
+      // Same doc-type read isPushableDocument above already made, reused rather than resolved
+      // twice — see lib/doc-types.ts's isPaymentConfirmationRequired for what it actually checks.
+      paymentConfirmationRequired: isPaymentConfirmationRequired({ docType: task.document.docType, template }),
     },
     checkResults: checkResults.map((check) => ({ id: check.id, checkCode: check.checkCode, status: check.status, message: check.message })),
     appliedRuleName: appliedRule?.name ?? null,

@@ -1,6 +1,6 @@
 "use client"
 
-import { assignReviewTaskAction, bulkUpdateReviewTaskStatusAction, decideReviewTaskStageAction, getReviewTaskDetailAction, startWorkflowOnReviewTaskAction, updateReviewTaskStatusAction } from "@/app/(app)/workspaces/[workspaceId]/review-actions"
+import { assignReviewTaskAction, bulkUpdateReviewTaskStatusAction, decideReviewTaskStageAction, getReviewTaskDetailAction, setDocumentPaymentStatusAction, startWorkflowOnReviewTaskAction, updateReviewTaskStatusAction } from "@/app/(app)/workspaces/[workspaceId]/review-actions"
 import { pushDocumentToAccountingAction } from "@/app/(app)/workspaces/[workspaceId]/integration-push-actions"
 import { DocumentPreview } from "@/components/documents/document-preview"
 import { AutomationRuleForm } from "@/components/workspace/automation-rule-form"
@@ -169,6 +169,18 @@ export function ReviewInbox({ workspaceId, tasks, currentStatus, members }: {
     } finally { setPending(false) }
   }
 
+  const confirmPayment = useCallback(async (documentId: string, status: "paid" | "unpaid") => {
+    if (!detail) return
+    setPending(true)
+    try {
+      const result = await setDocumentPaymentStatusAction(workspaceId, documentId, status)
+      if (!result.success) { toast.error(result.error || "Could not record payment status"); return }
+      await refetchDetail(detail.id)
+    } catch {
+      toast.error("Could not reach the server")
+    } finally { setPending(false) }
+  }, [workspaceId, detail, refetchDetail])
+
   const pushSelected = useCallback(async () => {
     if (!detail?.canPush || !detail.activeConnectionId || pushed.has(detail.id)) return
     setPushed((previous) => new Set(previous).add(detail.id))
@@ -207,7 +219,13 @@ export function ReviewInbox({ workspaceId, tasks, currentStatus, members }: {
         if (detail && detail.id === task.id && detail.workflow) {
           if (detail.workflow.canDecideCurrentStage) void decideStage(task.id, "approve")
         } else if (!detail?.workflow) {
-          void changeStatus(task.id, "approved", optimisticStatus[task.id] ?? task.status)
+          // Same gate the Approve button applies — see its `blocked` computation above. The
+          // server enforces this regardless; this only saves a round trip for the common case.
+          if (detail && detail.id === task.id && detail.document.paymentConfirmationRequired && !detail.document.paymentStatus) {
+            toast.warning("Confirm paid/unpaid first")
+          } else {
+            void changeStatus(task.id, "approved", optimisticStatus[task.id] ?? task.status)
+          }
         }
       } else if (event.key === "p") {
         event.preventDefault()
@@ -229,11 +247,26 @@ export function ReviewInbox({ workspaceId, tasks, currentStatus, members }: {
     if (!bulkSelected.size) return
     setPending(true)
     const ids = [...bulkSelected]
+    // Kept so a blocked row's optimistic status can be put back afterward — reverting to whatever
+    // the row actually shows now (task.status), not assuming it was "open".
+    const previousStatus = new Map(ids.map((id) => [id, optimisticStatus[id] ?? tasks.find((task) => task.id === id)?.status ?? "open"]))
     setOptimisticStatus((previous) => { const next = { ...previous }; for (const id of ids) next[id] = status; return next })
     try {
       const result = await bulkUpdateReviewTaskStatusAction(workspaceId, ids, status)
       if (!result.success) { toast.error(result.error || "Could not update the selected tasks"); return }
-      toast.success(`${result.data?.updated ?? 0} task${result.data?.updated === 1 ? "" : "s"} updated`)
+      const blockedTaskIds = result.data?.blockedTaskIds ?? []
+      if (blockedTaskIds.length) {
+        setOptimisticStatus((previous) => { const next = { ...previous }; for (const id of blockedTaskIds) next[id] = previousStatus.get(id)!; return next })
+      }
+      const updated = result.data?.updated ?? 0
+      if (updated && blockedTaskIds.length) {
+        toast.success(`${updated} task${updated === 1 ? "" : "s"} updated`)
+        toast.warning(`${blockedTaskIds.length} withheld — confirm paid/unpaid first`)
+      } else if (blockedTaskIds.length) {
+        toast.warning(`Confirm paid/unpaid on ${blockedTaskIds.length} document${blockedTaskIds.length === 1 ? "" : "s"} before approving`)
+      } else {
+        toast.success(`${updated} task${updated === 1 ? "" : "s"} updated`)
+      }
       setBulkSelected(new Set())
       router.refresh()
     } catch {
@@ -341,6 +374,22 @@ export function ReviewInbox({ workspaceId, tasks, currentStatus, members }: {
             </select>
           </div>
 
+          {detail.document.paymentConfirmationRequired && (
+            <div className="mt-3">
+              <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">Paid?</label>
+              <div className="mt-1.5 flex gap-2">
+                {(["paid", "unpaid"] as const).map((option) => (
+                  <button key={option} type="button" disabled={pending}
+                    className={`rounded-md border px-2.5 py-1.5 text-xs font-semibold capitalize transition-colors disabled:opacity-50 ${detail.document.paymentStatus === option ? (option === "paid" ? "border-emerald-700 bg-emerald-50 text-emerald-800" : "border-amber-600 bg-amber-50 text-amber-800") : "hover:bg-slate-50"}`}
+                    onClick={() => void confirmPayment(detail.document.id, option)}>
+                    {option}
+                  </button>
+                ))}
+              </div>
+              {!detail.document.paymentStatus && <p className="mt-1 text-xs text-amber-700">Required before this can be approved.</p>}
+            </div>
+          )}
+
           {detail.workflow ? (
             <div className="mt-3">
               <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">{detail.workflow.name}</label>
@@ -351,7 +400,15 @@ export function ReviewInbox({ workspaceId, tasks, currentStatus, members }: {
               {detail.status === "in_review" ? (
                 detail.workflow.canDecideCurrentStage ? (
                   <div className="mt-1.5 flex flex-wrap gap-2">
-                    <button type="button" disabled={pending} className="rounded-md bg-emerald-700 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-800 disabled:opacity-50" onClick={() => void decideStage(detail.id, "approve")}>Approve stage</button>
+                    {(() => {
+                      // Only the LAST stage clearing actually resolves the task as "approved" (see
+                      // decideStage in lib/approvals/engine.ts) — an earlier stage's approve just
+                      // advances currentStageIndex, so it needs no payment confirmation yet.
+                      const isLastStage = detail.workflow!.currentStageIndex === detail.workflow!.stages.length - 1
+                      const blocked = isLastStage && detail.document.paymentConfirmationRequired && !detail.document.paymentStatus
+                      return <button type="button" disabled={pending || blocked} title={blocked ? "Confirm paid/unpaid first" : undefined}
+                        className="rounded-md bg-emerald-700 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-800 disabled:opacity-50" onClick={() => void decideStage(detail.id, "approve")}>Approve stage</button>
+                    })()}
                     <button type="button" disabled={pending} className="rounded-md border border-red-300 px-2.5 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50" onClick={() => void decideStage(detail.id, "reject")}>Reject</button>
                   </div>
                 ) : <p className="mt-1.5 text-xs text-indigo-700">Only a workspace owner can decide this stage.</p>
@@ -363,8 +420,9 @@ export function ReviewInbox({ workspaceId, tasks, currentStatus, members }: {
               <div className="mt-1.5 flex flex-wrap gap-2">
                 {STATUS_OPTIONS.map((option) => {
                   const current = optimisticStatus[detail.id] ?? detail.status
-                  return <button key={option} type="button" disabled={current === option}
-                    className={`rounded-md border px-2.5 py-1.5 text-xs font-semibold capitalize transition-colors ${current === option ? "border-emerald-700 bg-emerald-50 text-emerald-800" : "hover:bg-slate-50"}`}
+                  const blocked = option === "approved" && detail.document.paymentConfirmationRequired && !detail.document.paymentStatus
+                  return <button key={option} type="button" disabled={current === option || blocked} title={blocked ? "Confirm paid/unpaid first" : undefined}
+                    className={`rounded-md border px-2.5 py-1.5 text-xs font-semibold capitalize transition-colors disabled:opacity-50 ${current === option ? "border-emerald-700 bg-emerald-50 text-emerald-800" : "hover:bg-slate-50"}`}
                     onClick={() => void changeStatus(detail.id, option, current)}>
                     {option.replace("_", " ")}
                   </button>

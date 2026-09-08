@@ -64,7 +64,7 @@ describe("updateReviewTaskStatus", () => {
   })
 
   it("stamps resolvedAt when moving to a terminal status", async () => {
-    db.reviewTask = { findFirst: vi.fn().mockResolvedValue({ id: "t1", documentId: "d1", status: "open" }), update: vi.fn().mockReturnValue("update") }
+    db.reviewTask = { findFirst: vi.fn().mockResolvedValue({ id: "t1", documentId: "d1", status: "open", document: { docType: "contract", paymentStatus: null, template: null } }), update: vi.fn().mockReturnValue("update") }
     db.documentAuditEvent = { create: vi.fn().mockReturnValue("audit") }
 
     await updateReviewTaskStatus({ workspaceId: "w1", taskId: "t1", status: "approved", actorId: "u1" })
@@ -118,6 +118,7 @@ describe("decideReviewTaskStage", () => {
       findFirst: vi.fn().mockResolvedValue({
         id: "t1", documentId: "d1", currentStageIndex: 0,
         workflow: { stages: [{ stageIndex: 0, requireOwner: false, name: "Only stage" }] },
+        document: { docType: "contract", paymentStatus: null, template: null },
       }),
       update: vi.fn().mockReturnValue("update"),
     }
@@ -146,8 +147,12 @@ describe("decideReviewTaskStage", () => {
 
 describe("bulkUpdateReviewTaskStatus", () => {
   it("writes one audit event per task actually found in this workspace", async () => {
+    const nonGated = { docType: "contract", paymentStatus: null, template: null }
     db.reviewTask = {
-      findMany: vi.fn().mockResolvedValue([{ id: "t1", documentId: "d1", status: "open" }, { id: "t2", documentId: "d2", status: "open" }]),
+      findMany: vi.fn().mockResolvedValue([
+        { id: "t1", documentId: "d1", status: "open", document: nonGated },
+        { id: "t2", documentId: "d2", status: "open", document: nonGated },
+      ]),
       updateMany: vi.fn().mockReturnValue("update-many"),
     }
     db.documentAuditEvent = { create: vi.fn((args: unknown) => args) }
@@ -155,6 +160,7 @@ describe("bulkUpdateReviewTaskStatus", () => {
     const result = await bulkUpdateReviewTaskStatus({ workspaceId: "w1", taskIds: ["t1", "t2", "t3"], status: "approved", actorId: "u1" })
 
     expect(result.updated).toBe(2)
+    expect(result.blockedTaskIds).toEqual([])
     expect(db.reviewTask.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { id: { in: ["t1", "t2", "t3"] }, workspaceId: "w1" } }))
     expect(db.$transaction).toHaveBeenCalledTimes(1)
     expect(db.$transaction.mock.calls[0][0]).toHaveLength(3) // updateMany + 2 audit events
@@ -184,5 +190,106 @@ describe("assignReviewTask", () => {
 
     expect(db.workspaceMember.findUnique).not.toHaveBeenCalled()
     expect(db.reviewTask.update).toHaveBeenCalledWith({ where: { id: "t1" }, data: { assigneeId: null } })
+  })
+})
+
+describe("payment status gate on approval", () => {
+  const invoiceUnconfirmed = { docType: "invoice", paymentStatus: null, template: null }
+  const invoiceConfirmed = { docType: "invoice", paymentStatus: "unpaid", template: null }
+  const contract = { docType: "contract", paymentStatus: null, template: null }
+
+  describe("updateReviewTaskStatus", () => {
+    it("refuses to approve an invoice with no payment confirmation", async () => {
+      db.reviewTask = { findFirst: vi.fn().mockResolvedValue({ id: "t1", documentId: "d1", status: "open", document: invoiceUnconfirmed }) }
+      await expect(updateReviewTaskStatus({ workspaceId: "w1", taskId: "t1", status: "approved", actorId: "u1" })).rejects.toThrow("payment_status_required")
+    })
+
+    it("does not gate a non-terminal status change", async () => {
+      db.reviewTask = { findFirst: vi.fn().mockResolvedValue({ id: "t1", documentId: "d1", status: "open", document: invoiceUnconfirmed }), update: vi.fn().mockReturnValue("update") }
+      db.documentAuditEvent = { create: vi.fn().mockReturnValue("audit") }
+      await expect(updateReviewTaskStatus({ workspaceId: "w1", taskId: "t1", status: "in_review", actorId: "u1" })).resolves.toBeDefined()
+    })
+
+    it("approves once payment status has been confirmed", async () => {
+      db.reviewTask = { findFirst: vi.fn().mockResolvedValue({ id: "t1", documentId: "d1", status: "open", document: invoiceConfirmed }), update: vi.fn().mockReturnValue("update") }
+      db.documentAuditEvent = { create: vi.fn().mockReturnValue("audit") }
+      await expect(updateReviewTaskStatus({ workspaceId: "w1", taskId: "t1", status: "approved", actorId: "u1" })).resolves.toBeDefined()
+    })
+
+    it("never gates a document type with no payment state of its own", async () => {
+      db.reviewTask = { findFirst: vi.fn().mockResolvedValue({ id: "t1", documentId: "d1", status: "open", document: contract }), update: vi.fn().mockReturnValue("update") }
+      db.documentAuditEvent = { create: vi.fn().mockReturnValue("audit") }
+      await expect(updateReviewTaskStatus({ workspaceId: "w1", taskId: "t1", status: "approved", actorId: "u1" })).resolves.toBeDefined()
+    })
+  })
+
+  describe("decideReviewTaskStage", () => {
+    it("gates the LAST stage clearing, which is what actually resolves the task", async () => {
+      db.reviewTask = {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "t1", documentId: "d1", currentStageIndex: 0,
+          workflow: { stages: [{ stageIndex: 0, requireOwner: false, name: "Only stage" }] },
+          document: invoiceUnconfirmed,
+        }),
+      }
+      await expect(decideReviewTaskStage({ workspaceId: "w1", taskId: "t1", decision: "approve", actorId: "u1", actorRole: "owner" })).rejects.toThrow("payment_status_required")
+    })
+
+    it("does not gate an intermediate stage advance", async () => {
+      db.reviewTask = {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "t1", documentId: "d1", currentStageIndex: 0,
+          workflow: { stages: [{ stageIndex: 0, requireOwner: false, name: "First" }, { stageIndex: 1, requireOwner: false, name: "Second" }] },
+          document: invoiceUnconfirmed,
+        }),
+        update: vi.fn().mockReturnValue("update"),
+      }
+      db.documentAuditEvent = { create: vi.fn().mockReturnValue("audit") }
+      await expect(decideReviewTaskStage({ workspaceId: "w1", taskId: "t1", decision: "approve", actorId: "u1", actorRole: "member" })).resolves.toBeDefined()
+    })
+
+    it("never gates a reject, regardless of stage", async () => {
+      db.reviewTask = {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "t1", documentId: "d1", currentStageIndex: 0,
+          workflow: { stages: [{ stageIndex: 0, requireOwner: false, name: "Only stage" }] },
+          document: invoiceUnconfirmed,
+        }),
+        update: vi.fn().mockReturnValue("update"),
+      }
+      db.documentAuditEvent = { create: vi.fn().mockReturnValue("audit") }
+      await expect(decideReviewTaskStage({ workspaceId: "w1", taskId: "t1", decision: "reject", actorId: "u1", actorRole: "member" })).resolves.toBeDefined()
+    })
+  })
+
+  describe("bulkUpdateReviewTaskStatus", () => {
+    it("withholds only the tasks missing payment confirmation, approving the rest", async () => {
+      db.reviewTask = {
+        findMany: vi.fn().mockResolvedValue([
+          { id: "t1", documentId: "d1", status: "open", document: invoiceConfirmed },
+          { id: "t2", documentId: "d2", status: "open", document: invoiceUnconfirmed },
+          { id: "t3", documentId: "d3", status: "open", document: contract },
+        ]),
+        updateMany: vi.fn().mockReturnValue("update-many"),
+      }
+      db.documentAuditEvent = { create: vi.fn((args: unknown) => args) }
+
+      const result = await bulkUpdateReviewTaskStatus({ workspaceId: "w1", taskIds: ["t1", "t2", "t3"], status: "approved", actorId: "u1" })
+
+      expect(result.updated).toBe(2)
+      expect(result.blockedTaskIds).toEqual(["t2"])
+      expect(result.documentIds).toEqual(["d1", "d3"])
+      expect(db.reviewTask.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: { id: { in: ["t1", "t3"] }, workspaceId: "w1" } }))
+    })
+
+    it("runs no transaction at all when every selected task is blocked", async () => {
+      db.reviewTask = {
+        findMany: vi.fn().mockResolvedValue([{ id: "t1", documentId: "d1", status: "open", document: invoiceUnconfirmed }]),
+        updateMany: vi.fn(),
+      }
+      const result = await bulkUpdateReviewTaskStatus({ workspaceId: "w1", taskIds: ["t1"], status: "approved", actorId: "u1" })
+      expect(result).toEqual({ updated: 0, blockedTaskIds: ["t1"], documentIds: [] })
+      expect(db.$transaction).not.toHaveBeenCalled()
+    })
   })
 })

@@ -8,7 +8,7 @@ vi.mock("@/lib/analytics", () => ({ track: vi.fn() }))
 vi.mock("@/models/document-field-values", () => ({ replaceDocumentFieldValues: vi.fn() }))
 vi.mock("@/models/field-corrections", () => ({ recordFieldCorrection: vi.fn().mockResolvedValue(undefined) }))
 
-const { createDocumentFromBuffer, deleteWorkspaceDocuments, documentDataForExport, documentHash, documentSourceFor, isSupportedDocumentBuffer, updateDocumentField, validateDocumentInput } = await import("@/models/documents")
+const { createDocumentFromBuffer, deleteWorkspaceDocuments, documentDataForExport, documentHash, documentSourceFor, isSupportedDocumentBuffer, setDocumentPaymentStatus, updateDocumentField, validateDocumentInput } = await import("@/models/documents")
 const { prisma } = await import("@/lib/db")
 const { deleteDocumentSource } = await import("@/lib/document-storage")
 const { recordFieldCorrection } = await import("@/models/field-corrections")
@@ -250,5 +250,37 @@ describe("documentDataForExport", () => {
       reviewedData: null as unknown as Record<string, unknown>,
     })
     expect(row.filename).toBe("doc.pdf")
+  })
+})
+
+describe("setDocumentPaymentStatus", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    db.document = { findFirst: vi.fn(), update: vi.fn().mockReturnValue("update") }
+    db.documentAuditEvent = { create: vi.fn().mockReturnValue("audit") }
+    db.$transaction = vi.fn(async (operations: unknown[]) => operations)
+  })
+
+  it("refuses a document outside the workspace", async () => {
+    db.document.findFirst.mockResolvedValue(null)
+    await expect(setDocumentPaymentStatus({ workspaceId: "w1", documentId: "d1", status: "paid", actorId: "u1" })).rejects.toThrow("document_not_found")
+  })
+
+  it("stamps who confirmed it and when", async () => {
+    db.document.findFirst.mockResolvedValue({ id: "d1", paymentStatus: null })
+    await setDocumentPaymentStatus({ workspaceId: "w1", documentId: "d1", status: "paid", actorId: "u1" })
+    expect(db.document.update).toHaveBeenCalledWith({
+      where: { id: "d1" },
+      data: { paymentStatus: "paid", paymentConfirmedAt: expect.any(Date), paymentConfirmedById: "u1" },
+    })
+  })
+
+  it("is overwritable — a later correction replaces the earlier answer, not just the first one", async () => {
+    db.document.findFirst.mockResolvedValue({ id: "d1", paymentStatus: "unpaid" })
+    await setDocumentPaymentStatus({ workspaceId: "w1", documentId: "d1", status: "paid", actorId: "u1" })
+    expect(db.document.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ paymentStatus: "paid" }) }))
+    expect(db.documentAuditEvent.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ detail: { from: "unpaid", to: "paid" } }),
+    }))
   })
 })

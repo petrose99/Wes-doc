@@ -47,6 +47,7 @@ const BILLING_MESSAGES: Record<string, string> = {
   stage_requires_owner: "Only a workspace owner can decide this stage.",
   review_task_already_has_workflow: "This review task already has a workflow attached.",
   review_task_not_open: "This review task has already moved past open — a workflow can only be started while it's open.",
+  payment_status_required: "Confirm whether this has been paid before approving it.",
   // Dext-parity Phase 3 WP3.3: expense claims.
   expense_claim_not_found: "That expense claim no longer exists.",
   expense_claim_needs_at_least_one_receipt: "Add at least one receipt to this claim.",

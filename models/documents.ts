@@ -3,7 +3,7 @@ import { track } from "@/lib/analytics"
 import { auditEventData, getRequestAuditContext, recordDocumentAudit } from "@/lib/audit"
 import { SUPPLIER_FIELD_BY_TEMPLATE } from "@/lib/automation/rules"
 import config from "@/lib/config"
-import { isPushableDocument, resolveDocType } from "@/lib/doc-types"
+import { isPushableDocument, PaidStatus, resolveDocType } from "@/lib/doc-types"
 import { findMissingRequiredFields, parseTemplateFields, validateDocumentValues } from "@/lib/document-templates"
 import { deleteDocumentSource, documentBlocksKey, documentStorageKey, putDocumentSource } from "@/lib/document-storage"
 import { projectDocumentFields } from "@/lib/field-projection"
@@ -649,6 +649,29 @@ export async function requeueDocumentExtraction(workspaceId: string, documentId:
     prisma.documentAuditEvent.create({ data: auditEventData({ workspaceId, documentId: document.id, type: "extraction_requeued" }, context) }),
   ])
   return job
+}
+
+/** A reviewer's paid/unpaid confirmation on one document — see the "paymentStatus" note on Document
+ * in prisma/schema.prisma for why this exists separately from LedgerTransaction.paymentStatus.
+ * Overwritable: a reviewer who confirmed "unpaid" can come back once the bill is settled and
+ * confirm "paid" without anyone needing to touch the review task again — the gate in
+ * models/review-tasks.ts only cares that a value exists, not which one, so this never blocks a
+ * correction the way an idempotent "already confirmed" guard would. */
+export async function setDocumentPaymentStatus(input: { workspaceId: string; documentId: string; status: PaidStatus; actorId: string }) {
+  const document = await prisma.document.findFirst({ where: { id: input.documentId, workspaceId: input.workspaceId }, select: { id: true, paymentStatus: true } })
+  if (!document) throw new Error("document_not_found")
+  const context = await getRequestAuditContext()
+  const now = new Date()
+  const [updated] = await prisma.$transaction([
+    prisma.document.update({
+      where: { id: document.id },
+      data: { paymentStatus: input.status, paymentConfirmedAt: now, paymentConfirmedById: input.actorId },
+    }),
+    prisma.documentAuditEvent.create({
+      data: auditEventData({ workspaceId: input.workspaceId, documentId: document.id, actorId: input.actorId, type: "payment_status_confirmed", detail: { from: document.paymentStatus, to: input.status } }, context),
+    }),
+  ])
+  return updated
 }
 
 /** Re-runs extraction for one document with adaptive line-item discovery forced on, even if the

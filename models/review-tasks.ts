@@ -3,6 +3,7 @@
 // app/(app)/workspaces/[workspaceId]/review-actions.ts and do the auth.
 import { track } from "@/lib/analytics"
 import { canDecideStage, decideStage, findCurrentStage } from "@/lib/approvals/engine"
+import { isPaymentConfirmationRequired } from "@/lib/doc-types"
 import { auditEventData, getRequestAuditContext } from "@/lib/audit"
 import { prisma } from "@/lib/db"
 import { cache } from "react"
@@ -10,6 +11,33 @@ import { cache } from "react"
 export const REVIEW_TASK_STATUSES = ["open", "in_review", "approved", "rejected"] as const
 export type ReviewTaskStatus = (typeof REVIEW_TASK_STATUSES)[number]
 const RESOLVED_STATUSES = new Set<ReviewTaskStatus>(["approved", "rejected"])
+
+/** Throws when a document needs a paid/unpaid confirmation before it can be approved and does not
+ * have one yet — see Document.paymentStatus in prisma/schema.prisma and
+ * lib/doc-types.ts's isPaymentConfirmationRequired. Checked at the moment a task is ABOUT to
+ * become "approved", not earlier, so a document that later turns out not to need confirmation
+ * (its docType was reclassified, say) is never blocked on a stale requirement. */
+function assertPaymentConfirmed(document: { docType: string | null; paymentStatus: string | null; template: { code: string } | null }) {
+  if (document.paymentStatus) return
+  if (!isPaymentConfirmationRequired(document)) return
+  throw new Error("payment_status_required")
+}
+
+const DOCUMENT_PAYMENT_GATE_SELECT = { docType: true, paymentStatus: true, template: { select: { code: true } } } as const
+
+function partitionByPaymentGate<T extends { document: { docType: string | null; paymentStatus: string | null; template: { code: string } | null } }>(tasks: T[]): [T[], T[]] {
+  const approvable: T[] = []
+  const blocked: T[] = []
+  for (const task of tasks) {
+    try {
+      assertPaymentConfirmed(task.document)
+      approvable.push(task)
+    } catch {
+      blocked.push(task)
+    }
+  }
+  return [approvable, blocked]
+}
 
 export const REVIEW_TASK_REASONS = ["manual", "low_confidence", "rule_required", "check_failed", "ai_suggestion", "push_preflight"] as const
 export type ReviewTaskReason = (typeof REVIEW_TASK_REASONS)[number]
@@ -113,8 +141,12 @@ export const getReviewTask = cache(async (workspaceId: string, taskId: string) =
 /** Every transition is written to DocumentAuditEvent, not just terminal ones — this is the
  * reviewed history WP11's rule-correction flow must only ever append to, never rewrite. */
 export async function updateReviewTaskStatus(input: { workspaceId: string; taskId: string; status: ReviewTaskStatus; actorId: string }) {
-  const task = await prisma.reviewTask.findFirst({ where: { id: input.taskId, workspaceId: input.workspaceId }, select: { id: true, documentId: true, status: true } })
+  const task = await prisma.reviewTask.findFirst({
+    where: { id: input.taskId, workspaceId: input.workspaceId },
+    select: { id: true, documentId: true, status: true, document: { select: DOCUMENT_PAYMENT_GATE_SELECT } },
+  })
   if (!task) throw new Error("review_task_not_found")
+  if (input.status === "approved") assertPaymentConfirmed(task.document)
   const context = await getRequestAuditContext()
   const resolvedAt = RESOLVED_STATUSES.has(input.status) ? new Date() : null
   const [updated] = await prisma.$transaction([
@@ -133,7 +165,10 @@ export async function updateReviewTaskStatus(input: { workspaceId: string; taskI
 export async function decideReviewTaskStage(input: { workspaceId: string; taskId: string; decision: "approve" | "reject"; actorId: string; actorRole: "owner" | "member" }) {
   const task = await prisma.reviewTask.findFirst({
     where: { id: input.taskId, workspaceId: input.workspaceId },
-    include: { workflow: { include: { stages: { orderBy: { stageIndex: "asc" } } } } },
+    include: {
+      workflow: { include: { stages: { orderBy: { stageIndex: "asc" } } } },
+      document: { select: DOCUMENT_PAYMENT_GATE_SELECT },
+    },
   })
   if (!task) throw new Error("review_task_not_found")
   if (!task.workflow || task.currentStageIndex === null) throw new Error("review_task_has_no_workflow")
@@ -143,6 +178,9 @@ export async function decideReviewTaskStage(input: { workspaceId: string; taskId
   if (!canDecideStage({ stage: currentStage, actorRole: input.actorRole })) throw new Error("stage_requires_owner")
 
   const result = decideStage({ stages: task.workflow.stages, currentStageIndex: task.currentStageIndex, decision: input.decision })
+  // The workflow's last stage clearing is the only way this reaches "approved" — an intermediate
+  // advance stays "in_review", and a reject never needs the gate at all.
+  if (result.outcome === "approved") assertPaymentConfirmed(task.document)
   const nextStatus = result.outcome === "advance" ? "in_review" : result.outcome
   const nextStageIndex = result.outcome === "advance" ? result.nextStageIndex : task.currentStageIndex
   const resolvedAt = result.outcome === "advance" ? null : new Date()
@@ -159,15 +197,30 @@ export async function decideReviewTaskStage(input: { workspaceId: string; taskId
  * event still has to exist for each task actually changed, since the audit trail is what has to
  * answer "who approved this specific document" later, not just "a bulk approval happened". */
 export async function bulkUpdateReviewTaskStatus(input: { workspaceId: string; taskIds: string[]; status: ReviewTaskStatus; actorId: string }) {
-  const tasks = await prisma.reviewTask.findMany({ where: { id: { in: input.taskIds.slice(0, 200) }, workspaceId: input.workspaceId }, select: { id: true, documentId: true, status: true } })
-  if (!tasks.length) return { updated: 0, documentIds: [] as string[] }
+  const tasks = await prisma.reviewTask.findMany({
+    where: { id: { in: input.taskIds.slice(0, 200) }, workspaceId: input.workspaceId },
+    select: { id: true, documentId: true, status: true, document: { select: DOCUMENT_PAYMENT_GATE_SELECT } },
+  })
+  if (!tasks.length) return { updated: 0, blockedTaskIds: [] as string[], documentIds: [] as string[] }
+
+  // A bulk approve is a batch of otherwise-independent decisions, so one document missing its
+  // payment confirmation withholds only that document — never turns a 40-document approval into an
+  // all-or-nothing failure over the one nobody checked yet. blockedTaskIds (not just a count) is
+  // what lets the client's optimistic list state be corrected for exactly the rows that did not
+  // move, rather than either trusting every row moved or reverting all of them.
+  const [approvable, blocked] = input.status === "approved"
+    ? partitionByPaymentGate(tasks)
+    : [tasks, [] as typeof tasks]
+  const blockedTaskIds = blocked.map((task) => task.id)
+  if (!approvable.length) return { updated: 0, blockedTaskIds, documentIds: [] as string[] }
+
   const context = await getRequestAuditContext()
   const resolvedAt = RESOLVED_STATUSES.has(input.status) ? new Date() : null
   await prisma.$transaction([
-    prisma.reviewTask.updateMany({ where: { id: { in: tasks.map((task) => task.id) }, workspaceId: input.workspaceId }, data: { status: input.status, resolvedAt } }),
-    ...tasks.map((task) => prisma.documentAuditEvent.create({ data: auditEventData({ workspaceId: input.workspaceId, documentId: task.documentId, actorId: input.actorId, type: "review_task_status_changed", detail: { from: task.status, to: input.status, bulk: true } }, context) })),
+    prisma.reviewTask.updateMany({ where: { id: { in: approvable.map((task) => task.id) }, workspaceId: input.workspaceId }, data: { status: input.status, resolvedAt } }),
+    ...approvable.map((task) => prisma.documentAuditEvent.create({ data: auditEventData({ workspaceId: input.workspaceId, documentId: task.documentId, actorId: input.actorId, type: "review_task_status_changed", detail: { from: task.status, to: input.status, bulk: true } }, context) })),
   ])
-  return { updated: tasks.length, documentIds: tasks.map((task) => task.documentId) }
+  return { updated: approvable.length, blockedTaskIds, documentIds: approvable.map((task) => task.documentId) }
 }
 
 /** Assignment is its own audit event, distinct from a status change — "who is responsible" and
