@@ -34,6 +34,7 @@ import { parseDocumentWithMineru } from "@/lib/mineru"
 import { parsePageRange } from "@/lib/page-range"
 import { auditEventData, recordSystemAudit } from "@/lib/audit"
 import { prisma } from "@/lib/db"
+import { unscoped } from "@/lib/workspace-scope"
 import { emitWorkspaceEvent } from "@/lib/webhooks"
 import { kickWebhookDrain } from "@/lib/webhook-delivery"
 import { Prisma } from "@/prisma/client"
@@ -790,10 +791,20 @@ async function enqueueEmbedJob(document: { id: string; workspaceId: string }, oc
   return job.id
 }
 
+/** Reclaiming expired leases and picking the next queued job are both deliberately cross-workspace
+ * — this is the queue drain, and it serves every workspace — so they run inside unscoped(). Without
+ * it the workspace-scope guard rejects the very first statement, and since this is the first thing
+ * the worker loop calls, every tick dies there: no document is ever processed, and the only sign is
+ * "Job worker failed …ran without a workspaceId filter" repeating in the worker log.
+ *
+ * processDocumentJob is deliberately left outside the unscoped block: it works on one job in one
+ * workspace and must keep the guard that proves it. */
 export async function processNextQueuedDocumentJob() {
   const now = new Date()
-  await prisma.documentProcessingJob.updateMany({ where: { status: "processing", leaseUntil: { lte: now } }, data: { status: "queued", leaseUntil: null, scheduledAt: now, errorCode: "processing_lease_expired" } })
-  const job = await prisma.documentProcessingJob.findFirst({ where: { status: "queued", documentId: { not: null }, scheduledAt: { lte: now } }, orderBy: { scheduledAt: "asc" }, select: { id: true } })
+  const job = await unscoped(async () => {
+    await prisma.documentProcessingJob.updateMany({ where: { status: "processing", leaseUntil: { lte: now } }, data: { status: "queued", leaseUntil: null, scheduledAt: now, errorCode: "processing_lease_expired" } })
+    return prisma.documentProcessingJob.findFirst({ where: { status: "queued", documentId: { not: null }, scheduledAt: { lte: now } }, orderBy: { scheduledAt: "asc" }, select: { id: true } })
+  })
   if (!job) return null
   await processDocumentJob(job.id)
   return job.id
