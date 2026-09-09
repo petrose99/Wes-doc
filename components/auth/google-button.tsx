@@ -49,14 +49,22 @@ export function GoogleButton({ redirectTo = "/workspaces", intent = "signin", on
           client_id: clientId,
           nonce: nonce.hashed,
           callback: (response: GoogleCredentialResponse) => { void signIn(response, nonce.raw) },
-          // FedCM, not the legacy popup. Without these the button opens a Google-hosted popup that
-          // hands the credential back through third-party cookies on accounts.google.com; where
-          // the browser restricts those the popup lands on accounts.google.com/gsi/transform,
-          // renders blank and never returns — the sign-in simply stops, with no error anywhere.
-          // FedCM has the browser itself mediate the account chooser, so no popup and no
-          // third-party cookie is involved. Chrome is also retiring the non-FedCM path outright.
+          // FedCM only for the passive one-tap prompt, which is the mode that actually needs it:
+          // without it, that silent auto-prompt opens a Google-hosted iframe that hands the
+          // credential back through third-party cookies on accounts.google.com, and where the
+          // browser restricts those it lands on accounts.google.com/gsi/transform, renders blank
+          // and never returns — the sign-in simply stops, with no error anywhere.
+          //
+          // The explicit button stays on the classic (non-FedCM) flow deliberately: it opens a real
+          // popup on click rather than a silent iframe, so it isn't subject to the same third-party-
+          // cookie block. FedCM for the button turned out to fail silently in its own way on mobile
+          // — Firefox doesn't implement the FedCM API at all, and Chrome for Android's FedCM account
+          // discovery depends on an account being known to Chrome itself, not just signed into
+          // accounts.google.com; when either comes up empty, GIS renders nothing and never rejects,
+          // so no error ever reaches onError. The button silently not appearing on mobile Chrome and
+          // Firefox alike is that failure, not a bug in this component's error handling.
           use_fedcm_for_prompt: true,
-          use_fedcm_for_button: true,
+          use_fedcm_for_button: false,
         })
         google.accounts.id.renderButton(slot.current, {
           type: "standard",
