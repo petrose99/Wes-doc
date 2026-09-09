@@ -4,7 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 
-import { updateAutomationConfigAction } from "@/app/(app)/workspaces/[workspaceId]/(chrome)/settings/automation/actions"
+import { updateAutomationConfigAction } from "@/app/(app)/workspaces/[workspaceId]/automation/settings/actions"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"

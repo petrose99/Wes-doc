@@ -1,6 +1,7 @@
 // Deliberately NOT a "use server" module: trusts the workspaceId it is handed.
 import { prisma } from "@/lib/db"
-import type { CodedDocumentSlice } from "@/lib/automation/vendor-history"
+import { SUPPLIER_FIELD_BY_TEMPLATE } from "@/lib/automation/rules"
+import { getVendorCodingPrior, HISTORY_APPLY_THRESHOLDS, type CodedDocumentSlice, type VendorCodingPrior } from "@/lib/automation/vendor-history"
 
 const HISTORY_CAP = 500
 
@@ -59,4 +60,53 @@ export async function loadVendorCodingHistory(
     })
   }
   return result
+}
+
+export type VendorHistoryRow = {
+  supplier: string
+  templateCode: string
+  totalConfirmed: number
+  prior: VendorCodingPrior
+  /** True when the confidence bar is cleared (support ≥ 3, agreement ≥ 90%) on every coding key
+   * present — the row auto-applies without asking the LLM. */
+  willAutoApply: boolean
+}
+
+/** Group the workspace's confirmed history into one row per (supplier, templateCode) so the UI
+ * can show what Phase 3 will do for that vendor. Aggregated per template because the coding
+ * engine already scopes to one template at a time, and a receipt's history should not spill into
+ * an invoice's coding. */
+export async function summarizeVendorHistory(workspaceId: string): Promise<VendorHistoryRow[]> {
+  const rows: VendorHistoryRow[] = []
+  const templates = Object.keys(SUPPLIER_FIELD_BY_TEMPLATE)
+
+  for (const templateCode of templates) {
+    const supplierField = SUPPLIER_FIELD_BY_TEMPLATE[templateCode]
+    if (!supplierField) continue
+    const history = await loadVendorCodingHistory(workspaceId, templateCode, supplierField)
+    if (!history.length) continue
+
+    // Group by normalized supplier so "Acme Ltd" and "acme ltd." collapse into one.
+    const bySupplier = new Map<string, CodedDocumentSlice[]>()
+    for (const row of history) {
+      const key = row.supplier.trim().toLowerCase()
+      const bucket = bySupplier.get(key) ?? []
+      bucket.push(row)
+      bySupplier.set(key, bucket)
+    }
+
+    for (const bucket of bySupplier.values()) {
+      const supplier = bucket[0].supplier
+      const prior = getVendorCodingPrior(bucket, supplier, templateCode)
+      const codingKeys = Object.keys(prior.byKey)
+      const willAutoApply = codingKeys.length > 0 && codingKeys.every((k) => {
+        const s = prior.byKey[k]
+        return s.support >= HISTORY_APPLY_THRESHOLDS.minSupport && s.agreement >= HISTORY_APPLY_THRESHOLDS.minAgreement
+      })
+      rows.push({ supplier, templateCode, totalConfirmed: bucket.length, prior, willAutoApply })
+    }
+  }
+
+  rows.sort((a, b) => b.totalConfirmed - a.totalConfirmed || a.supplier.localeCompare(b.supplier))
+  return rows
 }

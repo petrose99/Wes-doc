@@ -63,7 +63,12 @@ export const MODULES: ModuleDefinition[] = [
   { key: "ai-coding", name: "AI coding fallback", description: "When no supplier rule matches, AI suggests the coding with a confidence score; high-confidence suggestions keep documents touchless.", industry: "finance", tier: "default", activation: "enable" },
   { key: "data-health", name: "Data health", description: "Automated bookkeeping quality audits with source-document-linked findings.", industry: "finance", tier: "always", activation: "enable", navItems: [{ href: "health", label: "Health Checks", icon: "heart-pulse" }] },
 
-  { key: "touchless-automation", name: "Touchless automation", description: "Auto-approve routine documents that pass confidence, policy, and budget checks.", industry: "finance", tier: "default", activation: "enable", navItems: [{ href: "automation", label: "Automation", icon: "zap" }] },
+  { key: "touchless-automation", name: "Touchless automation", description: "Auto-approve routine documents that pass confidence, policy, and budget checks.", industry: "finance", tier: "default", activation: "enable", navItems: [
+    // Everything automation-related lives under this one destination — the page has its own
+    // internal Metrics · Review queue · Vendors · Settings tabs (components/automation/automation-tabs.tsx),
+    // so the sidebar doesn't need three parallel entries.
+    { href: "automation", label: "Automation", icon: "zap" },
+  ] },
   { key: "policy-agent", name: "Policy agent", description: "AI policy evaluation against workspace rules before auto-approval.", industry: "finance", tier: "default", activation: "enable" },
   { key: "document-matching", name: "Document matching", description: "2/3-way PO-to-invoice-to-receipt matching with confidence scoring.", industry: "finance", tier: "default", activation: "enable" },
   { key: "budget-controls", name: "Budget controls", description: "Per-vendor and per-category spend budgets with threshold alerts.", industry: "finance", tier: "optional", activation: "enable", navItems: [{ href: "settings/budgets", label: "Budgets", icon: "wallet" }] },

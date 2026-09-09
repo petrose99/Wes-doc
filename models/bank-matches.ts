@@ -191,7 +191,9 @@ function fuzzySupplierMatch(a: string, b: string): boolean {
 export const listBankMatches = cache(async (workspaceId: string, statementDocumentId: string) => prisma.bankMatch.findMany({
   where: { workspaceId, statementDocumentId },
   orderBy: { transactionIndex: "asc" },
-  include: { matchedDocument: { select: { id: true, filename: true, reviewedData: true } } },
+  // Phase 5: also pull paymentStatus so the UI can render the "Reconciled" pill on an accepted
+  // match — see components/bank-match/match-panel.tsx.
+  include: { matchedDocument: { select: { id: true, filename: true, reviewedData: true, paymentStatus: true } } },
 }))
 
 export async function decideBankMatch(input: { workspaceId: string; matchId: string; status: "accepted" | "rejected"; actorId: string }) {

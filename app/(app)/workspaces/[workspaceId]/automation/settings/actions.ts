@@ -7,7 +7,8 @@ import { updateAutomationConfig, type AutomationConfigUpdate } from "@/models/au
 import { requireWorkspaceRole } from "@/models/workspaces"
 
 /** Owner-only action that persists a patch to WorkspaceAutomationConfig. Every field is optional
- * — the form submits only what the reviewer changed. */
+ * — the form submits only what the reviewer changed. Lives under /automation/settings so all
+ * automation-related UI is one place. */
 export async function updateAutomationConfigAction(input: {
   workspaceId: string
   patch: AutomationConfigUpdate
@@ -16,7 +17,7 @@ export async function updateAutomationConfigAction(input: {
     const user = await getCurrentUser()
     await requireWorkspaceRole(input.workspaceId, user.id, ["owner"])
     await updateAutomationConfig({ workspaceId: input.workspaceId, actorId: user.id, patch: input.patch })
-    revalidatePath(`/workspaces/${input.workspaceId}/settings/automation`)
+    revalidatePath(`/workspaces/${input.workspaceId}/automation/settings`)
     return { ok: true }
   } catch (error) {
     const message = error instanceof Error ? error.message : "automation_config_update_failed"

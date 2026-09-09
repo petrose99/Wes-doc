@@ -12,6 +12,10 @@ const LOW_CONFIDENCE = 0.6
 const SOURCE_BADGE: Record<string, { label: string; className: string; icon: typeof Sparkles }> = {
   rule: { label: "Rule", className: "bg-blue-50 text-blue-700 border-blue-200", icon: BookOpen },
   ai: { label: "AI", className: "bg-indigo-50 text-indigo-700 border-indigo-200", icon: Bot },
+  // Phase 3: vendor history — visually distinct from AI (green ✅ for "we're sure") vs indigo bot
+  // ("model best guess") vs rule ("a person authored this"). Same Sparkles icon as few_shot since
+  // both signal "learned from prior data" — the color separates the two.
+  history: { label: "History", className: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: Sparkles },
   few_shot: { label: "Learned", className: "bg-purple-50 text-purple-700 border-purple-200", icon: Sparkles },
   extraction: { label: "Extracted", className: "bg-slate-50 text-slate-600 border-slate-200", icon: Info },
 }

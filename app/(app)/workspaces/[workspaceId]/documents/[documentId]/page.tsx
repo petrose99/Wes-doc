@@ -174,7 +174,9 @@ export default async function DocumentPage({ params, searchParams }: {
       matches={bankMatches.map((match) => ({
         id: match.id, transactionIndex: match.transactionIndex, kind: match.kind, confidence: match.confidence,
         dateDeltaDays: match.dateDeltaDays, status: match.status,
-        matchedDocument: { id: match.matchedDocument.id, filename: match.matchedDocument.filename },
+        // Phase 5: expose paymentStatus so the panel can render the Reconciled pill on an
+        // accepted match without a second query.
+        matchedDocument: { id: match.matchedDocument.id, filename: match.matchedDocument.filename, paymentStatus: match.matchedDocument.paymentStatus },
       }))}
     /> : null}
   />

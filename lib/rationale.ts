@@ -4,7 +4,7 @@
  * few-shot correction example, or extracted by the LLM? The UI uses this to show a source badge
  * and a confidence score on every field, and to let a reviewer correct a wrong value in one click. */
 
-export type FieldSource = "rule" | "ai" | "few_shot" | "extraction"
+export type FieldSource = "rule" | "ai" | "history" | "few_shot" | "extraction"
 
 export type FewShotAttribution = {
   fieldKey: string
@@ -62,6 +62,19 @@ export function buildFieldRationales(input: RationaleInput): FieldRationale[] {
           provenanceQuote: null,
           confidence: input.codingConfidence ?? confidence,
           aiRationale: input.aiRationale ?? null,
+        }
+      }
+      if (input.codingSource === "history") {
+        // Phase 3: vendor coding history — no rule id, no LLM rationale; the confidence is the
+        // agreement stat from getVendorCodingPrior stashed into codingConfidence at apply time.
+        return {
+          fieldKey,
+          source: "history" as const,
+          ruleId: null,
+          ruleName: null,
+          correctionExample: null,
+          provenanceQuote: null,
+          confidence: input.codingConfidence ?? confidence,
         }
       }
       return {

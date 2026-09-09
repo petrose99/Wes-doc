@@ -18,7 +18,10 @@ export type BankMatchRow = {
   confidence: number
   dateDeltaDays: number | null
   status: string
-  matchedDocument: { id: string; filename: string }
+  matchedDocument: { id: string; filename: string; paymentStatus?: string | null }
+  /** Phase 5: true when the matched document's paymentStatus is "paid" — i.e. the close-loop
+   * has run and the mirrored ledger row is reconciled. Optional so older callers still typecheck. */
+  reconciled?: boolean
 }
 
 const KIND_LABELS: Record<string, { title: string; rowNoun: string }> = {
@@ -79,7 +82,14 @@ export function MatchPanel({ workspaceId, statementDocumentId, kind, matches }: 
                         <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={() => decide(match.id, "rejected")}>Reject</Button>
                       </>
                     ) : (
-                      <span className={`text-xs font-medium ${match.status === "accepted" ? "text-emerald-700" : "text-slate-500"}`}>{match.status}</span>
+                      <>
+                        <span className={`text-xs font-medium ${match.status === "accepted" ? "text-emerald-700" : "text-slate-500"}`}>{match.status}</span>
+                        {match.status === "accepted" && (match.reconciled ?? match.matchedDocument.paymentStatus === "paid") && (
+                          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-800" title="Document marked paid and ledger row reconciled">
+                            Reconciled
+                          </span>
+                        )}
+                      </>
                     )}
                   </span>
                 </li>
