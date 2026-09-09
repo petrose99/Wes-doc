@@ -4,7 +4,7 @@ import Link from "next/link"
 
 const LINKS: { href: Route; label: string }[] = [
   { href: "/#how", label: "How it works" },
-  { href: "/#email", label: "Email intake" },
+  { href: "/#extraction", label: "Extraction" },
   { href: "/#trace", label: "Provenance" },
   { href: "/#checks", label: "Checks" },
   { href: "/#automation", label: "Automation" },

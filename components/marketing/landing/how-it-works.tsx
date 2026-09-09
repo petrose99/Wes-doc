@@ -2,7 +2,7 @@ const STEPS = [
   {
     n: "01",
     title: "Send it in, however it arrives",
-    body: "Drag in one file or a client's whole shoebox, or email it to your workspace address and let the bills arrive on their own. Mixed PDFs, phone photos and scans all go in together, and multi-document PDFs are split into separate records.",
+    body: "Upload a file or a client's whole shoebox, or email it in and let the bills arrive on their own.",
   },
   {
     n: "02",

@@ -1,11 +1,12 @@
 import { Accounting } from "@/components/marketing/landing/accounting"
 import { Automation } from "@/components/marketing/landing/automation"
 import { Comparison } from "@/components/marketing/landing/comparison"
-import { EmailIntake } from "@/components/marketing/landing/email-intake"
+import { Extraction } from "@/components/marketing/landing/extraction"
 import { Faq } from "@/components/marketing/landing/faq"
 import { FolderChecks } from "@/components/marketing/landing/folder-checks"
 import { Hero } from "@/components/marketing/landing/hero"
 import { HowItWorks } from "@/components/marketing/landing/how-it-works"
+import { Intake } from "@/components/marketing/landing/intake"
 import { Library } from "@/components/marketing/landing/library"
 import { Pipeline } from "@/components/marketing/landing/pipeline"
 import { Provenance } from "@/components/marketing/landing/provenance"
@@ -24,7 +25,8 @@ export default function Home() {
     <Hero />
     <ReadsStrip />
     <HowItWorks />
-    <EmailIntake />
+    <Intake />
+    <Extraction />
     <Provenance />
     <FolderChecks />
     <Pipeline />
