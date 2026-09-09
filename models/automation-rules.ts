@@ -96,8 +96,25 @@ export async function applyAutomationRules(input: {
       ])
     }
 
+    // Gap 1: at autonomyLevel "suggest", speculative fallbacks (vendor history + AI) are
+    // suppressed — only user-authored rules (workspace policy) apply, and everything else goes
+    // to review for a person to code by hand. "auto" and "touchless" keep the full fallback
+    // stack; the difference between them is whether the coded doc auto-publishes downstream
+    // (maybeAutopublish → touchlessEnabled gate, unchanged).
+    const config = await prisma.workspaceAutomationConfig.findUnique({
+      where: { workspaceId: input.workspaceId },
+      select: { autonomyLevel: true },
+    })
+    const level = (config?.autonomyLevel === "suggest" || config?.autonomyLevel === "auto" || config?.autonomyLevel === "touchless")
+      ? config.autonomyLevel
+      : "auto"
+
     if (result.reviewReason) {
       if (result.reviewReason === "no_match_risky") {
+        if (level === "suggest") {
+          await createReviewTask({ workspaceId: input.workspaceId, documentId: input.documentId, reason: "rule_required", detail: "Autonomy is set to Suggest — every document waits for manual coding.", createdById: null })
+          return
+        }
         // Phase 3 precedence: try the vendor-history prior BEFORE the LLM. If a workspace has
         // coded this supplier the same way many times before, that is the strongest signal
         // and skips both the LLM cost and the LLM's tendency to drift on well-known vendors.

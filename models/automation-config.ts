@@ -46,17 +46,15 @@ export async function getOrCreateAutomationConfig(workspaceId: string) {
   return prisma.workspaceAutomationConfig.create({ data: { workspaceId } })
 }
 
-/** Derive the graduated autonomyLevel from the stored fields. touchlessEnabled is Ramp's
- * highest level; a workspace where touchless is off but AI coding is applied is our "auto"
- * middle level; a workspace with neither is "suggest". */
+/** Read the persisted autonomy level. Falls back to the legacy touchlessEnabled bool for
+ * config rows written before autonomyLevel existed. */
 export function deriveAutonomyLevel(config: {
+  autonomyLevel?: string | null
   touchlessEnabled: boolean
 }): AutonomyLevel {
-  if (config.touchlessEnabled) return "touchless"
-  // The middle state — "auto with approval" — is the default when touchless is off but coding
-  // is still applied by rules + AI. Rules/AI running is a workspace-wide capability, not a
-  // config flag, so treating "not touchless" as "auto" here matches the app's actual behavior.
-  return "auto"
+  const stored = config.autonomyLevel
+  if (stored === "suggest" || stored === "auto" || stored === "touchless") return stored
+  return config.touchlessEnabled ? "touchless" : "auto"
 }
 
 /** Write helper — validates and applies, then records an audit event. Owner-gated by the caller. */
@@ -70,9 +68,10 @@ export async function updateAutomationConfig(input: {
 
   const data: Record<string, unknown> = {}
   if (patch.autonomyLevel !== undefined) {
-    // "touchless" is the only level that flips touchlessEnabled; "auto" and "suggest" both leave
-    // it off. Callers who need the "suggest" behavior can additionally toggle `blockOnWarnChecks`
-    // and lift minConfidence to 1 — but the level itself only writes touchlessEnabled here.
+    // Persist the choice AND the boolean it maps to — autopublish.ts still reads
+    // touchlessEnabled directly, so we keep it in sync rather than migrating every read site
+    // in one go. The stored autonomyLevel is what deriveAutonomyLevel reads back.
+    data.autonomyLevel = patch.autonomyLevel
     data.touchlessEnabled = patch.autonomyLevel === "touchless"
   }
   if (patch.minConfidence !== undefined) data.minConfidence = patch.minConfidence

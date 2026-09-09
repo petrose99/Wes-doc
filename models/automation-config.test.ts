@@ -22,10 +22,13 @@ beforeEach(() => {
 })
 
 describe("deriveAutonomyLevel", () => {
-  it("returns touchless when the flag is on", () => {
-    expect(deriveAutonomyLevel({ touchlessEnabled: true })).toBe("touchless")
+  it("prefers the stored autonomyLevel column", () => {
+    expect(deriveAutonomyLevel({ autonomyLevel: "suggest", touchlessEnabled: false })).toBe("suggest")
+    expect(deriveAutonomyLevel({ autonomyLevel: "auto", touchlessEnabled: false })).toBe("auto")
+    expect(deriveAutonomyLevel({ autonomyLevel: "touchless", touchlessEnabled: true })).toBe("touchless")
   })
-  it("returns auto when touchless is off", () => {
+  it("falls back to touchlessEnabled when the column is missing (legacy rows)", () => {
+    expect(deriveAutonomyLevel({ touchlessEnabled: true })).toBe("touchless")
     expect(deriveAutonomyLevel({ touchlessEnabled: false })).toBe("auto")
   })
 })
@@ -45,19 +48,27 @@ describe("getOrCreateAutomationConfig", () => {
 })
 
 describe("updateAutomationConfig", () => {
-  it("maps autonomyLevel touchless → touchlessEnabled true", async () => {
+  it("persists autonomyLevel touchless as both the string and the sync'd bool", async () => {
     db.workspaceAutomationConfig.findUnique.mockResolvedValue({ workspaceId: "w1" })
     await updateAutomationConfig({ workspaceId: "w1", actorId: "u1", patch: { autonomyLevel: "touchless" } })
     expect(db.workspaceAutomationConfig.update).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ touchlessEnabled: true }),
+      data: expect.objectContaining({ autonomyLevel: "touchless", touchlessEnabled: true }),
     }))
   })
 
-  it("maps autonomyLevel auto → touchlessEnabled false", async () => {
+  it("persists autonomyLevel auto and clears touchlessEnabled", async () => {
     db.workspaceAutomationConfig.findUnique.mockResolvedValue({ workspaceId: "w1" })
     await updateAutomationConfig({ workspaceId: "w1", actorId: "u1", patch: { autonomyLevel: "auto" } })
     expect(db.workspaceAutomationConfig.update).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ touchlessEnabled: false }),
+      data: expect.objectContaining({ autonomyLevel: "auto", touchlessEnabled: false }),
+    }))
+  })
+
+  it("persists autonomyLevel suggest (previously indistinguishable from auto)", async () => {
+    db.workspaceAutomationConfig.findUnique.mockResolvedValue({ workspaceId: "w1" })
+    await updateAutomationConfig({ workspaceId: "w1", actorId: "u1", patch: { autonomyLevel: "suggest" } })
+    expect(db.workspaceAutomationConfig.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ autonomyLevel: "suggest", touchlessEnabled: false }),
     }))
   })
 

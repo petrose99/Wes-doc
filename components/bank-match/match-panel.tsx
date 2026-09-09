@@ -22,6 +22,11 @@ export type BankMatchRow = {
   /** Phase 5: true when the matched document's paymentStatus is "paid" — i.e. the close-loop
    * has run and the mirrored ledger row is reconciled. Optional so older callers still typecheck. */
   reconciled?: boolean
+  /** Phase 2 (Gap 4): the durable StatementLine.id this match points at. When present, the
+   * match survives a re-extraction that reshuffles the source array; when null, it is still
+   * addressed by (statementDocumentId, transactionIndex) and would be re-projected on the
+   * next extraction. */
+  statementLineId?: string | null
 }
 
 const KIND_LABELS: Record<string, { title: string; rowNoun: string }> = {
@@ -70,7 +75,15 @@ export function MatchPanel({ workspaceId, statementDocumentId, kind, matches }: 
               {matches.map((match) => (
                 <li key={match.id} className="flex items-center justify-between gap-3 py-2 text-sm">
                   <span className="min-w-0">
-                    <span className="font-medium">#{match.transactionIndex + 1}</span>{" "}
+                    <span className="font-medium">#{match.transactionIndex + 1}</span>
+                    {match.statementLineId && (
+                      <span
+                        title="Anchored to a durable statement line — this match will survive a re-extraction that reshuffles the source array."
+                        className="ml-1 inline-block rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-semibold text-slate-600"
+                      >
+                        LINKED
+                      </span>
+                    )}{" "}
                     <span className="text-slate-600">→ {match.matchedDocument.filename}</span>
                     {match.dateDeltaDays !== null && <span className="ml-2 text-xs text-slate-500">{Math.round(match.dateDeltaDays)}d apart</span>}
                   </span>

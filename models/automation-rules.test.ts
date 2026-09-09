@@ -23,6 +23,10 @@ beforeEach(() => {
   vi.clearAllMocks()
   for (const key of Object.keys(db)) delete db[key]
   db.$transaction = vi.fn(async (operations: unknown[]) => operations)
+  // Gap 1: applyAutomationRules reads WorkspaceAutomationConfig.autonomyLevel to decide whether
+  // the speculative fallbacks (history + AI) may run. Default to "auto" so existing tests keep
+  // the full fallback stack unless a test opts into another level.
+  db.workspaceAutomationConfig = { findUnique: vi.fn().mockResolvedValue({ autonomyLevel: "auto" }) }
 })
 
 describe("createAutomationRule", () => {
@@ -153,5 +157,23 @@ describe("applyAutomationRules", () => {
   it("swallows an internal error rather than throwing past the caller", async () => {
     db.automationRule = { findMany: vi.fn().mockRejectedValue(new Error("db down")) }
     await expect(applyAutomationRules({ workspaceId: "w1", documentId: "d1", templateCode: "invoice", extraction })).resolves.toBeUndefined()
+  })
+
+  it("at autonomyLevel 'suggest', suppresses vendor history + AI fallbacks even when AI is enabled", async () => {
+    db.workspaceAutomationConfig.findUnique.mockResolvedValue({ autonomyLevel: "suggest" })
+    db.automationRule = { findMany: vi.fn().mockResolvedValue([{ id: "r1", matcher: { type: "exact", value: "Someone Else" }, actions: { codingData: { account: "6000" } }, minConfidence: null, requireReview: false, isActive: true, createdAt: new Date() }]) }
+    db.document = { update: vi.fn(), findFirst: vi.fn().mockResolvedValue({ codingData: null, codingSource: null }) }
+    vi.mocked(getWorkspaceCapabilities).mockResolvedValue({ has: (k: string) => k === "ai-coding", pushableTemplateCodes: [] } as ReturnType<typeof getWorkspaceCapabilities> extends Promise<infer T> ? T : never)
+
+    await applyAutomationRules({
+      workspaceId: "w1", documentId: "d1", templateCode: "invoice", extraction,
+      aiContext: { documentData: { vendor: "Acme Supplies" } },
+    })
+
+    expect(suggestCoding).not.toHaveBeenCalled()
+    expect(createReviewTask).toHaveBeenCalledWith(expect.objectContaining({
+      reason: "rule_required",
+      detail: expect.stringContaining("Suggest"),
+    }))
   })
 })

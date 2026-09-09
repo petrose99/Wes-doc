@@ -37,6 +37,12 @@ export function AutomationConfigForm({ workspaceId, initial }: { workspaceId: st
   const [requirePolicyPass, setRequirePolicyPass] = useState(initial.requirePolicyPass)
   const [blockOnWarnChecks, setBlockOnWarnChecks] = useState(initial.blockOnWarnChecks)
   const [policyText, setPolicyText] = useState(initial.policyText ?? "")
+  const [amountBands, setAmountBands] = useState(initial.amountBands)
+
+  const addBand = () => setAmountBands([...amountBands, { min: 0, max: null, minConfidence: 0.85 }])
+  const removeBand = (i: number) => setAmountBands(amountBands.filter((_, idx) => idx !== i))
+  const updateBand = (i: number, patch: Partial<typeof amountBands[number]>) =>
+    setAmountBands(amountBands.map((b, idx) => (idx === i ? { ...b, ...patch } : b)))
 
   const submit = async () => {
     setPending(true)
@@ -50,6 +56,7 @@ export function AutomationConfigForm({ workspaceId, initial }: { workspaceId: st
           requirePolicyPass,
           blockOnWarnChecks,
           policyText: policyText.trim() || null,
+          amountBands,
         },
       })
       if ("error" in result) {
@@ -145,6 +152,43 @@ export function AutomationConfigForm({ workspaceId, initial }: { workspaceId: st
           onChange={(e) => setPolicyText(e.target.value)}
           placeholder="e.g. Expenses over $1000 need a receipt attached."
         />
+      </div>
+
+      <div>
+        <div className="mb-2 flex items-center justify-between">
+          <Label className="!m-0">Amount bands</Label>
+          <button type="button" onClick={addBand} className="rounded-md border border-slate-200 px-2 py-1 text-xs font-medium hover:bg-slate-50">
+            + Add band
+          </button>
+        </div>
+        <p className="mb-2 text-xs text-slate-500">A small verified-supplier document can clear a laxer floor than the workspace default. Bands stack — first match wins.</p>
+        {amountBands.length === 0
+          ? <p className="rounded-md border border-dashed p-3 text-xs text-slate-500">No bands. The workspace-wide minimum confidence above applies to every document.</p>
+          : <div className="space-y-2">
+              {amountBands.map((band, i) => (
+                <div key={i} className="grid grid-cols-1 gap-2 rounded-md border p-3 sm:grid-cols-[1fr_1fr_1fr_auto_auto]">
+                  <div>
+                    <Label className="text-xs">Min</Label>
+                    <Input type="number" min={0} step="0.01" value={band.min} onChange={(e) => updateBand(i, { min: Number(e.target.value) })} />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Max (blank = no cap)</Label>
+                    <Input type="number" min={0} step="0.01" value={band.max ?? ""} onChange={(e) => updateBand(i, { max: e.target.value === "" ? null : Number(e.target.value) })} />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Min confidence</Label>
+                    <Input type="number" min={0} max={1} step={0.01} value={band.minConfidence} onChange={(e) => updateBand(i, { minConfidence: Number(e.target.value) })} />
+                  </div>
+                  <label className="flex items-end gap-1 pb-2 text-xs">
+                    <input type="checkbox" checked={band.requireVerifiedSupplier ?? false} onChange={(e) => updateBand(i, { requireVerifiedSupplier: e.target.checked || undefined })} />
+                    <span>Verified only</span>
+                  </label>
+                  <button type="button" onClick={() => removeBand(i)} className="self-end pb-2 text-xs font-medium text-red-600 hover:underline">
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>}
       </div>
     </div>
 

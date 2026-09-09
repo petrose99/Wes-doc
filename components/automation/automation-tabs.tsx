@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
-export type AutomationTab = "metrics" | "review" | "vendors" | "settings"
+export type AutomationTab = "metrics" | "review" | "vendors" | "matches" | "settings"
 
 export function AutomationTabs({ workspaceId, active, reviewCount, reviewEnabled }: {
   workspaceId: string
@@ -15,6 +15,7 @@ export function AutomationTabs({ workspaceId, active, reviewCount, reviewEnabled
   const base = `/workspaces/${workspaceId}`
   const current: AutomationTab = active ?? (
     pathname.includes("/automation/vendors") ? "vendors"
+    : pathname.includes("/automation/matches") ? "matches"
     : pathname.includes("/automation/settings") ? "settings"
     : pathname.includes("/review") ? "review"
     : "metrics"
@@ -29,6 +30,7 @@ export function AutomationTabs({ workspaceId, active, reviewCount, reviewEnabled
       {reviewCount > 0 && <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-100 px-1.5 text-[11px] font-semibold text-amber-800">{reviewCount}</span>}
     </Link>}
     <Link href={`${base}/automation/vendors`} className={tabClass(current === "vendors")}>Vendors</Link>
+    <Link href={`${base}/automation/matches`} className={tabClass(current === "matches")}>Matches</Link>
     <Link href={`${base}/automation/settings`} className={tabClass(current === "settings")}>Settings</Link>
   </nav>
 }

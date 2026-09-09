@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge"
 import { AutomationTabs } from "@/components/automation/automation-tabs"
+import { PinVendorHistoryButton } from "@/components/automation/pin-vendor-history-button"
 import { getCurrentUser } from "@/lib/auth"
 import { getWorkspaceCapabilities, requireModule } from "@/lib/modules/capabilities"
 import { HISTORY_APPLY_THRESHOLDS } from "@/lib/automation/vendor-history"
@@ -15,11 +16,12 @@ export const dynamic = "force-dynamic"
 export default async function AutomationVendorsPage({ params }: { params: Promise<{ workspaceId: string }> }) {
   const { workspaceId } = await params
   const user = await getCurrentUser()
-  await requireWorkspaceRole(workspaceId, user.id)
+  const membership = await requireWorkspaceRole(workspaceId, user.id)
   await requireModule(workspaceId, "touchless-automation")
 
   const capabilities = await getWorkspaceCapabilities(workspaceId)
   const reviewEnabled = capabilities.has("review-queue")
+  const isOwner = membership.role === "owner"
   const [rows, reviewCount] = await Promise.all([
     summarizeVendorHistory(workspaceId),
     reviewEnabled ? countOpenReviewTasks(workspaceId) : 0,
@@ -32,6 +34,11 @@ export default async function AutomationVendorsPage({ params }: { params: Promis
         What the automation engine will code each vendor to before asking the AI. Applies directly when at least{" "}
         {HISTORY_APPLY_THRESHOLDS.minSupport} prior confirmed documents agree{" "}
         {Math.round(HISTORY_APPLY_THRESHOLDS.minAgreement * 100)}% of the time.
+      </p>
+      <p className="mt-2 text-xs text-slate-500">
+        The <span className="font-mono">key: value</span> rows below are the coding fields your workspace uses
+        (typically a general-ledger <em>account</em> and a <em>taxCode</em>). The bracketed number is agreement × count:{" "}
+        <span className="font-mono">100% of 5</span> means all 5 prior documents for this vendor were coded the same way.
       </p>
     </header>
     <AutomationTabs workspaceId={workspaceId} active="vendors" reviewCount={reviewCount} reviewEnabled={reviewEnabled} />
@@ -59,32 +66,41 @@ export default async function AutomationVendorsPage({ params }: { params: Promis
                   <th className="py-2 pr-4 font-medium">Confirmed docs</th>
                   <th className="py-2 pr-4 font-medium">Coding</th>
                   <th className="py-2 pr-4 font-medium">Status</th>
+                  {isOwner && <th className="py-2 pr-4 font-medium">Actions</th>}
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row) => (
-                  <tr key={`${row.supplier}::${row.templateCode}`} className="border-b border-[#f1f5f9] last:border-b-0">
-                    <td className="py-2 pr-4 font-medium text-slate-900">{row.supplier}</td>
-                    <td className="py-2 pr-4 text-slate-500">{row.templateCode}</td>
-                    <td className="py-2 pr-4">{row.totalConfirmed}</td>
-                    <td className="py-2 pr-4">
-                      <ul className="space-y-0.5">
-                        {Object.entries(row.prior.byKey).map(([key, stat]) => (
-                          <li key={key} className="text-xs">
-                            <span className="font-medium">{key}:</span>{" "}
-                            <span>{stat.modalValue}</span>{" "}
-                            <span className="text-slate-500">({Math.round(stat.agreement * 100)}% of {stat.support})</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </td>
-                    <td className="py-2 pr-4">
-                      {row.willAutoApply
-                        ? <Badge className="bg-emerald-100 text-emerald-800">Auto-applies</Badge>
-                        : <Badge className="bg-slate-100 text-slate-700">Falls back to AI</Badge>}
-                    </td>
-                  </tr>
-                ))}
+                {rows.map((row) => {
+                  const modalCoding = Object.fromEntries(
+                    Object.entries(row.prior.byKey).map(([key, stat]) => [key, stat.modalValue] as const),
+                  )
+                  return (
+                    <tr key={`${row.supplier}::${row.templateCode}`} className="border-b border-[#f1f5f9] last:border-b-0">
+                      <td className="py-2 pr-4 font-medium text-slate-900">{row.supplier}</td>
+                      <td className="py-2 pr-4 text-slate-500">{row.templateCode}</td>
+                      <td className="py-2 pr-4">{row.totalConfirmed}</td>
+                      <td className="py-2 pr-4">
+                        <ul className="space-y-0.5">
+                          {Object.entries(row.prior.byKey).map(([key, stat]) => (
+                            <li key={key} className="text-xs">
+                              <span className="font-medium">{key}:</span>{" "}
+                              <span>{stat.modalValue}</span>{" "}
+                              <span className="text-slate-500">({Math.round(stat.agreement * 100)}% of {stat.support})</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </td>
+                      <td className="py-2 pr-4">
+                        {row.willAutoApply
+                          ? <Badge className="bg-emerald-100 text-emerald-800">Auto-applies</Badge>
+                          : <Badge className="bg-slate-100 text-slate-700">Falls back to AI</Badge>}
+                      </td>
+                      {isOwner && <td className="py-2 pr-4">
+                        <PinVendorHistoryButton workspaceId={workspaceId} supplier={row.supplier} templateCode={row.templateCode} coding={modalCoding} />
+                      </td>}
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>

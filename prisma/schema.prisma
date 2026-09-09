@@ -1890,6 +1890,13 @@ model AgentVerdict {
 model WorkspaceAutomationConfig {
   id                String    @id @default(uuid()) @db.Uuid
   workspaceId       String    @unique @map("workspace_id") @db.Uuid
+  /// "suggest" | "auto" | "touchless" — the graduated Ramp-style autonomy this workspace runs
+  /// at. Persisted so a saved level round-trips, and read by applyAutomationRules to decide
+  /// whether the speculative fallbacks (vendor history, LLM) may run at all. Rules are
+  /// workspace-authored policy and always apply.
+  autonomyLevel     String    @default("auto") @map("autonomy_level")
+  /// Legacy boolean kept because autopublish.ts still reads it. Kept in sync with autonomyLevel
+  /// by updateAutomationConfig — touchlessEnabled is true iff autonomyLevel is "touchless".
   touchlessEnabled  Boolean   @default(false) @map("touchless_enabled")
   minConfidence     Float     @default(0.85) @map("min_confidence")
   requirePolicyPass Boolean   @default(false) @map("require_policy_pass")
