@@ -72,6 +72,21 @@ describe("normalizeBillFromDocument", () => {
     expect(normalizeBillFromDocument(makeDoc({ reviewedData: { vendor: "Acme", total: 5, currency_code: "US" } })).currencyCode).toBeNull()
     expect(normalizeBillFromDocument(makeDoc({ reviewedData: { vendor: "Acme", total: 5, currency_code: "USDOLLAR" } })).currencyCode).toBeNull()
   })
+
+  it("swaps to the workspace-base amount + currency when fxOverride is provided", () => {
+    const bill = normalizeBillFromDocument(makeDoc({
+      reviewedData: {
+        vendor: "Acme", total: 100, currency_code: "EUR",
+        line_items: [{ description: "Widget", quantity: 1, unit_price: 60, amount: 60 }, { description: "Tax", amount: 40 }],
+      },
+      fxOverride: { total: 108.91, currencyCode: "USD" },
+    }))
+    expect(bill.total).toBe(108.91)
+    expect(bill.currencyCode).toBe("USD")
+    // Line items scaled by the same 1.0891 ratio and reconciled to sum exactly to 108.91.
+    expect(bill.lineItems.reduce((sum, l) => sum + l.amount, 0)).toBeCloseTo(108.91, 2)
+    expect(bill.lineItems).toHaveLength(2)
+  })
 })
 
 describe("reconcileLineItemRounding", () => {

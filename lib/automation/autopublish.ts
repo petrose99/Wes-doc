@@ -12,7 +12,7 @@ import { getCategoryAccountMap, upsertWorkspaceIntegrationPush } from "@/models/
  * was created, false if skipped (not pushable, already pushed, no connection). Never throws. */
 async function enqueuePush(
   workspaceId: string,
-  document: { id: string; filename: string; reviewedData: unknown; rawExtraction: unknown; codingData: unknown; docType?: string | null; template: { code: string } | null },
+  document: { id: string; filename: string; reviewedData: unknown; rawExtraction: unknown; codingData: unknown; docType?: string | null; template: { code: string } | null; baseCurrencyTotal?: unknown },
   actorId: string | null,
   auditType: string,
 ): Promise<boolean> {
@@ -26,6 +26,16 @@ async function enqueuePush(
 
   const existingPush = await prisma.integrationPush.findFirst({ where: { workspaceId, documentId: document.id, connectionId: connection.id }, select: { id: true } })
   if (existingPush) return false
+
+  // Autopublish must NEVER ship a foreign-currency document to the ledger before FX applies —
+  // the whole point of touchless push is that a person didn't look at it, so a currency mismatch
+  // that a person would have caught goes straight to the books. Skip and let the next path
+  // (retry drain, or a person clicking "Push") get to it after conversion lands.
+  const workspaceForFx = await prisma.workspace.findUnique({ where: { id: workspaceId }, select: { baseCurrency: true } })
+  const workspaceBase = workspaceForFx?.baseCurrency ? workspaceForFx.baseCurrency.toUpperCase() : null
+  const reviewedForFx = (document.reviewedData as Record<string, unknown> | null) ?? (document.rawExtraction as Record<string, unknown> | null) ?? {}
+  const docCurrency = typeof reviewedForFx.currency_code === "string" ? reviewedForFx.currency_code.toUpperCase() : null
+  if (workspaceBase && docCurrency && docCurrency !== workspaceBase && (document.baseCurrencyTotal ?? null) === null) return false
 
   const reviewedData = (document.reviewedData as Record<string, unknown> | null) ?? (document.rawExtraction as Record<string, unknown> | null) ?? {}
   const coding = (document.codingData as Record<string, unknown> | null) ?? {}
@@ -42,7 +52,10 @@ async function enqueuePush(
     if (!cashflowAccountId) return false
     payload = extractBankStatementPayload(document.id, reviewedData, cashflowAccountId, connection.defaultExpenseAccountId!)
   } else {
-    const bill = normalizeBillFromDocument({ documentId: document.id, filename: document.filename, templateCode: document.template?.code ?? null, reviewedData })
+    const fxOverride = workspaceBase && (document.baseCurrencyTotal ?? null) !== null
+      ? { total: Number(document.baseCurrencyTotal), currencyCode: workspaceBase }
+      : null
+    const bill = normalizeBillFromDocument({ documentId: document.id, filename: document.filename, templateCode: document.template?.code ?? null, reviewedData, fxOverride })
     const direction: "payable" | "receivable" = documentType === "sale" ? "receivable" : "payable"
     payload = { ...bill, documentType, direction, ...(resolvedAccountId ? { expenseAccountId: resolvedAccountId } : {}), ...(category ? { category } : {}) }
   }
@@ -67,7 +80,7 @@ export async function maybeAutopublish(workspaceId: string, documentId: string, 
   try {
     const document = await prisma.document.findUnique({
       where: { id: documentId },
-      select: { id: true, filename: true, reviewedData: true, rawExtraction: true, codingData: true, appliedRuleId: true, readinessStatus: true, docType: true, template: { select: { code: true } } },
+      select: { id: true, filename: true, reviewedData: true, rawExtraction: true, codingData: true, appliedRuleId: true, readinessStatus: true, docType: true, baseCurrencyTotal: true, template: { select: { code: true } } },
     })
     if (!document) return
 

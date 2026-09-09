@@ -39,6 +39,16 @@ async function pushDocumentToConnection(
   if (!isPushableDocument(document)) {
     throw new Error("This document's type can't be pushed to accounting")
   }
+  // Foreign-currency documents MUST be converted before they touch a ledger — a QB/Xero bill
+  // booked in a currency the workspace's chart of accounts doesn't use is a real accounting
+  // problem, not a UX one. If the conversion is still pending (currency ≠ base but no rate
+  // fetched yet), refuse the push and let the retry drain get to it first.
+  const workspaceForFx = await prisma.workspace.findUnique({ where: { id: workspaceId }, select: { baseCurrency: true } })
+  const workspaceBase = workspaceForFx?.baseCurrency ? workspaceForFx.baseCurrency.toUpperCase() : null
+  const docCurrency = ((document.reviewedData as { currency_code?: unknown })?.currency_code as string | undefined)?.toUpperCase() ?? null
+  if (workspaceBase && docCurrency && docCurrency !== workspaceBase && document.baseCurrencyTotal === null) {
+    throw new Error("fx_rate_pending")
+  }
   const coding = (document.codingData as Record<string, unknown> | null) ?? {}
   if (!isCategoryConfirmed(coding)) {
     throw new Error("Document category must be confirmed before pushing")
@@ -63,7 +73,16 @@ async function pushDocumentToConnection(
     if (!cashflowAccountId || !creditAccountId) throw new Error("No bank account configured for statement push")
     payload = extractBankStatementPayload(document.id, reviewedData, cashflowAccountId, creditAccountId)
   } else {
-    const bill = normalizeBillFromDocument({ documentId: document.id, filename: document.filename, templateCode: document.template?.code ?? null, reviewedData })
+    // Ledger books everything in the workspace's base currency: if the document has been
+    // converted, the bill body carries the converted total + base currency, NOT the extracted
+    // ones. A same-currency document has baseCurrencyTotal populated via the "identity" shortcut,
+    // so this branch covers those too — and a foreign-currency doc with pending FX was rejected
+    // above, so at this point either baseCurrencyTotal exists or the document was already same-
+    // currency to begin with.
+    const fxOverride = workspaceBase && document.baseCurrencyTotal !== null
+      ? { total: Number(document.baseCurrencyTotal), currencyCode: workspaceBase }
+      : null
+    const bill = normalizeBillFromDocument({ documentId: document.id, filename: document.filename, templateCode: document.template?.code ?? null, reviewedData, fxOverride })
     const direction: "payable" | "receivable" = documentType === "sale" ? "receivable" : "payable"
     payload = { ...bill, documentType, direction, ...(resolvedAccountId ? { expenseAccountId: resolvedAccountId } : {}), ...(category ? { category } : {}) }
   }

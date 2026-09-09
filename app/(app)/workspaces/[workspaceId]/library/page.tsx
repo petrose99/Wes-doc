@@ -27,7 +27,8 @@ export default async function LibraryPage({ params, searchParams }: {
   searchParams: Promise<SearchParams>
 }) {
   const [{ workspaceId }, query, user] = await Promise.all([params, searchParams, getCurrentUser()])
-  await requireWorkspaceRole(workspaceId, user.id)
+  const membership = await requireWorkspaceRole(workspaceId, user.id)
+  const workspaceBase = membership.workspace.baseCurrency
 
   const search = query.q?.trim() || ""
   const scope: LibraryScope = isValidScope(query.scope) ? query.scope : "smart"
@@ -68,7 +69,7 @@ export default async function LibraryPage({ params, searchParams }: {
     receivedAt: doc.receivedAt,
     flaggedAt: doc.flaggedAt ?? null,
     template: doc.template ? { code: doc.template.code, name: doc.template.name } : null,
-    review: summarizeDocumentForReview(doc),
+    review: summarizeDocumentForReview(doc, workspaceBase),
   }))
 
   const baseParams: Record<string, string> = {}

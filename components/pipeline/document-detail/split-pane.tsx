@@ -27,7 +27,7 @@ type PanelLayout = "split" | "source-only" | "details-only"
 export function SplitPane({
   workspaceId, source, fields, data, fieldConfidence, provenanceFields, provenanceItems, initialTarget, conflictingLabels, missingRequiredFields,
   saveReview, documentType: initialDocumentType, note: initialNote, auditEvents, prevHref, nextHref, position, stage, afterActionHref,
-  header, canPush, pushCard, canCreateRule, defaultSupplier, matchKind, bankMatches, paymentStatus, rationales,
+  header, canPush, pushCard, canCreateRule, defaultSupplier, matchKind, bankMatches, paymentStatus, rationales, fxBadge,
 }: {
   workspaceId: string
   source: SourceDocument
@@ -57,6 +57,7 @@ export function SplitPane({
   bankMatches: ReactNode
   paymentStatus?: string | null
   rationales?: Record<string, FieldRationale>
+  fxBadge?: ReactNode
 }) {
   const router = useRouter()
   const [tab, setTab] = useState<Tab>("details")
@@ -294,6 +295,7 @@ export function SplitPane({
               setTarget={setTarget}
             />
 
+            {fxBadge && <div className="pt-2">{fxBadge}</div>}
             {canPush && <div className="pt-2">{pushCard}</div>}
 
             {canCreateRule && <Card className="border-slate-200 shadow-sm">

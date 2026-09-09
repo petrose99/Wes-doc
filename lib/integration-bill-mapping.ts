@@ -96,12 +96,21 @@ export function reconcileLineItemRounding(items: NormalizedLineItem[], total: nu
  * normalized bill. Throws BillMappingError if there is no total — a bill with no amount is not a
  * bill a provider can create, and this is the one case scope explicitly says to refuse rather than
  * guess. `reviewedData` is expected to be the document's reviewedData (falling back to rawExtraction
- * is the caller's job, matching lib/document-export.ts's convention). */
+ * is the caller's job, matching lib/document-export.ts's convention).
+ *
+ * `fxOverride` swaps the bill's amount and currency to the workspace's base currency BEFORE the
+ * line-item rounding runs, so the pushed bill's lines sum EXACTLY to the converted total in the
+ * currency the ledger actually books at. When omitted, the bill goes out in the document's own
+ * extracted currency (the pre-FX behaviour). Callers pass it in whenever the document has a
+ * successful conversion (baseCurrencyTotal + fxRate); a document whose conversion is still
+ * pending (currency ≠ base but no baseCurrencyTotal yet) is expected to be refused UPSTREAM
+ * rather than pushed with a mismatched number. */
 export function normalizeBillFromDocument(input: {
   documentId: string
   filename: string
   templateCode: string | null
   reviewedData: Record<string, unknown>
+  fxOverride?: { total: number; currencyCode: string } | null
 }): NormalizedBill {
   const data = input.reviewedData
   const vendorName = asString(data.vendor) ?? asString(data.merchant) ?? "Unknown vendor"
@@ -109,10 +118,20 @@ export function normalizeBillFromDocument(input: {
   const issueDate = asString(data.issue_date) ?? asString(data.purchase_date)
   // Receipts have no due_date field at all (already paid) — only read it for invoices.
   const dueDate = input.templateCode === "receipt" ? null : asString(data.due_date)
-  const total = asNumber(data.total)
-  if (total === null) throw new BillMappingError("bill_missing_total")
-  const currencyCode = asCurrencyCode(data.currency_code)
-  const lineItems = reconcileLineItemRounding(normalizeLineItems(data.line_items, total), total, currencyCode)
+  const extractedTotal = asNumber(data.total)
+  if (extractedTotal === null) throw new BillMappingError("bill_missing_total")
+  const extractedCurrency = asCurrencyCode(data.currency_code)
+  const total = input.fxOverride?.total ?? extractedTotal
+  const currencyCode = input.fxOverride?.currencyCode ?? extractedCurrency
+  // When converting to a different currency, scale each line item by the same ratio the total
+  // was scaled by, then let reconcileLineItemRounding push any residual back into the largest
+  // lines so they sum exactly to the converted header total. Without the scaling step the
+  // reconciler would try to close a 20%+ gap in one-cent-per-line increments, which either loops
+  // for thousands of lines or produces obviously-wrong per-line amounts.
+  const rawItems = normalizeLineItems(data.line_items, extractedTotal)
+  const ratio = extractedTotal !== 0 ? total / extractedTotal : 1
+  const scaledItems = rawItems.map((item) => ({ ...item, unitPrice: item.unitPrice * ratio, amount: item.amount * ratio }))
+  const lineItems = reconcileLineItemRounding(scaledItems, total, currencyCode)
   return {
     documentId: input.documentId,
     filename: input.filename,

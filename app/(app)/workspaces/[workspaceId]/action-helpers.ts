@@ -20,6 +20,7 @@ export const sheetPath = (workspaceId: string, fileId: string) => `/workspaces/$
  * Codes not listed here still fall through to that behaviour. */
 const BILLING_MESSAGES: Record<string, string> = {
   free_trial_storage_exceeded: "You've reached the 200 MB free-trial upload limit for this workspace.",
+  fx_rate_pending: "This document is in a different currency and its exchange rate hasn't been fetched yet. Try again in a moment.",
   // Integrations (P1). The url_* codes come from lib/url-safety's SSRF guard.
   integrations_not_available: "Integrations aren't enabled on this deployment.",
   accounting_not_available: "The Bigcapital accounting bridge isn't enabled on this deployment.",
