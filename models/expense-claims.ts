@@ -4,6 +4,7 @@
 import { canDecideStage, decideStage, findCurrentStage } from "@/lib/approvals/engine"
 import { auditEventData, getRequestAuditContext } from "@/lib/audit"
 import { prisma } from "@/lib/db"
+import { addCents, fromCents } from "@/lib/money"
 import { cache } from "react"
 
 export const EXPENSE_CLAIM_STATUSES = ["draft", "submitted", "approved", "rejected"] as const
@@ -138,13 +139,16 @@ export async function submitExpenseClaim(input: { workspaceId: string; claimId: 
     if (!workflow) throw new Error("approval_workflow_not_found")
   }
 
-  let total = 0
+  // Sum in integer cents so the frozen claim total isn't off by a stray fractional cent from
+  // chained Float addition (0.1 + 0.2 = 0.30000000000000004). See lib/money.ts.
+  const amounts: Array<number | null> = []
   let currencyCode: string | null = null
   for (const item of claim.items) {
     const values = (item.document.reviewedData ?? item.document.rawExtraction ?? {}) as Record<string, unknown>
-    total += asNumber(values.total) ?? 0
+    amounts.push(asNumber(values.total))
     currencyCode = currencyCode ?? asString(values.currency_code)
   }
+  const total = fromCents(addCents(amounts))
 
   const context = await getRequestAuditContext()
   const [updated] = await prisma.$transaction([

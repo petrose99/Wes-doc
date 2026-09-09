@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db"
 import type { Prisma } from "@/prisma/client"
+import { candidateDocumentIds } from "./blocking"
 import { findMatches, type MatchableDocument, type MatchResult } from "./engine"
 
 export async function resolveDocumentMatches(workspaceId: string, documentId: string): Promise<MatchResult[]> {
@@ -23,31 +24,37 @@ export async function resolveDocumentMatches(workspaceId: string, documentId: st
     poNumber: asString(extracted.po_number) ?? asString(extracted.purchase_order_number),
   }
 
-  const candidates = await prisma.$queryRawUnsafe<{ id: string; raw_extraction: unknown; template_code: string }[]>(
-    `SELECT d."id", d."raw_extraction", t."code" AS "template_code"
-     FROM "documents" d
-     JOIN "document_templates" t ON t."id" = d."template_id"
-     WHERE d."workspace_id" = $1::uuid
-       AND d."id" != $2::uuid
-       AND d."raw_extraction" IS NOT NULL
-       AND d."template_id" IS NOT NULL
-     ORDER BY d."received_at" DESC
-     LIMIT 200`,
+  // Phase 4: blocking replaces the LIMIT-200 recent scan with an indexed union over
+  // DocumentFieldValue. See lib/matching/blocking.ts. When the source has neither an amount nor
+  // a date yet the blocker falls back to the same recent-200 behavior — recall doesn't collapse.
+  const ids = await candidateDocumentIds({
     workspaceId,
     documentId,
-  )
-
-  const matchables: MatchableDocument[] = candidates.map((c) => {
-    const ext = (typeof c.raw_extraction === "object" && c.raw_extraction !== null ? c.raw_extraction : {}) as Record<string, unknown>
-    return {
-      id: c.id,
-      templateCode: c.template_code,
-      vendor: asString(ext.vendor) ?? asString(ext.merchant),
-      amount: asNumber(ext.total) ?? asNumber(ext.amount),
-      date: asString(ext.date) ?? asString(ext.invoice_date),
-      poNumber: asString(ext.po_number) ?? asString(ext.purchase_order_number),
-    }
+    amount: source.amount,
+    date: source.date,
+    poNumber: source.poNumber,
   })
+
+  const candidates = ids.length
+    ? await prisma.document.findMany({
+        where: { workspaceId, id: { in: ids } },
+        select: { id: true, rawExtraction: true, template: { select: { code: true } } },
+      })
+    : []
+
+  const matchables: MatchableDocument[] = candidates
+    .filter((c) => c.template?.code)
+    .map((c) => {
+      const ext = (c.rawExtraction ?? {}) as Record<string, unknown>
+      return {
+        id: c.id,
+        templateCode: c.template!.code,
+        vendor: asString(ext.vendor) ?? asString(ext.merchant),
+        amount: asNumber(ext.total) ?? asNumber(ext.amount),
+        date: asString(ext.date) ?? asString(ext.invoice_date),
+        poNumber: asString(ext.po_number) ?? asString(ext.purchase_order_number),
+      }
+    })
 
   const results = findMatches(source, matchables)
 

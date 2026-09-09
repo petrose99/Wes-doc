@@ -37,7 +37,13 @@ describe("syncLedgerTransactions", () => {
       findUniqueOrThrow: vi.fn().mockResolvedValue({ id: "conn1", workspaceId: "ws1", provider: "bigcapital", externalTenantId: "org1" }),
     }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    db.ledgerTransaction = { upsert: vi.fn((args: any) => ({ op: "upsert", args })), updateMany: vi.fn((args: any) => ({ op: "updateMany", args })) }
+    db.ledgerTransaction = {
+      upsert: vi.fn((args: any) => ({ op: "upsert", args })),
+      updateMany: vi.fn((args: any) => ({ op: "updateMany", args })),
+      // Phase 5: syncLedgerTransactions now reads existing reconciled/reconciledSource state up
+      // front so `chooseReconciled` can honor a docubite-source row. Default: no prior rows.
+      findMany: vi.fn().mockResolvedValue([]),
+    }
     db.$transaction = vi.fn(async (ops: unknown[]) => { transactions.push(ops); return [] })
     return transactions
   }
@@ -74,6 +80,8 @@ describe("syncDueLedgerConnections", () => {
       upsert: vi.fn((args: any) => args),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       updateMany: vi.fn((args: any) => args),
+      // Phase 5: syncLedgerTransactions reads existing rows to decide reconciledSource.
+      findMany: vi.fn().mockResolvedValue([]),
     }
     db.$transaction = vi.fn().mockResolvedValue([])
     vi.mocked(bigcapital.listBills).mockImplementation(listBills)

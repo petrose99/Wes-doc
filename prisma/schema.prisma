@@ -143,6 +143,7 @@ model Workspace {
   codingCorrections CodingCorrection[]
   accountingEntities AccountingEntity[]
   bankMatches BankMatch[]
+  statementLines StatementLine[]
   approvalWorkflows ApprovalWorkflow[]
   approvalWorkflowStages ApprovalWorkflowStage[]
   expenseClaims ExpenseClaim[]
@@ -531,6 +532,7 @@ model Document {
   documentMatchesAsTarget DocumentMatch[] @relation("MatchTarget")
   bankMatchesAsStatement BankMatch[] @relation("BankMatchStatement")
   bankMatchesAsMatched   BankMatch[] @relation("BankMatchMatched")
+  statementLines         StatementLine[]
   expenseClaimItems ExpenseClaimItem[]
   healthCheckResults HealthCheckResult[]
   sheetPlacements    DocumentSheetPlacement[]
@@ -667,6 +669,12 @@ model DocumentFieldValue {
   file             DocumentFile @relation(fields: [fileId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId, documentId])
+  /// Phase 4: composite indexes powering matching blocking (lib/matching/blocking.ts). Amount
+  /// and date blocking scan `document_field_values` by (workspaceId, fieldKey, value*) so the
+  /// per-document raw-SQL LIMIT-200 fallback in resolve.ts can be replaced with a targeted union.
+  @@index([workspaceId, fieldKey, valueNumber])
+  @@index([workspaceId, fieldKey, valueDate])
+  @@index([workspaceId, fieldKey, valueText])
   @@map("document_field_values")
 }
 
@@ -1431,10 +1439,12 @@ model ExpenseClaim {
   /// moment the claim was submitted — not a live recompute. Null while still a draft. A snapshot
   /// so approving a claim later never silently changes what it says a person is owed just because
   /// a linked receipt's extracted total got corrected afterward — same freeze-at-the-moment
-  /// philosophy as Document.fieldSnapshot. Stored as Float: this codebase has no Decimal/cents
-  /// convention anywhere (every other amount is a plain JSON number inside Document.reviewedData),
-  /// so this matches the ambient practice rather than introducing a new one.
-  total       Float?
+  /// philosophy as Document.fieldSnapshot. Decimal(18,2) since Phase 1: chained Float arithmetic
+  /// on money drifts (0.1 + 0.2 = 0.30000000000000004) and this column is compared against pushed
+  /// ledger totals during reconciliation. See lib/money.ts for the boundary helpers that convert
+  /// Prisma's Decimal.js instance back to `number` at read sites — the app layer still speaks
+  /// plain `number | null` above the DB.
+  total       Decimal? @db.Decimal(18, 2)
   currencyCode String?  @map("currency_code")
   workflowId  String?   @map("workflow_id") @db.Uuid
   currentStageIndex Int? @map("current_stage_index")
@@ -1724,15 +1734,22 @@ model LedgerTransaction {
   accountExternalId String?  @map("account_external_id")
   accountName       String?  @map("account_name")
   docNumber         String?  @map("doc_number")
-  amount            Float?
-  taxAmount         Float?   @map("tax_amount")
+  /// Decimal(18,2) since Phase 1 — see lib/money.ts. Route reads through decimalToNumber where
+  /// the caller expects `number`.
+  amount            Decimal? @db.Decimal(18, 2)
+  taxAmount         Decimal? @db.Decimal(18, 2) @map("tax_amount")
   currencyCode      String?  @map("currency_code")
   txnDate           DateTime? @db.Date @map("txn_date")
   reconciled        Boolean  @default(false)
+  /// "docubite" when this row was reconciled by DocuBite closing a bank-match loop; "provider" when
+  /// the upstream ledger reported IsReconciled=true. Null means never reconciled. The sync path
+  /// treats a "docubite"-source row as authoritative: an upstream `reconciled: false` never
+  /// clobbers it back — only an upstream `true` can flip the source to "provider".
+  reconciledSource  String?  @map("reconciled_source")
   active            Boolean  @default(true)
   raw               Json?
-  dueAmount         Float?   @map("due_amount")
-  paidAmount        Float?   @map("paid_amount")
+  dueAmount         Decimal? @db.Decimal(18, 2) @map("due_amount")
+  paidAmount        Decimal? @db.Decimal(18, 2) @map("paid_amount")
   paymentStatus     String?  @map("payment_status")
   syncedAt          DateTime @map("synced_at")
   workspace         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -1766,17 +1783,62 @@ model BankMatch {
   decidedById         String?   @map("decided_by_id") @db.Uuid
   decidedAt           DateTime? @map("decided_at")
   detail              Json?
+  /// Phase 2: nullable FK to the durable StatementLine identity. Non-null once
+  /// projectStatementLines has run against the statement. `transactionIndex` stays as the
+  /// legacy positional address until every accepted-match row is migrated onto a StatementLine.
+  statementLineId     String?   @map("statement_line_id") @db.Uuid
   createdAt           DateTime  @default(now()) @map("created_at")
   updatedAt           DateTime  @updatedAt @map("updated_at")
   workspace           Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   statementDocument    Document @relation("BankMatchStatement", fields: [statementDocumentId], references: [id], onDelete: Cascade)
   matchedDocument      Document @relation("BankMatchMatched", fields: [matchedDocumentId], references: [id], onDelete: Cascade)
   decidedBy           User?     @relation("BankMatchDecider", fields: [decidedById], references: [id], onDelete: SetNull)
+  statementLine        StatementLine? @relation(fields: [statementLineId], references: [id], onDelete: SetNull)
 
   @@unique([workspaceId, kind, statementDocumentId, transactionIndex, matchedDocumentId])
   @@index([workspaceId, statementDocumentId])
   @@index([workspaceId, matchedDocumentId])
+  @@index([workspaceId, statementLineId])
   @@map("bank_matches")
+}
+
+/// Phase 2: durable identity for one line inside a bank or supplier statement document.
+///
+/// The statement's Document.reviewedData stays the canonical source of the line's content, but
+/// re-extraction reshuffles the underlying `transactions` array and (a) strands accepted
+/// BankMatch rows still keyed on the old array index and (b) makes reconciliation a moving
+/// target for anything that outlives one extraction pass. `contentHash` is a stable identity
+/// over the normalized line (date | amount cents | currency | description) so the same line
+/// survives a re-projection under the same id.
+model StatementLine {
+  id                  String    @id @default(uuid()) @db.Uuid
+  workspaceId         String    @map("workspace_id") @db.Uuid
+  documentId          String    @map("document_id") @db.Uuid
+  /// The row's current position in the statement's `transactions` (or `entries`) array, or -1 when
+  /// the line has since vanished from the source but is retained because an accepted BankMatch
+  /// still points at it (orphaned line, kept for the decision-record).
+  lineIndex           Int       @map("line_index")
+  /// sha256 of `date|amountCents|currency|description` after normalization (whitespace collapsed,
+  /// case-folded description). Genuine duplicate lines (same date, amount, description) get an
+  /// app-level `-N` suffix to keep the (documentId, contentHash) uniqueness.
+  contentHash         String    @map("content_hash")
+  txnDate             DateTime? @db.Date @map("txn_date")
+  amount              Decimal?  @db.Decimal(18, 2)
+  currencyCode        String?   @map("currency_code")
+  description         String?
+  counterparty        String?
+  /// "debit" | "credit" — direction relative to the statement's owner.
+  direction           String?
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+  workspace           Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  document            Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  bankMatches         BankMatch[]
+
+  @@unique([documentId, contentHash])
+  @@index([workspaceId, txnDate])
+  @@index([workspaceId, amount])
+  @@map("statement_lines")
 }
 
 /// Pipeline redesign: per-user, per-workspace, per-view column/filter/sort preferences for the
@@ -1880,7 +1942,9 @@ model WorkspaceBudget {
   category       String?
   vendor         String?
   templateCode   String?   @map("template_code")
-  amount         Float
+  /// Decimal(18,2) since Phase 1 — see lib/money.ts. Budget comparisons and % calculations happen
+  /// in cents to avoid the 0.1+0.2 float trap when a budget's threshold sits near a boundary.
+  amount         Decimal   @db.Decimal(18, 2)
   periodType     String    @default("monthly") @map("period_type")
   warnAtPercent  Int       @default(80) @map("warn_at_percent")
   isActive       Boolean   @default(true) @map("is_active")

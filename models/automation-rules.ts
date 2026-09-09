@@ -6,11 +6,13 @@ import { suggestCoding, type CodingAgentInput } from "@/lib/agents/coding-agent"
 import { AI_CODING_MIN_CONFIDENCE } from "@/lib/readiness/evaluate"
 import { maybeAutopublish } from "@/lib/automation/autopublish"
 import { applyRules, SUPPLIER_FIELD_BY_TEMPLATE, type AutomationRuleInput, type ExtractionForMatch, type RuleActions, type RuleMatcher } from "@/lib/automation/rules"
+import { confidentAssignments, getVendorCodingPrior } from "@/lib/automation/vendor-history"
 import { auditEventData, getRequestAuditContext } from "@/lib/audit"
 import { prisma } from "@/lib/db"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { getCodingCorrectionExamples } from "@/models/coding-corrections"
 import { createReviewTask } from "@/models/review-tasks"
+import { loadVendorCodingHistory } from "@/models/vendor-history"
 import { Prisma } from "@/prisma/client"
 import { cache } from "react"
 
@@ -96,6 +98,11 @@ export async function applyAutomationRules(input: {
 
     if (result.reviewReason) {
       if (result.reviewReason === "no_match_risky") {
+        // Phase 3 precedence: try the vendor-history prior BEFORE the LLM. If a workspace has
+        // coded this supplier the same way many times before, that is the strongest signal
+        // and skips both the LLM cost and the LLM's tendency to drift on well-known vendors.
+        const historyHandled = await applyVendorHistoryCoding(input, rows, context)
+        if (historyHandled) return
         const handled = await applyAiCodingFallback(input, rows, context)
         if (!handled) {
           await createReviewTask({ workspaceId: input.workspaceId, documentId: input.documentId, reason: "rule_required", detail: "No automation rule matched this document's supplier — coding was not applied.", createdById: null })
@@ -112,6 +119,53 @@ export async function applyAutomationRules(input: {
   } catch (error) {
     console.error("[automation] failed to apply rules:", error instanceof Error ? error.message : error)
   }
+}
+
+/** Phase 3: apply high-agreement vendor history directly (bypassing the LLM). Returns true when
+ * the whole set of `codingKeys` was resolved from history so the caller stops before running the
+ * LLM path. When only a subset is confident, we still fall through to the LLM but supply the
+ * partial map as a prior. */
+async function applyVendorHistoryCoding(
+  input: { workspaceId: string; documentId: string; templateCode: string; extraction: ExtractionForMatch; aiContext?: { documentData: Record<string, unknown> } },
+  activeRules: Array<{ matcher: unknown; actions: unknown }>,
+  _context: unknown,
+): Promise<boolean> {
+  const supplier = input.extraction.supplierValue
+  if (!supplier) return false
+  const codingKeys = extractCodingKeys(activeRules)
+  if (!codingKeys.length) return false
+
+  const supplierField = SUPPLIER_FIELD_BY_TEMPLATE[input.templateCode]
+  if (!supplierField) return false
+  const history = await loadVendorCodingHistory(input.workspaceId, input.templateCode, supplierField)
+  if (!history.length) return false
+
+  const prior = getVendorCodingPrior(history, supplier, input.templateCode)
+  const assignments = confidentAssignments(prior, codingKeys)
+  const covered = codingKeys.every((key) => key in assignments)
+  if (!covered) return false
+
+  const auditContext = await getRequestAuditContext()
+  await prisma.$transaction([
+    prisma.document.update({
+      where: { id: input.documentId },
+      data: {
+        codingData: assignments as unknown as Prisma.InputJsonValue,
+        codingSource: "history",
+        codingConfidence: prior.byKey[codingKeys[0]]?.agreement ?? null,
+      },
+    }),
+    prisma.documentAuditEvent.create({
+      data: auditEventData({
+        workspaceId: input.workspaceId, documentId: input.documentId,
+        type: "history_coding.applied",
+        detail: { codingData: assignments, support: prior.support, byKey: prior.byKey },
+      }, auditContext),
+    }),
+  ])
+  await track("vendor_history_coding_applied", { documentId: input.documentId, support: prior.support }, { workspaceId: input.workspaceId })
+  await maybeAutopublish(input.workspaceId, input.documentId, null)
+  return true
 }
 
 async function applyAiCodingFallback(
@@ -136,6 +190,26 @@ async function applyAiCodingFallback(
   const exemplarRules = buildExemplarRules(activeRules)
   const corrections = await getCodingCorrectionExamples(input.workspaceId, input.templateCode)
 
+  // Phase 3: pass the vendor prior as a soft signal even in the LLM path. Confident cases
+  // already short-circuited above (applyVendorHistoryCoding) — what we get here is medium-support
+  // history the LLM should weight.
+  let vendorHistoryStats: CodingAgentInput["vendorHistory"] = undefined
+  const supplierField = SUPPLIER_FIELD_BY_TEMPLATE[input.templateCode]
+  if (supplierField && input.extraction.supplierValue) {
+    const history = await loadVendorCodingHistory(input.workspaceId, input.templateCode, supplierField)
+    if (history.length) {
+      const prior = getVendorCodingPrior(history, input.extraction.supplierValue, input.templateCode)
+      if (prior.support > 0) {
+        vendorHistoryStats = codingKeys
+          .map((key) => {
+            const s = prior.byKey[key]
+            return s ? { key, modalValue: s.modalValue, support: s.support, agreement: s.agreement } : null
+          })
+          .filter((v): v is NonNullable<typeof v> => v !== null)
+      }
+    }
+  }
+
   const agentInput: CodingAgentInput = {
     workspaceId: input.workspaceId,
     documentId: input.documentId,
@@ -145,6 +219,7 @@ async function applyAiCodingFallback(
     codingKeys,
     exemplarRules: exemplarRules.slice(0, 15),
     corrections,
+    vendorHistory: vendorHistoryStats,
   }
 
   const suggestion = await suggestCoding(agentInput)

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db"
+import { decimalToNumber } from "@/lib/money"
 
 export type DocumentPaymentStatus = {
   paymentStatus: string | null
@@ -40,8 +41,8 @@ export async function getDocumentPaymentStatuses(
     if (row?.paymentStatus) {
       result.set(push.documentId, {
         paymentStatus: row.paymentStatus,
-        dueAmount: row.dueAmount,
-        paidAmount: row.paidAmount,
+        dueAmount: decimalToNumber(row.dueAmount),
+        paidAmount: decimalToNumber(row.paidAmount),
         syncedAt: row.syncedAt,
       })
     }

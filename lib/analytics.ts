@@ -36,6 +36,9 @@ const EVENT_SCHEMAS = {
   ai_coding_suggested: z.object({ documentId: uuid, confidence: z.number() }).strict(),
   ai_coding_accepted: z.object({ documentId: uuid }).strict(),
   ai_coding_overridden: z.object({ documentId: uuid, fieldCount: z.number().int().nonnegative() }).strict(),
+  /** Phase 3: the vendor-history prior applied full coding directly without asking the LLM.
+   * `support` is how many prior confirmed rows agreed with the applied value. */
+  vendor_history_coding_applied: z.object({ documentId: uuid, support: z.number().int().nonnegative() }).strict(),
   /** A6.1: an allowed sender's email produced zero documents — counts only, the mail's content
    * stays in InboundEmailIntake/audit where it belongs. */
   inbound_email_no_document: z.object({ attachmentCount: z.number().int().nonnegative(), rejected: z.number().int().nonnegative() }).strict(),

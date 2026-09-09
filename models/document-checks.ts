@@ -11,6 +11,7 @@ import { checkTextLayerDivergence } from "@/lib/checks/text-layer-divergence"
 import { extractPdfTextLayer } from "@/lib/pdf/text-layer"
 import { checkSplitInvoices } from "@/lib/checks/split-invoices"
 import { checkVendorOnboarding } from "@/lib/checks/vendor-onboarding"
+import { decimalToNumber } from "@/lib/money"
 import { documentStorageKey, readDocumentSource } from "@/lib/document-storage"
 import { resolveSupplier } from "@/lib/suppliers/alias"
 import { normalizeIban } from "@/lib/suppliers/normalize"
@@ -325,7 +326,9 @@ async function checkSplitInvoicesAgainstHistory(workspaceId: string, templateId:
       .map((r) => (r.matcher as Record<string, unknown> | null)?.minAmount)
       .filter((v): v is number => typeof v === "number" && v > 0)
     const budgets = await prisma.workspaceBudget.findMany({ where: { workspaceId, isActive: true }, select: { amount: true } }).catch(() => [])
-    const budgetThresholds = budgets.map((b) => b.amount).filter((v): v is number => typeof v === "number" && v > 0)
+    const budgetThresholds = budgets
+      .map((b) => decimalToNumber(b.amount))
+      .filter((v): v is number => typeof v === "number" && v > 0)
     const allThresholds = [...routingThresholds, ...budgetThresholds]
     const approvalThreshold = allThresholds.length ? Math.min(...allThresholds) : 1000
     return checkSplitInvoices({ candidateAmount: amount, candidateDate: date, siblings: window, approvalThreshold })

@@ -6,6 +6,8 @@ import { suggestMatches, type BankTransaction, type MatchCandidateDocument } fro
 import { prisma } from "@/lib/db"
 import { DOC_TYPE_SPECS, DOC_TYPES, resolveDocType, type MatchCandidateFieldMap } from "@/lib/doc-types"
 import { matchSupplierStatementEntries, type SupplierStatementEntry } from "@/lib/reconciliation/supplier-statement"
+import { onBankMatchAccepted, onBankMatchUnaccepted } from "@/lib/reconciliation/close-loop"
+import { computeContentHash, getStatementLineIdsByHash, projectStatementLines, type StatementLineInput } from "@/models/statement-lines"
 import { Prisma } from "@/prisma/client"
 import { cache } from "react"
 
@@ -45,14 +47,16 @@ async function loadCandidateDocuments(workspaceId: string, excludeDocumentId: st
 
 /** Deletes every non-accepted BankMatch row for this (statement, kind) before inserting fresh
  * suggestions — an accepted match is a person's decision and must survive a re-run; a stale
- * "suggested" or "rejected" row from a prior run has no reason to. */
-async function replaceSuggestions(workspaceId: string, statementDocumentId: string, kind: string, suggestions: { transactionIndex: number; matchedDocumentId: string; confidence: number; dateDeltaDays: number | null }[]): Promise<void> {
+ * "suggested" or "rejected" row from a prior run has no reason to. Suggestions include a
+ * statementLineId when the projection has run; it's written into BankMatch.statementLineId so
+ * later re-projections can join by durable identity rather than array position. */
+async function replaceSuggestions(workspaceId: string, statementDocumentId: string, kind: string, suggestions: { transactionIndex: number; matchedDocumentId: string; confidence: number; dateDeltaDays: number | null; statementLineId: string | null }[]): Promise<void> {
   await prisma.$transaction([
     prisma.bankMatch.deleteMany({ where: { workspaceId, statementDocumentId, kind, status: { not: "accepted" } } }),
     ...suggestions.map((s) => prisma.bankMatch.upsert({
       where: { workspaceId_kind_statementDocumentId_transactionIndex_matchedDocumentId: { workspaceId, kind, statementDocumentId, transactionIndex: s.transactionIndex, matchedDocumentId: s.matchedDocumentId } },
-      create: { workspaceId, statementDocumentId, kind, transactionIndex: s.transactionIndex, matchedDocumentId: s.matchedDocumentId, confidence: s.confidence, dateDeltaDays: s.dateDeltaDays },
-      update: { confidence: s.confidence, dateDeltaDays: s.dateDeltaDays, status: "suggested", decidedById: null, decidedAt: null },
+      create: { workspaceId, statementDocumentId, kind, transactionIndex: s.transactionIndex, matchedDocumentId: s.matchedDocumentId, confidence: s.confidence, dateDeltaDays: s.dateDeltaDays, statementLineId: s.statementLineId },
+      update: { confidence: s.confidence, dateDeltaDays: s.dateDeltaDays, status: "suggested", decidedById: null, decidedAt: null, statementLineId: s.statementLineId },
     })),
   ])
 }
@@ -77,11 +81,41 @@ export async function regenerateBankMatchSuggestions(workspaceId: string, statem
       const credit = asNumber(r.credit)
       return { index, date: asDate(r.transaction_date), description: asString(r.description), amount: debit ?? credit }
     })
-    if (!transactions.length) { await replaceSuggestions(workspaceId, statementDocumentId, "bank", []); return }
+    if (!transactions.length) {
+      await projectStatementLines(workspaceId, statementDocumentId, [])
+      await replaceSuggestions(workspaceId, statementDocumentId, "bank", [])
+      return
+    }
+
+    // Project first — subsequent suggestion writes attach to a durable StatementLine.id, so an
+    // accepted match survives the next re-extraction even if `transactions` reshuffles.
+    const lineInputs: StatementLineInput[] = transactions.map((t) => ({
+      lineIndex: t.index,
+      txnDate: t.date,
+      amount: t.amount,
+      currencyCode: statementCurrency,
+      description: t.description,
+      counterparty: null,
+      direction: (t.amount ?? 0) >= 0 ? "debit" : "credit",
+    }))
+    await projectStatementLines(workspaceId, statementDocumentId, lineInputs)
+    const hashToId = await getStatementLineIdsByHash(workspaceId, statementDocumentId)
+    const idByIndex = new Map<number, string>()
+    for (const line of lineInputs) {
+      const hash = computeContentHash(line)
+      const id = hashToId.get(hash)
+      if (id) idByIndex.set(line.lineIndex, id)
+    }
 
     const candidates = await loadCandidateDocuments(workspaceId, statementDocumentId)
     const suggestions = suggestMatches(transactions, candidates, { statementCurrency })
-    await replaceSuggestions(workspaceId, statementDocumentId, "bank", suggestions.map((s) => ({ transactionIndex: s.transactionIndex, matchedDocumentId: s.documentId, confidence: s.confidence, dateDeltaDays: s.dateDeltaDays })))
+    await replaceSuggestions(workspaceId, statementDocumentId, "bank", suggestions.map((s) => ({
+      transactionIndex: s.transactionIndex,
+      matchedDocumentId: s.documentId,
+      confidence: s.confidence,
+      dateDeltaDays: s.dateDeltaDays,
+      statementLineId: idByIndex.get(s.transactionIndex) ?? null,
+    })))
   } catch (error) {
     console.error("[bank-match] failed to regenerate suggestions:", error instanceof Error ? error.message : error)
   }
@@ -105,7 +139,28 @@ export async function regenerateSupplierStatementMatches(workspaceId: string, st
       const r = (row ?? {}) as Record<string, unknown>
       return { index, date: asDate(r.entry_date), description: asString(r.description), amount: asNumber(r.amount) }
     })
-    if (!entries.length) { await replaceSuggestions(workspaceId, statementDocumentId, "supplier_statement", []); return }
+    if (!entries.length) {
+      await projectStatementLines(workspaceId, statementDocumentId, [])
+      await replaceSuggestions(workspaceId, statementDocumentId, "supplier_statement", [])
+      return
+    }
+
+    const lineInputs: StatementLineInput[] = entries.map((e) => ({
+      lineIndex: e.index,
+      txnDate: e.date,
+      amount: e.amount,
+      currencyCode: statementCurrency,
+      description: e.description,
+      counterparty: statementSupplier,
+      direction: null,
+    }))
+    await projectStatementLines(workspaceId, statementDocumentId, lineInputs)
+    const hashToId = await getStatementLineIdsByHash(workspaceId, statementDocumentId)
+    const idByIndex = new Map<number, string>()
+    for (const line of lineInputs) {
+      const id = hashToId.get(computeContentHash(line))
+      if (id) idByIndex.set(line.lineIndex, id)
+    }
 
     const allInvoices = await loadCandidateDocuments(workspaceId, statementDocumentId)
     // Pre-filtered to invoices whose vendor fuzzy-matches the statement's own supplier — a supplier
@@ -114,7 +169,13 @@ export async function regenerateSupplierStatementMatches(workspaceId: string, st
       ? allInvoices.filter((candidate) => candidate.supplier && fuzzySupplierMatch(candidate.supplier, statementSupplier))
       : []
     const suggestions = matchSupplierStatementEntries(entries, candidates, { statementCurrency })
-    await replaceSuggestions(workspaceId, statementDocumentId, "supplier_statement", suggestions.map((s) => ({ transactionIndex: s.transactionIndex, matchedDocumentId: s.documentId, confidence: s.confidence, dateDeltaDays: s.dateDeltaDays })))
+    await replaceSuggestions(workspaceId, statementDocumentId, "supplier_statement", suggestions.map((s) => ({
+      transactionIndex: s.transactionIndex,
+      matchedDocumentId: s.documentId,
+      confidence: s.confidence,
+      dateDeltaDays: s.dateDeltaDays,
+      statementLineId: idByIndex.get(s.transactionIndex) ?? null,
+    })))
   } catch (error) {
     console.error("[bank-match] failed to regenerate supplier statement matches:", error instanceof Error ? error.message : error)
   }
@@ -134,12 +195,21 @@ export const listBankMatches = cache(async (workspaceId: string, statementDocume
 }))
 
 export async function decideBankMatch(input: { workspaceId: string; matchId: string; status: "accepted" | "rejected"; actorId: string }) {
-  const match = await prisma.bankMatch.findFirst({ where: { id: input.matchId, workspaceId: input.workspaceId }, select: { id: true, statementDocumentId: true, transactionIndex: true, kind: true } })
+  const match = await prisma.bankMatch.findFirst({ where: { id: input.matchId, workspaceId: input.workspaceId }, select: { id: true, statementDocumentId: true, transactionIndex: true, kind: true, status: true } })
   if (!match) throw new Error("bank_match_not_found")
+  const priorStatus = match.status
   const context = await getRequestAuditContext()
   const [updated] = await prisma.$transaction([
     prisma.bankMatch.update({ where: { id: match.id }, data: { status: input.status, decidedById: input.actorId, decidedAt: new Date() } }),
     prisma.documentAuditEvent.create({ data: auditEventData({ workspaceId: input.workspaceId, documentId: match.statementDocumentId, actorId: input.actorId, type: `bank_match.${input.status}`, detail: { matchId: match.id, transactionIndex: match.transactionIndex, kind: match.kind } as Prisma.InputJsonValue }, context) }),
   ])
+  // Phase 5: close the reconciliation loop after the decision commits. Never throws past the
+  // caller — the accept/reject itself must not fail because of a downstream side effect.
+  if (input.status === "accepted") {
+    await onBankMatchAccepted({ workspaceId: input.workspaceId, matchId: match.id }).catch(() => {})
+  } else if (priorStatus === "accepted") {
+    // Was accepted, now rejected: reverse the close-loop effects.
+    await onBankMatchUnaccepted({ workspaceId: input.workspaceId, matchId: match.id }).catch(() => {})
+  }
   return updated
 }

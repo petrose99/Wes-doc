@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db"
 import { isPushableDocument } from "@/lib/doc-types"
+import { decimalToNumber } from "@/lib/money"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { listAccountingEntities } from "@/models/accounting-entities"
 
@@ -171,7 +172,8 @@ export async function describeDecideExpenseClaim(workspaceId: string, claimId: s
   })
   if (!claim) return { error: "expense_claim_not_found" }
   if (claim.status !== "submitted") return { error: "expense_claim_not_submitted" }
-  const label = claim.title || (claim.total !== null && claim.currencyCode ? `${claim.total} ${claim.currencyCode}` : "expense claim")
+  const totalNum = decimalToNumber(claim.total)
+  const label = claim.title || (totalNum !== null && claim.currencyCode ? `${totalNum} ${claim.currencyCode}` : "expense claim")
   const hasWorkflow = Boolean(claim.workflowId && claim.currentStageIndex !== null)
   let stageNote = ""
   if (hasWorkflow) {

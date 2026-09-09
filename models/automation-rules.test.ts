@@ -7,6 +7,7 @@ vi.mock("@/models/review-tasks", () => ({ createReviewTask: vi.fn() }))
 vi.mock("@/lib/modules/capabilities", () => ({ getWorkspaceCapabilities: vi.fn().mockResolvedValue({ has: () => false, pushableTemplateCodes: [] }) }))
 vi.mock("@/models/coding-corrections", () => ({ getCodingCorrectionExamples: vi.fn().mockResolvedValue([]) }))
 vi.mock("@/lib/agents/coding-agent", () => ({ suggestCoding: vi.fn().mockResolvedValue(null) }))
+vi.mock("@/models/vendor-history", () => ({ loadVendorCodingHistory: vi.fn().mockResolvedValue([]) }))
 
 const { applyAutomationRules, createAutomationRule, updateAutomationRule } = await import("@/models/automation-rules")
 const { prisma } = await import("@/lib/db")

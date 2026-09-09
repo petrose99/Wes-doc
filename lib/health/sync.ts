@@ -22,15 +22,36 @@ export async function syncLedgerTransactions(connectionId: string): Promise<void
   const rows = await fetchProviderLedgerTransactions(connection.provider, connection.externalTenantId, accessToken)
 
   const syncedAt = new Date()
+  // Phase 5: rows DocuBite itself reconciled must not be clobbered back to false by a sync that
+  // fetches raw reconciled=false from a provider that doesn't track this concept. We look up
+  // the existing rows and, when reconciledSource=='docubite' and the incoming row says false,
+  // keep the current value. When the incoming row says true, we let the provider take over.
+  const existingByKey = new Map<string, { reconciled: boolean; reconciledSource: string | null }>()
+  const existing = await prisma.ledgerTransaction.findMany({
+    where: { connectionId: connection.id },
+    select: { kind: true, externalId: true, reconciled: true, reconciledSource: true },
+  })
+  for (const row of existing) existingByKey.set(`${row.kind}:${row.externalId}`, { reconciled: row.reconciled, reconciledSource: row.reconciledSource })
+  const chooseReconciled = (row: SyncRow) => {
+    const prior = existingByKey.get(`${row.kind}:${row.externalId}`)
+    if (prior?.reconciledSource === "docubite" && !row.reconciled) {
+      return { reconciled: true, reconciledSource: "docubite" as const }
+    }
+    if (row.reconciled) return { reconciled: true, reconciledSource: "provider" as const }
+    return { reconciled: false, reconciledSource: null }
+  }
   await prisma.$transaction([
-    ...rows.map((row) => prisma.ledgerTransaction.upsert({
+    ...rows.map((row) => {
+      const rec = chooseReconciled(row)
+      return prisma.ledgerTransaction.upsert({
       where: { connectionId_kind_externalId: { connectionId: connection.id, kind: row.kind, externalId: row.externalId } },
       create: {
         workspaceId: connection.workspaceId, connectionId: connection.id, externalId: row.externalId, kind: row.kind,
         contactExternalId: row.contactExternalId, contactName: row.contactName,
         accountExternalId: row.accountExternalId, accountName: row.accountName,
         docNumber: row.docNumber, amount: row.amount, taxAmount: row.taxAmount, currencyCode: row.currencyCode,
-        txnDate: row.txnDate, reconciled: row.reconciled, active: true, raw: row.raw as Prisma.InputJsonValue,
+        txnDate: row.txnDate, reconciled: rec.reconciled, reconciledSource: rec.reconciledSource,
+        active: true, raw: row.raw as Prisma.InputJsonValue,
         dueAmount: row.dueAmount, paidAmount: row.paidAmount, paymentStatus: row.paymentStatus,
         syncedAt,
       },
@@ -38,11 +59,13 @@ export async function syncLedgerTransactions(connectionId: string): Promise<void
         contactExternalId: row.contactExternalId, contactName: row.contactName,
         accountExternalId: row.accountExternalId, accountName: row.accountName,
         docNumber: row.docNumber, amount: row.amount, taxAmount: row.taxAmount, currencyCode: row.currencyCode,
-        txnDate: row.txnDate, reconciled: row.reconciled, active: true, raw: row.raw as Prisma.InputJsonValue,
+        txnDate: row.txnDate, reconciled: rec.reconciled, reconciledSource: rec.reconciledSource,
+        active: true, raw: row.raw as Prisma.InputJsonValue,
         dueAmount: row.dueAmount, paidAmount: row.paidAmount, paymentStatus: row.paymentStatus,
         syncedAt,
       },
-    })),
+    })
+    }),
     // workspaceId is redundant next to connectionId — a connection belongs to one workspace — but
     // the scope guard reads the `where` and does not know that. Without it this throws, the whole
     // $transaction rolls back, no row ever gets a syncedAt, and syncDueLedgerConnections finds the
@@ -165,6 +188,14 @@ function toDate(value: string | null): Date | null {
   return Number.isNaN(date.getTime()) ? null : date
 }
 
+/** Read `IsReconciled` from a Xero bank transaction payload, if the client surfaced it. Kept
+ * tolerant of shape drift — a missing/non-boolean value falls back to false. */
+function readXeroIsReconciled(payload: unknown): boolean {
+  if (!payload || typeof payload !== "object") return false
+  const raw = payload as Record<string, unknown>
+  return raw.IsReconciled === true || raw.isReconciled === true
+}
+
 function fetchProviderLedgerTransactions(provider: string, externalTenantId: string, accessToken: string): Promise<SyncRow[]> {
   switch (provider) {
     case "quickbooks":
@@ -226,7 +257,11 @@ async function fetchXeroLedgerTransactions(tenantId: string, accessToken: string
       kind: "bank_transaction", externalId: t.id, contactExternalId: t.contactId, contactName: t.contactName,
       accountExternalId: t.accountCode, accountName: t.accountCode, docNumber: t.docNumber,
       amount: t.total, taxAmount: null, currencyCode: t.currencyCode, txnDate: toDate(t.txnDate),
-      reconciled: false, dueAmount: null, paidAmount: null, paymentStatus: null, raw: t,
+      // Phase 5: Xero's bank transactions carry IsReconciled — surface it instead of hard-coding
+      // false. The chooseReconciled decision above still lets a docubite-source row keep its
+      // truth over a provider that says false.
+      reconciled: readXeroIsReconciled(t),
+      dueAmount: null, paidAmount: null, paymentStatus: null, raw: t,
     })),
   ]
 }

@@ -12,8 +12,18 @@ const db = prisma as any
 beforeEach(() => {
   vi.clearAllMocks()
   for (const key of Object.keys(db)) delete db[key]
-  db.bankMatch = { deleteMany: vi.fn(), upsert: vi.fn(), findFirst: vi.fn(), update: vi.fn() }
+  db.bankMatch = { deleteMany: vi.fn(), upsert: vi.fn(), findFirst: vi.fn(), update: vi.fn(), findMany: vi.fn().mockResolvedValue([]) }
   db.documentAuditEvent = { create: vi.fn() }
+  // Phase 2: projectStatementLines projects statement rows before suggestions run.
+  // Default to "no prior rows, no existing hashes" so tests keep asserting the same suggestion
+  // behavior; the new statementLineId field on the upsert is `null` until getStatementLineIdsByHash
+  // returns a mapping (which the specific test can set up when it cares).
+  db.statementLine = {
+    findMany: vi.fn().mockResolvedValue([]),
+    create: vi.fn(async ({ data }: { data: unknown }) => data),
+    update: vi.fn(),
+    delete: vi.fn(),
+  }
   db.$transaction = vi.fn((ops: unknown[]) => Promise.all(ops))
 })
 

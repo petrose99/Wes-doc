@@ -1,0 +1,54 @@
+{
+  "notes": [
+    "Phase 3 coding eval: gold cases for GL auto-coding.",
+    "Each case is (supplier, templateCode, documentData, expectedCoding) — the coding engine's",
+    "job is to reproduce expectedCoding when handed the same supplier + document data.",
+    "history: (supplier, templateCode, codingData) — one prior confirmed coding row.",
+    "Seed from real CodingCorrection rows in production before running.",
+    "Threshold: 0.75 aggregate first-pass accuracy; the eval exits non-zero below it."
+  ],
+  "threshold": 0.75,
+  "cases": [
+    {
+      "name": "acme-invoice-basic",
+      "supplier": "Acme Ltd",
+      "templateCode": "invoice",
+      "documentData": {
+        "vendor": "Acme Ltd",
+        "total": 100,
+        "line_items": [{ "description": "Cleaning services", "amount": 100 }]
+      },
+      "history": [
+        { "supplier": "Acme Ltd", "templateCode": "invoice", "codingData": { "account": "6000", "taxCode": "T1" } },
+        { "supplier": "Acme Ltd", "templateCode": "invoice", "codingData": { "account": "6000", "taxCode": "T1" } },
+        { "supplier": "Acme Ltd", "templateCode": "invoice", "codingData": { "account": "6000", "taxCode": "T1" } }
+      ],
+      "codingKeys": ["account", "taxCode"],
+      "expectedCoding": { "account": "6000", "taxCode": "T1" }
+    },
+    {
+      "name": "new-vendor-no-history",
+      "supplier": "Fresh Vendor Inc",
+      "templateCode": "invoice",
+      "documentData": { "vendor": "Fresh Vendor Inc", "total": 50 },
+      "history": [],
+      "codingKeys": ["account", "taxCode"],
+      "expectedCoding": { "account": null, "taxCode": null },
+      "expectFallthrough": true
+    },
+    {
+      "name": "acme-mostly-consistent",
+      "supplier": "Acme Ltd",
+      "templateCode": "invoice",
+      "documentData": { "vendor": "Acme Ltd", "total": 200 },
+      "history": [
+        { "supplier": "Acme Ltd", "templateCode": "invoice", "codingData": { "account": "6000" } },
+        { "supplier": "Acme Ltd", "templateCode": "invoice", "codingData": { "account": "6000" } },
+        { "supplier": "Acme Ltd", "templateCode": "invoice", "codingData": { "account": "7000" } }
+      ],
+      "codingKeys": ["account"],
+      "expectedCoding": { "account": "6000" },
+      "expectFallthrough": true
+    }
+  ]
+}

@@ -67,6 +67,9 @@ export const WORKSPACE_SCOPED_MODELS = new Set([
   "LedgerTransaction",
   // Dext-parity WP2.1/WP2.3: bank + supplier statement reconciliation.
   "BankMatch",
+  // Phase 2: durable identity for statement lines — survives re-extraction so accepted matches
+  // stay attached even when the source array reshuffles.
+  "StatementLine",
   // Dext-parity Phase 3 WP3.1: multi-stage approval workflows.
   "ApprovalWorkflow",
   "ApprovalWorkflowStage",

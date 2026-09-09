@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db"
 import { REVIEWED_OR_READY_STATUSES } from "@/lib/documents/stages"
+import { decimalToNumber } from "@/lib/money"
 import { REVIEW_TASK_STATUSES } from "@/models/review-tasks"
 
 /** Read-only finance-inbox queries, shared by the finance agent's ai-chat tools
@@ -88,7 +89,7 @@ export async function getExpenseClaims(workspaceId: string, limit = 20) {
     select: { id: true, title: true, status: true, total: true, currencyCode: true, workflowId: true, currentStageIndex: true },
   })
   return claims.map((claim) => ({
-    claimId: claim.id, title: claim.title, status: claim.status, total: claim.total, currencyCode: claim.currencyCode,
+    claimId: claim.id, title: claim.title, status: claim.status, total: decimalToNumber(claim.total), currencyCode: claim.currencyCode,
     hasWorkflow: Boolean(claim.workflowId && claim.currentStageIndex !== null),
   }))
 }

@@ -10,6 +10,7 @@ import { computeHealthScore, projectHealthScore, type CheckScoreInput, type Heal
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import type { BankStatementSlice, CheckContext, CheckDocumentSlice, CheckPushSlice, CheckResultSlice, CheckReviewTaskSlice, ConfidenceDriftRow, HealthFinding, LedgerAccountingEntitySlice, LedgerContext, LedgerTransactionSlice, LowConfidenceFieldSlice } from "@/lib/health/types"
 import { prisma } from "@/lib/db"
+import { decimalToNumber } from "@/lib/money"
 import { getTaxProfile } from "@/models/tax-profiles"
 import { Prisma } from "@/prisma/client"
 import { cache } from "react"
@@ -206,7 +207,8 @@ async function loadLedgerContext(workspaceId: string): Promise<LedgerContext | n
     id: t.id, externalId: t.externalId, kind: t.kind as LedgerTransactionSlice["kind"],
     contactExternalId: t.contactExternalId, contactName: t.contactName,
     accountExternalId: t.accountExternalId, accountName: t.accountName, docNumber: t.docNumber,
-    amount: t.amount, taxAmount: t.taxAmount, currencyCode: t.currencyCode, txnDate: t.txnDate,
+    amount: decimalToNumber(t.amount), taxAmount: decimalToNumber(t.taxAmount),
+    currencyCode: t.currencyCode, txnDate: t.txnDate,
     reconciled: t.reconciled, active: t.active,
   }))
 

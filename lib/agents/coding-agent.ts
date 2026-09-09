@@ -31,6 +31,11 @@ export type CodingAgentInput = {
   codingKeys: string[]
   exemplarRules: Array<{ supplier: string; coding: Record<string, string> }>
   corrections: Array<{ codingKey: string; wrongValue: string; correctedValue: string }>
+  /** Phase 3: vendor coding prior — per key, what the workspace has historically coded this
+   * supplier to, and how consistent that history was. When it's confident enough to apply on
+   * its own the caller uses it before us; what reaches us here is the "some support, not
+   * quite enough" case where the LLM should still weight it. */
+  vendorHistory?: Array<{ key: string; modalValue: string; support: number; agreement: number }>
 }
 
 export function buildInputHash(input: CodingAgentInput): string {
@@ -41,6 +46,7 @@ export function buildInputHash(input: CodingAgentInput): string {
     codingKeys: input.codingKeys.slice().sort(),
     exemplarRules: input.exemplarRules,
     corrections: input.corrections,
+    vendorHistory: input.vendorHistory ?? [],
   }
   return crypto.createHash("sha256").update(JSON.stringify(semantic)).digest("hex")
 }
@@ -65,6 +71,15 @@ export function buildSystemPrompt(input: CodingAgentInput): string {
     for (const c of input.corrections) {
       lines.push(`  Key "${c.codingKey}": you suggested "${c.wrongValue}" but the correct value was "${c.correctedValue}"`)
     }
+  }
+
+  if (input.vendorHistory && input.vendorHistory.length) {
+    lines.push("", "Vendor coding history for this supplier (what the workspace already coded this vendor to):")
+    for (const stat of input.vendorHistory) {
+      const pct = Math.round(stat.agreement * 100)
+      lines.push(`  Key "${stat.key}": most common value "${stat.modalValue}" — ${pct}% of ${stat.support} prior coded documents`)
+    }
+    lines.push("  Prefer these values unless the current document clearly contradicts them.")
   }
 
   lines.push(

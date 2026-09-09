@@ -22,7 +22,9 @@
     "test:watch": "vitest",
     "test:db": "vitest --env-file .env run --config vitest.db.config.ts",
     "eval:extraction": "tsx --env-file .env scripts/eval-extraction.ts",
-    "eval:promptfoo": "tsx --env-file .env scripts/eval-promptfoo.ts"
+    "eval:promptfoo": "tsx --env-file .env scripts/eval-promptfoo.ts",
+    "eval:coding": "tsx scripts/eval-coding.ts",
+    "eval:matching": "tsx scripts/eval-matching.ts"
   },
   "dependencies": {
     "@ai-sdk/google": "^2.0.88",

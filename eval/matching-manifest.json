@@ -1,0 +1,28 @@
+{
+  "notes": [
+    "Phase 4 matching eval: labeled positive pairs the engine should surface,",
+    "plus hard negatives the engine should NOT match (same amount, different vendor/date/PO).",
+    "Threshold gate: recall — a blocker that drops true matches is the failure mode."
+  ],
+  "recallThreshold": 0.95,
+  "cases": [
+    {
+      "name": "po-matches-invoice",
+      "source": { "id": "s1", "templateCode": "purchase_order", "vendor": "Acme Ltd", "amount": 100, "date": "2026-08-05", "poNumber": "PO-42" },
+      "candidates": [
+        { "id": "c1", "templateCode": "invoice", "vendor": "Acme Ltd", "amount": 100, "date": "2026-08-10", "poNumber": "PO-42" },
+        { "id": "c2", "templateCode": "invoice", "vendor": "Beta Co", "amount": 100, "date": "2026-08-10", "poNumber": "PO-99" }
+      ],
+      "expectedPositives": ["c1"]
+    },
+    {
+      "name": "invoice-matches-receipt-within-2pct",
+      "source": { "id": "s2", "templateCode": "invoice", "vendor": "Acme Ltd", "amount": 100, "date": "2026-08-10", "poNumber": null },
+      "candidates": [
+        { "id": "c3", "templateCode": "receipt", "vendor": "Acme Ltd", "amount": 101.5, "date": "2026-08-11", "poNumber": null },
+        { "id": "c4", "templateCode": "receipt", "vendor": "Acme Ltd", "amount": 200, "date": "2026-08-10", "poNumber": null }
+      ],
+      "expectedPositives": ["c3"]
+    }
+  ]
+}

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db"
 import type { Prisma } from "@/prisma/client"
+import { decimalToNumberOrZero } from "@/lib/money"
 import { checkDocumentAgainstBudgets, type Budget, type BudgetCheckResult, type BudgetDocument } from "./engine"
 
 export async function checkDocumentBudgets(
@@ -15,13 +16,15 @@ export async function checkDocumentBudgets(
 
   if (dbBudgets.length === 0) return []
 
-  const budgets: Budget[] = dbBudgets.map((b: { id: string; name: string; category: string | null; vendor: string | null; templateCode: string | null; amount: number; periodType: string; warnAtPercent: number }) => ({
+  const budgets: Budget[] = dbBudgets.map((b) => ({
     id: b.id,
     name: b.name,
     category: b.category,
     vendor: b.vendor,
     templateCode: b.templateCode,
-    amount: b.amount,
+    // Budget.amount is Decimal(18,2) in the DB (see prisma/schema.prisma) — decimalToNumberOrZero
+    // is the read boundary that keeps the pure engine speaking `number`.
+    amount: decimalToNumberOrZero(b.amount),
     periodType: b.periodType,
     warnAtPercent: b.warnAtPercent,
   }))

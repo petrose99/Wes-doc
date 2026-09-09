@@ -1,7 +1,13 @@
 /** Pure budget threshold engine — no Prisma.
  *
  * Checks a document's spend against workspace budgets, returning warnings/violations
- * for any that would be breached or are approaching their threshold. */
+ * for any that would be breached or are approaching their threshold.
+ *
+ * Arithmetic runs on integer cents so a budget threshold sitting on a cent boundary (100.00 vs
+ * 99.99999998) does not silently flip percent-used across the warn/exceed line — see lib/money.ts.
+ */
+
+import { addCents, fromCents, toCents } from "@/lib/money"
 
 export type Budget = {
   id: string
@@ -51,8 +57,10 @@ export function checkBudget(
   currentSpend: number,
   documentAmount: number,
 ): BudgetCheckResult {
-  const projectedSpend = currentSpend + documentAmount
-  const percentUsed = budget.amount > 0 ? (projectedSpend / budget.amount) * 100 : 0
+  const projectedCents = addCents([currentSpend, documentAmount])
+  const projectedSpend = fromCents(projectedCents)
+  const budgetCents = toCents(budget.amount)
+  const percentUsed = budgetCents > 0 ? (projectedCents / budgetCents) * 100 : 0
 
   let status: BudgetCheckResult["status"] = "ok"
   if (percentUsed >= 100) {

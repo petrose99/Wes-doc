@@ -3,6 +3,7 @@ import { ExpenseClaimRow } from "@/components/workspace/expense-claim-row"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { canDecideStage, findCurrentStage } from "@/lib/approvals/engine"
 import { getCurrentUser } from "@/lib/auth"
+import { decimalToNumber } from "@/lib/money"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { listApprovalWorkflows } from "@/models/approval-workflows"
 import { listExpenseClaims, listUnclaimedExpenseReceiptDocuments } from "@/models/expense-claims"
@@ -73,7 +74,7 @@ export default async function ExpenseClaimsPage({ params }: { params: Promise<{ 
                   availableWorkflows={availableWorkflows}
                   unclaimedReceipts={unclaimedReceipts}
                   claim={{
-                    id: claim.id, title: claim.title, status: claim.status, total: claim.total, currencyCode: claim.currencyCode,
+                    id: claim.id, title: claim.title, status: claim.status, total: decimalToNumber(claim.total), currencyCode: claim.currencyCode,
                     submitter: claim.submitter ? { id: claim.submitter.id, name: claim.submitter.name } : null,
                     items: claim.items.map((item) => ({ id: item.id, ...receiptSummary(item.document) })),
                     workflow: claim.workflow && claim.currentStageIndex !== null ? {
