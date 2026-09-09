@@ -102,6 +102,14 @@ export async function createDocumentFromBuffer(input: {
     return { document: existing, job, duplicate: true }
   }
 
+  // Free-trial storage cap: sum the bytes this workspace already stores and refuse the upload
+  // rather than commit it if the new document would push the workspace past the cap. Only reached
+  // after the dedup check, so a re-upload of a document that is already stored (returned as a
+  // duplicate above) never triggers this.
+  const cap = config.documents.freeTrialWorkspaceStorageBytes
+  const used = (await prisma.document.aggregate({ where: { workspaceId: input.workspaceId }, _sum: { sizeBytes: true } }))._sum.sizeBytes ?? 0
+  if (used + input.buffer.length > cap) throw new Error("free_trial_storage_exceeded")
+
   const id = randomUUID()
   const storageKey = documentStorageKey(input.workspaceId, id)
   const receivedAt = input.receivedAt || new Date()

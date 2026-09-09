@@ -100,7 +100,7 @@ describe("createDocumentFromBuffer deduplication", () => {
     templateFindFirst = vi.fn().mockResolvedValue({ id: "tpl-1", versions: [{ id: "ver-1", fields: [] }] })
     Object.assign(db, {
       documentTemplate: { findFirst: templateFindFirst },
-      document: { findUnique, create: vi.fn(async ({ data }: { data: unknown }) => data) },
+      document: { findUnique, create: vi.fn(async ({ data }: { data: unknown }) => data), aggregate: vi.fn().mockResolvedValue({ _sum: { sizeBytes: 0 } }) },
       documentProcessingJob: { findFirst: vi.fn().mockResolvedValue(null), create: vi.fn().mockResolvedValue({ id: "job-1" }) },
       documentAuditEvent: { create: vi.fn() },
       // No subscribed endpoints → emitWorkspaceEvent queues nothing and never kicks the drain.
@@ -123,6 +123,27 @@ describe("createDocumentFromBuffer deduplication", () => {
 
     await expect(createDocumentFromBuffer(input)).resolves.toMatchObject({ duplicate: true })
     await expect(createDocumentFromBuffer({ ...input, fileId: "file-b" })).resolves.toMatchObject({ duplicate: false })
+  })
+
+  it("refuses a new document that would push the workspace past the free-trial 200 MB cap", async () => {
+    // 199 MB already stored — the 14-byte PDF fits comfortably, so the first call must succeed.
+    db.document.aggregate = vi.fn().mockResolvedValue({ _sum: { sizeBytes: 199 * 1024 * 1024 } })
+    await expect(createDocumentFromBuffer(input)).resolves.toMatchObject({ duplicate: false })
+
+    // 200 MB - 5 bytes already stored — a 14-byte PDF would tip over the cap.
+    db.document.aggregate = vi.fn().mockResolvedValue({ _sum: { sizeBytes: 200 * 1024 * 1024 - 5 } })
+    findUnique.mockResolvedValue(null)
+    await expect(createDocumentFromBuffer(input)).rejects.toThrow("free_trial_storage_exceeded")
+  })
+
+  it("does not spend against the free-trial cap when the document is a duplicate", async () => {
+    // The cap is fully spent, but this file is already stored — the dedup path returns without ever
+    // consulting the aggregate, so a re-upload of an existing document is not blocked.
+    findUnique.mockResolvedValue({ id: "doc-1" })
+    const aggregate = vi.fn().mockResolvedValue({ _sum: { sizeBytes: 200 * 1024 * 1024 } })
+    db.document.aggregate = aggregate
+    await expect(createDocumentFromBuffer(input)).resolves.toMatchObject({ duplicate: true })
+    expect(aggregate).not.toHaveBeenCalled()
   })
 
   it("refuses a template that belongs to another file", async () => {
