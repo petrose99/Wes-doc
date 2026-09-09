@@ -11,7 +11,11 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-docubite}"]
+      # -d is not optional: without it pg_isready connects to a database named after the user,
+      # which does not exist here (the database is document_inbox). The check still passed —
+      # it only reports whether the server accepts connections — while Postgres logged a FATAL
+      # every 5s, roughly 17k lines a day, enough to bury a real error.
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-docubite} -d ${POSTGRES_DB:-document_inbox}"]
       interval: 5s
       timeout: 3s
       retries: 5
