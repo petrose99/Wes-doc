@@ -1,4 +1,4 @@
-import { AutomationTabs } from "@/components/automation/automation-tabs"
+import { AutomationFrame, Empty, Figure, Ledger, LedgerRow, Panel } from "@/components/automation/automation-ui"
 import { getCurrentUser } from "@/lib/auth"
 import { getWorkspaceCapabilities, requireModule } from "@/lib/modules/capabilities"
 import { summarizeMatching } from "@/models/matching-metrics"
@@ -6,6 +6,13 @@ import { countOpenReviewTasks } from "@/models/review-tasks"
 import { requireWorkspaceRole } from "@/models/workspaces"
 
 export const dynamic = "force-dynamic"
+
+/** The pipeline's own match-type keys, said the way an accountant would say them. An unmapped key
+ * falls back to its raw form rather than being hidden, so a new match type is visible immediately. */
+const MATCH_KIND_LABELS: Record<string, string> = {
+  two_way: "Two-way, invoice to order",
+  three_way: "Three-way, order to invoice to receipt",
+}
 
 /** Phase 4 visibility, folded into /automation as the "Matches" tab: DocumentMatch rollup +
  * BankMatch reconciliation state. */
@@ -24,76 +31,94 @@ export default async function AutomationMatchesPage({ params }: { params: Promis
 
   const maxBucket = Math.max(1, ...summary.confidenceBuckets.map((b) => b.count))
   const reconciledPct = summary.bankAccepted > 0 ? Math.round((summary.bankReconciled / summary.bankAccepted) * 100) : 0
+  const resolved = summary.byStatus.resolved ?? 0
+  const pending = summary.byStatus.pending ?? 0
+  const byType = Object.entries(summary.byType)
 
-  return <main className="mx-auto w-full max-w-5xl space-y-6 px-4 py-6 md:px-6">
-    <header>
-      <h1 className="text-2xl font-bold text-slate-900">Automation</h1>
-      <p className="mt-1 text-sm text-slate-500">Document matching + bank reconciliation activity.</p>
-    </header>
-    <AutomationTabs workspaceId={workspaceId} active="matches" reviewCount={reviewCount} reviewEnabled={reviewEnabled} />
+  return <AutomationFrame
+    workspaceId={workspaceId}
+    active="matches"
+    reviewCount={reviewCount}
+    reviewEnabled={reviewEnabled}
+    status="Documents the pipeline tied to each other, and how far the bank lines it accepted have gone toward reconciled."
+  >
+    {summary.total === 0 && summary.bankTotal === 0
+      ? <Empty title="No matches yet">
+          Matches appear once there are two documents to tie together — a purchase order and its invoice,
+          or a bank statement and the invoice it paid.
+        </Empty>
+      : <>
+        <section className="grid gap-8 md:grid-cols-[minmax(0,300px)_minmax(0,1fr)] md:items-center">
+          <Figure
+            value={`${resolved}`}
+            state={resolved > 0 ? "auto" : "idle"}
+            caption={<>
+              {resolved === 1 ? "match has been settled" : "matches have been settled"} out of {summary.total} the
+              pipeline proposed. {pending > 0 ? `${pending} still waiting on a decision.` : "Nothing is waiting on a decision."}
+            </>}
+          />
+          <div className="rounded-md border border-[#e6ebf1] p-5">
+            {summary.bankAccepted === 0
+              ? <p className="text-sm text-slate-600">
+                  No bank lines have been accepted yet. Once someone accepts a suggested match, this tracks
+                  how many of them reach reconciled in the ledger.
+                </p>
+              : <>
+                  <p className="text-sm text-slate-600">
+                    Of the {summary.bankAccepted} bank {summary.bankAccepted === 1 ? "line" : "lines"} someone accepted,{" "}
+                    <span className="font-semibold text-slate-900">{summary.bankReconciled}</span>{" "}
+                    {summary.bankReconciled === 1 ? "has" : "have"} made it all the way to reconciled in the ledger.
+                  </p>
+                  <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                    <div className="h-full bg-emerald-600" style={{ width: `${reconciledPct}%` }} />
+                  </div>
+                  <p className="mt-2 text-xs tabular-nums text-slate-500">{reconciledPct}% of accepted lines reconciled</p>
+                </>}
+          </div>
+        </section>
 
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-      <div className="rounded-2xl border border-[#e6ebf1] bg-white p-5 shadow-panel">
-        <h2 className="mb-2 text-[15px] font-bold text-slate-900">Document matching</h2>
-        <p className="text-xs text-slate-500">2/3-way PO ↔ invoice ↔ receipt matches surfaced by the pipeline.</p>
-        <div className="mt-4 grid grid-cols-3 gap-3 text-sm">
-          <Stat label="Total" value={summary.total} />
-          <Stat label="Resolved" value={summary.byStatus.resolved ?? 0} />
-          <Stat label="Pending" value={summary.byStatus.pending ?? 0} />
-        </div>
-        <div className="mt-4">
-          <h3 className="text-xs font-semibold uppercase text-slate-500">By type</h3>
-          <ul className="mt-1 space-y-0.5 text-sm">
-            {Object.entries(summary.byType).length === 0
-              ? <li className="text-slate-500">No matches yet.</li>
-              : Object.entries(summary.byType).map(([type, count]) => (
-                  <li key={type} className="flex justify-between">
-                    <span className="text-slate-600">{type}</span>
-                    <span className="tabular-nums">{count}</span>
-                  </li>
+        <div className="grid gap-x-12 gap-y-10 md:grid-cols-2">
+          <Panel title="Document matches" note="Two- and three-way ties between purchase orders, invoices and receipts.">
+            <Ledger>
+              <LedgerRow label="Settled" value={resolved} state="auto" />
+              <LedgerRow label="Waiting on a decision" value={pending} state={pending > 0 ? "waiting" : "idle"} />
+            </Ledger>
+            {byType.length > 0 && <>
+              <h3 className="mb-3 mt-7 text-[13px] font-medium text-slate-500">The same matches, by what they tie together</h3>
+              <Ledger>
+                {byType.map(([type, count]) => (
+                  <LedgerRow key={type} label={MATCH_KIND_LABELS[type] ?? type} value={count} state="idle" />
                 ))}
-          </ul>
-        </div>
-      </div>
+              </Ledger>
+            </>}
+          </Panel>
 
-      <div className="rounded-2xl border border-[#e6ebf1] bg-white p-5 shadow-panel">
-        <h2 className="mb-2 text-[15px] font-bold text-slate-900">Bank reconciliation</h2>
-        <p className="text-xs text-slate-500">Bank statement lines matched to invoices/receipts, and how many have gone all the way to reconciled.</p>
-        <div className="mt-4 grid grid-cols-3 gap-3 text-sm">
-          <Stat label="Suggested" value={summary.bankTotal} />
-          <Stat label="Accepted" value={summary.bankAccepted} />
-          <Stat label="Reconciled" value={summary.bankReconciled} />
+          <Panel title="Bank reconciliation" note="Statement lines matched to an invoice or receipt, and how far each got.">
+            <Ledger>
+              <LedgerRow label="Suggested by the pipeline" value={summary.bankTotal} state="idle" />
+              <LedgerRow label="Accepted by a person" value={summary.bankAccepted} state={summary.bankAccepted > 0 ? "waiting" : "idle"} />
+              <LedgerRow label="Reconciled in the ledger" value={summary.bankReconciled} state={summary.bankReconciled > 0 ? "auto" : "idle"} />
+            </Ledger>
+          </Panel>
         </div>
-        <div className="mt-4">
-          <p className="text-xs text-slate-500">Reconciled rate (of accepted): <span className="font-semibold text-slate-900">{reconciledPct}%</span></p>
-        </div>
-      </div>
-    </div>
 
-    <div className="rounded-2xl border border-[#e6ebf1] bg-white p-5 shadow-panel">
-      <h2 className="mb-4 text-[15px] font-bold text-slate-900">Confidence distribution (document matches)</h2>
-      {summary.total === 0
-        ? <p className="text-sm text-slate-500">No matches to plot yet — they appear as soon as the pipeline generates candidates.</p>
-        : <div className="space-y-2">
-            {summary.confidenceBuckets.map((b) => (
-              <div key={b.label}>
-                <div className="flex justify-between text-xs">
-                  <span className="text-slate-600">{b.label}</span>
-                  <span className="tabular-nums text-slate-500">{b.count}</span>
-                </div>
-                <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-                  <div className="h-full rounded-full bg-emerald-500" style={{ width: `${Math.round((b.count / maxBucket) * 100)}%` }} />
-                </div>
-              </div>
-            ))}
-          </div>}
-    </div>
-  </main>
-}
-
-function Stat({ label, value }: { label: string; value: number }) {
-  return <div className="rounded-lg border border-[#e6ebf1] bg-slate-50 p-3">
-    <div className="text-xs uppercase text-slate-500">{label}</div>
-    <div className="text-xl font-bold text-slate-900 tabular-nums">{value}</div>
-  </div>
+        <Panel title="How confident the matches were" note="Document matches grouped by the score the pipeline gave them.">
+          {summary.total === 0
+            ? <Empty title="Nothing to plot yet">
+                Confidence bands fill in as soon as the pipeline generates its first match candidates.
+              </Empty>
+            : <Ledger>
+                {summary.confidenceBuckets.map((b) => (
+                  <LedgerRow
+                    key={b.label}
+                    label={b.label}
+                    value={b.count}
+                    share={b.count / maxBucket}
+                    state={b.count > 0 ? "auto" : "idle"}
+                  />
+                ))}
+              </Ledger>}
+        </Panel>
+      </>}
+  </AutomationFrame>
 }

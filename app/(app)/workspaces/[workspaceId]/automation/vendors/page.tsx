@@ -1,5 +1,4 @@
-import { Badge } from "@/components/ui/badge"
-import { AutomationTabs } from "@/components/automation/automation-tabs"
+import { AutomationFrame, Empty, Figure, Panel, Pill, Sheet, Th } from "@/components/automation/automation-ui"
 import { PinVendorHistoryButton } from "@/components/automation/pin-vendor-history-button"
 import { getCurrentUser } from "@/lib/auth"
 import { getWorkspaceCapabilities, requireModule } from "@/lib/modules/capabilities"
@@ -26,84 +25,85 @@ export default async function AutomationVendorsPage({ params }: { params: Promis
     summarizeVendorHistory(workspaceId),
     reviewEnabled ? countOpenReviewTasks(workspaceId) : 0,
   ])
+  const autoCount = rows.filter((row) => row.willAutoApply).length
 
-  return <main className="mx-auto w-full max-w-5xl space-y-6 px-4 py-6 md:px-6">
-    <header>
-      <h1 className="text-2xl font-bold text-slate-900">Automation</h1>
-      <p className="mt-1 text-sm text-slate-500">
-        What the automation engine will code each vendor to before asking the AI. Applies directly when at least{" "}
-        {HISTORY_APPLY_THRESHOLDS.minSupport} prior confirmed documents agree{" "}
-        {Math.round(HISTORY_APPLY_THRESHOLDS.minAgreement * 100)}% of the time.
-      </p>
-      <p className="mt-2 text-xs text-slate-500">
-        The <span className="font-mono">key: value</span> rows below are the coding fields your workspace uses
-        (typically a general-ledger <em>account</em> and a <em>taxCode</em>). The bracketed number is agreement × count:{" "}
-        <span className="font-mono">100% of 5</span> means all 5 prior documents for this vendor were coded the same way.
-      </p>
-    </header>
-    <AutomationTabs workspaceId={workspaceId} active="vendors" reviewCount={reviewCount} reviewEnabled={reviewEnabled} />
-
+  return <AutomationFrame
+    workspaceId={workspaceId}
+    active="vendors"
+    reviewCount={reviewCount}
+    reviewEnabled={reviewEnabled}
+    status={<>
+      What each vendor gets coded to before the AI is asked. A coding applies on its own once at least{" "}
+      {HISTORY_APPLY_THRESHOLDS.minSupport} confirmed documents agree {Math.round(HISTORY_APPLY_THRESHOLDS.minAgreement * 100)}% of the time.
+    </>}
+  >
     {rows.length === 0
-      ? <div className="rounded-2xl border border-[#e6ebf1] bg-white p-8 text-center shadow-panel">
-          <h2 className="text-base font-semibold text-slate-900">No confirmed history yet</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Once a document is coded manually or via a rule, it counts as history. Three
-            consistent codings for the same vendor are enough for the engine to apply them
-            automatically on the next one.
-          </p>
-        </div>
-      : <div className="rounded-2xl border border-[#e6ebf1] bg-white p-5 shadow-panel">
-          <div className="mb-4">
-            <h2 className="text-[15px] font-bold text-slate-900">{rows.length} vendor{rows.length === 1 ? "" : "s"} with confirmed history</h2>
-            <p className="text-xs text-slate-500">Sorted by how many confirmed documents the workspace has for each vendor + template.</p>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-[#e6ebf1] text-left text-xs uppercase text-slate-500">
-                  <th className="py-2 pr-4 font-medium">Vendor</th>
-                  <th className="py-2 pr-4 font-medium">Template</th>
-                  <th className="py-2 pr-4 font-medium">Confirmed docs</th>
-                  <th className="py-2 pr-4 font-medium">Coding</th>
-                  <th className="py-2 pr-4 font-medium">Status</th>
-                  {isOwner && <th className="py-2 pr-4 font-medium">Actions</th>}
+      ? <Empty title="No confirmed history yet">
+          A document counts as history once it is coded, whether by hand or by a rule. Three consistent
+          codings for the same vendor are enough for the engine to apply them to the next one on its own.
+        </Empty>
+      : <>
+        <Figure
+          layout="inline"
+          value={`${autoCount}`}
+          state={autoCount > 0 ? "auto" : "idle"}
+          caption={<>
+            of the {rows.length} vendors with confirmed history now{" "}
+            {autoCount === 1 ? "codes itself" : "code themselves"}. The rest still go to the AI on every document.
+          </>}
+        />
+
+        <Panel
+          title="Confirmed coding history"
+          note={<>
+            Each row is one vendor and document type. The percentage is how consistently past documents
+            were coded that way, and the count is how many there were, so 100% of 5 means all five
+            agreed. Sorted by how much history the workspace has.
+          </>}
+        >
+          <Sheet minWidth={720} head={<>
+            <Th>Vendor</Th>
+            <Th>Document type</Th>
+            <Th align="right">Confirmed</Th>
+            <Th>Coding</Th>
+            <Th>Behaviour</Th>
+            {isOwner && <Th>{""}</Th>}
+          </>}>
+            {rows.map((row) => {
+              const modalCoding = Object.fromEntries(
+                Object.entries(row.prior.byKey).map(([key, stat]) => [key, stat.modalValue] as const),
+              )
+              return (
+                <tr key={`${row.supplier}::${row.templateCode}`} className="align-top">
+                  <td className="py-3 pr-4 font-medium text-slate-900">{row.supplier}</td>
+                  <td className="py-3 pr-4 text-slate-500">{row.templateCode}</td>
+                  <td className="py-3 pr-4 text-right tabular-nums text-slate-700">{row.totalConfirmed}</td>
+                  <td className="py-3 pr-4">
+                    <ul className="space-y-1">
+                      {Object.entries(row.prior.byKey).map(([key, stat]) => (
+                        <li key={key} className="flex flex-wrap items-baseline gap-x-2 text-[13px]">
+                          <span className="text-slate-500">{key}</span>
+                          <span className="font-medium text-slate-900">{stat.modalValue}</span>
+                          <span className="tabular-nums text-slate-400">
+                            {Math.round(stat.agreement * 100)}% of {stat.support}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </td>
+                  <td className="py-3 pr-4">
+                    {row.willAutoApply
+                      ? <Pill state="auto">Codes itself</Pill>
+                      : <Pill state="idle">Asks the AI</Pill>}
+                  </td>
+                  {isOwner && <td className="py-3">
+                    <PinVendorHistoryButton workspaceId={workspaceId} supplier={row.supplier} templateCode={row.templateCode} coding={modalCoding} />
+                  </td>}
                 </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => {
-                  const modalCoding = Object.fromEntries(
-                    Object.entries(row.prior.byKey).map(([key, stat]) => [key, stat.modalValue] as const),
-                  )
-                  return (
-                    <tr key={`${row.supplier}::${row.templateCode}`} className="border-b border-[#f1f5f9] last:border-b-0">
-                      <td className="py-2 pr-4 font-medium text-slate-900">{row.supplier}</td>
-                      <td className="py-2 pr-4 text-slate-500">{row.templateCode}</td>
-                      <td className="py-2 pr-4">{row.totalConfirmed}</td>
-                      <td className="py-2 pr-4">
-                        <ul className="space-y-0.5">
-                          {Object.entries(row.prior.byKey).map(([key, stat]) => (
-                            <li key={key} className="text-xs">
-                              <span className="font-medium">{key}:</span>{" "}
-                              <span>{stat.modalValue}</span>{" "}
-                              <span className="text-slate-500">({Math.round(stat.agreement * 100)}% of {stat.support})</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </td>
-                      <td className="py-2 pr-4">
-                        {row.willAutoApply
-                          ? <Badge className="bg-emerald-100 text-emerald-800">Auto-applies</Badge>
-                          : <Badge className="bg-slate-100 text-slate-700">Falls back to AI</Badge>}
-                      </td>
-                      {isOwner && <td className="py-2 pr-4">
-                        <PinVendorHistoryButton workspaceId={workspaceId} supplier={row.supplier} templateCode={row.templateCode} coding={modalCoding} />
-                      </td>}
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>}
-  </main>
+              )
+            })}
+          </Sheet>
+        </Panel>
+      </>}
+  </AutomationFrame>
 }

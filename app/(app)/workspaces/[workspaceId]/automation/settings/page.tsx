@@ -1,5 +1,5 @@
 import { AutomationConfigForm } from "@/components/settings/automation-config-form"
-import { AutomationTabs } from "@/components/automation/automation-tabs"
+import { AutomationFrame } from "@/components/automation/automation-ui"
 import { getCurrentUser } from "@/lib/auth"
 import { getWorkspaceCapabilities, requireModule } from "@/lib/modules/capabilities"
 import { decimalToNumberOrZero } from "@/lib/money"
@@ -27,36 +27,26 @@ export default async function AutomationSettingsPage({ params }: { params: Promi
   ])
   const level = deriveAutonomyLevel(config)
 
-  return <main className="mx-auto w-full max-w-5xl space-y-6 px-4 py-6 md:px-6">
-    <header>
-      <h1 className="text-2xl font-bold text-slate-900">Automation</h1>
-      <p className="mt-1 text-sm text-slate-500">Choose how much of the coding + review pipeline runs without a person clicking Approve.</p>
-    </header>
-    <AutomationTabs workspaceId={workspaceId} active="settings" reviewCount={reviewCount} reviewEnabled={reviewEnabled} />
-
-    <div className="rounded-2xl border border-[#e6ebf1] bg-white p-5 shadow-panel">
-      <div className="mb-4">
-        <h2 className="text-[15px] font-bold text-slate-900">Autonomy level</h2>
-        <p className="text-xs text-slate-500">
-          <strong>Suggest</strong> — every document waits for a reviewer.{" "}
-          <strong>Auto with approval</strong> — coding runs, reviewer confirms with one click.{" "}
-          <strong>Touchless</strong> — publish automatically at high confidence.
-        </p>
-      </div>
-      <AutomationConfigForm
-        workspaceId={workspaceId}
-        initial={{
-          level,
-          minConfidence: config.minConfidence,
-          qaSampleRate: config.qaSampleRate,
-          requirePolicyPass: config.requirePolicyPass,
-          blockOnWarnChecks: config.blockOnWarnChecks,
-          policyText: config.policyText,
-          amountBands: normalizeAmountBands(config.amountBands),
-        }}
-      />
-    </div>
-  </main>
+  return <AutomationFrame
+    workspaceId={workspaceId}
+    active="settings"
+    reviewCount={reviewCount}
+    reviewEnabled={reviewEnabled}
+    status="How much of the coding and review pipeline is allowed to finish without a person clicking Approve."
+  >
+    <AutomationConfigForm
+      workspaceId={workspaceId}
+      initial={{
+        level,
+        minConfidence: config.minConfidence,
+        qaSampleRate: config.qaSampleRate,
+        requirePolicyPass: config.requirePolicyPass,
+        blockOnWarnChecks: config.blockOnWarnChecks,
+        policyText: config.policyText,
+        amountBands: normalizeAmountBands(config.amountBands),
+      }}
+    />
+  </AutomationFrame>
 }
 
 function normalizeAmountBands(raw: unknown): Array<{ min: number; max: number | null; minConfidence: number; requireVerifiedSupplier?: boolean }> {
