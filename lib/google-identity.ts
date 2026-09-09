@@ -71,10 +71,13 @@ let scriptPromise: Promise<void> | null = null
  * hung for 25s+ while www.google.com answered in under a second. Without this the button would
  * show its loading placeholder forever and never tell the user anything went wrong.
  *
- * Generous rather than snappy, and deliberately so: this network has been seen serving the script
- * in two seconds on one load and well past ten on the next, and a cutoff that fires early is worse
- * than a slow button — it removes Google sign-in from a page where it would have worked. */
-const GIS_LOAD_TIMEOUT_MS = 25_000
+ * Eight seconds because a mobile visitor who has waited that long has already read the empty slot
+ * as broken and started typing their password. On networks that ever serve the script this loads
+ * it comfortably in under two; the ones that stretch past eight are, in practice, the ones that
+ * never finish at all (Firefox Android's strict tracking protection blocks accounts.google.com
+ * outright, some carrier networks black-hole it, etc.), and pinning the fallback message a few
+ * seconds sooner beats a longer wait to reach the same dead end. */
+const GIS_LOAD_TIMEOUT_MS = 8_000
 
 /** Loads the GIS script once per page, however many buttons ask for it. Memoized on the promise
  * rather than on a "loaded" boolean so two buttons mounting in the same tick share one request

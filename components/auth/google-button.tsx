@@ -117,7 +117,18 @@ export function GoogleButton({ redirectTo = "/workspaces", intent = "signin", on
         {/* Google draws into this element. The placeholder keeps the form from jumping as the
             script loads, and disappears rather than lingering behind the rendered button. */}
         <div ref={slot} className="flex justify-center [&>div]:!w-full" />
-        {status === "loading" && <div className="h-11 w-full animate-pulse rounded-lg bg-slate-100" aria-hidden />}
+        {status === "loading" && (
+          // Labelled rather than a bare shimmer: on a mobile browser where accounts.google.com is
+          // slow to reach, an unlabelled gray rectangle reads as "the button is broken" long before
+          // the failure timeout fires. A visible "loading" line tells the visitor to wait a beat.
+          <div
+            className="flex h-11 w-full animate-pulse items-center justify-center rounded-lg bg-slate-100 text-sm text-slate-500"
+            role="status"
+            aria-live="polite"
+          >
+            Loading Google sign-in…
+          </div>
+        )}
       </div>
       <AuthDivider />
     </>
