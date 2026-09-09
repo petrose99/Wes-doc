@@ -24,7 +24,11 @@ const nextConfig: NextConfig = {
         // camera is allowed as of WP13's mobile capture flow (components/extract/camera-capture) —
         // every other capability here is still unused by anything in the app and stays denied.
         { key: "Permissions-Policy", value: "geolocation=(), microphone=(), payment=(), usb=()" },
-        { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+        // same-origin (not same-origin-allow-popups) breaks Google Sign-In outright: GIS's
+        // gsi/transform popup needs window.opener back to this page to hand off the credential,
+        // and same-origin severs that — the popup opens, stays blank, and never returns. This is a
+        // known, documented Google Sign-In / COOP interaction, not specific to this app's flow.
+        { key: "Cross-Origin-Opener-Policy", value: "same-origin-allow-popups" },
         { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
       ],
     }]
