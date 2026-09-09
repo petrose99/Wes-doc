@@ -3,7 +3,7 @@
 import { AuthDivider } from "@/components/auth/fields"
 import { postSignInDestination } from "@/lib/auth-post-sign-in"
 import { reportAuthEvent } from "@/lib/auth-audit-client"
-import { buttonWidthFor, createNonce, loadGoogleIdentityScript, type GoogleCredentialResponse } from "@/lib/google-identity"
+import { createNonce, loadGoogleIdentityScript, type GoogleCredentialResponse, type GooglePromptNotification } from "@/lib/google-identity"
 import { createClient } from "@/lib/supabase/client"
 import { useEffect, useRef, useState } from "react"
 
@@ -14,120 +14,122 @@ import { useEffect, useRef, useState } from "react"
  * hand. If they drift the button renders and the token exchange fails with a visible error rather
  * than signing anyone in.
  *
- * The visible button is drawn by Google, not by us — GIS only issues credentials to a button it
- * rendered itself, so the styling here is confined to the slot it is placed in. */
+ * The button is drawn by us, not by Google — an earlier version handed the whole button to
+ * google.accounts.id.renderButton(), which meant the button simply did not exist until the GIS
+ * script loaded and Google decided to draw into the slot. On a stalled connection (a big-site
+ * "Sign in with Google" button always renders, then fails visibly on click; this one used to just
+ * never appear) that reads as the feature being missing rather than broken. This button is real,
+ * static markup — it always renders — and only touches Google's script when clicked, so a network
+ * or FedCM failure surfaces as a click that produces an error message, not an absent control. */
 export function GoogleButton({ redirectTo = "/workspaces", intent = "signin", onError }: {
   redirectTo?: string
   intent?: "signin" | "signup"
   onError?: (message: string) => void
 }) {
-  const slot = useRef<HTMLDivElement>(null)
-  // "loading" holds the placeholder; "ready" means Google drew its button; "failed" means it never
-  // will, and the placeholder has to go — a permanent shimmer reads as a button still on its way.
-  const [status, setStatus] = useState<"loading" | "ready" | "failed">("loading")
-  // Read through a ref inside the GIS callback: initialize() is called once on mount, so the
-  // callback it closes over would otherwise keep the first render's redirectTo forever — wrong for
-  // /login?invite=…, where the destination is resolved from the URL. Written in an effect rather
-  // than during render, which React forbids for refs.
+  const [busy, setBusy] = useState(false)
+  // initialize() needs a fresh nonce per attempt, but the script itself only needs loading once —
+  // memoized on a ref so a second click while the first is still settling reuses the same load
+  // rather than racing two <script> tags in.
+  const loadPromise = useRef<Promise<void> | null>(null)
   const destination = useRef(redirectTo)
   useEffect(() => { destination.current = redirectTo }, [redirectTo])
 
-  useEffect(() => {
-    let cancelled = false
-
-    const start = async () => {
-      try {
-        const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
-        if (!clientId) throw new Error("google_client_id_missing")
-
-        const [nonce] = await Promise.all([createNonce(), loadGoogleIdentityScript()])
-        if (cancelled || !slot.current) return
-        const google = window.google
-        if (!google) throw new Error("google_identity_unavailable")
-
-        google.accounts.id.initialize({
-          client_id: clientId,
-          nonce: nonce.hashed,
-          callback: (response: GoogleCredentialResponse) => { void signIn(response, nonce.raw) },
-          // FedCM only for the passive one-tap prompt, which is the mode that actually needs it:
-          // without it, that silent auto-prompt opens a Google-hosted iframe that hands the
-          // credential back through third-party cookies on accounts.google.com, and where the
-          // browser restricts those it lands on accounts.google.com/gsi/transform, renders blank
-          // and never returns — the sign-in simply stops, with no error anywhere.
-          //
-          // The explicit button stays on the classic (non-FedCM) flow deliberately: it opens a real
-          // popup on click rather than a silent iframe, so it isn't subject to the same third-party-
-          // cookie block. FedCM for the button turned out to fail silently in its own way on mobile
-          // — Firefox doesn't implement the FedCM API at all, and Chrome for Android's FedCM account
-          // discovery depends on an account being known to Chrome itself, not just signed into
-          // accounts.google.com; when either comes up empty, GIS renders nothing and never rejects,
-          // so no error ever reaches onError. The button silently not appearing on mobile Chrome and
-          // Firefox alike is that failure, not a bug in this component's error handling.
-          use_fedcm_for_prompt: true,
-          use_fedcm_for_button: false,
-        })
-        google.accounts.id.renderButton(slot.current, {
-          type: "standard",
-          theme: "outline",
-          size: "large",
-          shape: "rectangular",
-          text: intent === "signup" ? "signup_with" : "continue_with",
-          logo_alignment: "center",
-          width: buttonWidthFor(slot.current),
-        })
-        setStatus("ready")
-      } catch {
-        if (cancelled) return
-        setStatus("failed")
-        onError?.("Google sign-in is unavailable right now. Use your email and password instead.")
-      }
+  const signIn = async (response: GoogleCredentialResponse, rawNonce: string) => {
+    if (!response.credential) {
+      onError?.("Google did not return a sign-in token. Please try again.")
+      return
     }
+    onError?.("")
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.auth.signInWithIdToken({ provider: "google", token: response.credential, nonce: rawNonce })
+      if (error) throw error
 
-    const signIn = async (response: GoogleCredentialResponse, rawNonce: string) => {
-      if (!response.credential) {
-        onError?.("Google did not return a sign-in token. Please try again.")
-        return
-      }
-      onError?.("")
-      try {
-        const supabase = createClient()
-        const { error } = await supabase.auth.signInWithIdToken({ provider: "google", token: response.credential, nonce: rawNonce })
-        if (error) throw error
-
-        reportAuthEvent("auth_login_success", { method: "google" })
-        const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
-        // A hard navigation, not router.push: the session cookie was minted a moment ago, and a
-        // client-side push would render the destination against the session-less cached payload —
-        // which on /invite/[token] shows "Invitation unavailable" to someone who just signed in.
-        window.location.href = postSignInDestination(aal, destination.current)
-      } catch {
-        reportAuthEvent("auth_login_failed", { method: "google" })
-        onError?.("Could not sign you in with Google. Please try again.")
-      }
+      reportAuthEvent("auth_login_success", { method: "google" })
+      const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+      // A hard navigation, not router.push: the session cookie was minted a moment ago, and a
+      // client-side push would render the destination against the session-less cached payload —
+      // which on /invite/[token] shows "Invitation unavailable" to someone who just signed in.
+      window.location.href = postSignInDestination(aal, destination.current)
+    } catch {
+      reportAuthEvent("auth_login_failed", { method: "google" })
+      onError?.("Could not sign you in with Google. Please try again.")
     }
+  }
 
-    void start()
-    return () => { cancelled = true }
-    // onError is a fresh closure on every render of the parent form; re-running this effect for it
-    // would tear down and redraw Google's button on each keystroke in the email field.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [intent])
+  const onClick = async () => {
+    setBusy(true)
+    onError?.("")
+    try {
+      const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
+      if (!clientId) throw new Error("google_client_id_missing")
 
-  // Nothing at all once it has failed: the form still has email and password, and the error
-  // message says why Google is missing. An empty slot beats a dead control.
-  if (status === "failed") return null
+      loadPromise.current ??= loadGoogleIdentityScript()
+      const [nonce] = await Promise.all([createNonce(), loadPromise.current])
+      const google = window.google
+      if (!google) throw new Error("google_identity_unavailable")
 
-  // The "or" divider lives here rather than in the forms so it cannot outlive the button it
-  // separates — a lone divider above the email field is a rule with nothing on one side of it.
+      google.accounts.id.initialize({
+        client_id: clientId,
+        nonce: nonce.hashed,
+        callback: (response: GoogleCredentialResponse) => { void signIn(response, nonce.raw) },
+        // FedCM: the browser itself mediates the account chooser instead of a Google-hosted iframe
+        // riding third-party cookies on accounts.google.com — where those are blocked the iframe
+        // lands on accounts.google.com/gsi/transform, renders blank and never returns. FedCM is not
+        // universally supported (Firefox has no implementation at all; Chrome for Android's account
+        // discovery needs an account known to Chrome itself, not just cookies), but unlike the old
+        // renderButton() approach, a FedCM failure here just means prompt()'s moment listener below
+        // reports "not displayed" — the button stays visible and reports a real error instead of
+        // silently not existing.
+        use_fedcm_for_prompt: true,
+      })
+
+      let settled = false
+      google.accounts.id.prompt((notification: GooglePromptNotification) => {
+        settled = true
+        if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+          setBusy(false)
+          onError?.("Could not open Google sign-in on this browser or connection. Use your email and password instead.")
+        } else {
+          // A dialog is up (or the user is choosing an account); the credential callback above
+          // takes over from here, including turning busy back off once it resolves either way.
+          setBusy(false)
+        }
+      })
+      // Older GIS builds have shipped without invoking the moment listener at all on some mobile
+      // WebViews; without this the button would spin forever with no explanation.
+      setTimeout(() => { if (!settled) { setBusy(false) } }, 5000)
+    } catch {
+      setBusy(false)
+      onError?.("Google sign-in is unavailable right now. Use your email and password instead.")
+    }
+  }
+
   return (
     <>
-      <div className="min-h-11">
-        {/* Google draws into this element. The placeholder keeps the form from jumping as the
-            script loads, and disappears rather than lingering behind the rendered button. */}
-        <div ref={slot} className="flex justify-center [&>div]:!w-full" />
-        {status === "loading" && <div className="h-11 w-full animate-pulse rounded-lg bg-slate-100" aria-hidden />}
-      </div>
+      <button
+        type="button"
+        onClick={() => void onClick()}
+        disabled={busy}
+        className="inline-flex h-11 w-full items-center justify-center gap-3 rounded-lg border border-slate-300 bg-white text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600/40 focus-visible:ring-offset-2 disabled:opacity-60"
+      >
+        <GoogleLogo />
+        {busy ? "Connecting…" : intent === "signup" ? "Sign up with Google" : "Continue with Google"}
+      </button>
+      {/* The "or" divider lives here rather than in the forms so it cannot outlive the button it
+          separates — a lone divider above the email field is a rule with nothing on one side of it. */}
       <AuthDivider />
     </>
+  )
+}
+
+function GoogleLogo() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+      <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.9c1.7-1.57 2.7-3.87 2.7-6.62Z" />
+      <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.9-2.26c-.8.54-1.84.86-3.06.86-2.35 0-4.34-1.59-5.05-3.72H.95v2.33A9 9 0 0 0 9 18Z" />
+      <path fill="#FBBC05" d="M3.95 10.7A5.4 5.4 0 0 1 3.67 9c0-.59.1-1.16.28-1.7V4.97H.95A9 9 0 0 0 0 9c0 1.45.35 2.83.95 4.03l3-2.33Z" />
+      <path fill="#EA4335" d="M9 3.58c1.32 0 2.51.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 0 0 .95 4.97l3 2.33C4.66 5.17 6.65 3.58 9 3.58Z" />
+    </svg>
   )
 }

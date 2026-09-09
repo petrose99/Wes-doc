@@ -15,6 +15,18 @@ const GIS_SRC = "https://accounts.google.com/gsi/client"
 
 export type GoogleCredentialResponse = { credential?: string }
 
+/** The moment notification prompt() reports through its listener — not a credential result, just
+ * whether the browser actually put anything in front of the user. isNotDisplayed/isSkippedMoment
+ * both mean "nothing happened, no dialog," which is exactly the mobile FedCM failure this app hits:
+ * a custom button's click handler has no other way to learn that. */
+export type GooglePromptNotification = {
+  isNotDisplayed: () => boolean
+  isSkippedMoment: () => boolean
+  isDismissedMoment: () => boolean
+  getNotDisplayedReason?: () => string
+  getSkippedReason?: () => string
+}
+
 type GoogleIdentityApi = {
   accounts: {
     id: {
@@ -36,6 +48,7 @@ type GoogleIdentityApi = {
         logo_alignment?: "left" | "center"
         width?: number
       }) => void
+      prompt: (momentListener?: (notification: GooglePromptNotification) => void) => void
     }
   }
 }
