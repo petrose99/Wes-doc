@@ -60,7 +60,7 @@ export default async function WorkspaceHomePage({ params }: {
   const today = new Date()
   const analytics = showFinancials ? await getWorkspaceAnalytics(workspaceId, resolvePeriod({ period: "12m" }, today), today) : null
   const formatMoney = (value: number) => {
-    const currency = analytics?.currency.baseCurrency ?? "USD"
+    const currency = analytics?.currency.baseCurrency ?? membership.workspace.baseCurrency ?? "USD"
     return new Intl.NumberFormat("en", { style: "currency", currency, maximumFractionDigits: 0 }).format(value)
   }
   const pipelineTemplates = await getFileTemplates(workspaceId, pipelineFile.id)

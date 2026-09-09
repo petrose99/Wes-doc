@@ -100,16 +100,24 @@ describe("fillMonthSeries", () => {
 })
 
 describe("resolveCurrency", () => {
-  it("prefers the tax profile currency", () => {
-    expect(resolveCurrency("ZAR", [{ currency: "USD", count: 5 }])).toEqual({ baseCurrency: "ZAR", hasMultipleCurrencies: false })
-    expect(resolveCurrency("ZAR", [{ currency: "USD", count: 5 }, { currency: "GBP", count: 2 }])).toEqual({ baseCurrency: "ZAR", hasMultipleCurrencies: true })
+  it("prefers the tax profile currency over everything else", () => {
+    expect(resolveCurrency("ZAR", [{ currency: "USD", count: 5 }], "EUR")).toEqual({ baseCurrency: "ZAR", hasMultipleCurrencies: false })
+    expect(resolveCurrency("ZAR", [{ currency: "USD", count: 5 }, { currency: "GBP", count: 2 }], "EUR")).toEqual({ baseCurrency: "ZAR", hasMultipleCurrencies: true })
   })
 
-  it("falls back to the most common extracted currency", () => {
+  it("falls back to the workspace's picked base currency when there is no tax profile", () => {
+    // Regression: without this fallback the dashboard silently displayed USD on any workspace that
+    // hadn't extracted a document with a currency_code yet, regardless of what the owner chose at
+    // signup.
+    expect(resolveCurrency(null, [], "ZAR")).toEqual({ baseCurrency: "ZAR", hasMultipleCurrencies: false })
+    expect(resolveCurrency(null, [{ currency: "USD", count: 5 }], "ZAR")).toEqual({ baseCurrency: "ZAR", hasMultipleCurrencies: false })
+  })
+
+  it("falls back to the most common extracted currency when neither tax profile nor workspace base is set", () => {
     expect(resolveCurrency(null, [{ currency: "USD", count: 5 }, { currency: "GBP", count: 1 }])).toEqual({ baseCurrency: "USD", hasMultipleCurrencies: true })
   })
 
-  it("reports no currency for an empty workspace", () => {
+  it("reports no currency for an empty workspace with no configured base", () => {
     expect(resolveCurrency(null, [])).toEqual({ baseCurrency: null, hasMultipleCurrencies: false })
   })
 

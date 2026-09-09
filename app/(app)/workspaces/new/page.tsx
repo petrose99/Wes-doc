@@ -1,7 +1,9 @@
 import { NewWorkspaceForm } from "@/components/workspace/new-workspace-form"
 import config from "@/lib/config"
 import { getViewerUser } from "@/lib/auth"
+import { detectCountryFromHeaders } from "@/lib/geo/country-currency"
 import { getWorkspacesForUser } from "@/models/workspaces"
+import { headers } from "next/headers"
 import { redirect } from "next/navigation"
 
 /** The industry picker a brand-new user lands on instead of a silently-created "general"
@@ -15,12 +17,14 @@ export default async function NewWorkspacePage() {
   const memberships = await getWorkspacesForUser(user.id)
   if (memberships.length) redirect(`/workspaces/${memberships[0].id}`)
 
+  const initialCountry = detectCountryFromHeaders(await headers())
+
   return <main className="mx-auto max-w-4xl space-y-8 p-8">
     <header className="space-y-1 text-center">
       <h1 className="text-2xl font-bold text-slate-900">Set up your workspace</h1>
       <p className="text-sm text-muted-foreground">Tell us about your organization so we can configure your accounting ledger.</p>
     </header>
-    <NewWorkspaceForm defaultName={`${user.name || user.email}'s workspace`} />
+    <NewWorkspaceForm defaultName={`${user.name || user.email}'s workspace`} initialCountry={initialCountry} />
   </main>
 }
 

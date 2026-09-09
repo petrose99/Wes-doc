@@ -156,12 +156,19 @@ export function fillMonthSeries(
   })
 }
 
-/** The workspace's base currency: the tax profile's configured currency if one exists, otherwise
- * the most common currency actually seen across extracted documents. `hasMultipleCurrencies` flags
- * when totals get summed across currencies with no conversion — the UI's amber banner reads off
- * this rather than re-deriving it. */
-export function resolveCurrency(taxCurrency: string | null, inventory: { currency: string; count: number }[]): CurrencyContext {
+/** The workspace's base currency, in priority order:
+ *   1. The tax profile's configured currency, if one exists — the most specific signal, since it's
+ *      explicitly set for tax handling.
+ *   2. Workspace.baseCurrency — what the owner picked when creating the workspace. Without this
+ *      fallback the dashboard silently displayed USD on any workspace that hadn't extracted a
+ *      document with a currency_code yet, regardless of what the owner chose at signup.
+ *   3. The most common currency actually seen across extracted documents.
+ *
+ * `hasMultipleCurrencies` flags when totals get summed across currencies with no conversion — the
+ * UI's amber banner reads off this rather than re-deriving it. */
+export function resolveCurrency(taxCurrency: string | null, inventory: { currency: string; count: number }[], workspaceBase: string | null = null): CurrencyContext {
   if (taxCurrency) return { baseCurrency: taxCurrency, hasMultipleCurrencies: inventory.length > 1 }
+  if (workspaceBase) return { baseCurrency: workspaceBase, hasMultipleCurrencies: inventory.length > 1 }
   if (!inventory.length) return { baseCurrency: null, hasMultipleCurrencies: false }
   return { baseCurrency: inventory[0].currency, hasMultipleCurrencies: inventory.length > 1 }
 }
@@ -375,7 +382,7 @@ export async function getWorkspaceAnalytics(workspaceId: string, period: Period,
   const unpaidSql = buildUnpaidInvoicesSql(workspaceId)
   const currencySql = buildCurrencyInventorySql(workspaceId)
 
-  const [spendRows, vendorSpendRows, docOutflowRows, bankFlowRows, unpaidRows, currencyRows, taxProfile, openReviewTasks] = await Promise.all([
+  const [spendRows, vendorSpendRows, docOutflowRows, bankFlowRows, unpaidRows, currencyRows, taxProfile, openReviewTasks, workspaceRow] = await Promise.all([
     prisma.$queryRawUnsafe<SpendRow[]>(spendSql.text, ...spendSql.params),
     prisma.$queryRawUnsafe<VendorSpendSqlRow[]>(vendorSpendSql.text, ...vendorSpendSql.params),
     prisma.$queryRawUnsafe<DocOutflowRow[]>(docOutflowSql.text, ...docOutflowSql.params),
@@ -384,6 +391,7 @@ export async function getWorkspaceAnalytics(workspaceId: string, period: Period,
     prisma.$queryRawUnsafe<CurrencyRow[]>(currencySql.text, ...currencySql.params),
     getTaxProfile(workspaceId),
     prisma.reviewTask.count({ where: { workspaceId, status: "open" } }),
+    prisma.workspace.findUnique({ where: { id: workspaceId }, select: { baseCurrency: true } }),
   ])
 
   const spend: SpendByCategoryRow[] = spendRows.map((row) => ({ category: row.category, totalSpend: toNumber(row.totalSpend), documentCount: Number(row.documentCount) }))
@@ -406,7 +414,7 @@ export async function getWorkspaceAnalytics(workspaceId: string, period: Period,
     return { documentId: row.documentId, fileId: row.fileId, filename: row.filename, vendor: row.vendor, total, dueDate: row.dueDate, bucket }
   })
 
-  const currency = resolveCurrency(taxProfile?.config.currency ?? null, currencyRows)
+  const currency = resolveCurrency(taxProfile?.config.currency ?? null, currencyRows, workspaceRow?.baseCurrency ?? null)
   const totalOutstanding = AGING_BUCKET_KEYS.reduce((sum, key) => sum + buckets[key].total, 0)
   const totalSpend = spend.reduce((sum, row) => sum + row.totalSpend, 0)
   const netCashFlow = cashFlow.reduce((sum, month) => sum + month.net, 0)
