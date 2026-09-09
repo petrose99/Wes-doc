@@ -19,6 +19,7 @@ export const sheetPath = (workspaceId: string, fileId: string) => `/workspaces/$
  * "member_not_found" into "member not found", which is fine for most codes but not all of them.
  * Codes not listed here still fall through to that behaviour. */
 const BILLING_MESSAGES: Record<string, string> = {
+  free_trial_storage_exceeded: "You've reached the 200 MB free-trial upload limit for this workspace.",
   // Integrations (P1). The url_* codes come from lib/url-safety's SSRF guard.
   integrations_not_available: "Integrations aren't enabled on this deployment.",
   accounting_not_available: "The Bigcapital accounting bridge isn't enabled on this deployment.",

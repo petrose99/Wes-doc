@@ -280,6 +280,12 @@ const config = {
   ai: { openaiApiKey: env.OPENAI_API_KEY, openaiModelName: env.OPENAI_MODEL_NAME, geminiApiKey: env.GEMINI_API_KEY, geminiModelName: env.GEMINI_MODEL_NAME, provider: env.AI_PROVIDER },
   documents: {
     maxFileSizeBytes: 50 * 1024 * 1024,
+    // Free-trial cap on the total bytes a single workspace may have stored across all its
+    // documents. Every workspace is on the free trial today (no paid plan exists), so this is
+    // effectively a per-workspace storage ceiling. Enforced in models/documents.ts before a new
+    // Document row is written; an existing document re-uploaded (deduped by fileId+sha256) does
+    // not spend against it again.
+    freeTrialWorkspaceStorageBytes: 200 * 1024 * 1024,
     maxPages: env.DOCUMENT_MAX_PAGES,
     pagesPerBatch: env.DOCUMENT_PAGES_PER_BATCH,
     adaptiveExtraction: env.ADAPTIVE_EXTRACTION === "true",
