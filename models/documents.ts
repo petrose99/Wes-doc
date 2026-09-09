@@ -8,6 +8,7 @@ import { findMissingRequiredFields, parseTemplateFields, validateDocumentValues 
 import { deleteDocumentSource, documentBlocksKey, documentStorageKey, putDocumentSource } from "@/lib/document-storage"
 import { projectDocumentFields } from "@/lib/field-projection"
 import { LOW_CONFIDENCE, PIPELINE_STAGES, stageToStatusFilter, type PipelineStage } from "@/lib/documents/stages"
+import { applyFxToDocument } from "@/lib/fx/apply-to-document"
 import { normalizeBillFromDocument } from "@/lib/integration-bill-mapping"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { unscoped } from "@/lib/workspace-scope"
@@ -413,6 +414,11 @@ export async function updateDocumentReview(input: { workspaceId: string; documen
   })
   // Human review is the key integration trigger — a reviewed document is what a connector pushes.
   if (webhookQueued) await kickWebhookDrain()
+  // FX conversion runs AFTER the review commit rather than inside it: a network fetch to
+  // Frankfurter must not extend the review transaction (or hold locks while waiting on it), and
+  // a failure here must not roll the review back — the document is reviewed either way, its
+  // conversion just moves to "pending" until a retry succeeds.
+  await applyFxToDocument(document.id).catch(() => {})
   return result
 }
 

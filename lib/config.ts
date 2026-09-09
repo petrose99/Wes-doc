@@ -238,6 +238,18 @@ const envSchema = z.object({
   // The domain inbound addresses are issued under — "<token>@" + this. Informational (shown
   // nowhere yet, since the feature is dark), read once a workspace's address needs displaying.
   EMAIL_INBOUND_DOMAIN: z.string().default("inbound.docubite.com"),
+  // FX conversion (lib/fx/rates.ts). Every rate goes through Frankfurter's free, no-auth wrapper
+  // around the ECB reference feed — no key needed and it covers historical rates back to 1999,
+  // which is what most documents actually need. FASTRATES_API_KEY is optional and, when set, is
+  // tried FIRST for a same-day (today's) rate; Frankfurter is the fallback and the sole source for
+  // historical dates. Kept as a URL template because fastratesapi's exact path/params differ per
+  // account tier — plug in the URL from your dashboard, using {from}, {to}, and {key} as
+  // placeholders. Example: "https://api.fastratesapi.com/v1/fetch-one?from={from}&to={to}&api_key={key}".
+  // If the template is unset or a request fails, the fetcher silently falls back to Frankfurter.
+  FRANKFURTER_API_BASE: z.string().url().default("https://api.frankfurter.app"),
+  FASTRATES_API_KEY: z.string().optional(),
+  FASTRATES_API_URL_TEMPLATE: z.string().optional(),
+  FX_FETCH_TIMEOUT_MS: z.coerce.number().int().positive().default(8_000),
   // Nonce-based script-src (lib/csp.ts, proxy.ts). Off by default: the policy ships Report-Only
   // first so real traffic can surface anything the allowlist missed before it can block a script.
   // Flipping this is a config change, not a deploy — the whole point of staging it behind an env
@@ -366,6 +378,12 @@ const config = {
     rlsEnabled: env.DB_RLS_ENABLED === "true",
   },
   security: { cspEnforce: env.CSP_ENFORCE === "true" },
+  fx: {
+    frankfurterBase: env.FRANKFURTER_API_BASE.replace(/\/+$/, ""),
+    fastratesKey: env.FASTRATES_API_KEY || "",
+    fastratesUrlTemplate: env.FASTRATES_API_URL_TEMPLATE || "",
+    timeoutMs: env.FX_FETCH_TIMEOUT_MS,
+  },
   // `enabled` gates the whole inbound-email surface, the same "off unless a real secret is set"
   // shape as embeddings/integrations elsewhere in this file. Off by default in every environment,
   // including production, until DNS/a provider is actually provisioned for it.
