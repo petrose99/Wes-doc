@@ -8,6 +8,7 @@ import { Hero } from "@/components/marketing/landing/hero"
 import { HowItWorks } from "@/components/marketing/landing/how-it-works"
 import { Intake } from "@/components/marketing/landing/intake"
 import { Library } from "@/components/marketing/landing/library"
+import { MultiCurrency } from "@/components/marketing/landing/multi-currency"
 import { Pipeline } from "@/components/marketing/landing/pipeline"
 import { Provenance } from "@/components/marketing/landing/provenance"
 import { ReadsStrip } from "@/components/marketing/landing/reads-strip"
@@ -17,7 +18,7 @@ import type { Metadata } from "next"
 
 export const metadata: Metadata = {
   title: { absolute: "DocuBite — Turn documents into data you can trust" },
-  description: "DocuBite reads invoices, receipts and bank statements — scans, photos and handwriting included — into a live sheet where every value traces to its source. Upload them or email them in, and hand over as much of the coding as you trust it with. Self-serve, no credit card required.",
+  description: "DocuBite reads invoices, receipts and bank statements — scans, photos and handwriting included, in any currency — into a live sheet where every value traces to its source. Upload them or email them in, and hand over as much of the coding as you trust it with. Self-serve, no credit card required.",
 }
 
 export default function Home() {
@@ -33,6 +34,7 @@ export default function Home() {
     <Automation />
     <Sheets />
     <Accounting />
+    <MultiCurrency />
     <Library />
     <Comparison />
     <Faq />
