@@ -5,7 +5,7 @@ import { AccountMenu } from "@/components/shell/account-menu"
 import { SwitchableWorkspace, WorkspaceSwitcher } from "@/components/workspace/switcher"
 import { BiteMark } from "@/components/marketing/logo"
 import { MODULES } from "@/lib/modules"
-import { BarChart3, ClipboardCheck, Files, HeartPulse, History, Landmark, Library, ListChecks, Mic, Settings, Table2 } from "lucide-react"
+import { BarChart3, CheckCircle2, ClipboardCheck, Files, HeartPulse, History, Landmark, Library, ListChecks, Mic, Percent, Receipt, Settings, Table2, Wallet, Workflow, Zap } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
@@ -20,10 +20,20 @@ import { usePathname } from "next/navigation"
  * only from a dashboard stat card or a link on a document. It is a rail entry again, positioned
  * after Extraction because that is where it falls in the work, and badged with its open-task
  * count. Expenses IS still filtered out — reachable at its own route, just not a standing entry. */
+/** Every icon name a module declares in lib/modules/index.ts. Six of the nine used to be missing,
+ * so Automation, Approvals, Rules, Tax, Expenses and Budgets all silently rendered the generic
+ * Files icon — the declaration said one thing and the rail drew another. Keep this in step when a
+ * module adds a nav item; an unmapped name still falls back to Files rather than breaking the rail. */
 const ICONS: Record<string, typeof Files> = {
   inbox: ClipboardCheck,
   mic: Mic,
   "heart-pulse": HeartPulse,
+  zap: Zap,
+  "check-circle": CheckCircle2,
+  workflow: Workflow,
+  percent: Percent,
+  receipt: Receipt,
+  wallet: Wallet,
 }
 
 /** Lido's left rail. The repo had no sidebar component at all — the nav was inline in two

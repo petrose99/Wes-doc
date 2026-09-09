@@ -1,5 +1,5 @@
 import { BiteMark } from "@/components/marketing/logo"
-import { BarChart3, Files, Landmark, Library, ListChecks, Table2 } from "lucide-react"
+import { BarChart3, Landmark, Library, ListChecks, Table2, Zap } from "lucide-react"
 import Link from "next/link"
 
 const rows: { doc: string; supplier: string; total: string; status: "ready" | "review" | "dupe" }[] = [
@@ -11,17 +11,15 @@ const rows: { doc: string; supplier: string; total: string; status: "ready" | "r
 ]
 
 /** The rail the app actually renders (components/shell/sidebar.tsx): same labels, same order, same
- * icons. Automation resolves to Files rather than a bolt because the module declares icon "zap" and
- * the sidebar's ICONS map has no "zap" entry, so the app falls back — the mock follows the app,
- * not the intent. The lower group (Settings, Activity, Health Checks) is left out: this is a
- * marketing shot of where the work happens, not a full chrome trace. */
+ * icons. The lower group (Settings, Activity, Health Checks) is left out — this is a shot of where
+ * the work happens, not a full chrome trace. */
 const NAV: { label: string; icon: typeof BarChart3; active?: boolean; badge?: string }[] = [
   { label: "Dashboard", icon: BarChart3 },
   { label: "Extraction", icon: ListChecks, active: true, badge: "7" },
   { label: "Sheets", icon: Table2 },
   { label: "Docu Library", icon: Library },
   { label: "Accounting", icon: Landmark },
-  { label: "Automation", icon: Files },
+  { label: "Automation", icon: Zap },
 ]
 
 const statusStyle: Record<string, string> = {
