@@ -1,6 +1,5 @@
 "use client"
 
-import { ReplayButton } from "@/components/marketing/landing/_lib/replay-button"
 import { IN, POP, usePlayOnScroll } from "@/components/marketing/landing/_lib/use-play-on-scroll"
 import { Check } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
@@ -39,7 +38,7 @@ function useCountUp(played: boolean) {
 }
 
 export function Pipeline() {
-  const { ref, played, replay } = usePlayOnScroll()
+  const { ref, played } = usePlayOnScroll()
   const counts = useCountUp(played)
 
   return (
@@ -50,8 +49,8 @@ export function Pipeline() {
       style={{ backgroundImage: "radial-gradient(#eceee9 1px,transparent 1.4px)", backgroundSize: "24px 24px" }}
     >
       <div className="relative mx-auto max-w-6xl px-5">
-        <div className="flex flex-wrap items-end justify-between gap-6">
-          <div className="min-w-0 flex-1 basis-[420px]">
+        <div className="max-w-[42rem]">
+          <div className="min-w-0">
             <span className="text-[0.74rem] font-bold uppercase tracking-[.08em] text-emerald-700">Pipeline</span>
             <h2 className="mt-3 text-balance font-display text-[clamp(1.9rem,3vw,2.6rem)] font-bold leading-[1.08] tracking-[-0.03em] text-stone-950">
               One queue, from inbox to approved
@@ -60,7 +59,6 @@ export function Pipeline() {
               Documents move through Inbox, To review and Ready — badged with what&apos;s waiting on a person, so nothing sits unnoticed. Keep one workspace for your business, or a separate one per client, with owner and member roles and approval workflows for what needs a second pair of eyes.
             </p>
           </div>
-          <ReplayButton onClick={replay} />
         </div>
 
         <div className="mt-9 grid grid-cols-[repeat(auto-fit,minmax(250px,1fr))] gap-4">

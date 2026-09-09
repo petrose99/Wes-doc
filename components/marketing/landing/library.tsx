@@ -1,6 +1,5 @@
 "use client"
 
-import { ReplayButton } from "@/components/marketing/landing/_lib/replay-button"
 import { IN, POP, usePlayOnScroll } from "@/components/marketing/landing/_lib/use-play-on-scroll"
 import { FileText, Search, Sparkles } from "lucide-react"
 
@@ -10,7 +9,7 @@ const SOURCES = [
 ]
 
 export function Library() {
-  const { ref, played, replay } = usePlayOnScroll()
+  const { ref, played } = usePlayOnScroll()
 
   return (
     <section
@@ -29,7 +28,6 @@ export function Library() {
           <p className="mt-4 max-w-[31rem] text-pretty text-[1.02rem] leading-[1.62] text-stone-600">
             Every uploaded file is searchable by what&apos;s actually inside it — meaning and keywords both. Ask the Docu Library a plain question and it answers from your own documents, with each answer cited back to the filename and page, one click from the source.
           </p>
-          <ReplayButton onClick={replay} />
         </div>
 
         <div className="min-w-0 flex-1 basis-[440px]">

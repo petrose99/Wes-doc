@@ -1,6 +1,5 @@
 "use client"
 
-import { ReplayButton } from "@/components/marketing/landing/_lib/replay-button"
 import { IN, POP, SWEEP, usePlayOnScroll } from "@/components/marketing/landing/_lib/use-play-on-scroll"
 import { Target } from "lucide-react"
 
@@ -12,7 +11,7 @@ const FIELDS = [
 ]
 
 export function Provenance() {
-  const { ref, played, replay } = usePlayOnScroll()
+  const { ref, played } = usePlayOnScroll()
 
   return (
     <section id="trace" ref={ref} className="border-y border-cream-200 bg-white py-14 md:py-22">
@@ -25,7 +24,6 @@ export function Provenance() {
           <p className="mt-4 max-w-[31rem] text-pretty text-[1.02rem] leading-[1.62] text-stone-600">
             Nothing is a black box. Every extracted value keeps a pointer to its document, its page and the exact spot it was read from. &quot;Where did this figure come from?&quot; is one click, not an afternoon in a folder.
           </p>
-          <ReplayButton onClick={replay} />
         </div>
 
         <div className="min-w-0 flex-1 basis-[420px]">

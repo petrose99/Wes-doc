@@ -1,6 +1,5 @@
 "use client"
 
-import { ReplayButton } from "@/components/marketing/landing/_lib/replay-button"
 import { IN, POP, usePlayOnScroll } from "@/components/marketing/landing/_lib/use-play-on-scroll"
 import { Check, FileText, Sparkles } from "lucide-react"
 
@@ -12,7 +11,7 @@ const ROWS = [
 ]
 
 export function Sheets() {
-  const { ref, played, replay } = usePlayOnScroll()
+  const { ref, played } = usePlayOnScroll()
 
   return (
     <section id="sheets" ref={ref} className="bg-cream-50 py-14 md:py-22">
@@ -25,7 +24,6 @@ export function Sheets() {
           <p className="mt-4 max-w-[31rem] text-pretty text-[1.02rem] leading-[1.62] text-stone-600">
             Open a Sheet whenever you want to work with numbers. Pull in your reviewed extractions, run a report out of the built-in ledger, drop in a financial statement from QuickBooks or Xero, or upload any Excel or CSV — then sort, add columns, and ask the built-in AI Assistant to write a formula or answer a question about the rows. Download the tab as CSV or the whole book as Excel when you&apos;re done.
           </p>
-          <ReplayButton onClick={replay} />
         </div>
 
         <div className="min-w-0 flex-1 basis-[440px]">

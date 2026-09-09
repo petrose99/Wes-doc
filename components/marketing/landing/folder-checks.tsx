@@ -1,11 +1,10 @@
 "use client"
 
-import { ReplayButton } from "@/components/marketing/landing/_lib/replay-button"
 import { IN, POP, usePlayOnScroll } from "@/components/marketing/landing/_lib/use-play-on-scroll"
 import { AlertTriangle } from "lucide-react"
 
 export function FolderChecks() {
-  const { ref, played, replay } = usePlayOnScroll()
+  const { ref, played } = usePlayOnScroll()
 
   return (
     <section id="checks" ref={ref} className="bg-cream-50 py-14 md:py-22">
@@ -73,7 +72,6 @@ export function FolderChecks() {
           <p className="mt-4 max-w-[31rem] text-pretty text-[1.02rem] leading-[1.62] text-stone-600">
             Every upload batch is grouped by type and supplier, paired against near-identical copies, and scanned for period gaps and per-document problems — totals that don&apos;t sum, fields that aren&apos;t there. The report is deterministic: the same folder gives the same answer twice.
           </p>
-          <ReplayButton onClick={replay} />
         </div>
       </div>
     </section>

@@ -1,4 +1,5 @@
-import { ArrowRight } from "lucide-react"
+import { BiteMark } from "@/components/marketing/logo"
+import { BarChart3, Files, Landmark, Library, ListChecks, Table2 } from "lucide-react"
 import Link from "next/link"
 
 const rows: { doc: string; supplier: string; total: string; status: "ready" | "review" | "dupe" }[] = [
@@ -7,6 +8,20 @@ const rows: { doc: string; supplier: string; total: string; status: "ready" | "r
   { doc: "receipt-cafe.heic", supplier: "Provisions Co.", total: "£19.20", status: "review" },
   { doc: "INV-4471 (1).pdf", supplier: "Northwind Trading", total: "£2,475.60", status: "dupe" },
   { doc: "statement-feb.pdf", supplier: "Metro Bank", total: "—", status: "ready" },
+]
+
+/** The rail the app actually renders (components/shell/sidebar.tsx): same labels, same order, same
+ * icons. Automation resolves to Files rather than a bolt because the module declares icon "zap" and
+ * the sidebar's ICONS map has no "zap" entry, so the app falls back — the mock follows the app,
+ * not the intent. The lower group (Settings, Activity, Health Checks) is left out: this is a
+ * marketing shot of where the work happens, not a full chrome trace. */
+const NAV: { label: string; icon: typeof BarChart3; active?: boolean; badge?: string }[] = [
+  { label: "Dashboard", icon: BarChart3 },
+  { label: "Extraction", icon: ListChecks, active: true, badge: "7" },
+  { label: "Sheets", icon: Table2 },
+  { label: "Docu Library", icon: Library },
+  { label: "Accounting", icon: Landmark },
+  { label: "Automation", icon: Files },
 ]
 
 const statusStyle: Record<string, string> = {
@@ -60,14 +75,32 @@ export function Hero() {
               <span className="ml-2 text-[0.72rem] font-semibold text-slate-500">Extraction · March close · 42 documents</span>
             </div>
             <div className="flex flex-wrap">
-              <div className="flex flex-none basis-[148px] flex-col gap-0.5 border-r border-slate-200 bg-gradient-to-b from-slate-50 to-slate-100 p-2.5">
-                <div className="px-1.5 pb-1 text-[0.6rem] font-bold uppercase tracking-wide text-slate-400">Workspace</div>
-                <div className="rounded-md px-2 py-1.5 text-[0.76rem] font-medium text-slate-600">Dashboard</div>
-                <div className="flex items-center gap-2 rounded-md bg-white px-2 py-1.5 text-[0.76rem] font-semibold text-emerald-800 shadow-[0_1px_2px_rgba(15,23,42,.07),inset_0_0_0_1px_rgba(4,120,87,.10)]">
-                  Extraction<span className="ml-auto inline-flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-indigo-600 px-1 text-[0.62rem] font-bold text-white">7</span>
+              <div className="flex flex-none basis-[168px] flex-col border-r border-slate-200 bg-[#EEF1F2] p-2.5">
+                <div className="flex items-center gap-1.5 px-1.5 pb-3 pt-0.5">
+                  <BiteMark className="h-4 w-4 text-emerald-700" />
+                  <span className="font-display text-[0.82rem] font-bold tracking-[-0.02em] text-stone-900">DocuBite</span>
                 </div>
-                <div className="rounded-md px-2 py-1.5 text-[0.76rem] font-medium text-slate-600">Docu Library</div>
-                <div className="rounded-md px-2 py-1.5 text-[0.76rem] font-medium text-slate-600">Health Checks</div>
+                <div className="px-1.5 pb-1 text-[0.6rem] font-bold uppercase tracking-wide text-slate-400">Workspace</div>
+                <div className="flex flex-col gap-0.5">
+                  {NAV.map((item) => (
+                    <div
+                      key={item.label}
+                      className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-[0.74rem] ${
+                        item.active
+                          ? "bg-white font-semibold text-emerald-800 shadow-[0_1px_2px_rgba(15,23,42,.07),inset_0_0_0_1px_rgba(4,120,87,.10)]"
+                          : "font-medium text-slate-600"
+                      }`}
+                    >
+                      <item.icon aria-hidden className="h-3.5 w-3.5 shrink-0 opacity-80" strokeWidth={2} />
+                      <span className="truncate">{item.label}</span>
+                      {item.badge && (
+                        <span className="ml-auto inline-flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-indigo-600 px-1 text-[0.62rem] font-bold text-white">
+                          {item.badge}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
               <div className="relative min-w-0 flex-1 basis-[300px] overflow-hidden bg-white p-3.5 pb-3.5">
                 <div className="mb-2.5 flex flex-wrap gap-1.5">
@@ -89,7 +122,6 @@ export function Hero() {
                   ))}
                 </div>
                 <div className="mt-2.5 flex items-center gap-2 rounded-lg bg-indigo-50 px-2.5 py-2 text-[0.72rem] font-medium text-indigo-900">
-                  <ArrowRight aria-hidden className="hidden" />
                   January statement missing · 1 exact duplicate
                 </div>
                 <div aria-hidden className="db-sweep-bar pointer-events-none absolute inset-x-0 top-0 h-[30%]" style={{ background: "linear-gradient(to bottom, transparent, rgba(16,185,129,.16), transparent)", animation: "db-sweep 6s ease-in-out infinite" }} />

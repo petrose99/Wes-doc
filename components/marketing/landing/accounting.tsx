@@ -1,6 +1,5 @@
 "use client"
 
-import { ReplayButton } from "@/components/marketing/landing/_lib/replay-button"
 import { IN, POP, usePlayOnScroll } from "@/components/marketing/landing/_lib/use-play-on-scroll"
 import { Check, FileText, MoveUpRight } from "lucide-react"
 
@@ -11,7 +10,7 @@ const ROWS = [
 ]
 
 export function Accounting() {
-  const { ref, played, replay } = usePlayOnScroll()
+  const { ref, played } = usePlayOnScroll()
 
   return (
     <section id="accounting" ref={ref} className="border-y border-cream-200 bg-white py-14 md:py-22">
@@ -62,7 +61,6 @@ export function Accounting() {
           <p className="mt-4 max-w-[31rem] text-pretty text-[1.02rem] leading-[1.62] text-stone-600">
             A full double-entry accounting module is built in — chart of accounts, journals, AP/AR, VAT, financial statements. Reviewed invoices and receipts post as bills against the right expense account in one click. Prefer to keep the books elsewhere? Forward the same batch to QuickBooks or Xero instead — DocuBite&apos;s duplicate guard travels with it.
           </p>
-          <ReplayButton onClick={replay} />
         </div>
       </div>
     </section>
