@@ -5,21 +5,30 @@ import path from "path"
 
 const localRoot = path.resolve(process.env.DOCUMENT_SOURCE_PATH || "./data/document-sources")
 
-/** Storage is S3 when a bucket is named, and the local volume otherwise — that fallback is what a
- * dev machine and a single-box install run on.
+/** Storage is object storage when a bucket is named, and the local volume otherwise — that
+ * fallback is what a dev machine and a single-box install run on.
  *
- * S3_ENDPOINT points the same client at an S3-compatible service that is not AWS (Cloudflare R2).
- * Two things change when it is set. Requests go path-style, because a bucket in a vendor's domain
- * is not addressable as a subdomain the way an AWS bucket is. And SSE-KMS is dropped: KMS is an
- * AWS service, R2 rejects the header, and R2 encrypts every object at rest regardless — so asking
- * for encryption is both impossible and unnecessary there. On real S3 the header still goes,
- * because there the encryption is opt-in and dropping it would silently downgrade every upload. */
-const usingCustomEndpoint = Boolean(config.aws.endpoint)
+ * The protocol is S3; the service need not be Amazon's. STORAGE_ENDPOINT points the same client at
+ * Cloudflare R2 or MinIO, and two things change when it is set. Requests go path-style, because a
+ * bucket in a vendor's domain is not addressable as a subdomain the way an AWS bucket is. And
+ * SSE-KMS is dropped: KMS is an AWS service, R2 rejects the header, and R2 encrypts every object at
+ * rest regardless — so asking for encryption is both impossible and unnecessary there. On real S3
+ * the header still goes, because there encryption is opt-in and dropping it would silently
+ * downgrade every upload.
+ *
+ * Credentials are passed explicitly when given, rather than left to the SDK's environment lookup,
+ * so the variable holding an R2 key does not have to be called AWS_ANYTHING. Omit them and the
+ * default chain still applies — an EC2 instance role, or the AWS_ spellings. */
+const usingCustomEndpoint = Boolean(config.storage.endpoint)
+const explicitCredentials = config.storage.accessKeyId && config.storage.secretAccessKey
 const client = new S3Client({
-  region: config.aws.region,
-  ...(usingCustomEndpoint ? { endpoint: config.aws.endpoint, forcePathStyle: true } : {}),
+  region: config.storage.region,
+  ...(usingCustomEndpoint ? { endpoint: config.storage.endpoint, forcePathStyle: true } : {}),
+  ...(explicitCredentials
+    ? { credentials: { accessKeyId: config.storage.accessKeyId, secretAccessKey: config.storage.secretAccessKey } }
+    : {}),
 })
-const s3 = config.aws.documentsBucket ? client : null
+const s3 = config.storage.bucket ? client : null
 
 function localPathForKey(key: string) {
   const resolved = path.resolve(localRoot, key)
@@ -52,7 +61,7 @@ export async function putDocumentSource(key: string, body: Buffer, contentType: 
   if (s3) {
     await s3.send(
       new PutObjectCommand({
-        Bucket: config.aws.documentsBucket,
+        Bucket: config.storage.bucket,
         Key: key,
         Body: body,
         ContentType: contentType,
@@ -60,7 +69,7 @@ export async function putDocumentSource(key: string, body: Buffer, contentType: 
           ? {}
           : {
               ServerSideEncryption: "aws:kms" as const,
-              ...(config.aws.kmsKeyId ? { SSEKMSKeyId: config.aws.kmsKeyId } : {}),
+              ...(config.storage.kmsKeyId ? { SSEKMSKeyId: config.storage.kmsKeyId } : {}),
             }),
       })
     )
@@ -74,7 +83,7 @@ export async function putDocumentSource(key: string, body: Buffer, contentType: 
 
 export async function readDocumentSource(key: string): Promise<Buffer> {
   if (s3) {
-    const result = await s3.send(new GetObjectCommand({ Bucket: config.aws.documentsBucket, Key: key }))
+    const result = await s3.send(new GetObjectCommand({ Bucket: config.storage.bucket, Key: key }))
     if (!result.Body) throw new Error("Document source is missing")
     return Buffer.from(await result.Body.transformToByteArray())
   }
@@ -83,7 +92,7 @@ export async function readDocumentSource(key: string): Promise<Buffer> {
 
 export async function deleteDocumentSource(key: string) {
   if (s3) {
-    await s3.send(new DeleteObjectCommand({ Bucket: config.aws.documentsBucket, Key: key }))
+    await s3.send(new DeleteObjectCommand({ Bucket: config.storage.bucket, Key: key }))
     return
   }
   await fs.rm(localPathForKey(key), { force: true })

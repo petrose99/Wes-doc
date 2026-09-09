@@ -48,7 +48,7 @@ resource "aws_ecs_cluster" "main" {
 locals {
   worker_environment = [
     { name = "NODE_ENV", value = "production" }, { name = "AWS_REGION", value = var.aws_region },
-    { name = "AWS_S3_DOCUMENTS_BUCKET", value = aws_s3_bucket.documents.id }, { name = "AWS_S3_KMS_KEY_ID", value = aws_kms_key.documents.arn },
+    { name = "STORAGE_BUCKET", value = aws_s3_bucket.documents.id }, { name = "STORAGE_KMS_KEY_ID", value = aws_kms_key.documents.arn },
     { name = "MALWARE_SCAN_URL", value = var.malware_scan_url },
     # Semantic-search (RAG) embedding config. The worker runs the embed jobs, so it needs the same
     # EMBEDDINGS_* the web app has. Non-secret settings here; the token is a secret below. These

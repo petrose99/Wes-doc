@@ -59,15 +59,31 @@ const envSchema = z.object({
   // client *secret* is deliberately absent: the GIS flow never performs a code exchange from this
   // app, and the secret is only ever pasted into the Supabase dashboard.
   NEXT_PUBLIC_GOOGLE_CLIENT_ID: z.string().optional(),
+  // Where document sources live. The protocol is S3, but the service need not be Amazon's —
+  // Cloudflare R2 and MinIO speak it too — so these are named for the job rather than the vendor.
+  // Naming them AWS_ misled a reader into thinking configuring storage meant signing up with
+  // Amazon. Leave STORAGE_BUCKET empty and documents are written to the local volume instead.
+  //
+  // STORAGE_ENDPOINT points at a service that is not AWS: R2 is
+  // "https://<account-id>.r2.cloudflarestorage.com". Setting it changes two things in
+  // lib/document-storage.ts — requests go path-style, and the SSE-KMS header is dropped, since KMS
+  // is an AWS service that R2 rejects outright and R2 encrypts at rest with nothing to ask for.
+  // (Note the deliberately different name from S3_ENDPOINT in the compose files: that one belongs
+  // to bigcapital-server and points at its MinIO. Two unrelated things, two names.)
+  //
+  // STORAGE_REGION is "auto" for R2, which signs against that rather than a geographic region.
+  //
+  // The AWS_ spellings are still read, so an existing deployment and infra/aws/terraform keep
+  // working; the STORAGE_ ones win where both are set.
+  STORAGE_BUCKET: z.string().default(""),
+  STORAGE_ENDPOINT: z.string().default(""),
+  STORAGE_REGION: z.string().default(""),
+  STORAGE_ACCESS_KEY_ID: z.string().default(""),
+  STORAGE_SECRET_ACCESS_KEY: z.string().default(""),
+  STORAGE_KMS_KEY_ID: z.string().default(""),
   AWS_REGION: z.string().default("eu-west-1"),
   AWS_S3_DOCUMENTS_BUCKET: z.string().default(""),
   AWS_S3_KMS_KEY_ID: z.string().default(""),
-  // Set to point document storage at an S3-compatible service that is not AWS — Cloudflare R2 is
-  // "https://<account-id>.r2.cloudflarestorage.com". Leave empty for real S3. Two things follow
-  // from a custom endpoint, both handled in lib/document-storage.ts: requests use path-style
-  // addressing, and the SSE-KMS header is dropped, because KMS is an AWS service and R2 rejects
-  // the header outright (it encrypts at rest on its own, with no header to ask for it).
-  S3_ENDPOINT: z.string().default(""),
   INTERNAL_WORKER_SECRET: z.string().min(24).default(PLACEHOLDER_WORKER_SECRET),
   MALWARE_SCAN_URL: z.string().url().optional(),
   DOCUMENT_MAX_PAGES: z.coerce.number().int().default(-1),
@@ -317,7 +333,15 @@ const config = {
     maxAudioBytes: env.ASR_MAX_AUDIO_BYTES,
     language: env.ASR_LANGUAGE.trim() || null,
   },
-  aws: { region: env.AWS_REGION, documentsBucket: env.AWS_S3_DOCUMENTS_BUCKET, kmsKeyId: env.AWS_S3_KMS_KEY_ID, endpoint: env.S3_ENDPOINT.trim(), internalWorkerSecret: env.INTERNAL_WORKER_SECRET, malwareScanUrl: env.MALWARE_SCAN_URL },
+  storage: {
+    bucket: env.STORAGE_BUCKET || env.AWS_S3_DOCUMENTS_BUCKET,
+    endpoint: env.STORAGE_ENDPOINT.trim(),
+    region: env.STORAGE_REGION.trim() || env.AWS_REGION,
+    accessKeyId: env.STORAGE_ACCESS_KEY_ID.trim(),
+    secretAccessKey: env.STORAGE_SECRET_ACCESS_KEY.trim(),
+    kmsKeyId: env.STORAGE_KMS_KEY_ID || env.AWS_S3_KMS_KEY_ID,
+  },
+  aws: { region: env.AWS_REGION, internalWorkerSecret: env.INTERNAL_WORKER_SECRET, malwareScanUrl: env.MALWARE_SCAN_URL },
   auth: { loginUrl: "/login", disableSignup: env.DISABLE_SIGNUP === "true", idleTimeoutMinutes: env.SESSION_IDLE_TIMEOUT_MINUTES },
   // The project itself, plus the two keys: anonKey is safe in the browser (Postgres RLS is what
   // actually protects data reached through it — irrelevant here since this project is Auth-only
