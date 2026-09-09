@@ -1,6 +1,7 @@
 import type { SheetTemplate } from "@/components/extract/types"
 import { FileHubUploadButton } from "@/components/files/file-hub-upload-button"
 
+import { GettingStartedCard } from "@/components/onboarding/getting-started"
 import { WelcomeTour } from "@/components/onboarding/welcome-tour"
 
 import { LastUpdated } from "@/components/shared/relative-time"
@@ -81,6 +82,14 @@ export default async function WorkspaceHomePage({ params }: {
     { label: "Ready", value: stageCounts.ready, icon: CheckCircle2, href: `/workspaces/${workspaceId}/pipeline?stage=ready`, iconClass: "bg-emerald-50 text-emerald-700", hoverClass: "hover:border-[#a7f3d0] hover:-translate-y-0.5 hover:shadow-[0_2px_4px_rgba(15,23,42,0.05),0_12px_26px_rgba(4,120,87,0.10)]" },
   ]
 
+  // Auto-completion signals for the getting-started checklist. `uploaded` is any document at all
+  // (all stages sum), `reviewed` is anything past to_review, `placedInSheet` is ready docs not
+  // sitting on unplaced (i.e. actually pulled into a sheet). The component only reads these to
+  // tick steps ahead of a manual click — it never blocks on them.
+  const uploadedCount = stageCounts.inbox + stageCounts.to_review + stageCounts.ready
+  const reviewedCount = stageCounts.ready
+  const placedInSheetCount = Math.max(0, stageCounts.ready - unplacedCount)
+
   return <main className="mx-auto w-full max-w-6xl space-y-4 px-4 py-[18px] md:space-y-6 md:p-6">
     <WelcomeTour workspaceId={workspaceId} tourSeen={onboardingState.tourSeen} />
     <header className="flex flex-wrap items-end justify-between gap-4">
@@ -107,6 +116,12 @@ export default async function WorkspaceHomePage({ params }: {
     </header>
 
     <MobileUploadButtons workspaceId={workspaceId} fileId={pipelineFile.id} />
+
+    <GettingStartedCard
+      workspaceId={workspaceId}
+      initialState={onboardingState}
+      liveCounts={{ uploaded: uploadedCount, reviewed: reviewedCount, placedInSheet: placedInSheetCount }}
+    />
 
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-3.5">
       {stats.map((stat) => {
