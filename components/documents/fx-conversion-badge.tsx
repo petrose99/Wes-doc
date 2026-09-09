@@ -53,7 +53,7 @@ export function FxConversionBadge({ docCurrency, docTotal, baseCurrency, baseCur
     <p className="mt-1 text-slate-500">
       Converted at {fxRate!.toFixed(4)} {docCurrency}/{baseCurrency}
       {fxRateAt ? ` on ${fxRateAt}` : ""}
-      {fxRateSource ? ` · ${fxRateSource.replace("+triangulated", " (via EUR)")}` : ""}.
+      {fxRateSource ? ` · ${fxRateSource.replace("+triangulated", " (via EUR)").replace("+pegged_via_ZAR", " (via ZAR peg)").replace("+pegged_via_", " (via ")}` : ""}.
       Pipeline totals and any ledger push use the converted amount; the document library shows both.
     </p>
   </div>

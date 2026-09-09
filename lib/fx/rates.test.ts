@@ -109,6 +109,27 @@ describe("getHistoricalRate", () => {
     expect(await getHistoricalRate("EUR", "USD", "2024-03-15")).toBeNull()
   })
 
+  it("substitutes LSL with ZAR under the Common Monetary Area peg (Lesotho Loti tracks the Rand 1:1)", async () => {
+    // Frankfurter has never published an LSL rate — an LSL/USD query has to be answered via ZAR.
+    fetchMock.mockResolvedValue(jsonResponse({ base: "ZAR", date: "2024-03-15", rates: { USD: 0.055 } }))
+    const hit = await getHistoricalRate("LSL", "USD", "2024-03-15")
+    expect(hit).toEqual({ base: "LSL", quote: "USD", effectiveDate: "2024-03-15", rate: 0.055, source: "frankfurter+pegged_via_ZAR" })
+    // The wire call used ZAR, not LSL — that's the whole point.
+    expect(fetchMock.mock.calls[0][0]).toContain("from=ZAR&to=USD")
+  })
+
+  it("returns 1.0 for LSL → ZAR (both sides peg to the same anchor) without any fetch", async () => {
+    const hit = await getHistoricalRate("LSL", "ZAR", "2024-03-15")
+    expect(hit).toEqual({ base: "LSL", quote: "ZAR", effectiveDate: "2024-03-15", rate: 1, source: "pegged_via_ZAR" })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it("returns 1.0 for LSL → NAD (both peg to ZAR)", async () => {
+    const hit = await getHistoricalRate("LSL", "NAD", "2024-03-15")
+    expect(hit?.rate).toBe(1)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it("prefers fastratesapi over Frankfurter for today's rate when the template is configured", async () => {
     const config = (await import("@/lib/config")).default as { fx: { fastratesKey: string; fastratesUrlTemplate: string } }
     config.fx.fastratesKey = "test_key"

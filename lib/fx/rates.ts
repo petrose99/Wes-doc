@@ -18,6 +18,28 @@ export type FxRateHit = {
 
 const ISO_CURRENCY = /^[A-Z]{3}$/
 
+/** Currencies that are legally pegged 1:1 to another currency and, importantly, are NOT published
+ * by Frankfurter/ECB — so any rate for one of these has to be sourced through its anchor.
+ *
+ * The Common Monetary Area does exactly this: Lesotho's Loti (LSL), Namibia's Dollar (NAD), and
+ * Eswatini's Lilangeni (SZL) each circulate alongside the South African Rand (ZAR) at a fixed 1:1
+ * rate, guaranteed by treaty. So an "LSL 100 → USD" query is really "ZAR 100 → USD" plus a
+ * relabel — same number, different code. We substitute the pegged code with its anchor before
+ * every fetch and cache write, and stamp the source with "+pegged_via_ZAR" so an audit can tell
+ * a real LSL/USD rate (Frankfurter has never published one) from the ZAR proxy this app used. */
+const PEGGED_1_TO_1: Record<string, string> = {
+  LSL: "ZAR",
+  NAD: "ZAR",
+  SZL: "ZAR",
+}
+
+/** Replace a pegged currency with its anchor. Returns the anchor code plus a tag for source
+ * labelling ("pegged_via_ZAR" when substituted, empty when not). */
+function anchorFor(code: string): { code: string; tag: string } {
+  const anchor = PEGGED_1_TO_1[code]
+  return anchor ? { code: anchor, tag: `pegged_via_${anchor}` } : { code, tag: "" }
+}
+
 function normalizeCode(code: string): string | null {
   const trimmed = code.trim().toUpperCase()
   return ISO_CURRENCY.test(trimmed) ? trimmed : null
@@ -120,17 +142,35 @@ export async function getHistoricalRate(from: string, to: string, effectiveDate:
 
   if (base === quote) return { base, quote, effectiveDate: dateIso, rate: 1, source: "identity" }
 
+  // Substitute pegged currencies with their anchor BEFORE the cache check and every network
+  // fetch: LSL/USD is really ZAR/USD, and there's no point fetching or caching an "LSL/USD" that
+  // Frankfurter has never returned. If both sides of the pair peg to the same anchor the rate is
+  // trivially 1 — handled by the same-currency shortcut once we've substituted. The result is
+  // returned with the ORIGINAL codes (so a caller asking for LSL/USD gets a row saying LSL/USD)
+  // but the source tag records that a peg substitution was used.
+  const baseAnchor = anchorFor(base)
+  const quoteAnchor = anchorFor(quote)
+  if (baseAnchor.code === quoteAnchor.code) {
+    // Both sides peg to the same anchor — e.g. LSL → ZAR, or LSL → NAD (both anchor to ZAR).
+    return { base, quote, effectiveDate: dateIso, rate: 1, source: [baseAnchor.tag, quoteAnchor.tag].filter(Boolean).join("+") || "identity" }
+  }
+  const pegTags = [baseAnchor.tag, quoteAnchor.tag].filter(Boolean).join("+")
+  const fetchBase = baseAnchor.code
+  const fetchQuote = quoteAnchor.code
+
   const cached = await readCache(base, quote, dateIso)
   if (cached) return cached
 
   const timeoutMs = config.fx.timeoutMs
   const today = isToday(dateIso, new Date())
 
+  const stampSource = (base: string) => pegTags ? `${base}+${pegTags}` : base
+
   // Direct pair, either via fastratesapi (today only, if configured) or Frankfurter.
   if (today) {
-    const fast = await fetchFastRatesToday(base, quote, timeoutMs)
+    const fast = await fetchFastRatesToday(fetchBase, fetchQuote, timeoutMs)
     if (fast !== null) {
-      const hit: FxRateHit = { base, quote, effectiveDate: dateIso, rate: fast, source: "fastratesapi" }
+      const hit: FxRateHit = { base, quote, effectiveDate: dateIso, rate: fast, source: stampSource("fastratesapi") }
       await writeCache(hit).catch(() => {})
       return hit
     }
@@ -138,9 +178,9 @@ export async function getHistoricalRate(from: string, to: string, effectiveDate:
 
   // Frankfurter accepts any of its supported currencies as `from` — a direct EUR/USD, USD/EUR,
   // ZAR/USD all work. What it doesn't publish is the exotic-to-exotic cross itself.
-  const direct = await fetchFrankfurter(base, quote, dateIso, timeoutMs)
+  const direct = await fetchFrankfurter(fetchBase, fetchQuote, dateIso, timeoutMs)
   if (direct) {
-    const hit: FxRateHit = { base, quote, effectiveDate: dateIso, rate: direct.rate, source: today ? "frankfurter" : "frankfurter" }
+    const hit: FxRateHit = { base, quote, effectiveDate: dateIso, rate: direct.rate, source: stampSource("frankfurter") }
     // Cache under the response's own date — Frankfurter snaps to the previous business day for
     // weekends/holidays. The requested date is not what the row is FOR.
     await writeCache({ ...hit, effectiveDate: direct.date }).catch(() => {})
@@ -152,18 +192,20 @@ export async function getHistoricalRate(from: string, to: string, effectiveDate:
 
   // Triangulate via EUR. Only reachable when Frankfurter refused the direct pair — usually only
   // possible on future/nonsense dates or a rare currency it doesn't list.
-  if (base !== "EUR" && quote !== "EUR") {
+  if (fetchBase !== "EUR" && fetchQuote !== "EUR") {
     const [baseToEur, eurToQuote] = await Promise.all([
-      fetchFrankfurter(base, "EUR", dateIso, timeoutMs),
-      fetchFrankfurter("EUR", quote, dateIso, timeoutMs),
+      fetchFrankfurter(fetchBase, "EUR", dateIso, timeoutMs),
+      fetchFrankfurter("EUR", fetchQuote, dateIso, timeoutMs),
     ])
     if (baseToEur && eurToQuote && baseToEur.date === eurToQuote.date) {
       const rate = baseToEur.rate * eurToQuote.rate
-      const hit: FxRateHit = { base, quote, effectiveDate: baseToEur.date, rate, source: "frankfurter+triangulated" }
+      const hit: FxRateHit = { base, quote, effectiveDate: baseToEur.date, rate, source: stampSource("frankfurter+triangulated") }
       await writeCache(hit).catch(() => {})
       // Cache the two intermediate legs too — a later ZAR→JPY on the same day will find them.
-      await writeCache({ base, quote: "EUR", effectiveDate: baseToEur.date, rate: baseToEur.rate, source: "frankfurter" }).catch(() => {})
-      await writeCache({ base: "EUR", quote, effectiveDate: eurToQuote.date, rate: eurToQuote.rate, source: "frankfurter" }).catch(() => {})
+      // Cache under the ANCHOR codes (fetchBase/fetchQuote), not the pegged ones: an LSL→EUR
+      // cache row would never match a subsequent lookup for ZAR/EUR, and this app has both.
+      await writeCache({ base: fetchBase, quote: "EUR", effectiveDate: baseToEur.date, rate: baseToEur.rate, source: "frankfurter" }).catch(() => {})
+      await writeCache({ base: "EUR", quote: fetchQuote, effectiveDate: eurToQuote.date, rate: eurToQuote.rate, source: "frankfurter" }).catch(() => {})
       return hit
     }
   }
