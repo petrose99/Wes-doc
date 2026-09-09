@@ -27,8 +27,12 @@ export async function syncLedgerTransactions(connectionId: string): Promise<void
   // the existing rows and, when reconciledSource=='docubite' and the incoming row says false,
   // keep the current value. When the incoming row says true, we let the provider take over.
   const existingByKey = new Map<string, { reconciled: boolean; reconciledSource: string | null }>()
+  // workspaceId is redundant for correctness — connectionId already identifies exactly one
+  // workspace — but it's required for the scope guard, which refuses a bare read on a
+  // workspace-scoped model. Without it the sync fails on every attempt for every connection
+  // (observed in prod, health.log after 2026-09-09) and the health signal goes stale.
   const existing = await prisma.ledgerTransaction.findMany({
-    where: { connectionId: connection.id },
+    where: { workspaceId: connection.workspaceId, connectionId: connection.id },
     select: { kind: true, externalId: true, reconciled: true, reconciledSource: true },
   })
   for (const row of existing) existingByKey.set(`${row.kind}:${row.externalId}`, { reconciled: row.reconciled, reconciledSource: row.reconciledSource })
