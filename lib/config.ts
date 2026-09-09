@@ -62,6 +62,12 @@ const envSchema = z.object({
   AWS_REGION: z.string().default("eu-west-1"),
   AWS_S3_DOCUMENTS_BUCKET: z.string().default(""),
   AWS_S3_KMS_KEY_ID: z.string().default(""),
+  // Set to point document storage at an S3-compatible service that is not AWS — Cloudflare R2 is
+  // "https://<account-id>.r2.cloudflarestorage.com". Leave empty for real S3. Two things follow
+  // from a custom endpoint, both handled in lib/document-storage.ts: requests use path-style
+  // addressing, and the SSE-KMS header is dropped, because KMS is an AWS service and R2 rejects
+  // the header outright (it encrypts at rest on its own, with no header to ask for it).
+  S3_ENDPOINT: z.string().default(""),
   INTERNAL_WORKER_SECRET: z.string().min(24).default(PLACEHOLDER_WORKER_SECRET),
   MALWARE_SCAN_URL: z.string().url().optional(),
   DOCUMENT_MAX_PAGES: z.coerce.number().int().default(-1),
@@ -311,7 +317,7 @@ const config = {
     maxAudioBytes: env.ASR_MAX_AUDIO_BYTES,
     language: env.ASR_LANGUAGE.trim() || null,
   },
-  aws: { region: env.AWS_REGION, documentsBucket: env.AWS_S3_DOCUMENTS_BUCKET, kmsKeyId: env.AWS_S3_KMS_KEY_ID, internalWorkerSecret: env.INTERNAL_WORKER_SECRET, malwareScanUrl: env.MALWARE_SCAN_URL },
+  aws: { region: env.AWS_REGION, documentsBucket: env.AWS_S3_DOCUMENTS_BUCKET, kmsKeyId: env.AWS_S3_KMS_KEY_ID, endpoint: env.S3_ENDPOINT.trim(), internalWorkerSecret: env.INTERNAL_WORKER_SECRET, malwareScanUrl: env.MALWARE_SCAN_URL },
   auth: { loginUrl: "/login", disableSignup: env.DISABLE_SIGNUP === "true", idleTimeoutMinutes: env.SESSION_IDLE_TIMEOUT_MINUTES },
   // The project itself, plus the two keys: anonKey is safe in the browser (Postgres RLS is what
   // actually protects data reached through it — irrelevant here since this project is Auth-only

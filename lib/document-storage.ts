@@ -4,8 +4,22 @@ import fs from "fs/promises"
 import path from "path"
 
 const localRoot = path.resolve(process.env.DOCUMENT_SOURCE_PATH || "./data/document-sources")
-const awsS3 = new S3Client({ region: config.aws.region })
-const s3 = config.aws.documentsBucket ? awsS3 : null
+
+/** Storage is S3 when a bucket is named, and the local volume otherwise — that fallback is what a
+ * dev machine and a single-box install run on.
+ *
+ * S3_ENDPOINT points the same client at an S3-compatible service that is not AWS (Cloudflare R2).
+ * Two things change when it is set. Requests go path-style, because a bucket in a vendor's domain
+ * is not addressable as a subdomain the way an AWS bucket is. And SSE-KMS is dropped: KMS is an
+ * AWS service, R2 rejects the header, and R2 encrypts every object at rest regardless — so asking
+ * for encryption is both impossible and unnecessary there. On real S3 the header still goes,
+ * because there the encryption is opt-in and dropping it would silently downgrade every upload. */
+const usingCustomEndpoint = Boolean(config.aws.endpoint)
+const client = new S3Client({
+  region: config.aws.region,
+  ...(usingCustomEndpoint ? { endpoint: config.aws.endpoint, forcePathStyle: true } : {}),
+})
+const s3 = config.aws.documentsBucket ? client : null
 
 function localPathForKey(key: string) {
   const resolved = path.resolve(localRoot, key)
@@ -42,8 +56,12 @@ export async function putDocumentSource(key: string, body: Buffer, contentType: 
         Key: key,
         Body: body,
         ContentType: contentType,
-        ServerSideEncryption: "aws:kms",
-        ...(config.aws.kmsKeyId ? { SSEKMSKeyId: config.aws.kmsKeyId } : {}),
+        ...(usingCustomEndpoint
+          ? {}
+          : {
+              ServerSideEncryption: "aws:kms" as const,
+              ...(config.aws.kmsKeyId ? { SSEKMSKeyId: config.aws.kmsKeyId } : {}),
+            }),
       })
     )
     return
