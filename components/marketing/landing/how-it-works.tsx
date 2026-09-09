@@ -1,8 +1,8 @@
 const STEPS = [
   {
     n: "01",
-    title: "Upload one file or a folder",
-    body: "Your own quarter or a client's whole shoebox — mixed PDFs, phone photos and scans in one go. Multi-document PDFs are split into separate records automatically.",
+    title: "Send it in, however it arrives",
+    body: "Drag in one file or a client's whole shoebox, or email it to your workspace address and let the bills arrive on their own. Mixed PDFs, phone photos and scans all go in together, and multi-document PDFs are split into separate records.",
   },
   {
     n: "02",
@@ -12,7 +12,7 @@ const STEPS = [
   {
     n: "03",
     title: "Approve and send it on",
-    body: "Export clean CSV for your existing workflow, or push a reviewed bill straight to QuickBooks or Xero.",
+    body: "Export clean CSV for your existing workflow, or push a reviewed bill straight to QuickBooks or Xero — and hand the routine ones over entirely once it has learned how you code them.",
   },
 ]
 

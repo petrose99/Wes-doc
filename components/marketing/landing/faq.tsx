@@ -12,6 +12,14 @@ const QUESTIONS = [
     a: "Yes. Each workspace has owner and member roles with email invitations, a shared review queue badged with what's outstanding, and approval workflows for the documents that need a second signature. Every change is recorded against the person who made it.",
   },
   {
+    q: "How does emailing documents in work?",
+    a: "Each workspace gets its own address. Forward a bill to it, or hand the address to your suppliers so their invoices arrive without you touching them. Only senders you have allowed are accepted — anything else is refused and recorded. Zips are unpacked, supplier-portal links are followed, and if a mail has no attachment but reads like an invoice, the message body itself is turned into a PDF and read.",
+  },
+  {
+    q: "Does it code documents on its own?",
+    a: "Only as far as you let it. A workspace starts out merely suggesting, and you move it to auto-with-approval or fully touchless when you are ready. Once three documents from the same supplier have been coded the same way, it applies that coding itself instead of asking the AI. New suppliers always reach a person first, and a confidence floor, amount bands, your written policy and a random sample of the automatic work all still hold documents back for review.",
+  },
+  {
     q: "Can I get my data out?",
     a: "Reviewed data streams out as CSV whenever you want it, columns and all. Reviewed invoices and receipts can also be pushed to QuickBooks or Xero as bills. Nothing here is a one-way door.",
   },
