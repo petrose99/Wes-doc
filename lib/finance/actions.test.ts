@@ -144,7 +144,7 @@ describe("describePushToAccounting", () => {
   })
 
   it("refuses a document type that isn't pushable", async () => {
-    db.document = { findFirst: vi.fn().mockResolvedValue({ filename: "a.pdf", status: "reviewed", template: { code: "bank_statement" } }) }
+    db.document = { findFirst: vi.fn().mockResolvedValue({ filename: "a.pdf", status: "reviewed", template: { code: "purchase_order" } }) }
     expect(await describePushToAccounting("w1", "d1")).toEqual({ error: "document_type_not_pushable" })
   })
 
