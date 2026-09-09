@@ -1,5 +1,6 @@
 import { saveDocumentReviewAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
 import { SplitPane } from "@/components/pipeline/document-detail/split-pane"
+import { FxConversionBadge } from "@/components/documents/fx-conversion-badge"
 import { PushToAccountingCard } from "@/components/documents/push-to-accounting-card"
 import { MatchPanel } from "@/components/bank-match/match-panel"
 import { getCurrentUser } from "@/lib/auth"
@@ -163,6 +164,15 @@ export default async function DocumentPage({ params, searchParams }: {
     canPush={canPush}
     paymentStatus={paymentStatuses.get(documentId)?.paymentStatus ?? null}
     pushCard={canPush ? <PushToAccountingCard workspaceId={workspaceId} documentId={documentId} connections={connections} pushes={pushes} paymentStatus={(() => { const ps = paymentStatuses.get(documentId); return ps ? { ...ps, syncedAt: ps.syncedAt.toISOString() } : null })()} /> : null}
+    fxBadge={<FxConversionBadge
+      docCurrency={typeof data.currency_code === "string" ? data.currency_code.toUpperCase() : null}
+      docTotal={typeof data.total === "number" ? data.total : (typeof data.total === "string" ? Number(data.total) : null)}
+      baseCurrency={membership.workspace.baseCurrency}
+      baseCurrencyTotal={document.baseCurrencyTotal !== null ? Number(document.baseCurrencyTotal) : null}
+      fxRate={document.fxRate !== null ? Number(document.fxRate) : null}
+      fxRateAt={document.fxRateAt ? document.fxRateAt.toISOString().slice(0, 10) : null}
+      fxRateSource={document.fxRateSource}
+    />}
     canCreateRule={canCreateRule}
     defaultSupplier={supplier}
     rationales={rationales}

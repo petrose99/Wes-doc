@@ -28,7 +28,7 @@ export default async function PipelinePage({ params, searchParams }: {
   const { workspaceId } = await params
   const { stage: stageParam, q, flagged } = await searchParams
   const user = await getCurrentUser()
-  await requireWorkspaceRole(workspaceId, user.id)
+  const membership = await requireWorkspaceRole(workspaceId, user.id)
 
   const stage = parseStage(stageParam)
   const query = q?.trim() || ""
@@ -82,7 +82,7 @@ export default async function PipelinePage({ params, searchParams }: {
     // Every stage but Inbox shows this — a document still in Inbox hasn't been extracted yet, so
     // there's nothing to summarize. Computed for every row is cheap (pure JSON reads) and keeps
     // this map a single pass rather than a second one keyed by stage.
-    review: stage === "inbox" ? null : summarizeDocumentForReview(doc),
+    review: stage === "inbox" ? null : summarizeDocumentForReview(doc, membership.workspace.baseCurrency),
   }))
 
   // preference is read for a future column-picker refinement; the fixed column set ships first.

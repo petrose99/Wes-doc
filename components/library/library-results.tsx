@@ -64,7 +64,11 @@ export function LibraryDocumentGrid({ documents, basePath }: { documents: Librar
           </div>
           <div className="mt-auto flex items-center justify-between text-xs text-slate-400">
             <span>{formatDate(doc.receivedAt)}</span>
-            {doc.review.total && <span className="font-semibold text-slate-700">{doc.review.total}</span>}
+            <div className="flex items-center gap-1.5">
+              {doc.review.converted && <span className="text-[11px] text-slate-500">{doc.review.converted}</span>}
+              {doc.review.fxPending && <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-800"><AlertTriangle className="h-2.5 w-2.5" />FX pending</span>}
+              {doc.review.total && <span className="font-semibold text-slate-700">{doc.review.total}</span>}
+            </div>
           </div>
         </Link>
       ))}
@@ -95,6 +99,8 @@ export function LibraryDocumentList({ documents, basePath }: { documents: Librar
               <span>·</span>
               <span>{doc.review.category}</span>
               {doc.review.total && <><span>·</span><span className="font-medium text-slate-600">{doc.review.total}</span></>}
+              {doc.review.converted && <><span>·</span><span className="text-slate-500">{doc.review.converted}</span></>}
+              {doc.review.fxPending && <><span>·</span><span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-800"><AlertTriangle className="h-2.5 w-2.5" />FX pending</span></>}
               <span>·</span>
               <span>{formatDate(doc.receivedAt)}</span>
             </div>
@@ -148,6 +154,8 @@ export function LibrarySearchResults({ documents, snippets, query, degraded, bas
                 <div className="flex items-center gap-2 text-xs text-slate-400">
                   <span>{doc.review.category}</span>
                   {doc.review.total && <><span>·</span><span className="font-medium text-slate-600">{doc.review.total}</span></>}
+                  {doc.review.converted && <><span>·</span><span className="text-slate-500">{doc.review.converted}</span></>}
+                  {doc.review.fxPending && <><span>·</span><span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-800"><AlertTriangle className="h-2.5 w-2.5" />FX pending</span></>}
                   <span>·</span>
                   <span>{formatDate(doc.receivedAt)}</span>
                 </div>

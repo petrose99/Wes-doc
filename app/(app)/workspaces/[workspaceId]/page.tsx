@@ -174,7 +174,7 @@ export default async function WorkspaceHomePage({ params }: {
         {needsReview.length === 0 ? <p className="py-6 text-center text-sm text-slate-400">Nothing needs a look right now.</p> : <>
           {needsReview.slice(0, 3).map((doc) => {
             const reasons = flaggedFieldsFromConfidence(doc.confidence).slice(0, 2).map(formatFieldKey)
-            const review = summarizeDocumentForReview(doc)
+            const review = summarizeDocumentForReview(doc, membership.workspace.baseCurrency)
             return <Link key={doc.id} href={`/workspaces/${workspaceId}/documents/${doc.id}?stage=to_review`} className="flex items-center gap-2.5 border-t py-2.5 first:border-t-0 hover:text-emerald-800">
               <div className="min-w-0 flex-1">
                 <div className="truncate text-[13.5px] font-semibold text-slate-800">{review.supplier ?? "Unknown supplier"} · {review.category}{review.total ? ` · ${review.total}` : ""}</div>

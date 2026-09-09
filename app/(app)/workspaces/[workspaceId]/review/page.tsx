@@ -28,7 +28,7 @@ export default async function ReviewQueuePage({ params, searchParams }: {
   const { workspaceId } = await params
   const { status: statusParam } = await searchParams
   const user = await getCurrentUser()
-  await requireWorkspaceRole(workspaceId, user.id)
+  const membership = await requireWorkspaceRole(workspaceId, user.id)
   const capabilities = await getWorkspaceCapabilities(workspaceId)
   if (!capabilities.has("review-queue")) notFound()
 
@@ -71,7 +71,7 @@ export default async function ReviewQueuePage({ params, searchParams }: {
             minConfidence: scores.length ? Math.min(...scores) : null,
             appliedRuleName: task.document.appliedRule?.name ?? null,
             checks: task.document.checkResults.map((check) => ({ code: check.checkCode, status: check.status as "warn" | "fail", message: check.message })),
-            review: summarizeDocumentForReview(task.document),
+            review: summarizeDocumentForReview(task.document, membership.workspace.baseCurrency),
           },
           assignee: task.assignee ? { id: task.assignee.id, name: task.assignee.name } : null,
         }

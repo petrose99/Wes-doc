@@ -17,7 +17,16 @@ import { getTaxProfile } from "@/models/tax-profiles"
  * projection) and a bank statement's debit for the same payment are two independent series here —
  * this table has no reconciliation between them, which is bank-match's job, not analytics'. Cash
  * Flow Trend shows both rather than pretending they agree. Spend by Category is costs and expenses
- * only; sales/revenue is not tracked anywhere in this app yet. */
+ * only; sales/revenue is not tracked anywhere in this app yet.
+ *
+ * Currency: every totalSpend and unpaid-invoice total is summed via
+ * COALESCE(d.base_currency_total::numeric, total.value_number) so a converted document contributes
+ * its base-currency amount and a not-yet-converted one falls back to its original number — the
+ * pre-FX behaviour, at worst. hasMultipleCurrencies (below) still fires whenever the workspace has
+ * mixed extracted currencies so the UI's amber banner reads correctly. Bank flow is deliberately
+ * NOT converted here: bank statements are almost always in the account's own currency, and
+ * converting a currency that already matches the base is a no-op — cross-currency bank accounts
+ * would need their own conversion field on statement_lines, which is a separate change. */
 
 export type Sql = { text: string; params: unknown[] }
 
@@ -201,7 +210,7 @@ export function buildSpendByCategorySql(workspaceId: string, period: Period): Sq
   ]
   return {
     text: `SELECT COALESCE(NULLIF(btrim(d."coding_data"->>'account'), ''), 'Uncategorized') AS "category",
-        SUM(total."value_number") AS "totalSpend",
+        SUM(COALESCE(d."base_currency_total"::numeric, total."value_number")) AS "totalSpend",
         COUNT(DISTINCT d."id")::int AS "documentCount"
       FROM "documents" d
       JOIN "document_field_values" total ON total."document_id" = d."id" AND total."workspace_id" = ${workspaceRef}
@@ -231,7 +240,7 @@ export function buildDocumentOutflowByMonthSql(workspaceId: string, period: Peri
   ]
   return {
     text: `SELECT to_char(date_trunc('month', dt."value_date"), 'YYYY-MM') AS "month",
-        SUM(total."value_number") AS "documentOutflow"
+        SUM(COALESCE(d."base_currency_total"::numeric, total."value_number")) AS "documentOutflow"
       FROM "documents" d
       JOIN "document_field_values" total ON total."document_id" = d."id" AND total."workspace_id" = ${workspaceRef}
         AND total."field_key" = 'total' AND total."item_key" IS NULL
@@ -285,7 +294,7 @@ export function buildUnpaidInvoicesSql(workspaceId: string, limit = 500): Sql {
   const workspaceRef = `${bind(workspaceId)}::uuid`
   return {
     text: `SELECT d."id" AS "documentId", d."file_id" AS "fileId", d."filename",
-        vendor."value_text" AS "vendor", total."value_number" AS "total", due."value_date" AS "dueDate"
+        vendor."value_text" AS "vendor", COALESCE(d."base_currency_total"::numeric, total."value_number") AS "total", due."value_date" AS "dueDate"
       FROM "documents" d
       JOIN "document_field_values" total ON total."document_id" = d."id" AND total."workspace_id" = ${workspaceRef}
         AND total."field_key" = 'total' AND total."item_key" IS NULL AND total."template_code" = 'invoice'
@@ -341,7 +350,7 @@ export function buildVendorSpendSql(workspaceId: string, period: Period): Sql {
   ]
   return {
     text: `SELECT COALESCE(NULLIF(btrim(vendor."value_text"), ''), 'Unknown Vendor') AS "vendor",
-        SUM(total."value_number") AS "totalSpend",
+        SUM(COALESCE(d."base_currency_total"::numeric, total."value_number")) AS "totalSpend",
         COUNT(DISTINCT d."id")::int AS "documentCount",
         MAX(to_char(dt."value_date", 'YYYY-MM-DD')) AS "lastDocumentDate"
       FROM "documents" d

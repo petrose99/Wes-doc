@@ -504,6 +504,23 @@ model Document {
   paymentStatus       String?   @map("payment_status")
   paymentConfirmedAt  DateTime? @map("payment_confirmed_at")
   paymentConfirmedById String?  @map("payment_confirmed_by_id") @db.Uuid
+  /// FX conversion into the workspace's base currency, frozen at the time it was applied so a
+  /// later shift in the underlying feed does not silently re-price historical documents. Written
+  /// after review by lib/fx/apply-to-document.ts once total + currency_code are known:
+  ///   baseCurrencyTotal — the converted amount in the workspace base currency, rounded to that
+  ///                       currency's minor unit. Null when conversion is pending (no total yet,
+  ///                       or last fetch failed and a retry drain will re-try).
+  ///   fxRate            — rate applied, price of one unit of the document's currency in units of
+  ///                       the base. 1.0 for same-currency documents so `fxRate IS NOT NULL`
+  ///                       uniformly means "conversion done".
+  ///   fxRateAt          — the DATE the rate applies to (usually invoice/received date), not the
+  ///                       moment of fetch. A 2024 invoice processed in 2026 books at 2024's rate.
+  ///   fxRateSource      — which provider supplied it: "frankfurter" / "fastratesapi" /
+  ///                       "frankfurter+triangulated" / "identity" (same-currency shortcut).
+  baseCurrencyTotal Decimal?                 @map("base_currency_total") @db.Decimal(20, 4)
+  fxRate            Decimal?                 @map("fx_rate") @db.Decimal(20, 10)
+  fxRateAt          DateTime?                @map("fx_rate_at") @db.Date
+  fxRateSource      String?                  @map("fx_rate_source")
   createdAt         DateTime                 @default(now()) @map("created_at")
   updatedAt         DateTime                 @updatedAt @map("updated_at")
   workspace         Workspace                @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -2175,4 +2192,23 @@ model SupplierMatchLabel {
   @@unique([workspaceId, pairId])
   @@index([workspaceId, sameSupplier])
   @@map("supplier_match_labels")
+}
+
+/// Cached FX rates. Every provider publishes at most one rate per pair per business day, so this
+/// row is keyed on (base, quote, effectiveDate) — the same-day cache hit turns 200 EUR invoices
+/// from one workspace into one API call. Cross-workspace: rates aren't tenant data, one row
+/// serves everyone. `rate` is the price of 1 unit of `base` in units of `quote` (EUR/USD 1.0891 =
+/// one euro buys 1.0891 US dollars). See lib/fx/rates.ts.
+model FxRate {
+  id            String   @id @default(uuid()) @db.Uuid
+  base          String
+  quote         String
+  effectiveDate DateTime @map("effective_date") @db.Date
+  rate          Decimal  @db.Decimal(20, 10)
+  source        String
+  fetchedAt     DateTime @default(now()) @map("fetched_at")
+
+  @@unique([base, quote, effectiveDate], name: "fx_rates_base_quote_date_key")
+  @@index([effectiveDate])
+  @@map("fx_rates")
 }

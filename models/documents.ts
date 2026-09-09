@@ -8,6 +8,7 @@ import { findMissingRequiredFields, parseTemplateFields, validateDocumentValues 
 import { deleteDocumentSource, documentBlocksKey, documentStorageKey, putDocumentSource } from "@/lib/document-storage"
 import { projectDocumentFields } from "@/lib/field-projection"
 import { LOW_CONFIDENCE, PIPELINE_STAGES, stageToStatusFilter, type PipelineStage } from "@/lib/documents/stages"
+import { applyFxToDocument } from "@/lib/fx/apply-to-document"
 import { normalizeBillFromDocument } from "@/lib/integration-bill-mapping"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { unscoped } from "@/lib/workspace-scope"
@@ -413,6 +414,11 @@ export async function updateDocumentReview(input: { workspaceId: string; documen
   })
   // Human review is the key integration trigger — a reviewed document is what a connector pushes.
   if (webhookQueued) await kickWebhookDrain()
+  // FX conversion runs AFTER the review commit rather than inside it: a network fetch to
+  // Frankfurter must not extend the review transaction (or hold locks while waiting on it), and
+  // a failure here must not roll the review back — the document is reviewed either way, its
+  // conversion just moves to "pending" until a retry succeeds.
+  await applyFxToDocument(document.id).catch(() => {})
   return result
 }
 
@@ -556,14 +562,32 @@ export function flaggedFieldsFromConfidence(confidence: unknown): string[] {
   return [...new Set([...missing, ...low])]
 }
 
-export type DocumentReviewSummary = { supplier: string | null; category: string; total: string | null }
+export type DocumentReviewSummary = {
+  supplier: string | null
+  category: string
+  total: string | null
+  /** Pre-formatted converted total when the document is in a foreign currency AND its conversion
+   * has succeeded — e.g. "≈ $108" alongside the "€100" the `total` field carries. Null when the
+   * document is same-currency (nothing to convert) or when conversion is still pending (the UI
+   * shows an "FX pending" chip instead). */
+  converted: string | null
+  /** True when the document IS in a foreign currency but conversion hasn't landed yet. The
+   * library / pipeline list uses this to render the amber "FX pending" chip instead of a
+   * `converted` string. */
+  fxPending: boolean
+}
 
 /** What a reviewer needs to triage a to-review document at a glance, in place of its filename:
  * who it's from, what it's coded as, and how much. Read off the same fields the automation-rule
  * engine (SUPPLIER_FIELD_BY_TEMPLATE) and the spend-by-category analytics (codingData.account)
  * already treat as the supplier/category source of truth, so this agrees with those rather than
- * introducing a third convention. */
-export function summarizeDocumentForReview(doc: { reviewedData: unknown; codingData: unknown; template: { code: string } | null }): DocumentReviewSummary {
+ * introducing a third convention.
+ *
+ * `workspaceBaseCurrency`, when provided, gates the converted-total string: without it we can't
+ * know whether the document IS foreign-currency relative to this workspace. Callers that fetch
+ * documents in a workspace context should pass it; callers that don't (a rare cross-workspace
+ * report) get the extracted total only. */
+export function summarizeDocumentForReview(doc: { reviewedData: unknown; codingData: unknown; template: { code: string } | null; baseCurrencyTotal?: unknown }, workspaceBaseCurrency: string | null = null): DocumentReviewSummary {
   const reviewed = (doc.reviewedData as Record<string, unknown> | null) ?? {}
   const coding = (doc.codingData as Record<string, unknown> | null) ?? {}
   const templateCode = doc.template?.code ?? ""
@@ -571,8 +595,19 @@ export function summarizeDocumentForReview(doc: { reviewedData: unknown; codingD
   const supplier = supplierField ? asScalarString(reviewed[supplierField]) : null
   const category = asScalarString(coding.account) ?? asScalarString(reviewed.category) ?? "Uncategorized"
   const totalValue = reviewed.total
-  const total = typeof totalValue === "number" ? formatDocumentTotal(totalValue, asScalarString(reviewed.currency_code)) : null
-  return { supplier, category, total }
+  const docCurrency = asScalarString(reviewed.currency_code)?.toUpperCase() ?? null
+  const total = typeof totalValue === "number" ? formatDocumentTotal(totalValue, docCurrency) : null
+
+  const base = workspaceBaseCurrency ? workspaceBaseCurrency.toUpperCase() : null
+  const isForeign = Boolean(base && docCurrency && docCurrency !== base)
+  const baseTotalRaw = doc.baseCurrencyTotal
+  const baseTotal = baseTotalRaw !== null && baseTotalRaw !== undefined ? Number(baseTotalRaw) : null
+  const converted = isForeign && base && baseTotal !== null && Number.isFinite(baseTotal)
+    ? `≈ ${formatDocumentTotal(baseTotal, base)}`
+    : null
+  const fxPending = isForeign && converted === null
+
+  return { supplier, category, total, converted, fxPending }
 }
 
 function formatDocumentTotal(value: number, currencyCode: string | null): string {
