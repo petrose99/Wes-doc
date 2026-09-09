@@ -12,6 +12,7 @@ const COUNTRIES = [
   { value: "CA", label: "Canada" },
   { value: "AU", label: "Australia" },
   { value: "ZA", label: "South Africa" },
+  { value: "LS", label: "Lesotho" },
   { value: "DE", label: "Germany" },
   { value: "FR", label: "France" },
   { value: "IN", label: "India" },
