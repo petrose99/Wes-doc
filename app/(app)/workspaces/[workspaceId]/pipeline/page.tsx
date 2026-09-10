@@ -7,6 +7,7 @@ import { parseTemplateFields } from "@/lib/document-templates"
 import { PIPELINE_STAGES, parseStageAlias, type PipelineStage } from "@/lib/documents/stages"
 import { searchDocumentsByContent } from "@/lib/retrieval"
 import { activeJobDocumentIds, countDocumentsByStage, countFailedDocuments, documentIdsInStage, flaggedFieldsFromConfidence, listWorkspaceDocuments, summarizeDocumentForReview } from "@/models/documents"
+import { listLatestPushesForDocuments } from "@/models/integrations"
 import { listWorkspaceBills } from "@/models/bills"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { ensurePipelineFile, getFileTemplates } from "@/models/files"
@@ -97,6 +98,12 @@ export default async function PipelinePage({ params, searchParams }: {
     ? [...filteredByFlag].sort((a, b) => Number(b.status === "failed") - Number(a.status === "failed"))
     : filteredByFlag
   const activeJobs = stage === "inbox" ? await activeJobDocumentIds(workspaceId, filtered.map((doc) => doc.id)) : new Set<string>()
+  // Push receipt chips for Synced/Paid rows — one batched query for the visible page. Without
+  // this the row said "reviewed" for a document the ledger already had; a reviewer coming back
+  // the next day had to reopen it to see where and when the money moved.
+  const latestPushes = (stage === "synced" || stage === "paid")
+    ? await listLatestPushesForDocuments(workspaceId, filtered.map((doc) => doc.id))
+    : null
 
   const rows: PipelineDocumentRow[] = filtered.map((doc) => ({
     id: doc.id,
@@ -116,6 +123,9 @@ export default async function PipelinePage({ params, searchParams }: {
     // this map a single pass rather than a second one keyed by stage.
     review: stage === "inbox" ? null : summarizeDocumentForReview(doc, membership.workspace.baseCurrency),
     paid: doc.paymentStatus === "paid",
+    lastPush: latestPushes?.get(doc.id)
+      ? { destination: latestPushes.get(doc.id)!.destination, at: latestPushes.get(doc.id)!.at.toISOString() }
+      : null,
   }))
 
   // preference is read for a future column-picker refinement; the fixed column set ships first.

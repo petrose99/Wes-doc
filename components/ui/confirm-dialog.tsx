@@ -8,10 +8,12 @@ import { createPortal } from "react-dom"
 /** Confirmation for destructive actions. Portalled to the body so it is never clipped or
  * stacked by the panel/grid containers it is opened from. Same focus discipline as Dialog:
  * focus trapped while open (Tab cycles Cancel ⇄ Confirm), returned to the opener on close,
- * body scroll locked. Initial focus stays on the Confirm button via its autoFocus. */
-const FOCUSABLE = "button:not([disabled]), [tabindex]:not([tabindex=\"-1\"])"
+ * body scroll locked. Initial focus stays on the Confirm button via its autoFocus.
+ * FOCUSABLE matches Dialog's full selector, not just buttons — a confirm that carries an
+ * optional input (the stage-reject note) must keep that field in the tab cycle. */
+const FOCUSABLE = "a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex=\"-1\"])"
 
-export function ConfirmDialog({ open, title, description, confirmLabel = "Confirm", destructive = false, busy = false, onConfirm, onCancel }: {
+export function ConfirmDialog({ open, title, description, confirmLabel = "Confirm", destructive = false, busy = false, onConfirm, onCancel, children }: {
   open: boolean
   title: string
   description?: string
@@ -20,6 +22,10 @@ export function ConfirmDialog({ open, title, description, confirmLabel = "Confir
   busy?: boolean
   onConfirm: () => void
   onCancel: () => void
+  /** Optional extra content between the description and the button row — e.g. an optional
+   * note field. Keep it to one small control; a confirm dialog that grows a form should be a
+   * Dialog instead. */
+  children?: React.ReactNode
 }) {
   const contentRef = useRef<HTMLDivElement>(null)
   const openerRef = useRef<Element | null>(null)
@@ -66,6 +72,7 @@ export function ConfirmDialog({ open, title, description, confirmLabel = "Confir
         <div className="px-5 pb-4 pt-5">
           <h2 id={titleId} className="text-base font-semibold text-slate-900">{title}</h2>
           {description && <p id={descId} className="mt-1.5 text-sm text-slate-500">{description}</p>}
+          {children && <div className="mt-3">{children}</div>}
         </div>
         <div className="flex justify-end gap-2 border-t bg-slate-50 px-5 py-3">
           <Button type="button" variant="outline" size="sm" disabled={busy} onClick={onCancel}>Cancel</Button>

@@ -196,12 +196,13 @@ export async function startWorkflowOnReviewTaskAction(workspaceId: string, taskI
  * *current* stage rather than writing a status directly. Autopublish fires the same way, only once
  * the decision actually resolves the task as "approved" (the last stage clearing), never on an
  * intermediate stage advance. */
-export async function decideReviewTaskStageAction(workspaceId: string, taskId: string, decision: "approve" | "reject"): Promise<ActionState<null>> {
+export async function decideReviewTaskStageAction(workspaceId: string, taskId: string, decision: "approve" | "reject", note?: string): Promise<ActionState<null>> {
   const user = await getCurrentUser()
   const membership = await requireAccountingMember(workspaceId, user.id)
   if (!membership) return { success: false, error: NO_ACCESS }
+  if (note && note.length > 2_000) return { success: false, error: "Note is too long" }
   try {
-    const task = await decideReviewTaskStage({ workspaceId, taskId, decision, actorId: user.id, actorRole: membership.role === "owner" ? "owner" : "member" })
+    const task = await decideReviewTaskStage({ workspaceId, taskId, decision, actorId: user.id, actorRole: membership.role === "owner" ? "owner" : "member", note: note ?? null })
     if (task.status === "approved") await maybeConfirmAiCoding(workspaceId, task.documentId, user.id)
     await refreshDocumentReadiness({ workspaceId, documentId: task.documentId })
     if (task.status === "approved") await maybeAutopublish(workspaceId, task.documentId, user.id)

@@ -37,6 +37,10 @@ export type PipelineDocumentRow = {
    * paid — see models/documents.ts stageWhereClause), so paid rows on it carry a chip instead
    * of disappearing into the Paid tab. */
   paid: boolean
+  /** Most recent succeeded push, populated only for Synced/Paid rows — the row-level twin of the
+   * inline receipt in the review-inbox pane. Without this the row said "reviewed" for a bill
+   * the ledger already had. `at` is an ISO string so the row payload stays JSON-serialisable. */
+  lastPush: { destination: string; at: string } | null
 }
 
 /** A document matched by content rather than by name — the pipeline's own version of the Files
@@ -97,17 +101,21 @@ export function DocumentList({ workspaceId, stage, rows, contentMatches, query }
   const router = useRouter()
   const selected = [...marked]
   const selectedFileId = selected.length > 0 ? rows.find((r) => r.id === selected[0])?.fileId : undefined
-  /** Focused row index for j/k navigation on the Review tab — mirrors the /review inbox's
-   * keyboard-driven experience, which was the surface the audit named as the one the pipeline
-   * Review tab (now primary) had lost parity with. Only wired for stage="review"; on other
-   * stages the row set has no per-row action a shortcut would trigger. */
-  const [focusedIndex, setFocusedIndex] = useState<number | null>(rows.length ? 0 : null)
+  /** Focused row id (not index) for j/k navigation. Prior runs tracked by index, which meant a
+   * filter change that kept the same array length silently pointed selection at a different
+   * document — the reviewer thought j/k had moved onto row 3 and pressed Enter on the row that
+   * had *become* row 3. Tracking by id survives reorder/filter and only clears when the row
+   * itself is gone.
+   *
+   * Starts null so the first j/k moves to the first row rather than the invisible-jump-to-last
+   * that a `null → k` handler produced on default focus. */
+  const [focusedRowId, setFocusedRowId] = useState<string | null>(null)
+  const focusedIndex = focusedRowId ? rows.findIndex((row) => row.id === focusedRowId) : -1
+  // Render-time recovery: if the focused id disappears (row deleted, approved off, filtered
+  // out), clear it so the ring doesn't stay pointed at a ghost. Deliberately not an effect —
+  // React's own rule for state derived from props, and avoids a second render pass.
+  if (focusedRowId && focusedIndex === -1) setFocusedRowId(null)
   const keyboardEnabled = stage === "review"
-  // Render-time clamp: if the row set shrinks (a filter change, a bulk approve, a delete), an
-  // index that pointed past the new end would leave the focus ring invisible until j/k pressed.
-  // Snap to the first row instead. Deliberately not an effect: same rule React itself gives for
-  // "derived state that follows a prop", and avoids a second render pass.
-  if (focusedIndex !== null && focusedIndex >= rows.length) setFocusedIndex(rows.length ? 0 : null)
   useEffect(() => {
     if (!keyboardEnabled) return
     const handler = (event: KeyboardEvent) => {
@@ -122,16 +130,21 @@ export function DocumentList({ workspaceId, stage, rows, contentMatches, query }
       if (!rows.length) return
       if (event.key === "j" || event.key === "ArrowDown") {
         event.preventDefault()
-        setFocusedIndex((current) => Math.min((current ?? -1) + 1, rows.length - 1))
+        // From null-focus, j lands on the first row (not the second, which `-1 + 1` conveniently
+        // gives — but only by accident). k lands on the first too, not the last, so the initial
+        // press never causes a "why did the ring jump to the bottom?" surprise.
+        const next = focusedIndex < 0 ? 0 : Math.min(focusedIndex + 1, rows.length - 1)
+        setFocusedRowId(rows[next].id)
       } else if (event.key === "k" || event.key === "ArrowUp") {
         event.preventDefault()
-        setFocusedIndex((current) => Math.max((current ?? rows.length) - 1, 0))
+        const next = focusedIndex < 0 ? 0 : Math.max(focusedIndex - 1, 0)
+        setFocusedRowId(rows[next].id)
       } else if (event.key === " " || event.key === "x") {
         event.preventDefault()
-        if (focusedIndex !== null) markRow(focusedIndex)
+        if (focusedIndex >= 0) markRow(focusedIndex)
       } else if (event.key === "Enter") {
         event.preventDefault()
-        const row = focusedIndex !== null ? rows[focusedIndex] : null
+        const row = focusedIndex >= 0 ? rows[focusedIndex] : null
         if (row) router.push(`/workspaces/${workspaceId}/documents/${row.id}?stage=${stage}`)
       } else if (event.key === "a") {
         // Bulk-select toggle — the "select all N loaded rows" shortcut Alex was missing on both
@@ -175,7 +188,7 @@ export function DocumentList({ workspaceId, stage, rows, contentMatches, query }
 
   return <div className="flex min-h-0 flex-1 flex-col">
     <BulkActionBar workspaceId={workspaceId} stage={stage} selectedIds={selected} selectedFileId={selectedFileId} selectedRows={selectedRows} onDone={clear} />
-    {keyboardEnabled && rows.length > 0 && <div className="border-b bg-white px-6 py-1.5 text-[11px] text-slate-500">
+    {keyboardEnabled && <div className={`border-b bg-white px-6 py-1.5 text-[11px] ${rows.length > 0 ? "text-slate-500" : "text-slate-400/70"}`} aria-hidden={rows.length === 0}>
       <kbd className="rounded border border-slate-300 bg-slate-50 px-1 font-sans text-[10px] text-slate-600">j</kbd>/<kbd className="rounded border border-slate-300 bg-slate-50 px-1 font-sans text-[10px] text-slate-600">k</kbd> move
       · <kbd className="rounded border border-slate-300 bg-slate-50 px-1 font-sans text-[10px] text-slate-600">x</kbd> select
       · <kbd className="rounded border border-slate-300 bg-slate-50 px-1 font-sans text-[10px] text-slate-600">a</kbd> all
@@ -200,7 +213,7 @@ export function DocumentList({ workspaceId, stage, rows, contentMatches, query }
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, index) => <tr key={row.id} className={`${marked.has(row.id) ? "bg-emerald-50/60" : "hover:bg-slate-50 active:bg-slate-100"} ${keyboardEnabled && focusedIndex === index ? "outline outline-2 -outline-offset-2 outline-emerald-500/50" : ""}`}>
+          {rows.map((row, index) => <tr key={row.id} className={`${marked.has(row.id) ? "bg-emerald-50/60" : "hover:bg-slate-50 active:bg-slate-100"} ${keyboardEnabled && focusedIndex >= 0 && focusedIndex === index ? "outline outline-2 -outline-offset-2 outline-emerald-500/50" : ""}`}>
             <td className="border-b px-2 py-2">
               <input type="checkbox" aria-label={`Select ${row.filename}`} className="h-4 w-4 accent-emerald-600" checked={marked.has(row.id)}
                 onChange={(e) => markRow(index, e.nativeEvent)} />
@@ -235,6 +248,12 @@ export function DocumentList({ workspaceId, stage, rows, contentMatches, query }
             <td className="border-b px-3 py-2">
               <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${STATUS_BADGE[row.status] ?? "bg-slate-100 text-slate-500"}`}>{row.status.replaceAll("_", " ")}</span>
               {stage === "synced" && row.paid && <span className="ml-1.5 rounded bg-emerald-100 px-1.5 py-0.5 text-xs font-semibold text-emerald-800" title="Payment confirmed — also on the Paid tab">Paid</span>}
+              {(stage === "synced" || stage === "paid") && row.lastPush && <span
+                className="ml-1.5 inline-flex items-center gap-1 rounded bg-emerald-50 px-1.5 py-0.5 text-[11px] font-medium text-emerald-800"
+                title={`Pushed to ${row.lastPush.destination} · ${new Date(row.lastPush.at).toLocaleString()}`}>
+                <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
+                {row.lastPush.destination}
+              </span>}
             </td>
             <td className="border-b px-3 py-2 text-slate-500"><LastUpdated iso={row.receivedAt} /></td>
           </tr>)}

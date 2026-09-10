@@ -88,6 +88,10 @@ export function ReviewInbox({ workspaceId, tasks, currentStatus, members }: {
    * the same ConfirmDialog treatment a delete does. Reject on a workflow stage gets the same
    * guard ("stage-reject") since it kills the bill's approval run. */
   const [confirming, setConfirming] = useState<"approved" | "rejected" | "stage-reject" | null>(null)
+  /** Optional reason typed into the stage-reject dialog. Collected right in the confirm — the
+   * earlier copy sent people off to "add a note on the document", a multi-click detour nobody
+   * took. Cleared whenever the dialog closes so a stale note never rides along on the next reject. */
+  const [rejectNote, setRejectNote] = useState("")
   const detailTaskIdRef = useRef<string | null>(null)
 
   // Adjusted during render (React's own recommended pattern for "reset derived state when a prop
@@ -159,12 +163,12 @@ export function ReviewInbox({ workspaceId, tasks, currentStatus, members }: {
     }
   }, [workspaceId, router])
 
-  const decideStage = useCallback(async (taskId: string, decision: "approve" | "reject") => {
+  const decideStage = useCallback(async (taskId: string, decision: "approve" | "reject", note?: string) => {
     setPending(true)
     try {
-      const result = await decideReviewTaskStageAction(workspaceId, taskId, decision)
+      const result = await decideReviewTaskStageAction(workspaceId, taskId, decision, note)
       if (!result.success) { toast.error(result.error || "Could not record that decision"); return }
-      toast.success(decision === "approve" ? "Stage approved" : "Rejected")
+      toast.success(decision === "approve" ? "Stage approved" : note ? "Rejected — note recorded" : "Rejected")
       await refetchDetail(taskId)
       router.refresh()
     } catch {
@@ -350,10 +354,24 @@ export function ReviewInbox({ workspaceId, tasks, currentStatus, members }: {
         destructive
         busy={pending}
         title="Reject this stage?"
-        description="The document is marked rejected at this stage of its approval workflow, and its run ends. Add a note on the document itself if you want to explain why."
+        description="The document is marked rejected at this stage of its approval workflow, and its run ends."
         confirmLabel="Reject"
-        onConfirm={() => { const taskId = effectiveSelectedId; setConfirming(null); if (taskId) void decideStage(taskId, "reject") }}
-        onCancel={() => setConfirming(null)} />
+        onConfirm={() => {
+          const taskId = effectiveSelectedId
+          const note = rejectNote.trim()
+          setConfirming(null)
+          setRejectNote("")
+          if (taskId) void decideStage(taskId, "reject", note || undefined)
+        }}
+        onCancel={() => { setConfirming(null); setRejectNote("") }}>
+        <textarea
+          value={rejectNote}
+          onChange={(event) => setRejectNote(event.target.value)}
+          rows={2}
+          maxLength={2000}
+          placeholder="Why? (optional — recorded in the document's activity)"
+          className="w-full rounded-md border px-2.5 py-1.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-600" />
+      </ConfirmDialog>
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr className="border-b text-left text-slate-500">

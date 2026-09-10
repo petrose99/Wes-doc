@@ -270,6 +270,28 @@ export async function deleteWorkspaceIntegrationConnection(workspaceId: string, 
 
 // --- Accounting pushes ---
 
+/** Latest succeeded push per document, batched — for the Synced/Paid tab chips that name the
+ * destination and time without a per-row round trip. Keyed by documentId so the pipeline page
+ * can merge it into row objects in one pass. Empty input short-circuits so the caller can guard
+ * with a stage check without also having to check `documentIds.length`. */
+export async function listLatestPushesForDocuments(workspaceId: string, documentIds: string[]) {
+  if (!documentIds.length) return new Map<string, { destination: string; at: Date }>()
+  const pushes = await prisma.integrationPush.findMany({
+    where: { workspaceId, documentId: { in: documentIds }, status: "succeeded" },
+    orderBy: { completedAt: "desc" },
+    select: { documentId: true, completedAt: true, provider: true, connection: { select: { tenantName: true, provider: true } } },
+  })
+  const latest = new Map<string, { destination: string; at: Date }>()
+  for (const push of pushes) {
+    if (!push.completedAt || latest.has(push.documentId)) continue
+    latest.set(push.documentId, {
+      destination: push.connection?.tenantName || push.connection?.provider || push.provider,
+      at: push.completedAt,
+    })
+  }
+  return latest
+}
+
 export async function listWorkspaceIntegrationPushes(workspaceId: string, documentId?: string) {
   return prisma.integrationPush.findMany({
     where: { workspaceId, ...(documentId ? { documentId } : {}) },
