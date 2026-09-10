@@ -5,7 +5,14 @@ import { auditEventData, getRequestAuditContext } from "@/lib/audit"
 import { prisma } from "@/lib/db"
 import { cache } from "react"
 
-export type WorkflowStageDraft = { name: string; requireOwner?: boolean }
+export type WorkflowStageDraft = {
+  name: string
+  requireOwner?: boolean
+  /** WP-AP2: named approvers for this stage; empty = role-only gating (unchanged historic behavior). */
+  approverIds?: string[]
+  /** WP-AP2: amount threshold; null/undefined = the stage applies at every amount. */
+  minAmount?: number | null
+}
 
 /** Creates a workflow and its stages in one transaction. Stage order is the array's own order —
  * `stageIndex` is assigned 0, 1, 2... from `stages`, there is no separate reordering input. A
@@ -18,7 +25,7 @@ export async function createApprovalWorkflow(input: { workspaceId: string; name:
       workspaceId: input.workspaceId,
       name: input.name,
       createdById: input.createdById,
-      stages: { create: input.stages.map((stage, stageIndex) => ({ workspaceId: input.workspaceId, stageIndex, name: stage.name, requireOwner: stage.requireOwner ?? false })) },
+      stages: { create: input.stages.map((stage, stageIndex) => ({ workspaceId: input.workspaceId, stageIndex, name: stage.name, requireOwner: stage.requireOwner ?? false, approverIds: stage.approverIds ?? [], minAmount: stage.minAmount ?? null })) },
     },
     include: { stages: { orderBy: { stageIndex: "asc" } } },
   })
@@ -61,7 +68,7 @@ export async function replaceApprovalWorkflowStages(input: { workspaceId: string
   if (!workflow) throw new Error("approval_workflow_not_found")
   await prisma.$transaction([
     prisma.approvalWorkflowStage.deleteMany({ where: { workflowId: workflow.id, workspaceId: input.workspaceId } }),
-    prisma.approvalWorkflowStage.createMany({ data: input.stages.map((stage, stageIndex) => ({ workflowId: workflow.id, workspaceId: input.workspaceId, stageIndex, name: stage.name, requireOwner: stage.requireOwner ?? false })) }),
+    prisma.approvalWorkflowStage.createMany({ data: input.stages.map((stage, stageIndex) => ({ workflowId: workflow.id, workspaceId: input.workspaceId, stageIndex, name: stage.name, requireOwner: stage.requireOwner ?? false, approverIds: stage.approverIds ?? [], minAmount: stage.minAmount ?? null })) }),
   ])
   return getApprovalWorkflow(input.workspaceId, workflow.id)
 }

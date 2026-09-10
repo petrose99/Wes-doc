@@ -175,7 +175,7 @@ export async function decideReviewTaskStage(input: { workspaceId: string; taskId
 
   const currentStage = findCurrentStage(task.workflow.stages, task.currentStageIndex)
   if (!currentStage) throw new Error("workflow_stage_not_found")
-  if (!canDecideStage({ stage: currentStage, actorRole: input.actorRole })) throw new Error("stage_requires_owner")
+  if (!canDecideStage({ stage: currentStage, actorRole: input.actorRole, actorId: input.actorId })) throw new Error("stage_requires_owner")
 
   const result = decideStage({ stages: task.workflow.stages, currentStageIndex: task.currentStageIndex, decision: input.decision })
   // The workflow's last stage clearing is the only way this reaches "approved" — an intermediate

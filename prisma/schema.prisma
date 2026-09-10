@@ -1419,6 +1419,15 @@ model ApprovalWorkflowStage {
   /// When true, only a workspace "owner" (not a plain "member") can approve this stage — see
   /// models/workspaces.ts's WorkspaceRole. False means any workspace member can.
   requireOwner Boolean @default(false) @map("require_owner")
+  /// WP-AP2: per-stage named approvers. When non-empty, the stage can only be decided by one of
+  /// these users (rather than by "any member" or "any owner"). Empty keeps the historic role-only
+  /// behavior. The engine's canDecideStage honors both — see lib/approvals/engine.ts.
+  approverIds String[] @default([]) @map("approver_ids") @db.Uuid
+  /// WP-AP2: amount threshold. When non-null, a bill under this amount SKIPS the stage — a
+  /// caller building the stage list for one document should call applicableStages() to filter.
+  /// Money-typed for the same reason ExpenseClaim.total is: chained Float arithmetic drifts and
+  /// this is compared against ledger amounts. Null = the stage applies at every amount.
+  minAmount   Decimal? @map("min_amount") @db.Decimal(18, 2)
   createdAt   DateTime @default(now()) @map("created_at")
   workflow    ApprovalWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)

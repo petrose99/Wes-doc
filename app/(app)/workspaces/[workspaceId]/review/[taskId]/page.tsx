@@ -40,9 +40,9 @@ export default async function ReviewTaskDetailPage({ params }: { params: Promise
     ? (await listApprovalWorkflows(workspaceId, { activeOnly: true })).map((wf) => ({ id: wf.id, name: wf.name, stageCount: wf.stages.length }))
     : []
   const workflow = task.workflow && task.currentStageIndex !== null ? (() => {
-    const stages = task.workflow!.stages.map((stage) => ({ stageIndex: stage.stageIndex, name: stage.name, requireOwner: stage.requireOwner }))
+    const stages = task.workflow!.stages.map((stage) => ({ stageIndex: stage.stageIndex, name: stage.name, requireOwner: stage.requireOwner, approverIds: stage.approverIds ?? [], minAmount: stage.minAmount !== null && stage.minAmount !== undefined ? Number(stage.minAmount) : null }))
     const currentStage = findCurrentStage(stages, task.currentStageIndex!)
-    return { id: task.workflow!.id, name: task.workflow!.name, currentStageIndex: task.currentStageIndex!, stages, canDecideCurrentStage: currentStage ? canDecideStage({ stage: currentStage, actorRole: membership.role === "owner" ? "owner" : "member" }) : false }
+    return { id: task.workflow!.id, name: task.workflow!.name, currentStageIndex: task.currentStageIndex!, stages, canDecideCurrentStage: currentStage ? canDecideStage({ stage: currentStage, actorRole: membership.role === "owner" ? "owner" : "member", actorId: user.id }) : false }
   })() : null
 
   return <main className="mx-auto grid w-full max-w-6xl gap-6 p-6 lg:grid-cols-[1.2fr_0.8fr]">

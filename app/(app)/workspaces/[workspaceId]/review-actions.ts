@@ -123,11 +123,11 @@ export async function getReviewTaskDetailAction(workspaceId: string, taskId: str
   // the four-button status control unchanged. canDecideCurrentStage folds in the actor's own role
   // so the client never has to re-derive the "owner" gate itself.
   const workflow = task.workflow && task.currentStageIndex !== null ? (() => {
-    const stages = task.workflow!.stages.map((stage) => ({ stageIndex: stage.stageIndex, name: stage.name, requireOwner: stage.requireOwner }))
+    const stages = task.workflow!.stages.map((stage) => ({ stageIndex: stage.stageIndex, name: stage.name, requireOwner: stage.requireOwner, approverIds: stage.approverIds ?? [], minAmount: stage.minAmount !== null && stage.minAmount !== undefined ? Number(stage.minAmount) : null }))
     const currentStage = findCurrentStage(stages, task.currentStageIndex!)
     return {
       id: task.workflow!.id, name: task.workflow!.name, stages, currentStageIndex: task.currentStageIndex!,
-      canDecideCurrentStage: currentStage ? canDecideStage({ stage: currentStage, actorRole: membership.role === "owner" ? "owner" : "member" }) : false,
+      canDecideCurrentStage: currentStage ? canDecideStage({ stage: currentStage, actorRole: membership.role === "owner" ? "owner" : "member", actorId: user.id }) : false,
     }
   })() : null
 

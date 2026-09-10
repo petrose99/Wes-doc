@@ -33,8 +33,8 @@ describe("createApprovalWorkflow", () => {
       data: expect.objectContaining({
         workspaceId: "w1", name: "Two-step",
         stages: { create: [
-          { workspaceId: "w1", stageIndex: 0, name: "First pass", requireOwner: false },
-          { workspaceId: "w1", stageIndex: 1, name: "Owner sign-off", requireOwner: true },
+          { workspaceId: "w1", stageIndex: 0, name: "First pass", requireOwner: false, approverIds: [], minAmount: null },
+          { workspaceId: "w1", stageIndex: 1, name: "Owner sign-off", requireOwner: true, approverIds: [], minAmount: null },
         ] },
       }),
     }))
@@ -66,7 +66,7 @@ describe("replaceApprovalWorkflowStages", () => {
     await replaceApprovalWorkflowStages({ workspaceId: "w1", workflowId: "wf1", stages: [{ name: "Only stage" }] })
 
     expect(db.approvalWorkflowStage.deleteMany).toHaveBeenCalledWith({ where: { workflowId: "wf1", workspaceId: "w1" } })
-    expect(db.approvalWorkflowStage.createMany).toHaveBeenCalledWith({ data: [{ workflowId: "wf1", workspaceId: "w1", stageIndex: 0, name: "Only stage", requireOwner: false }] })
+    expect(db.approvalWorkflowStage.createMany).toHaveBeenCalledWith({ data: [{ workflowId: "wf1", workspaceId: "w1", stageIndex: 0, name: "Only stage", requireOwner: false, approverIds: [], minAmount: null }] })
   })
 })
 

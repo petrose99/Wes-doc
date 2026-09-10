@@ -192,7 +192,7 @@ export async function decideExpenseClaimStage(input: { workspaceId: string; clai
 
   const currentStage = findCurrentStage(claim.workflow.stages, claim.currentStageIndex)
   if (!currentStage) throw new Error("workflow_stage_not_found")
-  if (!canDecideStage({ stage: currentStage, actorRole: input.actorRole })) throw new Error("stage_requires_owner")
+  if (!canDecideStage({ stage: currentStage, actorRole: input.actorRole, actorId: input.actorId })) throw new Error("stage_requires_owner")
 
   const result = decideStage({ stages: claim.workflow.stages, currentStageIndex: claim.currentStageIndex, decision: input.decision })
   const nextStatus = result.outcome === "advance" ? "submitted" : result.outcome
