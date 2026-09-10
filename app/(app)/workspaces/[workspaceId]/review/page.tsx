@@ -1,7 +1,6 @@
-import { AutomationTabs } from "@/components/automation/automation-tabs"
 import { ReviewInbox } from "@/components/workspace/review-inbox"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
-import { countOpenReviewTasks, listReviewTasks, parseReviewTaskStatus, type ReviewTaskStatus } from "@/models/review-tasks"
+import { listReviewTasks, parseReviewTaskStatus, type ReviewTaskStatus } from "@/models/review-tasks"
 import { summarizeDocumentForReview } from "@/models/documents"
 import { getWorkspaceMembers, requireWorkspaceRole } from "@/models/workspaces"
 import { getCurrentUser } from "@/lib/auth"
@@ -33,18 +32,21 @@ export default async function ReviewQueuePage({ params, searchParams }: {
   if (!capabilities.has("review-queue")) notFound()
 
   const status = statusParam && statusParam !== "all" ? parseReviewTaskStatus(statusParam) ?? undefined : undefined
-  const [tasks, members, reviewCount] = await Promise.all([
+  const [tasks, members] = await Promise.all([
     listReviewTasks(workspaceId, status ? { status } : {}),
     getWorkspaceMembers(workspaceId),
-    countOpenReviewTasks(workspaceId),
   ])
 
   return <main className="mx-auto w-full max-w-6xl space-y-6 p-6">
-    <header>
-      <h1 className="text-2xl font-bold text-slate-900">Automation</h1>
-      <p className="mt-1 text-sm text-slate-500">Documents that need a person to look at them before they&apos;re trusted.</p>
+    <header className="flex flex-wrap items-end justify-between gap-3">
+      <div>
+        <h1 className="text-2xl font-bold text-slate-900">Documents — Review queue</h1>
+        <p className="mt-1 text-sm text-slate-500">Documents that need a person to look at them before they&apos;re trusted. Part of the Review stage of your document lifecycle.</p>
+      </div>
+      <Link href={`/workspaces/${workspaceId}/pipeline?stage=review`} className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900">
+        ← Back to Documents
+      </Link>
     </header>
-    <AutomationTabs workspaceId={workspaceId} active="review" reviewCount={reviewCount} reviewEnabled />
 
     <nav className="flex gap-1 border-b">
       {STATUS_TABS.map((tab) => {

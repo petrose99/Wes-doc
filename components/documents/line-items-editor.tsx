@@ -85,7 +85,7 @@ export function LineItemsEditor({ fieldKey, itemFields, initialRows, provenanceI
                   </button>
                 )}
                 <button type="button" aria-label="Remove row" title="Remove row" disabled={rows.length <= 1}
-                  className="rounded p-1 text-slate-300 hover:bg-red-50 hover:text-red-600 disabled:pointer-events-none disabled:opacity-0"
+                  className="rounded p-1 text-slate-500 hover:bg-red-50 hover:text-red-700 disabled:pointer-events-none disabled:opacity-0"
                   onClick={() => removeRow(row.id)}>
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>

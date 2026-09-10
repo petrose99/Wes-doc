@@ -189,7 +189,7 @@ export async function updateReviewTaskStatus(input: { workspaceId: string; taskI
  * keeps status "in_review" until the last stage clears. Throws review_task_has_no_workflow for a
  * plain task; callers (WP3.2's actions layer) are expected to branch on task.workflowId and call
  * updateReviewTaskStatus for the plain case instead of routing everything through here. */
-export async function decideReviewTaskStage(input: { workspaceId: string; taskId: string; decision: "approve" | "reject"; actorId: string; actorRole: "owner" | "member" }) {
+export async function decideReviewTaskStage(input: { workspaceId: string; taskId: string; decision: "approve" | "reject"; actorId: string; actorRole: "owner" | "member"; note?: string | null }) {
   const task = await prisma.reviewTask.findFirst({
     where: { id: input.taskId, workspaceId: input.workspaceId },
     include: {
@@ -212,10 +212,15 @@ export async function decideReviewTaskStage(input: { workspaceId: string; taskId
   const nextStageIndex = result.outcome === "advance" ? result.nextStageIndex : task.currentStageIndex
   const resolvedAt = result.outcome === "advance" ? null : new Date()
 
+  // A reject can carry the decider's note. It lands in two places: the audit event (the durable
+  // "who/why" trail the activity page reads) and, when the task has no detail yet, the task's own
+  // detail — so the queue row explains itself without a click. Never overwrites an existing
+  // detail: that text says why the task was raised, which the note doesn't replace.
+  const note = input.note?.trim() || null
   const context = await getRequestAuditContext()
   const [updated] = await prisma.$transaction([
-    prisma.reviewTask.update({ where: { id: task.id }, data: { status: nextStatus, currentStageIndex: nextStageIndex, resolvedAt } }),
-    prisma.documentAuditEvent.create({ data: auditEventData({ workspaceId: input.workspaceId, documentId: task.documentId, actorId: input.actorId, type: "review_task_stage_decided", detail: { stageIndex: currentStage.stageIndex, stageName: currentStage.name, decision: input.decision, outcome: result.outcome } }, context) }),
+    prisma.reviewTask.update({ where: { id: task.id }, data: { status: nextStatus, currentStageIndex: nextStageIndex, resolvedAt, ...(note && !task.detail ? { detail: note } : {}) } }),
+    prisma.documentAuditEvent.create({ data: auditEventData({ workspaceId: input.workspaceId, documentId: task.documentId, actorId: input.actorId, type: "review_task_stage_decided", detail: { stageIndex: currentStage.stageIndex, stageName: currentStage.name, decision: input.decision, outcome: result.outcome, ...(note ? { note } : {}) } }, context) }),
   ])
   return updated
 }

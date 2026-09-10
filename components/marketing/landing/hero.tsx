@@ -2,12 +2,12 @@ import { BiteMark } from "@/components/marketing/logo"
 import { BarChart3, Landmark, Library, ListChecks, Table2, Zap } from "lucide-react"
 import Link from "next/link"
 
-const rows: { doc: string; supplier: string; total: string; status: "ready" | "review" | "dupe" }[] = [
-  { doc: "INV-4471.pdf", supplier: "Northwind Trading", total: "£2,475.60", status: "ready" },
-  { doc: "scan_0043.jpg", supplier: "Bell & Sons Hardware", total: "£86.40", status: "ready" },
+const rows: { doc: string; supplier: string; total: string; status: "approved" | "review" | "dupe" }[] = [
+  { doc: "INV-4471.pdf", supplier: "Northwind Trading", total: "£2,475.60", status: "approved" },
+  { doc: "scan_0043.jpg", supplier: "Bell & Sons Hardware", total: "£86.40", status: "approved" },
   { doc: "receipt-cafe.heic", supplier: "Provisions Co.", total: "£19.20", status: "review" },
   { doc: "INV-4471 (1).pdf", supplier: "Northwind Trading", total: "£2,475.60", status: "dupe" },
-  { doc: "statement-feb.pdf", supplier: "Metro Bank", total: "—", status: "ready" },
+  { doc: "statement-feb.pdf", supplier: "Metro Bank", total: "—", status: "approved" },
 ]
 
 /** The rail the app actually renders (components/shell/sidebar.tsx): same labels, same order, same
@@ -15,7 +15,7 @@ const rows: { doc: string; supplier: string; total: string; status: "ready" | "r
  * the work happens, not a full chrome trace. */
 const NAV: { label: string; icon: typeof BarChart3; active?: boolean; badge?: string }[] = [
   { label: "Dashboard", icon: BarChart3 },
-  { label: "Extraction", icon: ListChecks, active: true, badge: "7" },
+  { label: "Documents", icon: ListChecks, active: true, badge: "7" },
   { label: "Sheets", icon: Table2 },
   { label: "Docu Library", icon: Library },
   { label: "Accounting", icon: Landmark },
@@ -23,7 +23,7 @@ const NAV: { label: string; icon: typeof BarChart3; active?: boolean; badge?: st
 ]
 
 const statusStyle: Record<string, string> = {
-  ready: "bg-emerald-50 text-emerald-700",
+  approved: "bg-emerald-50 text-emerald-700",
   review: "bg-indigo-50 text-indigo-700",
   dupe: "bg-red-50 text-red-700",
 }
@@ -102,9 +102,11 @@ export function Hero() {
               </div>
               <div className="relative min-w-0 flex-1 basis-[300px] overflow-hidden bg-white p-3.5 pb-3.5">
                 <div className="mb-2.5 flex flex-wrap gap-1.5">
-                  <span className="rounded-full bg-emerald-800 px-2.5 py-1 text-[0.68rem] font-semibold text-white">To review · 7</span>
                   <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[0.68rem] font-semibold text-slate-600">Inbox · 12</span>
-                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[0.68rem] font-semibold text-slate-600">Ready · 23</span>
+                  <span className="rounded-full bg-emerald-800 px-2.5 py-1 text-[0.68rem] font-semibold text-white">Review · 7</span>
+                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[0.68rem] font-semibold text-slate-600">Approved · 23</span>
+                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[0.68rem] font-semibold text-slate-600">Synced · 18</span>
+                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[0.68rem] font-semibold text-slate-600">Paid · 14</span>
                 </div>
                 <div className="grid grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_82px_70px] gap-2 border-b border-slate-100 px-2 pb-1.5 text-[0.63rem] font-bold uppercase tracking-wide text-slate-400">
                   <span>Document</span><span>Supplier</span><span className="text-right">Total</span><span className="text-right">Status</span>

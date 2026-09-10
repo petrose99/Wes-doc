@@ -68,7 +68,16 @@ export async function getApiUser(): Promise<User | null> {
 export async function getViewerUser(): Promise<User | null> {
   const session = await getSession()
   if (!session?.user) return null
-  const user = await resolveOrProvisionUser({ supabaseUserId: session.user.id, email: session.user.email, name: session.user.name })
+  let user: User
+  try {
+    user = await resolveOrProvisionUser({ supabaseUserId: session.user.id, email: session.user.email, name: session.user.name })
+  } catch (error) {
+    // A byEmail row already carrying a different supabaseUserId — two Supabase identities claiming
+    // one local account. Nothing the viewer can do in-app; land them on a designed screen with
+    // sign-out and support actions instead of the global-error crash page.
+    if ((error as Error | null)?.message === "email_already_linked_to_different_identity") redirect("/account-conflict")
+    throw error
+  }
   if (!user || user.suspendedAt) return null
   return user
 }

@@ -113,7 +113,8 @@ export function ShareDialog({ workspaceId, fileId, fileName, open, onClose }: {
           <section className="space-y-3 px-5 py-4">
             <h3 className="text-sm font-semibold text-slate-900">People with access</h3>
             <div className="flex gap-2">
-              <input className={inputClass} type="email" placeholder="Add people by email" value={email} onChange={(event) => setEmail(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void invite() } }} />
+              <label htmlFor="share-invite-email" className="sr-only">Add people by email</label>
+              <input id="share-invite-email" className={inputClass} type="email" placeholder="Add people by email" value={email} onChange={(event) => setEmail(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void invite() } }} />
               <select aria-label="Access for the invited person" className="shrink-0 rounded-md border border-slate-300 px-2 py-1.5 text-sm" value={inviteAccess} onChange={(event) => setInviteAccess(event.target.value)}>
                 {PERSON_ACCESS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
@@ -131,7 +132,7 @@ export function ShareDialog({ workspaceId, fileId, fileName, open, onClose }: {
                 <select aria-label={`Access for ${person.email}`} className="shrink-0 rounded border border-slate-200 px-1.5 py-1 text-xs" value={person.access} onChange={(event) => void changePersonAccess(person.email, event.target.value)}>
                   {PERSON_ACCESS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>
-                <button type="button" className="shrink-0 rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600" title={`Remove ${person.email}`} onClick={() => void remove(person.email)}><Trash2 className="h-3.5 w-3.5" /></button>
+                <button type="button" className="shrink-0 rounded p-1 text-slate-500 hover:bg-red-50 hover:text-red-700" title={`Remove ${person.email}`} onClick={() => void remove(person.email)}><Trash2 className="h-3.5 w-3.5" /></button>
               </li>)}
             </ul>
           </section>

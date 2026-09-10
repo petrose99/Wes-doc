@@ -1,7 +1,7 @@
 import config from "@/lib/config"
 import { parseSearchInput, fuseSearchResults, type SearchResultItem } from "@/lib/global-search"
 import { searchDocumentChunks, findMatchingDocuments, searchDocumentsByContent } from "@/lib/retrieval"
-import { documentIdsInStage, listWorkspaceDocuments, type LibraryListFilters } from "@/models/documents"
+import { documentIdsInLibrary, listWorkspaceDocuments, type LibraryListFilters } from "@/models/documents"
 
 export type LibraryScope = "smart" | "content" | "filename" | "supplier" | "category"
 
@@ -72,7 +72,7 @@ export async function runLibrarySearch(workspaceId: string, q: string, scope: Li
           ids.push(hit.documentId)
         }
       }
-      const readyIds = await documentIdsInStage(workspaceId, ids, "ready")
+      const readyIds = await documentIdsInLibrary(workspaceId, ids)
       const filteredIds = ids.filter((id) => readyIds.has(id))
       return { kind: "ranked", orderedIds: filteredIds, snippets: snippetMap, degraded: false }
     }
@@ -85,12 +85,12 @@ export async function runLibrarySearch(workspaceId: string, q: string, scope: Li
       const allIds = docItems.map((item) => item.documentId)
 
       if (degraded && !allIds.length) {
-        const fallback = await listWorkspaceDocuments(workspaceId, { stage: "ready", query: q })
+        const fallback = await listWorkspaceDocuments(workspaceId, { stage: "approved", query: q })
         const snippetMap = new Map<string, { text: string; page: number | null }>()
         return { kind: "ranked", orderedIds: fallback.map((d) => d.id), snippets: snippetMap, degraded: true }
       }
 
-      const readyIds = await documentIdsInStage(workspaceId, allIds, "ready")
+      const readyIds = await documentIdsInLibrary(workspaceId, allIds)
       const filteredIds = allIds.filter((id) => readyIds.has(id))
 
       const snippetMap = new Map<string, { text: string; page: number | null }>()

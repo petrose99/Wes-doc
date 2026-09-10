@@ -1,13 +1,16 @@
 "use client"
 
 import {
-  archiveDocumentsAction, deletePipelineDocumentsAction,
-  mergeDocumentsAction,
+  deletePipelineDocumentsAction,
+  mergeDocumentsAction, moveDocumentsToStageAction,
+  sendDocumentsBackToReviewAction,
 } from "@/app/(app)/workspaces/[workspaceId]/pipeline-actions"
 import { reextractAdaptivelyAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
+import { Button } from "@/components/ui/button"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
+import { Dialog } from "@/components/ui/dialog"
 import type { PipelineStage } from "@/lib/documents/stages"
-import { Archive, Combine, Loader2, Sparkles, Table2, Trash2 } from "lucide-react"
+import { CheckCircle2, Combine, Loader2, Sparkles, Table2, Trash2 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
@@ -20,6 +23,10 @@ export function BulkActionBar({ workspaceId, stage, selectedIds, selectedFileId,
   const router = useRouter()
   const [busy, setBusy] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  /** Guard the bulk Approve: approving N invoices at the Review stage authorises downstream
+   * sync/payment, and the previous one-click path had neither confirm nor undo. The dialog reuses
+   * ConfirmDialog (same focus trap, Esc, opener-restore, alertdialog semantics as Delete). */
+  const [confirmingApprove, setConfirmingApprove] = useState(false)
   const [showSheetChoice, setShowSheetChoice] = useState(false)
 
   const sheetsHref = selectedFileId ? `/workspaces/${workspaceId}/files/${selectedFileId}/sheet?docs=${selectedIds.join(",")}` : null
@@ -62,44 +69,80 @@ export function BulkActionBar({ workspaceId, stage, selectedIds, selectedFileId,
     }
   }
 
+  /** Bulk Approve with an honest outcome: a document that still fails validation (missing
+   * required fields, no document type) stays on Review, and the toast says so rather than
+   * claiming a success the tab counts immediately contradict. Successful moves are undoable
+   * via sendDocumentsBackToReviewAction — the pipeline counterpart to the review-inbox undo. */
+  const approve = async () => {
+    setBusy(true)
+    try {
+      const result = await moveDocumentsToStageAction(workspaceId, selectedIds, "approved")
+      if (!result.success) { toast.error(result.error || "Approve failed"); return }
+      const approved = result.data?.approved ?? 0
+      const heldBack = result.data?.heldBack ?? 0
+      const approvedIds = result.data?.approvedIds ?? []
+      const undoAction = approvedIds.length ? {
+        action: {
+          label: "Undo",
+          onClick: () => {
+            void sendDocumentsBackToReviewAction(workspaceId, approvedIds).then((revert) => {
+              if (!revert.success) { toast.error(revert.error || "Could not undo the approve"); return }
+              toast.success(`Sent ${revert.data?.updated ?? approvedIds.length} back to Review`)
+              router.refresh()
+            })
+          },
+        },
+      } : undefined
+      if (approved > 0 && heldBack === 0) toast.success(`Approved ${approved}`, undoAction)
+      else if (approved > 0) toast.warning(`Approved ${approved} — ${heldBack} held back (missing required fields or document type)`, undoAction)
+      else toast.warning(`Nothing approved — ${heldBack} still missing required fields or a document type. Open the document to fill them in.`)
+      onDone()
+      router.refresh()
+    } catch {
+      toast.error("Could not reach the server")
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const none = selectedIds.length === 0
   const dis = busy || none
 
   return <div className="flex flex-wrap items-center gap-2 border-b bg-slate-50 px-6 py-2.5 text-sm">
     {!none && <span className="font-medium text-slate-700">{selectedIds.length} selected</span>}
 
-    {stage === "ready" && <>
-      <button type="button" disabled={dis} className="inline-flex items-center gap-1.5 rounded-md border bg-white px-2.5 py-1 font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
-        onClick={() => run("Stored to Docu Library", () => archiveDocumentsAction(workspaceId, selectedIds, true))}>
-        <Archive className="h-3.5 w-3.5" />Store to Library
-      </button>
+    {stage === "review" && <Button type="button" size="sm" disabled={dis} onClick={() => setConfirmingApprove(true)}>
+      <CheckCircle2 className="h-3.5 w-3.5" />Approve
+    </Button>}
 
+    {stage === "approved" && <>
       {!none && sheetsHref ? (selectedIds.length === 1
-        ? <Link href={sheetsHref} className="inline-flex items-center gap-1.5 rounded-md border bg-white px-2.5 py-1 font-medium text-slate-700 hover:bg-slate-50">
+        ? <Button asChild size="sm" variant="outline">
+            <Link href={sheetsHref}><Table2 className="h-3.5 w-3.5" />Open in Sheets</Link>
+          </Button>
+        : <Button type="button" size="sm" variant="outline" onClick={() => setShowSheetChoice(true)}>
             <Table2 className="h-3.5 w-3.5" />Open in Sheets
-          </Link>
-        : <button type="button" className="inline-flex items-center gap-1.5 rounded-md border bg-white px-2.5 py-1 font-medium text-slate-700 hover:bg-slate-50" onClick={() => setShowSheetChoice(true)}>
-            <Table2 className="h-3.5 w-3.5" />Open in Sheets
-          </button>
-      ) : <span className="inline-flex items-center gap-1.5 rounded-md border bg-white px-2.5 py-1 font-medium text-slate-400 opacity-50">
+          </Button>
+      ) : <Button type="button" size="sm" variant="outline" disabled aria-disabled="true">
         <Table2 className="h-3.5 w-3.5" />Open in Sheets
-      </span>}
+      </Button>}
 
-      {selectedIds.length === 2 && <button type="button" disabled={dis} className="inline-flex items-center gap-1.5 rounded-md border bg-white px-2.5 py-1 font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+      {selectedIds.length === 2 && <Button type="button" size="sm" variant="outline" disabled={dis}
         onClick={() => run("Merged", () => mergeDocumentsAction(workspaceId, selectedIds))}>
         <Combine className="h-3.5 w-3.5" />Merge
-      </button>}
+      </Button>}
     </>}
 
-    <button type="button" disabled={dis || selectedRows.length === 0} title="Re-extract with adaptive line-item discovery — for a document whose line items came out empty or wrong under its worksheet's fixed columns"
-      className="inline-flex items-center gap-1.5 rounded-md border bg-white px-2.5 py-1 font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+    <Button type="button" size="sm" variant="outline" disabled={dis || selectedRows.length === 0}
+      title="Re-extract with adaptive line-item discovery — for a document whose line items came out empty or wrong under its worksheet's fixed columns"
       onClick={() => void reextract()}>
       {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}Re-extract
-    </button>
+    </Button>
 
-    <button type="button" disabled={dis} className="inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-white px-2.5 py-1 font-medium text-red-600 hover:bg-red-50 disabled:opacity-50" onClick={() => setConfirmingDelete(true)}>
+    <Button type="button" size="sm" variant="destructive" disabled={dis}
+      onClick={() => setConfirmingDelete(true)}>
       <Trash2 className="h-3.5 w-3.5" />Delete
-    </button>
+    </Button>
 
 
     <ConfirmDialog
@@ -112,20 +155,27 @@ export function BulkActionBar({ workspaceId, stage, selectedIds, selectedFileId,
       onConfirm={() => { setConfirmingDelete(false); void run("Deleted", () => deletePipelineDocumentsAction(workspaceId, selectedIds)) }}
       onCancel={() => setConfirmingDelete(false)} />
 
-    {showSheetChoice && sheetsHref && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowSheetChoice(false)}>
-      <div className="w-80 rounded-lg bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <h3 className="mb-1 text-sm font-semibold text-slate-900">Open {selectedIds.length} documents in Sheets</h3>
-        <p className="mb-4 text-xs text-slate-500">How would you like to view them?</p>
-        <div className="flex flex-col gap-2">
-          <Link href={`${sheetsHref}&mode=combined`} className="rounded-md border px-3 py-2 text-center text-sm font-medium text-slate-700 hover:bg-emerald-50 hover:text-emerald-800" onClick={() => setShowSheetChoice(false)}>
-            Combined into one sheet
-          </Link>
-          <Link href={`${sheetsHref}&mode=separate`} className="rounded-md border px-3 py-2 text-center text-sm font-medium text-slate-700 hover:bg-emerald-50 hover:text-emerald-800" onClick={() => setShowSheetChoice(false)}>
-            Separate sheet per document
-          </Link>
-          <button type="button" className="mt-1 text-xs text-slate-400 hover:text-slate-600" onClick={() => setShowSheetChoice(false)}>Cancel</button>
-        </div>
+    <ConfirmDialog
+      open={confirmingApprove}
+      busy={busy}
+      title={`Approve ${selectedIds.length} document${selectedIds.length === 1 ? "" : "s"}?`}
+      description="Approved documents can auto-publish and sync to accounting. Any that still need required fields or a document type are held back."
+      confirmLabel={busy ? "Approving…" : "Approve all"}
+      onConfirm={() => { setConfirmingApprove(false); void approve() }}
+      onCancel={() => setConfirmingApprove(false)} />
+
+    {/* Reuses the DS <Dialog> primitive instead of a hand-rolled overlay — one modal shape in the
+        app, and the choices below are Links so <Dialog>'s built-in focus trap/restore is enough. */}
+    <Dialog
+      open={showSheetChoice && Boolean(sheetsHref)}
+      title={`Open ${selectedIds.length} documents in Sheets`}
+      description="How would you like to view them?"
+      width="max-w-sm"
+      onClose={() => setShowSheetChoice(false)}>
+      <div className="flex flex-col gap-2 p-5">
+        <Button asChild variant="outline"><Link href={sheetsHref ? `${sheetsHref}&mode=combined` : ""} onClick={() => setShowSheetChoice(false)}>Combined into one sheet</Link></Button>
+        <Button asChild variant="outline"><Link href={sheetsHref ? `${sheetsHref}&mode=separate` : ""} onClick={() => setShowSheetChoice(false)}>Separate sheet per document</Link></Button>
       </div>
-    </div>}
+    </Dialog>
   </div>
 }

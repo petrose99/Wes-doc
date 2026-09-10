@@ -145,13 +145,48 @@ export async function createDocumentFromBuffer(input: {
   }
 }
 
-/** The full where-fragment for one pipeline stage: stageToStatusFilter plus the two axes it can't
- * express alone — archive (a boolean-ish timestamp, not a status) and the ready/approvals split
- * (which depends on ReviewTask existence). Shared by every query that needs "is this document on
- * stage X", so the list, its counts, and a content-search filter can never disagree. */
+/** The full where-fragment for one pipeline stage. Inbox/Review/Approved/Paid are mutually
+ * exclusive (precedence matches documentStage: Paid > Synced > Review > Approved > Inbox), but
+ * Synced is deliberately CUMULATIVE — it keeps a bill after it's paid. A controller asking "what
+ * did we push to the ledger this month?" queries by the sync event, and a paid bill vanishing
+ * from that answer reads as a data loss, not a stage transition. The list marks paid rows with a
+ * chip instead. Consequence: Synced's count overlaps Paid's, so the five counts do NOT sum to the
+ * workspace total — the tab badges are per-question answers, not a partition. */
+const openReviewTaskExists: Prisma.DocumentWhereInput = { reviewTasks: { some: { status: { in: ["open", "in_review"] } } } }
+const noOpenReviewTask: Prisma.DocumentWhereInput = { reviewTasks: { none: { status: { in: ["open", "in_review"] } } } }
+const succeededPushExists: Prisma.DocumentWhereInput = { integrationPushes: { some: { status: "succeeded" } } }
+const noSucceededPush: Prisma.DocumentWhereInput = { integrationPushes: { none: { status: "succeeded" } } }
+const paidPaymentStatus: Prisma.DocumentWhereInput = { paymentStatus: "paid" }
+/** NULL-safe "not paid": `NOT paymentStatus = 'paid'` is NULL for NULL rows in SQL, so a plain
+ * `NOT paidPaymentStatus` predicate silently drops every unpaid row where paymentStatus is null
+ * (the common case — nobody has confirmed either way yet). The OR-with-null spells the check out
+ * so NULLs land on the "not paid" side, not in a third undefined bucket. */
+const notPaid: Prisma.DocumentWhereInput = { OR: [{ paymentStatus: null }, { paymentStatus: { not: "paid" } }] }
+
 export function stageWhereClause(stage: PipelineStage): Prisma.DocumentWhereInput {
-  return {
-    ...stageToStatusFilter(stage),
+  switch (stage) {
+    case "inbox":
+      return { status: { in: ["queued", "failed"] } }
+    case "review":
+      return {
+        AND: [notPaid, noSucceededPush],
+        OR: [
+          { status: { in: ["needs_review", "ready_for_review"] } },
+          { status: "reviewed", ...openReviewTaskExists },
+        ],
+      }
+    case "approved":
+      return {
+        status: "reviewed",
+        AND: [notPaid, noSucceededPush, noOpenReviewTask],
+      }
+    case "synced":
+      return {
+        status: "reviewed",
+        ...succeededPushExists,
+      }
+    case "paid":
+      return { ...paidPaymentStatus }
   }
 }
 
@@ -189,11 +224,17 @@ export type LibraryListFilters = {
 
 export type LibraryDocument = Awaited<ReturnType<typeof listWorkspaceDocuments>>[number]
 
+/** Docu Library membership: every reviewed document, automatically — approved, synced, and paid
+ * alike. Deliberately NOT stageWhereClause("approved"): a document does not leave the library
+ * when it syncs or gets paid, and there is no "store to library" action any more; approval is
+ * the only gate. */
+export const LIBRARY_WHERE: Prisma.DocumentWhereInput = { status: "reviewed" }
+
 export async function listLibraryDocuments(workspaceId: string, filters: LibraryListFilters = {}): Promise<{ documents: LibraryDocument[]; total: number; page: number; pageCount: number }> {
   const pageSize = Math.min(Math.max(filters.pageSize ?? 24, 1), 100)
 
   if (filters.documentIds?.length) {
-    const where: Prisma.DocumentWhereInput = { workspaceId, id: { in: filters.documentIds }, ...stageWhereClause("ready") }
+    const where: Prisma.DocumentWhereInput = { workspaceId, id: { in: filters.documentIds }, ...LIBRARY_WHERE }
     const docs = await prisma.document.findMany({ where, include: { template: { include: { versions: { take: 1, orderBy: { createdAt: "desc" } } } }, templateVersion: true } })
     const idOrder = new Map(filters.documentIds.map((id, i) => [id, i]))
     docs.sort((a, b) => (idOrder.get(a.id) ?? Infinity) - (idOrder.get(b.id) ?? Infinity))
@@ -202,7 +243,7 @@ export async function listLibraryDocuments(workspaceId: string, filters: Library
 
   const where: Prisma.DocumentWhereInput = {
     workspaceId,
-    ...stageWhereClause("ready"),
+    ...LIBRARY_WHERE,
     ...(filters.templateId ? { templateId: filters.templateId } : {}),
     ...(filters.flagged ? { flaggedAt: { not: null } } : {}),
     ...(filters.filenameQuery?.trim() ? { filename: { contains: filters.filenameQuery.trim(), mode: "insensitive" as const } } : {}),
@@ -253,6 +294,13 @@ export async function countDocumentsByStage(workspaceId: string): Promise<Record
   return Object.fromEntries(PIPELINE_STAGES.map((stage, index) => [stage, counts[index]])) as Record<PipelineStage, number>
 }
 
+/** Failed extractions in the workspace — the one thing on the Inbox tab that needs a person to
+ * act (re-extract or delete) rather than wait. Surfaced as its own red sub-badge on the Inbox tab
+ * so a failure isn't visually buried among documents that are merely still processing. */
+export async function countFailedDocuments(workspaceId: string): Promise<number> {
+  return prisma.document.count({ where: { workspaceId, status: "failed" } })
+}
+
 /** Home's "Documents this month" stat — a plain calendar-month count off `receivedAt`, the same
  * timestamp the pipeline list sorts and displays by. Not stage-filtered: a document counts here
  * the moment it lands, whichever stage it's since moved through. */
@@ -267,7 +315,7 @@ export async function countDocumentsThisMonth(workspaceId: string, now: Date = n
  * card regardless of how many there are. */
 export async function countToReviewByFile(workspaceId: string, fileIds: string[]): Promise<Record<string, number>> {
   if (!fileIds.length) return {}
-  const rows = await prisma.document.groupBy({ by: ["fileId"], where: { workspaceId, fileId: { in: fileIds }, ...stageWhereClause("to_review") }, _count: { _all: true } })
+  const rows = await prisma.document.groupBy({ by: ["fileId"], where: { workspaceId, fileId: { in: fileIds }, ...stageWhereClause("review") }, _count: { _all: true } })
   return Object.fromEntries(rows.map((row) => [row.fileId, row._count._all]))
 }
 
@@ -277,6 +325,15 @@ export async function countToReviewByFile(workspaceId: string, fileIds: string[]
 export async function documentIdsInStage(workspaceId: string, documentIds: string[], stage: PipelineStage): Promise<Set<string>> {
   if (!documentIds.length) return new Set()
   const rows = await prisma.document.findMany({ where: { workspaceId, id: { in: documentIds }, ...stageWhereClause(stage) }, select: { id: true } })
+  return new Set(rows.map((row) => row.id))
+}
+
+/** Of the given document ids, which are in the Docu Library (any reviewed document — see
+ * LIBRARY_WHERE). The library-search narrowing filter, replacing the old stage-based one that
+ * silently dropped synced/paid documents from library search results. */
+export async function documentIdsInLibrary(workspaceId: string, documentIds: string[]): Promise<Set<string>> {
+  if (!documentIds.length) return new Set()
+  const rows = await prisma.document.findMany({ where: { workspaceId, id: { in: documentIds }, ...LIBRARY_WHERE }, select: { id: true } })
   return new Set(rows.map((row) => row.id))
 }
 
@@ -298,7 +355,7 @@ export type ReadyToPushDocument = {
  * way, so it doesn't belong on a "ready to push" list. */
 export async function listReadyToPushDocuments(workspaceId: string, connectionId: string): Promise<ReadyToPushDocument[]> {
   const [documents, pushes] = await Promise.all([
-    listWorkspaceDocuments(workspaceId, { stage: "ready" }),
+    listWorkspaceDocuments(workspaceId, { stage: "approved" }),
     listWorkspaceIntegrationPushes(workspaceId),
   ])
   const succeededDocumentIds = new Set(
@@ -419,6 +476,14 @@ export async function updateDocumentReview(input: { workspaceId: string; documen
   // a failure here must not roll the review back — the document is reviewed either way, its
   // conversion just moves to "pending" until a retry succeeds.
   await applyFxToDocument(document.id).catch(() => {})
+  // Approval IS the decision to sync: no separate "Push to Accounting" click. Runs after FX so a
+  // just-converted document ships with its base-currency total; the sync's own gates (connection,
+  // pushable type, FX landed) decide whether anything actually enqueues. Dynamic import to keep
+  // this module's import graph clean for vitest.
+  if (!missing.length) {
+    const { syncOnApproval } = await import("@/lib/automation/autopublish")
+    await syncOnApproval(input.workspaceId, document.id, input.actorId).catch(() => {})
+  }
   return result
 }
 
@@ -533,6 +598,7 @@ export async function markDocumentsReviewed(workspaceId: string, documentIds: st
   const capped = documentIds.slice(0, 100)
   let reviewed = 0
   let needsReview = 0
+  const reviewedIds: string[] = []
   for (const documentId of capped) {
     const doc = await getWorkspaceDocument(workspaceId, documentId)
     if (!doc || doc.status === "queued" || doc.status === "failed") continue
@@ -541,10 +607,39 @@ export async function markDocumentsReviewed(workspaceId: string, documentIds: st
       await updateDocumentReview({ workspaceId, documentId, reviewedData: data, actorId })
       const fields = parseTemplateFields(doc.fieldSnapshot)
       const missing = findMissingRequiredFields(fields, validateDocumentValues(fields, data))
-      if (missing.length) { needsReview++ } else { reviewed++ }
+      if (missing.length) { needsReview++ } else { reviewed++; reviewedIds.push(documentId) }
     } catch { needsReview++ }
   }
-  return { reviewed, needsReview }
+  // reviewedIds is what the client-side "Undo" can send back to Review — the set that actually
+  // moved off the Review stage this call. Held-back documents (missing required fields) never
+  // left Review, so they aren't in this list.
+  return { reviewed, needsReview, reviewedIds }
+}
+
+/** The Undo path for a pipeline bulk Approve: puts documents back on the Review stage by opening
+ * a fresh ReviewTask on each one. Doesn't touch reviewedData or status; the stage predicate
+ * (stageWhereClause("review") in this file) already treats `status: "reviewed"` + an open
+ * ReviewTask as Review, so an open task is enough to land the row back where it started. The
+ * task's `detail` says how it got there, so the reviewer looking at their queue knows this
+ * wasn't a fresh AI flag. Idempotent-ish: a document that already has an open task is skipped
+ * so a repeated Undo doesn't spawn duplicates. */
+export async function sendDocumentsBackToReview(workspaceId: string, documentIds: string[], actorId: string) {
+  const capped = documentIds.slice(0, 100)
+  let updated = 0
+  for (const documentId of capped) {
+    const doc = await prisma.document.findFirst({ where: { id: documentId, workspaceId }, select: { id: true, status: true } })
+    if (!doc) continue
+    const existing = await prisma.reviewTask.findFirst({ where: { workspaceId, documentId, status: { in: ["open", "in_review"] } }, select: { id: true } })
+    if (existing) { updated++; continue }
+    await prisma.reviewTask.create({
+      data: {
+        workspaceId, documentId, reason: "manual", detail: "Sent back to Review from bulk approve — Undo",
+        createdById: actorId, priority: 0,
+      },
+    })
+    updated++
+  }
+  return { updated }
 }
 
 /** Lightweight status read for the extraction-progress poller. Capped because callers track

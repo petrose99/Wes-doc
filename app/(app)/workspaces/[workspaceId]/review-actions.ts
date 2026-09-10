@@ -106,12 +106,20 @@ export async function getReviewTaskDetailAction(workspaceId: string, taskId: str
   const fields = parseTemplateFields(task.document.fieldSnapshot)
   const values = (task.document.reviewedData ?? task.document.rawExtraction ?? {}) as Record<string, unknown>
   const workflowsEnabled = capabilities.has("approval-workflows")
-  const [checkResults, connections, appliedRule, template, availableWorkflows] = await Promise.all([
+  const [checkResults, connections, appliedRule, template, availableWorkflows, lastPush] = await Promise.all([
     prisma.documentCheckResult.findMany({ where: { workspaceId, documentId: task.document.id }, orderBy: { checkCode: "asc" } }),
     capabilities.has("accounting-push") ? listWorkspaceIntegrationConnections(workspaceId) : Promise.resolve([]),
     task.document.appliedRuleId ? prisma.automationRule.findUnique({ where: { id: task.document.appliedRuleId }, select: { name: true } }) : Promise.resolve(null),
     task.document.templateId ? prisma.documentTemplate.findUnique({ where: { id: task.document.templateId }, select: { code: true } }) : Promise.resolve(null),
     workflowsEnabled ? listApprovalWorkflows(workspaceId, { activeOnly: true }) : Promise.resolve([]),
+    // Server-side hydration for the push receipt: the most recent succeeded push for this
+    // document, if any. Without it, a hard reload after a push wiped the client-side receipt
+    // and the peak "money moved here, at this time" moment vanished with it.
+    capabilities.has("accounting-push") ? prisma.integrationPush.findFirst({
+      where: { workspaceId, documentId: task.document.id, status: "succeeded" },
+      orderBy: { completedAt: "desc" },
+      select: { completedAt: true, provider: true, connection: { select: { tenantName: true, provider: true } } },
+    }) : Promise.resolve(null),
   ])
   const activeConnection = connections.find((connection) => connection.status === "active") ?? null
   const canPush = task.document.status === "reviewed" && Boolean(activeConnection)
@@ -154,6 +162,17 @@ export async function getReviewTaskDetailAction(workspaceId: string, taskId: str
     appliedRuleName: appliedRule?.name ?? null,
     canPush,
     activeConnectionId: activeConnection?.id ?? null,
+    // Provider/tenant so the client can render a real "Pushed to <destination>" receipt after a
+    // successful push, rather than a disabled button being the whole confirmation.
+    activeConnection: activeConnection ? { provider: activeConnection.provider, name: activeConnection.tenantName || activeConnection.provider } : null,
+    // Prior successful push, so the receipt survives a hard reload. `completedAt` can be null on
+    // a very old row where the field wasn't backfilled; guard against that. The destination
+    // name is read off the push's own connection (which may differ from activeConnection if the
+    // workspace has since reconnected under a new tenant).
+    lastSuccessfulPush: lastPush && lastPush.completedAt ? {
+      destination: lastPush.connection?.tenantName || lastPush.connection?.provider || lastPush.provider,
+      at: lastPush.completedAt.toISOString(),
+    } : null,
     canCreateRule: capabilities.has("supplier-rules") && membership.role === "owner" && supplier.length > 0,
     workflow,
     availableWorkflows: task.status === "open" && !task.workflowId ? availableWorkflows.map((wf) => ({ id: wf.id, name: wf.name, stageCount: wf.stages.length })) : [],
@@ -177,12 +196,13 @@ export async function startWorkflowOnReviewTaskAction(workspaceId: string, taskI
  * *current* stage rather than writing a status directly. Autopublish fires the same way, only once
  * the decision actually resolves the task as "approved" (the last stage clearing), never on an
  * intermediate stage advance. */
-export async function decideReviewTaskStageAction(workspaceId: string, taskId: string, decision: "approve" | "reject"): Promise<ActionState<null>> {
+export async function decideReviewTaskStageAction(workspaceId: string, taskId: string, decision: "approve" | "reject", note?: string): Promise<ActionState<null>> {
   const user = await getCurrentUser()
   const membership = await requireAccountingMember(workspaceId, user.id)
   if (!membership) return { success: false, error: NO_ACCESS }
+  if (note && note.length > 2_000) return { success: false, error: "Note is too long" }
   try {
-    const task = await decideReviewTaskStage({ workspaceId, taskId, decision, actorId: user.id, actorRole: membership.role === "owner" ? "owner" : "member" })
+    const task = await decideReviewTaskStage({ workspaceId, taskId, decision, actorId: user.id, actorRole: membership.role === "owner" ? "owner" : "member", note: note ?? null })
     if (task.status === "approved") await maybeConfirmAiCoding(workspaceId, task.documentId, user.id)
     await refreshDocumentReadiness({ workspaceId, documentId: task.documentId })
     if (task.status === "approved") await maybeAutopublish(workspaceId, task.documentId, user.id)
