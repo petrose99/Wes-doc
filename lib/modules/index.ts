@@ -44,7 +44,7 @@ export const MODULES: ModuleDefinition[] = [
   { key: "reports", name: "Reports", description: "Draft and export reports from extracted data.", industry: "core", tier: "always", activation: "enable" },
 
   { key: "review-queue", name: "Review queue", description: "Triage incoming documents that need a person to look at them.", industry: "finance", tier: "always", activation: "enable", navItems: [{ href: "review", label: "Review", icon: "inbox" }] },
-  { key: "approval-workflows", name: "Approval workflows", description: "Route a document through multiple approval stages before it's marked approved.", industry: "finance", tier: "always", activation: "enable", navItems: [{ href: "settings/approvals", label: "Approvals", icon: "check-circle" }] },
+  { key: "approval-workflows", name: "Approval workflows", description: "Route a document through multiple approval stages before it's marked approved.", industry: "finance", tier: "always", activation: "enable", navItems: [{ href: "automation/approvals", label: "Approvals", icon: "check-circle" }] },
   { key: "supplier-rules", name: "Supplier rules", description: "Auto-code recurring suppliers and, optionally, auto-publish them.", industry: "finance", tier: "always", activation: "enable", navItems: [{ href: "settings/rules", label: "Rules", icon: "workflow" }] },
   { key: "document-checks", name: "Document checks", description: "Deterministic duplicate, arithmetic, tax, and gap checks on every document.", industry: "finance", tier: "always", activation: "enable" },
   { key: "tax-profiles", name: "Tax profiles", description: "Per-workspace tax rate and jurisdiction settings.", industry: "finance", tier: "always", activation: "enable", navItems: [{ href: "settings/tax", label: "Tax", icon: "percent" }] },
