@@ -148,7 +148,7 @@ export function SplitPane({
   const moveToReady = async () => {
     setBusyAction("ready")
     try {
-      const result = await moveDocumentsToStageAction(workspaceId, [header.documentId], "ready")
+      const result = await moveDocumentsToStageAction(workspaceId, [header.documentId], "approved")
       if (!result.success) { toast.error(result.error || "Could not move this document"); return }
       toast.success("Moved to Ready")
       router.push(afterActionHref)
@@ -212,8 +212,8 @@ export function SplitPane({
         <Flag className={`h-4 w-4 ${flagged ? "fill-indigo-400" : ""}`} />
       </button>
 
-      {stage !== "ready" && stage !== "archive" && stage !== null && <button type="button" disabled={busyAction === "ready"} onClick={() => void moveToReady()} className={toolbarBtn}>
-        {busyAction === "ready" ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}Ready
+      {stage !== "approved" && stage !== "synced" && stage !== "paid" && stage !== "archive" && stage !== null && <button type="button" disabled={busyAction === "ready"} onClick={() => void moveToReady()} className={toolbarBtn}>
+        {busyAction === "ready" ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}Approve
       </button>}
       {stage !== "archive" && <button type="button" disabled={busyAction === "archive"} onClick={() => void archive()} className={toolbarBtn}>
         {busyAction === "archive" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Archive className="h-4 w-4" />}Archive

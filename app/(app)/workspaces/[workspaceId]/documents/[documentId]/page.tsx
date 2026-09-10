@@ -12,7 +12,7 @@ import { repairMissingBboxes } from "@/lib/provenance"
 import { prisma } from "@/lib/db"
 import { buildFieldRationales, type FieldRationale } from "@/lib/rationale"
 import { documentBlocksKey, readDocumentBlocks } from "@/lib/document-storage"
-import { PIPELINE_STAGES, type PipelineStage } from "@/lib/documents/stages"
+import { parseStageAlias, type PipelineStage } from "@/lib/documents/stages"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { listBankMatches } from "@/models/bank-matches"
 import { listDocumentAuditEvents } from "@/models/audit-events"
@@ -43,7 +43,7 @@ export default async function DocumentPage({ params, searchParams }: {
   const document = await getWorkspaceDocument(workspaceId, documentId)
   if (!document) notFound()
 
-  const stage: PipelineStage | null = (PIPELINE_STAGES as readonly string[]).includes(stageParam ?? "") ? (stageParam as PipelineStage) : null
+  const stage: PipelineStage | null = parseStageAlias(stageParam)
 
   const capabilities = await getWorkspaceCapabilities(workspaceId)
   const canPush = document.status === "reviewed" && capabilities.has("accounting-push")

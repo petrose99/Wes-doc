@@ -63,12 +63,12 @@ export default async function WorkspaceLayout({ children, params }: { children: 
       user={{ name: user.name, email: user.email }}
       enabledModuleKeys={[...capabilities.enabled]}
       accountingEnabled={config.integrations.bigcapital.enabled}
-      pipelineReviewCount={pipelineCounts.to_review}
+      pipelineReviewCount={pipelineCounts.review}
       reviewTaskCount={reviewTaskCount} />
     <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-[radial-gradient(1200px_480px_at_100%_-10%,rgba(4,120,87,0.05),transparent_60%),#fafbfc]">
       <MobileHeader workspaceId={workspaceId} workspaces={switchable} user={{ name: user.name, email: user.email }} />
       <div id="main" role="main" tabIndex={-1} className="flex min-h-0 flex-1 flex-col pb-[72px] md:pb-0">{children}</div>
-      <MobileTabBar workspaceId={workspaceId} pipelineReviewCount={pipelineCounts.to_review} />
+      <MobileTabBar workspaceId={workspaceId} pipelineReviewCount={pipelineCounts.review} />
     </div>
   </div>
 }

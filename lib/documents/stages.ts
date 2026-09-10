@@ -1,5 +1,3 @@
-import type { Prisma } from "@/prisma/client"
-
 /** Canonical Document.status/pipeline-stage vocabulary. `Document.status` is a plain
  * `String @default("received")` (schema.prisma), not a Prisma enum — deliberately, since the
  * public REST API and Zapier persist and match on the raw string values. Keep it that way: this
@@ -22,16 +20,40 @@ export const TERMINAL_STATUSES: ReadonlySet<string> = new Set(["ready_for_review
  * re-exports it for the sheet's own use. */
 export const LOW_CONFIDENCE = 0.6
 
-/** The UI pipeline tabs. Derived from Document.status (+ archive/review-task state), never
- * persisted — "processing" is deliberately not a stage; it is an inline spinner state within
- * Inbox, driven by `hasActiveJob`. */
-export const PIPELINE_STAGES = ["inbox", "to_review", "ready"] as const
+/** The UI pipeline tabs — the five-stage Documents lifecycle: Inbox (queued/failed) → Review
+ * (waiting on a person) → Approved (reviewer signed off, nothing pushed yet) → Synced (at least
+ * one integration accepted the bill) → Paid (a reviewer or the ledger confirmed payment). Derived
+ * from Document.status + ReviewTask/IntegrationPush/paymentStatus, never persisted. The former
+ * three-stage names ("to_review", "ready") remain valid as **aliases** in the public API — see
+ * LEGACY_STAGE_ALIASES and parseStageAlias below. */
+export const PIPELINE_STAGES = ["inbox", "review", "approved", "synced", "paid"] as const
 export type PipelineStage = (typeof PIPELINE_STAGES)[number]
 
+/** User-visible stage names. The one place the app spells the lifecycle out — the sidebar badge,
+ * the tabs, the storyboard the audit talked about. */
 export const STAGE_LABELS: Record<PipelineStage, string> = {
-  inbox: "Processing",
-  to_review: "To review",
-  ready: "Ready",
+  inbox: "Inbox",
+  review: "Review",
+  approved: "Approved",
+  synced: "Synced",
+  paid: "Paid",
+}
+
+/** Kept indefinitely: the /api/v1/documents contract accepted `to_review` and `ready` since v1,
+ * and Zapier/webhook consumers write against those names. New names go OUT (Documents-visible
+ * copy is on the new vocabulary); the API still parses the old ones with these aliases. */
+export const LEGACY_STAGE_ALIASES: Record<string, PipelineStage> = {
+  to_review: "review",
+  ready: "approved",
+}
+
+/** Accepts `PipelineStage`, a legacy alias, or anything else, and returns the canonical stage or
+ * null. Not throwing (the API answers 400 explicitly on a bad `stage`; internal callers already
+ * hold a `PipelineStage`). */
+export function parseStageAlias(raw: string | null | undefined): PipelineStage | null {
+  if (!raw) return null
+  if ((PIPELINE_STAGES as readonly string[]).includes(raw)) return raw as PipelineStage
+  return LEGACY_STAGE_ALIASES[raw] ?? null
 }
 
 /** Folds legacy/phantom status values onto the real ones: the schema's "received" default
@@ -44,39 +66,48 @@ export function normalizeStatus(raw: string): DocumentStatus {
   return "queued"
 }
 
-/** A minimal view of a Document (plus its review-task/archive state) sufficient to place it on a
- * pipeline tab. `archivedAt` is optional because the column does not exist yet (Phase 1 adds it);
- * until then no document is ever archived. */
-export type StageableDocument = { status: string; archivedAt?: Date | null }
+/** A minimal view of a Document (plus its review-task/push/payment state) sufficient to place it
+ * on a pipeline tab. `archivedAt` is optional because the column does not exist yet (Phase 1 adds
+ * it); until then no document is ever archived. */
+export type StageableDocument = { status: string; archivedAt?: Date | null; paymentStatus?: string | null }
 
 export type StageContext = {
   /** A queued/processing DocumentProcessingJob exists for this document. */
   hasActiveJob?: boolean
   /** An open or in_review ReviewTask exists for this document. */
   openReviewTask?: boolean
+  /** At least one IntegrationPush for this document is in "succeeded". */
+  hasSucceededPush?: boolean
 }
 
-/** Maps a document (+ its job/review-task context) onto the tab it belongs on. Archive wins over
- * every other rule: a document can be archived at any point in its lifecycle. */
+/** Maps a document (+ its job/review-task/push context) onto the tab it belongs on. Precedence,
+ * highest first: Paid > Synced > Review > Approved > Inbox — a paid bill with a stale open review
+ * task lands on Paid (the money moved regardless), the confirmed-payment signal wins. */
 export function documentStage(doc: StageableDocument, context: StageContext = {}): PipelineStage {
   const status = normalizeStatus(doc.status)
-  if (status === "failed" || status === "queued") return "inbox"
-  if (status === "needs_review" || status === "ready_for_review") return "to_review"
-  // status === "reviewed"
-  return "ready"
+  if (doc.paymentStatus === "paid") return "paid"
+  if (context.hasSucceededPush) return "synced"
+  if (status === "needs_review" || status === "ready_for_review") return "review"
+  if (status === "reviewed" && context.openReviewTask) return "review"
+  if (status === "reviewed") return "approved"
+  return "inbox"
 }
 
 /** The Prisma where-fragment for a stage's document-status set, so the pipeline list and its
- * count query share one definition of each tab. Excludes the archive axis (a boolean column, not
- * a status) and the approvals/ready split (which additionally depends on ReviewTask state) —
- * callers needing those narrow further themselves. */
+ * count query share one definition of each tab. Kept here for callers that need the raw status
+ * axis only (e.g. models/integrations.ts's cursor listing narrowing by status) — the full stage
+ * predicate (relations + NOT exclusions) is `stageWhereClause` in models/documents.ts. */
+import type { Prisma } from "@/prisma/client"
+
 export function stageToStatusFilter(stage: PipelineStage): Prisma.DocumentWhereInput {
   switch (stage) {
     case "inbox":
       return { status: { in: ["queued", "failed"] } }
-    case "to_review":
-      return { status: { in: ["needs_review", "ready_for_review"] } }
-    case "ready":
+    case "review":
+      return { status: { in: ["needs_review", "ready_for_review", "reviewed"] } }
+    case "approved":
+    case "synced":
+    case "paid":
       return { status: "reviewed" }
   }
 }

@@ -1,6 +1,6 @@
 import { apiError, parseLimit, requireApiAuth } from "@/lib/api-v1"
 import { buildApiDocumentListItem } from "@/lib/webhooks"
-import { DOCUMENT_STATUSES, PIPELINE_STAGES } from "@/lib/documents/stages"
+import { DOCUMENT_STATUSES, PIPELINE_STAGES, parseStageAlias } from "@/lib/documents/stages"
 import { createIngestionItem } from "@/lib/ingestion"
 import { processDocumentJob } from "@/lib/document-processing"
 import { getFileTemplates, getWorkspaceFile } from "@/models/files"
@@ -30,11 +30,14 @@ export async function GET(req: Request) {
   const statusRaw = url.searchParams.get("status")
   if (statusRaw && !(DOCUMENT_STATUSES as readonly string[]).includes(statusRaw)) return apiError(400, "invalid_status")
   const stageRaw = url.searchParams.get("stage")
-  if (stageRaw && !(PIPELINE_STAGES as readonly string[]).includes(stageRaw)) return apiError(400, "invalid_stage")
+  // Legacy aliases (to_review, ready) stay honored indefinitely — Zapier and webhook consumers
+  // are still writing against those names, and parseStageAlias maps them onto the canonical stage.
+  const stage = parseStageAlias(stageRaw)
+  if (stageRaw && !stage) return apiError(400, "invalid_stage")
 
   const { documents, nextCursor } = await listDocumentsForApi(auth.workspaceId, {
     status: statusRaw ?? undefined,
-    stage: stageRaw as (typeof PIPELINE_STAGES)[number] | undefined,
+    stage: stage ?? undefined,
     updatedSince,
     cursor: url.searchParams.get("cursor") ?? undefined,
     limit: parseLimit(url.searchParams.get("limit"), 50, 100),

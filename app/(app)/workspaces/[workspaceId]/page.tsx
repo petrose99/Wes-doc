@@ -71,14 +71,14 @@ export default async function WorkspaceHomePage({ params }: {
   })
 
   const [needsReview, recentFileReviewCounts] = await Promise.all([
-    listWorkspaceDocuments(workspaceId, { stage: "to_review" }),
+    listWorkspaceDocuments(workspaceId, { stage: "review" }),
     countToReviewByFile(workspaceId, recentFiles.map((file) => file.id)),
   ])
 
   const stats = [
     { label: "Documents this month", value: documentsThisMonth, icon: FileText, href: null, iconClass: "bg-emerald-50 text-emerald-700", hoverClass: "" },
-    { label: "In review", value: stageCounts.to_review, icon: SearchCheck, href: `/workspaces/${workspaceId}/pipeline?stage=to_review`, iconClass: "bg-indigo-50 text-indigo-600", hoverClass: "hover:border-[#c7d2fe] hover:-translate-y-0.5 hover:shadow-[0_2px_4px_rgba(15,23,42,0.05),0_12px_26px_rgba(79,70,229,0.10)]" },
-    { label: "Ready", value: stageCounts.ready, icon: CheckCircle2, href: `/workspaces/${workspaceId}/pipeline?stage=ready`, iconClass: "bg-emerald-50 text-emerald-700", hoverClass: "hover:border-[#a7f3d0] hover:-translate-y-0.5 hover:shadow-[0_2px_4px_rgba(15,23,42,0.05),0_12px_26px_rgba(4,120,87,0.10)]" },
+    { label: "Review", value: stageCounts.review, icon: SearchCheck, href: `/workspaces/${workspaceId}/pipeline?stage=review`, iconClass: "bg-indigo-50 text-indigo-600", hoverClass: "hover:border-[#c7d2fe] hover:-translate-y-0.5 hover:shadow-[0_2px_4px_rgba(15,23,42,0.05),0_12px_26px_rgba(79,70,229,0.10)]" },
+    { label: "Approved (30d)", value: stageCounts.approved, icon: CheckCircle2, href: `/workspaces/${workspaceId}/pipeline?stage=approved`, iconClass: "bg-emerald-50 text-emerald-700", hoverClass: "hover:border-[#a7f3d0] hover:-translate-y-0.5 hover:shadow-[0_2px_4px_rgba(15,23,42,0.05),0_12px_26px_rgba(4,120,87,0.10)]" },
   ]
 
   return <main className="mx-auto w-full max-w-6xl space-y-4 px-4 py-[18px] md:space-y-6 md:p-6">
@@ -89,7 +89,7 @@ export default async function WorkspaceHomePage({ params }: {
         <div className="flex items-center gap-2">
           <h1 className="font-display text-[25px] font-extrabold leading-[1.15] tracking-[-0.025em] text-slate-900 md:text-[33px] md:leading-normal">Welcome back to {membership.workspace.name}</h1>
         </div>
-        {stageCounts.to_review > 0 && <p className="mt-1.5 text-[13.5px] text-slate-500 md:text-[14.5px]">{stageCounts.to_review} document{stageCounts.to_review === 1 ? " is" : "s are"} waiting for review across your pipeline.</p>}
+        {stageCounts.review > 0 && <p className="mt-1.5 text-[13.5px] text-slate-500 md:text-[14.5px]">{stageCounts.review} document{stageCounts.review === 1 ? " is" : "s are"} waiting for review across your pipeline.</p>}
       </div>
       <div className="hidden md:block">
         <FileHubUploadButton
@@ -150,7 +150,7 @@ export default async function WorkspaceHomePage({ params }: {
         <div className="mb-3.5 flex items-center gap-2">
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600"><SearchCheck className="h-[17px] w-[17px]" /></span>
           <h2 className="text-[15px] font-bold text-slate-900">Needs your review</h2>
-          {stageCounts.to_review > 0 && <span className="ml-auto rounded-full bg-indigo-50 px-2.5 py-0.5 text-[11.5px] font-bold text-indigo-700">{stageCounts.to_review}</span>}
+          {stageCounts.review > 0 && <span className="ml-auto rounded-full bg-indigo-50 px-2.5 py-0.5 text-[11.5px] font-bold text-indigo-700">{stageCounts.review}</span>}
         </div>
         {needsReview.length === 0 ? <p className="py-6 text-center text-sm text-slate-400">Nothing needs a look right now.</p> : <>
           {needsReview.slice(0, 3).map((doc) => {

@@ -30,9 +30,9 @@ export function PipelineShell({ workspaceId, stage, counts, rows, contentMatches
     <div className="flex flex-wrap items-center gap-3 border-b px-6 py-4">
       <div>
         <div className="flex items-center gap-2">
-          <h1 className="text-xl font-bold text-slate-900">Extraction</h1>
+          <h1 className="text-xl font-bold text-slate-900">Documents</h1>
         </div>
-        <p className="text-sm text-slate-500">Add, review, and extract documents — one list across every file.</p>
+        <p className="text-sm text-slate-500">Inbox to paid — one list across every file, one lifecycle for every bill.</p>
       </div>
       <div className="ml-auto">
         <FileHubUploadButton
@@ -48,13 +48,13 @@ export function PipelineShell({ workspaceId, stage, counts, rows, contentMatches
       </div>
     </div>
     <StageTabs workspaceId={workspaceId} active={stage} counts={counts} />
-    {stage === "ready" && touchlessStats && touchlessStats.totalExtracted > 0 && <div className="flex items-center gap-6 border-b bg-slate-50 px-6 py-2 text-xs text-slate-600">
+    {stage === "approved" && touchlessStats && touchlessStats.totalExtracted > 0 && <div className="flex items-center gap-6 border-b bg-slate-50 px-6 py-2 text-xs text-slate-600">
       <span><strong className="text-slate-900">{(touchlessStats.touchlessRate * 100).toFixed(0)}%</strong> touchless rate (30d)</span>
-      <span><strong className="text-slate-900">{touchlessStats.totalReady}</strong> ready</span>
-      <span><strong className="text-slate-900">{touchlessStats.totalPushedTouchless}</strong> auto-pushed</span>
+      <span><strong className="text-slate-900">{touchlessStats.totalReady}</strong> approved (30d)</span>
+      <span><strong className="text-slate-900">{touchlessStats.totalPushedTouchless}</strong> synced untouched</span>
       <span><strong className="text-slate-900">{touchlessStats.totalExtracted}</strong> extracted</span>
     </div>}
-    {stage === "ready" && counts.ready > 0 && <ReadyBanner workspaceId={workspaceId} count={counts.ready} documentIds={rows.map((r) => r.id)} />}
+    {stage === "approved" && counts.approved > 0 && <ReadyBanner workspaceId={workspaceId} count={counts.approved} documentIds={rows.map((r) => r.id)} />}
     <FilterPanel query={query} documentSearchEnabled={documentSearchEnabled} />
     <DocumentList workspaceId={workspaceId} stage={stage} rows={rows} contentMatches={contentMatches} query={query} />
   </div>

@@ -49,7 +49,7 @@ export function buildSupplierFacetSql(workspaceId: string): Sql {
 }
 
 export async function listLibraryFacets(workspaceId: string): Promise<LibraryFacets> {
-  const readyWhere = { workspaceId, ...stageWhereClause("ready") }
+  const readyWhere = { workspaceId, ...stageWhereClause("approved") }
 
   const [templateRows, categoryRows, supplierRows] = await Promise.all([
     prisma.document.groupBy({

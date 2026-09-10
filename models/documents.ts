@@ -145,13 +145,40 @@ export async function createDocumentFromBuffer(input: {
   }
 }
 
-/** The full where-fragment for one pipeline stage: stageToStatusFilter plus the two axes it can't
- * express alone — archive (a boolean-ish timestamp, not a status) and the ready/approvals split
- * (which depends on ReviewTask existence). Shared by every query that needs "is this document on
- * stage X", so the list, its counts, and a content-search filter can never disagree. */
+/** The full where-fragment for one pipeline stage. Mutually exclusive by construction — a
+ * document appears in exactly one tab regardless of how many predicates would otherwise match, so
+ * stage counts sum to the same total whichever axis is queried. Precedence, highest first (matches
+ * documentStage in lib/documents/stages.ts): Paid > Synced > Review > Approved > Inbox. Shared by
+ * every query that needs "is this document on stage X" (list, counts, content-search filter). */
+const openReviewTaskExists: Prisma.DocumentWhereInput = { reviewTasks: { some: { status: { in: ["open", "in_review"] } } } }
+const succeededPushExists: Prisma.DocumentWhereInput = { integrationPushes: { some: { status: "succeeded" } } }
+const paidPaymentStatus: Prisma.DocumentWhereInput = { paymentStatus: "paid" }
+
 export function stageWhereClause(stage: PipelineStage): Prisma.DocumentWhereInput {
-  return {
-    ...stageToStatusFilter(stage),
+  switch (stage) {
+    case "inbox":
+      return { status: { in: ["queued", "failed"] } }
+    case "review":
+      return {
+        NOT: [paidPaymentStatus, succeededPushExists],
+        OR: [
+          { status: { in: ["needs_review", "ready_for_review"] } },
+          { status: "reviewed", ...openReviewTaskExists },
+        ],
+      }
+    case "approved":
+      return {
+        status: "reviewed",
+        NOT: [paidPaymentStatus, succeededPushExists, openReviewTaskExists],
+      }
+    case "synced":
+      return {
+        status: "reviewed",
+        ...succeededPushExists,
+        NOT: [paidPaymentStatus],
+      }
+    case "paid":
+      return { ...paidPaymentStatus }
   }
 }
 
@@ -193,7 +220,7 @@ export async function listLibraryDocuments(workspaceId: string, filters: Library
   const pageSize = Math.min(Math.max(filters.pageSize ?? 24, 1), 100)
 
   if (filters.documentIds?.length) {
-    const where: Prisma.DocumentWhereInput = { workspaceId, id: { in: filters.documentIds }, ...stageWhereClause("ready") }
+    const where: Prisma.DocumentWhereInput = { workspaceId, id: { in: filters.documentIds }, ...stageWhereClause("approved") }
     const docs = await prisma.document.findMany({ where, include: { template: { include: { versions: { take: 1, orderBy: { createdAt: "desc" } } } }, templateVersion: true } })
     const idOrder = new Map(filters.documentIds.map((id, i) => [id, i]))
     docs.sort((a, b) => (idOrder.get(a.id) ?? Infinity) - (idOrder.get(b.id) ?? Infinity))
@@ -202,7 +229,7 @@ export async function listLibraryDocuments(workspaceId: string, filters: Library
 
   const where: Prisma.DocumentWhereInput = {
     workspaceId,
-    ...stageWhereClause("ready"),
+    ...stageWhereClause("approved"),
     ...(filters.templateId ? { templateId: filters.templateId } : {}),
     ...(filters.flagged ? { flaggedAt: { not: null } } : {}),
     ...(filters.filenameQuery?.trim() ? { filename: { contains: filters.filenameQuery.trim(), mode: "insensitive" as const } } : {}),
@@ -267,7 +294,7 @@ export async function countDocumentsThisMonth(workspaceId: string, now: Date = n
  * card regardless of how many there are. */
 export async function countToReviewByFile(workspaceId: string, fileIds: string[]): Promise<Record<string, number>> {
   if (!fileIds.length) return {}
-  const rows = await prisma.document.groupBy({ by: ["fileId"], where: { workspaceId, fileId: { in: fileIds }, ...stageWhereClause("to_review") }, _count: { _all: true } })
+  const rows = await prisma.document.groupBy({ by: ["fileId"], where: { workspaceId, fileId: { in: fileIds }, ...stageWhereClause("review") }, _count: { _all: true } })
   return Object.fromEntries(rows.map((row) => [row.fileId, row._count._all]))
 }
 
@@ -298,7 +325,7 @@ export type ReadyToPushDocument = {
  * way, so it doesn't belong on a "ready to push" list. */
 export async function listReadyToPushDocuments(workspaceId: string, connectionId: string): Promise<ReadyToPushDocument[]> {
   const [documents, pushes] = await Promise.all([
-    listWorkspaceDocuments(workspaceId, { stage: "ready" }),
+    listWorkspaceDocuments(workspaceId, { stage: "approved" }),
     listWorkspaceIntegrationPushes(workspaceId),
   ])
   const succeededDocumentIds = new Set(

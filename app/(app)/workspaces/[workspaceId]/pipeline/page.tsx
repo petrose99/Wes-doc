@@ -4,7 +4,7 @@ import type { SheetTemplate } from "@/components/extract/types"
 import { getCurrentUser } from "@/lib/auth"
 import config from "@/lib/config"
 import { parseTemplateFields } from "@/lib/document-templates"
-import { PIPELINE_STAGES, type PipelineStage } from "@/lib/documents/stages"
+import { PIPELINE_STAGES, parseStageAlias, type PipelineStage } from "@/lib/documents/stages"
 import { searchDocumentsByContent } from "@/lib/retrieval"
 import { activeJobDocumentIds, countDocumentsByStage, documentIdsInStage, flaggedFieldsFromConfidence, listWorkspaceDocuments, summarizeDocumentForReview } from "@/models/documents"
 import { ensurePipelineFile, getFileTemplates } from "@/models/files"
@@ -14,8 +14,18 @@ import { getWorkspaceUsage, requireWorkspaceRole } from "@/models/workspaces"
 
 export const dynamic = "force-dynamic"
 
-function parseStage(raw: string | undefined): PipelineStage {
-  return (PIPELINE_STAGES as readonly string[]).includes(raw ?? "") ? (raw as PipelineStage) : "inbox"
+function parseStage(raw: string | undefined, counts?: Record<PipelineStage, number>): PipelineStage {
+  const aliased = parseStageAlias(raw)
+  if (aliased) return aliased
+  // Land the reader on the first non-empty stage so a fresh workspace doesn't open on a blank
+  // Inbox when a document is already on Review. Order matches how the work moves: Review first
+  // (needs someone), then Inbox, then Approved, Synced, Paid.
+  if (counts) {
+    for (const stage of ["review", "inbox", "approved", "synced", "paid"] as const) {
+      if (counts[stage] > 0) return stage
+    }
+  }
+  return "inbox"
 }
 
 /** The workspace-wide document pipeline: Inbox → To review → Ready → Approvals → Archive.
@@ -30,23 +40,26 @@ export default async function PipelinePage({ params, searchParams }: {
   const user = await getCurrentUser()
   const membership = await requireWorkspaceRole(workspaceId, user.id)
 
-  const stage = parseStage(stageParam)
   const query = q?.trim() || ""
   const flaggedOnly = flagged === "1"
   const documentSearchEnabled = config.embeddings.enabled
 
+  // Counts feed both the tab badges and the default-stage fallback, so they have to land before
+  // the stage is resolved.
+  const counts = await countDocumentsByStage(workspaceId)
+  const stage = parseStage(stageParam, stageParam ? undefined : counts)
+
   // The upload button's target: one app-managed container per workspace (kind: "pipeline"), so
   // uploading from here never forces a spreadsheet/file choice — see models/files.ts.
-  const [pipelineFile, usage, documents, counts, preference] = await Promise.all([
+  const [pipelineFile, usage, documents, preference] = await Promise.all([
     ensurePipelineFile(workspaceId, user.id),
     getWorkspaceUsage(workspaceId),
     listWorkspaceDocuments(workspaceId, { stage, query: query || undefined }),
-    countDocumentsByStage(workspaceId),
     getListPreference(user.id, workspaceId, `pipeline:${stage}`),
   ])
   const [pipelineTemplates, touchlessStats] = await Promise.all([
     getFileTemplates(workspaceId, pipelineFile.id),
-    stage === "ready" ? getTouchlessRateStats(workspaceId) : Promise.resolve(null),
+    stage === "approved" ? getTouchlessRateStats(workspaceId) : Promise.resolve(null),
   ])
 
   // Content search runs alongside the ordinary filename/OCR-text match, not instead of it — the

@@ -54,8 +54,10 @@ function ReadinessBadge({ status, blockers }: { status: string | null; blockers:
  * but as an invitation to upload on Inbox. */
 const EMPTY_COPY: Record<PipelineStage, string> = {
   inbox: "Nothing waiting to process. Upload PDFs or a folder — or email bills to your workspace address.",
-  to_review: "Nothing needs a look right now.",
-  ready: "Nothing marked ready yet — approve documents to use them in Sheets.",
+  review: "Nothing needs a look right now.",
+  approved: "Nothing marked approved yet — sign off on documents to use them in Sheets.",
+  synced: "No bills yet. Bills appear here once an invoice is extracted and approved.",
+  paid: "Nothing paid yet — a paid bill lands here once a reviewer or the ledger confirms it.",
 }
 
 /** The shared list shell for every pipeline tab: a plain table with checkbox/flag/status columns,
@@ -78,7 +80,9 @@ export function DocumentList({ workspaceId, stage, rows, contentMatches, query }
   // row's own file rather than selectedFileId's "first one wins" (which is only sound for the
   // Sheets link, where a cross-file selection is already meaningless).
   const selectedRows = rows.filter((row) => marked.has(row.id)).map((row) => ({ id: row.id, fileId: row.fileId }))
-  const isReview = stage === "ready"
+  // Supplier/Category/Total columns are shown on every stage except Inbox — documents on Inbox
+  // haven't been extracted yet, so their filename is still the only thing that identifies them.
+  const isReview = stage !== "inbox"
   const columnCount = isReview ? 7 : 5
 
 
