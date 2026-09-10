@@ -38,7 +38,7 @@ export function Comparison() {
   const { ref, played } = usePlayOnScroll(0.15)
 
   return (
-    <section ref={ref} className="bg-cream-50 py-16 md:py-30">
+    <section id="comparison" ref={ref} className="bg-cream-50 py-16 md:py-30">
       <div className="mx-auto max-w-6xl px-5">
         <h2 className="text-balance font-display text-[clamp(2.2rem,3.8vw,3.4rem)] font-extrabold leading-[1.06] tracking-[-0.035em] text-stone-900">
           The same three moments, done two ways

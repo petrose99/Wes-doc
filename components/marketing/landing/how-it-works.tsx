@@ -1,18 +1,25 @@
-const STEPS = [
+/** The three acts of the AP loop. Sits BEFORE the detailed 7-step rail so a reader gets the shape
+ * in three glances first, then can drop into the deeper rail. The 7 loop steps below each act name
+ * are the mapping so the two sections aren't competing enumerations — this is the summary, ApLoop is
+ * the deep-dive. */
+const ACTS: { n: string; title: string; steps: string; body: string }[] = [
   {
     n: "01",
-    title: "Send it in, however it arrives",
-    body: "Upload a file or a client's whole shoebox, or email it in and let the bills arrive on their own.",
+    title: "In",
+    steps: "Capture · Code · Check",
+    body: "Bills arrive by email, upload or API. Every field is read, every duplicate paired, and fraud checks catch what other tools miss — before anyone looks at anything.",
   },
   {
     n: "02",
-    title: "Read the flags first",
-    body: "Duplicates, missing periods and fields that couldn't be found are sorted for you. You start from what's wrong, not what's there.",
+    title: "Through",
+    steps: "Match · Approve",
+    body: "Each bill is tied to its PO and routed to the right approver by amount. Discrepancies surface with the numbers side by side. Your controls, not ours.",
   },
   {
     n: "03",
-    title: "Approve and send it on",
-    body: "Export clean CSV for your existing workflow, or push a reviewed bill straight to QuickBooks or Xero — and hand the routine ones over entirely once it has learned how you code them.",
+    title: "Out",
+    steps: "Sync · Pay-ready",
+    body: "Approved bills sync to QuickBooks, Xero or Bigcapital. One click assembles the bank-ready payment file with per-supplier remittance advice — you upload it to your own bank.",
   },
 ]
 
@@ -23,12 +30,16 @@ export function HowItWorks() {
         <h2 className="font-display text-[clamp(1.9rem,3vw,2.6rem)] font-bold leading-[1.1] tracking-[-0.03em] text-stone-900">
           Your part is three of them
         </h2>
+        <p className="mt-3 max-w-[46rem] text-[1.02rem] leading-[1.6] text-stone-600">
+          The AP loop in three glances. Every act is broken down step-by-step just below.
+        </p>
         <div className="mt-9 grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-5">
-          {STEPS.map((step) => (
-            <div key={step.n} className="rounded-2xl border border-cream-200 bg-white p-6 shadow-panel">
-              <span className="font-display text-[0.9rem] font-bold text-emerald-700">{step.n}</span>
-              <h3 className="mt-2 font-display text-xl font-bold tracking-[-0.02em] text-stone-900">{step.title}</h3>
-              <p className="mt-2.5 text-pretty text-[0.94rem] leading-[1.58] text-stone-600">{step.body}</p>
+          {ACTS.map((act) => (
+            <div key={act.n} className="rounded-2xl border border-cream-200 bg-white p-6 shadow-panel">
+              <span className="font-display text-[0.9rem] font-bold text-emerald-700">{act.n}</span>
+              <h3 className="mt-2 font-display text-xl font-bold tracking-[-0.02em] text-stone-900">{act.title}</h3>
+              <div className="mt-1 text-[0.78rem] font-semibold uppercase tracking-wide text-emerald-700">{act.steps}</div>
+              <p className="mt-2.5 text-pretty text-[0.94rem] leading-[1.58] text-stone-600">{act.body}</p>
             </div>
           ))}
         </div>
