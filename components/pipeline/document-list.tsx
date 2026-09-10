@@ -7,6 +7,8 @@ import { useRowSelection } from "@/components/shared/use-row-selection"
 import type { PipelineStage } from "@/lib/documents/stages"
 import { AlertTriangle, CheckCircle2, FileText, Inbox, Loader2, XCircle } from "lucide-react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
 
 export type PipelineDocumentRow = {
   id: string
@@ -92,8 +94,45 @@ export function DocumentList({ workspaceId, stage, rows, contentMatches, query }
   query: string
 }) {
   const { marked, markRow, toggleAll, clear } = useRowSelection(rows)
+  const router = useRouter()
   const selected = [...marked]
   const selectedFileId = selected.length > 0 ? rows.find((r) => r.id === selected[0])?.fileId : undefined
+  /** Focused row index for j/k navigation on the Review tab — mirrors the /review inbox's
+   * keyboard-driven experience, which was the surface the audit named as the one the pipeline
+   * Review tab (now primary) had lost parity with. Only wired for stage="review"; on other
+   * stages the row set has no per-row action a shortcut would trigger. */
+  const [focusedIndex, setFocusedIndex] = useState<number | null>(rows.length ? 0 : null)
+  const keyboardEnabled = stage === "review"
+  useEffect(() => {
+    if (!keyboardEnabled) return
+    const handler = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null
+      if (!target) return
+      if (["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) || target.isContentEditable) return
+      if (!rows.length) return
+      if (event.key === "j" || event.key === "ArrowDown") {
+        event.preventDefault()
+        setFocusedIndex((current) => Math.min((current ?? -1) + 1, rows.length - 1))
+      } else if (event.key === "k" || event.key === "ArrowUp") {
+        event.preventDefault()
+        setFocusedIndex((current) => Math.max((current ?? rows.length) - 1, 0))
+      } else if (event.key === " " || event.key === "x") {
+        event.preventDefault()
+        if (focusedIndex !== null) markRow(focusedIndex)
+      } else if (event.key === "Enter") {
+        event.preventDefault()
+        const row = focusedIndex !== null ? rows[focusedIndex] : null
+        if (row) router.push(`/workspaces/${workspaceId}/documents/${row.id}?stage=${stage}`)
+      } else if (event.key === "a") {
+        // Bulk-select toggle — the "select all N loaded rows" shortcut Alex was missing on both
+        // surfaces. `a` (not cmd+A) because the browser's own select-all shouldn't be hijacked.
+        event.preventDefault()
+        toggleAll()
+      }
+    }
+    window.addEventListener("keydown", handler)
+    return () => window.removeEventListener("keydown", handler)
+  }, [keyboardEnabled, rows, focusedIndex, markRow, toggleAll, router, workspaceId, stage])
   // Re-extract is per (fileId, documentId), and a selection can span files, so it needs each
   // row's own file rather than selectedFileId's "first one wins" (which is only sound for the
   // Sheets link, where a cross-file selection is already meaningless).
@@ -145,7 +184,7 @@ export function DocumentList({ workspaceId, stage, rows, contentMatches, query }
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, index) => <tr key={row.id} className={marked.has(row.id) ? "bg-emerald-50/60" : "hover:bg-slate-50 active:bg-slate-100"}>
+          {rows.map((row, index) => <tr key={row.id} className={`${marked.has(row.id) ? "bg-emerald-50/60" : "hover:bg-slate-50 active:bg-slate-100"} ${keyboardEnabled && focusedIndex === index ? "outline outline-2 -outline-offset-2 outline-emerald-500/50" : ""}`}>
             <td className="border-b px-2 py-2">
               <input type="checkbox" aria-label={`Select ${row.filename}`} className="h-4 w-4 accent-emerald-600" checked={marked.has(row.id)}
                 onChange={(e) => markRow(index, e.nativeEvent)} />
@@ -195,6 +234,12 @@ export function DocumentList({ workspaceId, stage, rows, contentMatches, query }
           </td></tr>}
         </tbody>
       </table>
+      {keyboardEnabled && rows.length > 0 && <p className="mt-2 text-xs text-slate-400">
+        <kbd className="rounded border px-1">j</kbd>/<kbd className="rounded border px-1">k</kbd> move,
+        {" "}<kbd className="rounded border px-1">x</kbd> select,
+        {" "}<kbd className="rounded border px-1">a</kbd> select all,
+        {" "}<kbd className="rounded border px-1">Enter</kbd> open. Select rows to Approve.
+      </p>}
     </div>
   </div>
 }

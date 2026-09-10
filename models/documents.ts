@@ -598,6 +598,7 @@ export async function markDocumentsReviewed(workspaceId: string, documentIds: st
   const capped = documentIds.slice(0, 100)
   let reviewed = 0
   let needsReview = 0
+  const reviewedIds: string[] = []
   for (const documentId of capped) {
     const doc = await getWorkspaceDocument(workspaceId, documentId)
     if (!doc || doc.status === "queued" || doc.status === "failed") continue
@@ -606,10 +607,39 @@ export async function markDocumentsReviewed(workspaceId: string, documentIds: st
       await updateDocumentReview({ workspaceId, documentId, reviewedData: data, actorId })
       const fields = parseTemplateFields(doc.fieldSnapshot)
       const missing = findMissingRequiredFields(fields, validateDocumentValues(fields, data))
-      if (missing.length) { needsReview++ } else { reviewed++ }
+      if (missing.length) { needsReview++ } else { reviewed++; reviewedIds.push(documentId) }
     } catch { needsReview++ }
   }
-  return { reviewed, needsReview }
+  // reviewedIds is what the client-side "Undo" can send back to Review — the set that actually
+  // moved off the Review stage this call. Held-back documents (missing required fields) never
+  // left Review, so they aren't in this list.
+  return { reviewed, needsReview, reviewedIds }
+}
+
+/** The Undo path for a pipeline bulk Approve: puts documents back on the Review stage by opening
+ * a fresh ReviewTask on each one. Doesn't touch reviewedData or status; the stage predicate
+ * (stageWhereClause("review") in this file) already treats `status: "reviewed"` + an open
+ * ReviewTask as Review, so an open task is enough to land the row back where it started. The
+ * task's `detail` says how it got there, so the reviewer looking at their queue knows this
+ * wasn't a fresh AI flag. Idempotent-ish: a document that already has an open task is skipped
+ * so a repeated Undo doesn't spawn duplicates. */
+export async function sendDocumentsBackToReview(workspaceId: string, documentIds: string[], actorId: string) {
+  const capped = documentIds.slice(0, 100)
+  let updated = 0
+  for (const documentId of capped) {
+    const doc = await prisma.document.findFirst({ where: { id: documentId, workspaceId }, select: { id: true, status: true } })
+    if (!doc) continue
+    const existing = await prisma.reviewTask.findFirst({ where: { workspaceId, documentId, status: { in: ["open", "in_review"] } }, select: { id: true } })
+    if (existing) { updated++; continue }
+    await prisma.reviewTask.create({
+      data: {
+        workspaceId, documentId, reason: "manual", detail: "Sent back to Review from bulk approve — Undo",
+        createdById: actorId, priority: 0,
+      },
+    })
+    updated++
+  }
+  return { updated }
 }
 
 /** Lightweight status read for the extraction-progress poller. Capped because callers track

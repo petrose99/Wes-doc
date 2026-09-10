@@ -36,7 +36,11 @@ const CHECK_LABELS: Record<string, string> = {
   duplicate: "Duplicate", invoice_arithmetic: "Arithmetic", statement_balance: "Balance",
   missing_statement_period: "Gap", tax_consistency: "Tax", suspicious_resubmission: "Resubmission",
 }
-const STATUS_OPTIONS = ["open", "in_review", "approved", "rejected"]
+/** The status buttons a reviewer picks from. `in_review` is deliberately absent — the server
+ * sets it as a machine transition when a workflow starts (see startWorkflowOnReviewTask), so
+ * putting it on this button row asked users to pick a state the system owns. `approved` leads
+ * because it is the goal of the whole surface; `open` and `rejected` follow as outlines. */
+const STATUS_OPTIONS = ["approved", "open", "rejected"] as const
 
 function ConfidenceDot({ score }: { score: number | null }) {
   if (score === null) return null
@@ -486,10 +490,14 @@ export function ReviewInbox({ workspaceId, tasks, currentStatus, members }: {
                 {STATUS_OPTIONS.map((option) => {
                   const current = optimisticStatus[detail.id] ?? detail.status
                   const blocked = option === "approved" && detail.document.paymentConfirmationRequired && !detail.document.paymentStatus
-                  return <Button key={option} type="button" size="sm" variant="outline" disabled={current === option || blocked} title={blocked ? "Confirm paid/unpaid first" : undefined}
-                    className={`capitalize ${current === option ? "border-emerald-700 bg-emerald-50 text-emerald-800 hover:bg-emerald-50" : ""}`}
+                  // Approve is the goal — default (primary) variant; the others are outline so the
+                  // primary action is unambiguous. Reject uses the destructive variant, same as
+                  // the workflow-stage Reject and the bulk Reject.
+                  const variant = option === "approved" ? "default" : option === "rejected" ? "destructive" : "outline"
+                  return <Button key={option} type="button" size="sm" variant={variant} disabled={current === option || blocked} title={blocked ? "Confirm paid/unpaid first" : undefined}
+                    className={`capitalize ${current === option && variant === "outline" ? "border-emerald-700 bg-emerald-50 text-emerald-800 hover:bg-emerald-50" : ""}`}
                     onClick={() => void changeStatus(detail.id, option, current)}>
-                    {option.replace("_", " ")}
+                    {option === "approved" ? "Approve" : option === "rejected" ? "Reject" : "Reopen"}
                   </Button>
                 })}
               </div>

@@ -3,16 +3,17 @@
 import {
   deletePipelineDocumentsAction,
   mergeDocumentsAction, moveDocumentsToStageAction,
+  sendDocumentsBackToReviewAction,
 } from "@/app/(app)/workspaces/[workspaceId]/pipeline-actions"
 import { reextractAdaptivelyAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
 import { Button } from "@/components/ui/button"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
+import { Dialog } from "@/components/ui/dialog"
 import type { PipelineStage } from "@/lib/documents/stages"
 import { CheckCircle2, Combine, Loader2, Sparkles, Table2, Trash2 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useEffect, useRef, useState } from "react"
-import { createPortal } from "react-dom"
+import { useState } from "react"
 import { toast } from "sonner"
 
 /** The N-selected action bar. Which actions make sense depends on the stage being viewed: you
@@ -70,7 +71,8 @@ export function BulkActionBar({ workspaceId, stage, selectedIds, selectedFileId,
 
   /** Bulk Approve with an honest outcome: a document that still fails validation (missing
    * required fields, no document type) stays on Review, and the toast says so rather than
-   * claiming a success the tab counts immediately contradict. */
+   * claiming a success the tab counts immediately contradict. Successful moves are undoable
+   * via sendDocumentsBackToReviewAction — the pipeline counterpart to the review-inbox undo. */
   const approve = async () => {
     setBusy(true)
     try {
@@ -78,11 +80,21 @@ export function BulkActionBar({ workspaceId, stage, selectedIds, selectedFileId,
       if (!result.success) { toast.error(result.error || "Approve failed"); return }
       const approved = result.data?.approved ?? 0
       const heldBack = result.data?.heldBack ?? 0
-      // No undo action here: markDocumentsReviewed has no server-side counterpart, so a reliable
-      // "Send back to Review" bulk move would need a new action first. Recovery today is opening
-      // the individual document — the ConfirmDialog above is what makes the bulk safe.
-      if (approved > 0 && heldBack === 0) toast.success(`Approved ${approved}`)
-      else if (approved > 0) toast.warning(`Approved ${approved} — ${heldBack} held back (missing required fields or document type)`)
+      const approvedIds = result.data?.approvedIds ?? []
+      const undoAction = approvedIds.length ? {
+        action: {
+          label: "Undo",
+          onClick: () => {
+            void sendDocumentsBackToReviewAction(workspaceId, approvedIds).then((revert) => {
+              if (!revert.success) { toast.error(revert.error || "Could not undo the approve"); return }
+              toast.success(`Sent ${revert.data?.updated ?? approvedIds.length} back to Review`)
+              router.refresh()
+            })
+          },
+        },
+      } : undefined
+      if (approved > 0 && heldBack === 0) toast.success(`Approved ${approved}`, undoAction)
+      else if (approved > 0) toast.warning(`Approved ${approved} — ${heldBack} held back (missing required fields or document type)`, undoAction)
       else toast.warning(`Nothing approved — ${heldBack} still missing required fields or a document type. Open the document to fill them in.`)
       onDone()
       router.refresh()
@@ -152,73 +164,18 @@ export function BulkActionBar({ workspaceId, stage, selectedIds, selectedFileId,
       onConfirm={() => { setConfirmingApprove(false); void approve() }}
       onCancel={() => setConfirmingApprove(false)} />
 
-    <SheetChoiceDialog
+    {/* Reuses the DS <Dialog> primitive instead of a hand-rolled overlay — one modal shape in the
+        app, and the choices below are Links so <Dialog>'s built-in focus trap/restore is enough. */}
+    <Dialog
       open={showSheetChoice && Boolean(sheetsHref)}
-      count={selectedIds.length}
-      combinedHref={sheetsHref ? `${sheetsHref}&mode=combined` : ""}
-      separateHref={sheetsHref ? `${sheetsHref}&mode=separate` : ""}
-      onClose={() => setShowSheetChoice(false)} />
-  </div>
-}
-
-/** A proper accessible dialog for the two-way "Open in Sheets" choice — replaces the earlier
- * hand-rolled overlay that had no role, no Escape handler, and no focus trap. The two options
- * are navigation, not a destructive confirmation, so it wants a plain dialog rather than
- * ConfirmDialog's alertdialog + destructive primary. Focus is trapped inside the panel while
- * open and returned to the opener on close (same portal-to-body pattern as ConfirmDialog so it
- * is never clipped by whichever grid container invoked it). */
-function SheetChoiceDialog({ open, count, combinedHref, separateHref, onClose }: {
-  open: boolean
-  count: number
-  combinedHref: string
-  separateHref: string
-  onClose: () => void
-}) {
-  const panelRef = useRef<HTMLDivElement>(null)
-  const openerRef = useRef<HTMLElement | null>(null)
-
-  useEffect(() => {
-    if (!open) return
-    openerRef.current = document.activeElement as HTMLElement | null
-    const panel = panelRef.current
-    const focusables = panel?.querySelectorAll<HTMLElement>('a[href], button:not([disabled])')
-    focusables?.[0]?.focus()
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") { event.preventDefault(); onClose(); return }
-      if (event.key !== "Tab" || !panel) return
-      const items = panel.querySelectorAll<HTMLElement>('a[href], button:not([disabled])')
-      if (!items.length) return
-      const first = items[0]
-      const last = items[items.length - 1]
-      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }
-      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
-    }
-    window.addEventListener("keydown", onKey)
-    return () => {
-      window.removeEventListener("keydown", onKey)
-      openerRef.current?.focus()
-    }
-  }, [open, onClose])
-
-  if (!open || typeof document === "undefined") return null
-
-  return createPortal(
-    <div role="presentation" className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 p-6" onClick={onClose}>
-      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby="sheet-choice-title" aria-describedby="sheet-choice-desc"
-        className="w-full max-w-sm overflow-hidden rounded-xl bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
-        <div className="px-5 pb-4 pt-5">
-          <h2 id="sheet-choice-title" className="text-base font-semibold text-slate-900">Open {count} documents in Sheets</h2>
-          <p id="sheet-choice-desc" className="mt-1.5 text-sm text-slate-500">How would you like to view them?</p>
-        </div>
-        <div className="flex flex-col gap-2 px-5 pb-5">
-          <Button asChild variant="outline"><Link href={combinedHref} onClick={onClose}>Combined into one sheet</Link></Button>
-          <Button asChild variant="outline"><Link href={separateHref} onClick={onClose}>Separate sheet per document</Link></Button>
-        </div>
-        <div className="flex justify-end border-t bg-slate-50 px-5 py-3">
-          <Button type="button" variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
-        </div>
+      title={`Open ${selectedIds.length} documents in Sheets`}
+      description="How would you like to view them?"
+      width="max-w-sm"
+      onClose={() => setShowSheetChoice(false)}>
+      <div className="flex flex-col gap-2 p-5">
+        <Button asChild variant="outline"><Link href={sheetsHref ? `${sheetsHref}&mode=combined` : ""} onClick={() => setShowSheetChoice(false)}>Combined into one sheet</Link></Button>
+        <Button asChild variant="outline"><Link href={sheetsHref ? `${sheetsHref}&mode=separate` : ""} onClick={() => setShowSheetChoice(false)}>Separate sheet per document</Link></Button>
       </div>
-    </div>,
-    document.body,
-  )
+    </Dialog>
+  </div>
 }
