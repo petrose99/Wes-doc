@@ -46,7 +46,7 @@ export function Hero() {
             AI accounts payable, end to end
           </span>
           <h1 className="mt-4 text-balance font-display text-[clamp(2.05rem,4.6vw,4.05rem)] font-extrabold leading-[1.04] tracking-[-0.038em] text-stone-950 md:mt-5 md:leading-[1.02]">
-            Bills in by email.{" "}
+            Bills in, however they arrive.{" "}
             <span style={{ backgroundImage: "linear-gradient(180deg,transparent 56%,#6EE7B7 56%,#6EE7B7 93%,transparent 93%)", padding: "0 .04em" }}>Coded, checked, approved</span>{" "}
             — ready to pay.
           </h1>
