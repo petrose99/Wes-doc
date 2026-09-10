@@ -194,8 +194,13 @@ export function ReviewInbox({ workspaceId, tasks, currentStatus, members }: {
     } finally { setPending(false) }
   }, [workspaceId, detail, refetchDetail])
 
-  const pushSelected = useCallback(async () => {
-    if (!detail?.canPush || !detail.activeConnectionId || pushed.has(detail.id)) return
+  /** `force` is the "Push again" path: it skips the already-pushed guard, which otherwise
+   * short-circuits on the stale `pushed` set this callback closed over — the setPushed the
+   * button fires first doesn't reach this closure until the next render, so without the flag
+   * the first "Push again" click (and a repeated `p`) is a silent no-op. No success toast:
+   * the inline receipt below the button is the success signal, and one is enough. */
+  const pushSelected = useCallback(async (force = false) => {
+    if (!detail?.canPush || !detail.activeConnectionId || (!force && pushed.has(detail.id))) return
     setPushed((previous) => new Set(previous).add(detail.id))
     try {
       const result = await pushDocumentToAccountingAction(workspaceId, detail.document.id, detail.activeConnectionId)
@@ -206,7 +211,6 @@ export function ReviewInbox({ workspaceId, tasks, currentStatus, members }: {
       }
       const destination = detail.activeConnection?.name ?? "accounting"
       setPushReceipts((previous) => ({ ...previous, [detail.id]: { destination, at: new Date() } }))
-      toast.success(`Pushed to ${destination}`)
     } catch {
       setPushed((previous) => { const next = new Set(previous); next.delete(detail.id); return next })
       toast.error("Could not reach the server")
@@ -322,7 +326,7 @@ export function ReviewInbox({ workspaceId, tasks, currentStatus, members }: {
       {bulkSelected.size > 0 && <div className="sticky top-2 z-10 mb-2 flex items-center gap-2 rounded-md bg-emerald-50 px-3 py-2 text-sm shadow-sm">
         <span className="font-medium text-emerald-900">{bulkSelected.size} selected</span>
         <Button type="button" size="sm" disabled={pending} onClick={() => setConfirming("approved")}>Approve</Button>
-        <Button type="button" size="sm" variant="outline" className="border-red-300 text-red-700 hover:bg-red-50 hover:text-red-800" disabled={pending} onClick={() => setConfirming("rejected")}>Reject</Button>
+        <Button type="button" size="sm" variant="destructive" disabled={pending} onClick={() => setConfirming("rejected")}>Reject</Button>
       </div>}
       <ConfirmDialog
         open={confirming === "approved" || confirming === "rejected"}
@@ -334,6 +338,17 @@ export function ReviewInbox({ workspaceId, tasks, currentStatus, members }: {
           : "Every selected document is marked approved — which can auto-publish them and sync them to accounting. Documents still waiting on a paid/unpaid answer are held back."}
         confirmLabel={confirming === "rejected" ? "Reject all" : "Approve all"}
         onConfirm={() => { const status = confirming; setConfirming(null); if (status && status !== "stage-reject") void bulk(status) }}
+        onCancel={() => setConfirming(null)} />
+      {/* Hoisted out of the detail pane so a mid-flight refetch that nulls `detail` can't unmount
+          the open dialog under the user; the task id is read from the selection at confirm time. */}
+      <ConfirmDialog
+        open={confirming === "stage-reject"}
+        destructive
+        busy={pending}
+        title="Reject this stage?"
+        description="The document is rejected at this stage of its approval workflow. Whoever raised it will see the reason in their queue."
+        confirmLabel="Reject"
+        onConfirm={() => { const taskId = effectiveSelectedId; setConfirming(null); if (taskId) void decideStage(taskId, "reject") }}
         onCancel={() => setConfirming(null)} />
       <table className="w-full border-collapse text-sm">
         <thead>
@@ -429,6 +444,7 @@ export function ReviewInbox({ workspaceId, tasks, currentStatus, members }: {
               <div className="mt-1.5 flex gap-2">
                 {(["paid", "unpaid"] as const).map((option) => (
                   <Button key={option} type="button" size="sm" variant="outline" disabled={pending}
+                    aria-pressed={detail.document.paymentStatus === option}
                     className={`capitalize ${detail.document.paymentStatus === option ? (option === "paid" ? "border-emerald-700 bg-emerald-50 text-emerald-800 hover:bg-emerald-50" : "border-amber-600 bg-amber-50 text-amber-800 hover:bg-amber-50") : ""}`}
                     onClick={() => void confirmPayment(detail.document.id, option)}>
                     {option}
@@ -458,7 +474,7 @@ export function ReviewInbox({ workspaceId, tasks, currentStatus, members }: {
                       return <Button type="button" size="sm" disabled={pending || blocked} title={blocked ? "Confirm paid/unpaid first" : undefined}
                         onClick={() => void decideStage(detail.id, "approve")}>Approve stage</Button>
                     })()}
-                    <Button type="button" size="sm" variant="outline" className="border-red-300 text-red-700 hover:bg-red-50 hover:text-red-800" disabled={pending} onClick={() => setConfirming("stage-reject")}>Reject</Button>
+                    <Button type="button" size="sm" variant="destructive" disabled={pending} onClick={() => setConfirming("stage-reject")}>Reject</Button>
                   </div>
                 ) : <p className="mt-1.5 text-xs text-indigo-700">Only a workspace owner can decide this stage.</p>
               ) : <p className="mt-1.5 text-xs font-medium capitalize text-slate-600">{detail.status.replace("_", " ")}</p>}
@@ -504,24 +520,15 @@ export function ReviewInbox({ workspaceId, tasks, currentStatus, members }: {
                       <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                       <span className="min-w-0 flex-1 truncate">
                         <span className="font-semibold">Pushed to {receipt?.destination ?? detail.activeConnection?.name ?? "accounting"}</span>
-                        {receipt?.at && <span className="ml-1 text-emerald-700/80">· {receipt.at.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span>}
+                        {receipt?.at && <span className="ml-1 text-emerald-700/80">· {receipt.at.toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span>}
                       </span>
                     </div>
-                    <Button type="button" size="sm" variant="outline" onClick={() => { setPushed((previous) => { const next = new Set(previous); next.delete(detail.id); return next }); void pushSelected() }}>
+                    <Button type="button" size="sm" variant="outline" onClick={() => void pushSelected(true)}>
                       Push again
                     </Button>
                   </div>}
             </div>
           })()}
-          <ConfirmDialog
-            open={confirming === "stage-reject"}
-            destructive
-            busy={pending}
-            title="Reject this stage?"
-            description="The document is rejected at this stage of its approval workflow. Whoever raised it will see the reason in their queue."
-            confirmLabel="Reject"
-            onConfirm={() => { setConfirming(null); void decideStage(detail.id, "reject") }}
-            onCancel={() => setConfirming(null)} />
 
           {detail.checkResults.length > 0 && <div className="mt-4">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Checks</h3>

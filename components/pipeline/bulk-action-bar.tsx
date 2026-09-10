@@ -127,8 +127,7 @@ export function BulkActionBar({ workspaceId, stage, selectedIds, selectedFileId,
       {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}Re-extract
     </Button>
 
-    <Button type="button" size="sm" variant="outline" disabled={dis}
-      className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+    <Button type="button" size="sm" variant="destructive" disabled={dis}
       onClick={() => setConfirmingDelete(true)}>
       <Trash2 className="h-3.5 w-3.5" />Delete
     </Button>

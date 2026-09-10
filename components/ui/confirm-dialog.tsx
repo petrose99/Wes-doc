@@ -55,10 +55,13 @@ export function ConfirmDialog({ open, title, description, confirmLabel = "Confir
 
   return createPortal(
     <div role="presentation" className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 p-6" onClick={() => { if (!busy) onCancel() }}>
-      <div ref={contentRef} role="alertdialog" aria-modal="true" aria-label={title} className="w-full max-w-sm overflow-hidden rounded-xl bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+      {/* labelledby/describedby against the visible heading and description, so a screen reader
+          announces the consequence line ("This cannot be undone", "can auto-publish and sync…"),
+          not just the title — the consequence is the reason this dialog exists. */}
+      <div ref={contentRef} role="alertdialog" aria-modal="true" aria-labelledby="confirm-dialog-title" aria-describedby={description ? "confirm-dialog-desc" : undefined} className="w-full max-w-sm overflow-hidden rounded-xl bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
         <div className="px-5 pb-4 pt-5">
-          <h2 className="text-base font-semibold text-slate-900">{title}</h2>
-          {description && <p className="mt-1.5 text-sm text-slate-500">{description}</p>}
+          <h2 id="confirm-dialog-title" className="text-base font-semibold text-slate-900">{title}</h2>
+          {description && <p id="confirm-dialog-desc" className="mt-1.5 text-sm text-slate-500">{description}</p>}
         </div>
         <div className="flex justify-end gap-2 border-t bg-slate-50 px-5 py-3">
           <Button type="button" variant="outline" size="sm" disabled={busy} onClick={onCancel}>Cancel</Button>
