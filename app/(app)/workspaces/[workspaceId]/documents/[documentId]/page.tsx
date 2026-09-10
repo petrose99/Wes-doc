@@ -3,6 +3,8 @@ import { SplitPane } from "@/components/pipeline/document-detail/split-pane"
 import { FxConversionBadge } from "@/components/documents/fx-conversion-badge"
 import { PushToAccountingCard } from "@/components/documents/push-to-accounting-card"
 import { MatchPanel } from "@/components/bank-match/match-panel"
+import { DocumentMatchesPanel } from "@/components/matching/document-matches-panel"
+import { listDocumentMatchesForDocument } from "@/models/document-matches-query"
 import { getCurrentUser } from "@/lib/auth"
 import { parseTemplateFields } from "@/lib/document-templates"
 import type { BlocksSidecar, DocumentProvenance } from "@/lib/provenance"
@@ -110,6 +112,9 @@ export default async function DocumentPage({ params, searchParams }: {
     : document.template?.code === "supplier_statement" && capabilities.has("statement-packs") ? "supplier_statement" as const
     : null
   const bankMatches = matchKind ? await listBankMatches(workspaceId, documentId) : []
+  // WP-AP1: DocumentMatch rows involving this document (as source OR target). Read-only for now;
+  // resolveDocumentMatches runs during extraction (models/document-matches.ts).
+  const documentMatches = await listDocumentMatchesForDocument(workspaceId, documentId)
 
   // A content-search result (Files browser, AP-aging chart, pipeline list) links here with an
   // ad-hoc page/bbox — a hit that matched full-text search rather than a named field, so there is
@@ -190,5 +195,6 @@ export default async function DocumentPage({ params, searchParams }: {
         matchedDocument: { id: match.matchedDocument.id, filename: match.matchedDocument.filename, paymentStatus: match.matchedDocument.paymentStatus },
       }))}
     /> : null}
+    documentMatches={documentMatches.length ? <DocumentMatchesPanel workspaceId={workspaceId} matches={documentMatches} /> : null}
   />
 }

@@ -27,7 +27,7 @@ type PanelLayout = "split" | "source-only" | "details-only"
 export function SplitPane({
   workspaceId, source, fields, data, fieldConfidence, provenanceFields, provenanceItems, initialTarget, conflictingLabels, missingRequiredFields,
   saveReview, documentType: initialDocumentType, note: initialNote, auditEvents, prevHref, nextHref, position, stage, afterActionHref,
-  header, canPush, pushCard, canCreateRule, defaultSupplier, matchKind, bankMatches, paymentStatus, rationales, fxBadge,
+  header, canPush, pushCard, canCreateRule, defaultSupplier, matchKind, bankMatches, documentMatches, paymentStatus, rationales, fxBadge,
 }: {
   workspaceId: string
   source: SourceDocument
@@ -55,6 +55,7 @@ export function SplitPane({
   defaultSupplier: string
   matchKind: "bank" | "supplier_statement" | null
   bankMatches: ReactNode
+  documentMatches?: ReactNode
   paymentStatus?: string | null
   rationales?: Record<string, FieldRationale>
   fxBadge?: ReactNode
@@ -304,6 +305,7 @@ export function SplitPane({
             </Card>}
 
             {matchKind && bankMatches}
+            {documentMatches}
 
             {!header.reviewLink && <CreateReviewTaskButton workspaceId={workspaceId} documentId={header.documentId} />}
           </div>}
