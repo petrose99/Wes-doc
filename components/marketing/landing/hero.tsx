@@ -51,7 +51,7 @@ export function Hero() {
             — ready to pay.
           </h1>
           <p className="mt-4 max-w-[34rem] text-pretty text-[1rem] leading-[1.55] text-stone-600 md:mt-6 md:text-[1.08rem] md:leading-[1.62]">
-            For bookkeepers running AP: dedupe, fraud checks, PO matching and approvals — synced to QuickBooks, Xero or Bigcapital before your bank sees the payment file.
+            Every bill is read, checked, routed for approval, and recorded in your books — ready for your bank to send.
           </p>
           <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-3.5 md:mt-8">
             <div className="flex flex-col">

@@ -19,7 +19,7 @@ const ACTS: { n: string; title: string; steps: string; body: string }[] = [
     n: "03",
     title: "Out",
     steps: "Sync · Pay-ready",
-    body: "Approved bills sync to QuickBooks, Xero or Bigcapital. One click assembles the bank-ready payment file with per-supplier remittance advice — you upload it to your own bank.",
+    body: "Approved bills sync to your accounting tool. One click assembles the bank-ready payment file with per-supplier remittance advice — you upload it to your own bank.",
   },
 ]
 

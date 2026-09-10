@@ -21,7 +21,7 @@ const QUESTIONS = [
   },
   {
     q: "Can I get my data out?",
-    a: "Reviewed data streams out as CSV whenever you want it, columns and all. Reviewed invoices and receipts push to QuickBooks, Xero or Bigcapital as bills. And when you're ready to pay, DocuBite assembles a bank-ready payment file with per-supplier remittance advice that you upload to your own bank. Nothing here is a one-way door.",
+    a: "Reviewed data streams out as CSV whenever you want it, columns and all. Reviewed invoices and receipts push to your accounting tool — QuickBooks, Xero and more — as bills. And when you're ready to pay, DocuBite assembles a bank-ready payment file with per-supplier remittance advice that you upload to your own bank. Nothing here is a one-way door.",
   },
   {
     q: "Does DocuBite move money or pay bills?",
