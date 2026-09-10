@@ -23,6 +23,8 @@ import type { CheckResult } from "@/lib/checks/types"
 import { checkVatNumber } from "@/lib/checks/vat-number"
 import { prisma } from "@/lib/db"
 import { createReviewTask } from "@/models/review-tasks"
+import { emitAccountsPayableEvent } from "@/lib/webhooks"
+import { kickWebhookDrain } from "@/lib/webhook-delivery"
 import { getTaxProfile } from "@/models/tax-profiles"
 import { DOC_TYPE_SPECS, resolveDocType, type CheckFieldMap } from "@/lib/doc-types"
 import { Prisma } from "@/prisma/client"
@@ -184,6 +186,17 @@ async function persistCheckResult(workspaceId: string, documentId: string, resul
   // must not pile up duplicate tasks every run.
   const existing = await prisma.reviewTask.findFirst({ where: { workspaceId, documentId, reason: "check_failed", status: { in: ["open", "in_review"] }, detail: { contains: result.checkCode } }, select: { id: true } })
   if (!existing) await createReviewTask({ workspaceId, documentId, reason: "check_failed", detail: `${result.checkCode}: ${result.message}`, priority: status === "fail" ? 1 : 0, createdById: null })
+  // WP-AP1: check.failed webhook. Best-effort — never throw past persistCheckResult.
+  try {
+    const emitted = await emitAccountsPayableEvent(prisma, {
+      workspaceId,
+      createdAt: new Date(),
+      event: { type: "check.failed", documentId, data: { check_code: result.checkCode, status: status as "warn" | "fail", message: result.message } },
+    })
+    if (emitted.queued > 0) await kickWebhookDrain().catch(() => {})
+  } catch (error) {
+    console.error("[checks] check.failed webhook emit failed:", error instanceof Error ? error.message : error)
+  }
 }
 
 /** A2.2 wiring: resolves the extracted supplier through the A5 registry, compares this document's

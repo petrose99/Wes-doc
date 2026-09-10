@@ -56,18 +56,19 @@ export default async function WorkspaceLayout({ children, params }: { children: 
   const switchable = workspaces.map((workspace) => ({ id: workspace.id, name: workspace.name, kind: workspace.kind, role: workspace.members[0]?.role }))
 
   return <div className="flex min-h-screen bg-white text-slate-900">
+    <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[200] focus:rounded-md focus:bg-slate-900 focus:px-3 focus:py-1.5 focus:text-sm focus:font-medium focus:text-white focus:shadow-lg">Skip to content</a>
     <Sidebar
       workspaceId={workspaceId}
       workspaces={switchable}
       user={{ name: user.name, email: user.email }}
       enabledModuleKeys={[...capabilities.enabled]}
       accountingEnabled={config.integrations.bigcapital.enabled}
-      pipelineReviewCount={pipelineCounts.to_review}
+      pipelineReviewCount={pipelineCounts.review}
       reviewTaskCount={reviewTaskCount} />
     <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-[radial-gradient(1200px_480px_at_100%_-10%,rgba(4,120,87,0.05),transparent_60%),#fafbfc]">
       <MobileHeader workspaceId={workspaceId} workspaces={switchable} user={{ name: user.name, email: user.email }} />
-      <div className="flex min-h-0 flex-1 flex-col pb-[72px] md:pb-0">{children}</div>
-      <MobileTabBar workspaceId={workspaceId} pipelineReviewCount={pipelineCounts.to_review} />
+      <div id="main" role="main" tabIndex={-1} className="flex min-h-0 flex-1 flex-col pb-[72px] md:pb-0">{children}</div>
+      <MobileTabBar workspaceId={workspaceId} pipelineReviewCount={pipelineCounts.review} />
     </div>
   </div>
 }

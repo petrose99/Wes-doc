@@ -16,25 +16,52 @@ const RESOLVED_STATUSES = new Set<ReviewTaskStatus>(["approved", "rejected"])
  * have one yet — see Document.paymentStatus in prisma/schema.prisma and
  * lib/doc-types.ts's isPaymentConfirmationRequired. Checked at the moment a task is ABOUT to
  * become "approved", not earlier, so a document that later turns out not to need confirmation
- * (its docType was reclassified, say) is never blocked on a stale requirement. */
-function assertPaymentConfirmed(document: { docType: string | null; paymentStatus: string | null; template: { code: string } | null }) {
+ * (its docType was reclassified, say) is never blocked on a stale requirement.
+ *
+ * WP-AP2: skipped when a ledger sync will fill in paymentStatus authoritatively. Any pending or
+ * succeeded IntegrationPush on this document means the accounting provider (QuickBooks / Xero /
+ * Bigcapital) is the source of truth for paid state going forward, and asking a reviewer to
+ * commit to "paid" or "unpaid" at approve-time — before payment has even happened — is friction
+ * with no signal. This matches how every other AP-first platform behaves: Bill.com's "Mark as
+ * Paid" is documented as the escape hatch for payments made OUTSIDE Bill; Tipalti's "mark paid
+ * manually" is the same, out-of-band-only; Stampli reads payment status back FROM QuickBooks
+ * every 5 minutes; Vic.ai's Autopilot approves without any human step at all. The gate is kept
+ * for workspaces with no ledger connection at all, where the manual click is still the only
+ * paid-state signal that will ever land. */
+async function assertPaymentConfirmed(
+  workspaceId: string,
+  documentId: string,
+  document: { docType: string | null; paymentStatus: string | null; template: { code: string } | null },
+): Promise<void> {
   if (document.paymentStatus) return
   if (!isPaymentConfirmationRequired(document)) return
+  const ledgerWillFillItIn = await prisma.integrationPush.findFirst({
+    where: { workspaceId, documentId, status: { in: ["pending", "succeeded"] } },
+    select: { id: true },
+  })
+  if (ledgerWillFillItIn) return
   throw new Error("payment_status_required")
 }
 
 const DOCUMENT_PAYMENT_GATE_SELECT = { docType: true, paymentStatus: true, template: { select: { code: true } } } as const
 
-function partitionByPaymentGate<T extends { document: { docType: string | null; paymentStatus: string | null; template: { code: string } | null } }>(tasks: T[]): [T[], T[]] {
+/** Bulk equivalent of assertPaymentConfirmed: one IntegrationPush.findMany per bulk approve
+ * instead of N. Called with the full task list; returns the [approvable, blocked] split without
+ * throwing so one document missing its confirmation withholds only itself, not the batch. */
+async function partitionByPaymentGate<T extends { documentId: string; document: { docType: string | null; paymentStatus: string | null; template: { code: string } | null } }>(workspaceId: string, tasks: T[]): Promise<[T[], T[]]> {
+  const candidates = tasks.filter((task) => !task.document.paymentStatus && isPaymentConfirmationRequired(task.document))
+  if (!candidates.length) return [tasks, []]
+  const pushed = await prisma.integrationPush.findMany({
+    where: { workspaceId, documentId: { in: candidates.map((task) => task.documentId) }, status: { in: ["pending", "succeeded"] } },
+    select: { documentId: true },
+  })
+  const pushedDocIds = new Set(pushed.map((row) => row.documentId))
   const approvable: T[] = []
   const blocked: T[] = []
   for (const task of tasks) {
-    try {
-      assertPaymentConfirmed(task.document)
-      approvable.push(task)
-    } catch {
-      blocked.push(task)
-    }
+    const needsGate = !task.document.paymentStatus && isPaymentConfirmationRequired(task.document)
+    if (!needsGate || pushedDocIds.has(task.documentId)) approvable.push(task)
+    else blocked.push(task)
   }
   return [approvable, blocked]
 }
@@ -146,7 +173,7 @@ export async function updateReviewTaskStatus(input: { workspaceId: string; taskI
     select: { id: true, documentId: true, status: true, document: { select: DOCUMENT_PAYMENT_GATE_SELECT } },
   })
   if (!task) throw new Error("review_task_not_found")
-  if (input.status === "approved") assertPaymentConfirmed(task.document)
+  if (input.status === "approved") await assertPaymentConfirmed(input.workspaceId, task.documentId, task.document)
   const context = await getRequestAuditContext()
   const resolvedAt = RESOLVED_STATUSES.has(input.status) ? new Date() : null
   const [updated] = await prisma.$transaction([
@@ -162,7 +189,7 @@ export async function updateReviewTaskStatus(input: { workspaceId: string; taskI
  * keeps status "in_review" until the last stage clears. Throws review_task_has_no_workflow for a
  * plain task; callers (WP3.2's actions layer) are expected to branch on task.workflowId and call
  * updateReviewTaskStatus for the plain case instead of routing everything through here. */
-export async function decideReviewTaskStage(input: { workspaceId: string; taskId: string; decision: "approve" | "reject"; actorId: string; actorRole: "owner" | "member" }) {
+export async function decideReviewTaskStage(input: { workspaceId: string; taskId: string; decision: "approve" | "reject"; actorId: string; actorRole: "owner" | "member"; note?: string | null }) {
   const task = await prisma.reviewTask.findFirst({
     where: { id: input.taskId, workspaceId: input.workspaceId },
     include: {
@@ -175,20 +202,25 @@ export async function decideReviewTaskStage(input: { workspaceId: string; taskId
 
   const currentStage = findCurrentStage(task.workflow.stages, task.currentStageIndex)
   if (!currentStage) throw new Error("workflow_stage_not_found")
-  if (!canDecideStage({ stage: currentStage, actorRole: input.actorRole })) throw new Error("stage_requires_owner")
+  if (!canDecideStage({ stage: currentStage, actorRole: input.actorRole, actorId: input.actorId })) throw new Error("stage_requires_owner")
 
   const result = decideStage({ stages: task.workflow.stages, currentStageIndex: task.currentStageIndex, decision: input.decision })
   // The workflow's last stage clearing is the only way this reaches "approved" — an intermediate
   // advance stays "in_review", and a reject never needs the gate at all.
-  if (result.outcome === "approved") assertPaymentConfirmed(task.document)
+  if (result.outcome === "approved") await assertPaymentConfirmed(input.workspaceId, task.documentId, task.document)
   const nextStatus = result.outcome === "advance" ? "in_review" : result.outcome
   const nextStageIndex = result.outcome === "advance" ? result.nextStageIndex : task.currentStageIndex
   const resolvedAt = result.outcome === "advance" ? null : new Date()
 
+  // A reject can carry the decider's note. It lands in two places: the audit event (the durable
+  // "who/why" trail the activity page reads) and, when the task has no detail yet, the task's own
+  // detail — so the queue row explains itself without a click. Never overwrites an existing
+  // detail: that text says why the task was raised, which the note doesn't replace.
+  const note = input.note?.trim() || null
   const context = await getRequestAuditContext()
   const [updated] = await prisma.$transaction([
-    prisma.reviewTask.update({ where: { id: task.id }, data: { status: nextStatus, currentStageIndex: nextStageIndex, resolvedAt } }),
-    prisma.documentAuditEvent.create({ data: auditEventData({ workspaceId: input.workspaceId, documentId: task.documentId, actorId: input.actorId, type: "review_task_stage_decided", detail: { stageIndex: currentStage.stageIndex, stageName: currentStage.name, decision: input.decision, outcome: result.outcome } }, context) }),
+    prisma.reviewTask.update({ where: { id: task.id }, data: { status: nextStatus, currentStageIndex: nextStageIndex, resolvedAt, ...(note && !task.detail ? { detail: note } : {}) } }),
+    prisma.documentAuditEvent.create({ data: auditEventData({ workspaceId: input.workspaceId, documentId: task.documentId, actorId: input.actorId, type: "review_task_stage_decided", detail: { stageIndex: currentStage.stageIndex, stageName: currentStage.name, decision: input.decision, outcome: result.outcome, ...(note ? { note } : {}) } }, context) }),
   ])
   return updated
 }
@@ -209,7 +241,7 @@ export async function bulkUpdateReviewTaskStatus(input: { workspaceId: string; t
   // what lets the client's optimistic list state be corrected for exactly the rows that did not
   // move, rather than either trusting every row moved or reverting all of them.
   const [approvable, blocked] = input.status === "approved"
-    ? partitionByPaymentGate(tasks)
+    ? await partitionByPaymentGate(input.workspaceId, tasks)
     : [tasks, [] as typeof tasks]
   const blockedTaskIds = blocked.map((task) => task.id)
   if (!approvable.length) return { updated: 0, blockedTaskIds, documentIds: [] as string[] }

@@ -12,6 +12,9 @@ beforeEach(() => {
   vi.clearAllMocks()
   for (const key of Object.keys(db)) delete db[key]
   db.$transaction = vi.fn(async (operations: unknown[]) => operations)
+  // WP-AP2: default "no push exists" so the payment-status gate still fires under existing
+  // tests unless a specific test overrides it to simulate a ledger sync in flight.
+  db.integrationPush = { findFirst: vi.fn().mockResolvedValue(null), findMany: vi.fn().mockResolvedValue([]) }
 })
 
 describe("parseReviewTaskStatus", () => {
@@ -221,6 +224,26 @@ describe("payment status gate on approval", () => {
       db.documentAuditEvent = { create: vi.fn().mockReturnValue("audit") }
       await expect(updateReviewTaskStatus({ workspaceId: "w1", taskId: "t1", status: "approved", actorId: "u1" })).resolves.toBeDefined()
     })
+
+    it("WP-AP2: bypasses the gate when a pending or succeeded IntegrationPush already exists", async () => {
+      // A ledger sync is in flight / has landed — QuickBooks/Xero/Bigcapital will fill in
+      // paymentStatus authoritatively, so asking the reviewer to guess is friction with no signal.
+      db.reviewTask = { findFirst: vi.fn().mockResolvedValue({ id: "t1", documentId: "d1", status: "open", document: invoiceUnconfirmed }), update: vi.fn().mockReturnValue("update") }
+      db.documentAuditEvent = { create: vi.fn().mockReturnValue("audit") }
+      db.integrationPush.findFirst.mockResolvedValue({ id: "push-1" })
+      await expect(updateReviewTaskStatus({ workspaceId: "w1", taskId: "t1", status: "approved", actorId: "u1" })).resolves.toBeDefined()
+      expect(db.integrationPush.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+        where: expect.objectContaining({ workspaceId: "w1", documentId: "d1", status: { in: ["pending", "succeeded"] } }),
+      }))
+    })
+
+    it("WP-AP2: still gates when a push exists but only in a failed / cancelled state", async () => {
+      // A failed push does NOT mean the ledger will fill paymentStatus in — treat as if no push
+      // exists at all. The gate re-engages.
+      db.reviewTask = { findFirst: vi.fn().mockResolvedValue({ id: "t1", documentId: "d1", status: "open", document: invoiceUnconfirmed }) }
+      db.integrationPush.findFirst.mockResolvedValue(null)
+      await expect(updateReviewTaskStatus({ workspaceId: "w1", taskId: "t1", status: "approved", actorId: "u1" })).rejects.toThrow("payment_status_required")
+    })
   })
 
   describe("decideReviewTaskStage", () => {
@@ -280,6 +303,27 @@ describe("payment status gate on approval", () => {
       expect(result.blockedTaskIds).toEqual(["t2"])
       expect(result.documentIds).toEqual(["d1", "d3"])
       expect(db.reviewTask.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: { id: { in: ["t1", "t3"] }, workspaceId: "w1" } }))
+    })
+
+    it("WP-AP2: does not block tasks whose document has a pending/succeeded IntegrationPush", async () => {
+      db.reviewTask = {
+        findMany: vi.fn().mockResolvedValue([
+          { id: "t1", documentId: "d1", status: "open", document: invoiceUnconfirmed },
+          { id: "t2", documentId: "d2", status: "open", document: invoiceUnconfirmed },
+        ]),
+        updateMany: vi.fn().mockReturnValue("update-many"),
+      }
+      db.documentAuditEvent = { create: vi.fn((args: unknown) => args) }
+      // Only d1 has a ledger push in flight — d2 stays blocked.
+      db.integrationPush.findMany.mockResolvedValue([{ documentId: "d1" }])
+
+      const result = await bulkUpdateReviewTaskStatus({ workspaceId: "w1", taskIds: ["t1", "t2"], status: "approved", actorId: "u1" })
+
+      expect(result.updated).toBe(1)
+      expect(result.blockedTaskIds).toEqual(["t2"])
+      expect(result.documentIds).toEqual(["d1"])
+      // One batched query, not two — pattern matters when a controller is bulk-approving 40 bills.
+      expect(db.integrationPush.findMany).toHaveBeenCalledTimes(1)
     })
 
     it("runs no transaction at all when every selected task is blocked", async () => {

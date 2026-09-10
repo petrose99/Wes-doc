@@ -28,7 +28,13 @@ function parseStageRows(formData: FormData): WorkflowStageDraft[] {
   for (let index = 0; index < count; index++) {
     const name = String(formData.get(`stageName_${index}`) || "").trim()
     if (!name) continue
-    stages.push({ name, requireOwner: formData.get(`stageRequireOwner_${index}`) === "on" })
+    // WP-AP2: getAll returns [] when nothing was submitted, which matches the "role-only" default
+    // in the engine — no extra defaulting needed here.
+    const approverIds = formData.getAll(`stageApproverIds_${index}`).map(String).filter(Boolean)
+    const minAmountRaw = String(formData.get(`stageMinAmount_${index}`) || "").trim()
+    const minAmountParsed = minAmountRaw ? Number(minAmountRaw) : NaN
+    const minAmount = Number.isFinite(minAmountParsed) && minAmountParsed >= 0 ? minAmountParsed : null
+    stages.push({ name, requireOwner: formData.get(`stageRequireOwner_${index}`) === "on", approverIds, minAmount })
   }
   return stages
 }

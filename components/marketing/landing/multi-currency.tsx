@@ -8,8 +8,8 @@ import { ArrowRight, Globe2 } from "lucide-react"
  * different rate magnitudes (EUR/USD near parity, JPY/USD tiny, LSL/ZAR pegged 1:1) so it's
  * visually obvious that the conversion is real, not a display trick. */
 const ROWS = [
-  { supplier: "Berlin Werkzeug GmbH", doc: "INV-2411.pdf",  from: "€2,140.00",  to: "$2,489.10",  rate: "1.0884",  date: "2026-03-12", source: "Frankfurter",       rowDelay: 0.15, popDelay: 1.0 },
-  { supplier: "Tokyo Office Supply",  doc: "receipt_88.jpg", from: "¥14,850",    to: "$99.10",     rate: "0.00668", date: "2026-03-12", source: "fxratesapi",        rowDelay: 0.4,  popDelay: 1.35 },
+  { supplier: "Berlin Werkzeug GmbH", doc: "INV-2411.pdf",  from: "€2,140.00",  to: "$2,489.10",  rate: "1.0884",  date: "2026-03-12", source: "ECB reference",       rowDelay: 0.15, popDelay: 1.0 },
+  { supplier: "Tokyo Office Supply",  doc: "receipt_88.jpg", from: "¥14,850",    to: "$99.10",     rate: "0.00668", date: "2026-03-12", source: "live intraday",        rowDelay: 0.4,  popDelay: 1.35 },
   { supplier: "Maseru Print Works",   doc: "M-INV-013.pdf",  from: "M 1,850.00", to: "R 1,850.00", rate: "1.0000",  date: "2026-03-12", source: "ZAR peg (CMA)",     rowDelay: 0.65, popDelay: 1.7 },
 ]
 
@@ -27,7 +27,7 @@ export function MultiCurrency() {
             One workspace, every currency
           </h2>
           <p className="mt-4 max-w-[31rem] text-pretty text-[1.02rem] leading-[1.62] text-stone-600">
-            Extract an invoice in any currency — DocuBite reads it in the original, then converts to your workspace&apos;s base at the rate that applied on the invoice&apos;s own date, not today&apos;s. The document library shows both; totals, dashboards and any push to QuickBooks or Xero use the converted amount. Rates come from the ECB reference feed via Frankfurter (free, historical back to 1999), with fxratesapi handling live intraday when you have a key.
+            Extract an invoice in any currency — DocuBite reads it in the original, then converts to your workspace&apos;s base at the rate that applied on the invoice&apos;s own date, not today&apos;s. The document library shows both; totals, dashboards and any push to QuickBooks or Xero use the converted amount. Rates come from live and historical ECB reference feeds, historical back to 1999.
           </p>
           <ul className="mt-5 space-y-2.5 text-[0.94rem] text-stone-600">
             <li className="flex items-start gap-2"><span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />Historical rates, frozen on the document — a 2024 invoice booked in 2026 keeps 2024&apos;s rate.</li>

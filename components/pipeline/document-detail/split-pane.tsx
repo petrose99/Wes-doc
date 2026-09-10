@@ -5,6 +5,7 @@ import { CreateReviewTaskButton } from "@/components/documents/create-review-tas
 import { DeleteDocumentButton } from "@/components/documents/delete-document-button"
 import { FieldRow } from "@/components/pipeline/document-detail/field-row"
 import { LineItemsSection } from "@/components/pipeline/document-detail/line-items-section"
+import { StageIndicator, type StageStep } from "@/components/pipeline/document-detail/stage-indicator"
 import { useFieldNav } from "@/components/pipeline/document-detail/use-field-nav"
 import { archiveDocumentsAction, flagDocumentsAction, moveDocumentsToStageAction, updateDocumentNoteAction } from "@/app/(app)/workspaces/[workspaceId]/pipeline-actions"
 import { setDocumentTypeAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
@@ -24,10 +25,21 @@ import { toast } from "sonner"
 type Tab = "details" | "note" | "activity"
 type PanelLayout = "split" | "source-only" | "details-only"
 
+/** Shared label map for the four document-type states. Extracted so the chip in the top bar, the
+ * inline "Type:" line, and the future stage indicator all read the same names — a mismatch here
+ * showed up in the audit as "Expense / Sale / Bank Statement / Other" competing with the Bill /
+ * Sales invoice glossary elsewhere in the app. */
+const DOC_TYPE_LABELS: Record<"expense" | "sale" | "bank_statement" | "other", string> = {
+  expense: "Bill",
+  sale: "Sales invoice",
+  bank_statement: "Bank statement",
+  other: "Other",
+}
+
 export function SplitPane({
   workspaceId, source, fields, data, fieldConfidence, provenanceFields, provenanceItems, initialTarget, conflictingLabels, missingRequiredFields,
   saveReview, documentType: initialDocumentType, note: initialNote, auditEvents, prevHref, nextHref, position, stage, afterActionHref,
-  header, canPush, pushCard, canCreateRule, defaultSupplier, matchKind, bankMatches, paymentStatus, rationales, fxBadge,
+  header, canPush, pushCard, canCreateRule, defaultSupplier, matchKind, bankMatches, documentMatches, paymentStatus, rationales, fxBadge, stageIndicator,
 }: {
   workspaceId: string
   source: SourceDocument
@@ -55,9 +67,13 @@ export function SplitPane({
   defaultSupplier: string
   matchKind: "bank" | "supplier_statement" | null
   bankMatches: ReactNode
+  documentMatches?: ReactNode
   paymentStatus?: string | null
   rationales?: Record<string, FieldRationale>
   fxBadge?: ReactNode
+  /** The five-step Extracted → Checks → Approval → Sync → Pay indicator. Derived at the page
+   * level so this client component doesn't need to pull in review-task/integration-push readers. */
+  stageIndicator?: StageStep[]
 }) {
   const router = useRouter()
   const [tab, setTab] = useState<Tab>("details")
@@ -136,9 +152,16 @@ export function SplitPane({
   const moveToReady = async () => {
     setBusyAction("ready")
     try {
-      const result = await moveDocumentsToStageAction(workspaceId, [header.documentId], "ready")
-      if (!result.success) { toast.error(result.error || "Could not move this document"); return }
-      toast.success("Moved to Ready")
+      const result = await moveDocumentsToStageAction(workspaceId, [header.documentId], "approved")
+      if (!result.success) { toast.error(result.error || "Could not approve this document"); return }
+      // Validation can hold the document back (missing required fields / no document type) — say
+      // so instead of announcing an approval the Review tab immediately contradicts.
+      if ((result.data?.heldBack ?? 0) > 0) {
+        toast.warning("Not approved yet — fill in the missing required fields (and pick a document type) first.")
+        router.refresh()
+        return
+      }
+      toast.success("Approved")
       router.push(afterActionHref)
       router.refresh()
     } catch {
@@ -186,7 +209,7 @@ export function SplitPane({
 
       {docType && <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium ${docType === "expense" ? "border-red-200 bg-red-50 text-red-700" : docType === "sale" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : docType === "bank_statement" ? "border-blue-200 bg-blue-50 text-blue-700" : "border-slate-200 bg-slate-50 text-slate-700"}`}>
         {docType === "expense" ? <ArrowUp className="h-3 w-3" /> : docType === "sale" ? <ArrowDown className="h-3 w-3" /> : docType === "bank_statement" ? <Building2 className="h-3 w-3" /> : null}
-        {docType === "expense" ? "Expense" : docType === "sale" ? "Sale" : docType === "bank_statement" ? "Bank Statement" : "Other"}
+        {DOC_TYPE_LABELS[docType]}
       </span>}
 
       {paymentStatus && <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${paymentStatus === "paid" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : paymentStatus === "partial" ? "border-amber-200 bg-amber-50 text-amber-700" : "border-red-200 bg-red-50 text-red-700"}`}>
@@ -200,8 +223,11 @@ export function SplitPane({
         <Flag className={`h-4 w-4 ${flagged ? "fill-indigo-400" : ""}`} />
       </button>
 
-      {stage !== "ready" && stage !== "archive" && stage !== null && <button type="button" disabled={busyAction === "ready"} onClick={() => void moveToReady()} className={toolbarBtn}>
-        {busyAction === "ready" ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}Ready
+      {/* Keyed off the document's own status, not the ?stage= the reader arrived from — a doc
+          opened from search (no stage param) still needs its Approve button. Hidden once the
+          document is reviewed: it's already approved, re-approving is a no-op. */}
+      {header.status !== "reviewed" && header.status !== "queued" && header.status !== "failed" && stage !== "archive" && <button type="button" disabled={busyAction === "ready"} onClick={() => void moveToReady()} className={toolbarBtn}>
+        {busyAction === "ready" ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}Approve
       </button>}
       {stage !== "archive" && <button type="button" disabled={busyAction === "archive"} onClick={() => void archive()} className={toolbarBtn}>
         {busyAction === "archive" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Archive className="h-4 w-4" />}Archive
@@ -223,6 +249,11 @@ export function SplitPane({
       <Link href={nextHref ?? "#"} aria-disabled={!nextHref} className={`rounded-lg p-1 ${nextHref ? "text-slate-500 hover:bg-slate-100 hover:text-slate-700" : "pointer-events-none text-slate-300"}`}><ChevronRight className="h-4 w-4" /></Link>
     </div>
 
+    {/* Five-step lifecycle: Extracted → Checks → Approval → Sync → Pay. See stage-indicator.tsx. */}
+    {stageIndicator && stageIndicator.length > 0 && <div className="border-b border-slate-200 bg-white">
+      <StageIndicator steps={stageIndicator} />
+    </div>}
+
     {/* Alert banner */}
     {(missingRequiredFields.length > 0 || conflictingLabels.length > 0) && <div className="border-b border-indigo-200 bg-indigo-50 px-6 py-2 text-sm text-indigo-700">
       {missingRequiredFields.length > 0 && <p>Missing required fields: <strong>{missingRequiredFields.join(", ")}</strong></p>}
@@ -232,7 +263,7 @@ export function SplitPane({
     {/* Main content area */}
     <div className="flex min-h-0 flex-1 overflow-hidden">
       {/* Source panel */}
-      {showSource && <div className={`flex min-h-0 flex-col overflow-hidden border-r border-slate-200 bg-white transition-all ${layout === "source-only" ? "flex-1" : "basis-[52%]"}`}>
+      {showSource && <div className={`flex min-h-0 flex-col overflow-hidden border-r border-slate-200 bg-white transition-[flex-basis] duration-200 ${layout === "source-only" ? "flex-1" : "basis-[52%]"}`}>
         {layout !== "split" && <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2">
           <span className="text-xs font-medium uppercase tracking-wider text-slate-400">Source document</span>
           <button type="button" onClick={() => setLayout("split")} className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600" title="Split view">
@@ -243,7 +274,7 @@ export function SplitPane({
       </div>}
 
       {/* Details panel */}
-      {showDetails && <div className={`flex min-h-0 flex-col overflow-hidden bg-white transition-all ${layout === "details-only" ? "flex-1" : "basis-[48%]"}`}>
+      {showDetails && <div className={`flex min-h-0 flex-col overflow-hidden bg-white transition-[flex-basis] duration-200 ${layout === "details-only" ? "flex-1" : "basis-[48%]"}`}>
         <div className="flex items-center border-b border-slate-100">
           <div className="flex gap-0.5 px-3 pt-1">
             {tabButton("details", "Details")}
@@ -269,10 +300,10 @@ export function SplitPane({
               <div>
                 <p className="mb-1.5 text-sm font-medium text-slate-800">What type of document is this?</p>
                 <div className="flex flex-wrap gap-1.5">
-                  {([["expense", "Expense"], ["sale", "Sale"], ["bank_statement", "Bank Statement"], ["other", "Other"]] as const).map(([value, label]) => (
+                  {(["expense", "sale", "bank_statement", "other"] as const).map((value) => (
                     <button key={value} type="button" disabled={savingDocType} onClick={() => void selectDocType(value)}
                       className="rounded border px-2.5 py-1 text-sm text-slate-600 hover:bg-slate-50">
-                      {label}
+                      {DOC_TYPE_LABELS[value]}
                     </button>
                   ))}
                 </div>
@@ -304,6 +335,7 @@ export function SplitPane({
             </Card>}
 
             {matchKind && bankMatches}
+            {documentMatches}
 
             {!header.reviewLink && <CreateReviewTaskButton workspaceId={workspaceId} documentId={header.documentId} />}
           </div>}
@@ -346,7 +378,13 @@ function FieldNavForm({ saveReview, docType, formFields, data, fieldConfidence, 
 }) {
   const navItems = formFields.map((field) => ({ key: field.key, confidence: fieldConfidence[field.key] ?? null, type: field.type }))
   const nav = useFieldNav(navItems)
+  // One summary line in place of the per-field "Extracted" badges the audit had FieldRow drop:
+  // says how many fields landed, and how many of those are worth a second look.
+  const extractedCount = formFields.filter((field) => data[field.key] !== undefined && data[field.key] !== null && data[field.key] !== "").length
   return <form action={saveReview} className="space-y-3" onKeyDown={nav.onFormKeyDown}>
+    {extractedCount > 0 && <p className="text-xs text-slate-500">
+      All {extractedCount} field{extractedCount === 1 ? "" : "s"} extracted{nav.totalSuspects > 0 ? ` — ${nav.totalSuspects} low-confidence` : ""}.
+    </p>}
     {nav.totalSuspects > 0 && <div className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
       <span><span className="font-semibold">{nav.suspectsRemaining}</span> of {nav.totalSuspects} low-confidence fields to review — Enter confirms and moves to the next.</span>
       <button type="button" className="rounded-md border border-amber-300 bg-white px-2 py-0.5 font-medium text-amber-800 hover:bg-amber-100" onClick={() => nav.focusNext()}>Next suspect</button>

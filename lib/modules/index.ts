@@ -44,7 +44,11 @@ export const MODULES: ModuleDefinition[] = [
   { key: "reports", name: "Reports", description: "Draft and export reports from extracted data.", industry: "core", tier: "always", activation: "enable" },
 
   { key: "review-queue", name: "Review queue", description: "Triage incoming documents that need a person to look at them.", industry: "finance", tier: "always", activation: "enable", navItems: [{ href: "review", label: "Review", icon: "inbox" }] },
-  { key: "approval-workflows", name: "Approval workflows", description: "Route a document through multiple approval stages before it's marked approved.", industry: "finance", tier: "always", activation: "enable", navItems: [{ href: "settings/approvals", label: "Approvals", icon: "check-circle" }] },
+  // Approval workflows is workflow *configuration*, reachable from the Automation page's own tabs
+  // (Approvals lives at /automation/approvals). It used to declare a sidebar navItem, which
+  // produced a duplicate "Approvals" rail entry alongside Automation itself — the audit flagged
+  // that as the clearest instance of the same destination being advertised twice.
+  { key: "approval-workflows", name: "Approval workflows", description: "Route a document through multiple approval stages before it's marked approved.", industry: "finance", tier: "always", activation: "enable" },
   { key: "supplier-rules", name: "Supplier rules", description: "Auto-code recurring suppliers and, optionally, auto-publish them.", industry: "finance", tier: "always", activation: "enable", navItems: [{ href: "settings/rules", label: "Rules", icon: "workflow" }] },
   { key: "document-checks", name: "Document checks", description: "Deterministic duplicate, arithmetic, tax, and gap checks on every document.", industry: "finance", tier: "always", activation: "enable" },
   { key: "tax-profiles", name: "Tax profiles", description: "Per-workspace tax rate and jurisdiction settings.", industry: "finance", tier: "always", activation: "enable", navItems: [{ href: "settings/tax", label: "Tax", icon: "percent" }] },

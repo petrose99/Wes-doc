@@ -8,7 +8,7 @@ vi.mock("@/lib/analytics", () => ({ track: vi.fn() }))
 vi.mock("@/models/document-field-values", () => ({ replaceDocumentFieldValues: vi.fn() }))
 vi.mock("@/models/field-corrections", () => ({ recordFieldCorrection: vi.fn().mockResolvedValue(undefined) }))
 
-const { createDocumentFromBuffer, deleteWorkspaceDocuments, documentDataForExport, documentHash, documentSourceFor, isSupportedDocumentBuffer, setDocumentPaymentStatus, updateDocumentField, validateDocumentInput } = await import("@/models/documents")
+const { createDocumentFromBuffer, deleteWorkspaceDocuments, documentDataForExport, documentHash, documentSourceFor, isSupportedDocumentBuffer, setDocumentPaymentStatus, stageWhereClause, updateDocumentField, validateDocumentInput } = await import("@/models/documents")
 const { prisma } = await import("@/lib/db")
 const { deleteDocumentSource } = await import("@/lib/document-storage")
 const { recordFieldCorrection } = await import("@/models/field-corrections")
@@ -303,5 +303,32 @@ describe("setDocumentPaymentStatus", () => {
     expect(db.documentAuditEvent.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ detail: { from: "unpaid", to: "paid" } }),
     }))
+  })
+})
+
+describe("stageWhereClause null-safety regression", () => {
+  // Regression: the original stageWhereClause used NOT: [{ paymentStatus: "paid" }, ...], which
+  // is NULL-unsafe (SQL: NOT (col = 'paid') is NULL for NULL rows) — every reviewed document
+  // whose paymentStatus was still null (the common case) silently disappeared from Approved,
+  // Review, and Synced. Live DB check on the seeded workspace confirmed 7 reviewed docs with
+  // NULL paymentStatus landing in 0 stages until this was rewritten to OR-with-null.
+  it("uses OR-with-null for the not-paid predicate on Approved", () => {
+    const clause = stageWhereClause("approved") as Record<string, unknown>
+    const and = clause.AND as Array<Record<string, unknown>>
+    expect(Array.isArray(and)).toBe(true)
+    const notPaid = and.find((c) => Array.isArray(c.OR))
+    expect(notPaid).toBeDefined()
+    const or = notPaid?.OR as Array<Record<string, unknown>>
+    expect(or.some((c) => c.paymentStatus === null)).toBe(true)
+    expect(or.some((c) => JSON.stringify(c.paymentStatus) === '{"not":"paid"}')).toBe(true)
+  })
+
+  it("uses OR-with-null on Review too", () => {
+    const clause = stageWhereClause("review") as Record<string, unknown>
+    const and = clause.AND as Array<Record<string, unknown>>
+    const notPaid = and.find((c) => Array.isArray(c.OR))
+    expect(notPaid).toBeDefined()
+    const or = notPaid?.OR as Array<Record<string, unknown>>
+    expect(or.some((c) => c.paymentStatus === null)).toBe(true)
   })
 })

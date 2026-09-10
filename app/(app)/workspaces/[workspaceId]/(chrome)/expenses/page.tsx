@@ -64,7 +64,7 @@ export default async function ExpenseClaimsPage({ params }: { params: Promise<{ 
           : <ul className="space-y-3">
               {claims.map((claim) => {
                 const currentStage = claim.workflow && claim.currentStageIndex !== null ? findCurrentStage(claim.workflow.stages, claim.currentStageIndex) : null
-                const canDecideCurrentStage = currentStage ? canDecideStage({ stage: currentStage, actorRole }) : actorRole === "owner"
+                const canDecideCurrentStage = currentStage ? canDecideStage({ stage: currentStage, actorRole, actorId: user.id }) : actorRole === "owner"
                 return <ExpenseClaimRow
                   key={claim.id}
                   workspaceId={workspaceId}

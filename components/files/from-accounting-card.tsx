@@ -12,7 +12,7 @@ export function FromAccountingCard({ workspaceId }: { workspaceId: string }) {
   return <>
     <button
       onClick={() => setOpen(true)}
-      className="group flex items-center gap-3 rounded-xl border border-[#e6ebf1] bg-white px-4 py-3 text-left shadow-panel transition-all hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md sm:flex-col sm:items-start sm:gap-0 sm:p-5"
+      className="group flex items-center gap-3 rounded-xl border border-[#e6ebf1] bg-white px-4 py-3 text-left shadow-panel transition-[border-color,box-shadow,transform] duration-150 hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md sm:flex-col sm:items-start sm:gap-0 sm:p-5"
     >
       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700 sm:mb-3 sm:h-10 sm:w-10">
         <Landmark className="h-[17px] w-[17px] sm:h-5 sm:w-5" />

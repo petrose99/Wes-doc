@@ -69,6 +69,7 @@ model User {
   dismissedHealthCheckResults HealthCheckResult[] @relation("HealthCheckResultDismisser")
   routingAssignments ReviewRoutingRule[] @relation("RoutingAssignee")
   matchResolutions   DocumentMatch[]     @relation("MatchResolver")
+  createdPaymentRuns PaymentRun[]        @relation("PaymentRunCreator")
 
   @@map("users")
 }
@@ -160,6 +161,8 @@ model Workspace {
   reviewRoutingRules ReviewRoutingRule[]
   budgets            WorkspaceBudget[]
   documentMatches    DocumentMatch[]
+  paymentRuns        PaymentRun[]
+  paymentRunItems    PaymentRunItem[]
   suppliers          Supplier[]
   supplierAliases    SupplierAlias[]
   inboundEmailIntakes InboundEmailIntake[]
@@ -547,6 +550,7 @@ model Document {
   reviewTasks       ReviewTask[]
   documentMatchesAsSource DocumentMatch[] @relation("MatchSource")
   documentMatchesAsTarget DocumentMatch[] @relation("MatchTarget")
+  paymentRunItems         PaymentRunItem[]
   bankMatchesAsStatement BankMatch[] @relation("BankMatchStatement")
   bankMatchesAsMatched   BankMatch[] @relation("BankMatchMatched")
   statementLines         StatementLine[]
@@ -1419,6 +1423,15 @@ model ApprovalWorkflowStage {
   /// When true, only a workspace "owner" (not a plain "member") can approve this stage — see
   /// models/workspaces.ts's WorkspaceRole. False means any workspace member can.
   requireOwner Boolean @default(false) @map("require_owner")
+  /// WP-AP2: per-stage named approvers. When non-empty, the stage can only be decided by one of
+  /// these users (rather than by "any member" or "any owner"). Empty keeps the historic role-only
+  /// behavior. The engine's canDecideStage honors both — see lib/approvals/engine.ts.
+  approverIds String[] @default([]) @map("approver_ids") @db.Uuid
+  /// WP-AP2: amount threshold. When non-null, a bill under this amount SKIPS the stage — a
+  /// caller building the stage list for one document should call applicableStages() to filter.
+  /// Money-typed for the same reason ExpenseClaim.total is: chained Float arithmetic drifts and
+  /// this is compared against ledger amounts. Null = the stage applies at every amount.
+  minAmount   Decimal? @map("min_amount") @db.Decimal(18, 2)
   createdAt   DateTime @default(now()) @map("created_at")
   workflow    ApprovalWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -1980,6 +1993,57 @@ model WorkspaceBudget {
   @@map("workspace_budgets")
 }
 
+/// WP-AP2: one payment run is a batch of bill payments the user prepared for their bank. The
+/// row is created when they generate the CSV; `status` transitions draft → sent → reconciled as
+/// the file is uploaded to the bank and the resulting ledger transactions match back to these
+/// items via the existing bank-match pipeline. DocuBite never itself moves money — this table
+/// exists purely to track what was included in a downloaded payment file so an unpaid bill isn't
+/// silently re-batched into a second run.
+model PaymentRun {
+  id            String   @id @default(uuid()) @db.Uuid
+  workspaceId   String   @map("workspace_id") @db.Uuid
+  createdById   String?  @map("created_by_id") @db.Uuid
+  format        String   @default("za_eft_csv")
+  status        String   @default("draft")
+  itemCount     Int      @default(0) @map("item_count")
+  totalsJson    Json?    @map("totals_json")
+  filename      String?
+  sentAt        DateTime? @map("sent_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy     User?     @relation("PaymentRunCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  items         PaymentRunItem[]
+
+  @@index([workspaceId, status])
+  @@index([workspaceId, createdAt])
+  @@map("payment_runs")
+}
+
+/// One bill (a Document) included in one PaymentRun. `documentId` is nullable + SetNull because
+/// a workspace deleting the underlying document should not orphan the whole run; the item stays
+/// as an audit record ("we tried to pay for this then the source was deleted"). Unique on
+/// (workspaceId, documentId, active) so the same bill isn't in two open runs at once.
+model PaymentRunItem {
+  id            String   @id @default(uuid()) @db.Uuid
+  workspaceId   String   @map("workspace_id") @db.Uuid
+  runId         String   @map("run_id") @db.Uuid
+  documentId    String?  @map("document_id") @db.Uuid
+  supplier      String
+  amount        Decimal  @db.Decimal(18, 2)
+  currencyCode  String   @map("currency_code")
+  reference     String
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now()) @map("created_at")
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  run           PaymentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  document      Document?  @relation(fields: [documentId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, runId])
+  @@index([workspaceId, documentId, active])
+  @@map("payment_run_items")
+}
+
 model DocumentMatch {
   id             String    @id @default(uuid()) @db.Uuid
   workspaceId    String    @map("workspace_id") @db.Uuid
@@ -2032,6 +2096,11 @@ model Supplier {
   /// N whatever their confidence).
   touchlessSeen Int       @default(0) @map("touchless_seen")
   lastSeenAt    DateTime? @map("last_seen_at")
+  /// WP-AP2: net payment terms in days. When set, models/bills.ts's due-date inference uses
+  /// `document.date + paymentTermsDays` when the extracted invoice has no explicit due_date. Null
+  /// = no default (aging falls back to the extracted date or blank). Common values: 0 (due on
+  /// receipt), 7, 14, 30, 60.
+  paymentTermsDays Int?   @map("payment_terms_days")
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
   workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)

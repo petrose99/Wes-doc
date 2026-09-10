@@ -6,8 +6,8 @@ import { sheetToCsv } from "@/lib/sheet-export"
 import { getCurrentUser } from "@/lib/auth"
 import {
   countDocumentsByStage, deleteWorkspaceDocuments, documentDataForExport, getWorkspaceDocument,
-  listWorkspaceDocuments, markDocumentsReviewed, mergeDocuments, setDocumentsArchived, setDocumentsFlagged,
-  updateDocumentNote,
+  listWorkspaceDocuments, markDocumentsReviewed, mergeDocuments, sendDocumentsBackToReview,
+  setDocumentsArchived, setDocumentsFlagged, updateDocumentNote,
 } from "@/models/documents"
 import { getListPreference, saveListPreference, type ListPreference } from "@/models/list-preferences"
 import { revalidatePath } from "next/cache"
@@ -24,7 +24,7 @@ async function revalidatePipeline(workspaceId: string) {
  * (models/documents.markDocumentsReviewed, the same write the single-document review form makes);
  * moving onto "archive" only sets archivedAt, leaving `status` untouched, per the archive/status
  * split in lib/documents/stages.ts. */
-export async function moveDocumentsToStageAction(workspaceId: string, documentIds: string[], stage: "ready" | "archive"): Promise<ActionState<{ moved: number }>> {
+export async function moveDocumentsToStageAction(workspaceId: string, documentIds: string[], stage: "approved" | "ready" | "archive"): Promise<ActionState<{ moved: number; approved?: number; heldBack?: number; approvedIds?: string[] }>> {
   const user = await getCurrentUser()
   if (!(await requireMember(workspaceId, user.id))) return { success: false, error: NO_ACCESS }
   try {
@@ -33,11 +33,31 @@ export async function moveDocumentsToStageAction(workspaceId: string, documentId
       revalidatePipeline(workspaceId)
       return { success: true, data: { moved: updated } }
     }
-    const { reviewed, needsReview } = await markDocumentsReviewed(workspaceId, documentIds, user.id)
+    // markDocumentsReviewed re-runs validation per document; one that is still missing required
+    // fields (document type included) stays needs_review. Reported separately so the UI can say
+    // "held back" instead of toasting a success that the tab counts immediately contradict.
+    // `approvedIds` names the documents that actually moved off Review, so the client's Undo
+    // path (sendDocumentsBackToReviewAction) can put exactly those back.
+    const { reviewed, needsReview, reviewedIds } = await markDocumentsReviewed(workspaceId, documentIds, user.id)
     revalidatePipeline(workspaceId)
-    return { success: true, data: { moved: reviewed + needsReview } }
+    return { success: true, data: { moved: reviewed + needsReview, approved: reviewed, heldBack: needsReview, approvedIds: reviewedIds } }
   } catch (error) {
     return { success: false, error: errorMessage(error, "Could not move the selected documents") }
+  }
+}
+
+/** Undo counterpart to a bulk Approve: puts the given documents back on Review by opening a
+ * fresh ReviewTask on each. Same review/membership gate as moveDocumentsToStageAction — a user
+ * who can approve a batch can un-approve it. */
+export async function sendDocumentsBackToReviewAction(workspaceId: string, documentIds: string[]): Promise<ActionState<{ updated: number }>> {
+  const user = await getCurrentUser()
+  if (!(await requireMember(workspaceId, user.id))) return { success: false, error: NO_ACCESS }
+  try {
+    const result = await sendDocumentsBackToReview(workspaceId, documentIds, user.id)
+    revalidatePipeline(workspaceId)
+    return { success: true, data: result }
+  } catch (error) {
+    return { success: false, error: errorMessage(error, "Could not send those documents back to Review") }
   }
 }
 

@@ -63,3 +63,4 @@ pgdata
 .worktrees/
 
 .vercel
+.impeccable/hook.cache.json

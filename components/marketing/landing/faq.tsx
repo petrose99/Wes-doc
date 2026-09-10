@@ -21,7 +21,11 @@ const QUESTIONS = [
   },
   {
     q: "Can I get my data out?",
-    a: "Reviewed data streams out as CSV whenever you want it, columns and all. Reviewed invoices and receipts can also be pushed to QuickBooks or Xero as bills. Nothing here is a one-way door.",
+    a: "Reviewed data streams out as CSV whenever you want it, columns and all. Reviewed invoices and receipts push to QuickBooks, Xero or Bigcapital as bills. And when you're ready to pay, DocuBite assembles a bank-ready payment file with per-supplier remittance advice that you upload to your own bank. Nothing here is a one-way door.",
+  },
+  {
+    q: "Does DocuBite move money or pay bills?",
+    a: "No — that's deliberate. DocuBite gets your bills ready to pay: coded, checked, matched, approved, synced to your ledger, and — when you're ready — assembled into a bank-payment file with a supplier remittance. You take that file to your own bank's bulk-payment portal and press send. Payment execution stays on rails you already trust and keeps DocuBite outside every payment-license perimeter, so we can serve you across South Africa, Lesotho, Namibia and Eswatini without asking you to switch banks.",
   },
 ]
 
@@ -34,9 +38,13 @@ export function Faq() {
         </h2>
         <div className="flex flex-col gap-2.5">
           {QUESTIONS.map((item) => (
-            <details key={item.q} className="rounded-xl border border-cream-200 bg-white p-5">
+            <details key={item.q} className="group rounded-xl border border-cream-200 bg-white p-5">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-base font-semibold text-stone-900 [&::-webkit-details-marker]:hidden">
-                {item.q}<span className="font-bold text-emerald-700">+</span>
+                <span>{item.q}</span>
+                <span aria-hidden className="grid h-6 w-6 shrink-0 place-items-center text-lg font-bold leading-none text-emerald-700">
+                  <span className="group-open:hidden">+</span>
+                  <span className="hidden group-open:inline">−</span>
+                </span>
               </summary>
               <p className="mt-3 text-pretty text-[0.94rem] leading-[1.6] text-stone-600">{item.a}</p>
             </details>

@@ -7,12 +7,15 @@ export interface SectionCopy {
 
 export const SECTION_COPY: Record<SectionKey, SectionCopy> = {
   extraction: {
+    // "extraction" as the key stays for API stability; the copy talks about Documents (the rail
+    // label the merge introduced) and the five-stage lifecycle (Inbox → Review → Approved → Synced
+    // → Paid) rather than the pre-merge "drop, review, move to Library" flow.
     banner:
-      "Extraction is your inbox: drop files, we OCR, split and extract, you review the results.",
+      "Documents is your inbox: drop files, we OCR, split and extract, you review, approve, sync, and mark paid.",
     howItWorks: [
-      "Add PDFs or drag a folder — we run OCR automatically.",
-      "Multi-page files are split into individual documents for you to confirm.",
-      "Review extracted fields, fix anything off, then the document moves to the Docu Library.",
+      "Add PDFs or drag a folder — we run OCR automatically. New arrivals land on Inbox.",
+      "Multi-page files are split into individual documents; extracted rows move to Review.",
+      "Approve confirms the extraction; Synced pushes to accounting; Paid records the payment.",
     ],
   },
   library: {
@@ -36,7 +39,7 @@ export const SECTION_COPY: Record<SectionKey, SectionCopy> = {
     banner:
       "Your workspace at a glance: see what needs attention and pick up where you left off.",
     howItWorks: [
-      "Stat cards show documents this month, in review, ready, and in sheets.",
+      "Stat cards show documents this month, waiting for review, and approved.",
       "The review queue surfaces documents that need your input.",
       "Recent files let you jump straight back into a sheet.",
     ],
@@ -59,7 +62,7 @@ export type OnboardingStepKey = (typeof ONBOARDING_STEPS)[number]["key"]
  * cannot see. A "search" step lived here for exactly that reason: components/shell/global-search.tsx
  * is written but never imported anywhere, so the launcher it describes is not in the app. */
 export const TOUR_STEPS = [
-  { target: "extraction", title: "Extraction", description: "Add and review documents here." },
+  { target: "extraction", title: "Documents", description: "Add and review documents here — through Inbox, Review, Approved, Synced, and Paid." },
   { target: "library", title: "Docu Library", description: "Your permanent, searchable document library." },
   { target: "sheets", title: "Sheets", description: "Spreadsheets with AI — pull documents in and compute." },
 ] as const

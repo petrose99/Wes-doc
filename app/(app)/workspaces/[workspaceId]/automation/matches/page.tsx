@@ -12,6 +12,12 @@ export const dynamic = "force-dynamic"
 const MATCH_KIND_LABELS: Record<string, string> = {
   two_way: "Two-way, invoice to order",
   three_way: "Three-way, order to invoice to receipt",
+  // WP-AP1: current lib/matching/engine.ts enum values. Historic seed data still writes the
+  // two_way/three_way strings above, so both vocabularies stay mapped here rather than migrating
+  // one into the other.
+  po_to_invoice: "Two-way, order to invoice",
+  invoice_to_receipt: "Two-way, invoice to receipt",
+  po_to_receipt: "Two-way, order to receipt",
 }
 
 /** Phase 4 visibility, folded into /automation as the "Matches" tab: DocumentMatch rollup +

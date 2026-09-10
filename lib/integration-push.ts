@@ -16,6 +16,8 @@ import { type BankStatementPayload, toBigcapitalCashflowBody } from "@/lib/integ
 import { computePushUpdate, PUSH_LEASE_MS, type PushAttemptResult } from "@/lib/integration-push-policy"
 import { preflightPush } from "@/lib/integration-preflight"
 import { createReviewTask } from "@/models/review-tasks"
+import { emitAccountsPayableEvent } from "@/lib/webhooks"
+import { kickWebhookDrain } from "@/lib/webhook-delivery"
 
 /** The push loop: claim a due IntegrationPush, resolve the vendor/contact + default expense account
  * at the provider, create the bill, and apply the pure policy's verdict (succeeded / retry-with-
@@ -230,6 +232,22 @@ export async function attemptIntegrationPush(pushId: string, now = new Date()): 
       type: "integration_push_succeeded",
       detail: { pushId: push.id, connectionId: connection.id, documentId: push.documentId, provider: connection.provider, externalBillId: result.externalBillId },
     })
+    // WP-AP1: bill.pushed webhook, best-effort — never throw past attemptIntegrationPush.
+    const externalRecordKind = await prisma.integrationPush.findUnique({ where: { id: push.id }, select: { externalRecordKind: true } }).then((r) => r?.externalRecordKind ?? null).catch(() => null)
+    try {
+      const emitted = await emitAccountsPayableEvent(prisma, {
+        workspaceId: push.workspaceId,
+        createdAt: now,
+        event: {
+          type: "bill.pushed",
+          documentId: push.documentId,
+          data: { provider: connection.provider, connection_id: connection.id, external_bill_id: result.externalBillId, external_record_kind: externalRecordKind },
+        },
+      })
+      if (emitted.queued > 0) await kickWebhookDrain()
+    } catch (error) {
+      console.error("[integration-push] bill.pushed webhook emit failed:", error instanceof Error ? error.message : error)
+    }
   } else if (update.status === "failed") {
     // Terminal only — every retry would otherwise get its own row and drown the signal in noise.
     await recordSystemAudit({
