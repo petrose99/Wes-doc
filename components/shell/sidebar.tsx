@@ -5,7 +5,7 @@ import { AccountMenu } from "@/components/shell/account-menu"
 import { SwitchableWorkspace, WorkspaceSwitcher } from "@/components/workspace/switcher"
 import { BiteMark } from "@/components/marketing/logo"
 import { MODULES } from "@/lib/modules"
-import { BarChart3, CheckCircle2, ClipboardCheck, Files, HeartPulse, History, Landmark, Library, ListChecks, Mic, Percent, Receipt, Settings, Table2, Wallet, Workflow, Zap } from "lucide-react"
+import { BarChart3, CheckCircle2, ClipboardCheck, FileText, Files, HeartPulse, History, Landmark, Library, ListChecks, Mic, Percent, Receipt, Settings, Table2, Wallet, Workflow, Zap } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
@@ -98,6 +98,7 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
   const workItems = [
     { href: base, label: "Dashboard", icon: BarChart3, exact: true },
     { href: `${base}/pipeline`, label: "Extraction", icon: ListChecks, exact: false, badge: pipelineReviewCount > 0 ? pipelineReviewCount : undefined, tourTarget: "extraction" as const },
+    { href: `${base}/bills`, label: "Bills", icon: FileText, exact: false },
     { href: `${base}/files`, label: "Sheets", icon: Table2, exact: false, tourTarget: "sheets" as const },
     { href: `${base}/library`, label: "Docu Library", icon: Library, exact: false, tourTarget: "library" as const },
     ...(accountingEnabled ? [{ href: `${base}/accounting`, label: "Accounting", icon: Landmark, exact: false }] : []),

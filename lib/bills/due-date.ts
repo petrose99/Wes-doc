@@ -12,8 +12,9 @@ export function inferDueDate(input: {
 }): Date | null {
   if (input.extractedDueDate) return input.extractedDueDate
   if (input.documentDate && input.supplierPaymentTermsDays !== null && input.supplierPaymentTermsDays >= 0) {
+    // Use UTC math so a call from a non-UTC test/env doesn't drift by a day at the day boundary.
     const inferred = new Date(input.documentDate)
-    inferred.setDate(inferred.getDate() + input.supplierPaymentTermsDays)
+    inferred.setUTCDate(inferred.getUTCDate() + input.supplierPaymentTermsDays)
     return inferred
   }
   return null
