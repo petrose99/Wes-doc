@@ -26,6 +26,13 @@ export const WEBHOOK_EVENT_TYPES = [
   "document.reviewed",
   "document.failed",
   "document.deleted",
+  // WP-AP1: AP-flow events. Their payload shape is not document-shaped — see
+  // buildAccountsPayableEventPayload. Receivers subscribed to a specific type get only that
+  // shape; a receiver subscribed to "all events" (empty `events`) gets both shapes and should
+  // switch on `type` before reading `data`.
+  "bill.pushed",
+  "match.discrepancy",
+  "check.failed",
 ] as const
 
 export type WebhookEventType = (typeof WEBHOOK_EVENT_TYPES)[number]
@@ -179,6 +186,53 @@ export async function emitWorkspaceEvent(
   tx: EmitTxClient,
   input: { workspaceId: string; type: WebhookEventType; createdAt: Date; document: DocumentEventInput }
 ): Promise<{ eventId: string; queued: number }> {
+  const payload = buildDocumentEventPayload({ eventId: "", type: input.type, workspaceId: input.workspaceId, createdAt: input.createdAt, document: input.document })
+  const documentId = "deleted" in input.document ? null : input.document.id
+  return fanOutEvent(tx, { workspaceId: input.workspaceId, type: input.type, payload, documentId })
+}
+
+/** WP-AP1: AP-flow events (bill.pushed, match.discrepancy, check.failed). Not document-shaped —
+ * each event carries a small AP-specific data blob (see buildAccountsPayableEventPayload). Same
+ * transaction contract as emitWorkspaceEvent: the caller passes a tx client and kicks the drain
+ * after commit. */
+export type AccountsPayableEventInput =
+  | { type: "bill.pushed"; documentId: string; data: { provider: string; connection_id: string; external_bill_id: string | null; external_record_kind: string | null } }
+  | { type: "match.discrepancy"; documentId: string; data: { matched_document_id: string; match_type: string; confidence: number; discrepancies: Array<{ field: string; expected: string; actual: string }> } }
+  | { type: "check.failed"; documentId: string; data: { check_code: string; status: "warn" | "fail"; message: string } }
+
+export function buildAccountsPayableEventPayload(input: {
+  eventId: string
+  workspaceId: string
+  createdAt: Date
+  event: AccountsPayableEventInput
+}): WebhookEventPayload {
+  const { eventId, workspaceId, createdAt, event } = input
+  const links = documentLinks(workspaceId, event.documentId)
+  return {
+    id: eventId,
+    type: event.type,
+    created_at: createdAt.toISOString(),
+    workspace_id: workspaceId,
+    // AP events reuse the top-level shape but their `data` carries an AP-specific object, not the
+    // document-shaped one document.* events use. Receivers switch on `type` before reading `data`.
+    data: { document: { id: event.documentId, links, ...event.data } },
+  }
+}
+
+export async function emitAccountsPayableEvent(
+  tx: EmitTxClient,
+  input: { workspaceId: string; createdAt: Date; event: AccountsPayableEventInput }
+): Promise<{ eventId: string; queued: number }> {
+  const payload = buildAccountsPayableEventPayload({ eventId: "", workspaceId: input.workspaceId, createdAt: input.createdAt, event: input.event })
+  return fanOutEvent(tx, { workspaceId: input.workspaceId, type: input.event.type, payload, documentId: input.event.documentId })
+}
+
+/** Shared fanout. The `payload.id` is rewritten to the generated eventId before inserting so
+ * every WebhookDelivery row carries a matching id and receivers can idempotency-key on it. */
+async function fanOutEvent(
+  tx: EmitTxClient,
+  input: { workspaceId: string; type: WebhookEventType; payload: WebhookEventPayload; documentId: string | null }
+): Promise<{ eventId: string; queued: number }> {
   const eventId = randomUUID()
   const endpoints = await tx.webhookEndpoint.findMany({
     where: { workspaceId: input.workspaceId, status: "active" },
@@ -187,16 +241,14 @@ export async function emitWorkspaceEvent(
   const subscribed = endpoints.filter((e) => endpointWantsEvent(e.events, input.type))
   if (!subscribed.length) return { eventId, queued: 0 }
 
-  const payload = buildDocumentEventPayload({ eventId, type: input.type, workspaceId: input.workspaceId, createdAt: input.createdAt, document: input.document })
-  const documentId = "deleted" in input.document ? null : input.document.id
-
+  const payload = { ...input.payload, id: eventId }
   await tx.webhookDelivery.createMany({
     data: subscribed.map((endpoint) => ({
       workspaceId: input.workspaceId,
       endpointId: endpoint.id,
       eventId,
       eventType: input.type,
-      documentId,
+      documentId: input.documentId,
       payload: payload as unknown as Prisma.InputJsonValue,
     })),
   })

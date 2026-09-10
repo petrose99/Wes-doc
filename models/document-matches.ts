@@ -6,6 +6,8 @@ import { prisma } from "@/lib/db"
 import { resolveDocumentMatches } from "@/lib/matching/resolve"
 import type { MatchResult } from "@/lib/matching/engine"
 import { createReviewTask } from "@/models/review-tasks"
+import { emitAccountsPayableEvent } from "@/lib/webhooks"
+import { kickWebhookDrain } from "@/lib/webhook-delivery"
 import { Prisma } from "@/prisma/client"
 
 /** WP-AP1: post-extraction 2/3-way matching hook. Runs the matcher over blocking candidates,
@@ -22,6 +24,26 @@ export async function runDocumentMatching(input: { workspaceId: string; document
     const withDiscrepancies = results.filter((r) => r.discrepancies.length > 0)
     if (withDiscrepancies.length) {
       await persistDiscrepancyCheck(input.workspaceId, input.documentId, withDiscrepancies)
+      // WP-AP1: match.discrepancy webhook, one event per matched target with a discrepancy.
+      // Best-effort — never throws past runDocumentMatching.
+      let anyQueued = false
+      for (const match of withDiscrepancies) {
+        try {
+          const emitted = await emitAccountsPayableEvent(prisma, {
+            workspaceId: input.workspaceId,
+            createdAt: new Date(),
+            event: {
+              type: "match.discrepancy",
+              documentId: input.documentId,
+              data: { matched_document_id: match.targetId, match_type: match.matchType, confidence: match.confidence, discrepancies: match.discrepancies },
+            },
+          })
+          if (emitted.queued > 0) anyQueued = true
+        } catch (error) {
+          console.error("[matching] match.discrepancy webhook emit failed:", error instanceof Error ? error.message : error)
+        }
+      }
+      if (anyQueued) await kickWebhookDrain().catch(() => {})
     } else {
       // A clean run clears any stale discrepancy row from a prior extraction.
       await prisma.documentCheckResult

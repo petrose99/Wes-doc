@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest"
 import {
+  buildAccountsPayableEventPayload,
   buildApiDocumentResponse,
   buildDocumentEventPayload,
+  emitAccountsPayableEvent,
   emitWorkspaceEvent,
   endpointWantsEvent,
   fieldValueScalar,
@@ -168,5 +170,59 @@ describe("emitWorkspaceEvent", () => {
     })
     const rows = tx.webhookDelivery.createMany.mock.calls[0][0].data
     expect(rows[0].documentId).toBeNull()
+  })
+})
+
+describe("buildAccountsPayableEventPayload", () => {
+  it("builds a bill.pushed payload with the AP-shape data blob", () => {
+    const payload = buildAccountsPayableEventPayload({
+      eventId: "evt_1", workspaceId, createdAt,
+      event: { type: "bill.pushed", documentId: "doc_1", data: { provider: "quickbooks", connection_id: "c1", external_bill_id: "QB-77", external_record_kind: "bill" } },
+    })
+    expect(payload.type).toBe("bill.pushed")
+    expect(payload.id).toBe("evt_1")
+    expect(payload.data.document).toMatchObject({ id: "doc_1", provider: "quickbooks", external_bill_id: "QB-77" })
+    expect((payload.data.document as { links: unknown }).links).toBeDefined()
+  })
+
+  it("builds a match.discrepancy payload carrying every discrepancy", () => {
+    const payload = buildAccountsPayableEventPayload({
+      eventId: "evt_2", workspaceId, createdAt,
+      event: { type: "match.discrepancy", documentId: "doc_1", data: { matched_document_id: "doc_2", match_type: "po_to_invoice", confidence: 0.7, discrepancies: [{ field: "amount", expected: "100", actual: "110" }] } },
+    })
+    expect(payload.type).toBe("match.discrepancy")
+    expect(payload.data.document).toMatchObject({ matched_document_id: "doc_2", match_type: "po_to_invoice" })
+  })
+})
+
+describe("emitAccountsPayableEvent", () => {
+  it("fans a check.failed event to every subscribed endpoint with the same eventId", async () => {
+    const tx = {
+      webhookEndpoint: { findMany: vi.fn().mockResolvedValue([{ id: "e1", events: [] }, { id: "e2", events: ["check.failed"] }]) },
+      webhookDelivery: { createMany: vi.fn().mockResolvedValue({ count: 2 }) },
+    }
+    const res = await emitAccountsPayableEvent(tx, {
+      workspaceId, createdAt,
+      event: { type: "check.failed", documentId: "doc_1", data: { check_code: "bank_detail_change", status: "fail", message: "IBAN changed" } },
+    })
+    expect(res.queued).toBe(2)
+    const rows = tx.webhookDelivery.createMany.mock.calls[0][0].data
+    expect(new Set(rows.map((r: { eventId: string }) => r.eventId)).size).toBe(1)
+    expect(rows[0].eventType).toBe("check.failed")
+    expect(rows[0].documentId).toBe("doc_1")
+    expect(rows[0].payload.id).toBe(res.eventId)
+  })
+
+  it("queues nothing when no endpoint subscribes to the AP event type", async () => {
+    const tx = {
+      webhookEndpoint: { findMany: vi.fn().mockResolvedValue([{ id: "e1", events: ["document.reviewed"] }]) },
+      webhookDelivery: { createMany: vi.fn() },
+    }
+    const res = await emitAccountsPayableEvent(tx, {
+      workspaceId, createdAt,
+      event: { type: "bill.pushed", documentId: "doc_1", data: { provider: "xero", connection_id: "c1", external_bill_id: null, external_record_kind: null } },
+    })
+    expect(res.queued).toBe(0)
+    expect(tx.webhookDelivery.createMany).not.toHaveBeenCalled()
   })
 })
