@@ -4,7 +4,9 @@ import { assignReviewTaskAction, bulkUpdateReviewTaskStatusAction, decideReviewT
 import { pushDocumentToAccountingAction } from "@/app/(app)/workspaces/[workspaceId]/integration-push-actions"
 import { DocumentPreview } from "@/components/documents/document-preview"
 import { AutomationRuleForm } from "@/components/workspace/automation-rule-form"
-import { Bot } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
+import { Bot, CheckCircle2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
@@ -74,6 +76,14 @@ export function ReviewInbox({ workspaceId, tasks, currentStatus, members }: {
   const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set())
   const [pending, setPending] = useState(false)
   const [pushed, setPushed] = useState<Set<string>>(new Set())
+  /** Receipts for successful pushes, keyed by task id: destination name + when. The disabled
+   * "Pushed" button alone was a dead end at the highest-stakes success moment. */
+  const [pushReceipts, setPushReceipts] = useState<Record<string, { destination: string; at: Date }>>({})
+  /** Which bulk decision is awaiting confirmation, if any. Bulk approve commits every selected
+   * bill in one click — the one action here that must never run off a stray mis-click, so it gets
+   * the same ConfirmDialog treatment a delete does. Reject on a workflow stage gets the same
+   * guard ("stage-reject") since it kills the bill's approval run. */
+  const [confirming, setConfirming] = useState<"approved" | "rejected" | "stage-reject" | null>(null)
   const detailTaskIdRef = useRef<string | null>(null)
 
   // Adjusted during render (React's own recommended pattern for "reset derived state when a prop
@@ -85,6 +95,9 @@ export function ReviewInbox({ workspaceId, tasks, currentStatus, members }: {
     setTasksSeen(tasks)
     setOptimisticStatus({})
     setPushed(new Set())
+    // pushReceipts is deliberately NOT reset here: a receipt records something that already
+    // happened, and the refresh after approve/assign would otherwise wipe it seconds after the
+    // push it confirms.
   }
 
   const visibleTasks = useMemo(() => tasks.filter((task) => {
@@ -191,7 +204,9 @@ export function ReviewInbox({ workspaceId, tasks, currentStatus, members }: {
         toast.error(result.error || "Could not push this document")
         return
       }
-      toast.success("Pushed to accounting")
+      const destination = detail.activeConnection?.name ?? "accounting"
+      setPushReceipts((previous) => ({ ...previous, [detail.id]: { destination, at: new Date() } }))
+      toast.success(`Pushed to ${destination}`)
     } catch {
       setPushed((previous) => { const next = new Set(previous); next.delete(detail.id); return next })
       toast.error("Could not reach the server")
@@ -259,13 +274,28 @@ export function ReviewInbox({ workspaceId, tasks, currentStatus, members }: {
         setOptimisticStatus((previous) => { const next = { ...previous }; for (const id of blockedTaskIds) next[id] = previousStatus.get(id)!; return next })
       }
       const updated = result.data?.updated ?? 0
+      // Same escape hatch the single-row path has had all along: put the rows that actually moved
+      // back to whatever each one showed before. Rows can arrive with different prior statuses
+      // (the All tab mixes open and in_review), so the revert groups by prior status and issues
+      // one bulk call per group.
+      const movedIds = ids.filter((id) => !blockedTaskIds.includes(id))
+      const undoBulk = () => {
+        setOptimisticStatus((previous) => { const next = { ...previous }; for (const id of movedIds) next[id] = previousStatus.get(id)!; return next })
+        const groups = new Map<string, string[]>()
+        for (const id of movedIds) {
+          const prior = previousStatus.get(id)!
+          groups.set(prior, [...(groups.get(prior) ?? []), id])
+        }
+        void Promise.all([...groups].map(([prior, group]) => bulkUpdateReviewTaskStatusAction(workspaceId, group, prior))).then(() => router.refresh())
+      }
+      const undoAction = movedIds.length ? { action: { label: "Undo", onClick: undoBulk } } : undefined
       if (updated && blockedTaskIds.length) {
-        toast.success(`${updated} task${updated === 1 ? "" : "s"} updated`)
+        toast.success(`${updated} task${updated === 1 ? "" : "s"} updated`, undoAction)
         toast.warning(`${blockedTaskIds.length} withheld — confirm paid/unpaid first`)
       } else if (blockedTaskIds.length) {
         toast.warning(`Confirm paid/unpaid on ${blockedTaskIds.length} document${blockedTaskIds.length === 1 ? "" : "s"} before approving`)
       } else {
-        toast.success(`${updated} task${updated === 1 ? "" : "s"} updated`)
+        toast.success(`${updated} task${updated === 1 ? "" : "s"} updated`, undoAction)
       }
       setBulkSelected(new Set())
       router.refresh()
@@ -291,9 +321,20 @@ export function ReviewInbox({ workspaceId, tasks, currentStatus, members }: {
     <div>
       {bulkSelected.size > 0 && <div className="sticky top-2 z-10 mb-2 flex items-center gap-2 rounded-md bg-emerald-50 px-3 py-2 text-sm shadow-sm">
         <span className="font-medium text-emerald-900">{bulkSelected.size} selected</span>
-        <button type="button" disabled={pending} className="rounded-md bg-emerald-700 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-800 disabled:opacity-50" onClick={() => void bulk("approved")}>Approve</button>
-        <button type="button" disabled={pending} className="rounded-md border border-red-300 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50" onClick={() => void bulk("rejected")}>Reject</button>
+        <Button type="button" size="sm" disabled={pending} onClick={() => setConfirming("approved")}>Approve</Button>
+        <Button type="button" size="sm" variant="outline" className="border-red-300 text-red-700 hover:bg-red-50 hover:text-red-800" disabled={pending} onClick={() => setConfirming("rejected")}>Reject</Button>
       </div>}
+      <ConfirmDialog
+        open={confirming === "approved" || confirming === "rejected"}
+        destructive={confirming === "rejected"}
+        busy={pending}
+        title={`${confirming === "rejected" ? "Reject" : "Approve"} ${bulkSelected.size} document${bulkSelected.size === 1 ? "" : "s"}?`}
+        description={confirming === "rejected"
+          ? "Every selected document is marked rejected. You can undo from the toast afterwards."
+          : "Every selected document is marked approved — which can auto-publish them and sync them to accounting. Documents still waiting on a paid/unpaid answer are held back."}
+        confirmLabel={confirming === "rejected" ? "Reject all" : "Approve all"}
+        onConfirm={() => { const status = confirming; setConfirming(null); if (status && status !== "stage-reject") void bulk(status) }}
+        onCancel={() => setConfirming(null)} />
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr className="border-b text-left text-slate-500">
@@ -387,11 +428,11 @@ export function ReviewInbox({ workspaceId, tasks, currentStatus, members }: {
               <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">Paid?</label>
               <div className="mt-1.5 flex gap-2">
                 {(["paid", "unpaid"] as const).map((option) => (
-                  <button key={option} type="button" disabled={pending}
-                    className={`rounded-md border px-2.5 py-1.5 text-xs font-semibold capitalize transition-colors disabled:opacity-50 ${detail.document.paymentStatus === option ? (option === "paid" ? "border-emerald-700 bg-emerald-50 text-emerald-800" : "border-amber-600 bg-amber-50 text-amber-800") : "hover:bg-slate-50"}`}
+                  <Button key={option} type="button" size="sm" variant="outline" disabled={pending}
+                    className={`capitalize ${detail.document.paymentStatus === option ? (option === "paid" ? "border-emerald-700 bg-emerald-50 text-emerald-800 hover:bg-emerald-50" : "border-amber-600 bg-amber-50 text-amber-800 hover:bg-amber-50") : ""}`}
                     onClick={() => void confirmPayment(detail.document.id, option)}>
                     {option}
-                  </button>
+                  </Button>
                 ))}
               </div>
               {!detail.document.paymentStatus && <p className="mt-1 text-xs text-amber-700">Required before this can be approved.</p>}
@@ -414,10 +455,10 @@ export function ReviewInbox({ workspaceId, tasks, currentStatus, members }: {
                       // advances currentStageIndex, so it needs no payment confirmation yet.
                       const isLastStage = detail.workflow!.currentStageIndex === detail.workflow!.stages.length - 1
                       const blocked = isLastStage && detail.document.paymentConfirmationRequired && !detail.document.paymentStatus
-                      return <button type="button" disabled={pending || blocked} title={blocked ? "Confirm paid/unpaid first" : undefined}
-                        className="rounded-md bg-emerald-700 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-800 disabled:opacity-50" onClick={() => void decideStage(detail.id, "approve")}>Approve stage</button>
+                      return <Button type="button" size="sm" disabled={pending || blocked} title={blocked ? "Confirm paid/unpaid first" : undefined}
+                        onClick={() => void decideStage(detail.id, "approve")}>Approve stage</Button>
                     })()}
-                    <button type="button" disabled={pending} className="rounded-md border border-red-300 px-2.5 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50" onClick={() => void decideStage(detail.id, "reject")}>Reject</button>
+                    <Button type="button" size="sm" variant="outline" className="border-red-300 text-red-700 hover:bg-red-50 hover:text-red-800" disabled={pending} onClick={() => setConfirming("stage-reject")}>Reject</Button>
                   </div>
                 ) : <p className="mt-1.5 text-xs text-indigo-700">Only a workspace owner can decide this stage.</p>
               ) : <p className="mt-1.5 text-xs font-medium capitalize text-slate-600">{detail.status.replace("_", " ")}</p>}
@@ -429,11 +470,11 @@ export function ReviewInbox({ workspaceId, tasks, currentStatus, members }: {
                 {STATUS_OPTIONS.map((option) => {
                   const current = optimisticStatus[detail.id] ?? detail.status
                   const blocked = option === "approved" && detail.document.paymentConfirmationRequired && !detail.document.paymentStatus
-                  return <button key={option} type="button" disabled={current === option || blocked} title={blocked ? "Confirm paid/unpaid first" : undefined}
-                    className={`rounded-md border px-2.5 py-1.5 text-xs font-semibold capitalize transition-colors disabled:opacity-50 ${current === option ? "border-emerald-700 bg-emerald-50 text-emerald-800" : "hover:bg-slate-50"}`}
+                  return <Button key={option} type="button" size="sm" variant="outline" disabled={current === option || blocked} title={blocked ? "Confirm paid/unpaid first" : undefined}
+                    className={`capitalize ${current === option ? "border-emerald-700 bg-emerald-50 text-emerald-800 hover:bg-emerald-50" : ""}`}
                     onClick={() => void changeStatus(detail.id, option, current)}>
                     {option.replace("_", " ")}
-                  </button>
+                  </Button>
                 })}
               </div>
               {detail.availableWorkflows.length > 0 && (
@@ -447,11 +488,40 @@ export function ReviewInbox({ workspaceId, tasks, currentStatus, members }: {
             </div>
           )}
 
-          {detail.canPush && <button type="button" disabled={pushed.has(detail.id)}
-            className="mt-3 w-full rounded-md bg-emerald-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50"
-            onClick={() => void pushSelected()}>
-            {pushed.has(detail.id) ? "Pushed" : "Push to accounting"}
-          </button>}
+          {detail.canPush && (() => {
+            const receipt = pushReceipts[detail.id]
+            const isPushed = pushed.has(detail.id)
+            // Post-push, the button drops to a subordinate "Push again" and the receipt line
+            // owns the confirmation — replacing the old disabled "Pushed" dead-end that gave the
+            // money-adjacent success moment no destination, no timestamp, and no path onward.
+            return <div className="mt-3 space-y-1.5">
+              {!isPushed
+                ? <Button type="button" className="w-full" onClick={() => void pushSelected()}>
+                    Push to {detail.activeConnection?.name ?? "accounting"}
+                  </Button>
+                : <div className="flex items-center gap-2">
+                    <div className="flex flex-1 items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs text-emerald-800">
+                      <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                      <span className="min-w-0 flex-1 truncate">
+                        <span className="font-semibold">Pushed to {receipt?.destination ?? detail.activeConnection?.name ?? "accounting"}</span>
+                        {receipt?.at && <span className="ml-1 text-emerald-700/80">· {receipt.at.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span>}
+                      </span>
+                    </div>
+                    <Button type="button" size="sm" variant="outline" onClick={() => { setPushed((previous) => { const next = new Set(previous); next.delete(detail.id); return next }); void pushSelected() }}>
+                      Push again
+                    </Button>
+                  </div>}
+            </div>
+          })()}
+          <ConfirmDialog
+            open={confirming === "stage-reject"}
+            destructive
+            busy={pending}
+            title="Reject this stage?"
+            description="The document is rejected at this stage of its approval workflow. Whoever raised it will see the reason in their queue."
+            confirmLabel="Reject"
+            onConfirm={() => { setConfirming(null); void decideStage(detail.id, "reject") }}
+            onCancel={() => setConfirming(null)} />
 
           {detail.checkResults.length > 0 && <div className="mt-4">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Checks</h3>

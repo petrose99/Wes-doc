@@ -154,6 +154,9 @@ export async function getReviewTaskDetailAction(workspaceId: string, taskId: str
     appliedRuleName: appliedRule?.name ?? null,
     canPush,
     activeConnectionId: activeConnection?.id ?? null,
+    // Provider/tenant so the client can render a real "Pushed to <destination>" receipt after a
+    // successful push, rather than a disabled button being the whole confirmation.
+    activeConnection: activeConnection ? { provider: activeConnection.provider, name: activeConnection.tenantName || activeConnection.provider } : null,
     canCreateRule: capabilities.has("supplier-rules") && membership.role === "owner" && supplier.length > 0,
     workflow,
     availableWorkflows: task.status === "open" && !task.workflowId ? availableWorkflows.map((wf) => ({ id: wf.id, name: wf.name, stageCount: wf.stages.length })) : [],

@@ -14,12 +14,11 @@ import { usePathname } from "next/navigation"
  * dependency — it's read by server code (capabilities, seeds) that has no business importing icons.
  * Settings-tagged module items (Rules, Tax, Approvals) don't render here at all — they show up in
  * components/shell/settings-nav.tsx instead, next to the settings pages they actually lead to.
- * The review-queue module's "Review" entry used to be filtered out here on the grounds that the
- * pipeline's Approvals tab had replaced it. That tab was never built — PIPELINE_STAGES is
- * ["inbox", "to_review", "ready"] — so the queue ended up with no navigation at all, reachable
- * only from a dashboard stat card or a link on a document. It is a rail entry again, positioned
- * after Extraction because that is where it falls in the work, and badged with its open-task
- * count. Expenses IS still filtered out — reachable at its own route, just not a standing entry. */
+ * The review-queue module's own "/review" entry is filtered out below: the five-stage lifecycle
+ * (PIPELINE_STAGES is ["inbox","review","approved","synced","paid"] in lib/documents/stages.ts)
+ * has a Review stage on the Documents rail, and pipelineReviewCount already badges Documents
+ * with the same waiting-on-you signal. Expenses is filtered out for the same reason it was
+ * before — reachable at its own route, just not a standing entry. */
 /** Every icon name a module declares in lib/modules/index.ts. Six of the nine used to be missing,
  * so Automation, Approvals, Rules, Tax, Expenses and Budgets all silently rendered the generic
  * Files icon — the declaration said one thing and the rail drew another. Keep this in step when a

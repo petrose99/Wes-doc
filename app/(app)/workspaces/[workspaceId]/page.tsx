@@ -78,7 +78,11 @@ export default async function WorkspaceHomePage({ params }: {
   const stats = [
     { label: "Documents this month", value: documentsThisMonth, icon: FileText, href: null, iconClass: "bg-emerald-50 text-emerald-700", hoverClass: "" },
     { label: "Review", value: stageCounts.review, icon: SearchCheck, href: `/workspaces/${workspaceId}/pipeline?stage=review`, iconClass: "bg-indigo-50 text-indigo-600", hoverClass: "hover:border-[#c7d2fe] hover:-translate-y-0.5 hover:shadow-[0_2px_4px_rgba(15,23,42,0.05),0_12px_26px_rgba(79,70,229,0.10)]" },
-    { label: "Approved (30d)", value: stageCounts.approved, icon: CheckCircle2, href: `/workspaces/${workspaceId}/pipeline?stage=approved`, iconClass: "bg-emerald-50 text-emerald-700", hoverClass: "hover:border-[#a7f3d0] hover:-translate-y-0.5 hover:shadow-[0_2px_4px_rgba(15,23,42,0.05),0_12px_26px_rgba(4,120,87,0.10)]" },
+    // countDocumentsByStage returns the current all-time size of each stage — there's no date
+    // window on `approved` — so "(30d)" was the dashboard's biggest lie. Labelled honestly as the
+    // stage count until we add a real 30-day rolling query. A wrong number on a financial
+    // dashboard costs more trust than no number.
+    { label: "Approved", value: stageCounts.approved, icon: CheckCircle2, href: `/workspaces/${workspaceId}/pipeline?stage=approved`, iconClass: "bg-emerald-50 text-emerald-700", hoverClass: "hover:border-[#a7f3d0] hover:-translate-y-0.5 hover:shadow-[0_2px_4px_rgba(15,23,42,0.05),0_12px_26px_rgba(4,120,87,0.10)]" },
   ]
 
   return <main className="mx-auto w-full max-w-6xl space-y-4 px-4 py-[18px] md:space-y-6 md:p-6">
@@ -156,7 +160,7 @@ export default async function WorkspaceHomePage({ params }: {
           {needsReview.slice(0, 3).map((doc) => {
             const reasons = flaggedFieldsFromConfidence(doc.confidence).slice(0, 2).map(formatFieldKey)
             const review = summarizeDocumentForReview(doc, membership.workspace.baseCurrency)
-            return <Link key={doc.id} href={`/workspaces/${workspaceId}/documents/${doc.id}?stage=to_review`} className="flex items-center gap-2.5 border-t py-2.5 first:border-t-0 hover:text-emerald-800">
+            return <Link key={doc.id} href={`/workspaces/${workspaceId}/documents/${doc.id}?stage=review`} className="flex items-center gap-2.5 border-t py-2.5 first:border-t-0 hover:text-emerald-800">
               <div className="min-w-0 flex-1">
                 <div className="truncate text-[13.5px] font-semibold text-slate-800">{review.supplier ?? "Unknown supplier"} · {review.category}{review.total ? ` · ${review.total}` : ""}</div>
                 <div className="text-xs text-slate-500">{reasons.length > 0 ? `${reasons.join(", ")} unclear` : "Ready for a look"}</div>
@@ -165,7 +169,7 @@ export default async function WorkspaceHomePage({ params }: {
             </Link>
           })}
         </>}
-        <Link href={`/workspaces/${workspaceId}/pipeline?stage=to_review`} className="mt-3.5 block rounded-[11px] bg-slate-900 px-3 py-2.5 text-center text-[13.5px] font-semibold text-white hover:bg-slate-800">
+        <Link href={`/workspaces/${workspaceId}/pipeline?stage=review`} className="mt-3.5 block rounded-[11px] bg-slate-900 px-3 py-2.5 text-center text-[13.5px] font-semibold text-white hover:bg-slate-800">
           Open the review queue →
         </Link>
       </div>

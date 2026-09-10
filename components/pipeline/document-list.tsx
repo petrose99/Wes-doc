@@ -74,7 +74,7 @@ const EMPTY_COPY: Record<PipelineStage, string> = {
   inbox: "Nothing waiting to process. Upload PDFs or a folder — or email bills to your workspace address.",
   review: "Nothing needs a look right now.",
   approved: "Nothing marked approved yet — sign off on documents to use them in Sheets.",
-  synced: "No bills yet. Bills appear here once an invoice is extracted and approved.",
+  synced: "Nothing synced yet. Documents appear here once they're approved and pushed to your accounting connection.",
   paid: "Nothing paid yet — a paid bill lands here once a reviewer or the ledger confirms it.",
 }
 
