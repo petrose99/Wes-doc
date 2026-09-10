@@ -153,8 +153,15 @@ export async function createDocumentFromBuffer(input: {
  * chip instead. Consequence: Synced's count overlaps Paid's, so the five counts do NOT sum to the
  * workspace total — the tab badges are per-question answers, not a partition. */
 const openReviewTaskExists: Prisma.DocumentWhereInput = { reviewTasks: { some: { status: { in: ["open", "in_review"] } } } }
+const noOpenReviewTask: Prisma.DocumentWhereInput = { reviewTasks: { none: { status: { in: ["open", "in_review"] } } } }
 const succeededPushExists: Prisma.DocumentWhereInput = { integrationPushes: { some: { status: "succeeded" } } }
+const noSucceededPush: Prisma.DocumentWhereInput = { integrationPushes: { none: { status: "succeeded" } } }
 const paidPaymentStatus: Prisma.DocumentWhereInput = { paymentStatus: "paid" }
+/** NULL-safe "not paid": `NOT paymentStatus = 'paid'` is NULL for NULL rows in SQL, so a plain
+ * `NOT paidPaymentStatus` predicate silently drops every unpaid row where paymentStatus is null
+ * (the common case — nobody has confirmed either way yet). The OR-with-null spells the check out
+ * so NULLs land on the "not paid" side, not in a third undefined bucket. */
+const notPaid: Prisma.DocumentWhereInput = { OR: [{ paymentStatus: null }, { paymentStatus: { not: "paid" } }] }
 
 export function stageWhereClause(stage: PipelineStage): Prisma.DocumentWhereInput {
   switch (stage) {
@@ -162,7 +169,7 @@ export function stageWhereClause(stage: PipelineStage): Prisma.DocumentWhereInpu
       return { status: { in: ["queued", "failed"] } }
     case "review":
       return {
-        NOT: [paidPaymentStatus, succeededPushExists],
+        AND: [notPaid, noSucceededPush],
         OR: [
           { status: { in: ["needs_review", "ready_for_review"] } },
           { status: "reviewed", ...openReviewTaskExists },
@@ -171,7 +178,7 @@ export function stageWhereClause(stage: PipelineStage): Prisma.DocumentWhereInpu
     case "approved":
       return {
         status: "reviewed",
-        NOT: [paidPaymentStatus, succeededPushExists, openReviewTaskExists],
+        AND: [notPaid, noSucceededPush, noOpenReviewTask],
       }
     case "synced":
       return {
