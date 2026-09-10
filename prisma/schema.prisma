@@ -2041,6 +2041,11 @@ model Supplier {
   /// N whatever their confidence).
   touchlessSeen Int       @default(0) @map("touchless_seen")
   lastSeenAt    DateTime? @map("last_seen_at")
+  /// WP-AP2: net payment terms in days. When set, models/bills.ts's due-date inference uses
+  /// `document.date + paymentTermsDays` when the extracted invoice has no explicit due_date. Null
+  /// = no default (aging falls back to the extracted date or blank). Common values: 0 (due on
+  /// receipt), 7, 14, 30, 60.
+  paymentTermsDays Int?   @map("payment_terms_days")
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
   workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
