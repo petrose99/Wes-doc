@@ -46,7 +46,10 @@ export function FieldRow({ field, value, confidence, ref: provenanceRef, onFocus
     </div>
   }
 
-  const badge = rationale ? SOURCE_BADGE[rationale.source] : null
+  // Suppress the plain "Extracted" badge on every field — it restated what the presence of a
+  // value already implied. Rule / AI / History / Learned still render, and low-confidence
+  // extraction is shown via the existing amber "Low confidence" pill above.
+  const badge = rationale && rationale.source !== "extraction" ? SOURCE_BADGE[rationale.source] : null
 
   return <div ref={(el) => registerNav?.(field.key, el)}
     data-field-key={field.key} data-suspect={lowConfidence || undefined} data-current={isCurrent || undefined} data-completed={isCompleted || undefined}

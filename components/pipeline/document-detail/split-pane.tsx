@@ -24,6 +24,17 @@ import { toast } from "sonner"
 type Tab = "details" | "note" | "activity"
 type PanelLayout = "split" | "source-only" | "details-only"
 
+/** Shared label map for the four document-type states. Extracted so the chip in the top bar, the
+ * inline "Type:" line, and the future stage indicator all read the same names — a mismatch here
+ * showed up in the audit as "Expense / Sale / Bank Statement / Other" competing with the Bill /
+ * Sales invoice glossary elsewhere in the app. */
+const DOC_TYPE_LABELS: Record<"expense" | "sale" | "bank_statement" | "other", string> = {
+  expense: "Bill",
+  sale: "Sales invoice",
+  bank_statement: "Bank statement",
+  other: "Other",
+}
+
 export function SplitPane({
   workspaceId, source, fields, data, fieldConfidence, provenanceFields, provenanceItems, initialTarget, conflictingLabels, missingRequiredFields,
   saveReview, documentType: initialDocumentType, note: initialNote, auditEvents, prevHref, nextHref, position, stage, afterActionHref,
@@ -187,7 +198,7 @@ export function SplitPane({
 
       {docType && <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium ${docType === "expense" ? "border-red-200 bg-red-50 text-red-700" : docType === "sale" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : docType === "bank_statement" ? "border-blue-200 bg-blue-50 text-blue-700" : "border-slate-200 bg-slate-50 text-slate-700"}`}>
         {docType === "expense" ? <ArrowUp className="h-3 w-3" /> : docType === "sale" ? <ArrowDown className="h-3 w-3" /> : docType === "bank_statement" ? <Building2 className="h-3 w-3" /> : null}
-        {docType === "expense" ? "Expense" : docType === "sale" ? "Sale" : docType === "bank_statement" ? "Bank Statement" : "Other"}
+        {DOC_TYPE_LABELS[docType]}
       </span>}
 
       {paymentStatus && <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${paymentStatus === "paid" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : paymentStatus === "partial" ? "border-amber-200 bg-amber-50 text-amber-700" : "border-red-200 bg-red-50 text-red-700"}`}>
@@ -270,10 +281,10 @@ export function SplitPane({
               <div>
                 <p className="mb-1.5 text-sm font-medium text-slate-800">What type of document is this?</p>
                 <div className="flex flex-wrap gap-1.5">
-                  {([["expense", "Expense"], ["sale", "Sale"], ["bank_statement", "Bank Statement"], ["other", "Other"]] as const).map(([value, label]) => (
+                  {(["expense", "sale", "bank_statement", "other"] as const).map((value) => (
                     <button key={value} type="button" disabled={savingDocType} onClick={() => void selectDocType(value)}
                       className="rounded border px-2.5 py-1 text-sm text-slate-600 hover:bg-slate-50">
-                      {label}
+                      {DOC_TYPE_LABELS[value]}
                     </button>
                   ))}
                 </div>

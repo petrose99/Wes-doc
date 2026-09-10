@@ -36,9 +36,11 @@ export function SearchPageClient({ workspaceId, initialQuery, askMode = false }:
   return (
     <div className="flex h-full">
       <div className={`mx-auto max-w-3xl flex-1 px-6 py-8 ${showAssistant ? "mr-0" : ""}`}>
-        <div className="mb-6 flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-          <Search className="h-5 w-5 shrink-0 text-slate-400" />
+        <div className="mb-6 flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm focus-within:border-emerald-300 focus-within:ring-2 focus-within:ring-emerald-100">
+          <Search className="h-5 w-5 shrink-0 text-slate-400" aria-hidden="true" />
+          <label htmlFor="search-input" className="sr-only">Search documents</label>
           <input
+            id="search-input"
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}

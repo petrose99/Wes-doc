@@ -54,7 +54,7 @@ export default async function AutomationDashboardPage({ params }: {
     active="metrics"
     reviewCount={reviewCount}
     reviewEnabled={reviewEnabled}
-    status="How much of the last 30 days of coding went through without anyone clicking Approve, and what is holding the rest back."
+    status="How much of the last 30 days of invoice coding went through without anyone clicking Approve, and what is holding the rest back."
   >
     {extracted === 0
       ? <Empty title="Nothing extracted yet">

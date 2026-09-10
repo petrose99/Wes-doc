@@ -18,7 +18,7 @@ import { SpendByCategoryChart } from "@/components/analytics/spend-by-category-c
 import { VendorSpendChart } from "@/components/analytics/vendor-spend-chart"
 import { MobileUploadButtons } from "@/components/shell/mobile-upload-buttons"
 import { getOnboardingStateAction } from "./onboarding-actions"
-import { ArrowRight, CheckCircle2, ChevronRight, FileText, ListChecks, SearchCheck, Table2, Upload } from "lucide-react"
+import { CheckCircle2, ChevronRight, FileText, SearchCheck, Table2 } from "lucide-react"
 import Link from "next/link"
 
 export const dynamic = "force-dynamic"
@@ -120,25 +120,6 @@ export default async function WorkspaceHomePage({ params }: {
           ? <Link key={stat.label} href={stat.href} className={className}>{inner}</Link>
           : <div key={stat.label} className={className}>{inner}</div>
       })}
-    </div>
-
-    <div className="grid grid-cols-3 gap-3">
-      {[
-        { icon: Upload, label: "Added", count: documentsThisMonth, desc: "documents this month", href: `/workspaces/${workspaceId}/pipeline`, color: "bg-indigo-50 text-indigo-600" },
-        { icon: ListChecks, label: "Review", count: stageCounts.to_review, desc: "awaiting review", href: `/workspaces/${workspaceId}/pipeline?stage=to_review`, color: "bg-amber-50 text-amber-600" },
-        { icon: Table2, label: "Sheets", count: stageCounts.ready, desc: unplacedCount > 0 ? `ready to use · ${unplacedCount} not in a sheet` : "ready to use", href: `/workspaces/${workspaceId}/files`, color: "bg-emerald-50 text-emerald-700" },
-      ].map((step, i) => (
-        <Link key={step.label} href={step.href} className="group flex items-center gap-3 rounded-xl border border-[#e6ebf1] bg-white px-4 py-3 shadow-panel transition-all hover:-translate-y-0.5 hover:shadow-md">
-          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${step.color}`}><step.icon className="h-[17px] w-[17px]" /></div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5 text-[13px] font-bold text-slate-800">
-              {step.label}
-              {i < 2 && <ArrowRight className="h-3 w-3 text-slate-300" />}
-            </div>
-            <div className="text-[12px] text-slate-500">{step.count} {step.desc}</div>
-          </div>
-        </Link>
-      ))}
     </div>
 
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.55fr_1fr]">

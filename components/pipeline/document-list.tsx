@@ -53,7 +53,7 @@ function ReadinessBadge({ status, blockers }: { status: string | null; blockers:
 /** What each stage's empty table says, so "nothing here" reads as expected-and-fine on Archive
  * but as an invitation to upload on Inbox. */
 const EMPTY_COPY: Record<PipelineStage, string> = {
-  inbox: "Documents are being processed. Upload PDFs or a folder to get started.",
+  inbox: "Nothing waiting to process. Upload PDFs or a folder — or email bills to your workspace address.",
   to_review: "Nothing needs a look right now.",
   ready: "Nothing marked ready yet — approve documents to use them in Sheets.",
 }
