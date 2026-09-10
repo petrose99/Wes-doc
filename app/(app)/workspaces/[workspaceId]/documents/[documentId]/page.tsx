@@ -160,13 +160,16 @@ export default async function DocumentPage({ params, searchParams }: {
     ? readinessDetail.filter((b): b is { detail: string } => typeof b === "object" && b !== null && typeof (b as { detail?: unknown }).detail === "string").map((b) => b.detail)
     : []
   const extracted = document.status === "reviewed" || document.status === "needs_review" || document.status === "ready_for_review"
+  // A bank statement's lifecycle ends at Sync — nobody "pays" a statement — so its indicator
+  // is four steps, not five with a forever-upcoming Pay.
+  const hasPayStep = codingData.documentType !== "bank_statement"
   const stageIndicator = ((): import("@/components/pipeline/document-detail/stage-indicator").StageStep[] => {
     if (!extracted) return [
       { key: "extracted", label: "Extracted", state: document.status === "failed" ? "blocked" : "current", detail: document.status === "failed" ? (document.errorCode ?? "extraction failed") : "in progress" },
       { key: "checks", label: "Checks", state: "upcoming" },
       { key: "approval", label: "Approval", state: "upcoming" },
       { key: "sync", label: "Sync", state: "upcoming" },
-      { key: "pay", label: "Pay", state: "upcoming" },
+      ...(hasPayStep ? [{ key: "pay", label: "Pay", state: "upcoming" } as const] : []),
     ]
     // Checks
     const checksState: import("@/components/pipeline/document-detail/stage-indicator").StageStep["state"] =
@@ -198,7 +201,7 @@ export default async function DocumentPage({ params, searchParams }: {
       { key: "checks", label: "Checks", state: checksState, detail: checksDetail },
       { key: "approval", label: "Approval", state: approvalState, detail: approvalDetail },
       { key: "sync", label: "Sync", state: syncState, detail: syncDetail },
-      { key: "pay", label: "Pay", state: payState, detail: payDetail },
+      ...(hasPayStep ? [{ key: "pay" as const, label: "Pay", state: payState, detail: payDetail }] : []),
     ]
   })()
 

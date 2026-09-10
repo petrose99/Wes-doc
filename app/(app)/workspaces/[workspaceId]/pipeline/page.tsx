@@ -6,8 +6,9 @@ import config from "@/lib/config"
 import { parseTemplateFields } from "@/lib/document-templates"
 import { PIPELINE_STAGES, parseStageAlias, type PipelineStage } from "@/lib/documents/stages"
 import { searchDocumentsByContent } from "@/lib/retrieval"
-import { activeJobDocumentIds, countDocumentsByStage, documentIdsInStage, flaggedFieldsFromConfidence, listWorkspaceDocuments, summarizeDocumentForReview } from "@/models/documents"
+import { activeJobDocumentIds, countDocumentsByStage, countFailedDocuments, documentIdsInStage, flaggedFieldsFromConfidence, listWorkspaceDocuments, summarizeDocumentForReview } from "@/models/documents"
 import { listWorkspaceBills } from "@/models/bills"
+import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { ensurePipelineFile, getFileTemplates } from "@/models/files"
 import { getListPreference } from "@/models/list-preferences"
 import { getTouchlessRateStats } from "@/lib/analytics/workspace-analytics"
@@ -47,8 +48,18 @@ export default async function PipelinePage({ params, searchParams }: {
 
   // Counts feed both the tab badges and the default-stage fallback, so they have to land before
   // the stage is resolved.
-  const counts = await countDocumentsByStage(workspaceId)
+  const [counts, failedCount, capabilities] = await Promise.all([
+    countDocumentsByStage(workspaceId),
+    countFailedDocuments(workspaceId),
+    getWorkspaceCapabilities(workspaceId),
+  ])
   const stage = parseStage(stageParam, stageParam ? undefined : counts)
+
+  // Synced/Paid only exist for a workspace that can (or ever did) sync bills to a ledger.
+  // A statements-only or integrations-off workspace would otherwise carry two permanently
+  // dead tabs. Never hidden while they hold documents — data wins over tidiness.
+  const showLedgerStages = capabilities.has("accounting-push") || counts.synced > 0 || counts.paid > 0
+  const visibleStages = showLedgerStages ? PIPELINE_STAGES : PIPELINE_STAGES.filter((s) => s !== "synced" && s !== "paid")
 
   // The upload button's target: one app-managed container per workspace (kind: "pipeline"), so
   // uploading from here never forces a spreadsheet/file choice — see models/files.ts.
@@ -79,7 +90,12 @@ export default async function PipelinePage({ params, searchParams }: {
     .filter((match) => matchedIds.has(match.documentId) && !rowIds.has(match.documentId))
     .map((match) => ({ documentId: match.documentId, filename: match.filename, page: match.page, bbox: match.bbox, snippet: match.snippet }))
 
-  const filtered = flaggedOnly ? documents.filter((doc) => doc.flaggedAt !== null) : documents
+  const filteredByFlag = flaggedOnly ? documents.filter((doc) => doc.flaggedAt !== null) : documents
+  // Failed extractions first on Inbox: they're the only rows there that need a person to act
+  // (re-extract or delete) rather than wait, so they must not sink below a page of spinners.
+  const filtered = stage === "inbox"
+    ? [...filteredByFlag].sort((a, b) => Number(b.status === "failed") - Number(a.status === "failed"))
+    : filteredByFlag
   const activeJobs = stage === "inbox" ? await activeJobDocumentIds(workspaceId, filtered.map((doc) => doc.id)) : new Set<string>()
 
   const rows: PipelineDocumentRow[] = filtered.map((doc) => ({
@@ -99,6 +115,7 @@ export default async function PipelinePage({ params, searchParams }: {
     // there's nothing to summarize. Computed for every row is cheap (pure JSON reads) and keeps
     // this map a single pass rather than a second one keyed by stage.
     review: stage === "inbox" ? null : summarizeDocumentForReview(doc, membership.workspace.baseCurrency),
+    paid: doc.paymentStatus === "paid",
   }))
 
   // preference is read for a future column-picker refinement; the fixed column set ships first.
@@ -129,6 +146,8 @@ export default async function PipelinePage({ params, searchParams }: {
     touchlessStats={touchlessStats}
     billsSummary={billsSummary}
     baseCurrency={membership.workspace.baseCurrency ?? "USD"}
+    failedCount={failedCount}
+    visibleStages={visibleStages}
   />
 }
 

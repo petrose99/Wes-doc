@@ -145,11 +145,13 @@ export async function createDocumentFromBuffer(input: {
   }
 }
 
-/** The full where-fragment for one pipeline stage. Mutually exclusive by construction — a
- * document appears in exactly one tab regardless of how many predicates would otherwise match, so
- * stage counts sum to the same total whichever axis is queried. Precedence, highest first (matches
- * documentStage in lib/documents/stages.ts): Paid > Synced > Review > Approved > Inbox. Shared by
- * every query that needs "is this document on stage X" (list, counts, content-search filter). */
+/** The full where-fragment for one pipeline stage. Inbox/Review/Approved/Paid are mutually
+ * exclusive (precedence matches documentStage: Paid > Synced > Review > Approved > Inbox), but
+ * Synced is deliberately CUMULATIVE — it keeps a bill after it's paid. A controller asking "what
+ * did we push to the ledger this month?" queries by the sync event, and a paid bill vanishing
+ * from that answer reads as a data loss, not a stage transition. The list marks paid rows with a
+ * chip instead. Consequence: Synced's count overlaps Paid's, so the five counts do NOT sum to the
+ * workspace total — the tab badges are per-question answers, not a partition. */
 const openReviewTaskExists: Prisma.DocumentWhereInput = { reviewTasks: { some: { status: { in: ["open", "in_review"] } } } }
 const succeededPushExists: Prisma.DocumentWhereInput = { integrationPushes: { some: { status: "succeeded" } } }
 const paidPaymentStatus: Prisma.DocumentWhereInput = { paymentStatus: "paid" }
@@ -175,7 +177,6 @@ export function stageWhereClause(stage: PipelineStage): Prisma.DocumentWhereInpu
       return {
         status: "reviewed",
         ...succeededPushExists,
-        NOT: [paidPaymentStatus],
       }
     case "paid":
       return { ...paidPaymentStatus }
@@ -278,6 +279,13 @@ export async function listLibraryDocuments(workspaceId: string, filters: Library
 export async function countDocumentsByStage(workspaceId: string): Promise<Record<PipelineStage, number>> {
   const counts = await Promise.all(PIPELINE_STAGES.map((stage) => prisma.document.count({ where: { workspaceId, ...stageWhereClause(stage) } })))
   return Object.fromEntries(PIPELINE_STAGES.map((stage, index) => [stage, counts[index]])) as Record<PipelineStage, number>
+}
+
+/** Failed extractions in the workspace — the one thing on the Inbox tab that needs a person to
+ * act (re-extract or delete) rather than wait. Surfaced as its own red sub-badge on the Inbox tab
+ * so a failure isn't visually buried among documents that are merely still processing. */
+export async function countFailedDocuments(workspaceId: string): Promise<number> {
+  return prisma.document.count({ where: { workspaceId, status: "failed" } })
 }
 
 /** Home's "Documents this month" stat — a plain calendar-month count off `receivedAt`, the same

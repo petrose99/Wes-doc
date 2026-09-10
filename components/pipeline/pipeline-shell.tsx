@@ -14,10 +14,15 @@ import type { TouchlessRateStats } from "@/lib/analytics/workspace-analytics"
  * upload entry point, tabs, a filter bar, then the table. A server component: the data (rows,
  * counts) is fetched by the page and handed down; only the list body, its bulk actions, and the
  * upload overlay need client interactivity. */
-export function PipelineShell({ workspaceId, stage, counts, rows, contentMatches, query, flaggedOnly, documentSearchEnabled, upload, touchlessStats, billsSummary, baseCurrency }: {
+export function PipelineShell({ workspaceId, stage, counts, rows, contentMatches, query, flaggedOnly, documentSearchEnabled, upload, touchlessStats, billsSummary, baseCurrency, failedCount = 0, visibleStages }: {
   workspaceId: string
   stage: PipelineStage
   counts: Record<PipelineStage, number>
+  /** Failed extractions workspace-wide — red sub-badge on the Inbox tab (see StageTabs). */
+  failedCount?: number
+  /** Stages worth showing for this workspace — Synced/Paid are dropped when they can never fill
+   * (no accounting integration and nothing ever synced). */
+  visibleStages?: readonly PipelineStage[]
   rows: PipelineDocumentRow[]
   contentMatches: ContentMatchRow[]
   query: string
@@ -53,7 +58,7 @@ export function PipelineShell({ workspaceId, stage, counts, rows, contentMatches
           primary />
       </div>
     </div>
-    <StageTabs workspaceId={workspaceId} active={stage} counts={counts} />
+    <StageTabs workspaceId={workspaceId} active={stage} counts={counts} failedCount={failedCount} visibleStages={visibleStages} />
     {/* WCAG 4.1.3: announce the active stage's count to screen readers on navigation/refresh —
         the visual tab badges carry this for sighted users, but nothing was announced before. */}
     <p aria-live="polite" role="status" className="sr-only">
