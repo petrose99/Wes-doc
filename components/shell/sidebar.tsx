@@ -94,13 +94,16 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
   // wants the underlying spreadsheet/ingestion-container view, but no longer where the app points
   // first. See the pipeline redesign plan, Phases 2 & 6.
   //
-  // Grouped into Workspace / Modules / Settings sections, mirroring the merged nav from the
-  // enterprise restyle — module entries (Dictate, Accounting) sit apart from the fixed Home/
-  // Pipeline/Files trio since they come and go per workspace, and Settings is its own section of
-  // one so it doesn't read as just another workspace destination.
+  // The audit's proposed structure (docs/ux/ux-audit-2026-09-10.html, "Proposed structure"):
+  // one lifecycle spine (Dashboard + Documents) and a separate Tools section for the secondary
+  // surfaces — Sheets, Docu Library, Accounting, Automation. The spine is where the work is;
+  // Tools is where you go on purpose. Module-declared entries (Dictation etc.) land in Tools
+  // too, since they come and go per workspace.
   const workItems = [
     { href: base, label: "Dashboard", icon: BarChart3, exact: true },
     { href: `${base}/pipeline`, label: "Documents", icon: ListChecks, exact: false, badge: pipelineReviewCount > 0 ? pipelineReviewCount : undefined, tourTarget: "extraction" as const },
+  ]
+  const toolItems = [
     { href: `${base}/files`, label: "Sheets", icon: Table2, exact: false, tourTarget: "sheets" as const },
     { href: `${base}/library`, label: "Docu Library", icon: Library, exact: false, tourTarget: "library" as const },
     ...(accountingEnabled ? [{ href: `${base}/accounting`, label: "Accounting", icon: Landmark, exact: false }] : []),
@@ -144,6 +147,9 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
     <nav className="mt-2 flex flex-1 flex-col">
       {sectionLabel("Workspace")}
       <div className="space-y-0.5">{workItems.map(navLink)}</div>
+
+      {sectionLabel("Tools")}
+      <div className="space-y-0.5">{toolItems.map(navLink)}</div>
 
       <div className="mt-auto space-y-0.5">{bottomItems.map(navLink)}</div>
     </nav>
