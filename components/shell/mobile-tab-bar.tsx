@@ -14,7 +14,7 @@ export function MobileTabBar({ workspaceId, pipelineReviewCount = 0 }: {
   const base = `/workspaces/${workspaceId}`
   const tabs = [
     { href: base, label: "Dashboard", icon: BarChart3, exact: true },
-    { href: `${base}/pipeline`, label: "Extraction", icon: ListChecks, exact: false, badge: pipelineReviewCount > 0 ? pipelineReviewCount : undefined },
+    { href: `${base}/pipeline`, label: "Documents", icon: ListChecks, exact: false, badge: pipelineReviewCount > 0 ? pipelineReviewCount : undefined },
     { href: `${base}/files`, label: "Sheets", icon: Table2, exact: false },
     { href: `${base}/library`, label: "Library", icon: Library, exact: false },
     { href: `${base}/settings/workspace`, label: "More", icon: MoreHorizontal, exact: false },
