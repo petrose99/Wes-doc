@@ -115,7 +115,7 @@ export default async function WorkspaceHomePage({ params }: {
           <div className="text-[25px] font-extrabold tracking-tight text-slate-900 sm:text-[27px]">{stat.value}</div>
           <div className="mt-0.5 text-[12.5px] text-slate-500 sm:text-[13px]">{stat.label}</div>
         </>
-        const className = `rounded-2xl border border-[#e6ebf1] bg-white p-[15px_16px] shadow-panel transition-all sm:p-[18px] ${stat.hoverClass}`
+        const className = `rounded-2xl border border-[#e6ebf1] bg-white p-[15px_16px] shadow-panel transition-[border-color,box-shadow,transform] duration-150 sm:p-[18px] ${stat.hoverClass}`
         return stat.href
           ? <Link key={stat.label} href={stat.href} className={className}>{inner}</Link>
           : <div key={stat.label} className={className}>{inner}</div>

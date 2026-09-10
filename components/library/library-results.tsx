@@ -46,7 +46,7 @@ export function LibraryDocumentGrid({ documents, basePath }: { documents: Librar
         <Link
           key={doc.id}
           href={`${basePath}/documents/${doc.id}`}
-          className="group flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-all hover:border-emerald-300 hover:shadow-md"
+          className="group flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-[border-color,box-shadow] duration-150 hover:border-emerald-300 hover:shadow-md"
         >
           <div className="flex items-start gap-3">
             <DocIcon templateCode={doc.template?.code ?? null} />

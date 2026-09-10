@@ -133,7 +133,7 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
 
   const sectionLabel = (label: string) => <div className="px-2.5 pb-1 pt-3 text-[10.5px] font-bold uppercase tracking-[0.06em] text-slate-400 first:pt-0">{label}</div>
 
-  return <aside className="hidden w-[236px] shrink-0 flex-col gap-0.5 border-r border-[#e6ebf1] bg-gradient-to-b from-[#f4f7f9] to-[#eef2f6] px-3 py-3.5 md:flex">
+  return <aside className="hidden w-[236px] shrink-0 flex-col gap-0.5 border-r border-[#e6ebf1] bg-[#f1f5f8] px-3 py-3.5 md:flex">
     <Link href={base} className="flex items-center gap-2 px-1.5 py-1">
       <BiteMark className="h-7 w-7 shrink-0" />
       <span className="truncate text-sm font-bold font-display text-slate-900">DocuBite</span>

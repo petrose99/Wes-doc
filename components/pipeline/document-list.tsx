@@ -141,7 +141,7 @@ export function DocumentList({ workspaceId, stage, rows, contentMatches, query }
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, index) => <tr key={row.id} className={marked.has(row.id) ? "bg-emerald-50/60" : "hover:bg-slate-50"}>
+          {rows.map((row, index) => <tr key={row.id} className={marked.has(row.id) ? "bg-emerald-50/60" : "hover:bg-slate-50 active:bg-slate-100"}>
             <td className="border-b px-2 py-2">
               <input type="checkbox" aria-label={`Select ${row.filename}`} className="h-4 w-4 accent-emerald-600" checked={marked.has(row.id)}
                 onChange={(e) => markRow(index, e.nativeEvent)} />

@@ -128,7 +128,7 @@ export function AssistantPanel({ workspaceId, apiRef, onClose, documentSearchEna
 
   return (
     <aside className={className ?? "absolute inset-0 z-20 flex flex-col bg-slate-50 sm:relative sm:inset-auto sm:z-auto sm:w-80 sm:shrink-0 sm:border-l sm:border-slate-200/80 sm:shadow-[inset_1px_0_0_0_rgba(0,0,0,0.04),-4px_0_12px_-4px_rgba(0,0,0,0.08)]"}>
-      <div className="flex items-center gap-2.5 border-b border-slate-200 bg-gradient-to-r from-emerald-50 to-white px-3 py-2.5">
+      <div className="flex items-center gap-2.5 border-b border-slate-200 bg-emerald-50 px-3 py-2.5">
         <span className="flex h-6 w-6 items-center justify-center rounded-md bg-emerald-700 shadow-sm">
           <Sparkles className="h-3.5 w-3.5 text-white" />
         </span>
@@ -147,7 +147,7 @@ export function AssistantPanel({ workspaceId, apiRef, onClose, documentSearchEna
                 : "Ask about the data in this sheet. The assistant reads the grid as you see it.")}
             </p>
             {(intents ?? (documentSearchEnabled ? [...INTENTS, DOCUMENT_INTENT] : INTENTS)).map((intent) => (
-              <button key={intent} type="button" className="block w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-left text-xs text-slate-600 shadow-sm transition-all hover:border-emerald-300 hover:bg-emerald-50/50 hover:text-slate-900" onClick={() => ask(intent)}>
+              <button key={intent} type="button" className="block w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-left text-xs text-slate-600 shadow-sm transition-[background-color,border-color,color] duration-150 hover:border-emerald-300 hover:bg-emerald-50/50 hover:text-slate-900" onClick={() => ask(intent)}>
                 {intent}
               </button>
             ))}

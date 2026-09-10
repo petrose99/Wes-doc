@@ -253,7 +253,7 @@ export function SplitPane({
     {/* Main content area */}
     <div className="flex min-h-0 flex-1 overflow-hidden">
       {/* Source panel */}
-      {showSource && <div className={`flex min-h-0 flex-col overflow-hidden border-r border-slate-200 bg-white transition-all ${layout === "source-only" ? "flex-1" : "basis-[52%]"}`}>
+      {showSource && <div className={`flex min-h-0 flex-col overflow-hidden border-r border-slate-200 bg-white transition-[flex-basis] duration-200 ${layout === "source-only" ? "flex-1" : "basis-[52%]"}`}>
         {layout !== "split" && <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2">
           <span className="text-xs font-medium uppercase tracking-wider text-slate-400">Source document</span>
           <button type="button" onClick={() => setLayout("split")} className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600" title="Split view">
@@ -264,7 +264,7 @@ export function SplitPane({
       </div>}
 
       {/* Details panel */}
-      {showDetails && <div className={`flex min-h-0 flex-col overflow-hidden bg-white transition-all ${layout === "details-only" ? "flex-1" : "basis-[48%]"}`}>
+      {showDetails && <div className={`flex min-h-0 flex-col overflow-hidden bg-white transition-[flex-basis] duration-200 ${layout === "details-only" ? "flex-1" : "basis-[48%]"}`}>
         <div className="flex items-center border-b border-slate-100">
           <div className="flex gap-0.5 px-3 pt-1">
             {tabButton("details", "Details")}
@@ -368,7 +368,13 @@ function FieldNavForm({ saveReview, docType, formFields, data, fieldConfidence, 
 }) {
   const navItems = formFields.map((field) => ({ key: field.key, confidence: fieldConfidence[field.key] ?? null, type: field.type }))
   const nav = useFieldNav(navItems)
+  // One summary line in place of the per-field "Extracted" badges the audit had FieldRow drop:
+  // says how many fields landed, and how many of those are worth a second look.
+  const extractedCount = formFields.filter((field) => data[field.key] !== undefined && data[field.key] !== null && data[field.key] !== "").length
   return <form action={saveReview} className="space-y-3" onKeyDown={nav.onFormKeyDown}>
+    {extractedCount > 0 && <p className="text-xs text-slate-500">
+      All {extractedCount} field{extractedCount === 1 ? "" : "s"} extracted{nav.totalSuspects > 0 ? ` — ${nav.totalSuspects} low-confidence` : ""}.
+    </p>}
     {nav.totalSuspects > 0 && <div className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
       <span><span className="font-semibold">{nav.suspectsRemaining}</span> of {nav.totalSuspects} low-confidence fields to review — Enter confirms and moves to the next.</span>
       <button type="button" className="rounded-md border border-amber-300 bg-white px-2 py-0.5 font-medium text-amber-800 hover:bg-amber-100" onClick={() => nav.focusNext()}>Next suspect</button>

@@ -54,6 +54,11 @@ export function PipelineShell({ workspaceId, stage, counts, rows, contentMatches
       </div>
     </div>
     <StageTabs workspaceId={workspaceId} active={stage} counts={counts} />
+    {/* WCAG 4.1.3: announce the active stage's count to screen readers on navigation/refresh —
+        the visual tab badges carry this for sighted users, but nothing was announced before. */}
+    <p aria-live="polite" role="status" className="sr-only">
+      {`${counts[stage]} document${counts[stage] === 1 ? "" : "s"} on the ${stage} stage`}
+    </p>
     {stage === "approved" && touchlessStats && touchlessStats.totalExtracted > 0 && <div className="flex items-center gap-6 border-b bg-slate-50 px-6 py-2 text-xs text-slate-600">
       <span><strong className="text-slate-900">{(touchlessStats.touchlessRate * 100).toFixed(0)}%</strong> touchless rate (30d)</span>
       <span><strong className="text-slate-900">{touchlessStats.totalReady}</strong> approved (30d)</span>
