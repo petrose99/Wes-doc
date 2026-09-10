@@ -75,7 +75,7 @@ export default async function AutomationDashboardPage({ params }: {
             stages={[
               { label: "Extracted", value: extracted },
               { label: "Passed every check", value: metrics.touchless.totalReady },
-              { label: "Published untouched", value: metrics.touchless.totalPushedTouchless },
+              { label: "Synced untouched", value: metrics.touchless.totalPushedTouchless },
             ]}
           />
         </section>
@@ -83,9 +83,9 @@ export default async function AutomationDashboardPage({ params }: {
         <div className="grid gap-x-10 gap-y-10 md:grid-cols-2 lg:grid-cols-3">
           <Panel title="Where documents are sitting" note="Every extracted document lands in exactly one of these three states.">
             <Ledger>
-              <LedgerRow label="Ready to sync" value={metrics.readiness.ready} share={share(metrics.readiness.ready)} state="auto" />
-              <LedgerRow label="Blocked by a failed check" value={metrics.readiness.blocked} share={share(metrics.readiness.blocked)} state="blocked" />
-              <LedgerRow label="Waiting to be evaluated" value={metrics.readiness.pending} share={share(metrics.readiness.pending)} state="idle" />
+              <LedgerRow label="Approved — ready to sync" value={metrics.readiness.ready} share={share(metrics.readiness.ready)} state="auto" />
+              <LedgerRow label="Blocked in Review" value={metrics.readiness.blocked} share={share(metrics.readiness.blocked)} state="blocked" />
+              <LedgerRow label="In Inbox — not yet evaluated" value={metrics.readiness.pending} share={share(metrics.readiness.pending)} state="idle" />
             </Ledger>
           </Panel>
 
