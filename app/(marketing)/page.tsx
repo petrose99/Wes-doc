@@ -7,6 +7,7 @@ import { Faq } from "@/components/marketing/landing/faq"
 import { FolderChecks } from "@/components/marketing/landing/folder-checks"
 import { Hero } from "@/components/marketing/landing/hero"
 import { HowItWorks } from "@/components/marketing/landing/how-it-works"
+import { InlineTrialCta } from "@/components/marketing/landing/inline-cta"
 import { Intake } from "@/components/marketing/landing/intake"
 import { Library } from "@/components/marketing/landing/library"
 import { MultiCurrency } from "@/components/marketing/landing/multi-currency"
@@ -27,6 +28,7 @@ export default function Home() {
     <Hero />
     <ReadsStrip />
     <ApLoop />
+    <InlineTrialCta />
     <HowItWorks />
     <Intake />
     <Extraction />

@@ -21,7 +21,7 @@ export function HowItWorks() {
     <section id="how" className="bg-cream-50 py-14 md:py-22">
       <div className="mx-auto max-w-6xl px-5">
         <h2 className="font-display text-[clamp(1.9rem,3vw,2.6rem)] font-bold leading-[1.1] tracking-[-0.03em] text-stone-900">
-          Three steps, and none of them is data entry
+          Your part is three of them
         </h2>
         <div className="mt-9 grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-5">
           {STEPS.map((step) => (
