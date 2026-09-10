@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth"
 import { listWorkspaceBills, type BillRow, type BillsSummary } from "@/models/bills"
 import { requireWorkspaceRole } from "@/models/workspaces"
 import type { AgingBucket } from "@/lib/bills/due-date"
+import { preparePaymentRunAction } from "./actions"
 
 export const dynamic = "force-dynamic"
 
@@ -18,11 +19,15 @@ export default async function BillsPage({ params, searchParams }: {
   const { workspaceId } = await params
   const { blocked, unpaid } = await searchParams
   const user = await getCurrentUser()
-  await requireWorkspaceRole(workspaceId, user.id)
+  const membership = await requireWorkspaceRole(workspaceId, user.id)
+  const isOwner = membership.role === "owner"
 
   const onlyBlocked = blocked === "1"
   const onlyUnpaid = unpaid === "1"
   const { bills, summary } = await listWorkspaceBills({ workspaceId, onlyBlocked, onlyUnpaid })
+  // Only bills with a total AND an unblocked status are candidates for a payment run.
+  const payableBills = bills.filter((b) => !b.blockedByCheck && b.total !== null && b.total > 0 && (!b.paymentStatus || !["paid", "reconciled"].includes(b.paymentStatus.toLowerCase())))
+  const preparePaymentRunActionBound = preparePaymentRunAction.bind(null, workspaceId)
 
   const buckets: (AgingBucket | "unknown")[] = ["current", "1-30", "31-60", "61-90", "90+", "unknown"]
 
@@ -45,6 +50,28 @@ export default async function BillsPage({ params, searchParams }: {
           <SummaryCard key={bucket} label={bucketLabel(bucket)} data={summary[bucket]} />
         ))}
       </div>
+
+      {isOwner && payableBills.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Prepare a payment run</CardTitle>
+            <CardDescription>
+              Generate a ZA EFT CSV for {payableBills.length} unpaid, unblocked bill{payableBills.length === 1 ? "" : "s"}. Upload the file to your bank&rsquo;s bulk-payment portal — DocuBite does not move money itself.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form action={preparePaymentRunActionBound} className="flex flex-wrap items-center gap-3">
+              {payableBills.map((bill) => (
+                <input key={bill.documentId} type="hidden" name="documentId" value={bill.documentId} />
+              ))}
+              <button type="submit" className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700">
+                Prepare payment run
+              </button>
+              <span className="text-xs text-slate-500">Bills without a supplier bank account are dropped from the file — set the account on the supplier record and re-run.</span>
+            </form>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

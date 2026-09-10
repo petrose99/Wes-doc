@@ -69,6 +69,7 @@ model User {
   dismissedHealthCheckResults HealthCheckResult[] @relation("HealthCheckResultDismisser")
   routingAssignments ReviewRoutingRule[] @relation("RoutingAssignee")
   matchResolutions   DocumentMatch[]     @relation("MatchResolver")
+  createdPaymentRuns PaymentRun[]        @relation("PaymentRunCreator")
 
   @@map("users")
 }
@@ -160,6 +161,8 @@ model Workspace {
   reviewRoutingRules ReviewRoutingRule[]
   budgets            WorkspaceBudget[]
   documentMatches    DocumentMatch[]
+  paymentRuns        PaymentRun[]
+  paymentRunItems    PaymentRunItem[]
   suppliers          Supplier[]
   supplierAliases    SupplierAlias[]
   inboundEmailIntakes InboundEmailIntake[]
@@ -547,6 +550,7 @@ model Document {
   reviewTasks       ReviewTask[]
   documentMatchesAsSource DocumentMatch[] @relation("MatchSource")
   documentMatchesAsTarget DocumentMatch[] @relation("MatchTarget")
+  paymentRunItems         PaymentRunItem[]
   bankMatchesAsStatement BankMatch[] @relation("BankMatchStatement")
   bankMatchesAsMatched   BankMatch[] @relation("BankMatchMatched")
   statementLines         StatementLine[]
@@ -1987,6 +1991,57 @@ model WorkspaceBudget {
 
   @@index([workspaceId, isActive])
   @@map("workspace_budgets")
+}
+
+/// WP-AP2: one payment run is a batch of bill payments the user prepared for their bank. The
+/// row is created when they generate the CSV; `status` transitions draft → sent → reconciled as
+/// the file is uploaded to the bank and the resulting ledger transactions match back to these
+/// items via the existing bank-match pipeline. DocuBite never itself moves money — this table
+/// exists purely to track what was included in a downloaded payment file so an unpaid bill isn't
+/// silently re-batched into a second run.
+model PaymentRun {
+  id            String   @id @default(uuid()) @db.Uuid
+  workspaceId   String   @map("workspace_id") @db.Uuid
+  createdById   String?  @map("created_by_id") @db.Uuid
+  format        String   @default("za_eft_csv")
+  status        String   @default("draft")
+  itemCount     Int      @default(0) @map("item_count")
+  totalsJson    Json?    @map("totals_json")
+  filename      String?
+  sentAt        DateTime? @map("sent_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy     User?     @relation("PaymentRunCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  items         PaymentRunItem[]
+
+  @@index([workspaceId, status])
+  @@index([workspaceId, createdAt])
+  @@map("payment_runs")
+}
+
+/// One bill (a Document) included in one PaymentRun. `documentId` is nullable + SetNull because
+/// a workspace deleting the underlying document should not orphan the whole run; the item stays
+/// as an audit record ("we tried to pay for this then the source was deleted"). Unique on
+/// (workspaceId, documentId, active) so the same bill isn't in two open runs at once.
+model PaymentRunItem {
+  id            String   @id @default(uuid()) @db.Uuid
+  workspaceId   String   @map("workspace_id") @db.Uuid
+  runId         String   @map("run_id") @db.Uuid
+  documentId    String?  @map("document_id") @db.Uuid
+  supplier      String
+  amount        Decimal  @db.Decimal(18, 2)
+  currencyCode  String   @map("currency_code")
+  reference     String
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now()) @map("created_at")
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  run           PaymentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  document      Document?  @relation(fields: [documentId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, runId])
+  @@index([workspaceId, documentId, active])
+  @@map("payment_run_items")
 }
 
 model DocumentMatch {
