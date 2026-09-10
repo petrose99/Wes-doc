@@ -70,6 +70,27 @@ async function enqueuePush(
   return true
 }
 
+/** The default post-approval sync: every document a person approves is enqueued to the
+ * workspace's accounting connection automatically — approval IS the decision to sync, there is
+ * no second "Push to Accounting" click. All of enqueuePush's own safety gates still apply
+ * (pushable type, confirmed category — satisfied by the human doc-type pick approval requires —
+ * active connection, FX landed, not already pushed), so a document that can't safely sync simply
+ * stays on Approved until the blocker clears. Never throws; fire-and-forget from
+ * models/documents.ts::updateDocumentReview. */
+export async function syncOnApproval(workspaceId: string, documentId: string, actorId: string | null): Promise<void> {
+  try {
+    const document = await prisma.document.findUnique({
+      where: { id: documentId },
+      select: { id: true, filename: true, status: true, reviewedData: true, rawExtraction: true, codingData: true, docType: true, baseCurrencyTotal: true, template: { select: { code: true } } },
+    })
+    if (!document || document.status !== "reviewed") return
+    await enqueuePush(workspaceId, document, actorId, "push.approval_enqueued")
+  } catch (error) {
+    if (error instanceof BillMappingError) return
+    console.error("[automation] sync-on-approval failed:", error instanceof Error ? error.message : error)
+  }
+}
+
 /** Pushes a document to its workspace's connected accounting provider automatically, when the rule
  * that coded it has autopublish=true. Called from two places: right after a rule applies to a
  * document with no review required (models/automation-rules.ts), and right after a reviewer

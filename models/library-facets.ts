@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db"
-import { stageWhereClause } from "@/models/documents"
+import { LIBRARY_WHERE } from "@/models/documents"
 import type { Sql } from "@/models/document-field-values"
 
 export type TemplateFacet = { id: string; name: string; count: number }
@@ -49,7 +49,7 @@ export function buildSupplierFacetSql(workspaceId: string): Sql {
 }
 
 export async function listLibraryFacets(workspaceId: string): Promise<LibraryFacets> {
-  const readyWhere = { workspaceId, ...stageWhereClause("approved") }
+  const readyWhere = { workspaceId, ...LIBRARY_WHERE }
 
   const [templateRows, categoryRows, supplierRows] = await Promise.all([
     prisma.document.groupBy({

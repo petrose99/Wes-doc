@@ -224,11 +224,17 @@ export type LibraryListFilters = {
 
 export type LibraryDocument = Awaited<ReturnType<typeof listWorkspaceDocuments>>[number]
 
+/** Docu Library membership: every reviewed document, automatically — approved, synced, and paid
+ * alike. Deliberately NOT stageWhereClause("approved"): a document does not leave the library
+ * when it syncs or gets paid, and there is no "store to library" action any more; approval is
+ * the only gate. */
+export const LIBRARY_WHERE: Prisma.DocumentWhereInput = { status: "reviewed" }
+
 export async function listLibraryDocuments(workspaceId: string, filters: LibraryListFilters = {}): Promise<{ documents: LibraryDocument[]; total: number; page: number; pageCount: number }> {
   const pageSize = Math.min(Math.max(filters.pageSize ?? 24, 1), 100)
 
   if (filters.documentIds?.length) {
-    const where: Prisma.DocumentWhereInput = { workspaceId, id: { in: filters.documentIds }, ...stageWhereClause("approved") }
+    const where: Prisma.DocumentWhereInput = { workspaceId, id: { in: filters.documentIds }, ...LIBRARY_WHERE }
     const docs = await prisma.document.findMany({ where, include: { template: { include: { versions: { take: 1, orderBy: { createdAt: "desc" } } } }, templateVersion: true } })
     const idOrder = new Map(filters.documentIds.map((id, i) => [id, i]))
     docs.sort((a, b) => (idOrder.get(a.id) ?? Infinity) - (idOrder.get(b.id) ?? Infinity))
@@ -237,7 +243,7 @@ export async function listLibraryDocuments(workspaceId: string, filters: Library
 
   const where: Prisma.DocumentWhereInput = {
     workspaceId,
-    ...stageWhereClause("approved"),
+    ...LIBRARY_WHERE,
     ...(filters.templateId ? { templateId: filters.templateId } : {}),
     ...(filters.flagged ? { flaggedAt: { not: null } } : {}),
     ...(filters.filenameQuery?.trim() ? { filename: { contains: filters.filenameQuery.trim(), mode: "insensitive" as const } } : {}),
@@ -319,6 +325,15 @@ export async function countToReviewByFile(workspaceId: string, fileIds: string[]
 export async function documentIdsInStage(workspaceId: string, documentIds: string[], stage: PipelineStage): Promise<Set<string>> {
   if (!documentIds.length) return new Set()
   const rows = await prisma.document.findMany({ where: { workspaceId, id: { in: documentIds }, ...stageWhereClause(stage) }, select: { id: true } })
+  return new Set(rows.map((row) => row.id))
+}
+
+/** Of the given document ids, which are in the Docu Library (any reviewed document — see
+ * LIBRARY_WHERE). The library-search narrowing filter, replacing the old stage-based one that
+ * silently dropped synced/paid documents from library search results. */
+export async function documentIdsInLibrary(workspaceId: string, documentIds: string[]): Promise<Set<string>> {
+  if (!documentIds.length) return new Set()
+  const rows = await prisma.document.findMany({ where: { workspaceId, id: { in: documentIds }, ...LIBRARY_WHERE }, select: { id: true } })
   return new Set(rows.map((row) => row.id))
 }
 
@@ -461,6 +476,14 @@ export async function updateDocumentReview(input: { workspaceId: string; documen
   // a failure here must not roll the review back — the document is reviewed either way, its
   // conversion just moves to "pending" until a retry succeeds.
   await applyFxToDocument(document.id).catch(() => {})
+  // Approval IS the decision to sync: no separate "Push to Accounting" click. Runs after FX so a
+  // just-converted document ships with its base-currency total; the sync's own gates (connection,
+  // pushable type, FX landed) decide whether anything actually enqueues. Dynamic import to keep
+  // this module's import graph clean for vitest.
+  if (!missing.length) {
+    const { syncOnApproval } = await import("@/lib/automation/autopublish")
+    await syncOnApproval(input.workspaceId, document.id, input.actorId).catch(() => {})
+  }
   return result
 }
 
