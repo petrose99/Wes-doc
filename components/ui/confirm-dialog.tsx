@@ -37,6 +37,16 @@ export function ConfirmDialog({ open, title, description, confirmLabel = "Confir
   useEffect(() => {
     if (!open) return
     openerRef.current = typeof document !== "undefined" ? document.activeElement : null
+    // With extra content present (the stage-reject note field), initial focus belongs to that
+    // content, not the destructive Confirm — a reviewer whose intent is "reject with a reason"
+    // shouldn't have to Tab backwards past the button their reflexive Enter would fire.
+    if (children) {
+      // rAF so the portal content exists before focusing; if the dialog closed in the same
+      // tick, contentRef is null and the optional chain makes this a no-op.
+      window.requestAnimationFrame(() => {
+        contentRef.current?.querySelector<HTMLElement>("textarea, input, select")?.focus()
+      })
+    }
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape" && !busy) { onCancel(); return }
       if (event.key !== "Tab") return
@@ -76,7 +86,7 @@ export function ConfirmDialog({ open, title, description, confirmLabel = "Confir
         </div>
         <div className="flex justify-end gap-2 border-t bg-slate-50 px-5 py-3">
           <Button type="button" variant="outline" size="sm" disabled={busy} onClick={onCancel}>Cancel</Button>
-          <Button type="button" variant={destructive ? "destructive" : "default"} size="sm" autoFocus disabled={busy} onClick={onConfirm}>
+          <Button type="button" variant={destructive ? "destructive" : "default"} size="sm" autoFocus={!children} disabled={busy} onClick={onConfirm}>
             {busy && <Loader2 className="h-4 w-4 animate-spin" />}{confirmLabel}
           </Button>
         </div>

@@ -188,7 +188,7 @@ export function DocumentList({ workspaceId, stage, rows, contentMatches, query }
 
   return <div className="flex min-h-0 flex-1 flex-col">
     <BulkActionBar workspaceId={workspaceId} stage={stage} selectedIds={selected} selectedFileId={selectedFileId} selectedRows={selectedRows} onDone={clear} />
-    {keyboardEnabled && <div className={`border-b bg-white px-6 py-1.5 text-[11px] ${rows.length > 0 ? "text-slate-500" : "text-slate-400/70"}`} aria-hidden={rows.length === 0}>
+    {keyboardEnabled && <div className={`border-b bg-white px-6 py-1.5 text-[11px] ${rows.length > 0 ? "text-slate-500" : "text-slate-400/70"}`}>
       <kbd className="rounded border border-slate-300 bg-slate-50 px-1 font-sans text-[10px] text-slate-600">j</kbd>/<kbd className="rounded border border-slate-300 bg-slate-50 px-1 font-sans text-[10px] text-slate-600">k</kbd> move
       · <kbd className="rounded border border-slate-300 bg-slate-50 px-1 font-sans text-[10px] text-slate-600">x</kbd> select
       · <kbd className="rounded border border-slate-300 bg-slate-50 px-1 font-sans text-[10px] text-slate-600">a</kbd> all
