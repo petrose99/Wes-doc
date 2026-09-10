@@ -5,6 +5,7 @@ import { CreateReviewTaskButton } from "@/components/documents/create-review-tas
 import { DeleteDocumentButton } from "@/components/documents/delete-document-button"
 import { FieldRow } from "@/components/pipeline/document-detail/field-row"
 import { LineItemsSection } from "@/components/pipeline/document-detail/line-items-section"
+import { StageIndicator, type StageStep } from "@/components/pipeline/document-detail/stage-indicator"
 import { useFieldNav } from "@/components/pipeline/document-detail/use-field-nav"
 import { archiveDocumentsAction, flagDocumentsAction, moveDocumentsToStageAction, updateDocumentNoteAction } from "@/app/(app)/workspaces/[workspaceId]/pipeline-actions"
 import { setDocumentTypeAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
@@ -38,7 +39,7 @@ const DOC_TYPE_LABELS: Record<"expense" | "sale" | "bank_statement" | "other", s
 export function SplitPane({
   workspaceId, source, fields, data, fieldConfidence, provenanceFields, provenanceItems, initialTarget, conflictingLabels, missingRequiredFields,
   saveReview, documentType: initialDocumentType, note: initialNote, auditEvents, prevHref, nextHref, position, stage, afterActionHref,
-  header, canPush, pushCard, canCreateRule, defaultSupplier, matchKind, bankMatches, documentMatches, paymentStatus, rationales, fxBadge,
+  header, canPush, pushCard, canCreateRule, defaultSupplier, matchKind, bankMatches, documentMatches, paymentStatus, rationales, fxBadge, stageIndicator,
 }: {
   workspaceId: string
   source: SourceDocument
@@ -70,6 +71,9 @@ export function SplitPane({
   paymentStatus?: string | null
   rationales?: Record<string, FieldRationale>
   fxBadge?: ReactNode
+  /** The five-step Extracted → Checks → Approval → Sync → Pay indicator. Derived at the page
+   * level so this client component doesn't need to pull in review-task/integration-push readers. */
+  stageIndicator?: StageStep[]
 }) {
   const router = useRouter()
   const [tab, setTab] = useState<Tab>("details")
@@ -234,6 +238,11 @@ export function SplitPane({
       <Link href={prevHref ?? "#"} aria-disabled={!prevHref} className={`rounded-lg p-1 ${prevHref ? "text-slate-500 hover:bg-slate-100 hover:text-slate-700" : "pointer-events-none text-slate-300"}`}><ChevronLeft className="h-4 w-4" /></Link>
       <Link href={nextHref ?? "#"} aria-disabled={!nextHref} className={`rounded-lg p-1 ${nextHref ? "text-slate-500 hover:bg-slate-100 hover:text-slate-700" : "pointer-events-none text-slate-300"}`}><ChevronRight className="h-4 w-4" /></Link>
     </div>
+
+    {/* Five-step lifecycle: Extracted → Checks → Approval → Sync → Pay. See stage-indicator.tsx. */}
+    {stageIndicator && stageIndicator.length > 0 && <div className="border-b border-slate-200 bg-white">
+      <StageIndicator steps={stageIndicator} />
+    </div>}
 
     {/* Alert banner */}
     {(missingRequiredFields.length > 0 || conflictingLabels.length > 0) && <div className="border-b border-indigo-200 bg-indigo-50 px-6 py-2 text-sm text-indigo-700">

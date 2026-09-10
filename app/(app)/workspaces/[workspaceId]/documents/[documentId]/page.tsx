@@ -141,6 +141,67 @@ export default async function DocumentPage({ params, searchParams }: {
   const afterActionHref = nextHref ?? (stage ? `/workspaces/${workspaceId}/pipeline?stage=${stage}` : `/workspaces/${workspaceId}/pipeline`)
   const position = stage && neighborIndex >= 0 ? { index: neighborIndex + 1, total: neighbors.length } : null
 
+  // Five-step lifecycle indicator. Derived server-side so the client SplitPane doesn't have to
+  // pull in review-task / integration-push readers. `checks` uses readinessStatus (added by the
+  // readiness engine); `approval` folds the open review task into the current step; `sync` reads
+  // the succeeded pushes we already loaded above; `pay` reads confirmedPaymentStatus AND the
+  // ledger's paymentStatuses map, so a "paid in ledger" bill lands on Pay-done even when nobody
+  // clicked "confirm paid".
+  const succeededPushCount = pushes.filter((p) => p.status === "succeeded").length
+  const failedPushCount = pushes.filter((p) => p.status === "failed").length
+  const ledgerPaid = (() => {
+    const ps = paymentStatuses.get(documentId)?.paymentStatus?.toLowerCase()
+    return ps === "paid" || ps === "reconciled"
+  })()
+  const confirmedPaid = document.paymentStatus === "paid"
+  const readinessStatus = (document as unknown as { readinessStatus: string | null }).readinessStatus
+  const readinessDetail = (document as unknown as { readinessDetail: unknown }).readinessDetail
+  const readinessBlockers = Array.isArray(readinessDetail)
+    ? readinessDetail.filter((b): b is { detail: string } => typeof b === "object" && b !== null && typeof (b as { detail?: unknown }).detail === "string").map((b) => b.detail)
+    : []
+  const extracted = document.status === "reviewed" || document.status === "needs_review" || document.status === "ready_for_review"
+  const stageIndicator = ((): import("@/components/pipeline/document-detail/stage-indicator").StageStep[] => {
+    if (!extracted) return [
+      { key: "extracted", label: "Extracted", state: document.status === "failed" ? "blocked" : "current", detail: document.status === "failed" ? (document.errorCode ?? "extraction failed") : "in progress" },
+      { key: "checks", label: "Checks", state: "upcoming" },
+      { key: "approval", label: "Approval", state: "upcoming" },
+      { key: "sync", label: "Sync", state: "upcoming" },
+      { key: "pay", label: "Pay", state: "upcoming" },
+    ]
+    // Checks
+    const checksState: import("@/components/pipeline/document-detail/stage-indicator").StageStep["state"] =
+      readinessStatus === "ready" ? "done"
+      : readinessStatus === "blocked" ? "blocked"
+      : "current"
+    const checksDetail = readinessStatus === "blocked" && readinessBlockers[0] ? readinessBlockers[0] : readinessStatus === "ready" ? "all clear" : undefined
+    // Approval
+    const approvalState: import("@/components/pipeline/document-detail/stage-indicator").StageStep["state"] =
+      openReviewTask && openReviewTask.status !== "approved" ? "blocked"
+      : document.status === "reviewed" ? "done"
+      : "current"
+    const approvalDetail = openReviewTask ? (openReviewTask.status === "in_review" ? "in review" : "awaiting approval") : (document.status === "reviewed" ? "signed off" : undefined)
+    // Sync
+    const syncState: import("@/components/pipeline/document-detail/stage-indicator").StageStep["state"] =
+      succeededPushCount > 0 ? "done"
+      : failedPushCount > 0 ? "blocked"
+      : approvalState === "done" ? "current"
+      : "upcoming"
+    const syncDetail = succeededPushCount > 0 ? `pushed × ${succeededPushCount}` : failedPushCount > 0 ? "push failed" : undefined
+    // Pay
+    const payState: import("@/components/pipeline/document-detail/stage-indicator").StageStep["state"] =
+      confirmedPaid || ledgerPaid ? "done"
+      : syncState === "done" ? "current"
+      : "upcoming"
+    const payDetail = confirmedPaid ? "confirmed paid" : ledgerPaid ? "paid in ledger" : undefined
+    return [
+      { key: "extracted", label: "Extracted", state: "done" },
+      { key: "checks", label: "Checks", state: checksState, detail: checksDetail },
+      { key: "approval", label: "Approval", state: approvalState, detail: approvalDetail },
+      { key: "sync", label: "Sync", state: syncState, detail: syncDetail },
+      { key: "pay", label: "Pay", state: payState, detail: payDetail },
+    ]
+  })()
+
   return <SplitPane
     workspaceId={workspaceId}
     source={{ documentId: document.id, filename: document.filename, mimeType: document.mimeType }}
@@ -196,5 +257,6 @@ export default async function DocumentPage({ params, searchParams }: {
       }))}
     /> : null}
     documentMatches={documentMatches.length ? <DocumentMatchesPanel workspaceId={workspaceId} matches={documentMatches} /> : null}
+    stageIndicator={stageIndicator}
   />
 }
