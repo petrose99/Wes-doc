@@ -43,15 +43,15 @@ export function Hero() {
         <div className="min-w-0 flex-1 basis-[400px]">
           <span className="inline-flex items-center gap-2 rounded-full border border-cream-200 bg-white px-3.5 py-1.5 text-[0.78rem] font-semibold text-emerald-700 shadow-sm">
             <span className="db-pulse-dot h-1.5 w-1.5 rounded-full bg-emerald-500" style={{ animation: "db-pulse 2.4s ease-in-out infinite" }} />
-            OCR + checks on every upload
+            AI accounts payable, end to end
           </span>
           <h1 className="mt-5 text-balance font-display text-[clamp(2.4rem,4.6vw,4.05rem)] font-extrabold leading-[1.02] tracking-[-0.038em] text-stone-950">
-            The messy pile goes in. A{" "}
-            <span style={{ backgroundImage: "linear-gradient(180deg,transparent 56%,#6EE7B7 56%,#6EE7B7 93%,transparent 93%)", padding: "0 .04em" }}>clean, checked ledger</span>{" "}
-            comes out.
+            Bills in by email.{" "}
+            <span style={{ backgroundImage: "linear-gradient(180deg,transparent 56%,#6EE7B7 56%,#6EE7B7 93%,transparent 93%)", padding: "0 .04em" }}>Coded, checked, approved</span>{" "}
+            — ready to pay.
           </h1>
           <p className="mt-6 max-w-[34rem] text-pretty text-[1.08rem] leading-[1.62] text-stone-600">
-            It starts with OCR that reads the hard cases — handwriting, faxes, phone photos of crumpled receipts. Drop in a single file or a whole folder; multi-document PDFs are split into separate records. Then every batch is checked for duplicates, missing months and totals that don&apos;t add up, before anything reaches your books.
+            DocuBite runs your accounts-payable loop: invoices arrive by email or API, extraction reads even the hard cases (handwriting, phone photos, scans), fraud checks freeze a supplier that quietly changed its bank details, 2- and 3-way matching ties them to the PO, approvals route by amount, and the bills sync to QuickBooks, Xero or Bigcapital. When you&apos;re ready to pay, we hand you a bank-ready payment file — you stay on the rails you already trust.
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-3">
             <Link href="/signup" className="group inline-flex h-12 items-center rounded-[10px] bg-emerald-700 px-6.5 text-[0.98rem] font-bold text-white shadow-[0_1px_2px_rgba(15,23,42,.08),0_10px_26px_rgba(4,120,87,.24)] transition-colors hover:bg-emerald-800">

@@ -1,4 +1,5 @@
 import { Accounting } from "@/components/marketing/landing/accounting"
+import { ApLoop } from "@/components/marketing/landing/ap-loop"
 import { Automation } from "@/components/marketing/landing/automation"
 import { Comparison } from "@/components/marketing/landing/comparison"
 import { Extraction } from "@/components/marketing/landing/extraction"
@@ -17,14 +18,15 @@ import { TrialCta } from "@/components/marketing/landing/trial-cta"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
-  title: { absolute: "DocuBite — Turn documents into data you can trust" },
-  description: "DocuBite reads invoices, receipts and bank statements — scans, photos and handwriting included, in any currency — into a live sheet where every value traces to its source. Upload them or email them in, and hand over as much of the coding as you trust it with. Self-serve, no credit card required.",
+  title: { absolute: "DocuBite — AI accounts payable, end to end" },
+  description: "DocuBite runs your accounts-payable loop: invoices in by email or API, coded and checked, matched to POs, approved, synced to QuickBooks/Xero/Bigcapital, and assembled into a bank-ready payment file. Payment execution stays with your bank — every step in between is DocuBite.",
 }
 
 export default function Home() {
   return <>
     <Hero />
     <ReadsStrip />
+    <ApLoop />
     <HowItWorks />
     <Intake />
     <Extraction />

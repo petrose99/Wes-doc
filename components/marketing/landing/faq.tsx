@@ -23,6 +23,10 @@ const QUESTIONS = [
     q: "Can I get my data out?",
     a: "Reviewed data streams out as CSV whenever you want it, columns and all. Reviewed invoices and receipts can also be pushed to QuickBooks or Xero as bills. Nothing here is a one-way door.",
   },
+  {
+    q: "Does DocuBite move money or pay bills?",
+    a: "No — that's deliberate. DocuBite gets your bills ready to pay: coded, checked, matched, approved, synced to your ledger, and — when you're ready — assembled into a bank-payment file with a supplier remittance. You take that file to your own bank's bulk-payment portal and press send. Payment execution stays on rails you already trust and keeps DocuBite outside every payment-license perimeter, so we can serve you across South Africa, Lesotho, Namibia and Eswatini without asking you to switch banks.",
+  },
 ]
 
 export function Faq() {
