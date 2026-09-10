@@ -22,10 +22,10 @@ export function ApLoop() {
             <CheckCircle2 className="h-3.5 w-3.5" /> The AP loop
           </span>
           <h2 className="mt-4 font-display text-[clamp(1.9rem,3vw,2.6rem)] font-bold leading-[1.1] tracking-[-0.03em] text-stone-900">
-            Seven steps, in order. So you never leave DocuBite mid-invoice.
+            From inbox to payment file
           </h2>
           <p className="mt-3 text-[1.02rem] leading-[1.6] text-stone-600">
-            The AP loop unfolded — from the bill arriving to the payment file leaving. Deterministic where it matters (checks, matching, approvals) and AI-assisted where it&apos;s useful (extraction, coding). No black boxes.
+            Deterministic where it matters (checks, matching, approvals), AI-assisted where it&apos;s useful (extraction, coding). No black boxes.
           </p>
         </div>
         {/* Horizontal rail: seven step cards connected by a continuous line. On desktop the line runs
