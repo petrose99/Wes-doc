@@ -1,7 +1,9 @@
-/** The three acts of the AP loop. Sits BEFORE the detailed 7-step rail so a reader gets the shape
- * in three glances first, then can drop into the deeper rail. The 7 loop steps below each act name
- * are the mapping so the two sections aren't competing enumerations — this is the summary, ApLoop is
- * the deep-dive. */
+import { CheckCircle2 } from "lucide-react"
+
+/** THE AP-loop section: three acts, each naming the steps it covers in its kicker. This replaced
+ * the seven-card rail — seven tiles read as seven chores, three acts read as a shape. The deep-dive
+ * sections below (Intake, Extraction, Checks, Pipeline, Automation) carry the step-level detail,
+ * and the "Not on the list" note keeps the no-money-movement trust beat that lived on the rail. */
 const ACTS: { n: string; title: string; steps: string; body: string }[] = [
   {
     n: "01",
@@ -19,19 +21,22 @@ const ACTS: { n: string; title: string; steps: string; body: string }[] = [
     n: "03",
     title: "Out",
     steps: "Sync · Pay-ready",
-    body: "Approved bills sync to your accounting tool. One click assembles the bank-ready payment file with per-supplier remittance advice — you upload it to your own bank.",
+    body: "Approved bills post to the built-in accounting or sync to QuickBooks, Xero and more. One click assembles the bank-ready payment file with per-supplier remittance advice — you upload it to your own bank.",
   },
 ]
 
 export function HowItWorks() {
   return (
-    <section id="how" className="bg-cream-50 py-14 md:py-22">
+    <section id="ap-loop" className="bg-cream-50 py-14 md:py-22">
       <div className="mx-auto max-w-6xl px-5">
-        <h2 className="font-display text-[clamp(1.9rem,3vw,2.6rem)] font-bold leading-[1.1] tracking-[-0.03em] text-stone-900">
-          The whole loop, in three acts
+        <span className="inline-flex items-center gap-2 rounded-full border border-cream-200 bg-white px-3.5 py-1.5 text-[0.78rem] font-semibold text-emerald-700">
+          <CheckCircle2 className="h-3.5 w-3.5" /> The AP loop
+        </span>
+        <h2 className="mt-4 font-display text-[clamp(1.9rem,3vw,2.6rem)] font-bold leading-[1.1] tracking-[-0.03em] text-stone-900">
+          From inbox to payment file
         </h2>
         <p className="mt-3 max-w-[46rem] text-[1.02rem] leading-[1.6] text-stone-600">
-          Seven steps run the loop — your part is these three. Each act is broken down step-by-step just below.
+          The whole loop, in three acts — your part is these three.
         </p>
         <div className="mt-9 grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-5">
           {ACTS.map((act) => (
@@ -43,6 +48,9 @@ export function HowItWorks() {
             </div>
           ))}
         </div>
+        <p className="mt-6 rounded-xl border border-stone-200 bg-white p-4 text-sm text-stone-600">
+          <strong className="text-stone-900">Not on the list, on purpose:</strong> DocuBite does not move money, does not issue cards, and does not hold funds. You still pay from your own bank — we just hand it a ready-to-pay file. That means no switching banks, no new payment licence to trust, and it works the same wherever in the world you bank.
+        </p>
       </div>
     </section>
   )

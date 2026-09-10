@@ -1,5 +1,4 @@
 import { Accounting } from "@/components/marketing/landing/accounting"
-import { ApLoop } from "@/components/marketing/landing/ap-loop"
 import { Automation } from "@/components/marketing/landing/automation"
 import { Comparison } from "@/components/marketing/landing/comparison"
 import { Extraction } from "@/components/marketing/landing/extraction"
@@ -30,7 +29,6 @@ export default function Home() {
     <ReadsStrip />
     <Proof />
     <HowItWorks />
-    <ApLoop />
     <InlineTrialCta />
     <Intake />
     <Extraction />
