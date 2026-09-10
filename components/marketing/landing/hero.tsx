@@ -51,7 +51,7 @@ export function Hero() {
             — ready to pay.
           </h1>
           <p className="mt-4 max-w-[34rem] text-pretty text-[1rem] leading-[1.55] text-stone-600 md:mt-6 md:text-[1.08rem] md:leading-[1.62]">
-            Supplier, date, VAT, total — every detail read off the page, checked, and approved. Accounting is built in — or sync to the software you already use.
+            Supplier, date, VAT, total — every detail read off the invoice, checked, and approved. Accounting is built in — or sync to the software you already use.
           </p>
           <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-3.5 md:mt-8">
             <div className="flex flex-col">
