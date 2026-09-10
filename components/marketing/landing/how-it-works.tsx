@@ -36,7 +36,7 @@ export function HowItWorks() {
           From inbox to payment file
         </h2>
         <p className="mt-3 max-w-[46rem] text-[1.02rem] leading-[1.6] text-stone-600">
-          The whole loop, in three acts — your part is these three.
+          Your part is these three — DocuBite does the rest.
         </p>
         <div className="mt-9 grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-5">
           {ACTS.map((act) => (
