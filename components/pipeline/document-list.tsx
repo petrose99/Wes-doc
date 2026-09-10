@@ -20,10 +20,17 @@ export type PipelineDocumentRow = {
   missingRequiredFields: string[]
   readinessStatus: string | null
   readinessBlockers: string[]
-  /** Set only on the to-review stage — supplier/category/total in place of the filename, since a
+  /** Set on every stage except Inbox — supplier/category/total in place of the filename, since a
    * reviewer triaging this list cares who the document is from and how much it's for, not what
-   * it happened to be named on upload. */
-  review: { supplier: string | null; category: string; total: string | null } | null
+   * it happened to be named on upload. `converted` carries the base-currency string on a
+   * foreign-currency document ("≈ $108" next to "€100"); `fxPending` is true when the document IS
+   * foreign-currency but the ECB conversion hasn't landed yet, so the Total column can render an
+   * "FX pending" chip instead of a wrong number. */
+  review: { supplier: string | null; category: string; total: string | null; converted: string | null; fxPending: boolean } | null
+  /** How many of this document's fields the model returned below the LOW_CONFIDENCE threshold —
+   * fed into the Readiness column so a reviewer sees "1 field low" alongside the ready/blocked
+   * state, rather than a green "Ready to sync" pill hiding a suspect value. */
+  lowConfidenceFieldCount: number
 }
 
 /** A document matched by content rather than by name — the pipeline's own version of the Files
@@ -39,10 +46,17 @@ const STATUS_BADGE: Record<string, string> = {
   reviewed: "bg-emerald-100 text-emerald-700",
 }
 
-function ReadinessBadge({ status, blockers }: { status: string | null; blockers: string[] }) {
-  if (!status) return null
-  if (status === "ready") return <span className="inline-flex items-center gap-1 rounded bg-emerald-50 px-1.5 py-0.5 text-xs font-medium text-emerald-700">
-    <CheckCircle2 className="h-3 w-3" />Ready to sync
+function ReadinessBadge({ status, blockers, lowConfidenceFieldCount }: { status: string | null; blockers: string[]; lowConfidenceFieldCount: number }) {
+  if (!status) {
+    // The audit called for an honest signal on rows the readiness engine hasn't scored yet — a
+    // silent empty cell hid the low-confidence exceptions the confidence map already knew about.
+    if (lowConfidenceFieldCount > 0) return <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-xs font-medium text-amber-700" title={`${lowConfidenceFieldCount} low-confidence field${lowConfidenceFieldCount === 1 ? "" : "s"}`}>
+      <AlertTriangle className="h-3 w-3" />{lowConfidenceFieldCount} field{lowConfidenceFieldCount === 1 ? "" : "s"} low
+    </span>
+    return null
+  }
+  if (status === "ready") return <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium ${lowConfidenceFieldCount > 0 ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`} title={lowConfidenceFieldCount > 0 ? `${lowConfidenceFieldCount} low-confidence field${lowConfidenceFieldCount === 1 ? "" : "s"} — otherwise ready to sync` : undefined}>
+    <CheckCircle2 className="h-3 w-3" />{lowConfidenceFieldCount > 0 ? `${lowConfidenceFieldCount} field low` : "Ready to sync"}
   </span>
   const title = blockers.length > 0 ? `Blocked: ${blockers.join(", ")}` : "Blocked"
   return <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-xs font-medium text-amber-700" title={title}>
@@ -142,8 +156,12 @@ export function DocumentList({ workspaceId, stage, rows, contentMatches, query }
                 </Link>
               </td>
               <td className="border-b px-3 py-2 text-slate-500">{row.review.category}</td>
-              <td className="border-b px-3 py-2 text-slate-500">{row.review.total ?? "—"}</td>
-              <td className="border-b px-3 py-2"><ReadinessBadge status={row.readinessStatus} blockers={row.readinessBlockers} /></td>
+              <td className="border-b px-3 py-2 text-slate-500">
+                {row.review.total ? <span className="tabular-nums text-slate-800">{row.review.total}</span> : <span>—</span>}
+                {row.review.converted && <span className="ml-1.5 text-[11px] text-slate-400 tabular-nums" title="Converted to workspace base currency at extraction-time FX rate">{row.review.converted}</span>}
+                {row.review.fxPending && <span className="ml-1.5 rounded bg-amber-50 px-1 py-px text-[10px] font-medium text-amber-700" title="Foreign-currency document — awaiting an ECB reference rate">FX pending</span>}
+              </td>
+              <td className="border-b px-3 py-2"><ReadinessBadge status={row.readinessStatus} blockers={row.readinessBlockers} lowConfidenceFieldCount={row.lowConfidenceFieldCount} /></td>
             </> : <>
               <td className="border-b px-3 py-2">
                 <Link href={`/workspaces/${workspaceId}/documents/${row.id}?stage=${stage}`} className="inline-flex items-center gap-2 font-medium text-slate-800 hover:text-emerald-800" title={row.filename}>

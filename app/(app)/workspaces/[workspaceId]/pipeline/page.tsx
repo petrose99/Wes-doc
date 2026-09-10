@@ -7,6 +7,7 @@ import { parseTemplateFields } from "@/lib/document-templates"
 import { PIPELINE_STAGES, parseStageAlias, type PipelineStage } from "@/lib/documents/stages"
 import { searchDocumentsByContent } from "@/lib/retrieval"
 import { activeJobDocumentIds, countDocumentsByStage, documentIdsInStage, flaggedFieldsFromConfidence, listWorkspaceDocuments, summarizeDocumentForReview } from "@/models/documents"
+import { listWorkspaceBills } from "@/models/bills"
 import { ensurePipelineFile, getFileTemplates } from "@/models/files"
 import { getListPreference } from "@/models/list-preferences"
 import { getTouchlessRateStats } from "@/lib/analytics/workspace-analytics"
@@ -57,9 +58,10 @@ export default async function PipelinePage({ params, searchParams }: {
     listWorkspaceDocuments(workspaceId, { stage, query: query || undefined }),
     getListPreference(user.id, workspaceId, `pipeline:${stage}`),
   ])
-  const [pipelineTemplates, touchlessStats] = await Promise.all([
+  const [pipelineTemplates, touchlessStats, billsSummary] = await Promise.all([
     getFileTemplates(workspaceId, pipelineFile.id),
     stage === "approved" ? getTouchlessRateStats(workspaceId) : Promise.resolve(null),
+    (stage === "synced" || stage === "paid") ? listWorkspaceBills({ workspaceId, limit: 1 }).then((res) => res.summary).catch(() => null) : Promise.resolve(null),
   ])
 
   // Content search runs alongside the ordinary filename/OCR-text match, not instead of it — the
@@ -90,6 +92,7 @@ export default async function PipelinePage({ params, searchParams }: {
     flagged: doc.flaggedAt !== null,
     hasActiveJob: activeJobs.has(doc.id),
     missingRequiredFields: flaggedFieldsFromConfidence(doc.confidence),
+    lowConfidenceFieldCount: flaggedFieldsFromConfidence(doc.confidence).length,
     readinessStatus: (doc as Record<string, unknown>).readinessStatus as string | null ?? null,
     readinessBlockers: parseReadinessBlockers((doc as Record<string, unknown>).readinessDetail),
     // Every stage but Inbox shows this — a document still in Inbox hasn't been extracted yet, so
@@ -124,6 +127,8 @@ export default async function PipelinePage({ params, searchParams }: {
     documentSearchEnabled={documentSearchEnabled}
     upload={{ fileId: pipelineFile.id, templates: uploadTemplates, usage, sheetCount: pipelineTemplates.length }}
     touchlessStats={touchlessStats}
+    billsSummary={billsSummary}
+    baseCurrency={membership.workspace.baseCurrency ?? "USD"}
   />
 }
 
