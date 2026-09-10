@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { Loader2 } from "lucide-react"
-import { useEffect, useRef } from "react"
+import { useEffect, useId, useRef } from "react"
 import { createPortal } from "react-dom"
 
 /** Confirmation for destructive actions. Portalled to the body so it is never clipped or
@@ -23,6 +23,10 @@ export function ConfirmDialog({ open, title, description, confirmLabel = "Confir
 }) {
   const contentRef = useRef<HTMLDivElement>(null)
   const openerRef = useRef<Element | null>(null)
+  // Per-instance ids so two ConfirmDialogs mounted concurrently (bulk approve + stage-reject,
+  // for example, if both open in quick succession) don't collide on the same aria targets.
+  const titleId = useId()
+  const descId = useId()
 
   useEffect(() => {
     if (!open) return
@@ -58,10 +62,10 @@ export function ConfirmDialog({ open, title, description, confirmLabel = "Confir
       {/* labelledby/describedby against the visible heading and description, so a screen reader
           announces the consequence line ("This cannot be undone", "can auto-publish and sync…"),
           not just the title — the consequence is the reason this dialog exists. */}
-      <div ref={contentRef} role="alertdialog" aria-modal="true" aria-labelledby="confirm-dialog-title" aria-describedby={description ? "confirm-dialog-desc" : undefined} className="w-full max-w-sm overflow-hidden rounded-xl bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+      <div ref={contentRef} role="alertdialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={description ? descId : undefined} className="w-full max-w-sm overflow-hidden rounded-xl bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
         <div className="px-5 pb-4 pt-5">
-          <h2 id="confirm-dialog-title" className="text-base font-semibold text-slate-900">{title}</h2>
-          {description && <p id="confirm-dialog-desc" className="mt-1.5 text-sm text-slate-500">{description}</p>}
+          <h2 id={titleId} className="text-base font-semibold text-slate-900">{title}</h2>
+          {description && <p id={descId} className="mt-1.5 text-sm text-slate-500">{description}</p>}
         </div>
         <div className="flex justify-end gap-2 border-t bg-slate-50 px-5 py-3">
           <Button type="button" variant="outline" size="sm" disabled={busy} onClick={onCancel}>Cancel</Button>

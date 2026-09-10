@@ -103,12 +103,22 @@ export function DocumentList({ workspaceId, stage, rows, contentMatches, query }
    * stages the row set has no per-row action a shortcut would trigger. */
   const [focusedIndex, setFocusedIndex] = useState<number | null>(rows.length ? 0 : null)
   const keyboardEnabled = stage === "review"
+  // Render-time clamp: if the row set shrinks (a filter change, a bulk approve, a delete), an
+  // index that pointed past the new end would leave the focus ring invisible until j/k pressed.
+  // Snap to the first row instead. Deliberately not an effect: same rule React itself gives for
+  // "derived state that follows a prop", and avoids a second render pass.
+  if (focusedIndex !== null && focusedIndex >= rows.length) setFocusedIndex(rows.length ? 0 : null)
   useEffect(() => {
     if (!keyboardEnabled) return
     const handler = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null
       if (!target) return
-      if (["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) || target.isContentEditable) return
+      // Editors, form fields, and links get to keep their native keystrokes. `a` on an anchor
+      // otherwise fired select-all while the user was tabbing through row supplier links; also
+      // guard the whole set once any modifier is held so browser shortcuts (Cmd/Ctrl+A, Alt+arrow)
+      // still work.
+      if (["INPUT", "TEXTAREA", "SELECT", "A", "BUTTON"].includes(target.tagName) || target.isContentEditable) return
+      if (event.metaKey || event.ctrlKey || event.altKey) return
       if (!rows.length) return
       if (event.key === "j" || event.key === "ArrowDown") {
         event.preventDefault()
@@ -165,6 +175,12 @@ export function DocumentList({ workspaceId, stage, rows, contentMatches, query }
 
   return <div className="flex min-h-0 flex-1 flex-col">
     <BulkActionBar workspaceId={workspaceId} stage={stage} selectedIds={selected} selectedFileId={selectedFileId} selectedRows={selectedRows} onDone={clear} />
+    {keyboardEnabled && rows.length > 0 && <div className="border-b bg-white px-6 py-1.5 text-[11px] text-slate-500">
+      <kbd className="rounded border border-slate-300 bg-slate-50 px-1 font-sans text-[10px] text-slate-600">j</kbd>/<kbd className="rounded border border-slate-300 bg-slate-50 px-1 font-sans text-[10px] text-slate-600">k</kbd> move
+      · <kbd className="rounded border border-slate-300 bg-slate-50 px-1 font-sans text-[10px] text-slate-600">x</kbd> select
+      · <kbd className="rounded border border-slate-300 bg-slate-50 px-1 font-sans text-[10px] text-slate-600">a</kbd> all
+      · <kbd className="rounded border border-slate-300 bg-slate-50 px-1 font-sans text-[10px] text-slate-600">Enter</kbd> open
+    </div>}
     <div className="min-h-0 flex-1 overflow-auto px-6 pb-4">
       <table className="w-full border-collapse text-sm">
         <thead className="sticky top-0 z-10 bg-white text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -234,12 +250,6 @@ export function DocumentList({ workspaceId, stage, rows, contentMatches, query }
           </td></tr>}
         </tbody>
       </table>
-      {keyboardEnabled && rows.length > 0 && <p className="mt-2 text-xs text-slate-400">
-        <kbd className="rounded border px-1">j</kbd>/<kbd className="rounded border px-1">k</kbd> move,
-        {" "}<kbd className="rounded border px-1">x</kbd> select,
-        {" "}<kbd className="rounded border px-1">a</kbd> select all,
-        {" "}<kbd className="rounded border px-1">Enter</kbd> open. Select rows to Approve.
-      </p>}
     </div>
   </div>
 }

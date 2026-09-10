@@ -1,7 +1,7 @@
 "use client"
 
 import { X } from "lucide-react"
-import { useEffect, useRef } from "react"
+import { useEffect, useId, useRef } from "react"
 import { createPortal } from "react-dom"
 
 /** The non-destructive counterpart to ConfirmDialog: a portalled modal that takes arbitrary
@@ -24,6 +24,10 @@ export function Dialog({ open, title, description, width = "max-w-md", onClose, 
 }) {
   const contentRef = useRef<HTMLDivElement>(null)
   const openerRef = useRef<Element | null>(null)
+  // Per-instance ids so aria-labelledby/aria-describedby don't collide when two Dialogs mount
+  // concurrently (e.g. Share opened over Create-folder). Static ids would silently break axe.
+  const titleId = useId()
+  const descId = useId()
 
   useEffect(() => {
     if (!open) return
@@ -76,11 +80,11 @@ export function Dialog({ open, title, description, width = "max-w-md", onClose, 
           reader announces both — the description often carries the actual instruction ("How
           would you like to view them?"), and aria-label={title} alone drops it from the a11y
           tree. Same fix ConfirmDialog got. */}
-      <div ref={contentRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="dialog-title" aria-describedby={description ? "dialog-desc" : undefined} className={`w-full ${width} overflow-hidden rounded-xl bg-white shadow-2xl focus:outline-none`} onClick={(event) => event.stopPropagation()}>
+      <div ref={contentRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={description ? descId : undefined} className={`w-full ${width} overflow-hidden rounded-xl bg-white shadow-2xl focus:outline-none`} onClick={(event) => event.stopPropagation()}>
         <div className="flex items-start justify-between gap-3 border-b px-5 py-4">
           <div>
-            <h2 id="dialog-title" className="text-base font-semibold text-slate-900">{title}</h2>
-            {description && <p id="dialog-desc" className="mt-1 text-sm text-slate-500">{description}</p>}
+            <h2 id={titleId} className="text-base font-semibold text-slate-900">{title}</h2>
+            {description && <p id={descId} className="mt-1 text-sm text-slate-500">{description}</p>}
           </div>
           <button type="button" className="-mr-1 rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Close" onClick={onClose}><X className="h-4 w-4" /></button>
         </div>

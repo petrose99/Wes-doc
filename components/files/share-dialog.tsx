@@ -132,7 +132,7 @@ export function ShareDialog({ workspaceId, fileId, fileName, open, onClose }: {
                 <select aria-label={`Access for ${person.email}`} className="shrink-0 rounded border border-slate-200 px-1.5 py-1 text-xs" value={person.access} onChange={(event) => void changePersonAccess(person.email, event.target.value)}>
                   {PERSON_ACCESS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>
-                <button type="button" className="shrink-0 rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600" title={`Remove ${person.email}`} onClick={() => void remove(person.email)}><Trash2 className="h-3.5 w-3.5" /></button>
+                <button type="button" className="shrink-0 rounded p-1 text-slate-500 hover:bg-red-50 hover:text-red-700" title={`Remove ${person.email}`} onClick={() => void remove(person.email)}><Trash2 className="h-3.5 w-3.5" /></button>
               </li>)}
             </ul>
           </section>

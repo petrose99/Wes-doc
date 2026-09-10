@@ -350,7 +350,7 @@ export function ReviewInbox({ workspaceId, tasks, currentStatus, members }: {
         destructive
         busy={pending}
         title="Reject this stage?"
-        description="The document is rejected at this stage of its approval workflow. Whoever raised it will see the reason in their queue."
+        description="The document is marked rejected at this stage of its approval workflow, and its run ends. Add a note on the document itself if you want to explain why."
         confirmLabel="Reject"
         onConfirm={() => { const taskId = effectiveSelectedId; setConfirming(null); if (taskId) void decideStage(taskId, "reject") }}
         onCancel={() => setConfirming(null)} />
@@ -513,11 +513,17 @@ export function ReviewInbox({ workspaceId, tasks, currentStatus, members }: {
           )}
 
           {detail.canPush && (() => {
-            const receipt = pushReceipts[detail.id]
-            const isPushed = pushed.has(detail.id)
-            // Post-push, the button drops to a subordinate "Push again" and the receipt line
-            // owns the confirmation — replacing the old disabled "Pushed" dead-end that gave the
-            // money-adjacent success moment no destination, no timestamp, and no path onward.
+            // Prefer the in-memory receipt from this session (destination + wall-clock time we
+            // observed at the point of push); fall back to detail.lastSuccessfulPush so a hard
+            // reload doesn't wipe the money-adjacent success moment. `pushed` tracks in-flight
+            // and just-completed pushes; `hasReceipt` covers the reload case where no push has
+            // fired in this session but the server remembers one.
+            const memoryReceipt = pushReceipts[detail.id]
+            const serverReceipt = detail.lastSuccessfulPush
+              ? { destination: detail.lastSuccessfulPush.destination, at: new Date(detail.lastSuccessfulPush.at) }
+              : null
+            const receipt = memoryReceipt ?? serverReceipt
+            const isPushed = pushed.has(detail.id) || Boolean(serverReceipt)
             return <div className="mt-3 space-y-1.5">
               {!isPushed
                 ? <Button type="button" className="w-full" onClick={() => void pushSelected()}>

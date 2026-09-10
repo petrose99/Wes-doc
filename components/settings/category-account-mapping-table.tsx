@@ -73,7 +73,7 @@ export function CategoryAccountMappingTable({ workspaceId, connectionId, mapping
                   {isOwner && (
                     <td className="py-2">
                       <button type="button" disabled={pending} onClick={() => remove(m.id)}
-                        className="rounded p-1 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600">
+                        className="rounded p-1 text-slate-500 transition-colors hover:bg-red-50 hover:text-red-700">
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </td>
