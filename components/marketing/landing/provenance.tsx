@@ -43,7 +43,7 @@ export function Provenance() {
                 <div className="h-1.5 w-[88%] rounded bg-stone-200" />
                 <div className="h-1.5 w-[58%] rounded bg-stone-200" />
               </div>
-              <div className={`relative mt-4.5 flex items-center justify-between rounded-md bg-emerald-500/10 px-2 py-1.5 shadow-[inset_0_0_0_2px_#10B981] ${played ? POP : ""}`} style={played ? { animationDelay: "2.5s" } : undefined}>
+              <div className={`relative mt-4.5 flex items-center justify-between rounded-md bg-emerald-500/10 px-2 py-1.5 shadow-[inset_0_0_0_2px_#10B981] ${played ? POP : ""}`} style={played ? { animationDelay: "1.6s" } : undefined}>
                 <span className="text-[0.62rem] font-semibold text-stone-500">TOTAL DUE</span>
                 <span className="text-[0.76rem] font-bold text-stone-900">£2,475.60</span>
                 <span className="absolute -right-1.5 -top-2.5 rounded-full bg-emerald-700 px-1.5 py-px text-[0.56rem] font-bold tracking-[.04em] text-white">PAGE 1</span>
@@ -64,11 +64,11 @@ export function Provenance() {
                   <span className="text-[0.79rem] font-semibold text-stone-900">{field.value}</span>
                 </div>
               ))}
-              <div className={`flex justify-between gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-2.5 ${played ? IN : ""}`} style={played ? { animationDelay: "2.15s" } : undefined}>
+              <div className={`flex justify-between gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-2.5 ${played ? IN : ""}`} style={played ? { animationDelay: "1.4s" } : undefined}>
                 <span className="text-[0.74rem] font-semibold text-emerald-700">Total</span>
                 <span className="text-[0.85rem] font-bold text-emerald-900">£2,475.60</span>
               </div>
-              <div className={`mt-auto flex items-start gap-1.5 pt-2.5 text-[0.7rem] leading-[1.45] text-stone-500 ${played ? IN : ""}`} style={played ? { animationDelay: "2.6s" } : undefined}>
+              <div className={`mt-auto flex items-start gap-1.5 pt-2.5 text-[0.7rem] leading-[1.45] text-stone-500 ${played ? IN : ""}`} style={played ? { animationDelay: "1.8s" } : undefined}>
                 <Target aria-hidden className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-700" />
                 Total traced to page 1 — the source opens highlighted at that line.
               </div>

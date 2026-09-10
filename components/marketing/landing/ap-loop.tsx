@@ -3,10 +3,10 @@ import { CheckCircle2, ClipboardCheck, FileSearch, GitCompare, Landmark, Mail, S
 const STEPS: { title: string; text: string; icon: typeof Mail }[] = [
   { title: "Capture", text: "Invoices in by email, upload, or API. Duplicates are caught before they cost you an hour.", icon: Mail },
   { title: "Code", text: "Vendor, dates, totals, tax and line items into typed fields — with per-field confidence and source citations.", icon: FileSearch },
-  { title: "Check", text: "Fraud checks that other tools miss: a supplier's bank details changed, a split invoice under an approval floor, a suspicious resubmission.", icon: ShieldAlert },
+  { title: "Check", text: "Fraud checks other tools miss: changed bank details, split invoices, suspicious resubmissions.", icon: ShieldAlert },
   { title: "Match", text: "Bills matched to their purchase order and — where you use them — the goods-received note. Any mismatch is surfaced with the exact numbers side by side.", icon: GitCompare },
   { title: "Approve", text: "Named approvers, amount thresholds, and a review trail for every decision. Your controls, not ours.", icon: ClipboardCheck },
-  { title: "Sync", text: "Bills pushed to your accounting tool — QuickBooks, Xero and more — with idempotency so a retry never duplicates.", icon: Landmark },
+  { title: "Sync", text: "Bills pushed to your accounting tool — QuickBooks, Xero and more — and a retry never posts twice.", icon: Landmark },
   { title: "Pay-ready", text: "One click assembles a bank-ready payment file with per-supplier remittance advice. You upload it to your bank.", icon: Send },
 ]
 
@@ -31,7 +31,7 @@ export function ApLoop() {
         {/* Horizontal rail: seven step cards connected by a continuous line. On desktop the line runs
          * behind the numbered pips so the "loop" reads as one shape, not seven detached tiles.
          * On narrow viewports we fall back to a stacked vertical rail with the connector on the left. */}
-        <ol className="relative grid gap-4 md:hidden">
+        <ol className="relative grid gap-4 lg:hidden">
           <span aria-hidden className="absolute left-4 top-4 bottom-4 w-px bg-cream-200" />
           {STEPS.map((step, i) => (
             <li key={step.title} className="relative rounded-2xl border border-cream-200 bg-cream-50/40 p-5 pl-14">
@@ -44,7 +44,7 @@ export function ApLoop() {
             </li>
           ))}
         </ol>
-        <ol className="relative hidden grid-cols-7 gap-3 md:grid">
+        <ol className="relative hidden grid-cols-7 gap-3 lg:grid">
           <span aria-hidden className="absolute left-0 right-0 top-4 h-px bg-cream-200" />
           {STEPS.map((step, i) => (
             <li key={step.title} className="relative flex flex-col items-stretch">

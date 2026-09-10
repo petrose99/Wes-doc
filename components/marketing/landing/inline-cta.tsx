@@ -14,7 +14,7 @@ export function InlineTrialCta() {
             Start with one messy folder
           </h3>
           <p className="mt-1 max-w-[36rem] text-[0.98rem] leading-[1.55] text-stone-600">
-            Upload the worst one you have. If the report doesn&apos;t tell you something you didn&apos;t know, you&apos;ve lost ten minutes.
+            Upload the worst one you have. If what comes back doesn&apos;t tell you something you didn&apos;t know, you&apos;ve lost ten minutes.
           </p>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-3">

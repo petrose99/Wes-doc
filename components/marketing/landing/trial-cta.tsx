@@ -24,7 +24,7 @@ export function TrialCta() {
             Book a demo
           </Link>
         </div>
-        <p className="mt-3.5 text-[0.83rem] text-stone-500">No card required.</p>
+        <p className="mt-3.5 text-[0.83rem] text-stone-500">No card required. You still pay from your own bank — DocuBite prepares the file, your bank sends the money.</p>
       </div>
     </section>
   )

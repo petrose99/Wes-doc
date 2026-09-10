@@ -8,7 +8,7 @@ import { Download, Lock, MapPin, RefreshCcw } from "lucide-react"
  * placeholders and beat fake numbers. */
 const SIGNALS: { icon: typeof Lock; label: string; sub: string }[] = [
   { icon: Lock, label: "Private encrypted storage", sub: "Keys managed for you" },
-  { icon: MapPin, label: "SA + CMA out of the box", sub: "Same rails, no bank switch" },
+  { icon: MapPin, label: "South Africa + neighbours", sub: "Same rails, no bank switch" },
   { icon: Download, label: "Your data, exportable", sub: "CSV, columns and all" },
   { icon: RefreshCcw, label: "No long-term contract", sub: "Cancel at any time" },
 ]

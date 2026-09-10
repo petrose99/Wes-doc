@@ -68,8 +68,7 @@ export function Hero() {
             </div>
           </div>
           <p className="mt-4 text-[0.82rem] text-stone-500">
-            No card required. Files held in private encrypted storage.<br />
-            You still pay from your own bank — DocuBite prepares the file, your bank sends the money.
+            No card required · Private encrypted storage · You still pay from your own bank
           </p>
         </div>
 
