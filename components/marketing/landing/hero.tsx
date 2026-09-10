@@ -51,7 +51,7 @@ export function Hero() {
             — ready to pay.
           </h1>
           <p className="mt-4 max-w-[34rem] text-pretty text-[1rem] leading-[1.55] text-stone-600 md:mt-6 md:text-[1.08rem] md:leading-[1.62]">
-            Every invoice and receipt is read, checked, routed for approval, and posted straight into your ERP or accounting software.
+            Supplier, date, VAT, total — every detail read off the page, checked, and approved. Accounting is built in — or sync to the software you already use.
           </p>
           <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-3.5 md:mt-8">
             <div className="flex flex-col">
@@ -67,9 +67,6 @@ export function Hero() {
               <span className="mt-1.5 text-[0.76rem] text-stone-500">Best for a walkthrough with your own AP.</span>
             </div>
           </div>
-          <p className="mt-4 text-[0.82rem] text-stone-500">
-            No card required · Private encrypted storage · You still pay from your own bank
-          </p>
         </div>
 
         <div className="min-w-0 flex-1 basis-[440px]">

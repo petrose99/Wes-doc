@@ -21,7 +21,7 @@ import type { Metadata } from "next"
 
 export const metadata: Metadata = {
   title: { absolute: "DocuBite — AI accounts payable, end to end" },
-  description: "Invoices and receipts in by email. DocuBite reads them, checks them, routes them for approval, and posts them straight into your ERP or accounting software.",
+  description: "Invoices and receipts in by email. Every detail read off the page, checked, and approved — with accounting built in, or synced to the software you already use.",
 }
 
 export default function Home() {
