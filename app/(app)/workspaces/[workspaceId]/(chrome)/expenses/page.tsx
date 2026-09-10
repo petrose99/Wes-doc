@@ -1,7 +1,7 @@
 import { ExpenseClaimForm } from "@/components/workspace/expense-claim-form"
 import { ExpenseClaimRow } from "@/components/workspace/expense-claim-row"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { canDecideStage, findCurrentStage } from "@/lib/approvals/engine"
+import { canDecideStage, findCurrentStage, toWorkflowStageInputs } from "@/lib/approvals/engine"
 import { getCurrentUser } from "@/lib/auth"
 import { decimalToNumber } from "@/lib/money"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
@@ -63,7 +63,7 @@ export default async function ExpenseClaimsPage({ params }: { params: Promise<{ 
           ? <p className="text-sm text-slate-500">No claims yet.</p>
           : <ul className="space-y-3">
               {claims.map((claim) => {
-                const currentStage = claim.workflow && claim.currentStageIndex !== null ? findCurrentStage(claim.workflow.stages, claim.currentStageIndex) : null
+                const currentStage = claim.workflow && claim.currentStageIndex !== null ? findCurrentStage(toWorkflowStageInputs(claim.workflow.stages), claim.currentStageIndex) : null
                 const canDecideCurrentStage = currentStage ? canDecideStage({ stage: currentStage, actorRole, actorId: user.id }) : actorRole === "owner"
                 return <ExpenseClaimRow
                   key={claim.id}
