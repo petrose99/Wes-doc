@@ -63,10 +63,12 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
    * now. Surfaced as a badge on the Pipeline entry so "something needs you" is visible from every
    * page, not just after clicking into Pipeline's own To review tab. */
   pipelineReviewCount?: number
-  /** countOpenReviewTasks — open + in_review tasks, badged on the Review entry so the queue
-   * advertises that it has work rather than waiting to be discovered. */
+  /** countOpenReviewTasks — retained on the prop signature for API stability; no longer surfaced
+   * as its own sidebar badge, since pipelineReviewCount already carries that signal on the
+   * Documents entry. */
   reviewTaskCount?: number
 }) {
+  void reviewTaskCount
   const pathname = usePathname()
   if (pathname.endsWith("/sheet") || pathname.includes("/documents/")) return null
 
@@ -78,11 +80,12 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
     .filter((item) => !item.href.startsWith("settings/") && item.href !== "expenses" && item.href !== "dictation" && item.href !== "health")
     .map((item) => ({ href: `${base}/${item.href}`, label: item.label, icon: ICONS[item.icon] ?? Files, exact: false }))
 
-  // Review queue is part of the Automation section — not shown as a standalone sidebar entry.
-  // Badge the Automation entry with the review task count so the queue still advertises work.
+  // Review queue is a stage on the Documents lifecycle, not a standalone sidebar entry —
+  // pipelineReviewCount is what the Documents badge advertises. The review-queue module's
+  // /review page still exists as the approval-queue detail (a document's ReviewTask), reached
+  // from a document row rather than a rail slot.
   const otherModuleItems = moduleWorkItems
     .filter((item) => item.href !== `${base}/review`)
-    .map((item) => item.href === `${base}/automation` && reviewTaskCount > 0 ? { ...item, badge: reviewTaskCount } : item)
 
   // Home is every workspace's unconditional first entry — exact-matched so it doesn't stay lit on
   // every page under it, unlike Files (which stays lit through a file's hub and sheet too).
@@ -112,7 +115,13 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
   const navLink = (item: { href: string; label: string; icon: typeof Files; exact: boolean; badge?: number; tourTarget?: string }) => {
     // Non-exact entries stay lit while you're inside a page under them — Settings while you're on
     // any settings leaf, a module item while you're on its own sub-pages.
-    const active = item.exact ? pathname === item.href : pathname === item.href || pathname.startsWith(`${item.href}/`) || (item.label === "Settings" && pathname.startsWith(`${base}/settings`)) || (item.label === "Automation" && pathname.startsWith(`${base}/review`))
+    const active = item.exact
+      ? pathname === item.href
+      : pathname === item.href || pathname.startsWith(`${item.href}/`)
+        || (item.label === "Settings" && pathname.startsWith(`${base}/settings`))
+        // Documents is the parent for /pipeline, /documents/<id>, /review and /bills — every
+        // page along the lifecycle should light up the same rail entry.
+        || (item.label === "Documents" && (pathname.startsWith(`${base}/pipeline`) || pathname.startsWith(`${base}/documents`) || pathname.startsWith(`${base}/review`) || pathname.startsWith(`${base}/bills`)))
     return <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined}
       {...(item.tourTarget ? { "data-tour-target": item.tourTarget } : {})}
       className={`flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors ${active ? "relative bg-white text-emerald-800 shadow-[0_1px_2px_rgba(15,23,42,0.07),inset_0_0_0_1px_rgba(4,120,87,0.10)]" : "text-slate-600 hover:bg-[rgba(148,163,184,0.16)] hover:text-slate-900"}`}>
