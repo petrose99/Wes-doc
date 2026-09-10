@@ -56,7 +56,7 @@ export function GettingStartedCard({ workspaceId, initialState, liveCounts }: {
     </div>
 
     <div className="mt-3 h-1.5 rounded-full bg-slate-100">
-      <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${progress}%` }} />
+      <div className="h-full rounded-full bg-emerald-500 transition-[width] duration-300" style={{ width: `${progress}%` }} />
     </div>
     <p className="mt-1.5 text-[12px] text-slate-400">{doneCount} of {ONBOARDING_STEPS.length} complete</p>
 

@@ -5,7 +5,7 @@ import { AccountMenu } from "@/components/shell/account-menu"
 import { SwitchableWorkspace, WorkspaceSwitcher } from "@/components/workspace/switcher"
 import { BiteMark } from "@/components/marketing/logo"
 import { MODULES } from "@/lib/modules"
-import { BarChart3, CheckCircle2, ClipboardCheck, FileText, Files, HeartPulse, History, Landmark, Library, ListChecks, Mic, Percent, Receipt, Settings, Table2, Wallet, Workflow, Zap } from "lucide-react"
+import { BarChart3, CheckCircle2, ClipboardCheck, Files, HeartPulse, History, Landmark, Library, ListChecks, Mic, Percent, Receipt, Settings, Table2, Wallet, Workflow, Zap } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
@@ -63,10 +63,12 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
    * now. Surfaced as a badge on the Pipeline entry so "something needs you" is visible from every
    * page, not just after clicking into Pipeline's own To review tab. */
   pipelineReviewCount?: number
-  /** countOpenReviewTasks — open + in_review tasks, badged on the Review entry so the queue
-   * advertises that it has work rather than waiting to be discovered. */
+  /** countOpenReviewTasks — retained on the prop signature for API stability; no longer surfaced
+   * as its own sidebar badge, since pipelineReviewCount already carries that signal on the
+   * Documents entry. */
   reviewTaskCount?: number
 }) {
+  void reviewTaskCount
   const pathname = usePathname()
   if (pathname.endsWith("/sheet") || pathname.includes("/documents/")) return null
 
@@ -78,11 +80,12 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
     .filter((item) => !item.href.startsWith("settings/") && item.href !== "expenses" && item.href !== "dictation" && item.href !== "health")
     .map((item) => ({ href: `${base}/${item.href}`, label: item.label, icon: ICONS[item.icon] ?? Files, exact: false }))
 
-  // Review queue is part of the Automation section — not shown as a standalone sidebar entry.
-  // Badge the Automation entry with the review task count so the queue still advertises work.
+  // Review queue is a stage on the Documents lifecycle, not a standalone sidebar entry —
+  // pipelineReviewCount is what the Documents badge advertises. The review-queue module's
+  // /review page still exists as the approval-queue detail (a document's ReviewTask), reached
+  // from a document row rather than a rail slot.
   const otherModuleItems = moduleWorkItems
     .filter((item) => item.href !== `${base}/review`)
-    .map((item) => item.href === `${base}/automation` && reviewTaskCount > 0 ? { ...item, badge: reviewTaskCount } : item)
 
   // Home is every workspace's unconditional first entry — exact-matched so it doesn't stay lit on
   // every page under it, unlike Files (which stays lit through a file's hub and sheet too).
@@ -91,14 +94,16 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
   // wants the underlying spreadsheet/ingestion-container view, but no longer where the app points
   // first. See the pipeline redesign plan, Phases 2 & 6.
   //
-  // Grouped into Workspace / Modules / Settings sections, mirroring the merged nav from the
-  // enterprise restyle — module entries (Dictate, Accounting) sit apart from the fixed Home/
-  // Pipeline/Files trio since they come and go per workspace, and Settings is its own section of
-  // one so it doesn't read as just another workspace destination.
+  // The audit's proposed structure (docs/ux/ux-audit-2026-09-10.html, "Proposed structure"):
+  // one lifecycle spine (Dashboard + Documents) and a separate Tools section for the secondary
+  // surfaces — Sheets, Docu Library, Accounting, Automation. The spine is where the work is;
+  // Tools is where you go on purpose. Module-declared entries (Dictation etc.) land in Tools
+  // too, since they come and go per workspace.
   const workItems = [
     { href: base, label: "Dashboard", icon: BarChart3, exact: true },
-    { href: `${base}/pipeline`, label: "Extraction", icon: ListChecks, exact: false, badge: pipelineReviewCount > 0 ? pipelineReviewCount : undefined, tourTarget: "extraction" as const },
-    { href: `${base}/bills`, label: "Bills", icon: FileText, exact: false },
+    { href: `${base}/pipeline`, label: "Documents", icon: ListChecks, exact: false, badge: pipelineReviewCount > 0 ? pipelineReviewCount : undefined, tourTarget: "extraction" as const },
+  ]
+  const toolItems = [
     { href: `${base}/files`, label: "Sheets", icon: Table2, exact: false, tourTarget: "sheets" as const },
     { href: `${base}/library`, label: "Docu Library", icon: Library, exact: false, tourTarget: "library" as const },
     ...(accountingEnabled ? [{ href: `${base}/accounting`, label: "Accounting", icon: Landmark, exact: false }] : []),
@@ -113,7 +118,13 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
   const navLink = (item: { href: string; label: string; icon: typeof Files; exact: boolean; badge?: number; tourTarget?: string }) => {
     // Non-exact entries stay lit while you're inside a page under them — Settings while you're on
     // any settings leaf, a module item while you're on its own sub-pages.
-    const active = item.exact ? pathname === item.href : pathname === item.href || pathname.startsWith(`${item.href}/`) || (item.label === "Settings" && pathname.startsWith(`${base}/settings`)) || (item.label === "Automation" && pathname.startsWith(`${base}/review`))
+    const active = item.exact
+      ? pathname === item.href
+      : pathname === item.href || pathname.startsWith(`${item.href}/`)
+        || (item.label === "Settings" && pathname.startsWith(`${base}/settings`))
+        // Documents is the parent for /pipeline, /documents/<id>, /review and /bills — every
+        // page along the lifecycle should light up the same rail entry.
+        || (item.label === "Documents" && (pathname.startsWith(`${base}/pipeline`) || pathname.startsWith(`${base}/documents`) || pathname.startsWith(`${base}/review`) || pathname.startsWith(`${base}/bills`)))
     return <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined}
       {...(item.tourTarget ? { "data-tour-target": item.tourTarget } : {})}
       className={`flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors ${active ? "relative bg-white text-emerald-800 shadow-[0_1px_2px_rgba(15,23,42,0.07),inset_0_0_0_1px_rgba(4,120,87,0.10)]" : "text-slate-600 hover:bg-[rgba(148,163,184,0.16)] hover:text-slate-900"}`}>
@@ -125,7 +136,7 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
 
   const sectionLabel = (label: string) => <div className="px-2.5 pb-1 pt-3 text-[10.5px] font-bold uppercase tracking-[0.06em] text-slate-400 first:pt-0">{label}</div>
 
-  return <aside className="hidden w-[236px] shrink-0 flex-col gap-0.5 border-r border-[#e6ebf1] bg-gradient-to-b from-[#f4f7f9] to-[#eef2f6] px-3 py-3.5 md:flex">
+  return <aside className="hidden w-[236px] shrink-0 flex-col gap-0.5 border-r border-[#e6ebf1] bg-[#f1f5f8] px-3 py-3.5 md:flex">
     <Link href={base} className="flex items-center gap-2 px-1.5 py-1">
       <BiteMark className="h-7 w-7 shrink-0" />
       <span className="truncate text-sm font-bold font-display text-slate-900">DocuBite</span>
@@ -136,6 +147,9 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
     <nav className="mt-2 flex flex-1 flex-col">
       {sectionLabel("Workspace")}
       <div className="space-y-0.5">{workItems.map(navLink)}</div>
+
+      {sectionLabel("Tools")}
+      <div className="space-y-0.5">{toolItems.map(navLink)}</div>
 
       <div className="mt-auto space-y-0.5">{bottomItems.map(navLink)}</div>
     </nav>

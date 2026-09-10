@@ -399,7 +399,8 @@ export function FilesBrowser({ workspaceId, tab, folderId, trail, search, sort, 
 
     <Dialog open={newFolder !== null} onClose={() => setNewFolder(null)} title="Create folder">
       <div className="space-y-4 px-5 py-4">
-        <input autoFocus className={inputClass} placeholder="Folder name" value={newFolder?.name ?? ""} onChange={(event) => setNewFolder({ name: event.target.value })} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void submitFolder() } }} />
+        <label htmlFor="new-folder-name" className="sr-only">Folder name</label>
+        <input id="new-folder-name" autoFocus className={inputClass} placeholder="Folder name" value={newFolder?.name ?? ""} onChange={(event) => setNewFolder({ name: event.target.value })} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void submitFolder() } }} />
         <div className="flex justify-end gap-2">
           <button type="button" className="rounded-md border px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50" onClick={() => setNewFolder(null)}>Cancel</button>
           <button type="button" className="rounded-md bg-emerald-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50" disabled={busy || !newFolder?.name.trim()} onClick={() => void submitFolder()}>Create</button>

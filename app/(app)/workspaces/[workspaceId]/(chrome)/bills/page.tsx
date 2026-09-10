@@ -80,7 +80,11 @@ export default async function BillsPage({ params, searchParams }: {
         </CardHeader>
         <CardContent>
           {bills.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No bills match the current filter.</p>
+            <p className="text-sm text-muted-foreground">
+              {onlyBlocked || onlyUnpaid
+                ? "No bills match the current filter."
+                : "No bills yet. Bills appear here once an invoice is extracted and approved."}
+            </p>
           ) : (
             <div className="-mx-6 overflow-x-auto">
               <table className="w-full min-w-[720px] text-sm">
