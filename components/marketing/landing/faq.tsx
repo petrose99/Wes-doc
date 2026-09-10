@@ -25,7 +25,7 @@ const QUESTIONS = [
   },
   {
     q: "Does DocuBite move money or pay bills?",
-    a: "No — that's deliberate. DocuBite gets your bills ready to pay: coded, checked, matched, approved, synced to your ledger, and — when you're ready — assembled into a bank-payment file with a supplier remittance. You take that file to your own bank's bulk-payment portal and press send. Payment execution stays on rails you already trust and keeps DocuBite outside every payment-license perimeter, so we can serve you across South Africa, Lesotho, Namibia and Eswatini without asking you to switch banks.",
+    a: "No — that's deliberate. DocuBite gets your bills ready to pay: coded, checked, matched, approved, synced to your ledger, and — when you're ready — assembled into a bank-payment file with a supplier remittance. You take that file to your own bank's bulk-payment portal and press send. Payment execution stays on rails you already trust, so DocuBite works wherever in the world you bank — without ever asking you to switch.",
   },
 ]
 

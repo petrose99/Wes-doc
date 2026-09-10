@@ -60,7 +60,7 @@ export function ApLoop() {
           ))}
         </ol>
         <p className="mt-6 rounded-xl border border-stone-200 bg-white p-4 text-sm text-stone-600">
-          <strong className="text-stone-900">Not on the list, on purpose:</strong> DocuBite does not move money, does not issue cards, and does not hold funds. You still pay from your own bank — we just hand it a ready-to-pay file. That means no switching banks, no new payment licence to trust, and DocuBite works the same across South Africa, Lesotho, Namibia and Eswatini.
+          <strong className="text-stone-900">Not on the list, on purpose:</strong> DocuBite does not move money, does not issue cards, and does not hold funds. You still pay from your own bank — we just hand it a ready-to-pay file. That means no switching banks, no new payment licence to trust, and it works the same wherever in the world you bank.
         </p>
       </div>
     </section>
