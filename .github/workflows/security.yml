@@ -3,6 +3,8 @@ name: Security checks
 on:
   pull_request:
     branches: [master]
+  push:
+    branches: [master]
   schedule:
     - cron: "17 3 * * 1"
   workflow_dispatch:
@@ -11,20 +13,25 @@ permissions:
   contents: read
   security-events: write
 
+# Every action pinned to a commit SHA (NIST CSF PR.PS-01 / supply-chain integrity). A
+# `# v<version>` comment names the intended release so a bump is a review of the SHA against
+# that tag on GitHub. Do not replace a SHA with a floating tag under any circumstance — a tag
+# can be re-pointed by the action's maintainer, a SHA cannot.
+
 jobs:
   codeql:
     name: CodeQL (JavaScript/TypeScript)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-      - uses: github/codeql-action/init@v4
+      - uses: github/codeql-action/init@dd7559424621a6dd0b32ababe9e4b271a87f78d2 # v3.28.11
         with:
           languages: javascript-typescript
           build-mode: none
-      - uses: github/codeql-action/analyze@v4
+      - uses: github/codeql-action/analyze@dd7559424621a6dd0b32ababe9e4b271a87f78d2 # v3.28.11
         with:
           category: "/language:javascript-typescript"
 
@@ -33,12 +40,102 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a # v4.2.0
         with:
-          node-version: "26"
+          node-version: "22"
           cache: npm
       - run: npm ci --ignore-scripts
       - run: npm audit --omit=dev --audit-level=high
+
+  gitleaks:
+    name: Gitleaks secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  sbom:
+    name: SBOM (CycloneDX)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: anchore/sbom-action@f325610c9f50a54015d37c8d16cb3b0e2c8f4de0 # v0.20.0
+        with:
+          format: cyclonedx-json
+          artifact-name: docubite-sbom.cdx.json
+          output-file: docubite-sbom.cdx.json
+
+  trivy-image:
+    name: Trivy container scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Build web image
+        run: docker build -f Dockerfile.web -t docubite-web:ci .
+      - uses: aquasecurity/trivy-action@6c175e9c4083a92bbca2f9724c8a5e33bc2d97a5 # v0.30.0
+        with:
+          image-ref: docubite-web:ci
+          format: sarif
+          output: trivy-image.sarif
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          ignore-unfixed: true
+          trivyignores: .trivyignore
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@dd7559424621a6dd0b32ababe9e4b271a87f78d2 # v3.28.11
+        with:
+          sarif_file: trivy-image.sarif
+          category: trivy-image
+
+  checkov:
+    name: Checkov IaC scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: bridgecrewio/checkov-action@38a95e98d734de90fb2f9c6d7bc9db203c6485fb # v12.2947.0
+        with:
+          directory: infra/aws/terraform
+          framework: terraform
+          quiet: true
+          soft_fail: false
+          output_format: sarif
+          output_file_path: checkov.sarif
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@dd7559424621a6dd0b32ababe9e4b271a87f78d2 # v3.28.11
+        with:
+          sarif_file: checkov.sarif
+          category: checkov
+
+  dependency-review:
+    name: Dependency review (PR only)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/dependency-review-action@4081bf99e2866ebe428fc0477b69eb4fcda7220a # v4.5.0
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: on-failure

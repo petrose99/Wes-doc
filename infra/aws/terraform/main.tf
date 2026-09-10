@@ -20,6 +20,74 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "documents" {
   rule { apply_server_side_encryption_by_default { sse_algorithm = "aws:kms" kms_master_key_id = aws_kms_key.documents.arn } }
 }
 
+# Versioning: guards against a lost object from a bad delete or overwrite. Required alongside
+# Object Lock for audit-archives/ retention.
+resource "aws_s3_bucket_versioning" "documents" {
+  bucket = aws_s3_bucket.documents.id
+  versioning_configuration { status = "Enabled" }
+}
+
+# Access logs: every object-level access on the documents bucket is written to a separate
+# access-log bucket. Closes DE.CM-01 for the data plane.
+resource "aws_s3_bucket" "documents_access_logs" {
+  bucket_prefix = "${var.name}-documents-access-logs-"
+}
+
+resource "aws_s3_bucket_public_access_block" "documents_access_logs" {
+  bucket                  = aws_s3_bucket.documents_access_logs.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "documents_access_logs" {
+  bucket = aws_s3_bucket.documents_access_logs.id
+  rule { apply_server_side_encryption_by_default { sse_algorithm = "AES256" } }
+}
+
+resource "aws_s3_bucket_logging" "documents" {
+  bucket        = aws_s3_bucket.documents.id
+  target_bucket = aws_s3_bucket.documents_access_logs.id
+  target_prefix = "documents/"
+}
+
+# Lifecycle: audit-archives/ prefix retains for 6 years then transitions to Glacier, matching
+# HIPAA §164.316(b)(2)(i) and the audit retention in docs/security/registers/data-inventory.csv.
+resource "aws_s3_bucket_lifecycle_configuration" "documents" {
+  bucket = aws_s3_bucket.documents.id
+
+  rule {
+    id     = "audit-archives-retention"
+    status = "Enabled"
+    filter { prefix = "audit-archives/" }
+
+    transition {
+      days          = 90
+      storage_class = "STANDARD_IA"
+    }
+    transition {
+      days          = 365
+      storage_class = "GLACIER"
+    }
+    expiration {
+      days = 2190 # 6 years
+    }
+    noncurrent_version_expiration {
+      noncurrent_days = 2190
+    }
+  }
+
+  rule {
+    id     = "expire-old-versions"
+    status = "Enabled"
+    filter { prefix = "" }
+    noncurrent_version_expiration {
+      noncurrent_days = 90
+    }
+  }
+}
+
 resource "aws_iam_role" "worker" {
   name_prefix = "${var.name}-worker-"
   assume_role_policy = jsonencode({ Version = "2012-10-17", Statement = [{ Effect = "Allow", Principal = { Service = "ecs-tasks.amazonaws.com" }, Action = "sts:AssumeRole" }] })

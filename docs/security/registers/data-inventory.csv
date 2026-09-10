@@ -1,0 +1,11 @@
+data_class,description,pii,storage_location,encryption_at_rest,encryption_in_transit,retention_default,deletion_trigger,legal_basis,owner
+Customer identity,name / email / MFA factor / role,Yes,Postgres users + Supabase auth,Postgres SSE + Supabase-managed,TLS 1.2+,Duration of contract + 30d,Account deletion request or contract end,Contract; consent for optional fields,<TBD-privacy-owner>
+Workspace metadata,workspace name / country / currency / plan,No (org data),Postgres Workspace/WorkspaceMember,Postgres SSE,TLS 1.2+,Duration of contract + 30d,Workspace deletion request,Contract,<TBD-privacy-owner>
+Uploaded documents,receipts / invoices / bank statements uploaded by customer,Yes (may contain),AWS S3 aws_s3_bucket.documents,KMS aws:kms,TLS 1.2+,Duration of contract + 30d,Document deletion or workspace deletion,Contract; processor role under GDPR/HIPAA,<TBD-privacy-owner>
+Extracted values,merchant / total / date / structured fields on Document,Yes (may contain),Postgres Document + DocumentField,Postgres SSE,TLS 1.2+,Duration of contract + 30d,Document deletion,Contract,<TBD-privacy-owner>
+Embeddings,pgvector 768-dim from bge model,Yes (derived),Postgres DocumentEmbedding,Postgres SSE,TLS 1.2+,Duration of contract + 30d,Document deletion,Contract,<TBD-privacy-owner>
+Credentials,SECRETS_ENCRYPTION_KEY-sealed OAuth tokens / webhook secrets,No (yields access to PII),Postgres Subprocessor and Webhook,AES-256-GCM (lib/secret-crypto),TLS 1.2+,Duration of integration,Integration disconnect,Contract; legitimate interest,<TBD-security-owner>
+Audit events,DocumentAuditEvent rows (who / what / when / from where),Yes (IP + user),Postgres DocumentAuditEvent + S3 audit-archives/ lifecycle,Postgres SSE + S3 SSE-KMS,TLS 1.2+,6 years (HIPAA §164.316),Retention expiry only,Legal obligation,<TBD-security-owner>
+Application logs,CloudWatch structured JSON,No (PII scrubbed at emit),AWS CloudWatch Logs,CloudWatch SSE,TLS 1.2+,12 months,Retention expiry,Legitimate interest,<TBD-security-owner>
+CloudTrail management events,AWS control-plane events,No,AWS S3 (Object Lock),KMS,TLS 1.2+,12 months,Retention expiry,Legal obligation,<TBD-security-owner>
+Backups,RDS + volume snapshots,Yes (mirrors production),AWS RDS + AWS Backup,KMS,TLS 1.2+,7 days PITR + 30d snapshot,Retention expiry,Contract,<TBD-system-owner>

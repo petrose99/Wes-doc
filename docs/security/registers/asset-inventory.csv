@@ -1,0 +1,21 @@
+asset_id,asset_name,asset_type,environment,owner,data_classification,location_or_account,criticality,backup_or_recovery,access_review_date,last_reviewed,notes
+A-001,DocuBite web (Next.js),Application,Production,<TBD-system-owner>,Confidential,Lightsail VPS 16.60.212.8 (primary) + AWS Fargate (worker),High,Container image versioned; Postgres backups per RDS config,2026-12-01,2026-09-10,Migration to AWS ECS planned; see infra/aws/terraform/
+A-002,DocuBite worker (job-worker.ts),Application,Production,<TBD-system-owner>,Confidential,AWS Fargate,High,Container image versioned,2026-12-01,2026-09-10,Runs extraction and embedding jobs
+A-003,Customer document storage,Data store,Production,<TBD-system-owner>,Restricted,AWS S3 aws_s3_bucket.documents (see infra/aws/terraform/main.tf),Critical,Versioning + KMS + Object Lock (see main.tf changes),2026-12-01,2026-09-10,KMS key with rotation enabled
+A-004,Production database,Data store,Production,<TBD-system-owner>,Restricted,AWS RDS Postgres 17 (see infra/aws/terraform/rds.tf),Critical,7-day PITR; Multi-AZ,2026-12-01,2026-09-10,pgvector extension for embeddings
+A-005,Audit-archives bucket (S3 audit-archives/ prefix),Data store,Production,<TBD-security-owner>,Confidential,AWS S3 (same bucket as A-003),High,Lifecycle: retain 6 years then transition to Glacier,2026-12-01,2026-09-10,Closes ID.AM-07 retention
+A-006,CloudTrail management events,Data store,Production,<TBD-security-owner>,Confidential,AWS S3 (dedicated trail bucket with Object Lock),High,Object Lock; 12-month retention,2026-12-01,2026-09-10,Multi-region trail
+A-007,GitHub org,SaaS account,Production,<TBD-system-owner>,Confidential,github.com/<org>,High,Repo-level history,2026-12-01,2026-09-10,MFA required org-wide; Code Owners active
+A-008,AWS account (production),SaaS account,Production,<TBD-accountable-exec>,Restricted,AWS <account-id>,Critical,Config recorder for account state,2026-12-01,2026-09-10,Root MFA hardware key; Config + GuardDuty on
+A-009,Supabase project,SaaS account,Production,<TBD-system-owner>,Restricted,supabase.com/<project>,Critical,Managed backups (7d),2026-12-01,2026-09-10,Auth + SMTP for confirmation emails
+A-010,Stripe account,SaaS account,Production,<TBD-accountable-exec>,Restricted,stripe.com/<account>,High,Stripe-managed,2026-12-01,2026-09-10,Restricted API key + webhook signing
+A-011,Resend account,SaaS account,Production,<TBD-system-owner>,Internal,resend.com/<account>,Medium,None (transactional log only),2026-12-01,2026-09-10,SPF/DMARC on docubite.app
+A-012,Sentry account,SaaS account,Production,<TBD-security-owner>,Confidential,sentry.io/<org>,Medium,Sentry-managed retention,2026-12-01,2026-09-10,PII scrubbing rules configured
+A-013,Cloudflare account,SaaS account,Production,<TBD-system-owner>,Internal,cloudflare.com/<account>,High,Cloudflare-managed,2026-12-01,2026-09-10,DNS + inbound email routing
+A-014,MinerU account (OCR),SaaS account,Production,<TBD-system-owner>,Restricted,mineru.net/<account>,High,MinerU-managed,2026-12-01,2026-09-10,Document text extraction pipeline
+A-015,OpenAI account,SaaS account,Production,<TBD-privacy-owner>,Restricted,platform.openai.com/<account>,High,Provider-managed,2026-12-01,2026-09-10,No training on API data (per DPA)
+A-016,Google Cloud (Gemini),SaaS account,Production,<TBD-privacy-owner>,Restricted,console.cloud.google.com/<project>,High,Provider-managed,2026-12-01,2026-09-10,Vertex AI or AI Studio API key
+A-017,Hugging Face account (embeddings),SaaS account,Production,<TBD-system-owner>,Confidential,huggingface.co/<account>,High,Provider-managed,2026-12-01,2026-09-10,BAAI/bge-base-en-v1.5 serverless
+A-018,DNS registrar (docubite.app),SaaS account,Production,<TBD-system-owner>,High,<TBD-registrar>,Critical,Registrar lock + registry lock,2026-12-01,2026-09-10,DNSSEC signed
+A-019,SECRETS_ENCRYPTION_KEY (AES-256-GCM key),Cryptographic key,Production,<TBD-security-owner>,Restricted,AWS SSM Parameter Store / .env.production,Critical,Previous key kept for lazy re-seal,2026-12-01,2026-09-10,Rotation runbook in POLICY-SET §3
+A-020,KMS key (aws_kms_key.documents),Cryptographic key,Production,<TBD-security-owner>,Restricted,AWS KMS,Critical,AWS-managed rotation (annual),2026-12-01,2026-09-10,Guards S3 documents + Secrets Manager

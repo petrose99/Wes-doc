@@ -2,6 +2,31 @@
 
 **Approval:** These policies are inactive until signed by the accountable executive. Replace bracketed fields, record approver/date/version, publish them to personnel, and capture acknowledgements.
 
+## Sign-off log
+
+Each policy below is version 1.0 and is *ready* for signature. The Approver column is filled in
+by the accountable executive at the point of signature; the Next-review column is one year from
+that date. Workforce acknowledgements are tracked under
+[docs/security/acknowledgements/](acknowledgements/).
+
+| # | Policy | Owner | Approver | Version | Approved | Next review |
+|---|--------|-------|----------|---------|----------|-------------|
+| 1 | Information security & risk management | `<TBD-security-owner>` | `<TBD-accountable-exec>` | 1.0 | `<pending>` | `<+1y from approval>` |
+| 2 | Access control & authentication | `<TBD-security-owner>` | `<TBD-accountable-exec>` | 1.0 | `<pending>` | `<+1y from approval>` |
+| 3 | Data protection, retention & cryptography | `<TBD-privacy-owner>` | `<TBD-accountable-exec>` | 1.0 | `<pending>` | `<+1y from approval>` |
+| 4 | Secure development, change & vulnerability mgmt | `<TBD-system-owner>` | `<TBD-accountable-exec>` | 1.0 | `<pending>` | `<+1y from approval>` |
+| 5 | Security monitoring & logging | `<TBD-security-owner>` | `<TBD-accountable-exec>` | 1.0 | `<pending>` | `<+1y from approval>` |
+| 6 | Incident response | `<TBD-incident-commander>` | `<TBD-accountable-exec>` | 1.0 | `<pending>` | `<+1y from approval>` |
+| 7 | Business continuity & disaster recovery | `<TBD-system-owner>` | `<TBD-accountable-exec>` | 1.0 | `<pending>` | `<+1y from approval>` |
+| 8 | Supplier / third-party risk | `<TBD-security-owner>` | `<TBD-accountable-exec>` | 1.0 | `<pending>` | `<+1y from approval>` |
+| 9 | Privacy & data-subject rights | `<TBD-privacy-owner>` | `<TBD-accountable-exec>` | 1.0 | `<pending>` | `<+1y from approval>` |
+| 10 | Acceptable use & workforce security | `<TBD-security-owner>` | `<TBD-accountable-exec>` | 1.0 | `<pending>` | `<+1y from approval>` |
+
+The `<TBD-*>` placeholders resolve to the named roles in
+[docs/security/roles-raci.md](roles-raci.md). Filling that RACI in with real names propagates
+here by find-and-replace.
+
+
 ## 1. Information security and risk management policy
 
 The organization protects customer, employee, and company information using the NIST CSF 2.0 Tier 3 target profile. The accountable executive owns risk acceptance; the security owner operates this program; the system owner maintains DocuBite; and the privacy owner approves privacy and regulatory decisions. Risks are recorded, rated for likelihood and impact, assigned an owner and due date, reviewed quarterly, and accepted only in writing with an expiry date. Material system, supplier, data, or threat changes trigger reassessment. Policy exceptions require documented compensating controls, executive approval, and review at least every 90 days.

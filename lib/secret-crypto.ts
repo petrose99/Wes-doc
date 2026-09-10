@@ -65,11 +65,19 @@ export function decryptWithKeys(ciphertext: string, keys: Buffer[]): string {
     try {
       const decipher = createDecipheriv("aes-256-gcm", key, iv)
       decipher.setAuthTag(tag)
-      return Buffer.concat([decipher.update(ct), decipher.final()]).toString("utf8")
+      const plainBuf = Buffer.concat([decipher.update(ct), decipher.final()])
+      const plaintext = plainBuf.toString("utf8")
+      // Zeroise intermediate plaintext buffer (defence in depth). The returned string cannot be
+      // zeroised — V8 strings are immutable — but any raw byte residue in the Buffer heap is
+      // wiped as soon as we no longer need it.
+      plainBuf.fill(0)
+      return plaintext
     } catch {
       // Wrong key (or tampered ciphertext) → GCM auth fails here; fall through to the next key.
     }
   }
+  // Also zeroise the ciphertext buffer once every attempt has finished.
+  ct.fill(0)
   throw new SecretCryptoError("secret_decrypt_failed")
 }
 

@@ -1,0 +1,5 @@
+# Accepted findings from Trivy container scans. Each row MUST have a justification comment and
+# an expiry date; a row past its expiry re-appears in the next scan.
+#
+# Format: <CVE-id> or <check-id>
+# Reviewed quarterly per docs/security/POLICY-SET.md §4.

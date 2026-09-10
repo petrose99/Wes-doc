@@ -1,0 +1,11 @@
+review_date,system,person_or_service_account,role_or_permissions,business_justification,mfa_confirmed,reviewer,decision_keep_change_remove,completion_date,evidence_link
+2026-Q4,AWS,<TBD-accountable-exec>,Root + billing,Root ownership - required,Yes (hardware key),<TBD-security-owner>,Keep,<pending>,../roles-raci.md
+2026-Q4,AWS,<TBD-system-owner>,PowerUser + iam:PassRole,Manages Terraform apply,Yes,<TBD-security-owner>,Keep,<pending>,
+2026-Q4,GitHub,<TBD-system-owner>,Org owner,Repo + Actions ownership,Yes,<TBD-security-owner>,Keep,<pending>,
+2026-Q4,GitHub,<TBD-security-owner>,Org owner,Break-glass for repo access,Yes,<TBD-accountable-exec>,Keep,<pending>,
+2026-Q4,Supabase,<TBD-system-owner>,Project owner,Manages auth config,Yes,<TBD-security-owner>,Keep,<pending>,
+2026-Q4,Stripe,<TBD-accountable-exec>,Administrator,Billing owner,Yes,<TBD-security-owner>,Keep,<pending>,
+2026-Q4,DocuBite production DB,<TBD-system-owner>,postgres (via SSM Session Manager),Runtime + migrations,Yes (bastion + break-glass),<TBD-security-owner>,Keep,<pending>,
+2026-Q4,DocuBite /admin-next,<TBD-security-owner>,role=admin,Platform administration,Yes (aal2),<TBD-accountable-exec>,Keep,<pending>,../break-glass.md
+2026-Q4,DNS registrar,<TBD-system-owner>,Registrant + technical contact,DNS record ownership,Yes,<TBD-accountable-exec>,Keep,<pending>,
+2026-Q4,OpenAI / Google / HF,<TBD-privacy-owner>,Owner,LLM provider account owner,Yes,<TBD-security-owner>,Keep,<pending>,

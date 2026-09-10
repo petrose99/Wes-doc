@@ -1,0 +1,38 @@
+# Code Owners for DocuBite.
+#
+# Merges to master require at least one code-owner review. The named-role placeholders match the
+# RACI in docs/security/roles-raci.md so a single find-and-replace resolves them once the
+# organisation names real GitHub handles for each role.
+#
+# Set up: enable "Require review from Code Owners" on the master branch protection rule.
+
+# --- Security-critical paths ---------------------------------------------------------------
+/lib/admin.ts                                @docubite-security-owner
+/lib/auth.ts                                 @docubite-security-owner
+/lib/db-rls.ts                               @docubite-security-owner
+/lib/malware-scan.ts                         @docubite-security-owner
+/lib/verify-production-config.ts             @docubite-security-owner
+/lib/secret-crypto.ts                        @docubite-security-owner
+/lib/csp.ts                                  @docubite-security-owner
+
+/prisma/migrations/**/migration.sql          @docubite-security-owner @docubite-system-owner
+
+# --- Infrastructure ------------------------------------------------------------------------
+/infra/**                                    @docubite-system-owner
+/docker-compose.prod.yml                     @docubite-system-owner
+/Dockerfile.*                                @docubite-system-owner
+/Caddyfile                                   @docubite-system-owner
+
+# --- CI & release --------------------------------------------------------------------------
+/.github/workflows/**                        @docubite-security-owner @docubite-system-owner
+/.github/CODEOWNERS                          @docubite-security-owner @docubite-accountable-exec
+
+# --- Governance ----------------------------------------------------------------------------
+/docs/security/**                            @docubite-security-owner @docubite-privacy-owner
+/SECURITY.md                                 @docubite-security-owner @docubite-privacy-owner
+/CODE_OF_CONDUCT.md                          @docubite-accountable-exec
+/CONTRIBUTING.md                             @docubite-security-owner
+/CHANGELOG.md                                @docubite-system-owner
+
+# --- Default -------------------------------------------------------------------------------
+*                                            @docubite-system-owner
