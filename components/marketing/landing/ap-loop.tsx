@@ -6,7 +6,7 @@ const STEPS: { title: string; text: string; icon: typeof Mail }[] = [
   { title: "Check", text: "Fraud checks that other tools miss: a supplier's bank details changed, a split invoice under an approval floor, a suspicious resubmission.", icon: ShieldAlert },
   { title: "Match", text: "Bills matched to their purchase order and — where you use them — the goods-received note. Any mismatch is surfaced with the exact numbers side by side.", icon: GitCompare },
   { title: "Approve", text: "Named approvers, amount thresholds, and a review trail for every decision. Your controls, not ours.", icon: ClipboardCheck },
-  { title: "Sync", text: "Bills pushed to QuickBooks, Xero, or Bigcapital as bills, with idempotency so a retry never duplicates.", icon: Landmark },
+  { title: "Sync", text: "Bills pushed to your accounting tool — QuickBooks, Xero and more — with idempotency so a retry never duplicates.", icon: Landmark },
   { title: "Pay-ready", text: "One click assembles a bank-ready payment file with per-supplier remittance advice. You upload it to your bank.", icon: Send },
 ]
 
