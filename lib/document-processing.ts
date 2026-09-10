@@ -7,6 +7,7 @@ import { track } from "@/lib/analytics"
 import { SUPPLIER_FIELD_BY_TEMPLATE } from "@/lib/automation/rules"
 import { applyAutomationRules } from "@/models/automation-rules"
 import { runDeterministicChecks } from "@/models/document-checks"
+import { runDocumentMatching } from "@/models/document-matches"
 import { applyFxToDocument } from "@/lib/fx/apply-to-document"
 import { recordSupplierObservation } from "@/lib/suppliers/alias"
 import { getFewShotExamples } from "@/models/field-corrections"
@@ -801,6 +802,9 @@ export async function processDocumentJob(jobId: string) {
     // Runs after rules, per the roadmap — a check comparing against codingData (or a future check
     // that does) needs the rule's coding to already be on the document.
     await runDeterministicChecks({ workspaceId: document.workspaceId, documentId: document.id })
+    // WP-AP1: 2/3-way matching over blocking candidates. Never throws past the caller (same
+    // contract as runDeterministicChecks); a matcher failure must not fail extraction.
+    await runDocumentMatching({ workspaceId: document.workspaceId, documentId: document.id })
     // FX conversion into the workspace base currency, once we have an extracted total and a
     // currency_code. Never throws — a fetch failure leaves fxRate null and a retry drain picks
     // it up later, exactly like a MinerU timeout doesn't roll extraction back. Runs here so an
