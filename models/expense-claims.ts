@@ -1,7 +1,7 @@
 // Deliberately NOT a "use server" module, matching every other models/*.ts helper: trusts the
 // workspaceId it is handed. Server actions live in
 // app/(app)/workspaces/[workspaceId]/expense-claim-actions.ts and do the auth + capability gate.
-import { canDecideStage, decideStage, findCurrentStage } from "@/lib/approvals/engine"
+import { canDecideStage, decideStage, findCurrentStage, toWorkflowStageInputs } from "@/lib/approvals/engine"
 import { auditEventData, getRequestAuditContext } from "@/lib/audit"
 import { prisma } from "@/lib/db"
 import { addCents, fromCents } from "@/lib/money"
@@ -190,11 +190,12 @@ export async function decideExpenseClaimStage(input: { workspaceId: string; clai
   if (!claim) throw new Error("expense_claim_not_found")
   if (!claim.workflow || claim.currentStageIndex === null) throw new Error("expense_claim_has_no_workflow")
 
-  const currentStage = findCurrentStage(claim.workflow.stages, claim.currentStageIndex)
+  const stages = toWorkflowStageInputs(claim.workflow.stages)
+  const currentStage = findCurrentStage(stages, claim.currentStageIndex)
   if (!currentStage) throw new Error("workflow_stage_not_found")
   if (!canDecideStage({ stage: currentStage, actorRole: input.actorRole, actorId: input.actorId })) throw new Error("stage_requires_owner")
 
-  const result = decideStage({ stages: claim.workflow.stages, currentStageIndex: claim.currentStageIndex, decision: input.decision })
+  const result = decideStage({ stages, currentStageIndex: claim.currentStageIndex, decision: input.decision })
   const nextStatus = result.outcome === "advance" ? "submitted" : result.outcome
   const nextStageIndex = result.outcome === "advance" ? result.nextStageIndex : claim.currentStageIndex
   const resolvedAt = result.outcome === "advance" ? null : new Date()
