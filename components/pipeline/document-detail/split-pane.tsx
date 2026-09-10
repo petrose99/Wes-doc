@@ -153,8 +153,15 @@ export function SplitPane({
     setBusyAction("ready")
     try {
       const result = await moveDocumentsToStageAction(workspaceId, [header.documentId], "approved")
-      if (!result.success) { toast.error(result.error || "Could not move this document"); return }
-      toast.success("Moved to Ready")
+      if (!result.success) { toast.error(result.error || "Could not approve this document"); return }
+      // Validation can hold the document back (missing required fields / no document type) — say
+      // so instead of announcing an approval the Review tab immediately contradicts.
+      if ((result.data?.heldBack ?? 0) > 0) {
+        toast.warning("Not approved yet — fill in the missing required fields (and pick a document type) first.")
+        router.refresh()
+        return
+      }
+      toast.success("Approved")
       router.push(afterActionHref)
       router.refresh()
     } catch {
@@ -216,7 +223,10 @@ export function SplitPane({
         <Flag className={`h-4 w-4 ${flagged ? "fill-indigo-400" : ""}`} />
       </button>
 
-      {stage !== "approved" && stage !== "synced" && stage !== "paid" && stage !== "archive" && stage !== null && <button type="button" disabled={busyAction === "ready"} onClick={() => void moveToReady()} className={toolbarBtn}>
+      {/* Keyed off the document's own status, not the ?stage= the reader arrived from — a doc
+          opened from search (no stage param) still needs its Approve button. Hidden once the
+          document is reviewed: it's already approved, re-approving is a no-op. */}
+      {header.status !== "reviewed" && header.status !== "queued" && header.status !== "failed" && stage !== "archive" && <button type="button" disabled={busyAction === "ready"} onClick={() => void moveToReady()} className={toolbarBtn}>
         {busyAction === "ready" ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}Approve
       </button>}
       {stage !== "archive" && <button type="button" disabled={busyAction === "archive"} onClick={() => void archive()} className={toolbarBtn}>

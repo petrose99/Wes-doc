@@ -2,12 +2,12 @@
 
 import {
   archiveDocumentsAction, deletePipelineDocumentsAction,
-  mergeDocumentsAction,
+  mergeDocumentsAction, moveDocumentsToStageAction,
 } from "@/app/(app)/workspaces/[workspaceId]/pipeline-actions"
 import { reextractAdaptivelyAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import type { PipelineStage } from "@/lib/documents/stages"
-import { Archive, Combine, Loader2, Sparkles, Table2, Trash2 } from "lucide-react"
+import { Archive, CheckCircle2, Combine, Loader2, Sparkles, Table2, Trash2 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
@@ -62,11 +62,38 @@ export function BulkActionBar({ workspaceId, stage, selectedIds, selectedFileId,
     }
   }
 
+  /** Bulk Approve with an honest outcome: a document that still fails validation (missing
+   * required fields, no document type) stays on Review, and the toast says so rather than
+   * claiming a success the tab counts immediately contradict. */
+  const approve = async () => {
+    setBusy(true)
+    try {
+      const result = await moveDocumentsToStageAction(workspaceId, selectedIds, "approved")
+      if (!result.success) { toast.error(result.error || "Approve failed"); return }
+      const approved = result.data?.approved ?? 0
+      const heldBack = result.data?.heldBack ?? 0
+      if (approved > 0 && heldBack === 0) toast.success(`Approved ${approved}`)
+      else if (approved > 0) toast.warning(`Approved ${approved} — ${heldBack} held back (missing required fields or document type)`)
+      else toast.warning(`Nothing approved — ${heldBack} still missing required fields or a document type. Open the document to fill them in.`)
+      onDone()
+      router.refresh()
+    } catch {
+      toast.error("Could not reach the server")
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const none = selectedIds.length === 0
   const dis = busy || none
 
   return <div className="flex flex-wrap items-center gap-2 border-b bg-slate-50 px-6 py-2.5 text-sm">
     {!none && <span className="font-medium text-slate-700">{selectedIds.length} selected</span>}
+
+    {stage === "review" && <button type="button" disabled={dis} className="inline-flex items-center gap-1.5 rounded-md bg-emerald-700 px-2.5 py-1 font-semibold text-white hover:bg-emerald-800 disabled:opacity-50"
+      onClick={() => void approve()}>
+      <CheckCircle2 className="h-3.5 w-3.5" />Approve
+    </button>}
 
     {stage === "approved" && <>
       <button type="button" disabled={dis} className="inline-flex items-center gap-1.5 rounded-md border bg-white px-2.5 py-1 font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
