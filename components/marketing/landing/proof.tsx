@@ -1,14 +1,14 @@
-import { Download, Lock, MapPin, RefreshCcw } from "lucide-react"
+import { Download, Globe, Lock, RefreshCcw } from "lucide-react"
 
 /** Trust-signal strip. Built from FACTS already asserted elsewhere on the page (private encrypted
- * storage, CSV export, no bank switch, CMA coverage) — no fabricated customer counts or logos.
+ * storage, multi-currency FX, CSV export, no lock-in) — no fabricated customer counts or logos.
  *
  * TODO(marketing): once we have real numbers or a real customer quote, swap the strip below for a
  * customer-count + one-line testimonial pattern. Until then, honest trust signals beat empty
  * placeholders and beat fake numbers. */
 const SIGNALS: { icon: typeof Lock; label: string; sub: string }[] = [
   { icon: Lock, label: "Private encrypted storage", sub: "Keys managed for you" },
-  { icon: MapPin, label: "South Africa + neighbours", sub: "Same rails, no bank switch" },
+  { icon: Globe, label: "Any currency, anywhere", sub: "Historical FX rates built in" },
   { icon: Download, label: "Your data, exportable", sub: "CSV, columns and all" },
   { icon: RefreshCcw, label: "No long-term contract", sub: "Cancel at any time" },
 ]
