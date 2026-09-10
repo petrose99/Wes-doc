@@ -25,7 +25,7 @@ export async function listPlaceableDocumentsAction(
   await requireWorkspaceRole(workspaceId, user.id)
 
   const [docs, placedIds] = await Promise.all([
-    listWorkspaceDocuments(workspaceId, { stage: "ready" }),
+    listWorkspaceDocuments(workspaceId, { stage: "approved" }),
     listPlacedDocumentIds(fileId),
   ])
 

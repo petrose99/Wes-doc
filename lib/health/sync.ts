@@ -80,6 +80,27 @@ export async function syncLedgerTransactions(connectionId: string): Promise<void
       data: { active: false },
     }),
   ])
+
+  // Ledger-paid write-back: when the provider says a bill this app pushed is paid, land that on
+  // Document.paymentStatus so the document reaches the Paid tab without anyone re-confirming what
+  // the ledger already knows. Only fills a NULL — a reviewer's explicit answer (paid OR unpaid)
+  // is never overwritten by a sync, and paymentConfirmedById stays null so an audit can tell a
+  // ledger-sourced Paid from a human-confirmed one.
+  const paidExternalIds = rows
+    .filter((row) => (row.kind === "bill" || row.kind === "invoice") && row.paymentStatus === "paid")
+    .map((row) => row.externalId)
+  if (paidExternalIds.length) {
+    const paidPushes = await prisma.integrationPush.findMany({
+      where: { workspaceId: connection.workspaceId, connectionId: connection.id, status: "succeeded", externalBillId: { in: paidExternalIds } },
+      select: { documentId: true },
+    })
+    if (paidPushes.length) {
+      await prisma.document.updateMany({
+        where: { workspaceId: connection.workspaceId, id: { in: paidPushes.map((p) => p.documentId) }, paymentStatus: null },
+        data: { paymentStatus: "paid", paymentConfirmedAt: syncedAt },
+      })
+    }
+  }
 }
 
 const LEDGER_SYNC_STALE_MS = 24 * 60 * 60 * 1000

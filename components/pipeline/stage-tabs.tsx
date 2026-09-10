@@ -1,20 +1,36 @@
 import { STAGE_LABELS, PIPELINE_STAGES, type PipelineStage } from "@/lib/documents/stages"
-import { CheckCircle2, Loader2, SearchCheck } from "lucide-react"
+import { AlertTriangle, Banknote, CheckCircle2, Inbox, Loader2, SearchCheck, Send } from "lucide-react"
 import Link from "next/link"
 
 const STAGE_ICONS: Record<PipelineStage, typeof Loader2> = {
-  inbox: Loader2,
-  to_review: SearchCheck,
-  ready: CheckCircle2,
+  inbox: Inbox,
+  review: SearchCheck,
+  approved: CheckCircle2,
+  synced: Send,
+  paid: Banknote,
 }
 
-/** The pipeline's five tabs, with an icon and a count badge each. Plain links (?stage=) rather
+/** The pipeline's stage tabs, with an icon and a count badge each. Plain links (?stage=) rather
  * than a client router — this list is a server component's data, so switching tabs is a normal
- * navigation. No generic Tabs primitive exists in components/ui yet (checked); this is
- * hand-rolled the same way components/shell/settings-nav.tsx is. */
-export function StageTabs({ workspaceId, active, counts }: { workspaceId: string; active: PipelineStage; counts: Record<PipelineStage, number> }) {
+ * navigation.
+ *
+ * `failedCount`, when > 0, renders a red sub-badge on the Inbox tab: failed extractions are the
+ * one thing on Inbox that needs a person to act rather than wait, and burying them inside the
+ * neutral count hid that (audit fix — Inbox merges two opposite states).
+ *
+ * `visibleStages` lets the page hide Synced/Paid for a workspace where they can never fill —
+ * no accounting integration configured and nothing ever synced. Tabs never hide while they hold
+ * documents; data always wins over tidiness. */
+export function StageTabs({ workspaceId, active, counts, failedCount = 0, visibleStages }: {
+  workspaceId: string
+  active: PipelineStage
+  counts: Record<PipelineStage, number>
+  failedCount?: number
+  visibleStages?: readonly PipelineStage[]
+}) {
+  const stages = visibleStages ?? PIPELINE_STAGES
   return <nav className="flex flex-wrap gap-1 border-b px-6" aria-label="Pipeline stage">
-    {PIPELINE_STAGES.map((stage) => {
+    {stages.map((stage) => {
       const isActive = stage === active
       const Icon = STAGE_ICONS[stage]
       return <Link key={stage} href={`/workspaces/${workspaceId}/pipeline?stage=${stage}`}
@@ -23,6 +39,9 @@ export function StageTabs({ workspaceId, active, counts }: { workspaceId: string
         <Icon className="h-4 w-4 shrink-0" />
         {STAGE_LABELS[stage]}
         <span className={`rounded-full px-1.5 py-0.5 text-xs font-semibold tabular-nums ${isActive ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-500"}`}>{counts[stage]}</span>
+        {stage === "inbox" && failedCount > 0 && <span className="inline-flex items-center gap-0.5 rounded-full bg-red-100 px-1.5 py-0.5 text-xs font-semibold tabular-nums text-red-700" title={`${failedCount} failed extraction${failedCount === 1 ? "" : "s"} — open Inbox to re-extract or delete`}>
+          <AlertTriangle className="h-3 w-3" />{failedCount}
+        </span>}
       </Link>
     })}
   </nav>

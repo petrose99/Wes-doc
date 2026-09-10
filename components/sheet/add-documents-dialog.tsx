@@ -91,9 +91,11 @@ export function AddDocumentsDialog({ workspaceId, fileId, apiRef, onClose }: {
       </div>
 
       <div className="border-b px-5 py-3">
-        <div className="flex items-center gap-2 rounded-lg border px-3 py-2">
-          <Search className="h-4 w-4 text-slate-400" />
+        <div className="flex items-center gap-2 rounded-lg border px-3 py-2 focus-within:border-emerald-300 focus-within:ring-2 focus-within:ring-emerald-100">
+          <Search className="h-4 w-4 text-slate-400" aria-hidden="true" />
+          <label htmlFor="add-docs-search" className="sr-only">Search documents</label>
           <input
+            id="add-docs-search"
             type="text"
             placeholder="Search documents..."
             value={query}

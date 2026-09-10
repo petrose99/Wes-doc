@@ -2,11 +2,15 @@
 
 import { Button } from "@/components/ui/button"
 import { Loader2 } from "lucide-react"
-import { useEffect } from "react"
+import { useEffect, useRef } from "react"
 import { createPortal } from "react-dom"
 
 /** Confirmation for destructive actions. Portalled to the body so it is never clipped or
- * stacked by the panel/grid containers it is opened from. */
+ * stacked by the panel/grid containers it is opened from. Same focus discipline as Dialog:
+ * focus trapped while open (Tab cycles Cancel ⇄ Confirm), returned to the opener on close,
+ * body scroll locked. Initial focus stays on the Confirm button via its autoFocus. */
+const FOCUSABLE = "button:not([disabled]), [tabindex]:not([tabindex=\"-1\"])"
+
 export function ConfirmDialog({ open, title, description, confirmLabel = "Confirm", destructive = false, busy = false, onConfirm, onCancel }: {
   open: boolean
   title: string
@@ -17,11 +21,33 @@ export function ConfirmDialog({ open, title, description, confirmLabel = "Confir
   onConfirm: () => void
   onCancel: () => void
 }) {
+  const contentRef = useRef<HTMLDivElement>(null)
+  const openerRef = useRef<Element | null>(null)
+
   useEffect(() => {
     if (!open) return
-    const close = (event: KeyboardEvent) => { if (event.key === "Escape" && !busy) onCancel() }
-    window.addEventListener("keydown", close)
-    return () => window.removeEventListener("keydown", close)
+    openerRef.current = typeof document !== "undefined" ? document.activeElement : null
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !busy) { onCancel(); return }
+      if (event.key !== "Tab") return
+      const container = contentRef.current
+      if (!container) return
+      const focusables = Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE))
+      if (focusables.length === 0) return
+      const first = focusables[0]
+      const last = focusables[focusables.length - 1]
+      const active = document.activeElement as HTMLElement | null
+      if (event.shiftKey && (active === first || !container.contains(active))) { event.preventDefault(); last.focus() }
+      else if (!event.shiftKey && active === last) { event.preventDefault(); first.focus() }
+    }
+    window.addEventListener("keydown", onKey)
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+    return () => {
+      window.removeEventListener("keydown", onKey)
+      document.body.style.overflow = previousOverflow
+      if (openerRef.current instanceof HTMLElement) openerRef.current.focus()
+    }
   }, [open, busy, onCancel])
 
   // The dialog only ever opens after hydration, so there is nothing to mismatch on the server.
@@ -29,7 +55,7 @@ export function ConfirmDialog({ open, title, description, confirmLabel = "Confir
 
   return createPortal(
     <div role="presentation" className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 p-6" onClick={() => { if (!busy) onCancel() }}>
-      <div role="alertdialog" aria-modal="true" aria-label={title} className="w-full max-w-sm overflow-hidden rounded-xl bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+      <div ref={contentRef} role="alertdialog" aria-modal="true" aria-label={title} className="w-full max-w-sm overflow-hidden rounded-xl bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
         <div className="px-5 pb-4 pt-5">
           <h2 className="text-base font-semibold text-slate-900">{title}</h2>
           {description && <p className="mt-1.5 text-sm text-slate-500">{description}</p>}

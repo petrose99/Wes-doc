@@ -18,7 +18,7 @@ import { SpendByCategoryChart } from "@/components/analytics/spend-by-category-c
 import { VendorSpendChart } from "@/components/analytics/vendor-spend-chart"
 import { MobileUploadButtons } from "@/components/shell/mobile-upload-buttons"
 import { getOnboardingStateAction } from "./onboarding-actions"
-import { ArrowRight, CheckCircle2, ChevronRight, FileText, ListChecks, SearchCheck, Table2, Upload } from "lucide-react"
+import { CheckCircle2, ChevronRight, FileText, SearchCheck, Table2 } from "lucide-react"
 import Link from "next/link"
 
 export const dynamic = "force-dynamic"
@@ -71,14 +71,14 @@ export default async function WorkspaceHomePage({ params }: {
   })
 
   const [needsReview, recentFileReviewCounts] = await Promise.all([
-    listWorkspaceDocuments(workspaceId, { stage: "to_review" }),
+    listWorkspaceDocuments(workspaceId, { stage: "review" }),
     countToReviewByFile(workspaceId, recentFiles.map((file) => file.id)),
   ])
 
   const stats = [
     { label: "Documents this month", value: documentsThisMonth, icon: FileText, href: null, iconClass: "bg-emerald-50 text-emerald-700", hoverClass: "" },
-    { label: "In review", value: stageCounts.to_review, icon: SearchCheck, href: `/workspaces/${workspaceId}/pipeline?stage=to_review`, iconClass: "bg-indigo-50 text-indigo-600", hoverClass: "hover:border-[#c7d2fe] hover:-translate-y-0.5 hover:shadow-[0_2px_4px_rgba(15,23,42,0.05),0_12px_26px_rgba(79,70,229,0.10)]" },
-    { label: "Ready", value: stageCounts.ready, icon: CheckCircle2, href: `/workspaces/${workspaceId}/pipeline?stage=ready`, iconClass: "bg-emerald-50 text-emerald-700", hoverClass: "hover:border-[#a7f3d0] hover:-translate-y-0.5 hover:shadow-[0_2px_4px_rgba(15,23,42,0.05),0_12px_26px_rgba(4,120,87,0.10)]" },
+    { label: "Review", value: stageCounts.review, icon: SearchCheck, href: `/workspaces/${workspaceId}/pipeline?stage=review`, iconClass: "bg-indigo-50 text-indigo-600", hoverClass: "hover:border-[#c7d2fe] hover:-translate-y-0.5 hover:shadow-[0_2px_4px_rgba(15,23,42,0.05),0_12px_26px_rgba(79,70,229,0.10)]" },
+    { label: "Approved (30d)", value: stageCounts.approved, icon: CheckCircle2, href: `/workspaces/${workspaceId}/pipeline?stage=approved`, iconClass: "bg-emerald-50 text-emerald-700", hoverClass: "hover:border-[#a7f3d0] hover:-translate-y-0.5 hover:shadow-[0_2px_4px_rgba(15,23,42,0.05),0_12px_26px_rgba(4,120,87,0.10)]" },
   ]
 
   return <main className="mx-auto w-full max-w-6xl space-y-4 px-4 py-[18px] md:space-y-6 md:p-6">
@@ -89,7 +89,7 @@ export default async function WorkspaceHomePage({ params }: {
         <div className="flex items-center gap-2">
           <h1 className="font-display text-[25px] font-extrabold leading-[1.15] tracking-[-0.025em] text-slate-900 md:text-[33px] md:leading-normal">Welcome back to {membership.workspace.name}</h1>
         </div>
-        {stageCounts.to_review > 0 && <p className="mt-1.5 text-[13.5px] text-slate-500 md:text-[14.5px]">{stageCounts.to_review} document{stageCounts.to_review === 1 ? " is" : "s are"} waiting for review across your pipeline.</p>}
+        {stageCounts.review > 0 && <p className="mt-1.5 text-[13.5px] text-slate-500 md:text-[14.5px]">{stageCounts.review} document{stageCounts.review === 1 ? " is" : "s are"} waiting for review across your pipeline.</p>}
       </div>
       <div className="hidden md:block">
         <FileHubUploadButton
@@ -115,30 +115,11 @@ export default async function WorkspaceHomePage({ params }: {
           <div className="text-[25px] font-extrabold tracking-tight text-slate-900 sm:text-[27px]">{stat.value}</div>
           <div className="mt-0.5 text-[12.5px] text-slate-500 sm:text-[13px]">{stat.label}</div>
         </>
-        const className = `rounded-2xl border border-[#e6ebf1] bg-white p-[15px_16px] shadow-panel transition-all sm:p-[18px] ${stat.hoverClass}`
+        const className = `rounded-2xl border border-[#e6ebf1] bg-white p-[15px_16px] shadow-panel transition-[border-color,box-shadow,transform] duration-150 sm:p-[18px] ${stat.hoverClass}`
         return stat.href
           ? <Link key={stat.label} href={stat.href} className={className}>{inner}</Link>
           : <div key={stat.label} className={className}>{inner}</div>
       })}
-    </div>
-
-    <div className="grid grid-cols-3 gap-3">
-      {[
-        { icon: Upload, label: "Added", count: documentsThisMonth, desc: "documents this month", href: `/workspaces/${workspaceId}/pipeline`, color: "bg-indigo-50 text-indigo-600" },
-        { icon: ListChecks, label: "Review", count: stageCounts.to_review, desc: "awaiting review", href: `/workspaces/${workspaceId}/pipeline?stage=to_review`, color: "bg-amber-50 text-amber-600" },
-        { icon: Table2, label: "Sheets", count: stageCounts.ready, desc: unplacedCount > 0 ? `ready to use · ${unplacedCount} not in a sheet` : "ready to use", href: `/workspaces/${workspaceId}/files`, color: "bg-emerald-50 text-emerald-700" },
-      ].map((step, i) => (
-        <Link key={step.label} href={step.href} className="group flex items-center gap-3 rounded-xl border border-[#e6ebf1] bg-white px-4 py-3 shadow-panel transition-all hover:-translate-y-0.5 hover:shadow-md">
-          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${step.color}`}><step.icon className="h-[17px] w-[17px]" /></div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5 text-[13px] font-bold text-slate-800">
-              {step.label}
-              {i < 2 && <ArrowRight className="h-3 w-3 text-slate-300" />}
-            </div>
-            <div className="text-[12px] text-slate-500">{step.count} {step.desc}</div>
-          </div>
-        </Link>
-      ))}
     </div>
 
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.55fr_1fr]">
@@ -169,7 +150,7 @@ export default async function WorkspaceHomePage({ params }: {
         <div className="mb-3.5 flex items-center gap-2">
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600"><SearchCheck className="h-[17px] w-[17px]" /></span>
           <h2 className="text-[15px] font-bold text-slate-900">Needs your review</h2>
-          {stageCounts.to_review > 0 && <span className="ml-auto rounded-full bg-indigo-50 px-2.5 py-0.5 text-[11.5px] font-bold text-indigo-700">{stageCounts.to_review}</span>}
+          {stageCounts.review > 0 && <span className="ml-auto rounded-full bg-indigo-50 px-2.5 py-0.5 text-[11.5px] font-bold text-indigo-700">{stageCounts.review}</span>}
         </div>
         {needsReview.length === 0 ? <p className="py-6 text-center text-sm text-slate-400">Nothing needs a look right now.</p> : <>
           {needsReview.slice(0, 3).map((doc) => {

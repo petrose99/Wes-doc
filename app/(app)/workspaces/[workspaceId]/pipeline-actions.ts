@@ -24,7 +24,7 @@ async function revalidatePipeline(workspaceId: string) {
  * (models/documents.markDocumentsReviewed, the same write the single-document review form makes);
  * moving onto "archive" only sets archivedAt, leaving `status` untouched, per the archive/status
  * split in lib/documents/stages.ts. */
-export async function moveDocumentsToStageAction(workspaceId: string, documentIds: string[], stage: "ready" | "archive"): Promise<ActionState<{ moved: number }>> {
+export async function moveDocumentsToStageAction(workspaceId: string, documentIds: string[], stage: "approved" | "ready" | "archive"): Promise<ActionState<{ moved: number; approved?: number; heldBack?: number }>> {
   const user = await getCurrentUser()
   if (!(await requireMember(workspaceId, user.id))) return { success: false, error: NO_ACCESS }
   try {
@@ -33,9 +33,12 @@ export async function moveDocumentsToStageAction(workspaceId: string, documentId
       revalidatePipeline(workspaceId)
       return { success: true, data: { moved: updated } }
     }
+    // markDocumentsReviewed re-runs validation per document; one that is still missing required
+    // fields (document type included) stays needs_review. Reported separately so the UI can say
+    // "held back" instead of toasting a success that the tab counts immediately contradict.
     const { reviewed, needsReview } = await markDocumentsReviewed(workspaceId, documentIds, user.id)
     revalidatePipeline(workspaceId)
-    return { success: true, data: { moved: reviewed + needsReview } }
+    return { success: true, data: { moved: reviewed + needsReview, approved: reviewed, heldBack: needsReview } }
   } catch (error) {
     return { success: false, error: errorMessage(error, "Could not move the selected documents") }
   }
