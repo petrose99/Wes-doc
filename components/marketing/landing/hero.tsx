@@ -51,7 +51,7 @@ export function Hero() {
             — ready to pay.
           </h1>
           <p className="mt-4 max-w-[34rem] text-pretty text-[1rem] leading-[1.55] text-stone-600 md:mt-6 md:text-[1.08rem] md:leading-[1.62]">
-            Every bill is read, checked, routed for approval, and recorded in your books — ready for your bank to send.
+            Every invoice and receipt is read, checked, routed for approval, and posted straight into your ERP or accounting software.
           </p>
           <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-3.5 md:mt-8">
             <div className="flex flex-col">
