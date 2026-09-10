@@ -30,14 +30,14 @@ export function FolderChecks() {
                       <span className="text-[0.8rem] font-semibold text-stone-800">Bank statement · Metro Bank</span>
                       <span className="rounded-full bg-stone-100 px-2 py-px text-[0.7rem] font-semibold text-stone-600">11</span>
                     </div>
-                    <div className={`mt-1.5 ${played ? POP : ""}`} style={played ? { animationDelay: "1.15s" } : undefined}>
+                    <div className={`mt-1.5 ${played ? POP : ""}`} style={played ? { animationDelay: "0.9s" } : undefined}>
                       <span className="inline-block rounded bg-indigo-100 px-2 py-0.5 text-[0.72rem] font-semibold text-indigo-800">January missing</span>
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div className={played ? IN : ""} style={played ? { animationDelay: "1.5s" } : undefined}>
+              <div className={played ? IN : ""} style={played ? { animationDelay: "1.1s" } : undefined}>
                 <h4 className="mb-1.5 text-[0.66rem] font-bold uppercase tracking-[.07em] text-stone-500">Duplicates</h4>
                 <div className="flex flex-wrap items-center gap-2 rounded-lg bg-indigo-50 px-2.5 py-2 text-[0.78rem] text-indigo-900">
                   <span className="max-w-[11rem] truncate">INV-4471.pdf</span>
@@ -47,7 +47,7 @@ export function FolderChecks() {
                 </div>
               </div>
 
-              <div className={played ? IN : ""} style={played ? { animationDelay: "1.95s" } : undefined}>
+              <div className={played ? IN : ""} style={played ? { animationDelay: "1.4s" } : undefined}>
                 <h4 className="mb-1.5 text-[0.66rem] font-bold uppercase tracking-[.07em] text-stone-500">Needs attention</h4>
                 <div className="flex flex-col gap-1.5">
                   <div className="flex items-center gap-2 rounded-lg bg-red-50 px-2.5 py-2 text-[0.78rem] text-red-900">

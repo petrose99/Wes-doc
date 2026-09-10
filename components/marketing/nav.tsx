@@ -7,15 +7,15 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useEffect, useRef, useState } from "react"
 
-/** Nav links. Anchor targets on the marketing page get scroll-spy active state (see effect below);
- * Pricing is a real route and matches on pathname. Trimmed to five choices from nine — enough for
- * the buyer's journey ("what does it do" → "how does it work" → "what does it cost") without
- * blowing past the working-memory line. */
+/** Nav links. Anchor targets on the marketing page get scroll-spy active state (see effect below).
+ * Trimmed hard — few enough choices to hold in working memory. Pricing is deliberately absent
+ * until real tiers exist: a "Pricing" link that lands on a page with no prices costs more trust
+ * than it earns (the /pricing route itself stays reachable by URL). Re-add it here the day the
+ * tier grid is real. */
 const LINKS: { href: Route; label: string; anchor?: string }[] = [
   { href: "/#ap-loop", label: "The AP loop", anchor: "ap-loop" },
   { href: "/#extraction", label: "Extraction", anchor: "extraction" },
   { href: "/#automation", label: "Automation", anchor: "automation" },
-  { href: "/pricing", label: "Pricing" },
   { href: "/#faq", label: "FAQ", anchor: "faq" },
 ]
 

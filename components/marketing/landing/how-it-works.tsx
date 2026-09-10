@@ -28,10 +28,10 @@ export function HowItWorks() {
     <section id="how" className="bg-cream-50 py-14 md:py-22">
       <div className="mx-auto max-w-6xl px-5">
         <h2 className="font-display text-[clamp(1.9rem,3vw,2.6rem)] font-bold leading-[1.1] tracking-[-0.03em] text-stone-900">
-          Your part is three of them
+          The whole loop, in three acts
         </h2>
         <p className="mt-3 max-w-[46rem] text-[1.02rem] leading-[1.6] text-stone-600">
-          The AP loop in three glances. Every act is broken down step-by-step just below.
+          Seven steps run the loop — your part is these three. Each act is broken down step-by-step just below.
         </p>
         <div className="mt-9 grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-5">
           {ACTS.map((act) => (
