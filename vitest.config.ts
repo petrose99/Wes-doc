@@ -10,6 +10,9 @@ export default defineConfig({
       // test of the route itself is the only verification available before one exists — not a
       // general invitation to unit-test app/api/**, which this repo otherwise deliberately doesn't.
       "app/api/inbound-email/**/*.test.ts",
+      // WP-AP1: POST /api/v1/documents is the second AP-flow ingestion channel (after email);
+      // its route tests follow the same shipped-dark pattern as inbound-email above.
+      "app/api/v1/documents/**/*.test.ts",
     ],
     // SECRETS_ENCRYPTION_KEY is a fixed test-only key (never used outside vitest) so tests that
     // round-trip lib/secret-crypto.ts (webhook secrets, integration OAuth tokens) don't each need
