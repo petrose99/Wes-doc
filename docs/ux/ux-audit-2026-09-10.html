@@ -1,0 +1,359 @@
+<title>DocuBite UX Audit</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --ground:#f7f9f8; --panel:#ffffff; --ink:#1c2620; --muted:#5b6a62;
+  --line:#dfe6e2; --accent:#0e7a52; --accent-soft:#e3f1ea;
+  --warn:#9a5b08; --warn-soft:#f6ecd9; --crit:#b3352c; --crit-soft:#f8e7e5;
+  --ok:#256e46; --ok-soft:#e3f1ea; --code-bg:#eef2ef;
+}
+:root:not([data-theme="light"]){}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#131917; --panel:#1b2320; --ink:#e6ece8; --muted:#94a39b;
+    --line:#2c3833; --accent:#4cc492; --accent-soft:#1d3229;
+    --warn:#e0a95c; --warn-soft:#33291a; --crit:#e08078; --crit-soft:#38211f;
+    --ok:#6fce9f; --ok-soft:#1d3229; --code-bg:#232d29;
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#131917; --panel:#1b2320; --ink:#e6ece8; --muted:#94a39b;
+  --line:#2c3833; --accent:#4cc492; --accent-soft:#1d3229;
+  --warn:#e0a95c; --warn-soft:#33291a; --crit:#e08078; --crit-soft:#38211f;
+  --ok:#6fce9f; --ok-soft:#1d3229; --code-bg:#232d29;
+}
+body{background:var(--ground);color:var(--ink);font:16px/1.6 "IBM Plex Sans",system-ui,sans-serif;margin:0;}
+main{max-width:780px;margin:0 auto;padding:48px 24px 80px;}
+h1,h2,h3{font-family:"Sora","IBM Plex Sans",sans-serif;text-wrap:balance;line-height:1.2;}
+h1{font-size:2rem;margin:8px 0 4px;}
+h2{font-size:1.3rem;margin:44px 0 6px;padding-top:20px;border-top:1px solid var(--line);}
+h3{font-size:1.02rem;margin:22px 0 6px;}
+p{margin:8px 0;}
+.eyebrow{font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:600;}
+.sub{color:var(--muted);margin-top:2px;}
+.verdict{display:flex;gap:14px;align-items:flex-start;background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--warn);border-radius:10px;padding:16px 18px;margin:26px 0 6px;}
+.verdict strong{font-family:"Sora",sans-serif;}
+code{font:.86em "IBM Plex Mono",monospace;background:var(--code-bg);border-radius:4px;padding:1px 5px;}
+.chip{display:inline-block;font:600 .7rem/1 "IBM Plex Sans",sans-serif;letter-spacing:.06em;text-transform:uppercase;border-radius:999px;padding:4px 9px;vertical-align:2px;margin-right:6px;}
+.chip.high{background:var(--crit-soft);color:var(--crit);}
+.chip.med{background:var(--warn-soft);color:var(--warn);}
+.chip.low{background:var(--accent-soft);color:var(--accent);}
+.chip.good{background:var(--ok-soft);color:var(--ok);}
+ul{margin:6px 0 14px;padding-left:22px;}
+li{margin:5px 0;}
+li::marker{color:var(--muted);}
+.finding{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 18px;margin:12px 0;}
+.finding h3{margin:0 0 4px;}
+.finding p{color:var(--ink);}
+.where{font-size:.85rem;color:var(--muted);}
+.priority{counter-reset:pr;list-style:none;padding:0;}
+.priority li{counter-increment:pr;display:flex;gap:14px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 18px;margin:10px 0;}
+.priority li::before{content:counter(pr);font:700 1rem/1.9 "Sora",sans-serif;color:var(--accent);background:var(--accent-soft);border-radius:8px;min-width:34px;height:34px;text-align:center;flex-shrink:0;}
+table{border-collapse:collapse;width:100%;font-size:.92rem;margin:10px 0;}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top;}
+th{font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);}
+.tablewrap{overflow-x:auto;}
+footer{margin-top:56px;padding-top:16px;border-top:1px solid var(--line);color:var(--muted);font-size:.85rem;}
+</style>
+<main>
+<div class="eyebrow">UX audit · awesome-ux-skills frameworks · 10 Sep 2026</div>
+<h1>DocuBite UX Audit</h1>
+<p class="sub">Live walkthrough of the local build (landing, sign-in, dashboard, Extraction, document detail, Bills, Sheets, Automation) audited against Nielsen's 10 heuristics, the cognitive-load → conversion model, and the 12 visual-craft rules.</p>
+
+<div class="verdict">⚠️ <div><strong>Several issues to address.</strong> The visual system is coherent and most states are designed — but the document lifecycle is described in four competing vocabularies, several empty states actively mislead, and one real crash reached the generic error page during the walkthrough.</div></div>
+
+<h2>Heuristic review (Nielsen)</h2>
+
+<div class="finding"><h3><span class="chip high">High</span>H4 · Four vocabularies for one lifecycle</h3>
+<p>The same pipeline is named differently on every surface: tabs say <em>Processing / To review / Ready</em>, status chips say <em>reviewed</em>, the stat strip says <em>ready / auto-pushed / extracted</em>, and Automation says <em>Ready to sync / Blocked by a failed check / Waiting to be evaluated</em>. Worst case observed: the strip reads <strong>“0 ready”</strong> directly beneath a tab labeled <strong>“Ready 7”</strong> — two different definitions of “ready” two lines apart.</p>
+<p class="where"><code>components/pipeline/pipeline-shell.tsx:53</code> vs the stage tabs; Automation overview cards.</p></div>
+
+<div class="finding"><h3><span class="chip high">High</span>H1/H9 · Misleading and dead-end empty states</h3>
+<ul>
+<li>Extraction’s default tab (Processing) with zero documents says <em>“Documents are being processed”</em> — it claims work is happening when nothing is. (<code>components/pipeline/document-list.tsx:56</code>)</li>
+<li>Bills with no data at all says <em>“No bills match the current filter”</em> under the default <em>All</em> filter — the user hasn’t filtered anything. (<code>bills/page.tsx</code>)</li>
+<li>The crash page (<em>“Oops! Something went wrong… our team has been notified”</em>) offers only <em>Go Home</em>: no error reference, no retry, no support path.</li>
+</ul></div>
+
+<div class="finding"><h3><span class="chip high">High</span>H9 · Real crash reproduced: stale identity link hard-crashes the whole app shell</h3>
+<p>Signing in as the seeded demo user whose local row pointed at an outdated Supabase identity threw <code>email_already_linked_to_different_identity</code> from <code>models/users.ts:73</code> — and because <code>AppLayout</code> calls <code>getCurrentUser</code>, <em>every</em> page rendered the generic crash screen with no recovery path. A guarded auth conflict deserves a designed screen (“this email is linked to another sign-in — contact support / sign out”), not the 500 boundary. (Worked around locally by re-pointing <code>users.supabase_user_id</code>.)</p></div>
+
+<div class="finding"><h3><span class="chip med">Med</span>H6 · Table promises data it doesn’t show</h3>
+<p>On the Ready list, <em>TOTAL</em> renders “—” and <em>READINESS</em> is blank for all 7 seeded documents even though the extractions contain totals (Acme Corp: 5175.00 shows fine on the detail page). Either surface the values or drop the columns — an all-dash column trains users to ignore the table.</p></div>
+
+<div class="finding"><h3><span class="chip med">Med</span>H4/H8 · “Approvals” exists twice in the sidebar</h3>
+<p>The sidebar has <em>Approvals</em> (→ <code>/automation/approvals</code>) and <em>Automation</em>, whose page repeats an <em>Approvals</em> tab. Two entries, one destination family — pick one home and cross-link from the other.</p></div>
+
+<div class="finding"><h3><span class="chip med">Med</span>H2 · Vocabulary drift from the user’s world</h3>
+<ul>
+<li>Automation subtitle: “How much of the last 30 days of <em>coding</em> went through…” — GL coding is right for AP, but sitting alone it reads as software development; “invoice coding” disambiguates for one extra word.</li>
+<li>Document detail asks “What type of document is this? <em>Expense / Sale / Bank Statement / Other</em>” while the rest of the product says Bills, invoices, receipts — the chips don’t use the nouns the app taught two screens earlier.</li>
+</ul></div>
+
+<div class="finding"><h3><span class="chip low">Low</span>H1 · Slow navigations feel dead in dev</h3>
+<p>Route changes routinely took 10–60&nbsp;s (cold Turbopack compiles on the memory-constrained machine) with no in-app pending indicator; <code>loading.tsx</code> boundaries exist, so verify skeletons actually show on production latencies — the sidebar item doesn’t take an active state until the new page commits.</p></div>
+
+<div class="finding"><h3><span class="chip good">Good</span>What’s already working</h3>
+<ul>
+<li>Bulk actions (Store to Library, Delete…) correctly disabled until a row is selected; destructive Delete is visually distinct and confirmed via dialog.</li>
+<li>Sheets’ empty page is a model empty state: three concrete creation paths, one carrying a live “7 documents ready to pull in” badge.</li>
+<li>Responsive layout exists (bottom tab bar at narrow widths); dialogs use a disciplined two-step z-index scale, not an arms race.</li>
+</ul></div>
+
+<h2>Cognitive load → conversion</h2>
+
+<h3>Extraneous load found</h3>
+<ul>
+<li><strong>Eight identical “Extracted” badges</strong> on the document detail — one per field. A single “All 8 fields extracted” note (with badges only on <em>low-confidence</em> fields) inverts the signal so attention lands where review is needed.</li>
+<li><strong>Dashboard repeats itself:</strong> the three big stat cards (Documents this month / In review / Ready) are immediately followed by a strip re-stating the same three numbers (Added / Review / Sheets). Same figures twice on one screen, two label sets.</li>
+<li><strong>Ready-tab toolbar mixes a setting with actions:</strong> “7 documents ready · Auto-stored to Docu Library after [24 hours ▾] · Push to Docu Library · Push to Accounting” packs a persistent workspace setting (retention dropdown) between one-shot actions in a single green strip. The setting belongs in Settings or behind a gear.</li>
+</ul>
+
+<h3>Mental-model gaps</h3>
+<ul>
+<li>Landing on <em>Processing</em> (empty) when all content sits in <em>Ready</em> forces the first click to be navigation recovery. Default the stage to the first non-empty tab.</li>
+<li>“Touchless rate”, “auto-pushed”, “published untouched” — three coinages for the same concept across Extraction and Automation.</li>
+</ul>
+
+<h3>Offloading opportunities</h3>
+<ul>
+<li>Automation’s hero bar chart renders as one undifferentiated gray bar at 0% with a three-item legend; at the empty/zero state, replace it with a sentence (“Nothing has qualified for touchless publishing yet — suppliers earn trust after 3 reviewed documents”) that the Supplier-trust card already writes well.</li>
+<li>Date fields show <code>15/07/2026</code> in the detail while lists say “4 minutes ago” — fine, but currency and totals should be computed onto the list (see H6) so users don’t open 7 documents to compare amounts.</li>
+</ul>
+
+<h2>Craft (12 rules)</h2>
+<p>Verdict: <strong>⚠️ a few rough edges</strong> — the neutral ramp, spacing scale, and elevation language are genuinely consistent.</p>
+<div class="tablewrap"><table>
+<tr><th>Rule</th><th>Where</th><th>Fix</th></tr>
+<tr><td><strong>R3</strong> no <code>transition: all</code></td><td>9+ components, e.g. <code>components/shell/account-menu.tsx:45</code>, <code>components/pipeline/document-detail/split-pane.tsx:236,247</code>, <code>components/files/sheets-create-card.tsx:102</code></td><td><code>transition-[background-color,border-color,box-shadow] duration-150</code> (and <code>flex-basis</code> explicitly for the split pane)</td></tr>
+<tr><td><strong>R1</strong> gradients</td><td><code>components/shell/sidebar.tsx:128</code> (<code>from-[#f4f7f9] to-[#eef2f6]</code>), <code>assistant-panel.tsx:131</code></td><td>Both are near-invisible fades — flatten to the midpoint (<code>#f1f5f8</code>) and spend the difference on the hairline border</td></tr>
+<tr><td><strong>R11</strong> states</td><td>Ready-list rows</td><td>Row click gives no pressed/pending state while the detail route loads; add an active row highlight</td></tr>
+<tr><td><strong>R6/R7/R8</strong></td><td>—</td><td>Clean: z-scale stops at 101 with local stacking, neutrals are a tuned slate ramp, spacing is on-scale</td></tr>
+</table></div>
+
+<h2>Landing page</h2>
+<p><strong>Verdict: ✅ strong, with three fixable gaps.</strong> Full-length pass (hero through FAQ and closing CTA).</p>
+<h3>What's genuinely good — keep all of it</h3>
+<ul>
+<li><strong>Honesty as a feature:</strong> “Not on the list, on purpose: DocuBite does not move money, does not issue cards, does not hold funds” — a limitation presented as the reason it works across SA/Lesotho/Namibia/Eswatini. Model Rams-principle-6 copy.</li>
+<li><strong>The closing CTA is the best conversion copy on the page:</strong> “Start with one messy folder. Upload the worst one you have. If the report doesn't tell you something you didn't know, you've lost ten minutes.” Low commitment, falsifiable promise.</li>
+<li><strong>Product mockups carry the trust model:</strong> the extraction demo shows a PO field held back at 61% confidence (“waiting for you rather than sitting in your books”) — the AI's fallibility handling is demonstrated, not claimed. The app itself should be this explicit (see AI review).</li>
+<li>Hero CTA pairing (“no card required · private encrypted storage”), the by-hand-vs-DocuBite three moments, and FAQ questions that are the real questions (“Does DocuBite move money?”).</li>
+</ul>
+<h3>Gaps</h3>
+<ul>
+<li><strong>No pricing signal anywhere</strong> (high). A finance buyer's first qualification question is unanswerable on the page — no price, no tier names, no “from R…/mo”. On a 12-screen page that otherwise answers everything, silence on price reads as “expensive” and pushes qualified SMBs to bounce rather than book a demo.</li>
+<li><strong>Two competing narrative spines back-to-back</strong> (medium): “The AP loop — seven steps” is immediately followed by “Three steps, and none of them is data entry.” Same product, 7-step and 3-step mental models in consecutive sections. Pick one as the page spine and demote the other to a detail.</li>
+<li><strong>No social proof</strong> (medium): no customers, numbers, or testimonials on the entire page — every trust claim is self-asserted. Even one concrete figure near the commitment point (“X documents processed”, a pilot customer quote) would carry more than another feature section.</li>
+<li><strong>Implementation jargon leaks</strong> (low): the multi-currency section names Frankfurter and fxratesapi — rate-provider plumbing buyers don't need; “Provenance” as a nav label is archivist vocabulary for an SMB audience (“Where numbers come from” is the section's own, better, phrasing).</li>
+<li><strong>Only two CTA locations</strong> (low) — hero and footer, ~12 screens apart; add one after the AP-loop section.</li>
+</ul>
+<p><strong>The connective insight:</strong> the landing page already names the lifecycle better than the app does — Capture → Code → Check → Match → Approve → Sync → Pay-ready. The app's four-vocabulary problem could be solved by adopting the marketing page's own seven words (or the proposal's five) as the single glossary, so the product a user meets after the trial matches the story that sold them.</p>
+
+<h2>Accessibility (WCAG 2.1 A/AA)</h2>
+<p><strong>Verdict: accessibility risks to fix.</strong> The foundation is real — <code>html lang="en"</code>, no alt-less images, 38 components carry <code>aria-label</code>s, dialogs declare <code>role="dialog"/"alertdialog"</code> + <code>aria-modal</code>, toasts go through sonner (which announces politely).</p>
+<h3>Likely WCAG issues</h3>
+<ul>
+<li><strong>No skip link</strong> — 2.4.1 A. The 11-item sidebar precedes main content on every page; keyboard users tab through it every time.</li>
+<li><strong>Focus visibility gaps</strong> — 2.4.7 AA. Only 6 files use <code>focus-visible</code>; bare <code>outline-none</code> without a focus replacement on the search inputs (<code>search-client.tsx:46</code>, <code>global-search.tsx:88</code>, <code>add-documents-dialog.tsx:101</code>) — verify the wrapper carries a focus ring.</li>
+<li><strong>Placeholder-only labels</strong> — 3.3.2 A. “Folder name” (<code>files-browser.tsx:402</code>), “Add people by email” (<code>share-dialog.tsx:116</code>), and the search fields have no persistent label.</li>
+<li><strong>No live regions</strong> — 4.1.3 AA. Zero <code>aria-live</code>/<code>role="status"</code> in components; extraction progress and stage-count changes are not announced (sonner covers only toasted events).</li>
+</ul>
+<h3>Needs implementation verification</h3>
+<ul>
+<li><code>components/ui/dialog.tsx</code> has correct roles but no visible focus trap, initial focus, or focus return — keyboard-trap/focus-order risk (2.1.2, 2.4.3).</li>
+<li>Contrast of the smallest gray metadata (“4 minutes ago”, stat-strip labels) against 4.5:1 — measure before claiming a failure.</li>
+</ul>
+
+<h2>Dieter Rams review</h2>
+<p><strong>Core job:</strong> get a supplier's bill from an email into the ledger, coded and approved, with as few human touches as trust allows.</p>
+<div class="tablewrap"><table>
+<tr><th>Principle</th><th>Score</th><th>One line</th></tr>
+<tr><td>1 · Innovative</td><td>Strong</td><td>Touchless publishing gated by an earned supplier-trust ladder is a real capability, not bolted-on AI.</td></tr>
+<tr><td>2 · Useful</td><td>Strong</td><td>Add documents is the only filled button on every screen; the core path is never crowded by upsells.</td></tr>
+<tr><td>3 · Aesthetic</td><td>Strong</td><td>One emerald accent, tuned slate ramp, 4px grid, border-based elevation — consistent everywhere audited.</td></tr>
+<tr><td>4 · Understandable</td><td><strong>Weak</strong></td><td>Four vocabularies for one lifecycle; “coding”; Expense/Sale chips that don't match the product's own nouns.</td></tr>
+<tr><td>5 · Unobtrusive</td><td>Strong</td><td>Quiet chrome, no autoplay, no interruptions; the one welcome tour is dismissible.</td></tr>
+<tr><td>6 · Honest</td><td>Strong</td><td>Automation states “0 of 7 documents published themselves” plainly; no fake urgency anywhere; “no card required” is honored.</td></tr>
+<tr><td>7 · Long-lasting</td><td>Adequate</td><td>Durable patterns, no trend-chasing; the near-invisible gradients are the only fashion residue.</td></tr>
+<tr><td>8 · Thorough</td><td><strong>Weak</strong></td><td>Empty TOTAL column, blank READINESS, contradictory “0 ready”, misleading inbox empty state, app-wide crash on an auth edge — unfinished details are exactly what this principle measures.</td></tr>
+<tr><td>10 · As little as possible</td><td>Adequate</td><td>Mostly restrained, but: duplicate Approvals nav, dashboard numbers stated twice, 8 identical badges per document.</td></tr>
+</table></div>
+<p><strong>The one edit:</strong> delete the redundancies (duplicate nav entry, repeated dashboard strip, per-field badges) — the strongest Rams move here is subtraction, and all three are deletions.</p>
+
+<h2>Persuasive UX (Fogg's 7 tools)</h2>
+<ul>
+<li><strong>Self-monitoring</strong> — the supplier-trust ladder is the product's best motivation mechanic but lives as prose at the bottom of Automation. → Show per-supplier progress (“2 of 3 reviews until Acme publishes untouched”) on the Vendors tab and in the review flow. <em>Why it works: reviewers see each review buying future automation, which reframes review work as progress rather than toil.</em></li>
+<li><strong>Conditioning</strong> — the first touchless publish is the product's “aha” and currently passes silently into a stat. → Celebrate it once, lightly (a toast naming the supplier and what earned it). <em>Why it works: reinforces the exact behavior (consistent review) that feeds the automation loop.</em></li>
+<li><strong>Suggestion</strong> — the dashboard's “Set up supplier rules to auto-code documents” nudge appears when spend is empty, i.e. before it's actionable. → Move the prompt to the moment a second document from the same supplier is coded by hand. <em>Why it works: kairos — the prompt lands exactly when the user has just done the thing the rule would automate.</em></li>
+<li><em>Flag:</em> no dark-pattern risk found — no fake urgency, pre-checked options, or roach-motel flows on any audited screen.</li>
+</ul>
+
+<h2>AI product review (general-design-review lens)</h2>
+<p><strong>Verdict: needs work</strong> — controls are genuinely strong, disclosure is thin.</p>
+<ul>
+<li><strong>Control (strong — keep):</strong> the sheet assistant uses write-then-undo with a persistent pending-changes bar (<code>components/assistant/pending-changes-bar.tsx</code>), and finance actions use confirm-before-execute proposals (<code>finance-proposal.tsx</code>) — textbook governors, correctly calibrated (cheap cell edits get undo, ledger writes get approval).</li>
+<li><strong>Trust (gap):</strong> no “AI can make mistakes”-class caveat exists anywhere in the assistant or sheet components (grep confirms), and extraction confidence is shown per field in the detail but never rolled up into the list's blank READINESS column — the one place a reviewer would triage by it.</li>
+<li><strong>Scope/steering (verify):</strong> no visible stop/abort control in the assistant panel while a chained tool loop runs; verify a user can interrupt a long run.</li>
+<li><strong>Disclosure (adequate):</strong> the =AI() formula and assistant are plainly AI by name and context; automation results are logged per document (footprints via the Activity page).</li>
+</ul>
+
+<h2>Design analysis (measured tokens)</h2>
+<p>Measured from the code rather than screenshots (same data, exact values): accent <code>emerald-600≈#059669</code> family with soft tints for chips; neutrals are the Tailwind slate ramp plus custom hairlines <code>#e6ebf1</code>/<code>#dbe3ea</code>; type is Inter (5 weights, self-hosted) + a display face via CSS variables; spacing observed on the 4px scale throughout; radius vocabulary <code>rounded-lg/xl</code> + one <code>rounded-[11px]</code> outlier (<code>account-menu.tsx:45</code>); elevation = hairline borders, with shadow reserved for menus/dialogs (<code>shadow-2xl</code>) — consistent with the craft findings. <em>Feature-prioritization remains the one unrun skill: its weighted matrix needs business weights (revenue impact vs. churn risk vs. compliance) that only you can set; the effort×reward grid below is the code-informed substitute.</em></p>
+
+<h2>Document journey (research &amp; strategy pass)</h2>
+<p><strong>Problem statement</strong> (Double Diamond, Define): <em>A bookkeeper processing supplier bills needs to see where each document is in its lifecycle and what is blocking it, because the product presents seven parallel destinations (Extraction, Bills, Sheets, Docu Library, Accounting, Approvals, Automation) for what is actually one linear flow — so they carry the pipeline in their head instead of seeing it on screen.</em></p>
+
+<p><strong>Actor: Naledi</strong> (proto-persona below) — owner-bookkeeper, does the books alone in one Friday-afternoon sitting. <strong>Scenario:</strong> supplier bills arrived by email through the week; she expects to clear all of them in one session and end knowing nothing slipped. One map, one actor — the team variant follows.</p>
+
+<div class="tablewrap"><table>
+<tr><th></th><th>Arrive (all week)</th><th>Extract</th><th>Review (Friday)</th><th>Approve &amp; match</th><th>Sync &amp; pay</th></tr>
+<tr><td><strong>Actions</strong></td><td>Forwards each bill as it lands; spot-checks the inbound address worked</td><td>Nothing — extraction runs before she next logs in</td><td>Opens Extraction to batch-review the week's pile; lands on the empty Processing tab first</td><td>Approves her own work; hunts across Approvals, Automation and Bills for anything held back</td><td>Checks sync into her ledger, exports the EFT payment file</td></tr>
+<tr><td><strong>Mindset</strong></td><td>“Did it arrive? I won't look again until Friday.”</td><td>—</td><td>“Show me only what needs me — I have one afternoon.”</td><td>“Why isn't this a bill yet? Approval routing is overhead when the approver is me.”</td><td>“Is the ledger clean enough to hand to my accountant?”</td></tr>
+<tr><td><strong>Emotion</strong></td><td>Neutral</td><td>—</td><td>Dip — wrong tab, misleading copy, no totals to triage the batch by</td><td><strong>Low point</strong> — status scattered across three pages, three vocabularies, for approvals she gives herself</td><td>Recovering — if the sync worked</td></tr>
+</table></div>
+
+<p><strong>Team variant — Thabo (AP clerk) with Lerato (controller):</strong> same phases, two differences. <em>Review</em> is daily queue work, not a weekly batch — so list triage (amount, due date, confidence) matters more than batch totals. And <em>Approve &amp; match</em> splits across people: Thabo's low point isn't finding status for himself but <strong>answering for it</strong> (“where is the CloudHost bill?” — see storyboard), and Lerato's entire product experience is the approval surface, so approvals buried inside Automation buries her whole product. The proposed stage indicator serves both maps: for Naledi it collapses stages she performs alone into one glance; for Thabo it names who holds the document (“Awaiting approval — Lerato”).</p>
+
+<p><strong>Opportunities (mapped to phases):</strong></p>
+<ul>
+<li><strong>Arrive/Extract:</strong> land on the stage with content; make the inbound-email receipt visible (“received 2 min ago, extracting”).</li>
+<li><strong>Review:</strong> roll per-field confidence up into the list so the reviewer triages by it (the blank READINESS column's real job).</li>
+<li><strong>Approve &amp; match (the valley):</strong> restructure the nav so lifecycle stages are one “Documents” spine (Inbox → Review → Approve → Ready to pay → Done) and Library/Sheets/Accounting/Automation become secondary sections; give every document a stage indicator on its detail page (“Extracted ✓ → Checks ✓ → Awaiting approval → Sync → Pay”). This single change dissolves the duplicate-Approvals nav and forces the one-glossary fix.</li>
+<li><strong>Sync &amp; pay:</strong> the bill row should carry its ledger-sync state inline rather than asking the user to cross-check Accounting.</li>
+</ul>
+<h3>Proposed structure (before → after)</h3>
+<div class="tablewrap"><table>
+<tr><th>Today's sidebar (7 parallel destinations)</th><th>Proposed (one lifecycle spine + tools)</th></tr>
+<tr><td>Dashboard<br>Extraction<br>Bills<br>Sheets<br>Docu Library<br>Accounting<br>Approvals<br>Automation</td><td><strong>Dashboard</strong><br><strong>Documents</strong> — Inbox → Review → Approve → Ready to pay → Done (one staged surface; absorbs Extraction, Approvals, and Bills' aging view)<br><em>Tools:</em> Sheets · Docu Library · Accounting · Automation (settings/monitoring only — its Review-queue and Approvals tabs move into the spine)</td></tr>
+</table></div>
+<ul>
+<li><strong>Every document gets a stage indicator</strong> on its detail page — “Extracted ✓ → Checks ✓ → Awaiting approval → Sync → Pay” — so “where is my bill and what's blocking it” is answered on the document itself, not by touring three pages.</li>
+<li><strong>The five spine words become the single glossary</strong> inherited by tabs, chips, stat strips, and Automation cards — the four-vocabulary problem can't regrow.</li>
+<li><strong>Implementation cost is lower than it looks</strong> (code-checked): the whole rail is declared in one component (<code>components/shell/sidebar.tsx</code>) with module entries fed from a single registry (<code>lib/modules</code>), so the restructure is a one-file nav change plus routing; the stage indicator is one new component fed by state Automation already computes (“every extracted document lands in exactly one of these three states”). The real work is the glossary rename, already scoped under “Plan it in”.</li>
+</ul>
+<p><em>Research to run before committing (ux-research-methods): this map is inference from the live product, not user data. Validate with 3–5 interviews (“walk me through the last bill you chased”) and a tree test of the proposed Documents spine vs. the current seven-item sidebar.</em></p>
+
+<h2>Proto-personas (inferred — validate with interviews)</h2>
+<p>Per ux-personas' own rule these are <strong>proto-personas</strong>: inferred from the product's framing (AP loop, ZA EFT payment runs, QuickBooks/Xero/Bigcapital sync) and typical accounting/finance roles, not from user research. They cover the two shapes the product must serve: one person wearing every hat, and a team where stages are different people.</p>
+
+<div class="finding"><h3>Naledi, 38 — owner &amp; bookkeeper, 6-person services firm</h3>
+<p>“<em>I do the books on Friday afternoons. If something needs chasing, it waits a week.</em>”</p>
+<ul>
+<li><strong>Goals:</strong> clear every bill in one sitting; trust that nothing slipped; hand her accountant a clean ledger.</li>
+<li><strong>Frustrations:</strong> can't tell at a glance what still needs her; anything that takes touring multiple pages doesn't fit a Friday-afternoon session.</li>
+<li><strong>Behaviors:</strong> forwards supplier emails as they arrive, processes in one weekly batch; approves her own work (approval routing is overhead to her).</li>
+<li><strong>Context:</strong> laptop, weekly, alone — she is uploader, reviewer, approver, and payer. The lifecycle spine must collapse gracefully when every stage is the same person.</li>
+</ul></div>
+
+<div class="finding"><h3>Thabo, 29 — AP clerk, 80-person company, finance team of 3</h3>
+<p>“<em>My job is the queue. If the controller asks where an invoice is, I must answer in one look.</em>”</p>
+<ul>
+<li><strong>Goals:</strong> empty the review queue daily; route bills over threshold to the controller; never be the reason a supplier calls.</li>
+<li><strong>Frustrations:</strong> status scattered across Extraction, Approvals and Bills; “0 ready under Ready 7” type contradictions make him distrust the counts he reports upward.</li>
+<li><strong>Behaviors:</strong> in the product daily; lives in lists; triages by amount and due date — which is why the blank TOTAL column hurts him most.</li>
+<li><strong>Context:</strong> desktop, all day. He hands off to Lerato (controller, 45) who only ever opens the product to approve — her entire experience is the approval surface, so a buried Approvals page is <em>her whole product</em> being buried.</li>
+</ul></div>
+
+<h2>Storyboard: Thabo chases one invoice (current UI)</h2>
+<p><em>Ideation-fidelity storyboard (speculative — from the live walkthrough, not observed users). One persona, one path: the controller asks “where is the CloudHost invoice?”</em></p>
+<div class="tablewrap"><table>
+<tr><th>Panel</th><th>Scene</th><th>Caption</th><th>Emotion</th></tr>
+<tr><td>1</td><td>Desk, two monitors. Chat message from Lerato: “Where's the CloudHost bill? Supplier is asking.”</td><td>• Needs one answer: what stage, what's blocking.</td><td>😐</td></tr>
+<tr><td>2</td><td>Opens Extraction. Lands on empty Processing tab: “Documents are being processed.”</td><td>• Wrong tab, misleading copy.<br>• Clicks over to Ready, finds the row — no total, blank readiness.</td><td>😟</td></tr>
+<tr><td>3</td><td>Opens Automation → sees “Waiting to be evaluated: 7”. Opens Approvals — different words again.</td><td>• Three pages, three vocabularies, still no per-document answer.</td><td>😤</td></tr>
+<tr><td>4</td><td>Opens Bills, cross-references the aging buckets, finally reconstructs the status himself.</td><td>• Answers Lerato several minutes later, from memory and inference.</td><td>😟</td></tr>
+<tr><td>5</td><td><em>Proposed:</em> opens the document; stage indicator reads “Extracted ✓ → Checks ✓ → <strong>Awaiting approval (Lerato)</strong> → Sync → Pay”.</td><td>• One look, one answer — pastes it into chat.</td><td>😊</td></tr>
+</table></div>
+<p>The storyboard makes the prioritization argument visual: panels 2–4 are the emotional valley the journey map identified, and the single proposed change (panel 5) removes all three.</p>
+
+<h2>What to fix first (effort × reward, code-checked)</h2>
+<h3>Do first — low effort, high reward</h3>
+<ol>
+<li><strong>Fix the two lying empty states</strong> — copy-only edits in <code>document-list.tsx:56</code> and the Bills page string. Pays off because they sit on every new user's first screen.</li>
+<li><strong>Rename the stat-strip “ready”</strong> — one line in <code>pipeline-shell.tsx:53</code>; kills the “0 ready under Ready 7” contradiction today, ahead of the full glossary work.</li>
+<li><strong>Default Extraction to the first non-empty stage</strong> — the stage is already a URL param the server page reads; pick the default from the counts it already fetches.</li>
+<li><strong>Add a skip link + focus rings on the three bare inputs</strong> — one layout element and three class edits.</li>
+<li><strong>Drop the duplicate sidebar “Approvals” entry and the dashboard's repeated stat strip</strong> — deletions, not builds.</li>
+</ol>
+<h3>Do next</h3>
+<ul>
+<li><strong>Collapse the 8 “Extracted” badges</strong> — low effort (single <code>field-row.tsx</code> render), medium reward.</li>
+<li><strong>Replace <code>transition-all</code> in 9 components</strong> — low effort, mechanical; low-medium reward.</li>
+<li><strong>Designed screen for the identity-conflict error</strong> — medium effort (catch in <code>lib/auth.ts</code> + one page), high reward: it currently takes down every route.</li>
+<li><strong>Dialog focus management</strong> — medium reward, and <em>looks hard, isn't</em>: every dialog flows through the one <code>components/ui/dialog.tsx</code>, so trap/restore lands everywhere at once.</li>
+</ul>
+<h3>Plan it in</h3>
+<ul>
+<li><strong>One lifecycle glossary</strong> — high reward but real work: tabs, chips, stat strip, six Automation cards, and marketing copy all carry stage names; do it once, with a written glossary, not piecemeal.</li>
+<li><strong>TOTAL/READINESS columns</strong> — <em>looks easy, isn't</em>: the detail page has the totals but the list doesn't, so the list query/serializer isn't carrying extracted fields; that's a data-path change plus a decision about which field is “the” total per template.</li>
+</ul>
+<h3>Skip for now</h3>
+<ul>
+<li><strong>Flattening the sidebar/assistant gradients</strong> — both are near-invisible; cheap but near-zero payoff.</li>
+<li><strong>Relocating the auto-store retention dropdown</strong> — annoying placement, but wait for the Settings IA to firm up rather than moving it twice.</li>
+</ul>
+
+<h2>Specified improvements (ready to apply)</h2>
+<p>The exact changes, written out so they can be applied without re-deriving them. Copy fixes are final wording; code fixes name file and value. <em>Pricing and social proof on the landing page are deliberately excluded — being added separately by the owner.</em></p>
+
+<h3>1 · Empty states that tell the truth</h3>
+<div class="tablewrap"><table>
+<tr><th>Where</th><th>Now</th><th>Change to</th></tr>
+<tr><td><code>components/pipeline/document-list.tsx:56</code> (inbox, empty)</td><td>“Documents are being processed. Upload PDFs or a folder to get started.”</td><td>“Nothing waiting to process. Upload PDFs or a folder — or email bills to your workspace address.”</td></tr>
+<tr><td>Bills page, no bills at all (unfiltered)</td><td>“No bills match the current filter.”</td><td>“No bills yet. Bills appear here once an invoice is extracted and approved.” <em>(keep the current copy only when a filter other than All is active)</em></td></tr>
+<tr><td>Crash page</td><td>“Oops! Something went wrong… our team has been notified.” + Go Home</td><td>Add: “Try again” action, an error reference (the digest Next.js already provides), and a support mailto carrying that reference. Auth-conflict case gets its own page: “This email is already linked to a different sign-in. Sign out and back in, or contact support — nothing in your workspace was changed.”</td></tr>
+</table></div>
+
+<h3>2 · One vocabulary, borrowed from the landing page</h3>
+<ul>
+<li>Glossary (five words, app-wide): <strong>Inbox → Review → Approved → Synced → Paid</strong>. Landing's seven-step loop keeps its marketing granularity but uses the same words for the shared stages (Approve→Approved etc.).</li>
+<li><code>pipeline-shell.tsx:53</code> stat strip: “<strong>0</strong> ready” → “<strong>0</strong> published untouched” (that's what <code>totalReady</code> actually counts), so it can never contradict the Ready tab count above it.</li>
+<li>Document-type chips on the detail page: “Expense / Sale / Bank Statement / Other” → “Bill / Sales invoice / Bank statement / Other” — the nouns the rest of the product uses.</li>
+<li>Automation subtitle: “…the last 30 days of coding…” → “…the last 30 days of <strong>invoice coding</strong>…”.</li>
+</ul>
+
+<h3>3 · Land users on content</h3>
+<ul>
+<li>Extraction default stage: when no <code>?stage=</code> param, pick the first stage with a non-zero count (order: To review → Inbox → Ready); the counts are already fetched for the tab badges.</li>
+<li>Ready list: show extracted <strong>Total</strong> (already on the detail page) and roll per-field confidence into <strong>Readiness</strong> (“8/8 confident” / “1 field low”); until the data path exists, drop both columns rather than shipping dashes.</li>
+</ul>
+
+<h3>4 · Accessibility minimum</h3>
+<ul>
+<li>Skip link, first element in the app layout: <code>&lt;a href="#main" class="sr-only focus:not-sr-only …"&gt;Skip to content&lt;/a&gt;</code> + <code>id="main"</code> on the main region.</li>
+<li>The three bare inputs (<code>search-client.tsx:46</code>, <code>global-search.tsx:88</code>, <code>add-documents-dialog.tsx:101</code>): keep <code>outline-none</code> only if the wrapper gains <code>focus-within:ring-2 focus-within:ring-emerald-200</code>.</li>
+<li>Persistent labels (visible or <code>sr-only</code>) for “Folder name” and “Add people by email”; <code>aria-live="polite"</code> region announcing stage-count changes and extraction completion.</li>
+<li><code>components/ui/dialog.tsx</code>: initial focus to the dialog, focus trapped while open, returned to the opener on close, Escape closes — one shared component fixes every dialog.</li>
+</ul>
+
+<h3>5 · Deletions (Rams edit)</h3>
+<ul>
+<li>Sidebar: remove the standalone <strong>Approvals</strong> entry; Automation keeps its Approvals tab (or, with the nav restructure, both fold into the Documents spine).</li>
+<li>Dashboard: delete the Added/Review/Sheets strip that restates the three stat cards above it.</li>
+<li>Document detail: replace 8 per-field “Extracted” badges with one line — “All 8 fields extracted” — and badge only low-confidence fields (“Check this · 61%”), matching the landing page's own demo.</li>
+</ul>
+
+<h3>6 · Landing page (excluding pricing &amp; social proof)</h3>
+<ul>
+<li><strong>One spine:</strong> keep “The AP loop — seven steps” as the page's narrative; retitle “Three steps, and none of them is data entry” to a supporting role — “Your part is three of them” — and visually mark Capture/Review/Approve as the human steps inside the same loop, so the two sections read as one model instead of two.</li>
+<li><strong>De-jargon:</strong> nav label “Provenance” → “Where numbers come from” (the section's own subtitle); drop “Frankfurter” / “fxratesapi” from body copy → “live and historical ECB reference rates” (providers belong in docs).</li>
+<li><strong>Mid-page CTA:</strong> after the AP-loop section, repeat the primary CTA with the closing section's framing (“Start with one messy folder”), so ~12 screens don't separate the two conversion points.</li>
+</ul>
+
+<h3>7 · Craft cleanups</h3>
+<ul>
+<li>Replace <code>transition-all</code> in the 9 flagged components with named properties — buttons/cards: <code>transition-[background-color,border-color,box-shadow,transform] duration-150</code>; the split pane (<code>split-pane.tsx:236,247</code>): transition <code>flex-basis</code> explicitly.</li>
+<li>Flatten the two decorative gradients (<code>sidebar.tsx:128</code> → solid <code>#f1f5f8</code>; assistant header → solid <code>emerald-50</code>).</li>
+<li>Ready-list rows: add an active/pressed state (<code>active:bg-slate-50</code>) so a click registers before the detail route loads.</li>
+</ul>
+
+<h2>Priority actions</h2>
+<ol class="priority">
+<li><div><strong>Unify the lifecycle vocabulary.</strong> One glossary — e.g. <em>Processing → Needs review → Ready → Published</em> — used by tabs, chips, stat strips, and every Automation card. Rename the strip’s “ready” (it means <em>published untouched</em>) so “0 ready” can never sit under “Ready 7”. <em>Impact: high — this is the product’s core object.</em></div></li>
+<li><div><strong>Fix the three lying/dead-end states.</strong> Inbox empty copy (<code>document-list.tsx:56</code>), Bills unfiltered-empty copy, and a designed screen for the <code>email_already_linked_to_different_identity</code> conflict instead of the app-wide crash page. <em>Impact: high — first-session trust.</em></div></li>
+<li><div><strong>Land users on content.</strong> Default the Extraction stage to the first non-empty tab, populate or remove TOTAL/READINESS, and move the auto-store retention dropdown out of the action strip. <em>Impact: medium.</em></div></li>
+</ol>
+
+<footer>Audited with the UI Analysis &amp; Improvement skills from tommyjepsen/awesome-ux-skills — all ten run in full except feature-prioritization (needs business weights only the owner can set) — against the live dev build on branch <code>claude/awesome-ux-skills-review-93f205</code>.</footer>
+</main>
