@@ -70,7 +70,11 @@ export default async function WorkspaceLayout({ children, params }: { children: 
       accountingEnabled={config.integrations.bigcapital.enabled}
       pipelineReviewCount={pipelineCounts.review}
       reviewTaskCount={reviewTaskCount}
-      sheetsUnplacedCount={sheetsUnplacedCount} />
+      sheetsUnplacedCount={sheetsUnplacedCount}
+      /* pipelineCounts.approved is the Approved-stage count from countDocumentsByStage: documents
+       * past review and waiting to push to the ledger. Only meaningful when accountingEnabled;
+       * the sidebar itself hides the Finance badge otherwise. */
+      financePushableCount={pipelineCounts.approved} />
     <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-[radial-gradient(1200px_480px_at_100%_-10%,rgba(4,120,87,0.05),transparent_60%),#fafbfc]">
       <MobileHeader workspaceId={workspaceId} workspaces={switchable} user={{ name: user.name, email: user.email }} />
       <div id="main" role="main" tabIndex={-1} className="flex min-h-0 flex-1 flex-col pb-[72px] md:pb-0">{children}</div>
