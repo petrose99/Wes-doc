@@ -40,6 +40,7 @@ model User {
   workspaceMemberships  WorkspaceMember[]
   sentInvitations       WorkspaceInvitation[] @relation("InvitationSender")
   documentAuditEvents   DocumentAuditEvent[]  @relation("AuditActor")
+  auditEventsActed      AuditEvent[]          @relation("AuditEventActor")
   adminAuditEvents      AdminAuditEvent[]     @relation("AdminAuditActor")
   createdFiles          DocumentFile[]        @relation("FileCreator")
   fileShares            DocumentFileShare[]
@@ -116,6 +117,7 @@ model Workspace {
   files           DocumentFile[]
   jobs            DocumentProcessingJob[]
   auditEvents     DocumentAuditEvent[]
+  workflowAuditEvents AuditEvent[]
   workbooks       SpreadsheetWorkbook[]
   aiFormulaCache  AiFormulaCache[]
   extractionShapes ExtractionShape[]
@@ -832,6 +834,50 @@ model AdminAuditEvent {
   @@index([createdAt])
   @@index([actorId, createdAt])
   @@map("admin_audit_events")
+}
+
+/** Workflow audit trail for the touchless-AP gates (#40) and the close checklist (#42): one row
+ * per state transition on a bill's gate result or a close-item computation/sign-off. Separate
+ * from DocumentAuditEvent, which is the HIPAA §164.312(b) log covering document access; this is
+ * the operational trail auditors and workspace admins read to understand why a bill blocked or
+ * how a period closed. subjectType + subjectId is a soft pointer (not a foreign key) because the
+ * subject may be a bill, close item, or in-flight gate instance whose row lives in another
+ * table, and — like AdminAuditEvent — the subject is sometimes gone by the time anyone reads
+ * the trail. Idempotent by (type, subjectId, payloadHash) so #42's "computed logged only on
+ * value change" rule holds without callers needing to remember to diff first. */
+model AuditEvent {
+  id          String    @id @default(uuid()) @db.Uuid
+  workspaceId String    @map("workspace_id") @db.Uuid
+  /// Nullable because gate/close events emitted by the job worker or a scheduled recompute have
+  /// no user behind them; NOT NULL would force every system emitter to invent a fake actor.
+  actorId     String?   @map("actor_id") @db.Uuid
+  /// The union in lib/audit/events.ts: "gate.blocked" | "gate.overridden" | "gate.resolved" |
+  /// "close.opened" | "close.item.computed" | "close.item.signed" | "close.item.unsigned" |
+  /// "close.item.override" | "close.period.locked" | "close.period.reopened" | "close.period.relocked".
+  /// String, not a Prisma enum, matching DocumentAuditEvent.type — new event types are added
+  /// with a code change and don't need a migration.
+  type        String
+  /// "bill" | "close_item" | "close" | "gate" — namespaces subjectId so the same uuid can
+  /// legitimately appear under two subject types without collision.
+  subjectType String    @map("subject_type")
+  subjectId   String    @map("subject_id") @db.Uuid
+  payload     Json?
+  /// sha256 of the canonicalized payload — the idempotency key. UNIQUE(type, subjectId,
+  /// payloadHash) enforces "same event, same subject, same payload = one row"; a change in any
+  /// field of the payload yields a fresh hash and a new row. Filled by writeAuditEvent, never
+  /// by callers.
+  payloadHash String    @map("payload_hash")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  /// Restrict, not Cascade: workflow evidence must survive the workspace being deleted the same
+  /// way the HIPAA trail does; workspace deletion is expected to archive these first.
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  actor       User?     @relation("AuditEventActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@unique([type, subjectId, payloadHash])
+  @@index([workspaceId, createdAt])
+  @@index([subjectType, subjectId, createdAt])
+  @@index([actorId, createdAt])
+  @@map("audit_events")
 }
 
 /** The spreadsheet behind one file: a Univer `IWorkbookData` snapshot holding every tab, its
