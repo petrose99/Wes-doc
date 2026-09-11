@@ -63,7 +63,7 @@ export default async function ExpenseClaimsPage({ params }: { params: Promise<{ 
           ? <p className="text-sm text-slate-500">No claims yet.</p>
           : <ul className="space-y-3">
               {claims.map((claim) => {
-                const currentStage = claim.workflow && claim.currentStageIndex !== null ? findCurrentStage(claim.workflow.stages, claim.currentStageIndex) : null
+                const currentStage = claim.workflow && claim.currentStageIndex !== null ? findCurrentStage(claim.workflow.stages.map((stage) => ({ ...stage, minAmount: decimalToNumber(stage.minAmount) })), claim.currentStageIndex) : null
                 const canDecideCurrentStage = currentStage ? canDecideStage({ stage: currentStage, actorRole, actorId: user.id }) : actorRole === "owner"
                 return <ExpenseClaimRow
                   key={claim.id}
