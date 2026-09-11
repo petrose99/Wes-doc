@@ -118,3 +118,12 @@ async function upsertGate(
  * singleton (not a class) so the import graph gives us "register once at module load"; tests
  * that need isolation reach for `createGateRegistry()` directly. */
 export const gateRegistry: GateRegistry = createGateRegistry()
+
+// --- Concrete gate registrations ---------------------------------------------------------
+// Each concrete gate ticket (#51–#56) imports its runner and registers it here. Order is the
+// evaluation order at arrival: hard-blocking gates before soft-tunable ones, and warn-checks
+// last so a workspace's own rules never pre-empt a duplicate or a jurisdiction-validity
+// failure the workspace admin didn't author.
+import { warnChecksGateRunner } from "./warn-checks"
+
+gateRegistry.register(warnChecksGateRunner)
