@@ -1,4 +1,5 @@
 import type { ReactNode } from "react"
+import Link from "next/link"
 
 import { AutomationTabs, type AutomationTab } from "@/components/automation/automation-tabs"
 
@@ -31,20 +32,23 @@ const STATE_FILL: Record<AutomationState, string> = {
 /** Page shell. Every tab shares one header, so the four screens stop re-announcing "Automation"
  * and the space goes to the tab's own hero instead. `status` is the one live sentence a person
  * wants before anything else: what the workspace is currently allowed to do on its own. */
-export function AutomationFrame({ workspaceId, active, reviewCount, reviewEnabled, status, children }: {
+export function AutomationFrame({ workspaceId, active, reviewCount, reviewEnabled, status, showSettings = true, children }: {
   workspaceId: string
   active: AutomationTab
   reviewCount: number
   reviewEnabled: boolean
   status: ReactNode
+  /** Settings is an owner-only page (404s for anyone else) — pass false for a non-owner viewer
+   * so the tab link doesn't render a door that slams. */
+  showSettings?: boolean
   children: ReactNode
 }) {
   return <main className="mx-auto w-full max-w-5xl px-4 py-8 md:px-6">
     <header className="mb-5">
-      <h1 className="font-display text-[26px] leading-none font-semibold tracking-tight text-slate-900">Automation</h1>
+      <h1 className="font-display text-[26px] leading-none font-semibold tracking-tight text-slate-900">Controls</h1>
       <p className="mt-2 max-w-[68ch] text-sm leading-relaxed text-slate-600">{status}</p>
     </header>
-    <AutomationTabs workspaceId={workspaceId} active={active} reviewCount={reviewCount} reviewEnabled={reviewEnabled} />
+    <AutomationTabs workspaceId={workspaceId} active={active} reviewCount={reviewCount} reviewEnabled={reviewEnabled} showSettings={showSettings} />
     <div className="mt-8 space-y-10">{children}</div>
   </main>
 }
@@ -130,17 +134,21 @@ export function Ledger({ children }: { children: ReactNode }) {
   return <div className="divide-y divide-[#f1f5f9]">{children}</div>
 }
 
-export function LedgerRow({ label, value, note, share, state = "idle" }: {
+export function LedgerRow({ label, value, note, share, state = "idle", href }: {
   label: ReactNode
   value: ReactNode
   note?: ReactNode
   /** 0–1. Draws a hairline proportion bar beneath the row when given. */
   share?: number
   state?: AutomationState
+  /** When given, the row's figure is what it always was but the row itself becomes a link — a
+   * count like "Blocked in Review 14" is a dead end otherwise, forcing a reader who wants to see
+   * those 14 documents to go hunting for them by hand. */
+  href?: string
 }) {
-  return <div className="py-3 first:pt-0">
+  const body = <>
     <div className="flex items-baseline justify-between gap-4">
-      <span className="text-sm text-slate-700">{label}</span>
+      <span className="text-sm text-slate-700 group-hover:text-slate-900">{label}</span>
       <span className={`text-sm font-semibold tabular-nums ${STATE_INK[state]}`}>{value}</span>
     </div>
     {note && <p className="mt-0.5 text-xs text-slate-500">{note}</p>}
@@ -149,7 +157,11 @@ export function LedgerRow({ label, value, note, share, state = "idle" }: {
         <div className={`h-full ${STATE_FILL[state]}`} style={{ width: `${Math.min(100, Math.max(0, share * 100))}%` }} />
       </div>
     )}
-  </div>
+  </>
+  if (href) {
+    return <Link href={href} className="group -mx-1 block rounded px-1 py-3 first:pt-0 hover:bg-slate-50">{body}</Link>
+  }
+  return <div className="py-3 first:pt-0">{body}</div>
 }
 
 /** State marker for table rows. Reads as a word plus a colour, never colour alone. */
@@ -176,7 +188,7 @@ export function Sheet({ head, children, minWidth = 560 }: { head: ReactNode; chi
 }
 
 export function Th({ children, align = "left" }: { children: ReactNode; align?: "left" | "right" }) {
-  return <th className={`pb-2 pr-4 text-[13px] font-medium text-slate-500 ${align === "right" ? "text-right" : ""}`}>{children}</th>
+  return <th scope="col" className={`pb-2 pr-4 text-[13px] font-medium text-slate-500 ${align === "right" ? "text-right" : ""}`}>{children}</th>
 }
 
 /** An empty state is an instruction, not an apology: it says what fills this screen. */

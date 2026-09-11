@@ -71,7 +71,10 @@ export const MODULES: ModuleDefinition[] = [
     // Everything automation-related lives under this one destination — the page has its own
     // internal Metrics · Review queue · Vendors · Settings tabs (components/automation/automation-tabs.tsx),
     // so the sidebar doesn't need three parallel entries.
-    { href: "automation", label: "Automation", icon: "zap" },
+    // User-facing name is "Controls" — the accountant's own word for approvals, thresholds and
+    // policies (internal controls). The route stays /automation: module keys, revalidatePaths and
+    // external links all point there, and a label rename doesn't justify a URL migration.
+    { href: "automation", label: "Controls", icon: "zap" },
   ] },
   { key: "policy-agent", name: "Policy agent", description: "AI policy evaluation against workspace rules before auto-approval.", industry: "finance", tier: "default", activation: "enable" },
   { key: "document-matching", name: "Document matching", description: "2/3-way PO-to-invoice-to-receipt matching with confidence scoring.", industry: "finance", tier: "default", activation: "enable" },

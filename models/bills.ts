@@ -25,6 +25,9 @@ export type BillRow = {
   agingBucket: AgingBucket | null
   paymentStatus: string | null
   paidAmount: number | null
+  /** When the ledger last confirmed this payment status — the closest thing to a "paid on" date
+   * a synced push gives us (there's no separate payment-event table). Null until synced. */
+  paidAt: Date | null
   status: string
   reviewedAt: Date | null
   blockedByCheck: boolean
@@ -32,6 +35,34 @@ export type BillRow = {
 }
 
 export type BillsSummary = Record<AgingBucket | "unknown", { count: number; total: number }>
+
+/** What the Paid tab's header shows — deliberately not the aging summary. A bill that's already
+ * paid has no "days outstanding" to report; the story there is how much moved and how recently,
+ * not what's still owed. `total`/`last30d` both prefer `paidAmount` (what the ledger says actually
+ * settled) and fall back to the extracted `total` for a paid bill the ledger hasn't given an exact
+ * amount for. */
+export type PaidSummary = {
+  total: { count: number; amount: number }
+  last30d: { count: number; amount: number }
+}
+
+const PAID_STATUSES = new Set(["paid", "reconciled"])
+
+export function summarizePaidBills(bills: BillRow[], asOf = new Date()): PaidSummary {
+  const cutoff = new Date(asOf.getTime() - 30 * 24 * 60 * 60 * 1000)
+  const summary: PaidSummary = { total: { count: 0, amount: 0 }, last30d: { count: 0, amount: 0 } }
+  for (const bill of bills) {
+    if (!bill.paymentStatus || !PAID_STATUSES.has(bill.paymentStatus.toLowerCase())) continue
+    const amount = bill.paidAmount ?? bill.total ?? 0
+    summary.total.count += 1
+    summary.total.amount += amount
+    if (bill.paidAt && bill.paidAt >= cutoff) {
+      summary.last30d.count += 1
+      summary.last30d.amount += amount
+    }
+  }
+  return summary
+}
 
 /** Loads bills for a workspace. Bounded (up to `limit`, default 500) — a cockpit view is not the
  * place to render every historical invoice a workspace has ever seen. */
@@ -116,6 +147,7 @@ export async function listWorkspaceBills(input: {
       agingBucket: bucket,
       paymentStatus: paymentRow?.paymentStatus ?? null,
       paidAmount: paymentRow?.paidAmount ?? null,
+      paidAt: paymentRow?.syncedAt ?? null,
       status: doc.status,
       reviewedAt: doc.reviewedAt,
       blockedByCheck: openChecks.length > 0,
