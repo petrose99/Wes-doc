@@ -38,7 +38,7 @@ export type ModuleDefinition = {
 
 export const MODULES: ModuleDefinition[] = [
   { key: "documents", name: "Documents", description: "Upload, store, and organize source documents.", industry: "core", tier: "always", activation: "enable" },
-  { key: "sheets", name: "Sheets", description: "Structured extraction worksheets over your documents.", industry: "core", tier: "always", activation: "enable" },
+  { key: "sheets", name: "Worksheets", description: "Structured extraction worksheets over your documents.", industry: "core", tier: "always", activation: "enable" },
   { key: "search", name: "Search", description: "Cross-document semantic search.", industry: "core", tier: "always", activation: "enable" },
   { key: "assistant", name: "AI Assistant", description: "Ask questions and take actions across your workspace.", industry: "core", tier: "always", activation: "enable" },
   { key: "reports", name: "Reports", description: "Draft and export reports from extracted data.", industry: "core", tier: "always", activation: "enable" },

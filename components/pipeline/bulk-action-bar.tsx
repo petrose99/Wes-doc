@@ -29,7 +29,7 @@ export function BulkActionBar({ workspaceId, stage, selectedIds, selectedFileId,
   const [confirmingApprove, setConfirmingApprove] = useState(false)
   const [showSheetChoice, setShowSheetChoice] = useState(false)
 
-  const sheetsHref = selectedFileId ? `/workspaces/${workspaceId}/files/${selectedFileId}/sheet?docs=${selectedIds.join(",")}` : null
+  const sheetsHref = selectedFileId ? `/workspaces/${workspaceId}/worksheets/${selectedFileId}/sheet?docs=${selectedIds.join(",")}` : null
 
   const run = async (label: string, action: () => Promise<{ success: boolean; error?: string }>) => {
     setBusy(true)
@@ -141,13 +141,13 @@ export function BulkActionBar({ workspaceId, stage, selectedIds, selectedFileId,
     {stage === "approved" && <>
       {!none && sheetsHref ? (selectedIds.length === 1
         ? <Button asChild size="sm" variant="outline">
-            <Link href={sheetsHref}><Table2 className="h-3.5 w-3.5" />Open in Sheets</Link>
+            <Link href={sheetsHref}><Table2 className="h-3.5 w-3.5" />Open in Worksheet</Link>
           </Button>
         : <Button type="button" size="sm" variant="outline" onClick={() => setShowSheetChoice(true)}>
-            <Table2 className="h-3.5 w-3.5" />Open in Sheets
+            <Table2 className="h-3.5 w-3.5" />Open in Worksheet
           </Button>
       ) : <Button type="button" size="sm" variant="outline" disabled aria-disabled="true">
-        <Table2 className="h-3.5 w-3.5" />Open in Sheets
+        <Table2 className="h-3.5 w-3.5" />Open in Worksheet
       </Button>}
 
       {selectedIds.length === 2 && <Button type="button" size="sm" variant="outline" disabled={dis}
@@ -197,13 +197,13 @@ export function BulkActionBar({ workspaceId, stage, selectedIds, selectedFileId,
         app, and the choices below are Links so <Dialog>'s built-in focus trap/restore is enough. */}
     <Dialog
       open={showSheetChoice && Boolean(sheetsHref)}
-      title={`Open ${selectedIds.length} documents in Sheets`}
+      title={`Open ${selectedIds.length} documents in a worksheet`}
       description="How would you like to view them?"
       width="max-w-sm"
       onClose={() => setShowSheetChoice(false)}>
       <div className="flex flex-col gap-2 p-5">
-        <Button asChild variant="outline"><Link href={sheetsHref ? `${sheetsHref}&mode=combined` : ""} onClick={() => setShowSheetChoice(false)}>Combined into one sheet</Link></Button>
-        <Button asChild variant="outline"><Link href={sheetsHref ? `${sheetsHref}&mode=separate` : ""} onClick={() => setShowSheetChoice(false)}>Separate sheet per document</Link></Button>
+        <Button asChild variant="outline"><Link href={sheetsHref ? `${sheetsHref}&mode=combined` : ""} onClick={() => setShowSheetChoice(false)}>Combined into one worksheet</Link></Button>
+        <Button asChild variant="outline"><Link href={sheetsHref ? `${sheetsHref}&mode=separate` : ""} onClick={() => setShowSheetChoice(false)}>Separate worksheet per document</Link></Button>
       </div>
     </Dialog>
   </div>
