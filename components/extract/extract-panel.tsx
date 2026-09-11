@@ -5,6 +5,7 @@ import { ColumnChips } from "@/components/extract/column-chips"
 import { downscaleImage } from "@/components/extract/downscale-image"
 import { FileRow } from "@/components/extract/file-row"
 import { filesFromDataTransfer } from "@/components/extract/folder-traverse"
+import { describeDocumentError } from "@/lib/document-error-copy"
 import { FolderReport } from "@/components/extract/folder-report"
 import { RunDiffDialog } from "@/components/extract/run-diff-dialog"
 import type { MatchedShape, SheetTemplate, StagedFile, WorkspaceUsage } from "@/components/extract/types"
@@ -142,7 +143,10 @@ export function ExtractPanel({ workspaceId, fileId, fileName, template, template
       // searchable rides along on every settled row; it flips from false to true a beat after
       // extraction finishes, once embedding has run. With document search off it is always false.
       if (polled.status === "queued" || polled.status === "processing") return { ...row, status: "processing" }
-      if (polled.status === "failed") return { ...row, status: "failed", error: polled.errorCode?.replaceAll("_", " ") || "Extraction failed" }
+      if (polled.status === "failed") {
+        const description = describeDocumentError(polled.errorCode)
+        return { ...row, status: "failed", error: description.permanent ? `${description.message} ${description.action}` : description.message }
+      }
       if (polled.status === "needs_review") return { ...row, status: "attention", searchable: polled.searchable, indexing: polled.indexing, flaggedFields: polled.flaggedFields }
       if (polled.status === "ready_for_review" || polled.status === "reviewed") return { ...row, status: "done", searchable: polled.searchable, indexing: polled.indexing, flaggedFields: polled.flaggedFields }
       return row

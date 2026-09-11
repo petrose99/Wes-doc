@@ -95,7 +95,7 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
   //
   // The audit's proposed structure (docs/ux/ux-audit-2026-09-10.html, "Proposed structure"):
   // one lifecycle spine (Dashboard + Documents) and a separate Tools section for the secondary
-  // surfaces — Sheets, Docu Library, Accounting, Automation. The spine is where the work is;
+  // surfaces — Sheets, Docu Search, Accounting, Automation. The spine is where the work is;
   // Tools is where you go on purpose. Module-declared entries (Dictation etc.) land in Tools
   // too, since they come and go per workspace.
   const workItems = [
@@ -104,7 +104,7 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
   ]
   const toolItems = [
     { href: `${base}/files`, label: "Sheets", icon: Table2, exact: false, tourTarget: "sheets" as const },
-    { href: `${base}/library`, label: "Docu Library", icon: Library, exact: false, tourTarget: "library" as const },
+    { href: `${base}/library`, label: "Docu Search", icon: Library, exact: false, tourTarget: "library" as const },
     ...(accountingEnabled ? [{ href: `${base}/accounting`, label: "Accounting", icon: Landmark, exact: false }] : []),
     ...otherModuleItems,
   ]

@@ -84,6 +84,9 @@ export async function createDocumentFromBuffer(input: {
    * pass may re-point it once the document's actual content is known; an explicit pick from the
    * upload modal's document-type picker is left unmarked and is never overridden. */
   worksheetAutoAssigned?: boolean
+  /** The sender's address for an emailed-in document, or null for every other channel. See
+   * lib/ingestion.ts's note on the same field. */
+  sourceEmail?: string | null
 }) {
   validateDocumentInput(input.buffer, input.mimeType)
   // Scoped by fileId as well as workspaceId: worksheet codes are only unique within a file, so
@@ -120,7 +123,7 @@ export async function createDocumentFromBuffer(input: {
     const result = await prisma.$transaction(async (tx) => {
       const document = await tx.document.create({ data: {
         id, workspaceId: input.workspaceId, fileId: input.fileId, templateId: template.id, templateVersionId: version.id,
-        source: documentSourceFor(input.mimeType, input.source),
+        source: documentSourceFor(input.mimeType, input.source), sourceEmail: input.sourceEmail || null,
         status: "queued", filename: cleanFilename(input.filename), mimeType: input.mimeType, sizeBytes: input.buffer.length,
         sha256, storageKey, receivedAt, pageRange: input.pageRange?.trim() || null, uploadBatchId: input.uploadBatchId || null,
         fieldSnapshot: version.fields as Prisma.InputJsonValue, searchText: cleanFilename(input.filename),
@@ -224,7 +227,7 @@ export type LibraryListFilters = {
 
 export type LibraryDocument = Awaited<ReturnType<typeof listWorkspaceDocuments>>[number]
 
-/** Docu Library membership: every reviewed document, automatically — approved, synced, and paid
+/** Docu Search membership: every reviewed document, automatically — approved, synced, and paid
  * alike. Deliberately NOT stageWhereClause("approved"): a document does not leave the library
  * when it syncs or gets paid, and there is no "store to library" action any more; approval is
  * the only gate. */
@@ -328,7 +331,7 @@ export async function documentIdsInStage(workspaceId: string, documentIds: strin
   return new Set(rows.map((row) => row.id))
 }
 
-/** Of the given document ids, which are in the Docu Library (any reviewed document — see
+/** Of the given document ids, which are in Docu Search (any reviewed document — see
  * LIBRARY_WHERE). The library-search narrowing filter, replacing the old stage-based one that
  * silently dropped synced/paid documents from library search results. */
 export async function documentIdsInLibrary(workspaceId: string, documentIds: string[]): Promise<Set<string>> {

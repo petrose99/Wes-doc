@@ -4,7 +4,7 @@
 import { canDecideStage, decideStage, findCurrentStage } from "@/lib/approvals/engine"
 import { auditEventData, getRequestAuditContext } from "@/lib/audit"
 import { prisma } from "@/lib/db"
-import { addCents, fromCents } from "@/lib/money"
+import { addCents, decimalToNumber, fromCents } from "@/lib/money"
 import { cache } from "react"
 
 export const EXPENSE_CLAIM_STATUSES = ["draft", "submitted", "approved", "rejected"] as const
@@ -190,11 +190,12 @@ export async function decideExpenseClaimStage(input: { workspaceId: string; clai
   if (!claim) throw new Error("expense_claim_not_found")
   if (!claim.workflow || claim.currentStageIndex === null) throw new Error("expense_claim_has_no_workflow")
 
-  const currentStage = findCurrentStage(claim.workflow.stages, claim.currentStageIndex)
+  const stages = claim.workflow.stages.map((stage) => ({ ...stage, minAmount: decimalToNumber(stage.minAmount) }))
+  const currentStage = findCurrentStage(stages, claim.currentStageIndex)
   if (!currentStage) throw new Error("workflow_stage_not_found")
   if (!canDecideStage({ stage: currentStage, actorRole: input.actorRole, actorId: input.actorId })) throw new Error("stage_requires_owner")
 
-  const result = decideStage({ stages: claim.workflow.stages, currentStageIndex: claim.currentStageIndex, decision: input.decision })
+  const result = decideStage({ stages, currentStageIndex: claim.currentStageIndex, decision: input.decision })
   const nextStatus = result.outcome === "advance" ? "submitted" : result.outcome
   const nextStageIndex = result.outcome === "advance" ? result.nextStageIndex : claim.currentStageIndex
   const resolvedAt = result.outcome === "advance" ? null : new Date()

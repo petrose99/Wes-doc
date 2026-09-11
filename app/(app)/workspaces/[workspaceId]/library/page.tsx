@@ -94,7 +94,7 @@ export default async function LibraryPage({ params, searchParams }: {
           <div className="flex items-center gap-2">
             <Library className="h-5 w-5 text-emerald-600" />
             <h1 className="text-xl font-bold text-slate-900">
-              {pickMode ? "Select documents for your sheet" : "Docu Library"}
+              {pickMode ? "Select documents for your sheet" : "Docu Search"}
             </h1>
           </div>
           <p className="mt-1 text-sm text-slate-500">
