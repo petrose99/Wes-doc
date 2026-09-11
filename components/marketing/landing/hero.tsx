@@ -17,7 +17,7 @@ const NAV: { label: string; icon: typeof BarChart3; active?: boolean; badge?: st
   { label: "Dashboard", icon: BarChart3 },
   { label: "Documents", icon: ListChecks, active: true, badge: "7" },
   { label: "Sheets", icon: Table2 },
-  { label: "Docu Library", icon: Library },
+  { label: "Docu Search", icon: Library },
   { label: "Accounting", icon: Landmark },
   { label: "Automation", icon: Zap },
 ]

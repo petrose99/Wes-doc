@@ -1,6 +1,7 @@
 "use client"
 
 import { getDocumentProcessingStatusAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
+import { describeDocumentError } from "@/lib/document-error-copy"
 import { TERMINAL_STATUSES } from "@/lib/documents/stages"
 import { useRouter } from "next/navigation"
 import { useCallback, useEffect, useRef, useState } from "react"
@@ -71,7 +72,10 @@ export function useExtractionProgress(workspaceId: string, seedIds: string[] = [
         if (!wasTerminal && TERMINAL_STATUSES.has(row.status)) {
           transitioned = true
           if (row.status !== "failed") settled.push(row.id)
-          if (row.status === "failed") toast.error(`${row.filename} failed`, { description: row.errorCode?.replaceAll("_", " ") || "Extraction failed" })
+          if (row.status === "failed") {
+            const description = describeDocumentError(row.errorCode)
+            toast.error(`${row.filename} failed`, { description: description.permanent ? `${description.message} ${description.action}` : description.message })
+          }
           else if (row.status === "needs_review") toast.warning(`${row.filename} extracted`, { description: "Some fields need review" })
           else toast.success(`${row.filename} extracted`)
         }

@@ -42,6 +42,9 @@ export async function createIngestionItem(input: {
   /** Passed straight through to createDocumentFromBuffer — see its own note. Set by an intake
    * channel that had to guess the worksheet rather than being told. */
   worksheetAutoAssigned?: boolean
+  /** The sender's address, for source: "email" only — stored on Document.sourceEmail so a
+   * terminal failure can name who sent it in when notifying the workspace. */
+  sourceEmail?: string | null
 }): Promise<IngestionResult> {
   const idempotencyKey = documentHash(input.buffer)
   // Scoped to the file, not the whole workspace: Document's own (fileId, sha256) constraint says
@@ -83,6 +86,7 @@ export async function createIngestionItem(input: {
       filename: input.filename, mimeType: input.mimeType, buffer: input.buffer,
       pageRange: input.pageRange, uploadBatchId: input.uploadBatchId,
       worksheetAutoAssigned: input.worksheetAutoAssigned,
+      sourceEmail: input.source === "email" ? input.sourceEmail : null,
     })
     const item = await upsertItem({ documentId: result.document.id, malwareStatus: "clean", status: result.duplicate ? "duplicate" : "extracting", errorCode: null })
     if (!result.duplicate) await track("document_uploaded", { fileId: input.fileId, documentId: result.document.id, source: input.source }, { workspaceId: input.workspaceId })

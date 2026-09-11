@@ -5,12 +5,12 @@ import {
   mergeDocumentsAction, moveDocumentsToStageAction,
   sendDocumentsBackToReviewAction,
 } from "@/app/(app)/workspaces/[workspaceId]/pipeline-actions"
-import { reextractAdaptivelyAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
+import { reextractAdaptivelyAction, reprocessDocumentAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
 import { Button } from "@/components/ui/button"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { Dialog } from "@/components/ui/dialog"
 import type { PipelineStage } from "@/lib/documents/stages"
-import { CheckCircle2, Combine, Loader2, Sparkles, Table2, Trash2 } from "lucide-react"
+import { CheckCircle2, Combine, Loader2, RotateCw, Sparkles, Table2, Trash2 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
@@ -60,6 +60,29 @@ export function BulkActionBar({ workspaceId, stage, selectedIds, selectedFileId,
       const queued = results.filter((result) => result.success).length
       if (!queued) { toast.error("Could not re-extract — already processing, or the document has no template"); return }
       toast.success(queued === results.length ? `Re-extracting ${queued}` : `Re-extracting ${queued} of ${results.length}`)
+      onDone()
+      router.refresh()
+    } catch {
+      toast.error("Could not reach the server")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /** Retry every selected document's extraction. Runs per document, same shape as `reextract`:
+   * the underlying action rejects a document that isn't actually failed/staged
+   * ("document_already_processing"), so a mixed selection just retries the ones that need it and
+   * silently skips the rest, rather than surfacing N separate error toasts. This is the "Retry
+   * all" from the degraded-pipeline journey — outage failures arrive in cohorts, so retrying one
+   * at a time turns a system failure into user labor. */
+  const retry = async () => {
+    setBusy(true)
+    try {
+      const results = await Promise.all(selectedRows.map((row) =>
+        reprocessDocumentAction(workspaceId, row.fileId, row.id).catch(() => ({ success: false as const }))))
+      const queued = results.filter((result) => result.success).length
+      if (!queued) { toast.error("Nothing to retry — already processing, or every selected document is fine"); return }
+      toast.success(queued === results.length ? `Retrying ${queued}` : `Retrying ${queued} of ${results.length}`)
       onDone()
       router.refresh()
     } catch {
@@ -132,6 +155,12 @@ export function BulkActionBar({ workspaceId, stage, selectedIds, selectedFileId,
         <Combine className="h-3.5 w-3.5" />Merge
       </Button>}
     </>}
+
+    {stage === "inbox" && <Button type="button" size="sm" variant="outline" disabled={dis || selectedRows.length === 0}
+      title="Retry — for documents that failed because of a problem on our side, not the file itself"
+      onClick={() => void retry()}>
+      {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCw className="h-3.5 w-3.5" />}Retry
+    </Button>}
 
     <Button type="button" size="sm" variant="outline" disabled={dis || selectedRows.length === 0}
       title="Re-extract with adaptive line-item discovery — for a document whose line items came out empty or wrong under its worksheet's fixed columns"
