@@ -5,6 +5,7 @@ import { ActionState } from "@/lib/actions"
 import { redirect } from "next/navigation"
 import { recordDocumentAudit } from "@/lib/audit"
 import config from "@/lib/config"
+import { JurisdictionRequiredError } from "@/lib/jurisdictions/require"
 import { DOC_TYPE_SPECS, isDocType } from "@/lib/doc-types"
 import { processDocumentJob } from "@/lib/document-processing"
 import { sampleDocumentPages } from "@/lib/document-suggest"
@@ -92,7 +93,10 @@ export async function uploadDocumentsAction(workspaceId: string, fileId: string,
     await revalidateSheet(workspaceId, fileId)
     if (!documents.length && rejection) return { success: false, error: errorMessage(new Error(rejection), "Upload failed") }
     return { success: true, data: { count, documents } }
-  } catch (error) { return { success: false, error: errorMessage(error, "Upload failed") } }
+  } catch (error) {
+    if (error instanceof JurisdictionRequiredError) return { success: false, error: "Pick a jurisdiction in Settings → Jurisdiction before uploading." }
+    return { success: false, error: errorMessage(error, "Upload failed") }
+  }
 }
 
 /** Server-side ZIP expansion (WP9): one IngestionItem/Document per entry, each accepted or
@@ -133,7 +137,10 @@ export async function uploadZipAction(workspaceId: string, fileId: string, formD
     }
     await revalidateSheet(workspaceId, fileId)
     return { success: true, data: { count, documents, skipped: skipped.length, truncated } }
-  } catch (error) { return { success: false, error: errorMessage(error, "ZIP upload failed") } }
+  } catch (error) {
+    if (error instanceof JurisdictionRequiredError) return { success: false, error: "Pick a jurisdiction in Settings → Jurisdiction before uploading." }
+    return { success: false, error: errorMessage(error, "ZIP upload failed") }
+  }
 }
 
 export async function setDocumentTypeAction(workspaceId: string, documentId: string, documentType: "expense" | "sale" | "bank_statement" | "other"): Promise<ActionState<null>> {
