@@ -71,6 +71,7 @@ model User {
   routingAssignments ReviewRoutingRule[] @relation("RoutingAssignee")
   matchResolutions   DocumentMatch[]     @relation("MatchResolver")
   createdPaymentRuns PaymentRun[]        @relation("PaymentRunCreator")
+  resolvedGates      Gate[]              @relation("GateResolver")
 
   @@map("users")
 }
@@ -118,6 +119,7 @@ model Workspace {
   jobs            DocumentProcessingJob[]
   auditEvents     DocumentAuditEvent[]
   workflowAuditEvents AuditEvent[]
+  gates           Gate[]
   workbooks       SpreadsheetWorkbook[]
   aiFormulaCache  AiFormulaCache[]
   extractionShapes ExtractionShape[]
@@ -564,6 +566,7 @@ model Document {
   expenseClaimItems ExpenseClaimItem[]
   healthCheckResults HealthCheckResult[]
   sheetPlacements    DocumentSheetPlacement[]
+  gates              Gate[]
 
   @@unique([fileId, sha256])
   @@index([workspaceId, status])
@@ -878,6 +881,57 @@ model AuditEvent {
   @@index([subjectType, subjectId, createdAt])
   @@index([actorId, createdAt])
   @@map("audit_events")
+}
+
+/// One control-gate finding against one document (a "bill" in the #40 language). Shared
+/// scaffolding: no rule lives here — each of the six gates from #40 (duplicate, jurisdiction
+/// validity, 2/3-way match, supplier trust, confidence-per-band, warn-checks) is its own
+/// runner in lib/gates/, registered into the shared registry, and this row records what it
+/// found. See lib/gates/registry.ts for the run loop and the AuditEvent pair that always
+/// travels alongside a state change.
+///
+/// One row per (documentId, gateType, firing) — a gate that re-fires on a re-processed bill
+/// upserts by (documentId, gateType) rather than piling up rows. `payload` carries whatever
+/// the runner needs to explain itself (the winning bill's id for duplicate, the invoice-check
+/// failures for jurisdiction, the variance amount for match, etc.); the shape is per-gate.
+model Gate {
+  id             String    @id @default(uuid()) @db.Uuid
+  workspaceId    String    @map("workspace_id") @db.Uuid
+  documentId     String    @map("document_id") @db.Uuid
+  /// Kebab-case identifier for the runner that produced this row: "duplicate", "jurisdiction",
+  /// "match", "trust", "confidence", "warn-checks". Registered by lib/gates/registry.ts. String,
+  /// not a Prisma enum, matching AuditEvent.type — new gate types are a code change, not a
+  /// migration.
+  gateType       String    @map("gate_type")
+  /// "hard" or "soft". Hard gates always block and are read-only in Overview; soft gates are
+  /// workspace-tunable and can be dismissed. Set by the runner, not the caller.
+  severity       String
+  /// "blocked" (fresh finding, still in the exception queue), "overridden" (a human resolved
+  /// it by acknowledging rather than fixing), "resolved" (the underlying condition went away —
+  /// the duplicate resolved itself, the match variance came into tolerance, etc.).
+  state          String    @default("blocked")
+  firedAt        DateTime  @default(now()) @map("fired_at")
+  resolvedAt     DateTime? @map("resolved_at")
+  /// Who overrode/resolved it, when a person did — null for auto-resolve paths (the winning
+  /// duplicate deleted, variance recomputed within tolerance). SetNull so a former member's
+  /// past overrides stay attributed to "someone we no longer have on file" rather than
+  /// disappearing.
+  resolvedBy     String?   @map("resolved_by") @db.Uuid
+  overrideReason String?   @map("override_reason")
+  payload        Json?
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  document    Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  resolver    User?     @relation("GateResolver", fields: [resolvedBy], references: [id], onDelete: SetNull)
+
+  /// A gate re-firing on the same document should replace, not stack — the run loop upserts by
+  /// this key. Deliberately not workspace-scoped: documentId is already workspace-unique.
+  @@unique([documentId, gateType])
+  /// Exception-queue read: "every open gate in this workspace" for the Overview panel.
+  @@index([workspaceId, state])
+  @@map("gates")
 }
 
 /** The spreadsheet behind one file: a Univer `IWorkbookData` snapshot holding every tab, its
