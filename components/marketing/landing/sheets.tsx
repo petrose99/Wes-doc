@@ -10,19 +10,23 @@ const ROWS = [
   { n: 4, doc: "EDF-energy.pdf", supplier: "EDF Energy", total: "£318.09", delay: 0.9 },
 ]
 
+/** Worksheets — the spreadsheet the app ships (Univer under the hood): documents land as rows a
+ * person can compute over with real formulas and =AI(), or a plain xlsx/csv the visitor already
+ * uses. The section is the one place on the landing where DocuBite's structural advantage over
+ * Dext/Hubdoc/QBO is a demo, not a claim — nobody in the category gives you the extraction as
+ * live rows. */
 export function Sheets() {
   const { ref, played } = usePlayOnScroll()
 
   return (
-    <section id="sheets" ref={ref} className="bg-cream-50 py-14 md:py-22">
+    <section id="worksheets" ref={ref} className="bg-cream-50 py-14 md:py-22">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-8 md:gap-13 px-5">
         <div className="min-w-0 flex-1 basis-[340px]">
-          <span className="text-[0.74rem] font-bold uppercase tracking-[.08em] text-emerald-700">Sheets</span>
-          <h2 className="mt-3 text-balance font-display text-[clamp(1.9rem,3vw,2.6rem)] font-bold leading-[1.08] tracking-[-0.03em] text-stone-900">
-            A spreadsheet built in, for the analysis afterwards
+          <h2 className="text-balance font-display text-[clamp(1.9rem,3vw,2.6rem)] font-bold leading-[1.08] tracking-[-0.03em] text-stone-900">
+            Every invoice, a row you can compute on
           </h2>
           <p className="mt-4 max-w-[31rem] text-pretty text-[1.02rem] leading-[1.62] text-stone-600">
-            Open a Sheet whenever you want to work with numbers. Pull in your reviewed extractions, run a report out of the built-in ledger, drop in a financial statement from QuickBooks or Xero, or upload any Excel or CSV — then sort, add columns, and ask the built-in AI Assistant to write a formula or answer a question about the rows. Download the tab as CSV or the whole book as Excel when you&apos;re done.
+            Open a worksheet whenever you need to work with numbers. Pull in your reviewed extractions, run a report out of the built-in ledger, drop in a financial statement from QuickBooks or Xero, or upload any Excel or CSV — then sort, add columns, and ask the built-in AI Assistant to write a formula or answer a question about the rows. Download the tab as CSV or the whole book as Excel when you&apos;re done.
           </p>
         </div>
 

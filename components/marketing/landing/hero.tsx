@@ -10,16 +10,18 @@ const rows: { doc: string; supplier: string; total: string; status: "approved" |
   { doc: "statement-feb.pdf", supplier: "Metro Bank", total: "—", status: "approved" },
 ]
 
-/** The rail the app actually renders (components/shell/sidebar.tsx): same labels, same order, same
- * icons. The lower group (Settings, Activity, Health Checks) is left out — this is a shot of where
- * the work happens, not a full chrome trace. */
+/** Mirrors the real app rail (components/shell/sidebar.tsx): TODAY caption, then the primary spine
+ * in workflow order — Dashboard, Documents (with the review badge), Controls, Finance (with the
+ * push-ready badge), Archive, Worksheets. The lower group (Settings, Activity, Health) is trimmed
+ * — this is a shot of where the work happens, not the full chrome. Kept in sync with the live
+ * app so a first-time visitor's mental model matches their first workspace visit. */
 const NAV: { label: string; icon: typeof BarChart3; active?: boolean; badge?: string }[] = [
   { label: "Dashboard", icon: BarChart3 },
   { label: "Documents", icon: ListChecks, active: true, badge: "7" },
-  { label: "Sheets", icon: Table2 },
-  { label: "Docu Search", icon: Library },
-  { label: "Accounting", icon: Landmark },
-  { label: "Automation", icon: Zap },
+  { label: "Controls", icon: Zap },
+  { label: "Finance", icon: Landmark, badge: "5" },
+  { label: "Archive", icon: Library },
+  { label: "Worksheets", icon: Table2 },
 ]
 
 const statusStyle: Record<string, string> = {
@@ -28,54 +30,52 @@ const statusStyle: Record<string, string> = {
   dupe: "bg-red-50 text-red-700",
 }
 
-/** The homepage hero. The mock browser window and its scan-line sweep are decorative and never
- * react to anything, so — like .doc-scan in app/globals.css — they're plain CSS, not a client
- * component: nothing here needs an IntersectionObserver. */
+/** The homepage hero. Wedge in the headline: DocuBite is the AP system that works with an existing
+ * ledger OR brings its own — every competitor is one or the other, never both. The mock browser
+ * window shows the real app's rail and pipeline stages so the visitor sees what they will actually
+ * open on the other side of the trial button.
+ *
+ * The scan-line sweep is decorative and never reacts to anything, so — like .doc-scan in
+ * app/globals.css — it's plain CSS, not a client component: nothing here needs an IntersectionObserver. */
 export function Hero() {
   return (
     <section
       id="top"
-      className="relative overflow-hidden border-b border-cream-200 bg-cream-50 pb-12 md:pb-24"
+      className="relative overflow-hidden border-b border-cream-200 bg-cream-50 pb-14 md:pb-24"
       style={{ backgroundImage: "radial-gradient(#e7dcc7 1px, transparent 1.4px)", backgroundSize: "24px 24px" }}
     >
       <div aria-hidden className="pointer-events-none absolute -right-32 -top-32 h-[26rem] w-[26rem] rounded-full" style={{ background: "radial-gradient(circle, rgba(16,185,129,.10), transparent 70%)" }} />
-      <div className="relative mx-auto flex max-w-6xl flex-wrap items-center gap-8 px-5 pt-8 md:gap-14 md:pt-16">
+      <div className="relative mx-auto flex max-w-6xl flex-wrap items-center gap-10 px-5 pt-10 md:gap-14 md:pt-16">
         <div className="min-w-0 flex-1 basis-[400px]">
           <span className="inline-flex items-center gap-2 rounded-full border border-cream-200 bg-white px-3.5 py-1.5 text-[0.78rem] font-semibold text-emerald-700 shadow-sm">
             <span className="db-pulse-dot h-1.5 w-1.5 rounded-full bg-emerald-500" style={{ animation: "db-pulse 2.4s ease-in-out infinite" }} />
-            AI accounts payable, end to end
+            Documents in. Books out.
           </span>
-          <h1 className="mt-4 text-balance font-display text-[clamp(2.05rem,4.6vw,4.05rem)] font-extrabold leading-[1.04] tracking-[-0.038em] text-stone-950 md:mt-5 md:leading-[1.02]">
-            Bills in, however they arrive.{" "}
-            <span style={{ backgroundImage: "linear-gradient(180deg,transparent 56%,#6EE7B7 56%,#6EE7B7 93%,transparent 93%)", padding: "0 .04em" }}>Coded, checked, approved</span>{" "}
-            — ready to pay.
+          <h1 className="mt-5 text-balance font-display text-[clamp(2.4rem,4.6vw,4.05rem)] font-extrabold leading-[1.02] tracking-[-0.038em] text-stone-950">
+            Works with your books —{" "}
+            <span style={{ backgroundImage: "linear-gradient(180deg,transparent 56%,#6EE7B7 56%,#6EE7B7 93%,transparent 93%)", padding: "0 .04em" }}>or brings its own</span>.
           </h1>
-          <p className="mt-4 max-w-[34rem] text-pretty text-[1rem] leading-[1.55] text-stone-600 md:mt-6 md:text-[1.08rem] md:leading-[1.62]">
-            Supplier, date, VAT, total — every detail read off the invoice, checked, and approved. Accounting is built in — or sync to the software you already use.
+          <p className="mt-6 max-w-[34rem] text-pretty text-[1.08rem] leading-[1.62] text-stone-600">
+            Bills arrive by email, upload or API. DocuBite reads even the hard cases — handwriting, phone photos, scans — checks for the frauds nobody else looks for, routes approvals, then posts to <strong className="font-semibold text-stone-800">QuickBooks, Xero or your ERP</strong> — or the double-entry ledger built into DocuBite, if you&apos;d rather start whole. Payment stays on your bank&apos;s rails.
           </p>
-          <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-3.5 md:mt-8">
-            <div className="flex flex-col">
-              <Link href="/signup" className="group inline-flex h-12 items-center rounded-[10px] bg-emerald-700 px-6.5 text-[0.98rem] font-bold text-white shadow-[0_1px_2px_rgba(15,23,42,.08),0_10px_26px_rgba(4,120,87,.24)] transition-colors hover:bg-emerald-800">
-                Start 14-day free trial
-              </Link>
-              <span className="mt-1.5 text-[0.76rem] text-stone-500">Best if you can upload a folder today.</span>
-            </div>
-            <div className="flex flex-col">
-              <Link href="/demo" className="inline-flex h-12 items-center rounded-[10px] border border-stone-200 bg-white px-6 text-[0.98rem] font-semibold text-stone-900 shadow-sm transition-colors hover:bg-stone-50">
-                Book a demo
-              </Link>
-              <span className="mt-1.5 text-[0.76rem] text-stone-500">Best for a walkthrough with your own AP.</span>
-            </div>
+          <div className="mt-8 flex flex-wrap items-center gap-3">
+            <Link href="/signup" className="group inline-flex h-12 items-center rounded-[10px] bg-emerald-700 px-6.5 text-[0.98rem] font-bold text-white shadow-[0_1px_2px_rgba(15,23,42,.08),0_10px_26px_rgba(4,120,87,.24)] transition-colors hover:bg-emerald-800">
+              Start 14-day free trial
+            </Link>
+            <Link href="/demo" className="inline-flex h-12 items-center rounded-[10px] border border-stone-200 bg-white px-6 text-[0.98rem] font-semibold text-stone-900 shadow-sm transition-colors hover:bg-stone-50">
+              Book a demo
+            </Link>
           </div>
+          <p className="mt-3.5 text-[0.82rem] text-stone-500">No card required. Files held in private encrypted storage.</p>
         </div>
 
         <div className="min-w-0 flex-1 basis-[440px]">
-          <div className="overflow-hidden rounded-2xl border border-cream-200 bg-white shadow-[0_18px_44px_rgba(15,23,42,.09),0_2px_6px_rgba(15,23,42,.05)]">
+          <div className="overflow-hidden rounded-2xl border border-white/10 bg-white shadow-[0_30px_70px_rgba(0,0,0,.38)]">
             <div className="flex items-center gap-2 border-b border-slate-200 bg-gradient-to-b from-slate-50 to-slate-100 px-3.5 py-2.5">
               <span className="h-2.5 w-2.5 rounded-full bg-slate-300" />
               <span className="h-2.5 w-2.5 rounded-full bg-slate-300" />
               <span className="h-2.5 w-2.5 rounded-full bg-slate-300" />
-              <span className="ml-2 text-[0.72rem] font-semibold text-slate-500">Extraction · March close · 42 documents</span>
+              <span className="ml-2 text-[0.72rem] font-semibold text-slate-500">Documents · March close · 42 bills</span>
             </div>
             <div className="flex flex-wrap">
               <div className="flex flex-none basis-[168px] flex-col border-r border-slate-200 bg-[#EEF1F2] p-2.5">
@@ -83,7 +83,7 @@ export function Hero() {
                   <BiteMark className="h-4 w-4 text-emerald-700" />
                   <span className="font-display text-[0.82rem] font-bold tracking-[-0.02em] text-stone-900">DocuBite</span>
                 </div>
-                <div className="px-1.5 pb-1 text-[0.6rem] font-bold uppercase tracking-wide text-slate-400">Workspace</div>
+                <div className="px-1.5 pb-1 text-[0.6rem] font-bold uppercase tracking-wide text-slate-400">Today</div>
                 <div className="flex flex-col gap-0.5">
                   {NAV.map((item) => (
                     <div

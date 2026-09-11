@@ -62,7 +62,7 @@ export function Automation() {
 
       <div className="relative mx-auto max-w-6xl px-5">
         <div className="max-w-[44rem]">
-          <span className="text-[0.74rem] font-bold uppercase tracking-[.08em] text-emerald-700">Automation</span>
+          <span className="text-[0.74rem] font-bold uppercase tracking-[.08em] text-emerald-700">Controls</span>
           <h2 className="mt-3 text-balance font-display text-[clamp(2.05rem,3.4vw,3rem)] font-extrabold leading-[1.05] tracking-[-0.035em] text-stone-950">
             It watches how you code, then stops asking
           </h2>

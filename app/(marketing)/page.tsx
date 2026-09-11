@@ -19,8 +19,8 @@ import { TrialCta } from "@/components/marketing/landing/trial-cta"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
-  title: { absolute: "DocuBite — AI accounts payable, end to end" },
-  description: "Invoices and receipts in by email, upload or API. Every detail read off the page, checked, and approved — with accounting built in, or synced to the software you already use.",
+  title: { absolute: "DocuBite — Documents in. Books out." },
+  description: "Bills arrive by email, upload or API. DocuBite reads even the hard cases, runs the fraud checks nobody else does, routes approvals, and posts to QuickBooks, Xero or your ERP — or the double-entry ledger built into DocuBite, if you'd rather start whole. Payment stays on your bank's rails.",
 }
 
 export default function Home() {
