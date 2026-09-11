@@ -2,6 +2,7 @@
 // trusts the workspaceId/fileId/templateId it is handed. Callers (upload/zip server actions,
 // future email/API intake) do the auth.
 import { track } from "@/lib/analytics"
+import { JurisdictionRequiredError, requireWorkspaceJurisdiction } from "@/lib/jurisdictions/require"
 import { scanDocumentBuffer } from "@/lib/malware-scan"
 import { prisma } from "@/lib/db"
 import { gateRegistry } from "@/lib/gates/registry"
@@ -47,6 +48,11 @@ export async function createIngestionItem(input: {
    * terminal failure can name who sent it in when notifying the workspace. */
   sourceEmail?: string | null
 }): Promise<IngestionResult> {
+  // #49 short-circuit: every intake channel funnels through here, so refusing an inbound bill on a
+  // workspace with no jurisdictionCode is one check, not four. The upload/API/email callers catch
+  // JurisdictionRequiredError and surface the "pick a jurisdiction" state; nothing is written.
+  await requireWorkspaceJurisdiction(input.workspaceId)
+
   const idempotencyKey = documentHash(input.buffer)
   // Scoped to the file, not the whole workspace: Document's own (fileId, sha256) constraint says
   // the same PDF may deliberately be extracted into two sheets with different columns, and a
