@@ -21,12 +21,12 @@ export function Library() {
       <div aria-hidden className="pointer-events-none absolute -left-32 -top-28 h-96 w-96 rounded-full" style={{ background: "radial-gradient(circle, rgba(16,185,129,.09), transparent 70%)" }} />
       <div className="relative mx-auto flex max-w-6xl flex-wrap items-center gap-8 md:gap-13 px-5">
         <div className="min-w-0 flex-1 basis-[340px]">
-          <span className="text-[0.74rem] font-bold uppercase tracking-[.08em] text-emerald-700">Docu Library</span>
+          <span className="text-[0.74rem] font-bold uppercase tracking-[.08em] text-emerald-700">Docu Search</span>
           <h2 className="mt-3 text-balance font-display text-[clamp(1.9rem,3vw,2.6rem)] font-bold leading-[1.08] tracking-[-0.03em] text-stone-950">
             Ask a question, get the document that answers it
           </h2>
           <p className="mt-4 max-w-[31rem] text-pretty text-[1.02rem] leading-[1.62] text-stone-600">
-            Every uploaded file is searchable by what&apos;s actually inside it — meaning and keywords both. Ask the Docu Library a plain question and it answers from your own documents, with each answer cited back to the filename and page, one click from the source.
+            Every uploaded file is searchable by what&apos;s actually inside it — meaning and keywords both. Ask Docu Search a plain question and it answers from your own documents, with each answer cited back to the filename and page, one click from the source.
           </p>
         </div>
 

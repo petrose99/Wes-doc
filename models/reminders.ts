@@ -25,8 +25,10 @@ async function resolveRecipients(workspaceId: string, assigneeEmail: string | nu
 
 /** Every stage-gated decision (see lib/approvals/engine.ts) defers to whichever owners are on the
  * workspace when the current stage requires one — same reasoning as an unassigned ReviewTask,
- * just applied to ExpenseClaim, which has no assignee concept at all today. */
-async function resolveOwnerRecipients(workspaceId: string): Promise<string[]> {
+ * just applied to ExpenseClaim, which has no assignee concept at all today. Exported: it's also
+ * how a permanently-failed emailed document notifies the workspace (lib/document-processing.ts) —
+ * that failure has no assignee either, and the sender isn't a workspace member to notify instead. */
+export async function resolveOwnerRecipients(workspaceId: string): Promise<string[]> {
   return resolveRecipients(workspaceId, null)
 }
 

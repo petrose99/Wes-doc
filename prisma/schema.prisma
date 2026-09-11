@@ -398,6 +398,11 @@ model Document {
   templateId        String?                  @map("template_id") @db.Uuid
   templateVersionId String?                  @map("template_version_id") @db.Uuid
   source            String
+  /// The sender's address, set only when source is "email" — carries the "who emailed this in"
+  /// fact from InboundEmailIntake forward onto the resulting Document, so a terminal failure can
+  /// be reported back to the workspace ("a document emailed by X couldn't be processed") without
+  /// joining back through the intake log by timing. Null for every other intake channel.
+  sourceEmail       String?                  @map("source_email")
   status            String                   @default("received")
   filename          String
   mimeType          String                   @map("mime_type")
