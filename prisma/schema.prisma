@@ -72,6 +72,7 @@ model User {
   matchResolutions   DocumentMatch[]     @relation("MatchResolver")
   createdPaymentRuns PaymentRun[]        @relation("PaymentRunCreator")
   resolvedGates      Gate[]              @relation("GateResolver")
+  verifiedSuppliers  Supplier[]          @relation("SupplierVerifier")
 
   @@map("users")
 }
@@ -2050,6 +2051,12 @@ model WorkspaceAutomationConfig {
   /// fields' low confidence block touchless for that template. Empty object = every field
   /// gates (historic behaviour), so opting in is a deliberate one-workspace change.
   criticalFieldsByTemplate Json @default("{}") @map("critical_fields_by_template")
+  /// #54: supplier-trust gate 4/6 from #40. Shape: `{ amount: number, currency?: string }`. A
+  /// bill from an unverified supplier whose total exceeds this threshold fires the soft gate.
+  /// `currency` is optional; unset means "resolve against workspace.baseCurrency at gate-eval
+  /// time" so a base-currency change picks up without a data backfill. #40 fixed the seed at
+  /// local-500.
+  supplierTrustThreshold Json @default("{\"amount\":500}") @map("supplier_trust_threshold")
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
   workspace         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -2206,6 +2213,15 @@ model Supplier {
   /// = no default (aging falls back to the extracted date or blank). Common values: 0 (due on
   /// receipt), 7, 14, 30, 60.
   paymentTermsDays Int?   @map("payment_terms_days")
+  /// #54: supplier-trust gate 4/6 from #40. `verifiedAt` is set the first time a workspace admin
+  /// confirms this supplier (the exception chip's inline-verify affordance, or a bulk-verify from
+  /// the settings surface). Once set, the trust gate stops firing on this supplier's bills;
+  /// clearing it (never done automatically today) puts them back into the exception queue for the
+  /// threshold. `verifiedById` records the admin who did it. Both null on newcomers, which is
+  /// what makes the gate fire in the first place.
+  verifiedAt    DateTime? @map("verified_at")
+  verifiedById  String?   @map("verified_by_id") @db.Uuid
+  verifiedBy    User?     @relation("SupplierVerifier", fields: [verifiedById], references: [id], onDelete: SetNull)
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
   workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)

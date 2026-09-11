@@ -30,6 +30,14 @@ const amountBandSchema = z.object({
   path: ["max"],
 })
 
+/** #54 supplier-trust threshold. `currency` is optional — the gate resolves it against
+ * `workspace.baseCurrency` at evaluation time when the setting doesn't pin one, so a
+ * workspace that later changes its base currency doesn't need a manual re-save. */
+const supplierTrustThresholdSchema = z.object({
+  amount: z.number().nonnegative(),
+  currency: z.string().length(3).optional(),
+})
+
 const updateSchema = z.object({
   autonomyLevel: z.enum(["suggest", "auto", "touchless"]).optional(),
   minConfidence: z.number().min(0).max(1).optional(),
@@ -38,6 +46,7 @@ const updateSchema = z.object({
   amountBands: z.array(amountBandSchema).max(10).optional(),
   blockOnWarnChecks: z.boolean().optional(),
   policyText: z.string().max(4000).nullable().optional(),
+  supplierTrustThreshold: supplierTrustThresholdSchema.optional(),
 })
 
 export type AutomationConfigUpdate = z.infer<typeof updateSchema>
@@ -83,6 +92,8 @@ export async function updateAutomationConfig(input: {
   if (patch.amountBands !== undefined) data.amountBands = patch.amountBands
   if (patch.blockOnWarnChecks !== undefined) data.blockOnWarnChecks = patch.blockOnWarnChecks
   if (patch.policyText !== undefined) data.policyText = patch.policyText
+  if (patch.supplierTrustThreshold !== undefined)
+    data.supplierTrustThreshold = patch.supplierTrustThreshold as unknown as Prisma.InputJsonValue
 
   const context = await getRequestAuditContext()
   const [updated] = await prisma.$transaction([
@@ -96,5 +107,15 @@ export async function updateAutomationConfig(input: {
       }, context),
     }),
   ])
+
+  // #54 DoD: a threshold change retroactively re-evaluates open supplier-trust exceptions.
+  // Runs after the update commits so a downstream error can never leave the workspace with
+  // a fresh threshold + stale exceptions. Import lazily so this module doesn't drag the
+  // gate runners into every automation-config caller.
+  if (patch.supplierTrustThreshold !== undefined) {
+    const { reevaluateOpenSupplierTrustGates } = await import("@/lib/gates/supplier-trust")
+    await reevaluateOpenSupplierTrustGates(input.workspaceId)
+  }
+
   return updated
 }

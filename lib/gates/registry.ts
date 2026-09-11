@@ -118,3 +118,12 @@ async function upsertGate(
  * singleton (not a class) so the import graph gives us "register once at module load"; tests
  * that need isolation reach for `createGateRegistry()` directly. */
 export const gateRegistry: GateRegistry = createGateRegistry()
+
+// Concrete gate registrations. Order matters — #40 fixed duplicate first (arrival de-noise),
+// jurisdiction-validity second (the load-bearing hard gate that reads the workspace's pack).
+// Additional gates (#53–#56: match, trust, confidence, warn-checks) register below in ticket
+// order. `register` throws on a duplicate `gateType`, so registrations here also double as the
+// one-runner-per-type assertion at module load.
+import { supplierTrustGateRunner } from "./supplier-trust"
+
+gateRegistry.register(supplierTrustGateRunner)
