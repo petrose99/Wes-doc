@@ -30,6 +30,15 @@ const amountBandSchema = z.object({
   path: ["max"],
 })
 
+/** #55 confidence-per-band bands. `upTo: null` marks the open-ended top band; every other
+ * row's `upTo` must be a positive number. `min` is the confidence floor (0–1). Sort order
+ * is normalised at gate-eval time (see `coerceConfidenceBands`), so a workspace can save
+ * rows in any order. */
+const confidenceBandSchema = z.object({
+  upTo: z.number().positive().nullable(),
+  min: z.number().min(0).max(1),
+})
+
 const updateSchema = z.object({
   autonomyLevel: z.enum(["suggest", "auto", "touchless"]).optional(),
   minConfidence: z.number().min(0).max(1).optional(),
@@ -38,6 +47,7 @@ const updateSchema = z.object({
   amountBands: z.array(amountBandSchema).max(10).optional(),
   blockOnWarnChecks: z.boolean().optional(),
   policyText: z.string().max(4000).nullable().optional(),
+  confidenceBands: z.array(confidenceBandSchema).max(10).optional(),
 })
 
 export type AutomationConfigUpdate = z.infer<typeof updateSchema>
@@ -83,6 +93,8 @@ export async function updateAutomationConfig(input: {
   if (patch.amountBands !== undefined) data.amountBands = patch.amountBands
   if (patch.blockOnWarnChecks !== undefined) data.blockOnWarnChecks = patch.blockOnWarnChecks
   if (patch.policyText !== undefined) data.policyText = patch.policyText
+  if (patch.confidenceBands !== undefined)
+    data.confidenceBands = patch.confidenceBands as unknown as Prisma.InputJsonValue
 
   const context = await getRequestAuditContext()
   const [updated] = await prisma.$transaction([
@@ -96,5 +108,15 @@ export async function updateAutomationConfig(input: {
       }, context),
     }),
   ])
+
+  // #55 DoD: editing the bands retroactively re-evaluates open confidence-band exceptions.
+  // Runs after the update commits so a downstream error can never leave the workspace with
+  // fresh bands + stale exceptions. Import lazily so this module doesn't drag the gate
+  // runners into every automation-config caller (same lazy-import policy as #53 / #54).
+  if (patch.confidenceBands !== undefined) {
+    const { reevaluateOpenConfidenceBandGates } = await import("@/lib/gates/confidence-band")
+    await reevaluateOpenConfidenceBandGates(input.workspaceId)
+  }
+
   return updated
 }

@@ -2050,6 +2050,13 @@ model WorkspaceAutomationConfig {
   /// fields' low confidence block touchless for that template. Empty object = every field
   /// gates (historic behaviour), so opting in is a deliberate one-workspace change.
   criticalFieldsByTemplate Json @default("{}") @map("critical_fields_by_template")
+  /// #55: confidence-per-band gate 5/6 from #40. Shape: `[{ upTo: number|null, min: number }]`
+  /// sorted by `upTo` ascending, last row has `upTo: null` (the open-ended top band). A bill
+  /// whose extraction confidence falls below its band's `min` fires the soft gate. #40 fixed
+  /// the seed at 0.85 / 0.92 / 1.00 across 0–500 / 500–5k / 5k+. Kept separate from
+  /// `amountBands` above because they answer different questions: `amountBands` relaxes the
+  /// autopublish floor, this holds bills that miss the floor in the exception queue.
+  confidenceBands   Json      @default("[{\"upTo\":500,\"min\":0.85},{\"upTo\":5000,\"min\":0.92},{\"upTo\":null,\"min\":1.0}]") @map("confidence_bands")
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
   workspace         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
