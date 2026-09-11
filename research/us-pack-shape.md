@@ -41,7 +41,7 @@ Source: https://www.irs.gov/filing/e-file-information-returns
 | Economy (BEA rank, current-$ GDP) | 1st | 2nd | 4th | 3rd |
 | State rate | 7.25% (incl. 1.25% local base) | 6.25% | 6% | 4% |
 | Local layer | district taxes 0.10–2.00%+ | up to 2% (8.25% cap) | county surtax (DR-15DSS) | county/city + 0.375% MCTD |
-| Timely-filer discount | none found | 0.5% (+1.25% prepay) | 2.5% of first $1,200, cap $30 | none found |
+| Timely-filer discount | none found | 0.5% (+1.25% prepay) | 2.5% of first $1,200, cap $30 | vendor collection credit 5%, max $200 per quarter (Pub 20 / TB-ST-925) |
 | Economic nexus | $500k | $500k (safe harbor) | $100k | $500k **and** >100 sales |
 
 Sources: rates & discounts — https://www.cdtfa.ca.gov/taxes-and-fees/sut-rates-description.htm, https://comptroller.texas.gov/taxes/sales/, https://floridarevenue.com/taxes/taxesfees/Pages/sales_tax.aspx, https://www.tax.ny.gov/pubs_and_bulls/tg_bulletins/st/sales_tax_rates_additional_sales_taxes_and_fees.htm (TB-ST-825); nexus — https://www.cdtfa.ca.gov/industry/wayfair.htm (AB 147, $500,000, eff. 2019-04-01), https://comptroller.texas.gov/taxes/sales/remote-sellers.php ($500,000 preceding 12 months; optional single local use-tax rate 1.75%), https://floridarevenue.com/taxes/taxesfees/Pages/sales_tax.aspx ($100,000 prior calendar year), https://www.tax.ny.gov/pubs_and_bulls/publications/sales/nexus.htm ($500,000 and >100 sales in preceding four quarters); economy rank — https://www.bea.gov/data/gdp/gdp-state (specific 2024 dollar figures not extracted from the BEA release PDF; rank order used instead).
