@@ -80,22 +80,30 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
     .filter((item) => !item.href.startsWith("settings/") && item.href !== "expenses" && item.href !== "dictation" && item.href !== "health")
     .map((item) => ({ href: `${base}/${item.href}`, label: item.label, icon: ICONS[item.icon] ?? Files, exact: false }))
 
-  const otherModuleItems = moduleWorkItems.filter((item) => item.href !== `${base}/review`)
+  // Controls (the touchless-automation module's nav item) is hoisted out of the module bucket
+  // into the primary spine, directly under Documents: it is the levers that govern the document
+  // pipeline, so adjacency to the pipeline it controls is the information architecture.
+  const controlsItem = moduleWorkItems.find((item) => item.href === `${base}/automation`)
+  const otherModuleItems = moduleWorkItems.filter((item) => item.href !== `${base}/review` && item.href !== `${base}/automation`)
 
-  // Primary spine. Dashboard is the workspace overview (not a primary "job" surface but the natural
-  // TODAY entry point). Then the three peer verbs: intake, compute, book.
+  // Primary spine, in workflow order: Documents (intake) with Controls (its governing levers)
+  // directly beneath, Finance (booked outcome), Archive (the permanent record everything lands
+  // in), and Worksheets (compute over any of it) closing the group.
   const primaryItems = [
     { href: base, label: "Dashboard", icon: BarChart3, exact: true, badge: undefined as number | undefined },
     { href: `${base}/pipeline`, label: "Documents", icon: ListChecks, exact: false, badge: pipelineReviewCount > 0 ? pipelineReviewCount : undefined, tourTarget: "extraction" as const },
-    { href: `${base}/worksheets`, label: "Worksheets", icon: Table2, exact: false, badge: sheetsUnplacedCount > 0 ? sheetsUnplacedCount : undefined, tourTarget: "sheets" as const },
+    ...(controlsItem ? [controlsItem] : []),
     ...(accountingEnabled ? [{ href: `${base}/finance`, label: "Finance", icon: Landmark, exact: false, badge: financePushableCount > 0 ? financePushableCount : undefined }] : []),
+    // "Archive" is the accountant's own word for the permanent source-document record (Dext and
+    // Hubdoc both name this surface Archive). Route stays /library — same label-over-URL stance
+    // as Controls (/automation) and Finance's /accounting redirect.
+    { href: `${base}/library`, label: "Archive", icon: Library, exact: false, tourTarget: "library" as const },
+    { href: `${base}/worksheets`, label: "Worksheets", icon: Table2, exact: false, badge: sheetsUnplacedCount > 0 ? sheetsUnplacedCount : undefined, tourTarget: "sheets" as const },
   ]
 
-  // Secondary destinations. Under a hairline, no caption — the divider is the sectioning.
-  const secondaryItems = [
-    { href: `${base}/library`, label: "Docu Search", icon: Library, exact: false, tourTarget: "library" as const },
-    ...otherModuleItems,
-  ]
+  // Secondary destinations: per-workspace module extras only. Under a hairline, no caption — the
+  // divider is the sectioning.
+  const secondaryItems = otherModuleItems
 
   const bottomItems = [
     { href: `${base}/settings/workspace`, label: "Settings", icon: Settings, exact: false },

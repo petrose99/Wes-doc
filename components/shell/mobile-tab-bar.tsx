@@ -5,7 +5,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 
 /** Mobile bottom tab bar. Five slots, mirroring the desktop rail's primary spine:
- * Dashboard, Documents, Worksheets, Finance (when the ledger integration is enabled) or Docu Search
+ * Dashboard, Documents, Worksheets, Finance (when the ledger integration is enabled) or Archive
  * as a fallback fifth slot, then More. Same core-first framing as the desktop rail so a person on
  * mobile learns the same shape of the product as a person on desktop.
  *
@@ -23,7 +23,7 @@ export function MobileTabBar({ workspaceId, pipelineReviewCount = 0, sheetsUnpla
   const base = `/workspaces/${workspaceId}`
   const fifthSlot = accountingEnabled
     ? { href: `${base}/finance`, label: "Finance", icon: Landmark, exact: false as const }
-    : { href: `${base}/library`, label: "Search", icon: Library, exact: false as const }
+    : { href: `${base}/library`, label: "Archive", icon: Library, exact: false as const }
 
   const tabs = [
     { href: base, label: "Dashboard", icon: BarChart3, exact: true, badge: undefined as number | undefined },

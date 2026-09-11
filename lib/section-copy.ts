@@ -28,9 +28,9 @@ export const SECTION_COPY: Record<SectionKey, SectionCopy> = {
   },
   sheets: {
     banner:
-      "Worksheets are spreadsheets you compute in; bring in your financial statements, invoices, or any spreadsheet — or pull documents already in Docu Search. Use built-in formulas, the =AI() function, or ask the AI assistant to do the work.",
+      "Worksheets are spreadsheets you compute in; bring in your financial statements, invoices, or any spreadsheet — or pull documents already in your Archive. Use built-in formulas, the =AI() function, or ask the AI assistant to do the work.",
     howItWorks: [
-      "Import your own xlsx/csv files (financial statements, reports, etc.) or pull documents from Docu Search.",
+      "Import your own xlsx/csv files (financial statements, reports, etc.) or pull documents from your Archive.",
       "Use formulas, the =AI() function, and the AI assistant to analyse and compute.",
       "Every cell from an extraction keeps provenance — right-click to jump back to the source document.",
     ],
@@ -49,7 +49,7 @@ export const SECTION_COPY: Record<SectionKey, SectionCopy> = {
 export const ONBOARDING_STEPS = [
   { key: "upload", label: "Add your first document", section: "extraction" as SectionKey },
   { key: "review", label: "Review a document", section: "extraction" as SectionKey },
-  { key: "find_library", label: "Find it in Docu Search", section: "library" as SectionKey },
+  { key: "find_library", label: "Find it in the Archive", section: "library" as SectionKey },
   { key: "pull_sheet", label: "Pull it into a worksheet", section: "sheets" as SectionKey },
   { key: "ask_question", label: "Ask a question", section: "sheets" as SectionKey },
 ] as const
@@ -63,6 +63,6 @@ export type OnboardingStepKey = (typeof ONBOARDING_STEPS)[number]["key"]
  * is written but never imported anywhere, so the launcher it describes is not in the app. */
 export const TOUR_STEPS = [
   { target: "extraction", title: "Documents", description: "Add and review documents here — through Inbox, Review, Approved, Synced, and Paid." },
-  { target: "library", title: "Docu Search", description: "Your permanent, searchable document library." },
+  { target: "library", title: "Archive", description: "Your permanent, searchable document record." },
   { target: "sheets", title: "Worksheets", description: "Spreadsheets with AI — pull documents in and compute." },
 ] as const

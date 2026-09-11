@@ -12,6 +12,6 @@ export function ReadyBanner({ count }: { workspaceId?: string; count: number; do
     <CheckCircle2 className="h-3.5 w-3.5" />
     <span className="font-medium">{count} approved</span>
     <span className="text-emerald-600">·</span>
-    <span className="text-emerald-600/90">in Docu Search and syncing to accounting automatically — nothing left to click.</span>
+    <span className="text-emerald-600/90">in the Archive and syncing to accounting automatically — nothing left to click.</span>
   </div>
 }

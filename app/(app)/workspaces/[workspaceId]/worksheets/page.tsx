@@ -38,7 +38,7 @@ export default async function SheetsPage({ params, searchParams }: {
     <header>
       <h1 className="text-xl font-bold text-slate-900">Worksheets</h1>
       <p className="mt-1 hidden text-sm text-slate-500 sm:block">
-        Bring in your financial statements, invoices, or any spreadsheet — or pull documents already in Docu Search. Use built-in spreadsheet formulas, the =AI() function, or ask the AI assistant to do the heavy lifting.
+        Bring in your financial statements, invoices, or any spreadsheet — or pull documents already in your Archive. Use built-in spreadsheet formulas, the =AI() function, or ask the AI assistant to do the heavy lifting.
       </p>
     </header>
 
@@ -58,7 +58,7 @@ export default async function SheetsPage({ params, searchParams }: {
       />
       <SheetsCreateCard
         icon="extraction"
-        title="From Docu Search"
+        title="From Archive"
         description={unplacedCount > 0 ? `${unplacedCount} document${unplacedCount === 1 ? "" : "s"} ready to pull in.` : "Pull invoices and documents already in your library."}
         workspaceId={workspaceId}
         href={`${base}/library?pick=sheet`}
