@@ -10,16 +10,18 @@ const rows: { doc: string; supplier: string; total: string; status: "approved" |
   { doc: "statement-feb.pdf", supplier: "Metro Bank", total: "—", status: "approved" },
 ]
 
-/** The rail the app actually renders (components/shell/sidebar.tsx): same labels, same order, same
- * icons. The lower group (Settings, Activity, Health Checks) is left out — this is a shot of where
- * the work happens, not a full chrome trace. */
+/** Mirrors the real app rail (components/shell/sidebar.tsx): TODAY caption, then the primary spine
+ * in workflow order — Dashboard, Documents (with the review badge), Controls, Finance (with the
+ * push-ready badge), Archive, Worksheets. The lower group (Settings, Activity, Health) is trimmed
+ * — this is a shot of where the work happens, not the full chrome. Kept in sync with the live
+ * app so a first-time visitor's mental model matches their first workspace visit. */
 const NAV: { label: string; icon: typeof BarChart3; active?: boolean; badge?: string }[] = [
   { label: "Dashboard", icon: BarChart3 },
   { label: "Documents", icon: ListChecks, active: true, badge: "7" },
-  { label: "Sheets", icon: Table2 },
-  { label: "Docu Search", icon: Library },
-  { label: "Accounting", icon: Landmark },
-  { label: "Automation", icon: Zap },
+  { label: "Controls", icon: Zap },
+  { label: "Finance", icon: Landmark, badge: "5" },
+  { label: "Archive", icon: Library },
+  { label: "Worksheets", icon: Table2 },
 ]
 
 const statusStyle: Record<string, string> = {
@@ -28,9 +30,13 @@ const statusStyle: Record<string, string> = {
   dupe: "bg-red-50 text-red-700",
 }
 
-/** The homepage hero. The mock browser window and its scan-line sweep are decorative and never
- * react to anything, so — like .doc-scan in app/globals.css — they're plain CSS, not a client
- * component: nothing here needs an IntersectionObserver. */
+/** The homepage hero. Wedge in the headline: DocuBite is the AP system that works with an existing
+ * ledger OR brings its own — every competitor is one or the other, never both. The mock browser
+ * window shows the real app's rail and pipeline stages so the visitor sees what they will actually
+ * open on the other side of the trial button.
+ *
+ * The scan-line sweep is decorative and never reacts to anything, so — like .doc-scan in
+ * app/globals.css — it's plain CSS, not a client component: nothing here needs an IntersectionObserver. */
 export function Hero() {
   return (
     <section
@@ -43,15 +49,14 @@ export function Hero() {
         <div className="min-w-0 flex-1 basis-[400px]">
           <span className="inline-flex items-center gap-2 rounded-full border border-cream-200 bg-white px-3.5 py-1.5 text-[0.78rem] font-semibold text-emerald-700 shadow-sm">
             <span className="db-pulse-dot h-1.5 w-1.5 rounded-full bg-emerald-500" style={{ animation: "db-pulse 2.4s ease-in-out infinite" }} />
-            AI accounts payable, end to end
+            Documents in. Books out.
           </span>
           <h1 className="mt-5 text-balance font-display text-[clamp(2.4rem,4.6vw,4.05rem)] font-extrabold leading-[1.02] tracking-[-0.038em] text-stone-950">
-            Bills in by email.{" "}
-            <span style={{ backgroundImage: "linear-gradient(180deg,transparent 56%,#6EE7B7 56%,#6EE7B7 93%,transparent 93%)", padding: "0 .04em" }}>Coded, checked, approved</span>{" "}
-            — ready to pay.
+            Works with your books —{" "}
+            <span style={{ backgroundImage: "linear-gradient(180deg,transparent 56%,#6EE7B7 56%,#6EE7B7 93%,transparent 93%)", padding: "0 .04em" }}>or brings its own</span>.
           </h1>
           <p className="mt-6 max-w-[34rem] text-pretty text-[1.08rem] leading-[1.62] text-stone-600">
-            DocuBite runs your accounts-payable loop: invoices arrive by email or API, extraction reads even the hard cases (handwriting, phone photos, scans), fraud checks freeze a supplier that quietly changed its bank details, 2- and 3-way matching ties them to the PO, approvals route by amount, and the bills sync to QuickBooks, Xero or Bigcapital. When you&apos;re ready to pay, we hand you a bank-ready payment file — you stay on the rails you already trust.
+            Bills arrive by email, upload or API. DocuBite reads even the hard cases — handwriting, phone photos, scans — checks for the frauds nobody else looks for, routes approvals, then posts to <strong className="font-semibold text-stone-800">QuickBooks, Xero or your ERP</strong> — or the double-entry ledger built into DocuBite, if you&apos;d rather start whole. Payment stays on your bank&apos;s rails.
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-3">
             <Link href="/signup" className="group inline-flex h-12 items-center rounded-[10px] bg-emerald-700 px-6.5 text-[0.98rem] font-bold text-white shadow-[0_1px_2px_rgba(15,23,42,.08),0_10px_26px_rgba(4,120,87,.24)] transition-colors hover:bg-emerald-800">
@@ -70,7 +75,7 @@ export function Hero() {
               <span className="h-2.5 w-2.5 rounded-full bg-slate-300" />
               <span className="h-2.5 w-2.5 rounded-full bg-slate-300" />
               <span className="h-2.5 w-2.5 rounded-full bg-slate-300" />
-              <span className="ml-2 text-[0.72rem] font-semibold text-slate-500">Extraction · March close · 42 documents</span>
+              <span className="ml-2 text-[0.72rem] font-semibold text-slate-500">Documents · March close · 42 bills</span>
             </div>
             <div className="flex flex-wrap">
               <div className="flex flex-none basis-[168px] flex-col border-r border-slate-200 bg-[#EEF1F2] p-2.5">
@@ -78,7 +83,7 @@ export function Hero() {
                   <BiteMark className="h-4 w-4 text-emerald-700" />
                   <span className="font-display text-[0.82rem] font-bold tracking-[-0.02em] text-stone-900">DocuBite</span>
                 </div>
-                <div className="px-1.5 pb-1 text-[0.6rem] font-bold uppercase tracking-wide text-slate-400">Workspace</div>
+                <div className="px-1.5 pb-1 text-[0.6rem] font-bold uppercase tracking-wide text-slate-400">Today</div>
                 <div className="flex flex-col gap-0.5">
                   {NAV.map((item) => (
                     <div

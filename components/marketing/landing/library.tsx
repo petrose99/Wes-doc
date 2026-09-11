@@ -8,12 +8,16 @@ const SOURCES = [
   { doc: "sigma-aldrich-mar.pdf", page: "p.2", match: "89% match", quote: "“…Sigma-Aldrich Chemie GmbH — solvents, buffers and reference materials…”", delay: 1.2 },
 ]
 
+/** Archive — the section that used to be called Docu Search on the landing. Renamed to match the
+ * app; the surface's job is the permanent, searchable record every reviewed document lands in.
+ * Search is the hero interaction inside the page (the demo shot leads with the question box) so
+ * the archive framing does not undersell the retrieval power. */
 export function Library() {
   const { ref, played } = usePlayOnScroll()
 
   return (
     <section
-      id="library"
+      id="archive"
       ref={ref}
       className="relative overflow-hidden bg-cream-50 py-14 md:py-22"
       style={{ backgroundImage: "radial-gradient(#e7dcc7 1px,transparent 1.4px)", backgroundSize: "24px 24px" }}
@@ -21,12 +25,11 @@ export function Library() {
       <div aria-hidden className="pointer-events-none absolute -left-32 -top-28 h-96 w-96 rounded-full" style={{ background: "radial-gradient(circle, rgba(16,185,129,.09), transparent 70%)" }} />
       <div className="relative mx-auto flex max-w-6xl flex-wrap items-center gap-8 md:gap-13 px-5">
         <div className="min-w-0 flex-1 basis-[340px]">
-          <span className="text-[0.74rem] font-bold uppercase tracking-[.08em] text-emerald-700">Docu Search</span>
-          <h2 className="mt-3 text-balance font-display text-[clamp(1.9rem,3vw,2.6rem)] font-bold leading-[1.08] tracking-[-0.03em] text-stone-950">
+          <h2 className="text-balance font-display text-[clamp(1.9rem,3vw,2.6rem)] font-bold leading-[1.08] tracking-[-0.03em] text-stone-950">
             Ask a question, get the document that answers it
           </h2>
           <p className="mt-4 max-w-[31rem] text-pretty text-[1.02rem] leading-[1.62] text-stone-600">
-            Every uploaded file is searchable by what&apos;s actually inside it — meaning and keywords both. Ask Docu Search a plain question and it answers from your own documents, with each answer cited back to the filename and page, one click from the source.
+            Every reviewed document lands in the Archive automatically — the permanent record of what came in, what it said, and when. Search it by meaning as well as words: ask a plain question and DocuBite answers from your own documents, each answer cited to the filename and page it came from, one click from the source. Auditors get a link; you keep the source.
           </p>
         </div>
 
