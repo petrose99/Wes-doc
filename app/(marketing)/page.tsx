@@ -1,5 +1,4 @@
 import { Accounting } from "@/components/marketing/landing/accounting"
-import { ApLoop } from "@/components/marketing/landing/ap-loop"
 import { Automation } from "@/components/marketing/landing/automation"
 import { Comparison } from "@/components/marketing/landing/comparison"
 import { Extraction } from "@/components/marketing/landing/extraction"
@@ -12,6 +11,7 @@ import { Intake } from "@/components/marketing/landing/intake"
 import { Library } from "@/components/marketing/landing/library"
 import { MultiCurrency } from "@/components/marketing/landing/multi-currency"
 import { Pipeline } from "@/components/marketing/landing/pipeline"
+import { Proof } from "@/components/marketing/landing/proof"
 import { Provenance } from "@/components/marketing/landing/provenance"
 import { ReadsStrip } from "@/components/marketing/landing/reads-strip"
 import { Sheets } from "@/components/marketing/landing/sheets"
@@ -27,9 +27,9 @@ export default function Home() {
   return <>
     <Hero />
     <ReadsStrip />
-    <ApLoop />
-    <InlineTrialCta />
+    <Proof />
     <HowItWorks />
+    <InlineTrialCta />
     <Intake />
     <Extraction />
     <Provenance />

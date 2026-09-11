@@ -2,11 +2,10 @@
 // these helpers trust the workspaceId they are handed. Server actions live in
 // app/(app)/workspaces/[workspaceId]/review-actions.ts and do the auth.
 import { track } from "@/lib/analytics"
-import { canDecideStage, decideStage, findCurrentStage } from "@/lib/approvals/engine"
+import { canDecideStage, decideStage, findCurrentStage, toWorkflowStageInputs } from "@/lib/approvals/engine"
 import { isPaymentConfirmationRequired } from "@/lib/doc-types"
 import { auditEventData, getRequestAuditContext } from "@/lib/audit"
 import { prisma } from "@/lib/db"
-import { decimalToNumber } from "@/lib/money"
 import { cache } from "react"
 
 export const REVIEW_TASK_STATUSES = ["open", "in_review", "approved", "rejected"] as const
@@ -201,7 +200,7 @@ export async function decideReviewTaskStage(input: { workspaceId: string; taskId
   if (!task) throw new Error("review_task_not_found")
   if (!task.workflow || task.currentStageIndex === null) throw new Error("review_task_has_no_workflow")
 
-  const stages = task.workflow.stages.map((stage) => ({ ...stage, minAmount: decimalToNumber(stage.minAmount) }))
+  const stages = toWorkflowStageInputs(task.workflow.stages)
   const currentStage = findCurrentStage(stages, task.currentStageIndex)
   if (!currentStage) throw new Error("workflow_stage_not_found")
   if (!canDecideStage({ stage: currentStage, actorRole: input.actorRole, actorId: input.actorId })) throw new Error("stage_requires_owner")

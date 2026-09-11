@@ -98,6 +98,12 @@
   .font-display {
     font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
   }
+  /* Anchor targets scroll clear of the sticky marketing header (~64px). Applied to every
+   * section carrying an id so nav clicks and deep links never decapitate the headline. */
+  section[id] {
+    scroll-margin-top: 5rem;
+  }
+
   /* The dotted perforation between marketing sections — a tear-here line, echoing the bite. */
   .perforation {
     background-image: radial-gradient(circle, currentColor 1.5px, transparent 1.6px);

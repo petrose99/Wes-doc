@@ -13,9 +13,20 @@ import { getWorkspacesForUser } from "@/models/workspaces"
  * local users.id, since the Supabase migration. This intentionally skips resolveOrProvisionUser
  * (unlike getViewerUser) — a first-ever visit before the local row is provisioned just shows the
  * signed-out nav, which is a fine outcome for a marketing page and cheaper than provisioning one
- * on every anonymous pageview. */
+ * on every anonymous pageview.
+ *
+ * The session lookup is capped at 2.5s and failure-tolerant. The auth service being slow or down
+ * must never take the marketing site with it: a visitor with a stale session cookie was getting a
+ * 60s hang and then Caddy's 502 whenever Supabase timed out, because getSession() retries 504s.
+ * On timeout or error the page simply renders the signed-out nav — the only cost is a "Sign in"
+ * button shown to someone who is signed in, and only while auth is degraded. */
+const SESSION_LOOKUP_TIMEOUT_MS = 2500
+
 export default async function MarketingLayout({ children }: { children: React.ReactNode }) {
-  const session = await getSession()
+  const session = await Promise.race([
+    getSession().catch(() => null),
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), SESSION_LOOKUP_TIMEOUT_MS)),
+  ])
   const user = session ? await getUserBySupabaseUserId(session.user.id) : null
   const workspace = user ? (await getWorkspacesForUser(user.id))[0] : null
   const workspaceHref = user ? (workspace ? `/workspaces/${workspace.id}` : "/workspaces") : undefined

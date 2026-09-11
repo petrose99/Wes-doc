@@ -1,5 +1,11 @@
 {$DOCUBITE_DOMAIN} {
-	reverse_proxy web:7331
+	# Hold and retry requests while the web container restarts (deploys, crashes) instead of
+	# failing them: visitors mid-deploy see a slower load, never an error page. 60s comfortably
+	# covers a container recreate + prisma migrate deploy + next start (~10-30s in practice).
+	reverse_proxy web:7331 {
+		lb_try_duration 60s
+		lb_try_interval 2s
+	}
 }
 
 # www is a redirect, not a second origin — keeps one canonical host so

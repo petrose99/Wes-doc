@@ -91,7 +91,7 @@ export function Pipeline() {
               </div>
               <div className={`flex flex-wrap items-center gap-2 rounded-lg border border-violet-100 bg-violet-50 px-2.5 py-2 text-[0.76rem] text-indigo-800 ${played ? IN : ""}`} style={played ? { animationDelay: ".95s" } : undefined}>
                 <span className="min-w-0 flex-1 truncate">INV-4471 (1).pdf</span>
-                <span className="rounded bg-indigo-100 px-1.5 py-px text-[0.64rem] font-bold text-indigo-800">dupe</span>
+                <span className="rounded bg-red-100 px-1.5 py-px text-[0.64rem] font-bold text-red-700">dupe</span>
               </div>
             </div>
           </div>
@@ -103,17 +103,17 @@ export function Pipeline() {
             </div>
             <p className="mb-3 mt-1.5 text-[0.76rem] text-stone-500">Approved, exportable</p>
             <div className="flex flex-col gap-1.5">
-              <div className={`flex flex-wrap items-center gap-2 rounded-lg border border-emerald-50 bg-[#F8FAF9] px-2.5 py-2 text-[0.76rem] text-slate-700 ${played ? IN : ""}`} style={played ? { animationDelay: "1.4s" } : undefined}>
+              <div className={`flex flex-wrap items-center gap-2 rounded-lg border border-emerald-50 bg-[#F8FAF9] px-2.5 py-2 text-[0.76rem] text-slate-700 ${played ? IN : ""}`} style={played ? { animationDelay: "1s" } : undefined}>
                 <span className="min-w-0 flex-1 truncate">INV-4471.pdf</span>
                 <span className="font-bold text-slate-900">£2,475.60</span>
               </div>
-              <div className={`flex flex-wrap items-center gap-2 rounded-lg border border-emerald-50 bg-[#F8FAF9] px-2.5 py-2 text-[0.76rem] text-slate-700 ${played ? IN : ""}`} style={played ? { animationDelay: "1.6s" } : undefined}>
+              <div className={`flex flex-wrap items-center gap-2 rounded-lg border border-emerald-50 bg-[#F8FAF9] px-2.5 py-2 text-[0.76rem] text-slate-700 ${played ? IN : ""}`} style={played ? { animationDelay: "1.15s" } : undefined}>
                 <span className="min-w-0 flex-1 truncate">scan_0043.jpg</span>
                 <span className="font-bold text-slate-900">£86.40</span>
               </div>
-              <div className={`flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-2 text-[0.76rem] font-semibold text-emerald-800 ${played ? POP : ""}`} style={played ? { animationDelay: "2s" } : undefined}>
+              <div className={`flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-2 text-[0.76rem] font-semibold text-emerald-800 ${played ? POP : ""}`} style={played ? { animationDelay: "1.4s" } : undefined}>
                 <Check aria-hidden className="h-3.5 w-3.5 shrink-0 text-emerald-700" strokeWidth={2.6} />
-                23 rows exported to CSV
+                23 approved bills exported to CSV
               </div>
             </div>
           </div>

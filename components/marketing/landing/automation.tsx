@@ -100,7 +100,7 @@ export function Automation() {
 
               <div
                 className={`flex items-center gap-2.5 border-t border-emerald-100 bg-emerald-50 px-5 py-3.5 ${played ? POP : ""}`}
-                style={played ? { animationDelay: "1.7s" } : undefined}
+                style={played ? { animationDelay: "1.2s" } : undefined}
               >
                 <Sparkles aria-hidden className="h-4 w-4 shrink-0 text-emerald-700" strokeWidth={2.2} />
                 <p className="text-[0.84rem] font-semibold text-emerald-900">
