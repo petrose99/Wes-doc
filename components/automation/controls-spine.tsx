@@ -1,4 +1,4 @@
-import { STAGE_LABELS, type PipelineStage } from "@/lib/documents/stages"
+import { STAGE_LABELS, PIPELINE_STAGES, type PipelineStage } from "@/lib/documents/stages"
 import type { AutonomyLevel } from "@/models/automation-config"
 import { ArrowRight, Banknote, CheckCircle2, Inbox, SearchCheck, Send } from "lucide-react"
 import Link from "next/link"
@@ -76,9 +76,19 @@ export function ControlsSpine({ workspaceId, counts, visibleStages, level, minCo
   // wraps or clips against its slot — it just bleeds over its neighbors. Wrapping (not truncating)
   // is the right failure mode for a 2-4 word label: "Approval workflows" as two short lines stays
   // fully legible; the same label ellipsized to "Approva…" does not.
+  // Screen-reader context for a joint's link. Read as ink, "Approval workflows" is the shortest
+  // legible label; read in tab order with no visible spatial cues, the same string is context-free.
+  // Naming the handoff it governs closes that gap without lengthening the visible label at all.
+  const jointAria = (joint: Joint): string => {
+    const idx = PIPELINE_STAGES.indexOf(joint.before)
+    const from = idx > 0 ? STAGE_LABELS[PIPELINE_STAGES[idx - 1]] : STAGE_LABELS[joint.before]
+    const to = STAGE_LABELS[joint.before]
+    return `${joint.label} — governs the handoff from ${from} to ${to}`
+  }
+
   const annotation = (joint: Joint): ReactNode => joint.href
-    ? <Link href={joint.href} className="block w-full text-[11px] font-medium leading-tight text-emerald-700 underline-offset-2 hover:text-emerald-800 hover:underline">{joint.label}</Link>
-    : <span className="block w-full text-[11px] leading-tight text-slate-400">{joint.label}</span>
+    ? <Link href={joint.href} aria-label={jointAria(joint)} className="block w-full text-[11px] font-medium leading-tight text-emerald-700 underline-offset-2 hover:text-emerald-800 hover:underline">{joint.label}</Link>
+    : <span className="block w-full text-[11px] leading-tight text-slate-400" aria-label={jointAria(joint)}>{joint.label}</span>
 
   // A real CSS grid, not flexbox, for the desktop band — annotations that wrap to two lines must
   // never push the arrow row out of alignment across columns. A grid's rows size independently:
