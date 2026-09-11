@@ -30,6 +30,17 @@ const amountBandSchema = z.object({
   path: ["max"],
 })
 
+/** #53 match-variance tolerance. `floor.currency` is optional — the gate resolves it against
+ * `workspace.baseCurrency` at evaluation time when the setting doesn't pin one, so a
+ * workspace that later changes its base currency doesn't need a manual re-save. */
+const matchToleranceSchema = z.object({
+  percent: z.number().min(0).max(1),
+  floor: z.object({
+    amount: z.number().nonnegative(),
+    currency: z.string().length(3).optional(),
+  }),
+})
+
 const updateSchema = z.object({
   autonomyLevel: z.enum(["suggest", "auto", "touchless"]).optional(),
   minConfidence: z.number().min(0).max(1).optional(),
@@ -38,6 +49,7 @@ const updateSchema = z.object({
   amountBands: z.array(amountBandSchema).max(10).optional(),
   blockOnWarnChecks: z.boolean().optional(),
   policyText: z.string().max(4000).nullable().optional(),
+  matchTolerance: matchToleranceSchema.optional(),
 })
 
 export type AutomationConfigUpdate = z.infer<typeof updateSchema>
@@ -83,6 +95,7 @@ export async function updateAutomationConfig(input: {
   if (patch.amountBands !== undefined) data.amountBands = patch.amountBands
   if (patch.blockOnWarnChecks !== undefined) data.blockOnWarnChecks = patch.blockOnWarnChecks
   if (patch.policyText !== undefined) data.policyText = patch.policyText
+  if (patch.matchTolerance !== undefined) data.matchTolerance = patch.matchTolerance as unknown as Prisma.InputJsonValue
 
   const context = await getRequestAuditContext()
   const [updated] = await prisma.$transaction([
@@ -96,5 +109,14 @@ export async function updateAutomationConfig(input: {
       }, context),
     }),
   ])
+
+  // #53 DoD: a tolerance change retroactively re-evaluates open match-variance exceptions.
+  // Runs after the update commits so a downstream error can never leave the workspace with
+  // fresh tolerance + stale exceptions. Import lazily so this file, imported from a "use
+  // server" module chain, doesn't drag the gate runners into every automation-config caller.
+  if (patch.matchTolerance !== undefined) {
+    const { reevaluateOpenMatchVarianceGates } = await import("@/lib/gates/match-variance")
+    await reevaluateOpenMatchVarianceGates(input.workspaceId)
+  }
   return updated
 }
