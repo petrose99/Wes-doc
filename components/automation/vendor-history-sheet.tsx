@@ -7,6 +7,14 @@ import { Pill, Sheet, Th } from "@/components/automation/automation-ui"
 import { PinVendorHistoryButton } from "@/components/automation/pin-vendor-history-button"
 import type { VendorHistoryRow } from "@/models/vendor-history"
 
+/** "expense_receipt" → "Expense receipt", "category" → "Category" — the table shows the person's
+ * words for these, not the template registry's snake_case codes. Purely presentational: search
+ * still matches the raw code too, and the pin action keeps sending the raw keys. */
+const humanize = (code: string) => {
+  const spaced = code.replace(/_/g, " ")
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1)
+}
+
 /** The Vendors tab's history table, split into its own client component for one reason: search.
  * A workspace with 200 vendors turned this into a Ctrl+F exercise — every row was rendered with
  * no way to narrow it down. Filtering happens over the page's already-fetched rows (the same
@@ -43,9 +51,9 @@ export function VendorHistorySheet({ workspaceId, rows, pinnedRuleIds, isOwner }
       : <Sheet minWidth={720} head={<>
           <Th>Vendor</Th>
           <Th>Document type</Th>
-          <Th align="right">Confirmed</Th>
-          <Th>Coding</Th>
-          <Th>Behaviour</Th>
+          <Th align="right">Reviewed so far</Th>
+          <Th>What gets filled in</Th>
+          <Th>On the next document</Th>
           {isOwner && <Th>{""}</Th>}
         </>}>
           {filtered.map((row) => {
@@ -55,15 +63,15 @@ export function VendorHistorySheet({ workspaceId, rows, pinnedRuleIds, isOwner }
             return (
               <tr key={`${row.supplier}::${row.templateCode}`} className="align-top">
                 <td className="py-3 pr-4 font-medium text-slate-900">{row.supplier}</td>
-                <td className="py-3 pr-4 text-slate-500">{row.templateCode}</td>
+                <td className="py-3 pr-4 text-slate-500">{humanize(row.templateCode)}</td>
                 <td className="py-3 pr-4 text-right tabular-nums text-slate-700">{row.totalConfirmed}</td>
                 <td className="py-3 pr-4">
                   <ul className="space-y-1">
                     {Object.entries(row.prior.byKey).map(([key, stat]) => (
                       <li key={key} className="flex flex-wrap items-baseline gap-x-2 text-[13px]">
-                        <span className="text-slate-500">{key}</span>
+                        <span className="text-slate-500">{humanize(key)}</span>
                         <span className="font-medium text-slate-900">{stat.modalValue}</span>
-                        <span className="tabular-nums text-slate-400">
+                        <span className="tabular-nums text-slate-400" title={`${stat.support} reviewed documents agreed ${Math.round(stat.agreement * 100)}% of the time`}>
                           {Math.round(stat.agreement * 100)}% of {stat.support}
                         </span>
                       </li>
@@ -72,7 +80,7 @@ export function VendorHistorySheet({ workspaceId, rows, pinnedRuleIds, isOwner }
                 </td>
                 <td className="py-3 pr-4">
                   {row.willAutoApply
-                    ? <Pill state="auto">Codes itself</Pill>
+                    ? <Pill state="auto">Fills itself in</Pill>
                     : <Pill state="idle">Asks the AI</Pill>}
                 </td>
                 {isOwner && <td className="py-3">

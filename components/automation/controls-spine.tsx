@@ -53,7 +53,7 @@ export function ControlsSpine({ workspaceId, counts, visibleStages, level, minCo
     : LEVEL_LABELS[level]
 
   const joints: Joint[] = [
-    { before: "review", label: "Vendor coding", href: `${base}/automation/vendors` },
+    { before: "review", label: "Vendor rules", href: `${base}/automation/vendors` },
     { before: "approved", label: "Approval workflows", href: `${base}/automation/approvals` },
     { before: "synced", label: autonomyLabel, href: canOpenSettings ? `${base}/automation/settings` : null },
     { before: "paid", label: "Ledger confirms payment", href: null },
