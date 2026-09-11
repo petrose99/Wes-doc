@@ -25,7 +25,7 @@ const MATCH_KIND_LABELS: Record<string, string> = {
 export default async function AutomationMatchesPage({ params }: { params: Promise<{ workspaceId: string }> }) {
   const { workspaceId } = await params
   const user = await getCurrentUser()
-  await requireWorkspaceRole(workspaceId, user.id)
+  const membership = await requireWorkspaceRole(workspaceId, user.id)
   await requireModule(workspaceId, "touchless-automation")
 
   const capabilities = await getWorkspaceCapabilities(workspaceId)
@@ -46,6 +46,7 @@ export default async function AutomationMatchesPage({ params }: { params: Promis
     active="matches"
     reviewCount={reviewCount}
     reviewEnabled={reviewEnabled}
+    showSettings={membership.role === "owner"}
     status="Documents the pipeline tied to each other, and how far the bank lines it accepted have gone toward reconciled."
   >
     {summary.total === 0 && summary.bankTotal === 0

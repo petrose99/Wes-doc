@@ -7,14 +7,15 @@ import type { SheetTemplate, WorkspaceUsage } from "@/components/extract/types"
 import type { PipelineStage } from "@/lib/documents/stages"
 import { ReadyBanner } from "@/components/pipeline/ready-banner"
 import { SyncedStageHeader } from "@/components/pipeline/synced-stage-header"
-import type { BillsSummary } from "@/models/bills"
+import { PaidStageHeader } from "@/components/pipeline/paid-stage-header"
+import type { BillsSummary, PaidSummary } from "@/models/bills"
 import type { TouchlessRateStats } from "@/lib/analytics/workspace-analytics"
 
 /** The one list shell every pipeline tab renders through — a header with the workspace-wide
  * upload entry point, tabs, a filter bar, then the table. A server component: the data (rows,
  * counts) is fetched by the page and handed down; only the list body, its bulk actions, and the
  * upload overlay need client interactivity. */
-export function PipelineShell({ workspaceId, stage, counts, rows, contentMatches, query, flaggedOnly, documentSearchEnabled, upload, touchlessStats, billsSummary, baseCurrency, failedCount = 0, visibleStages }: {
+export function PipelineShell({ workspaceId, stage, counts, rows, contentMatches, query, flaggedOnly, documentSearchEnabled, upload, touchlessStats, billsSummary, paidSummary, baseCurrency, failedCount = 0, visibleStages }: {
   workspaceId: string
   stage: PipelineStage
   counts: Record<PipelineStage, number>
@@ -30,9 +31,11 @@ export function PipelineShell({ workspaceId, stage, counts, rows, contentMatches
   documentSearchEnabled: boolean
   upload: { fileId: string; templates: SheetTemplate[]; usage: WorkspaceUsage; sheetCount: number }
   touchlessStats?: TouchlessRateStats | null
-  /** Populated only on Synced/Paid tabs where the aging strip is worth its screen area.
-   * Undefined on other stages, so no cost when the header isn't going to render. */
+  /** Populated only on the Synced tab — the aging strip answers "what's still owed", which is
+   * meaningless once a bill has settled. */
   billsSummary?: BillsSummary | null
+  /** Populated only on the Paid tab — see PaidStageHeader for why it isn't the aging strip. */
+  paidSummary?: PaidSummary | null
   baseCurrency: string
 }) {
   return <div className="flex min-h-0 flex-1 flex-col">
@@ -71,7 +74,8 @@ export function PipelineShell({ workspaceId, stage, counts, rows, contentMatches
       <span><strong className="text-slate-900">{touchlessStats.totalExtracted}</strong> extracted</span>
     </div>}
     {stage === "approved" && counts.approved > 0 && <ReadyBanner workspaceId={workspaceId} count={counts.approved} documentIds={rows.map((r) => r.id)} />}
-    {(stage === "synced" || stage === "paid") && billsSummary && <SyncedStageHeader workspaceId={workspaceId} summary={billsSummary} currency={baseCurrency} />}
+    {stage === "synced" && billsSummary && <SyncedStageHeader workspaceId={workspaceId} summary={billsSummary} currency={baseCurrency} />}
+    {stage === "paid" && paidSummary && <PaidStageHeader workspaceId={workspaceId} summary={paidSummary} currency={baseCurrency} />}
     <FilterPanel query={query} documentSearchEnabled={documentSearchEnabled} />
     <DocumentList workspaceId={workspaceId} stage={stage} rows={rows} contentMatches={contentMatches} query={query} />
   </div>

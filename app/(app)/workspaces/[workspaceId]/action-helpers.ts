@@ -6,14 +6,14 @@ import { revalidatePath } from "next/cache"
 
 /** `documents` is only the detail-page prefix — there is no document list page; the sheet is
  * the view of that data, so document mutations revalidate the file's `sheet`. */
-export const paths = (workspaceId: string) => ({ overview: `/workspaces/${workspaceId}`, documents: `/workspaces/${workspaceId}/documents`, pipeline: `/workspaces/${workspaceId}/pipeline`, files: `/workspaces/${workspaceId}/files`, dictation: `/workspaces/${workspaceId}/dictation`, templates: `/workspaces/${workspaceId}/settings/templates`, reports: `/workspaces/${workspaceId}/settings/reports`, workspace: `/workspaces/${workspaceId}/settings/workspace`, integrations: `/workspaces/${workspaceId}/settings/integrations`, tax: `/workspaces/${workspaceId}/settings/tax`, review: `/workspaces/${workspaceId}/review`, rules: `/workspaces/${workspaceId}/settings/rules`, modules: `/workspaces/${workspaceId}/settings/modules`, settingsEmail: `/workspaces/${workspaceId}/settings/email`, approvals: `/workspaces/${workspaceId}/automation/approvals`, expenses: `/workspaces/${workspaceId}/expenses`, accounting: `/workspaces/${workspaceId}/accounting` })
+export const paths = (workspaceId: string) => ({ overview: `/workspaces/${workspaceId}`, documents: `/workspaces/${workspaceId}/documents`, pipeline: `/workspaces/${workspaceId}/pipeline`, files: `/workspaces/${workspaceId}/worksheets`, dictation: `/workspaces/${workspaceId}/dictation`, templates: `/workspaces/${workspaceId}/settings/templates`, reports: `/workspaces/${workspaceId}/settings/reports`, workspace: `/workspaces/${workspaceId}/settings/workspace`, integrations: `/workspaces/${workspaceId}/settings/integrations`, tax: `/workspaces/${workspaceId}/settings/tax`, review: `/workspaces/${workspaceId}/review`, rules: `/workspaces/${workspaceId}/settings/rules`, modules: `/workspaces/${workspaceId}/settings/modules`, settingsEmail: `/workspaces/${workspaceId}/settings/email`, approvals: `/workspaces/${workspaceId}/automation/approvals`, expenses: `/workspaces/${workspaceId}/expenses`, accounting: `/workspaces/${workspaceId}/accounting` })
 
 /** Revalidates the whole workspace segment layout, not just one page — needed whenever a change
  * (module toggle, rename, ownership transfer) should update the persistent sidebar, which the
  * layout renders once and a plain revalidatePath(concretePath) does not reach. */
 export const revalidateWorkspaceLayout = () => revalidatePath("/workspaces/[workspaceId]", "layout")
 
-export const sheetPath = (workspaceId: string, fileId: string) => `/workspaces/${workspaceId}/files/${fileId}/sheet`
+export const sheetPath = (workspaceId: string, fileId: string) => `/workspaces/${workspaceId}/worksheets/${fileId}/sheet`
 
 /** Refusals, spelled out. The generic underscore-to-space fallback turns
  * "member_not_found" into "member not found", which is fine for most codes but not all of them.

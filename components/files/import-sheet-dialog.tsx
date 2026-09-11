@@ -1,6 +1,6 @@
 "use client"
 
-import { importSpreadsheetAction } from "@/app/(app)/workspaces/[workspaceId]/files/import-actions"
+import { importSpreadsheetAction } from "@/app/(app)/workspaces/[workspaceId]/worksheets/import-actions"
 import { FileSpreadsheet, Loader2, Upload, X } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useCallback, useRef, useState, useTransition } from "react"
@@ -28,7 +28,7 @@ export function ImportSheetDialog({ workspaceId, folderId, onClose }: {
       fd.append("file", file)
       const result = await importSpreadsheetAction(workspaceId, folderId, fd)
       if ("error" in result) { setError(result.error); return }
-      router.push(`/workspaces/${workspaceId}/files/${result.fileId}/sheet`)
+      router.push(`/workspaces/${workspaceId}/worksheets/${result.fileId}/sheet`)
     })
   }, [file, workspaceId, folderId, router])
 

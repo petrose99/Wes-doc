@@ -38,6 +38,9 @@ import { auditEventData, recordSystemAudit } from "@/lib/audit"
 import { prisma } from "@/lib/db"
 import { unscoped } from "@/lib/workspace-scope"
 import { emitWorkspaceEvent } from "@/lib/webhooks"
+import { isEmailConfigured, sendReminderEmail } from "@/lib/email"
+import { describeDocumentError } from "@/lib/document-error-copy"
+import { resolveOwnerRecipients } from "@/models/reminders"
 import { kickWebhookDrain } from "@/lib/webhook-delivery"
 import { Prisma } from "@/prisma/client"
 import sharp from "sharp"
@@ -247,8 +250,10 @@ async function failDocumentJob(
   // Interactive (not array) form so a permanent failure can fan out document.failed inside the same
   // tx — a transient retry emits nothing, since the document is not in a terminal state yet.
   let webhookQueued = false
+  let sourceEmail: string | null = null
   await prisma.$transaction(async (tx) => {
     const updated = await tx.document.update({ where: { id: job.documentId }, data: { status: permanent ? "failed" : "queued", errorCode } })
+    sourceEmail = updated.sourceEmail
     await tx.documentProcessingJob.update({ where: { id: job.jobId }, data: { status: permanent ? "failed" : "queued", errorCode, scheduledAt: permanent ? job.scheduledAt : retryAt, completedAt: permanent ? new Date() : null, leaseUntil: null } })
     await tx.documentAuditEvent.create({ data: auditEventData({ workspaceId: job.workspaceId, documentId: job.documentId, type: permanent ? "extraction_failed" : "extraction_retrying", outcome: permanent ? "failure" : "success" }) })
     if (permanent) {
@@ -266,7 +271,38 @@ async function failDocumentJob(
     const failed = await prisma.document.findUnique({ where: { id: job.documentId }, select: { receivedAt: true, template: { select: { code: true } } } })
     if (failed) await track("document_extraction_completed", { documentId: job.documentId, templateCode: failed.template?.code ?? "unknown", status: "failed", durationMs: Date.now() - failed.receivedAt.getTime() }, { workspaceId: job.workspaceId })
     await prisma.ingestionItem.updateMany({ where: { workspaceId: job.workspaceId, documentId: job.documentId }, data: { status: "failed" } })
+    // Arc 2 of the degraded-pipeline journey: the sender who emailed this in gets exactly one
+    // signal today — a mail-level bounce, sent only for the unknown-recipient/allowlist case
+    // (models/inbound-email.ts). A processing failure that happens later, after the mail was
+    // already accepted, has no such signal — the sender's mail client has nothing left to show
+    // them, and sending a "your document failed" email from a document service reads as phishing
+    // bait and trains senders to expect chatter. So the workspace is notified instead, addressed
+    // to its owners rather than the arbitrary sender, and only for a *permanent* failure — a
+    // transient one still might resolve on its own retry, and paging owners for every provider
+    // hiccup would make this the noisy alert nobody reads.
+    await notifyWorkspaceOfEmailedDocumentFailure({ workspaceId: job.workspaceId, documentId: job.documentId, sourceEmail, errorCode }).catch((error) =>
+      console.error("[document-processing] failed to notify workspace of emailed document failure:", error instanceof Error ? error.message : error))
   }
+}
+
+/** See the comment at its call site in failDocumentJob. No-ops for anything that didn't arrive by
+ * email (sourceEmail is only ever set by the inbound-email channel) or when Resend isn't
+ * configured, matching every other best-effort notification in this codebase. */
+async function notifyWorkspaceOfEmailedDocumentFailure(input: { workspaceId: string; documentId: string; sourceEmail: string | null; errorCode: string }) {
+  if (!input.sourceEmail || !isEmailConfigured()) return
+  const document = await prisma.document.findUnique({ where: { id: input.documentId }, select: { filename: true, receivedAt: true } })
+  if (!document) return
+  const recipients = await resolveOwnerRecipients(input.workspaceId)
+  if (!recipients.length) return
+  const description = describeDocumentError(input.errorCode)
+  const sentAt = document.receivedAt.toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit" })
+  const actionUrl = `${config.app.baseURL}/workspaces/${input.workspaceId}/pipeline`
+  const body = `A document emailed by ${input.sourceEmail} on ${sentAt} couldn't be processed: ${description.message}${description.permanent ? ` ${description.action}` : ""} It's in your inbox to handle.`
+  await Promise.all(recipients.map((to) => sendReminderEmail({
+    to, subject: `A document from ${input.sourceEmail} needs your attention`,
+    heading: `${document.filename} couldn't be processed`,
+    body, actionUrl, actionLabel: "Open it",
+  }))).catch((error) => console.error("[document-processing] emailed-document-failure notification failed:", error instanceof Error ? error.message : error))
 }
 
 function stripMeta(output: Record<string, unknown>): Record<string, unknown> {

@@ -49,7 +49,7 @@ export default async function SharedFilePage({ params }: { params: Promise<{ fil
       <span className="text-sm font-bold">{config.app.title}</span>
       <span className="truncate text-sm font-semibold text-slate-700" title={file.name}>{file.name}</span>
       <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">{modeLabel}</span>
-      {access === "owner" && <Link href={`/workspaces/${file.workspaceId}/files/${file.id}/sheet`} className="ml-auto rounded-md border px-2.5 py-1 text-sm font-medium text-slate-700 hover:bg-slate-50">Open in your workspace</Link>}
+      {access === "owner" && <Link href={`/workspaces/${file.workspaceId}/worksheets/${file.id}/sheet`} className="ml-auto rounded-md border px-2.5 py-1 text-sm font-medium text-slate-700 hover:bg-slate-50">Open in your workspace</Link>}
     </header>
 
     <SharedSheet

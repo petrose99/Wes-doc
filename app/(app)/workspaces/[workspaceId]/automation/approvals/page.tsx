@@ -1,4 +1,4 @@
-import { AutomationFrame, Empty, Panel } from "@/components/automation/automation-ui"
+import { AutomationFrame, Empty, Panel, Pill } from "@/components/automation/automation-ui"
 import { ApprovalWorkflowForm, type ApprovalFormMember } from "@/components/workspace/approval-workflow-form"
 import { ApprovalWorkflowRowControls } from "@/components/workspace/approval-workflow-row"
 import { getCurrentUser } from "@/lib/auth"
@@ -23,8 +23,10 @@ export default async function AutomationApprovalsPage({ params }: { params: Prom
   const user = await getCurrentUser()
   const membership = await requireWorkspaceRole(workspaceId, user.id)
   await requireModule(workspaceId, "touchless-automation")
-  if (!(await getWorkspaceCapabilities(workspaceId)).has("approval-workflows")) {
-    return <AutomationFrame workspaceId={workspaceId} active="approvals" reviewCount={0} reviewEnabled={false} status="Approval workflows are disabled for this workspace.">
+  const owner = membership.role === "owner"
+  const capabilities = await getWorkspaceCapabilities(workspaceId)
+  if (!capabilities.has("approval-workflows")) {
+    return <AutomationFrame workspaceId={workspaceId} active="approvals" reviewCount={0} reviewEnabled={false} showSettings={owner} status="Approval workflows are disabled for this workspace.">
       <Empty title="Not enabled">Turn on the Approval workflows module in Settings → Modules to configure named stages here.</Empty>
     </AutomationFrame>
   }
@@ -34,7 +36,6 @@ export default async function AutomationApprovalsPage({ params }: { params: Prom
     getWorkspaceMembers(workspaceId),
     countOpenReviewTasks(workspaceId),
   ])
-  const owner = membership.role === "owner"
   const memberOptions: ApprovalFormMember[] = members.map((m) => ({
     id: m.userId,
     name: m.user.name ?? "",
@@ -42,12 +43,21 @@ export default async function AutomationApprovalsPage({ params }: { params: Prom
     role: m.role === "owner" ? "owner" : "member",
   }))
   const memberNameById = new Map(memberOptions.map((m) => [m.id, m.name || m.email]))
+  const currency = membership.workspace.baseCurrency ?? "USD"
+  const formatThreshold = (value: number) => {
+    try {
+      return new Intl.NumberFormat("en", { style: "currency", currency, maximumFractionDigits: 0 }).format(value)
+    } catch {
+      return `${value.toFixed(0)} ${currency}`.trim()
+    }
+  }
 
   return <AutomationFrame
     workspaceId={workspaceId}
     active="approvals"
     reviewCount={reviewCount}
-    reviewEnabled={(await getWorkspaceCapabilities(workspaceId)).has("review-queue")}
+    reviewEnabled={capabilities.has("review-queue")}
+    showSettings={owner}
     status="Route a bill through named stages before it counts as approved. Add named approvers or an amount threshold per stage."
   >
     {owner && (
@@ -59,36 +69,36 @@ export default async function AutomationApprovalsPage({ params }: { params: Prom
     <Panel title="Workflows" note={`${workflows.length} workflow${workflows.length === 1 ? "" : "s"} in this workspace.`}>
       {!workflows.length
         ? <Empty title="No workflows yet">Review tasks use the plain open → in review → approved/rejected flow until one is started on them.</Empty>
-        : <ul className="space-y-3">
+        : <div className="divide-y divide-[#f1f5f9]">
             {workflows.map((workflow) => (
-              <li key={workflow.id} className="rounded border border-slate-200 p-3">
+              <div key={workflow.id} className="py-4 first:pt-0">
                 <div className="flex items-center justify-between gap-3">
-                  <span className="font-medium text-slate-900">{workflow.name}</span>
+                  <span className="text-sm font-semibold text-slate-900">{workflow.name}</span>
                   {owner
                     ? <ApprovalWorkflowRowControls workspaceId={workspaceId} workflowId={workflow.id} workflowName={workflow.name} active={workflow.active} />
-                    : <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-500">{workflow.active ? "Active" : "Inactive"}</span>}
+                    : <Pill state={workflow.active ? "auto" : "idle"}>{workflow.active ? "Active" : "Inactive"}</Pill>}
                 </div>
-                <ol className="mt-2 space-y-1 text-xs text-slate-600">
+                <ol className="mt-2.5 space-y-1.5">
                   {workflow.stages.map((stage, index) => {
                     const approverIds = (stage.approverIds ?? []) as string[]
                     const threshold = stage.minAmount === null || stage.minAmount === undefined ? null : decimalToNumber(stage.minAmount)
                     return (
-                      <li key={stage.id} className="flex flex-wrap items-center gap-1.5">
+                      <li key={stage.id} className="flex flex-wrap items-center gap-1.5 text-[13px]">
                         <span className="tabular-nums text-slate-400">{index + 1}.</span>
-                        <span className="rounded-full border px-2 py-0.5">{stage.name}</span>
+                        <span className="font-medium text-slate-800">{stage.name}</span>
                         {approverIds.length > 0
-                          ? <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-emerald-800">approvers: {approverIds.map((id) => memberNameById.get(id) ?? id.slice(0, 8)).join(", ")}</span>
+                          ? <Pill state="auto">{approverIds.map((id) => memberNameById.get(id) ?? id.slice(0, 8)).join(", ")}</Pill>
                           : stage.requireOwner
-                            ? <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-700">owner only</span>
-                            : <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">any member</span>}
-                        {threshold !== null && threshold !== undefined && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-amber-800">≥ {threshold}</span>}
+                            ? <Pill state="idle">Owner only</Pill>
+                            : <Pill state="idle">Any member</Pill>}
+                        {threshold !== null && <Pill state="waiting">≥ {formatThreshold(threshold)}</Pill>}
                       </li>
                     )
                   })}
                 </ol>
-              </li>
+              </div>
             ))}
-          </ul>}
+          </div>}
     </Panel>
   </AutomationFrame>
 }

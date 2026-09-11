@@ -4,6 +4,7 @@ import { BulkActionBar } from "@/components/pipeline/bulk-action-bar"
 import { highlightSnippet } from "@/components/shared/highlight-snippet"
 import { LastUpdated } from "@/components/shared/relative-time"
 import { useRowSelection } from "@/components/shared/use-row-selection"
+import { blockerControlHref, blockerControlTarget } from "@/lib/documents/blocker-controls"
 import type { PipelineStage } from "@/lib/documents/stages"
 import { AlertTriangle, CheckCircle2, FileText, Inbox, Loader2, XCircle } from "lucide-react"
 import Link from "next/link"
@@ -21,7 +22,7 @@ export type PipelineDocumentRow = {
   hasActiveJob: boolean
   missingRequiredFields: string[]
   readinessStatus: string | null
-  readinessBlockers: string[]
+  readinessBlockers: { code: string; detail: string }[]
   /** Set on every stage except Inbox — supplier/category/total in place of the filename, since a
    * reviewer triaging this list cares who the document is from and how much it's for, not what
    * it happened to be named on upload. `converted` carries the base-currency string on a
@@ -56,7 +57,7 @@ const STATUS_BADGE: Record<string, string> = {
   reviewed: "bg-emerald-100 text-emerald-700",
 }
 
-function ReadinessBadge({ status, blockers, lowConfidenceFieldCount }: { status: string | null; blockers: string[]; lowConfidenceFieldCount: number }) {
+function ReadinessBadge({ workspaceId, status, blockers, lowConfidenceFieldCount }: { workspaceId: string; status: string | null; blockers: { code: string; detail: string }[]; lowConfidenceFieldCount: number }) {
   if (!status) {
     // The audit called for an honest signal on rows the readiness engine hasn't scored yet — a
     // silent empty cell hid the low-confidence exceptions the confidence map already knew about.
@@ -68,10 +69,20 @@ function ReadinessBadge({ status, blockers, lowConfidenceFieldCount }: { status:
   if (status === "ready") return <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium ${lowConfidenceFieldCount > 0 ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`} title={lowConfidenceFieldCount > 0 ? `${lowConfidenceFieldCount} low-confidence field${lowConfidenceFieldCount === 1 ? "" : "s"} — otherwise ready to sync` : undefined}>
     <CheckCircle2 className="h-3 w-3" />{lowConfidenceFieldCount > 0 ? `${lowConfidenceFieldCount} field low` : "Ready to sync"}
   </span>
-  const title = blockers.length > 0 ? `Blocked: ${blockers.join(", ")}` : "Blocked"
-  return <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-xs font-medium text-amber-700" title={title}>
+  // The link is the connection point: a reviewer sees a blocked row, sees which lever caused it,
+  // and clicks straight into the Controls tab that owns that lever. Only when the top blocker's
+  // code actually maps to a Controls tab — a duplicate or a missing required field is a fact
+  // about the document, not a control that was configured, so those keep the bare badge.
+  const top = blockers[0]
+  const target = top ? blockerControlTarget(top.code) : null
+  const details = blockers.map((b) => b.detail).join(" · ")
+  const title = details ? `Blocked: ${details}` : "Blocked"
+  const body = <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-xs font-medium text-amber-700 hover:bg-amber-100">
     <XCircle className="h-3 w-3" />{blockers.length} blocker{blockers.length !== 1 ? "s" : ""}
+    {target && <span className="text-[10px] font-medium text-amber-600/80">→ {target.label.replace("Controls · ", "")}</span>}
   </span>
+  if (target) return <Link href={blockerControlHref(workspaceId, target)} title={`${title}\nOpen ${target.label} to see or adjust the rule that caused this.`} className="inline-flex">{body}</Link>
+  return <span title={title} className="inline-flex">{body}</span>
 }
 
 /** What each stage's empty table says, so "nothing here" reads as expected-and-fine on Archive
@@ -79,7 +90,7 @@ function ReadinessBadge({ status, blockers, lowConfidenceFieldCount }: { status:
 const EMPTY_COPY: Record<PipelineStage, string> = {
   inbox: "Nothing waiting to process. Upload PDFs or a folder — or email bills to your workspace address.",
   review: "Nothing needs a look right now.",
-  approved: "Nothing marked approved yet — sign off on documents to use them in Sheets.",
+  approved: "Nothing marked approved yet — sign off on documents to use them in a worksheet.",
   synced: "Nothing synced yet. Documents appear here once they're approved and pushed to your accounting connection.",
   paid: "Nothing paid yet — a paid bill lands here once a reviewer or the ledger confirms it.",
 }
@@ -233,7 +244,7 @@ export function DocumentList({ workspaceId, stage, rows, contentMatches, query }
                 {row.review.converted && <span className="ml-1.5 text-[11px] text-slate-400 tabular-nums" title="Converted to workspace base currency at extraction-time FX rate">{row.review.converted}</span>}
                 {row.review.fxPending && <span className="ml-1.5 rounded bg-amber-50 px-1 py-px text-[10px] font-medium text-amber-700" title="Foreign-currency document — awaiting an ECB reference rate">FX pending</span>}
               </td>
-              <td className="border-b px-3 py-2"><ReadinessBadge status={row.readinessStatus} blockers={row.readinessBlockers} lowConfidenceFieldCount={row.lowConfidenceFieldCount} /></td>
+              <td className="border-b px-3 py-2"><ReadinessBadge workspaceId={workspaceId} status={row.readinessStatus} blockers={row.readinessBlockers} lowConfidenceFieldCount={row.lowConfidenceFieldCount} /></td>
             </> : <>
               <td className="border-b px-3 py-2">
                 <Link href={`/workspaces/${workspaceId}/documents/${row.id}?stage=${stage}`} className="inline-flex items-center gap-2 font-medium text-slate-800 hover:text-emerald-800" title={row.filename}>

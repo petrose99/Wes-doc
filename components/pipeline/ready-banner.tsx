@@ -1,9 +1,9 @@
 import { CheckCircle2 } from "lucide-react"
 
-/** The Approved tab's status strip. Informational only: approved documents are in the Docu
- * Library automatically (library membership follows from the reviewed status, not a second
+/** The Approved tab's status strip. Informational only: approved documents are in Docu
+ * Search automatically (library membership follows from the reviewed status, not a second
  * "store" click) and sync to the connected accounting provider automatically on approval (see
- * lib/automation/autopublish.ts::syncOnApproval). The old "Push to Docu Library" / "Push to
+ * lib/automation/autopublish.ts::syncOnApproval). The old "Push to Docu Search" / "Push to
  * Accounting" buttons and the auto-store retention dropdown are gone — the audit flagged the
  * strip for mixing a persistent setting with one-shot actions, and the redesign made both
  * actions the default rather than a chore. */
@@ -12,6 +12,6 @@ export function ReadyBanner({ count }: { workspaceId?: string; count: number; do
     <CheckCircle2 className="h-3.5 w-3.5" />
     <span className="font-medium">{count} approved</span>
     <span className="text-emerald-600">·</span>
-    <span className="text-emerald-600/90">in your Docu Library and syncing to accounting automatically — nothing left to click.</span>
+    <span className="text-emerald-600/90">in the Archive and syncing to accounting automatically — nothing left to click.</span>
   </div>
 }

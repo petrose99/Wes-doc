@@ -1,10 +1,15 @@
 import { getCurrentUser } from "@/lib/auth"
 import { getAutomationMetrics, getSupplierTrust, type SupplierTrustRow } from "@/lib/analytics/workspace-analytics"
 import { getWorkspaceCapabilities, requireModule } from "@/lib/modules/capabilities"
+import { PIPELINE_STAGES } from "@/lib/documents/stages"
 import { SUPPLIER_COLD_START_COUNT, SUPPLIER_TRUST_STREAK } from "@/lib/readiness/supplier-thresholds"
+import { deriveAutonomyLevel, getOrCreateAutomationConfig } from "@/models/automation-config"
+import { countDocumentsByStage } from "@/models/documents"
 import { countOpenReviewTasks } from "@/models/review-tasks"
 import { requireWorkspaceRole } from "@/models/workspaces"
 import { AutomationFrame, Empty, Figure, Funnel, Ledger, LedgerRow, Panel, Pill, Sheet, Th } from "@/components/automation/automation-ui"
+import { ControlsSpine } from "@/components/automation/controls-spine"
+import Link from "next/link"
 
 export const dynamic = "force-dynamic"
 
@@ -34,16 +39,22 @@ export default async function AutomationDashboardPage({ params }: {
 }) {
   const { workspaceId } = await params
   const user = await getCurrentUser()
-  await requireWorkspaceRole(workspaceId, user.id)
+  const membership = await requireWorkspaceRole(workspaceId, user.id)
   await requireModule(workspaceId, "touchless-automation")
 
   const capabilities = await getWorkspaceCapabilities(workspaceId)
   const reviewEnabled = capabilities.has("review-queue")
-  const [metrics, supplierTrust, reviewCount] = await Promise.all([
+  const [metrics, supplierTrust, reviewCount, stageCounts, config] = await Promise.all([
     getAutomationMetrics(workspaceId, 30),
     getSupplierTrust(workspaceId),
     reviewEnabled ? countOpenReviewTasks(workspaceId) : 0,
+    countDocumentsByStage(workspaceId),
+    getOrCreateAutomationConfig(workspaceId),
   ])
+  // The pipeline's own visibleStages rule, mirrored exactly (pipeline/page.tsx) — the spine and
+  // the Documents tabs must never disagree about whether Synced/Paid exist for this workspace.
+  const showLedgerStages = capabilities.has("accounting-push") || stageCounts.synced > 0 || stageCounts.paid > 0
+  const visibleStages = showLedgerStages ? PIPELINE_STAGES : PIPELINE_STAGES.filter((s) => s !== "synced" && s !== "paid")
   const touchlessPercent = Math.round(metrics.touchless.touchlessRate * 100)
   const matchPercent = Math.round(metrics.matchCoverage.matchRate * 100)
   const extracted = metrics.touchless.totalExtracted
@@ -54,8 +65,27 @@ export default async function AutomationDashboardPage({ params }: {
     active="metrics"
     reviewCount={reviewCount}
     reviewEnabled={reviewEnabled}
+    showSettings={membership.role === "owner"}
     status="How much of the last 30 days of invoice coding went through without anyone clicking Approve, and what is holding the rest back."
   >
+    <Panel
+      title="Where controls act"
+      note="The same five stages as Documents — each handoff names the control that decides it. Stages open that tab of the pipeline; controls open their own tab here."
+    >
+      <ControlsSpine
+        workspaceId={workspaceId}
+        counts={stageCounts}
+        visibleStages={visibleStages}
+        level={deriveAutonomyLevel(config)}
+        minConfidence={config.minConfidence}
+        canOpenSettings={membership.role === "owner"}
+      />
+      <p className="mt-3 text-xs text-slate-500">
+        <Link href={`/workspaces/${workspaceId}/automation/matches`} className="font-medium text-emerald-700 underline-offset-2 hover:text-emerald-800 hover:underline">Matching</Link>
+        {" "}— purchase-order, receipt and bank ties — runs alongside every step, feeding the checks that hold a document back.
+      </p>
+    </Panel>
+
     {extracted === 0
       ? <Empty title="Nothing extracted yet">
           These figures start moving as soon as documents reach the pipeline. Upload or email one in,
@@ -83,9 +113,9 @@ export default async function AutomationDashboardPage({ params }: {
         <div className="grid gap-x-10 gap-y-10 md:grid-cols-2 lg:grid-cols-3">
           <Panel title="Where documents are sitting" note="Every extracted document lands in exactly one of these three states.">
             <Ledger>
-              <LedgerRow label="Approved — ready to sync" value={metrics.readiness.ready} share={share(metrics.readiness.ready)} state="auto" />
-              <LedgerRow label="Blocked in Review" value={metrics.readiness.blocked} share={share(metrics.readiness.blocked)} state="blocked" />
-              <LedgerRow label="In Inbox — not yet evaluated" value={metrics.readiness.pending} share={share(metrics.readiness.pending)} state="idle" />
+              <LedgerRow label="Approved — ready to sync" value={metrics.readiness.ready} share={share(metrics.readiness.ready)} state="auto" href={`/workspaces/${workspaceId}/pipeline?stage=approved`} />
+              <LedgerRow label="Blocked in Review" value={metrics.readiness.blocked} share={share(metrics.readiness.blocked)} state="blocked" href={`/workspaces/${workspaceId}/pipeline?stage=review`} />
+              <LedgerRow label="In Inbox — not yet evaluated" value={metrics.readiness.pending} share={share(metrics.readiness.pending)} state="idle" href={`/workspaces/${workspaceId}/pipeline?stage=inbox`} />
             </Ledger>
           </Panel>
 

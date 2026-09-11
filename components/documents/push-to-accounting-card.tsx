@@ -8,7 +8,10 @@ import { useRouter } from "next/navigation"
 import { useTransition } from "react"
 import { toast } from "sonner"
 
-const PROVIDER_LABELS: Record<string, string> = { quickbooks: "QuickBooks", xero: "Xero", bigcapital: "Accounting" }
+// User-facing pill for the connected provider. The in-house Bigcapital ledger reads as "Finance"
+// everywhere in the UI (see the /finance route and the rail label); external providers keep their
+// brand names so a user recognises the destination they connected.
+const PROVIDER_LABELS: Record<string, string> = { quickbooks: "QuickBooks", xero: "Xero", bigcapital: "Finance" }
 
 export type PushableConnection = {
   id: string

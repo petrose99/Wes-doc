@@ -33,6 +33,24 @@ export async function createAutomationRule(input: { workspaceId: string; name: s
   })
 }
 
+/** Every rule the Vendors tab's "Pin as rule" button has created, keyed by the exact supplier
+ * string it was pinned for. `createAutomationRule` names these rules "Pinned: <supplier>", which
+ * is the only marker distinguishing a one-click pin from a rule an owner built by hand in
+ * Settings → Rules — used so the Vendors tab can show "Pinned ✓" instead of letting a second
+ * click silently create a duplicate rule for the same vendor. */
+export async function listPinnedRuleIdsBySupplier(workspaceId: string): Promise<Map<string, string>> {
+  const rows = await prisma.automationRule.findMany({
+    where: { workspaceId, name: { startsWith: "Pinned: " } },
+    select: { id: true, matcher: true },
+  })
+  const bySupplier = new Map<string, string>()
+  for (const row of rows) {
+    const matcher = row.matcher as { value?: string } | null
+    if (matcher?.value) bySupplier.set(matcher.value, row.id)
+  }
+  return bySupplier
+}
+
 /** The "update rule" correction flow: a reviewer fixing a rule-applied field edits the rule
  * itself, which only ever changes what FUTURE documents get — this never touches a document
  * already coded by the old version, and never rewrites the rule.applied audit event that recorded

@@ -5,11 +5,15 @@ import { usePathname } from "next/navigation"
 
 export type AutomationTab = "metrics" | "review" | "vendors" | "matches" | "approvals" | "settings"
 
-export function AutomationTabs({ workspaceId, active, reviewCount, reviewEnabled }: {
+export function AutomationTabs({ workspaceId, active, reviewCount, reviewEnabled, showSettings = true }: {
   workspaceId: string
   active?: AutomationTab
   reviewCount: number
   reviewEnabled: boolean
+  /** The Settings tab 404s for non-owners (owner-only page) — false hides the link rather than
+   * leaving a door that slams. Defaults true so every existing caller keeps its prior behavior;
+   * pages gated to owners-only pass the membership check through explicitly. */
+  showSettings?: boolean
 }) {
   const pathname = usePathname()
   const base = `/workspaces/${workspaceId}`
@@ -36,11 +40,11 @@ export function AutomationTabs({ workspaceId, active, reviewCount, reviewEnabled
   // stay on the prop signature so the pages calling AutomationTabs don't have to change.
   void reviewCount; void reviewEnabled
 
-  return <nav className="flex flex-wrap border-b border-[#e6ebf1]">
-    <Link href={`${base}/automation`} className={tabClass(current === "metrics")}>Overview</Link>
-    <Link href={`${base}/automation/vendors`} className={tabClass(current === "vendors")}>Vendors</Link>
-    <Link href={`${base}/automation/matches`} className={tabClass(current === "matches")}>Matches</Link>
-    <Link href={`${base}/automation/approvals`} className={tabClass(current === "approvals")}>Approval workflows</Link>
-    <Link href={`${base}/automation/settings`} className={tabClass(current === "settings")}>Settings</Link>
+  return <nav className="flex flex-wrap border-b border-[#e6ebf1]" aria-label="Controls">
+    <Link href={`${base}/automation`} aria-current={current === "metrics" ? "page" : undefined} className={tabClass(current === "metrics")}>Overview</Link>
+    <Link href={`${base}/automation/vendors`} aria-current={current === "vendors" ? "page" : undefined} className={tabClass(current === "vendors")}>Vendors</Link>
+    <Link href={`${base}/automation/matches`} aria-current={current === "matches" ? "page" : undefined} className={tabClass(current === "matches")}>Matches</Link>
+    <Link href={`${base}/automation/approvals`} aria-current={current === "approvals" ? "page" : undefined} className={tabClass(current === "approvals")}>Approval workflows</Link>
+    {showSettings && <Link href={`${base}/automation/settings`} aria-current={current === "settings" ? "page" : undefined} className={tabClass(current === "settings")}>Settings</Link>}
   </nav>
 }

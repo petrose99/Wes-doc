@@ -236,7 +236,7 @@ export async function processInboundEmail(input: InboundEmailInput): Promise<{ a
       try {
         const expansion = expandZipBuffer(buffer)
         for (const entry of expansion.entries) {
-          const outcome = await createIngestionItem({ workspaceId: input.workspaceId, fileId: file.id, templateId: template.id, source: "email", worksheetAutoAssigned: true, filename: entry.filename, mimeType: entry.mimeType, buffer: entry.buffer })
+          const outcome = await createIngestionItem({ workspaceId: input.workspaceId, fileId: file.id, templateId: template.id, source: "email", worksheetAutoAssigned: true, sourceEmail: effectiveFrom, filename: entry.filename, mimeType: entry.mimeType, buffer: entry.buffer })
           if (outcome.outcome === "accepted") accepted++
           else if (outcome.outcome === "duplicate") duplicated++
           else rejected++
@@ -251,7 +251,7 @@ export async function processInboundEmail(input: InboundEmailInput): Promise<{ a
     }
     const mimeType = inferMimeType(attachment.filename)
     if (!mimeType || !buffer.length || !isSupportedDocumentBuffer(buffer, mimeType)) { rejected++; continue }
-    const outcome = await createIngestionItem({ workspaceId: input.workspaceId, fileId: file.id, templateId: template.id, source: "email", worksheetAutoAssigned: true, filename: attachment.filename, mimeType, buffer })
+    const outcome = await createIngestionItem({ workspaceId: input.workspaceId, fileId: file.id, templateId: template.id, source: "email", worksheetAutoAssigned: true, sourceEmail: effectiveFrom, filename: attachment.filename, mimeType, buffer })
     if (outcome.outcome === "accepted") accepted++
           else if (outcome.outcome === "duplicate") duplicated++
     else rejected++
@@ -263,7 +263,7 @@ export async function processInboundEmail(input: InboundEmailInput): Promise<{ a
   if (accepted === 0 && intent !== "noise") {
     const portals = await fetchPortalPdfs(bodyText)
     for (const portal of portals) {
-      const outcome = await createIngestionItem({ workspaceId: input.workspaceId, fileId: file.id, templateId: template.id, source: "email", worksheetAutoAssigned: true, filename: portal.filename, mimeType: "application/pdf", buffer: portal.buffer })
+      const outcome = await createIngestionItem({ workspaceId: input.workspaceId, fileId: file.id, templateId: template.id, source: "email", worksheetAutoAssigned: true, sourceEmail: effectiveFrom, filename: portal.filename, mimeType: "application/pdf", buffer: portal.buffer })
       if (outcome.outcome === "accepted") accepted++
           else if (outcome.outcome === "duplicate") duplicated++
       else rejected++
@@ -276,7 +276,7 @@ export async function processInboundEmail(input: InboundEmailInput): Promise<{ a
     try {
       const buffer = renderEmailBodyPdf({ subject: input.subject ?? null, from: input.from, bodyText })
       const filename = `${(input.subject?.trim() || "email-body").replace(/[^\w.-]+/g, "-").slice(0, 60)}.pdf`
-      const outcome = await createIngestionItem({ workspaceId: input.workspaceId, fileId: file.id, templateId: template.id, source: "email", worksheetAutoAssigned: true, filename, mimeType: "application/pdf", buffer })
+      const outcome = await createIngestionItem({ workspaceId: input.workspaceId, fileId: file.id, templateId: template.id, source: "email", worksheetAutoAssigned: true, sourceEmail: effectiveFrom, filename, mimeType: "application/pdf", buffer })
       if (outcome.outcome === "accepted") accepted++
           else if (outcome.outcome === "duplicate") duplicated++
     } catch (error) {

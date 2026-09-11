@@ -130,12 +130,12 @@ export default async function WorkspaceHomePage({ params }: {
       <div className="order-2 overflow-hidden rounded-2xl border border-[#e6ebf1] bg-white shadow-panel lg:order-none">
         <div className="flex items-center justify-between border-b border-b-[#eef2f6] px-5 py-4">
           <h2 className="text-[15px] font-bold text-slate-900">Recent files</h2>
-          <Link href={`/workspaces/${workspaceId}/files`} className="text-[13px] font-semibold text-emerald-700 hover:text-emerald-800">View all</Link>
+          <Link href={`/workspaces/${workspaceId}/worksheets`} className="text-[13px] font-semibold text-emerald-700 hover:text-emerald-800">View all</Link>
         </div>
         {recentFiles.length === 0 ? <p className="px-5 py-10 text-center text-sm text-slate-400">No files yet — add a document to get started.</p> : <div>
           {recentFiles.map((file) => {
             const reviewCount = recentFileReviewCounts[file.id] ?? 0
-            return <Link key={file.id} href={`/workspaces/${workspaceId}/files/${file.id}/sheet`} className="flex items-center gap-3 border-b px-5 py-3 last:border-b-0 hover:bg-slate-50">
+            return <Link key={file.id} href={`/workspaces/${workspaceId}/worksheets/${file.id}/sheet`} className="flex items-center gap-3 border-b px-5 py-3 last:border-b-0 hover:bg-slate-50">
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-emerald-50 text-emerald-700"><Table2 className="h-[17px] w-[17px]" /></span>
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-semibold text-slate-800">{file.name}</div>

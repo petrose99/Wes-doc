@@ -48,7 +48,7 @@ export function FileHeader({ workspaceId, fileId, name, linkAccess, status, back
   }
 
   return <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2">
-    <Link href={backHref ?? `/workspaces/${workspaceId}/files`} className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+    <Link href={backHref ?? `/workspaces/${workspaceId}/worksheets`} className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-800"
       onClick={(e) => {
         if (hasUnsavedChanges && !window.confirm("You have unsaved changes. Leave without saving?")) e.preventDefault()
       }}>
