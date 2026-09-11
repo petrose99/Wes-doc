@@ -25,6 +25,9 @@ const amountBandSchema = z.object({
   max: z.number().positive().nullable(),
   minConfidence: z.number().min(0).max(1),
   requireVerifiedSupplier: z.boolean().optional(),
+}).refine((band) => band.max === null || band.max >= band.min, {
+  message: "A band's \"Up to\" must be at least its \"From\".",
+  path: ["max"],
 })
 
 const updateSchema = z.object({
