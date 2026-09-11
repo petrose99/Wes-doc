@@ -467,6 +467,39 @@ export async function getTouchlessRateStats(workspaceId: string, days = 30): Pro
   }
 }
 
+export type TouchlessImpactEstimate = {
+  /** Of `totalRecent`, how many had every extracted field at or above `minConfidence` — the
+   * closest approximation of "would have cleared the confidence bar" available without re-running
+   * the full readiness engine (checks, policy, rules, supplier cold-start) against every one of
+   * them. An estimate, not a guarantee: a document counted here could still have been held back by
+   * a failed check or an unconfirmed rule match. */
+  eligible: number
+  totalRecent: number
+}
+
+/** Preview for the Settings tab's Touchless confirm step: of the last `days` days' extracted
+ * documents, how many would have cleared a given confidence bar. Read-only, deliberately cheap
+ * (one query, in-memory min over each document's stored field confidences) — this exists so
+ * switching a workspace to self-publishing isn't a blind guess about what "0.90" actually holds
+ * back. */
+export async function estimateTouchlessImpact(workspaceId: string, minConfidence: number, days = 30): Promise<TouchlessImpactEstimate> {
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+  const docs = await prisma.document.findMany({
+    where: { workspaceId, status: { notIn: POST_INTAKE_STATUSES }, receivedAt: { gte: since } },
+    select: { confidence: true },
+  })
+  let eligible = 0
+  for (const doc of docs) {
+    const record = (doc.confidence as Record<string, unknown> | null) ?? null
+    const fieldConfidence = (record?.fieldConfidence as Record<string, number> | null) ?? null
+    if (!fieldConfidence) continue
+    const scores = Object.values(fieldConfidence).filter((v): v is number => typeof v === "number")
+    if (!scores.length) continue
+    if (Math.min(...scores) >= minConfidence) eligible++
+  }
+  return { eligible, totalRecent: docs.length }
+}
+
 export type AutomationMetrics = {
   touchless: TouchlessRateStats
   matchCoverage: { totalDocuments: number; matchedDocuments: number; matchRate: number }

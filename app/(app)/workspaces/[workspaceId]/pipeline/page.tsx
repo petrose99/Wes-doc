@@ -8,7 +8,7 @@ import { PIPELINE_STAGES, parseStageAlias, type PipelineStage } from "@/lib/docu
 import { searchDocumentsByContent } from "@/lib/retrieval"
 import { activeJobDocumentIds, countDocumentsByStage, countFailedDocuments, documentIdsInStage, flaggedFieldsFromConfidence, listWorkspaceDocuments, summarizeDocumentForReview } from "@/models/documents"
 import { listLatestPushesForDocuments } from "@/models/integrations"
-import { listWorkspaceBills } from "@/models/bills"
+import { listWorkspaceBills, summarizePaidBills } from "@/models/bills"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { ensurePipelineFile, getFileTemplates } from "@/models/files"
 import { getListPreference } from "@/models/list-preferences"
@@ -70,11 +70,13 @@ export default async function PipelinePage({ params, searchParams }: {
     listWorkspaceDocuments(workspaceId, { stage, query: query || undefined }),
     getListPreference(user.id, workspaceId, `pipeline:${stage}`),
   ])
-  const [pipelineTemplates, touchlessStats, billsSummary] = await Promise.all([
+  const [pipelineTemplates, touchlessStats, workspaceBills] = await Promise.all([
     getFileTemplates(workspaceId, pipelineFile.id),
     stage === "approved" ? getTouchlessRateStats(workspaceId) : Promise.resolve(null),
-    (stage === "synced" || stage === "paid") ? listWorkspaceBills({ workspaceId, limit: 1 }).then((res) => res.summary).catch(() => null) : Promise.resolve(null),
+    (stage === "synced" || stage === "paid") ? listWorkspaceBills({ workspaceId }).catch(() => null) : Promise.resolve(null),
   ])
+  const billsSummary = stage === "synced" ? workspaceBills?.summary ?? null : null
+  const paidSummary = stage === "paid" ? summarizePaidBills(workspaceBills?.bills ?? []) : null
 
   // Content search runs alongside the ordinary filename/OCR-text match, not instead of it — the
   // same "advanced" hybrid (vector + lexical, RRF-fused) search the Files browser uses, scoped
@@ -155,15 +157,19 @@ export default async function PipelinePage({ params, searchParams }: {
     upload={{ fileId: pipelineFile.id, templates: uploadTemplates, usage, sheetCount: pipelineTemplates.length }}
     touchlessStats={touchlessStats}
     billsSummary={billsSummary}
+    paidSummary={paidSummary}
     baseCurrency={membership.workspace.baseCurrency ?? "USD"}
     failedCount={failedCount}
     visibleStages={visibleStages}
   />
 }
 
-function parseReadinessBlockers(detail: unknown): string[] {
+/** Keep the machine code alongside the human detail. The Controls-spine work uses the code to
+ * route a blocker to the tab that owns it ("supplier_cold_start" → supplier trust,
+ * "low_confidence:*" → Settings, and so on); the detail is what the reviewer reads. */
+function parseReadinessBlockers(detail: unknown): { code: string; detail: string }[] {
   if (!Array.isArray(detail)) return []
   return detail
-    .filter((b): b is { detail: string } => typeof b === "object" && b !== null && typeof b.detail === "string")
-    .map((b) => b.detail)
+    .filter((b): b is { code: string; detail: string } => typeof b === "object" && b !== null && typeof (b as { code?: unknown }).code === "string" && typeof (b as { detail?: unknown }).detail === "string")
+    .map((b) => ({ code: b.code, detail: b.detail }))
 }
