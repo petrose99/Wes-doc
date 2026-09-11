@@ -55,18 +55,25 @@ the VAT charged** must be held to support the deduction. Source: SARS tax-invoic
 
 - **21-day rule:** the supplier must issue the tax invoice within **21 days** of the
   supply (s 20(1); confirmed on the SARS tax-invoices page).
-- **Currency:** a tax invoice must be in **South African Rand** (currency of the
-  Republic), except for zero-rated supplies (s 20(4)/(5) as amended; VAT404 ch. 13).
-  *Note: the ZAR rule is stated in the Act/VAT404; the SARS web page fetched did not
-  restate it — flagged here as Act-sourced.*
+- **Currency:** amounts must be in **the currency of the Republic (ZAR)**; the proviso
+  to s 20(4)(g) lifts this only for supplies charged with tax under s 11 (zero-rated).
+- **Electronic invoices:** conditions (recipient consent, secure transmission,
+  retention) live in VAT404 ch. 13; SARS's Aug 2026 VAT Modernisation consultation
+  paper signals a move to structured e-invoicing —
+  <https://www.sars.gov.za/wp-content/uploads/VAT-Modernisation-Consultation-Paper-August-2026.pdf>.
+  Do not hard-code e-invoice conditions without checking VAT404 directly.
 - **One invoice per supply:** only one tax invoice may be issued per taxable supply;
   a lost original is replaced by a **copy** marked "copy tax invoice" (s 20(1) proviso;
   VAT404 ch. 13).
 
 ## (b) VAT201 return field structure (return workpaper output)
 
-Source: SARS "Guide to Completing the Value-Added Tax (VAT201) Return"
-<https://www.sars.gov.za/guide-to-completing-the-value-added-tax-vat201-return/>.
+Source: SARS "Guide for Completing the VAT201 Declaration" (**GEN-ELEC-04-G01**,
+effective 12 May 2025)
+<https://www.sars.gov.za/gen-elec-04-g01-guide-for-completing-the-value-added-tax-vat201-declaration-external-guide/>
+and <https://www.sars.gov.za/guide-to-completing-the-value-added-tax-vat201-return/>.
+(An older 2018 rate-change FAQ shows a pre-2018 layout with 1A = accommodation; the
+current guide — 1A = capital goods, 5–9 = accommodation — governs.)
 
 ### Part A — Output tax (supplies)
 
@@ -135,10 +142,12 @@ Workpaper implication: the AP subledger must split claimable input VAT four ways
 - **Return deadline:** VAT201 due by the **25th** (manual) or the **last business day**
   of the month following the tax period (eFiling). Source: obligations-of-a-vat-vendor
   page above.
-- **Accounting basis:** most vendors are on the **invoice basis** (s 15) — output and
-  input recognised at the earlier of invoice or payment; payments-basis vendors claim
-  input only when paid. VAT201 field 17 (bad debts) applies to invoice-basis vendors
-  only (VAT201 guide).
+- **Accounting basis:** default is the **invoice basis** (s 15(1)); the Commissioner
+  may allow a **payments basis** for e.g. natural persons/unincorporated bodies with
+  taxable supplies ≤ **R2.5 million** (s 15(2)) — such vendors deduct input tax only to
+  the extent payment is made, and s 15(2A) forces invoice-basis treatment for
+  individual supplies of **R100,000 or more**. VAT201 field 17 (bad debts) applies to
+  invoice-basis vendors only (VAT201 guide).
 
 ## Verification notes / gaps
 
