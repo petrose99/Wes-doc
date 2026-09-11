@@ -254,7 +254,7 @@ export function SheetView({ workspaceId, fileId, fileName, linkAccess, snapshot,
       tooltip: "Download this spreadsheet as .xlsx",
       icon: "docubite-download-icon",
       order: 0,
-      action: () => { window.location.href = `/workspaces/${workspaceId}/files/${fileId}/export?format=xlsx` },
+      action: () => { window.location.href = `/workspaces/${workspaceId}/worksheets/${fileId}/export?format=xlsx` },
     }).appendTo("ribbon.start.history")
 
     /** Download CSV, beside the XLSX export: a CSV is one sheet, so this one exports the tab you
@@ -269,7 +269,7 @@ export function SheetView({ workspaceId, fileId, fileName, linkAccess, snapshot,
       order: 0,
       action: () => {
         const name = api.getActiveWorkbook()?.getActiveSheet()?.getSheetName()
-        const base = `/workspaces/${workspaceId}/files/${fileId}/export?format=csv`
+        const base = `/workspaces/${workspaceId}/worksheets/${fileId}/export?format=csv`
         window.location.href = name ? `${base}&sheetName=${encodeURIComponent(name)}` : base
       },
     }).appendTo("ribbon.start.history")
@@ -316,16 +316,16 @@ export function SheetView({ workspaceId, fileId, fileName, linkAccess, snapshot,
         fileId={fileId}
         name={fileName || "Untitled"}
         linkAccess={linkAccess}
-        backHref={`/workspaces/${workspaceId}/files`}
-        backLabel="Sheets"
+        backHref={`/workspaces/${workspaceId}/worksheets`}
+        backLabel="Worksheets"
         hasUnsavedChanges={saveState === "saving" || saveState === "error"}
         status={label ? <span className={`text-xs ${saveState === "error" && !readOnly ? "text-destructive" : "text-slate-400"}`}>{label}</span> : null}
         trailing={!readOnly ? <div className="flex items-center gap-1.5">
-          <a href={`/workspaces/${workspaceId}/files/${fileId}/export?format=csv`} download
+          <a href={`/workspaces/${workspaceId}/worksheets/${fileId}/export?format=csv`} download
             className="inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 sm:px-2.5">
             <FileDown className="h-3.5 w-3.5" />Export CSV
           </a>
-          <a href={`/workspaces/${workspaceId}/files/${fileId}/export?format=xlsx`} download
+          <a href={`/workspaces/${workspaceId}/worksheets/${fileId}/export?format=xlsx`} download
             className="inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 sm:px-2.5">
             <Download className="h-3.5 w-3.5" />Export Excel
           </a>

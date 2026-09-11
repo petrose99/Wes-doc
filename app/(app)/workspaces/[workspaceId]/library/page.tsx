@@ -100,7 +100,7 @@ export default async function LibraryPage({ params, searchParams }: {
           <p className="mt-1 text-sm text-slate-500">
             {pickMode
               ? "Pick the documents you want — the sheet will use their extracted fields as columns."
-              : "Every document that's been through extraction — browse, search, and pull into Sheets."}
+              : "Every document that's been through extraction — browse, search, and pull into a worksheet."}
           </p>
         </header>
 

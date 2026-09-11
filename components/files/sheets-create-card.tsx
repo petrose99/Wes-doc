@@ -47,7 +47,7 @@ export function SheetsCreateCard({ icon, title, description, workspaceId, href, 
     startCreate(async () => {
       const result = await createFileAction(workspaceId, null, trimmed)
       if (result.success && result.data) {
-        router.push(`/workspaces/${workspaceId}/files/${result.data.fileId}/sheet`)
+        router.push(`/workspaces/${workspaceId}/worksheets/${result.data.fileId}/sheet`)
       } else {
         setError(result.error ?? "Something went wrong")
       }
@@ -65,7 +65,7 @@ export function SheetsCreateCard({ icon, title, description, workspaceId, href, 
         <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
           <Icon className="h-5 w-5" />
         </div>
-        <label className="mb-1 text-sm font-semibold text-slate-900">Name your sheet</label>
+        <label className="mb-1 text-sm font-semibold text-slate-900">Name your worksheet</label>
         <input
           ref={inputRef}
           type="text"

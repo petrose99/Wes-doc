@@ -53,7 +53,7 @@ export function LibraryPickList({ workspaceId, documents }: {
     startCreate(async () => {
       const result = await createSheetFromDocumentsAction(workspaceId, [...selected], trimmed)
       if (result.success && result.data) {
-        router.push(`/workspaces/${workspaceId}/files/${result.data.fileId}/sheet`)
+        router.push(`/workspaces/${workspaceId}/worksheets/${result.data.fileId}/sheet`)
       } else {
         setError(result.error ?? "Something went wrong")
       }
@@ -117,9 +117,9 @@ export function LibraryPickList({ workspaceId, documents }: {
         }
       }
       if (fileIds.length === 1) {
-        router.push(`/workspaces/${workspaceId}/files/${fileIds[0]}/sheet`)
+        router.push(`/workspaces/${workspaceId}/worksheets/${fileIds[0]}/sheet`)
       } else {
-        router.push(`/workspaces/${workspaceId}/files`)
+        router.push(`/workspaces/${workspaceId}/worksheets`)
       }
     })
   }
@@ -145,7 +145,7 @@ export function LibraryPickList({ workspaceId, documents }: {
                   value={name}
                   onChange={(e) => { setName(e.target.value); setError("") }}
                   onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleCombine() } }}
-                  placeholder="Sheet name — e.g. Q3 Invoices"
+                  placeholder="Worksheet name — e.g. Q3 Invoices"
                   className="flex-1 rounded-md border border-emerald-300 bg-white px-3 py-1.5 text-sm outline-none focus:border-emerald-500"
                 />
                 <button

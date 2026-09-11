@@ -1,6 +1,6 @@
 "use client"
 
-import { createSheetFromAccountingReportAction } from "@/app/(app)/workspaces/[workspaceId]/files/accounting-report-actions"
+import { createSheetFromAccountingReportAction } from "@/app/(app)/workspaces/[workspaceId]/worksheets/accounting-report-actions"
 import { BIGCAPITAL_REPORTS } from "@/lib/integrations/bigcapital/report-mapper"
 import { Landmark, Loader2, X } from "lucide-react"
 import { useRouter } from "next/navigation"
@@ -18,8 +18,8 @@ export function FromAccountingCard({ workspaceId }: { workspaceId: string }) {
         <Landmark className="h-[17px] w-[17px] sm:h-5 sm:w-5" />
       </div>
       <div className="min-w-0">
-        <h3 className="text-sm font-semibold text-slate-900 group-hover:text-emerald-800">From Accounting</h3>
-        <p className="hidden text-xs text-slate-500 sm:mt-1 sm:block">Pull a live report from your connected accounting system.</p>
+        <h3 className="text-sm font-semibold text-slate-900 group-hover:text-emerald-800">From Finance</h3>
+        <p className="hidden text-xs text-slate-500 sm:mt-1 sm:block">Pull a live report straight from your connected ledger.</p>
       </div>
     </button>
     {open && <AccountingReportDialog workspaceId={workspaceId} onClose={() => setOpen(false)} />}
@@ -48,14 +48,14 @@ function AccountingReportDialog({ workspaceId, onClose }: { workspaceId: string;
         name: name.trim() || undefined,
       })
       if ("error" in result) { setError(result.error); return }
-      router.push(`/workspaces/${workspaceId}/files/${result.fileId}/sheet`)
+      router.push(`/workspaces/${workspaceId}/worksheets/${result.fileId}/sheet`)
     })
   }, [workspaceId, reportType, fromDate, toDate, name, router])
 
   return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
     <div className="w-full max-w-md rounded-2xl border border-[#e6ebf1] bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold text-slate-900">From Accounting</h2>
+        <h2 className="text-lg font-bold text-slate-900">From Finance</h2>
         <button onClick={onClose} className="rounded p-1 text-slate-400 hover:text-slate-600"><X className="h-4 w-4" /></button>
       </div>
 
@@ -85,7 +85,7 @@ function AccountingReportDialog({ workspaceId, onClose }: { workspaceId: string;
         </div>}
 
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">Sheet name <span className="font-normal text-slate-400">(optional)</span></label>
+          <label className="mb-1 block text-sm font-medium text-slate-700">Worksheet name <span className="font-normal text-slate-400">(optional)</span></label>
           <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder={`${selectedReport?.label ?? "Report"} — ${new Date().toISOString().slice(0, 10)}`}
             className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-400" />
         </div>
@@ -98,7 +98,7 @@ function AccountingReportDialog({ workspaceId, onClose }: { workspaceId: string;
         <button onClick={submit} disabled={pending}
           className="inline-flex items-center gap-2 rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50">
           {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Landmark className="h-4 w-4" />}
-          Create sheet
+          Create worksheet
         </button>
       </div>
     </div>

@@ -93,7 +93,7 @@ export function FilesBrowser({ workspaceId, tab, folderId, trail, search, sort, 
   const searchParams = useSearchParams()
   // This list's own page (folder nav, search, sort) and a row/newly created file's own sheet both
   // hang off the same /files prefix.
-  const pageBase = `/workspaces/${workspaceId}/files`
+  const pageBase = `/workspaces/${workspaceId}/worksheets`
   const fileBase = pageBase
   const rows = tab === "shared" ? sharedFiles : files
 
