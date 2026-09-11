@@ -35,37 +35,42 @@ export function Hero() {
   return (
     <section
       id="top"
-      className="relative overflow-hidden border-b border-cream-200 bg-cream-50 pb-14 md:pb-24"
+      className="relative overflow-hidden border-b border-cream-200 bg-cream-50 pb-12 md:pb-24"
       style={{ backgroundImage: "radial-gradient(#e7dcc7 1px, transparent 1.4px)", backgroundSize: "24px 24px" }}
     >
       <div aria-hidden className="pointer-events-none absolute -right-32 -top-32 h-[26rem] w-[26rem] rounded-full" style={{ background: "radial-gradient(circle, rgba(16,185,129,.10), transparent 70%)" }} />
-      <div className="relative mx-auto flex max-w-6xl flex-wrap items-center gap-10 px-5 pt-10 md:gap-14 md:pt-16">
+      <div className="relative mx-auto flex max-w-6xl flex-wrap items-center gap-8 px-5 pt-8 md:gap-14 md:pt-16">
         <div className="min-w-0 flex-1 basis-[400px]">
           <span className="inline-flex items-center gap-2 rounded-full border border-cream-200 bg-white px-3.5 py-1.5 text-[0.78rem] font-semibold text-emerald-700 shadow-sm">
             <span className="db-pulse-dot h-1.5 w-1.5 rounded-full bg-emerald-500" style={{ animation: "db-pulse 2.4s ease-in-out infinite" }} />
             AI accounts payable, end to end
           </span>
-          <h1 className="mt-5 text-balance font-display text-[clamp(2.4rem,4.6vw,4.05rem)] font-extrabold leading-[1.02] tracking-[-0.038em] text-stone-950">
-            Bills in by email.{" "}
+          <h1 className="mt-4 text-balance font-display text-[clamp(2.05rem,4.6vw,4.05rem)] font-extrabold leading-[1.04] tracking-[-0.038em] text-stone-950 md:mt-5 md:leading-[1.02]">
+            Bills in, however they arrive.{" "}
             <span style={{ backgroundImage: "linear-gradient(180deg,transparent 56%,#6EE7B7 56%,#6EE7B7 93%,transparent 93%)", padding: "0 .04em" }}>Coded, checked, approved</span>{" "}
             — ready to pay.
           </h1>
-          <p className="mt-6 max-w-[34rem] text-pretty text-[1.08rem] leading-[1.62] text-stone-600">
-            DocuBite runs your accounts-payable loop: invoices arrive by email or API, extraction reads even the hard cases (handwriting, phone photos, scans), fraud checks freeze a supplier that quietly changed its bank details, 2- and 3-way matching ties them to the PO, approvals route by amount, and the bills sync to QuickBooks, Xero or Bigcapital. When you&apos;re ready to pay, we hand you a bank-ready payment file — you stay on the rails you already trust.
+          <p className="mt-4 max-w-[34rem] text-pretty text-[1rem] leading-[1.55] text-stone-600 md:mt-6 md:text-[1.08rem] md:leading-[1.62]">
+            Supplier, date, VAT, total — every detail read off the invoice, checked, and approved. Accounting is built in — or sync to the software you already use.
           </p>
-          <div className="mt-8 flex flex-wrap items-center gap-3">
-            <Link href="/signup" className="group inline-flex h-12 items-center rounded-[10px] bg-emerald-700 px-6.5 text-[0.98rem] font-bold text-white shadow-[0_1px_2px_rgba(15,23,42,.08),0_10px_26px_rgba(4,120,87,.24)] transition-colors hover:bg-emerald-800">
-              Start 14-day free trial
-            </Link>
-            <Link href="/demo" className="inline-flex h-12 items-center rounded-[10px] border border-stone-200 bg-white px-6 text-[0.98rem] font-semibold text-stone-900 shadow-sm transition-colors hover:bg-stone-50">
-              Book a demo
-            </Link>
+          <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-3.5 md:mt-8">
+            <div className="flex flex-col">
+              <Link href="/signup" className="group inline-flex h-12 items-center rounded-[10px] bg-emerald-700 px-6.5 text-[0.98rem] font-bold text-white shadow-[0_1px_2px_rgba(15,23,42,.08),0_10px_26px_rgba(4,120,87,.24)] transition-colors hover:bg-emerald-800">
+                Start 14-day free trial
+              </Link>
+              <span className="mt-1.5 text-[0.76rem] text-stone-500">Best if you can upload a folder today.</span>
+            </div>
+            <div className="flex flex-col">
+              <Link href="/demo" className="inline-flex h-12 items-center rounded-[10px] border border-stone-200 bg-white px-6 text-[0.98rem] font-semibold text-stone-900 shadow-sm transition-colors hover:bg-stone-50">
+                Book a demo
+              </Link>
+              <span className="mt-1.5 text-[0.76rem] text-stone-500">Best for a walkthrough with your own AP.</span>
+            </div>
           </div>
-          <p className="mt-3.5 text-[0.82rem] text-stone-500">No card required. Files held in private encrypted storage.</p>
         </div>
 
         <div className="min-w-0 flex-1 basis-[440px]">
-          <div className="overflow-hidden rounded-2xl border border-white/10 bg-white shadow-[0_30px_70px_rgba(0,0,0,.38)]">
+          <div className="overflow-hidden rounded-2xl border border-cream-200 bg-white shadow-[0_18px_44px_rgba(15,23,42,.09),0_2px_6px_rgba(15,23,42,.05)]">
             <div className="flex items-center gap-2 border-b border-slate-200 bg-gradient-to-b from-slate-50 to-slate-100 px-3.5 py-2.5">
               <span className="h-2.5 w-2.5 rounded-full bg-slate-300" />
               <span className="h-2.5 w-2.5 rounded-full bg-slate-300" />

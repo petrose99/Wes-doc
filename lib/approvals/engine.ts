@@ -16,6 +16,27 @@ export type WorkflowStageInput = {
   minAmount?: number | null
 }
 
+/** Adapter for stage rows loaded from Prisma — normalises Decimal to number so callers can pass
+ * `workflow.stages` straight into the engine without hand-mapping at every call site. Kept here (not
+ * in models/) so the engine's zero-Prisma-import promise still holds: the input is a plain object
+ * with a `.toNumber()` on minAmount, matching Prisma.Decimal's shape without naming the type. */
+export function toWorkflowStageInputs(
+  stages: readonly (Omit<WorkflowStageInput, "minAmount"> & { minAmount: { toNumber(): number } | number | null })[],
+): WorkflowStageInput[] {
+  return stages.map((stage) => ({
+    stageIndex: stage.stageIndex,
+    requireOwner: stage.requireOwner,
+    name: stage.name,
+    approverIds: stage.approverIds,
+    minAmount:
+      stage.minAmount === null || stage.minAmount === undefined
+        ? null
+        : typeof stage.minAmount === "number"
+          ? stage.minAmount
+          : stage.minAmount.toNumber(),
+  }))
+}
+
 /** Role + named-approver gating. Precedence:
  *   - When `approverIds` is non-empty, the actor MUST be in it (regardless of role). This lets a
  *     workspace name specific approvers per stage without also having to make them owners.
