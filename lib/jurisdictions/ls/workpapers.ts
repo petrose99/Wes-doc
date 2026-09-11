@@ -4,15 +4,20 @@
  *
  * Consumed by the close checklist's LS VAT return prep item (#42, #47).
  *
- * ## Box codes are deferred
+ * ## Box codes stay undefined — a workpaper-vs-VAT12 shape mismatch
  *
- * The ticket calls for LRA VAT-12 box codes on every VAT column, pulled from #43's SourceRefs.
- * The LS rule pack (parallel to #50 for ZA) is not yet shipped on this branch — the file that
- * would authoritatively declare those box codes (`lib/jurisdictions/ls/filings.ts`) does not
- * exist. This workpaper therefore leaves `box` UNDEFINED on every column: the arithmetic
- * (per-column totals, crossCutting slice) is correct and testable without box codes; form
- * generation waits on the LS rule pack and box codes get added in-place then. This is a
- * cleaner boundary than inventing box codes now.
+ * The LRA VAT-12 form splits inputs six ways: **goods vs services × deferred vs other**
+ * (lines 7a/7b/8a/8b/8c/8d — see `filings.ts` and `input-tax.ts`). This workpaper buckets bills
+ * by **isImport × taxRate ∈ {15, 10, 0}** (the shape decided in #47). Those two splits do NOT
+ * commute — a "local 15%" column mixes 7a (goods) and 7b (services), a "import 15%" column mixes
+ * all four of 8a/8b/8c/8d. Back-filling `box:` codes would require every bill's projection to
+ * carry `isService` and `isDeferred` flags, and those flags need coding classification the app
+ * doesn't currently produce.
+ *
+ * So every VAT column stays `box: undefined`. The workpaper remains valuable as a review sheet
+ * plus the RSA cross-border slice; **return-form generation is a separate ticket** and will
+ * either (a) extend `WorkpaperBill` with `isService`/`isDeferred` and re-bucket the columns, or
+ * (b) ship a second, orthogonal workpaper shaped to the VAT-12 form.
  *
  * ## `isRsaCrossBorder` semantics (#47 Q13)
  *
