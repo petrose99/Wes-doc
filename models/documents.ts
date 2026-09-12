@@ -19,6 +19,7 @@ import { recordFieldCorrection } from "@/models/field-corrections"
 import { resetSupplierStreak } from "@/models/suppliers"
 import { listWorkspaceIntegrationPushes } from "@/models/integrations"
 import { emitWorkspaceEvent } from "@/lib/webhooks"
+import { resolveDuplicateGatesAgainst } from "@/lib/gates/duplicate"
 import { kickWebhookDrain } from "@/lib/webhook-delivery"
 import { prisma } from "@/lib/db"
 import { Document, Prisma } from "@/prisma/client"
@@ -766,6 +767,18 @@ export async function deleteWorkspaceDocuments(workspaceId: string, documentIds:
     // Context fetched before the tx: recordDocumentAudit's getRequestAuditContext() reads next/headers(),
     // which only works outside a transaction callback (it is not a lazy Prisma query).
     const context = await getRequestAuditContext()
+    // #51 auto-resolve: a duplicate gate whose winning bill is this one has lost its
+    // counterpart; transition every such gate to resolved before the delete cascades
+    // its own row away. Runs OUTSIDE the delete tx so its `gate.resolved` audit event
+    // is durable even if the delete itself races or aborts — the underlying condition
+    // (winner gone) is a fact from the moment we decide to delete, not the moment the
+    // row disappears.
+    await resolveDuplicateGatesAgainst(document.id).catch((error) => {
+      // Never break a document delete for an audit-side transition — the gate row would
+      // cascade-delete anyway; the missing `gate.resolved` event is a logged degradation,
+      // not a data-integrity failure.
+      console.error(`[gates] resolveDuplicateGatesAgainst failed for ${document.id}:`, error instanceof Error ? error.message : error)
+    })
     await prisma.$transaction(async (tx) => {
       await tx.document.delete({ where: { id: document.id } })
       await tx.documentAuditEvent.create({ data: auditEventData({ workspaceId, actorId, type: "document_deleted" }, context) })
