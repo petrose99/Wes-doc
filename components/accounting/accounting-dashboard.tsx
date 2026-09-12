@@ -226,6 +226,7 @@ function ReadyToPushList({ workspaceId, connectionId, documents, defaultAccountI
   const [loadingAccounts, setLoadingAccounts] = useState(false)
   const [accountOverrides, setAccountOverrides] = useState<Record<string, string>>({})
   const [confirmation, setConfirmation] = useState<{ kind: "one"; document: ReadyToPushDocument } | { kind: "all" } | null>(null)
+  const [feedback, setFeedback] = useState<{ tone: "status" | "alert"; message: string } | null>(null)
 
   const loadAccounts = () => {
     setLoadingAccounts(true)
@@ -249,17 +250,27 @@ function ReadyToPushList({ workspaceId, connectionId, documents, defaultAccountI
 
   const pushOne = (doc: ReadyToPushDocument) => {
     setPushingId(doc.id)
+    setFeedback({ tone: "status", message: `Pushing ${doc.filename} to Finance…` })
     const accountId = getDocAccount(doc.id, doc)
     startTransition(async () => {
       const res = await pushDocumentToAccountingAction(workspaceId, doc.id, connectionId, accountId)
       setPushingId(null)
       setConfirmation(null)
-      if (res.success) { toast.success(res.data?.status === "succeeded" ? "Pushed to accounting" : "Push queued"); onChanged() }
-      else toast.error(res.error || "Could not push this document")
+      if (res.success) {
+        const message = res.data?.status === "succeeded" ? `${doc.filename} pushed to Finance` : `${doc.filename} push queued`
+        setFeedback({ tone: "status", message })
+        toast.success(res.data?.status === "succeeded" ? "Pushed to accounting" : "Push queued")
+        onChanged()
+      } else {
+        const message = res.error || "Could not push this document"
+        setFeedback({ tone: "alert", message })
+        toast.error(message)
+      }
     })
   }
 
   const pushAll = () => {
+    setFeedback({ tone: "status", message: `Pushing ${documents.length} documents to Finance…` })
     const overrides: Record<string, string> = {}
     for (const doc of documents) {
       overrides[doc.id] = getDocAccount(doc.id, doc)
@@ -269,11 +280,14 @@ function ReadyToPushList({ workspaceId, connectionId, documents, defaultAccountI
       setConfirmation(null)
       if (res.success) {
         const { pushed, failed } = res.data ?? { pushed: 0, failed: 0 }
+        setFeedback({ tone: failed ? "alert" : "status", message: failed ? `Pushed ${pushed}; ${failed} failed. Review the failed items and retry them.` : `Pushed ${pushed} document${pushed === 1 ? "" : "s"} to Finance` })
         if (failed) toast.warning(`Pushed ${pushed}, ${failed} failed`)
         else toast.success(`Pushed ${pushed} document${pushed === 1 ? "" : "s"}`)
         onChanged()
       } else {
-        toast.error(res.error || "Could not push documents")
+        const message = res.error || "Could not push documents"
+        setFeedback({ tone: "alert", message })
+        toast.error(message)
       }
     })
   }
@@ -292,7 +306,7 @@ function ReadyToPushList({ workspaceId, connectionId, documents, defaultAccountI
   }
 
   return (
-    <Card>
+    <Card aria-busy={pending}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <div className="flex items-center gap-2">
           <FileText className="h-4 w-4 text-slate-400" />
@@ -305,6 +319,11 @@ function ReadyToPushList({ workspaceId, connectionId, documents, defaultAccountI
         </Button>
       </CardHeader>
       <CardContent className="p-0">
+        {feedback && (
+          <p role={feedback.tone} aria-live={feedback.tone === "alert" ? "assertive" : "polite"} className={`border-b px-5 py-2.5 text-sm ${feedback.tone === "alert" ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}`}>
+            {feedback.message}
+          </p>
+        )}
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
