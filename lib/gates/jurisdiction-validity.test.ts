@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 
 vi.mock("next/headers", () => ({
   headers: vi.fn(() => { throw new Error("no request scope") }),
@@ -31,8 +31,14 @@ const ctx = (fields: Record<string, unknown>, reviewed?: Record<string, unknown>
   } as GateContext["document"],
 })
 
-/** A fieldSnapshot that satisfies every ZA s20(4) full-invoice rule. Reused and mutated by the
- * "one rule fails" cases below so it's clear which key each test breaks. */
+/** A fieldSnapshot that satisfies every ZA s20(4) full-invoice rule. Shaped exactly like real
+ * extraction output (lib/domains/finance.ts's invoice fields) — `description`/`quantity`/
+ * `vat_shown_separately` are deliberately NOT top-level keys here: extraction never produces
+ * those, and extractInvoiceLike derives them from `line_items`/`subtotal`+`tax_total` instead.
+ * A version of this fixture that used those nonexistent top-level keys is exactly what let the
+ * gate's tests pass while the real pipeline hard-blocked every invoice — see extractInvoiceLike's
+ * doc comment. Reused and mutated by the "one rule fails" cases below so it's clear which key
+ * each test breaks. */
 const passingFullInvoice = () => ({
   has_tax_invoice_wording: true,
   vendor: "Acme (Pty) Ltd",
@@ -44,13 +50,11 @@ const passingFullInvoice = () => ({
   recipient_is_registered_vendor: true,
   invoice_number: "INV-0001",
   issue_date: "2026-08-01",
-  description: "Consulting services",
-  quantity: 1,
+  line_items: [{ description: "Consulting services", quantity: 1, unit_price: 10000, amount: 10000 }],
   subtotal: 10000,
   tax_total: 1500,
   total: 11500,
   currency_code: "ZAR",
-  vat_shown_separately: true,
 })
 
 describe("extractInvoiceLike", () => {
@@ -72,6 +76,101 @@ describe("extractInvoiceLike", () => {
     expect(invoice.supplierName).toBe("Acme (Pty) Ltd")
     expect(invoice.supplierVatNumber).toBe("4123456789")
     expect(invoice.currency).toBe("ZAR")
+  })
+
+  // Regression for the incident where description/quantity/vatShownSeparately/isZeroRated read
+  // top-level extraction keys (description, quantity, vat_shown_separately) that extraction never
+  // produces — an invoice has line items, not one description/quantity, and "shown separately"/
+  // "zero-rated" are derived facts, not fields the model is asked to fill in directly. Every ZA
+  // s20 invoice failed za.s20.4.e (and often f-g) regardless of content until this was fixed.
+  describe("line-item and VAT-shape derivation (regression)", () => {
+    it("derives description from every line item's description, joined", () => {
+      const invoice = extractInvoiceLike({
+        id: "d1", workspaceId: "w1", docType: "invoice", receivedAt: new Date(),
+        fieldSnapshot: { line_items: [{ description: "Widgets", quantity: 4 }, { description: "Gadgets", quantity: 2 }] },
+      } as GateContext["document"])
+      expect(invoice.description).toBe("Widgets; Gadgets")
+      expect(invoice.quantity).toBe(4)
+    })
+
+    it("reports no description/quantity for a lineless bill (services invoice, header total only)", () => {
+      const invoice = extractInvoiceLike({
+        id: "d1", workspaceId: "w1", docType: "invoice", receivedAt: new Date(),
+        fieldSnapshot: { total: 500 },
+      } as GateContext["document"])
+      expect(invoice.description).toBeUndefined()
+      expect(invoice.quantity).toBeUndefined()
+    })
+
+    it("skips a line item with no description when deriving the joined description", () => {
+      const invoice = extractInvoiceLike({
+        id: "d1", workspaceId: "w1", docType: "invoice", receivedAt: new Date(),
+        fieldSnapshot: { line_items: [{ quantity: 1 }, { description: "Consulting", quantity: 2 }] },
+      } as GateContext["document"])
+      expect(invoice.description).toBe("Consulting")
+      // First line item with a defined quantity wins, even without a description of its own.
+      expect(invoice.quantity).toBe(1)
+    })
+
+    it("derives vatShownSeparately: true when subtotal and tax_total are both present", () => {
+      const invoice = extractInvoiceLike({
+        id: "d1", workspaceId: "w1", docType: "invoice", receivedAt: new Date(),
+        fieldSnapshot: { subtotal: 100, tax_total: 15, total: 115 },
+      } as GateContext["document"])
+      expect(invoice.vatShownSeparately).toBe(true)
+    })
+
+    it("derives vatShownSeparately: false when only a total is present (VAT-inclusive by construction)", () => {
+      const invoice = extractInvoiceLike({
+        id: "d1", workspaceId: "w1", docType: "invoice", receivedAt: new Date(),
+        fieldSnapshot: { total: 115 },
+      } as GateContext["document"])
+      expect(invoice.vatShownSeparately).toBe(false)
+    })
+
+    it("leaves vatShownSeparately undefined when there is no amount data at all", () => {
+      const invoice = extractInvoiceLike({
+        id: "d1", workspaceId: "w1", docType: "invoice", receivedAt: new Date(),
+        fieldSnapshot: { vendor: "Acme" },
+      } as GateContext["document"])
+      expect(invoice.vatShownSeparately).toBeUndefined()
+    })
+
+    it("derives isZeroRated: true when tax_total is exactly 0 alongside a subtotal", () => {
+      const invoice = extractInvoiceLike({
+        id: "d1", workspaceId: "w1", docType: "invoice", receivedAt: new Date(),
+        fieldSnapshot: { subtotal: 22000, tax_total: 0, total: 22000 },
+      } as GateContext["document"])
+      expect(invoice.isZeroRated).toBe(true)
+    })
+
+    it("derives isZeroRated: false when tax_total is a positive number", () => {
+      const invoice = extractInvoiceLike({
+        id: "d1", workspaceId: "w1", docType: "invoice", receivedAt: new Date(),
+        fieldSnapshot: { subtotal: 100, tax_total: 15, total: 115 },
+      } as GateContext["document"])
+      expect(invoice.isZeroRated).toBe(false)
+    })
+  })
+
+  // Regression: the receipt doc type uses merchant/purchase_date/receipt_number, not
+  // vendor/issue_date/invoice_number — extractInvoiceLike is shared across doc types (the gate
+  // runs on any document above the no-invoice threshold, not just docType "invoice"), so it must
+  // fall back to the receipt field names too.
+  it("falls back to receipt field names (merchant/merchant_address/receipt_number/purchase_date)", () => {
+    const invoice = extractInvoiceLike({
+      id: "d1", workspaceId: "w1", docType: "receipt", receivedAt: new Date(),
+      fieldSnapshot: {
+        merchant: "Shell Ultra City Colesberg",
+        merchant_address: "N1 Highway, Colesberg, 9795",
+        receipt_number: "R-88213",
+        purchase_date: "2026-10-28",
+      },
+    } as GateContext["document"])
+    expect(invoice.supplierName).toBe("Shell Ultra City Colesberg")
+    expect(invoice.supplierAddress).toBe("N1 Highway, Colesberg, 9795")
+    expect(invoice.invoiceNumber).toBe("R-88213")
+    expect(invoice.issueDate).toBe("2026-10-28")
   })
 
   it("coerces number-typed monetary strings — extraction sometimes hands over 'R 11,500.00'", () => {

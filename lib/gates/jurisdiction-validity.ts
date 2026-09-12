@@ -101,9 +101,45 @@ function toBoolean(value: Json): boolean | undefined {
   return undefined
 }
 
+/** One line item, loosely typed — line_items rows vary by doc type (invoice vs receipt) but both
+ * use `description`/`quantity` keys per lib/domains/finance.ts. */
+type LineItem = { description?: Json; quantity?: Json }
+
+/** Every line-item description, joined — used to derive the s20(4)(e)/s.24(8)(e) "description"
+ * requirement from the line-item table rather than a nonexistent top-level field. An invoice
+ * doesn't have one description, it has one per row; a real (non-empty) joined description proves
+ * the bill shows what was supplied, matching the rule's actual intent. `undefined` for a
+ * genuinely lineless bill (services invoice with only a header total), which correctly still
+ * fails the rule. */
+function lineItemDescriptions(items: Json): string | undefined {
+  if (!Array.isArray(items)) return undefined
+  const parts = (items as LineItem[])
+    .map((item) => (typeof item?.description === "string" ? item.description.trim() : ""))
+    .filter((d) => d !== "")
+  return parts.length ? parts.join("; ") : undefined
+}
+
+/** The first line item carrying a quantity — used to derive the s20(4)(e)/s.24(8)(f) "quantity"
+ * requirement the same way: at least one row states how much was supplied. */
+function firstLineItemQuantity(items: Json): number | undefined {
+  if (!Array.isArray(items)) return undefined
+  for (const item of items as LineItem[]) {
+    const q = toNumber(item?.quantity)
+    if (q !== undefined) return q
+  }
+  return undefined
+}
+
 /** Map a Document's extraction/review data into the pack-agnostic `InvoiceLike` shape the pack
  * rules consume. Prefers `reviewedData` (post-review truth) over `fieldSnapshot` (arrival-time
- * template shell) so a re-fire after edit sees the edited values. */
+ * template shell) so a re-fire after edit sees the edited values.
+ *
+ * `description`/`quantity`/`vatShownSeparately`/`isZeroRated` are DERIVED rather than read from a
+ * matching top-level extraction key, because no such key exists (an invoice has line items, not
+ * one description/quantity; whether VAT is "shown separately" or the bill is zero-rated are
+ * judgments the extraction schema doesn't ask the model to make directly) — see the ticket that
+ * added this comment for the incident where reading nonexistent fields hard-blocked every
+ * invoice regardless of content. */
 export function extractInvoiceLike(document: GateContext["document"]): InvoiceLike {
   const reviewed = (document.reviewedData as Record<string, Json> | null | undefined) ?? null
   const snapshot = (document.fieldSnapshot as Record<string, Json> | null | undefined) ?? null
@@ -113,27 +149,41 @@ export function extractInvoiceLike(document: GateContext["document"]): InvoiceLi
   }
 
   const total = toNumber(read("total"))
+  const netAmount = toNumber(read("subtotal"))
+  const vatAmount = toNumber(read("tax_total"))
+  const lineItems = read("line_items")
+
+  // Net + VAT extracted as distinct figures IS "shown separately" for this schema — the two
+  // numbers only exist because the bill broke them out. Absent that, but with a total present,
+  // the total is VAT-inclusive by construction (it's the only amount extraction found).
+  const vatShownSeparately = netAmount !== undefined && vatAmount !== undefined ? true
+    : total !== undefined ? false
+    : undefined
+  // Zero-rated iff we have both figures and the tax component is exactly zero — a fact read off
+  // the extracted numbers, not a judgment invented on top of them.
+  const isZeroRated = netAmount !== undefined && vatAmount !== undefined ? vatAmount === 0 : undefined
+
   return {
     hasTaxInvoiceWording: toBoolean(read("has_tax_invoice_wording")),
-    supplierName: toString(read("vendor")) ?? toString(read("supplier_name")),
-    supplierAddress: toString(read("supplier_address")) ?? toString(read("vendor_address")),
+    supplierName: toString(read("vendor")) ?? toString(read("merchant")) ?? toString(read("supplier_name")),
+    supplierAddress: toString(read("supplier_address")) ?? toString(read("merchant_address")) ?? toString(read("vendor_address")),
     supplierVatNumber: toString(read("supplier_vat_number")),
     recipientName: toString(read("recipient_name")) ?? toString(read("customer_name")),
     recipientAddress: toString(read("recipient_address")) ?? toString(read("customer_address")),
     recipientVatNumber: toString(read("recipient_vat_number")) ?? toString(read("customer_vat_number")),
     recipientIsRegisteredVendor: toBoolean(read("recipient_is_registered_vendor")),
-    invoiceNumber: toString(read("invoice_number")),
-    issueDate: toString(read("issue_date")) ?? null,
+    invoiceNumber: toString(read("invoice_number")) ?? toString(read("receipt_number")),
+    issueDate: toString(read("issue_date")) ?? toString(read("purchase_date")) ?? null,
     supplyDate: toString(read("supply_date")) ?? null,
-    description: toString(read("description")) ?? toString(read("line_items_description")),
-    quantity: toNumber(read("quantity")),
-    netAmount: toNumber(read("subtotal")),
-    vatAmount: toNumber(read("tax_total")),
+    description: lineItemDescriptions(lineItems),
+    quantity: firstLineItemQuantity(lineItems),
+    netAmount,
+    vatAmount,
     totalAmount: total,
     consideration: total,
     currency: toString(read("currency_code")) ?? toString(read("currency")),
-    vatShownSeparately: toBoolean(read("vat_shown_separately")),
-    isZeroRated: toBoolean(read("is_zero_rated")),
+    vatShownSeparately,
+    isZeroRated,
   }
 }
 
