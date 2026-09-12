@@ -12,7 +12,7 @@ export async function setTaxRegionAction(workspaceId: string, region: string): P
   const user = await getCurrentUser()
   const membership = await requireMember(workspaceId, user.id, ["owner"])
   if (!membership) return { success: false, error: NO_ACCESS }
-  if (!(await getWorkspaceCapabilities(workspaceId)).has("tax-profiles")) return { success: false, error: "Tax settings are only available in a finance-industry workspace." }
+  if (!(await getWorkspaceCapabilities(workspaceId)).has("jurisdiction")) return { success: false, error: "Jurisdiction settings are only available in a finance-industry workspace." }
   if (!TAX_REGION_CODES.includes(region as (typeof TAX_REGION_CODES)[number])) return { success: false, error: "Unknown tax region" }
 
   try {
