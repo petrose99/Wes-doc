@@ -20,6 +20,10 @@ const input = { workspaceId: "w1", fileId: "f1", templateId: "t1", source: "uplo
 beforeEach(() => {
   vi.clearAllMocks()
   db.ingestionItem = { findUnique: vi.fn().mockResolvedValue(null), upsert: vi.fn() }
+  // #49: createIngestionItem now short-circuits when the workspace has no jurisdiction. Every
+  // existing test wants the happy path (a picked jurisdiction), so seed the mock here; the
+  // dedicated jurisdiction-short-circuit test overrides it below.
+  db.workspace = { findUnique: vi.fn().mockResolvedValue({ jurisdictionCode: "ZA", jurisdictionPackVersion: "za-v0-2026-09" }) }
   vi.mocked(scanDocumentBuffer).mockResolvedValue(undefined)
 })
 
@@ -125,5 +129,19 @@ describe("createIngestionItem", () => {
     expect(result.outcome).toBe("duplicate")
     expect(scanDocumentBuffer).not.toHaveBeenCalled()
     expect(createDocumentFromBuffer).not.toHaveBeenCalled()
+  })
+
+  // #49 short-circuit: without a jurisdiction picked, every intake channel refuses at the door
+  // before it touches the idempotency lookup, the scanner, or the Document pipeline.
+  it("throws JurisdictionRequiredError when the workspace has no jurisdictionCode", async () => {
+    db.workspace.findUnique.mockResolvedValue({ jurisdictionCode: null, jurisdictionPackVersion: null })
+    const { JurisdictionRequiredError } = await import("@/lib/jurisdictions/require")
+
+    await expect(createIngestionItem(input)).rejects.toBeInstanceOf(JurisdictionRequiredError)
+
+    expect(db.ingestionItem.findUnique).not.toHaveBeenCalled()
+    expect(scanDocumentBuffer).not.toHaveBeenCalled()
+    expect(createDocumentFromBuffer).not.toHaveBeenCalled()
+    expect(db.ingestionItem.upsert).not.toHaveBeenCalled()
   })
 })
