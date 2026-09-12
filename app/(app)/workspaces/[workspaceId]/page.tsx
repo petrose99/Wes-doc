@@ -7,7 +7,7 @@ import { LastUpdated } from "@/components/shared/relative-time"
 import config from "@/lib/config"
 import { getCurrentUser } from "@/lib/auth"
 import { parseTemplateFields } from "@/lib/document-templates"
-import { countDocumentsByStage, countDocumentsThisMonth, countToReviewByFile, flaggedFieldsFromConfidence, listWorkspaceDocuments, summarizeDocumentForReview } from "@/models/documents"
+import { countDocumentsByStage, countDocumentsThisMonth, countFailedDocuments, countToReviewByFile, flaggedFieldsFromConfidence, listWorkspaceDocuments, summarizeDocumentForReview } from "@/models/documents"
 import { countReviewedUnplaced } from "@/models/document-sheet-placements"
 import { ensurePipelineFile, getFileTemplates, listRecentFiles } from "@/models/files"
 import { getWorkspaceUsage, requireWorkspaceRole } from "@/models/workspaces"
@@ -18,7 +18,7 @@ import { SpendByCategoryChart } from "@/components/analytics/spend-by-category-c
 import { VendorSpendChart } from "@/components/analytics/vendor-spend-chart"
 import { MobileUploadButtons } from "@/components/shell/mobile-upload-buttons"
 import { getOnboardingStateAction } from "./onboarding-actions"
-import { CheckCircle2, ChevronRight, FileText, SearchCheck, Table2 } from "lucide-react"
+import { AlertTriangle, CheckCircle2, ChevronRight, FileText, SearchCheck, Table2 } from "lucide-react"
 import Link from "next/link"
 
 export const dynamic = "force-dynamic"
@@ -45,7 +45,7 @@ export default async function WorkspaceHomePage({ params }: {
 
   const documentSearchEnabled = config.embeddings.enabled
 
-  const [pipelineFile, usage, stageCounts, documentsThisMonth, recentFiles, onboardingState, unplacedCount, capabilities] = await Promise.all([
+  const [pipelineFile, usage, stageCounts, documentsThisMonth, recentFiles, onboardingState, unplacedCount, failedCount, capabilities] = await Promise.all([
     ensurePipelineFile(workspaceId, user.id),
     getWorkspaceUsage(workspaceId),
     countDocumentsByStage(workspaceId),
@@ -53,8 +53,35 @@ export default async function WorkspaceHomePage({ params }: {
     listRecentFiles(workspaceId, 4),
     getOnboardingStateAction(workspaceId),
     countReviewedUnplaced(workspaceId),
+    countFailedDocuments(workspaceId),
     getWorkspaceCapabilities(workspaceId),
   ])
+
+  // Wayfinder decision #112: the home surfaces one shared, priority-ranked queue rather than a
+  // broad dashboard. Priority is review > approved-awaiting-placement > failed/stalled recovery >
+  // upload > exploratory destinations. The first item is the prominent "next best action"; the
+  // rest render as a compact secondary list. An empty queue is the "all caught up" state.
+  const queueItems = [
+    stageCounts.review > 0 && {
+      key: "review",
+      message: `${stageCounts.review} document${stageCounts.review === 1 ? "" : "s"} need${stageCounts.review === 1 ? "s" : ""} review`,
+      href: `/workspaces/${workspaceId}/pipeline?stage=review`,
+      icon: SearchCheck,
+    },
+    unplacedCount > 0 && {
+      key: "placement",
+      message: `${unplacedCount} approved document${unplacedCount === 1 ? "" : "s"} ready for a worksheet`,
+      href: `/workspaces/${workspaceId}/worksheets`,
+      icon: Table2,
+    },
+    failedCount > 0 && {
+      key: "recovery",
+      message: `${failedCount} document${failedCount === 1 ? "" : "s"} failed to process`,
+      href: `/workspaces/${workspaceId}/pipeline?stage=inbox`,
+      icon: AlertTriangle,
+    },
+  ].filter((item): item is { key: string; message: string; href: string; icon: typeof SearchCheck } => !!item)
+  const [nextAction, ...secondaryQueueItems] = queueItems
 
   const showFinancials = capabilities.has("finance-analytics")
   const today = new Date()
@@ -93,7 +120,6 @@ export default async function WorkspaceHomePage({ params }: {
         <div className="flex items-center gap-2">
           <h1 className="font-display text-[25px] font-extrabold leading-[1.15] tracking-[-0.025em] text-slate-900 md:text-[33px] md:leading-normal">Welcome back to {membership.workspace.name}</h1>
         </div>
-        {stageCounts.review > 0 && <p className="mt-1.5 text-[13.5px] text-slate-500 md:text-[14.5px]">{stageCounts.review} document{stageCounts.review === 1 ? " is" : "s are"} waiting for review across your pipeline.</p>}
       </div>
       <div className="hidden md:block">
         <FileHubUploadButton
@@ -111,6 +137,39 @@ export default async function WorkspaceHomePage({ params }: {
     </header>
 
     <MobileUploadButtons workspaceId={workspaceId} fileId={pipelineFile.id} />
+
+    <div className="rounded-2xl border border-[#e6ebf1] bg-white p-[18px] shadow-panel sm:p-5">
+      {nextAction ? <>
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600"><nextAction.icon className="h-[19px] w-[19px]" /></span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-slate-400">Next best action</p>
+            <p className="text-[15.5px] font-bold text-slate-900">{nextAction.message}</p>
+          </div>
+          <Link href={nextAction.href} className="shrink-0 rounded-[11px] bg-slate-900 px-4 py-2.5 text-[13.5px] font-semibold text-white hover:bg-slate-800">
+            Open →
+          </Link>
+        </div>
+        {secondaryQueueItems.length > 0 && <ul className="mt-3.5 flex flex-wrap gap-2 border-t border-[#eef2f6] pt-3.5">
+          {secondaryQueueItems.map((item) => (
+            <li key={item.key}>
+              <Link href={item.href} className="inline-flex items-center gap-1.5 rounded-full border border-[#e6ebf1] bg-white px-3 py-1.5 text-[12.5px] font-medium text-slate-600 hover:border-[#c7d2fe] hover:bg-indigo-50 hover:text-indigo-700">
+                <item.icon className="h-3.5 w-3.5" />{item.message}
+              </Link>
+            </li>
+          ))}
+        </ul>}
+      </> : <div className="flex flex-wrap items-center gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700"><CheckCircle2 className="h-[19px] w-[19px]" /></span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-slate-400">Next best action</p>
+          <p className="text-[15.5px] font-bold text-slate-900">All caught up — nothing needs your attention right now.</p>
+        </div>
+        <Link href={`/workspaces/${workspaceId}/worksheets`} className="shrink-0 rounded-[11px] border border-[#e6ebf1] px-4 py-2.5 text-[13.5px] font-semibold text-slate-700 hover:bg-slate-50">
+          Browse recent work
+        </Link>
+      </div>}
+    </div>
 
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-3.5">
       {stats.map((stat) => {

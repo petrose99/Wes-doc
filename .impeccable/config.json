@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "gray-on-color",
+        "value": "*",
+        "files": [
+          "app/(app)/workspaces/[workspaceId]/page.tsx"
+        ],
+        "createdAt": "2026-09-12T20:50:21.328Z",
+        "reason": "false positive: rule matches text-slate-600 co-occurring with hover:bg-indigo-50/hover:text-indigo-700 in the same class string; base is text-slate-600 on bg-white and the hover state pairs indigo text with indigo bg, both real AA-contrast pairs"
+      }
+    ]
+  }
+}
