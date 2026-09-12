@@ -108,6 +108,16 @@ model Workspace {
   /// Deliberately never issued for a clinical workspace — see the same file: unencrypted email
   /// is not an acceptable channel for ePHI, so the route refuses one even if a token existed.
   inboundEmailToken  String?             @unique @map("inbound_email_token")
+  /// Workspace jurisdiction pack code (ZA, LS, GB, US-CA at ship time). AP inbound (email-in,
+  /// upload, API) short-circuits with a typed "workspace needs a jurisdiction" error until this
+  /// is set — see lib/jurisdictions/require.ts. One jurisdiction per workspace for now; multi-
+  /// entity graduates to a future decision. Rule packs live in lib/jurisdictions/<code>/ and
+  /// are read live from code (see #39 in the wayfinder map).
+  jurisdictionCode   String?             @map("jurisdiction_code")
+  /// Stamped from lib/jurisdictions/<code>/index.ts's packVersion when the workspace picks a
+  /// pack (or when the pack version changes and the workspace re-confirms). Every
+  /// DocumentCheckResult also stamps its packVersion so old checks stay legible after a bump.
+  jurisdictionPackVersion String?        @map("jurisdiction_pack_version")
   createdAt       DateTime               @default(now()) @map("created_at")
   updatedAt       DateTime               @updatedAt @map("updated_at")
   members         WorkspaceMember[]
