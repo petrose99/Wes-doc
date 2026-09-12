@@ -76,11 +76,11 @@ export async function deleteWorkspaceAction(workspaceId: string): Promise<Action
   } catch (error) { return { success: false, error: errorMessage(error, "Could not delete the workspace") } }
 }
 
-export async function leaveWorkspaceAction(workspaceId: string): Promise<ActionState<null>> {
+export async function leaveWorkspaceAction(workspaceId: string, options: { confirmLastReviewerRemoval?: boolean } = {}): Promise<ActionState<null>> {
   const user = await getCurrentUser()
   if (!(await requireMember(workspaceId, user.id))) return { success: false, error: NO_ACCESS }
   try {
-    await leaveWorkspace(workspaceId, user.id)
+    await leaveWorkspace(workspaceId, user.id, { confirmLastReviewerRemoval: options.confirmLastReviewerRemoval })
     revalidatePath("/workspaces", "layout")
     return { success: true, data: null }
   } catch (error) { return { success: false, error: errorMessage(error, "Could not leave the workspace") } }
@@ -88,32 +88,36 @@ export async function leaveWorkspaceAction(workspaceId: string): Promise<ActionS
 
 /* ------------------------------------------------------------------------- membership --- */
 
-export async function removeWorkspaceMemberAction(workspaceId: string, memberUserId: string): Promise<ActionState<null>> {
+export async function removeWorkspaceMemberAction(workspaceId: string, memberUserId: string, options: { confirmLastReviewerRemoval?: boolean } = {}): Promise<ActionState<null>> {
   const user = await getCurrentUser()
   if (!(await requireMember(workspaceId, user.id, ["owner"]))) return { success: false, error: NO_ACCESS }
   try {
-    await removeWorkspaceMember({ workspaceId, actorId: user.id, memberUserId })
+    await removeWorkspaceMember({ workspaceId, actorId: user.id, memberUserId, confirmLastReviewerRemoval: options.confirmLastReviewerRemoval })
     revalidatePath(paths(workspaceId).workspace)
     return { success: true, data: null }
   } catch (error) { return { success: false, error: errorMessage(error, "Could not remove the member") } }
 }
 
-export async function changeWorkspaceMemberRoleAction(workspaceId: string, memberUserId: string, role: string): Promise<ActionState<null>> {
+/** Role strings mirror WorkspaceRole (`owner | reviewer | member`). The UI's confirm step for
+ * dropping the last reviewer round-trips through this action twice: the first call surfaces
+ * `last_reviewer_removal_requires_confirmation`, the second passes `confirmLastReviewerRemoval:
+ * true` after the admin acknowledges the SMB-mode flip warning. */
+export async function changeWorkspaceMemberRoleAction(workspaceId: string, memberUserId: string, role: string, options: { confirmLastReviewerRemoval?: boolean } = {}): Promise<ActionState<null>> {
   const user = await getCurrentUser()
   if (!(await requireMember(workspaceId, user.id, ["owner"]))) return { success: false, error: NO_ACCESS }
-  if (role !== "owner" && role !== "member") return { success: false, error: "Choose a valid role" }
+  if (role !== "owner" && role !== "reviewer" && role !== "member") return { success: false, error: "Choose a valid role" }
   try {
-    await updateWorkspaceMemberRole({ workspaceId, actorId: user.id, memberUserId, role: role as WorkspaceRole })
+    await updateWorkspaceMemberRole({ workspaceId, actorId: user.id, memberUserId, role: role as WorkspaceRole, confirmLastReviewerRemoval: options.confirmLastReviewerRemoval })
     revalidatePath(paths(workspaceId).workspace)
     return { success: true, data: null }
   } catch (error) { return { success: false, error: errorMessage(error, "Could not change the role") } }
 }
 
-export async function transferWorkspaceOwnershipAction(workspaceId: string, targetUserId: string): Promise<ActionState<null>> {
+export async function transferWorkspaceOwnershipAction(workspaceId: string, targetUserId: string, options: { confirmLastReviewerRemoval?: boolean } = {}): Promise<ActionState<null>> {
   const user = await getCurrentUser()
   if (!(await requireMember(workspaceId, user.id, ["owner"]))) return { success: false, error: NO_ACCESS }
   try {
-    await transferWorkspaceOwnership({ workspaceId, actorId: user.id, targetUserId })
+    await transferWorkspaceOwnership({ workspaceId, actorId: user.id, targetUserId, confirmLastReviewerRemoval: options.confirmLastReviewerRemoval })
     // No role re-check after this point: the actor has just stepped down to plain member, so
     // asserting ["owner"] again would fail on their own successful transfer.
     revalidatePath(paths(workspaceId).workspace)
@@ -131,7 +135,7 @@ export async function inviteWorkspaceMemberAction(workspaceId: string, formData:
   const role = String(formData.get("role") || "member")
   if (!z.string().email().safeParse(email).success) return { success: false, error: "Enter a valid email" }
   try {
-    const { token, invitation, workspaceName } = await createWorkspaceInvitation({ workspaceId, ownerId: user.id, email, role: role === "owner" ? "owner" : "member" })
+    const { token, invitation, workspaceName } = await createWorkspaceInvitation({ workspaceId, ownerId: user.id, email, role: role === "owner" ? "owner" : role === "reviewer" ? "reviewer" : "member" })
     const emailed = await deliverInvitation({ email: invitation.email, workspaceName, inviterName: user.name || user.email, token, expiresAt: invitation.expiresAt })
     revalidatePath(paths(workspaceId).workspace)
     return { success: true, data: { inviteUrl: inviteUrlFor(token), emailed } }
@@ -144,7 +148,7 @@ export async function resendWorkspaceInvitationAction(workspaceId: string, email
   const user = await getCurrentUser()
   if (!(await requireMember(workspaceId, user.id, ["owner"]))) return { success: false, error: NO_ACCESS }
   try {
-    const { token, invitation, workspaceName } = await createWorkspaceInvitation({ workspaceId, ownerId: user.id, email, role: role === "owner" ? "owner" : "member" })
+    const { token, invitation, workspaceName } = await createWorkspaceInvitation({ workspaceId, ownerId: user.id, email, role: role === "owner" ? "owner" : role === "reviewer" ? "reviewer" : "member" })
     const emailed = await deliverInvitation({ email: invitation.email, workspaceName, inviterName: user.name || user.email, token, expiresAt: invitation.expiresAt })
     revalidatePath(paths(workspaceId).workspace)
     return { success: true, data: { inviteUrl: inviteUrlFor(token), emailed } }

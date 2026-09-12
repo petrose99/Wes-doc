@@ -37,6 +37,7 @@ export function MemberInvite({ workspaceId, onLink }: { workspaceId: string; onL
       <Input name="email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="teammate@company.com" required className="sm:flex-1" />
       <NativeSelect name="role" aria-label="Role" className="sm:w-32" value={role} onChange={(event) => setRole(event.target.value)}>
         <option value="member">Member</option>
+        <option value="reviewer">Reviewer</option>
         <option value="owner">Owner</option>
       </NativeSelect>
       <Button type="submit" disabled={pending}><UserPlus />{pending ? "Inviting…" : "Send invite"}</Button>
