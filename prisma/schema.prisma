@@ -72,6 +72,7 @@ model User {
   matchResolutions   DocumentMatch[]     @relation("MatchResolver")
   createdPaymentRuns PaymentRun[]        @relation("PaymentRunCreator")
   resolvedGates      Gate[]              @relation("GateResolver")
+  createdWarnChecks  WarnCheck[]         @relation("WarnCheckAuthor")
   verifiedSuppliers  Supplier[]          @relation("SupplierVerifier")
 
   @@map("users")
@@ -131,6 +132,7 @@ model Workspace {
   auditEvents     DocumentAuditEvent[]
   workflowAuditEvents AuditEvent[]
   gates           Gate[]
+  warnChecks      WarnCheck[]
   workbooks       SpreadsheetWorkbook[]
   aiFormulaCache  AiFormulaCache[]
   extractionShapes ExtractionShape[]
@@ -943,6 +945,48 @@ model Gate {
   /// Exception-queue read: "every open gate in this workspace" for the Overview panel.
   @@index([workspaceId, state])
   @@map("gates")
+}
+
+/// Workspace-authored soft gate rules ("warn checks"): the extensibility point on top of the
+/// five built-in touchless-AP gates from decision #40. Each row is one rule the workspace
+/// declared — a predicate over a fixed field set, and a message to show when it fires. When
+/// enabled, the warn-checks runner (lib/gates/warn-checks.ts) evaluates every enabled rule on
+/// document arrival and upserts a Gate row per match; the Gate carries the WarnCheck.id and
+/// message in its payload so the exception queue can render the workspace's own wording.
+///
+/// Rules are workspace-only in v1 — no cross-workspace templates and no firm-level rules that
+/// span client workspaces (see #56 out-of-scope + fog #45). Predicates use a narrow expression
+/// language (lib/gates/warn-checks-evaluator.ts), NOT arbitrary JS; that keeps this from
+/// becoming a code-injection surface and lets us reject unknown fields at save time.
+model WarnCheck {
+  id           String    @id @default(uuid()) @db.Uuid
+  workspaceId  String    @map("workspace_id") @db.Uuid
+  /// Short human name shown in the admin list and in the exception queue as the header of the
+  /// finding. Not unique — a workspace may have two rules with the same name that scope to
+  /// different conditions.
+  name         String
+  /// The predicate source, in the warn-checks DSL. Parsed on save (unknown fields rejected)
+  /// and re-parsed at evaluation time (parser is pure). Stored verbatim so the admin edit UI
+  /// can round-trip what the author typed.
+  whenExpr    String    @map("when_expr")
+  /// The message shown to the reviewer when the rule matches. Stored verbatim, rendered as
+  /// text (no HTML) in the exception queue.
+  message     String
+  /// A disabled rule is preserved for history — Gate rows already emitted keep the WarnCheck.id
+  /// in their payload and the admin UI can still show the rule name. Disabling stops future
+  /// firings without deleting the row.
+  enabled     Boolean   @default(true)
+  createdById String    @map("created_by_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy User      @relation("WarnCheckAuthor", fields: [createdById], references: [id], onDelete: Restrict)
+
+  /// Admin list read: "every enabled rule for this workspace" for the runner and the settings
+  /// panel; the sort by createdAt happens in the query.
+  @@index([workspaceId, enabled])
+  @@map("warn_checks")
 }
 
 /** The spreadsheet behind one file: a Univer `IWorkbookData` snapshot holding every tab, its

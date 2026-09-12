@@ -120,5 +120,6 @@ async function upsertGate(
 export const gateRegistry: GateRegistry = createGateRegistry()
 
 // Concrete gate registrations live in ./index.ts (the barrel), in #40 order — duplicate first,
-// jurisdiction-validity second, then the soft gates in ticket order. Registering there rather
-// than here keeps one wiring point that callers can't bypass via import order.
+// jurisdiction-validity second, then the soft gates in ticket order, warn-checks last so a
+// workspace's own rules never pre-empt a built-in gate. Registering there rather than here
+// keeps one wiring point that callers can't bypass via import order.

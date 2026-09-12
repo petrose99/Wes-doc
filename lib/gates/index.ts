@@ -10,12 +10,15 @@ import { jurisdictionValidityRunner } from "./jurisdiction-validity"
 import { matchVarianceGateRunner } from "./match-variance"
 import { supplierTrustGateRunner } from "./supplier-trust"
 import { confidenceBandGateRunner } from "./confidence-band"
+import { warnChecksGateRunner } from "./warn-checks"
 
 gateRegistry.register(duplicateGateRunner)
 gateRegistry.register(jurisdictionValidityRunner)
 gateRegistry.register(matchVarianceGateRunner)
 gateRegistry.register(supplierTrustGateRunner)
 gateRegistry.register(confidenceBandGateRunner)
+// Warn-checks registers last so a workspace's own rules never pre-empt a built-in gate.
+gateRegistry.register(warnChecksGateRunner)
 
 export { gateRegistry, createGateRegistry } from "./registry"
 export type { GateRegistry } from "./registry"
