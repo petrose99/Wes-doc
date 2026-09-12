@@ -104,12 +104,12 @@ export const DOC_TYPE_SPECS: Record<DocType, DocTypeSpec> = {
     counterpartyField: "merchant",
     taxField: "tax_total",
     amountKeys: {
-      taxTotal: "tax_total", total: "total", lineItems: "line_items",
+      subtotal: "subtotal", taxTotal: "tax_total", total: "total", lineItems: "line_items",
       currency: "currency_code",
     },
     checkFields: {
       supplier: "merchant", invoiceNumber: "receipt_number", date: "purchase_date",
-      taxTotal: "tax_total", total: "total", currency: "currency_code",
+      subtotal: "subtotal", taxTotal: "tax_total", total: "total", currency: "currency_code",
       lineItems: "line_items",
     },
     matchCandidateFields: {
@@ -121,6 +121,7 @@ export const DOC_TYPE_SPECS: Record<DocType, DocTypeSpec> = {
       { key: "merchant", hint: "Name of the merchant or store" },
       { key: "receipt_number", hint: "Receipt reference number" },
       { key: "purchase_date", hint: "Date of purchase (YYYY-MM-DD)" },
+      { key: "subtotal", hint: "Amount before tax, if shown separately" },
       { key: "total", hint: "Total amount paid" },
       { key: "tax_total", hint: "Total tax amount" },
       { key: "currency_code", hint: "ISO 4217 currency code" },
