@@ -423,7 +423,7 @@ function ReadyToPushList({ workspaceId, connectionId, documents, defaultAccountI
   )
 }
 
-export function AccountingDashboard({ workspaceId, isOwner, apiBase, connection, job, lastSyncedAt, entityCounts, readyToPush, categoryAccountMap }: {
+export function AccountingDashboard({ workspaceId, isOwner, apiBase: _apiBase, connection, job, lastSyncedAt, entityCounts, readyToPush, categoryAccountMap }: {
   workspaceId: string
   isOwner: boolean
   apiBase: string
