@@ -33,7 +33,7 @@ export function MobileTabBar({ workspaceId, pipelineReviewCount = 0, sheetsUnpla
     { href: `${base}/settings/workspace`, label: "More", icon: MoreHorizontal, exact: false, badge: undefined as number | undefined },
   ]
 
-  return <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 items-center border-t border-[#eef2f6] bg-[rgba(255,255,255,0.94)] px-2 pb-5 pt-2 backdrop-blur-[10px] md:hidden">
+  return <nav aria-label="Primary workspace navigation" className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 items-center border-t border-[#eef2f6] bg-[rgba(255,255,255,0.94)] px-2 pb-5 pt-2 backdrop-blur-[10px] md:hidden">
     {tabs.map((tab) => {
       const active = tab.exact
         ? pathname === tab.href
@@ -45,6 +45,7 @@ export function MobileTabBar({ workspaceId, pipelineReviewCount = 0, sheetsUnpla
           || (tab.label === "Finance" && pathname.startsWith(`${base}/accounting`))
       const badge = "badge" in tab ? tab.badge : undefined
       return <Link key={tab.href} href={tab.href}
+        aria-current={active ? "page" : undefined}
         className={`relative flex flex-col items-center gap-1 p-1 text-[10.5px] ${active ? "font-semibold text-emerald-700" : "font-medium text-slate-400"}`}>
         <tab.icon className="h-[21px] w-[21px]" />
         {badge != null && <span className="absolute left-[calc(50%+8px)] top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-indigo-600 px-1 text-[10px] font-bold text-white">{badge}</span>}
