@@ -1,5 +1,6 @@
 import { DEFAULT_DOCUMENT_TEMPLATES, parseTemplateFields } from "@/lib/document-templates"
 import { prisma } from "@/lib/db"
+import { unscoped } from "@/lib/workspace-scope"
 
 /** One-off backfill: adds a new template version carrying `has_tax_invoice_wording`,
  * `supplier_address`/`merchant_address`, `recipient_name`, `recipient_address`, and
@@ -26,10 +27,14 @@ async function main() {
     if (!defaultTemplate) throw new Error(`${code}_default_template_missing`)
     const fields = parseTemplateFields(defaultTemplate.fields)
 
-    const templates = await prisma.documentTemplate.findMany({
+    // documentTemplate.findMany scoped by { code, isSystem: true } deliberately spans every
+    // workspace's system template — that's the whole point of a backfill. Wrapped in unscoped()
+    // per lib/workspace-scope.ts's own escape hatch, matching the job-worker/webhook-drain
+    // precedent for cross-workspace queries the guard's docstring names directly.
+    const templates = await unscoped(() => prisma.documentTemplate.findMany({
       where: { code, isSystem: true },
       include: { versions: { orderBy: { version: "desc" }, take: 1 } },
-    })
+    }))
     totalTemplates += templates.length
 
     let updated = 0
