@@ -7,12 +7,19 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useCallback, useEffect, useRef, useState } from "react"
 
+// Same Tab/Shift+Tab cycle as components/ui/dialog.tsx — this panel predates that shared
+// component and has a bespoke layout (search input + results list, not a title/description
+// card), so the trap is duplicated here rather than reshaping it to fit Dialog's children slot.
+const FOCUSABLE = "a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex=\"-1\"])"
+
 export function GlobalSearch({ workspaceId }: { workspaceId: string }) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
   const [result, setResult] = useState<GlobalSearchResult | null>(null)
   const [loading, setLoading] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+  const openerRef = useRef<Element | null>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const router = useRouter()
 
@@ -29,7 +36,27 @@ export function GlobalSearch({ workspaceId }: { workspaceId: string }) {
   }, [])
 
   useEffect(() => {
-    if (open) setTimeout(() => inputRef.current?.focus(), 50)
+    if (!open) return
+    openerRef.current = typeof document !== "undefined" ? document.activeElement : null
+    setTimeout(() => inputRef.current?.focus(), 50)
+
+    const onTab = (e: KeyboardEvent) => {
+      if (e.key !== "Tab") return
+      const container = panelRef.current
+      if (!container) return
+      const focusables = Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE))
+      if (focusables.length === 0) return
+      const first = focusables[0]
+      const last = focusables[focusables.length - 1]
+      const active = document.activeElement as HTMLElement | null
+      if (e.shiftKey && (active === first || !container.contains(active))) { e.preventDefault(); last.focus() }
+      else if (!e.shiftKey && active === last) { e.preventDefault(); first.focus() }
+    }
+    window.addEventListener("keydown", onTab)
+    return () => {
+      window.removeEventListener("keydown", onTab)
+      if (openerRef.current instanceof HTMLElement) openerRef.current.focus()
+    }
   }, [open])
 
   const search = useCallback((q: string) => {
@@ -74,6 +101,10 @@ export function GlobalSearch({ workspaceId }: { workspaceId: string }) {
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh] bg-black/40" onClick={close}>
       <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Search documents"
         className="flex max-h-[60vh] w-full max-w-xl flex-col rounded-2xl border border-[#e6ebf1] bg-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
@@ -90,7 +121,7 @@ export function GlobalSearch({ workspaceId }: { workspaceId: string }) {
             className="flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
           />
           {loading && <Loader2 className="h-4 w-4 animate-spin text-slate-400" />}
-          <button onClick={close} className="rounded p-1 text-slate-400 hover:text-slate-600">
+          <button type="button" onClick={close} aria-label="Close search" className="rounded p-1 text-slate-400 hover:text-slate-600">
             <X className="h-4 w-4" />
           </button>
         </div>
