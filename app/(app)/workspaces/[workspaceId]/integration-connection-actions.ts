@@ -111,16 +111,16 @@ export async function syncAccountingEntitiesAction(workspaceId: string, connecti
  * (Phase B) — the ledger-side counterpart of syncAccountingEntitiesAction above. Reachable from
  * the Data Health page (next to "Run checks now"), since the ledger checks are what this data
  * actually feeds — see components/health/sync-ledger-button.tsx. */
-export async function syncLedgerTransactionsAction(workspaceId: string, connectionId: string): Promise<ActionState> {
+export async function syncLedgerTransactionsAction(workspaceId: string, connectionId: string): Promise<ActionState<{ synced: number }>> {
   const gate = await guardIntegrations(workspaceId)
   if ("error" in gate) return { success: false, error: errorMessage(new Error(gate.error), NO_ACCESS) }
   try {
     const connection = await prisma.integrationConnection.findFirst({ where: { id: connectionId, workspaceId }, select: { id: true } })
     if (!connection) return { success: false, error: "That connection no longer exists" }
-    await syncLedgerTransactions(connection.id)
-    await recordDocumentAudit({ workspaceId, actorId: gate.userId, type: "integration_ledger_synced", detail: { connectionId } })
+    const { synced } = await syncLedgerTransactions(connection.id)
+    await recordDocumentAudit({ workspaceId, actorId: gate.userId, type: "integration_ledger_synced", detail: { connectionId, synced } })
     revalidatePath(`/workspaces/${workspaceId}/health`)
-    return { success: true }
+    return { success: true, data: { synced } }
   } catch (error) {
     if (error instanceof TokenRefreshError && error.message === "integration_needs_reauth") {
       return { success: false, error: "This connection needs to be reconnected before its ledger can be synced" }

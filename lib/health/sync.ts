@@ -11,7 +11,7 @@ import { Prisma } from "@/prisma/client"
  * exactly (same connection lookup, same getValidAccessToken credential handling, same
  * upsert-then-soft-retire $transaction shape). A row from a prior sync the provider no longer
  * returns is marked inactive rather than deleted, same convention as AccountingEntity. */
-export async function syncLedgerTransactions(connectionId: string): Promise<void> {
+export async function syncLedgerTransactions(connectionId: string): Promise<{ synced: number }> {
   const connection = await prisma.integrationConnection.findUniqueOrThrow({
     where: { id: connectionId },
     select: { id: true, workspaceId: true, provider: true, externalTenantId: true },
@@ -101,6 +101,8 @@ export async function syncLedgerTransactions(connectionId: string): Promise<void
       })
     }
   }
+
+  return { synced: rows.length }
 }
 
 const LEDGER_SYNC_STALE_MS = 24 * 60 * 60 * 1000
