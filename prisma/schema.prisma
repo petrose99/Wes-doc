@@ -2522,9 +2522,11 @@ model FxRate {
 /// new row, and the sequence-of-events truth lives in audit_events (close.opened /
 /// close.period.locked / close.period.reopened / close.period.relocked).
 ///
-/// The v1 lock snapshot is minimal — packCode + packVersion at lock time, plus a `lockSnapshot`
-/// JSON column that #79 will extend with `workspaceModeAtLock` and `reviewerOfRecord` without
-/// requiring another migration. Computation (#96) writes into CloseItem.computedValue; sign-off
+/// The lock snapshot is a `lockSnapshot` JSON column carrying `{packCode, packVersion,
+/// lockedAt, workspaceModeAtLock, reviewerOfRecord}` (#79). New fields are added to the
+/// TypeScript shape in `lib/close/types.ts` without a Prisma migration; a data back-fill
+/// migration is only needed when historical rows must gain a required field (as #79 did).
+/// Computation (#96) writes into CloseItem.computedValue; sign-off
 /// (#97) writes into CloseItem.signedAt/signedById. This ticket owns the persistence and the
 /// four lifecycle actions only.
 model Close {
@@ -2553,8 +2555,10 @@ model Close {
   lastReopenedAt     DateTime?    @map("last_reopened_at")
   lastReopenedById   String?      @map("last_reopened_by_id") @db.Uuid
   reopenReason       String?      @map("reopen_reason")
-  /// Extension point for #79 (workspaceModeAtLock, reviewerOfRecord). Written by lockClose;
-  /// v1 records `{ packCode, packVersion, lockedAt }` — a strict subset of what #79 will grow.
+  /// Written by lockClose/relockClose per `CloseLockSnapshot` in lib/close/types.ts:
+  /// `{ packCode, packVersion, lockedAt, workspaceModeAtLock, reviewerOfRecord }`. Historical
+  /// rows locked before #79 landed are back-filled to workspaceModeAtLock='firm' +
+  /// reviewerOfRecord=null by 20260912030000_backfill_close_lock_snapshot_mode.
   lockSnapshot       Json?        @map("lock_snapshot")
   createdAt          DateTime     @default(now()) @map("created_at")
   updatedAt          DateTime     @updatedAt @map("updated_at")

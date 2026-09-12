@@ -10,6 +10,8 @@ const closeUpdate = vi.fn()
 const closeItemUpdateMany = vi.fn()
 const gateFindMany = vi.fn()
 const workspaceFindUnique = vi.fn()
+const workspaceMemberCount = vi.fn()
+const workspaceMemberFindFirst = vi.fn()
 const auditCreate = vi.fn()
 
 vi.mock("@/lib/db", () => ({
@@ -18,6 +20,7 @@ vi.mock("@/lib/db", () => ({
     closeItem: { updateMany: closeItemUpdateMany },
     gate: { findMany: gateFindMany },
     workspace: { findUnique: workspaceFindUnique },
+    workspaceMember: { count: workspaceMemberCount, findFirst: workspaceMemberFindFirst },
     auditEvent: { create: auditCreate },
   },
 }))
@@ -31,6 +34,7 @@ const {
   CloseNotFoundError,
   CloseAlreadyOpenError,
   CloseLockBlockedByGatesError,
+  CloseLockRequiresReviewerActorError,
   CloseWrongStateError,
 } = await import("./actions")
 
@@ -63,7 +67,13 @@ beforeEach(() => {
   closeItemUpdateMany.mockReset()
   gateFindMany.mockReset()
   workspaceFindUnique.mockReset()
+  workspaceMemberCount.mockReset()
+  workspaceMemberFindFirst.mockReset()
   auditCreate.mockReset()
+  // Default: firm mode with the lock actor as reviewer of record. Tests that need SMB or a
+  // non-signing actor override these two mocks per-case.
+  workspaceMemberCount.mockResolvedValue(1)
+  workspaceMemberFindFirst.mockResolvedValue({ user: { id: "u1", name: "Ann Reviewer" } })
 })
 
 describe("isVatPeriodEnd", () => {
@@ -175,6 +185,58 @@ describe("lockClose", () => {
     const event = auditCreate.mock.calls[0][0].data
     expect(event.type).toBe("close.period.locked")
     expect(event.payload).toMatchObject({ packCode: "ZA", packVersion: "za-v1-2026-09" })
+  })
+
+  it("firm mode: snapshot carries workspaceModeAtLock='firm' + reviewerOfRecord = lock actor (#79)", async () => {
+    closeFindUnique.mockResolvedValue(closeRow({ state: "open" }))
+    gateFindMany.mockResolvedValue([])
+    workspaceFindUnique.mockResolvedValue({ jurisdictionCode: "ZA" })
+    workspaceMemberCount.mockResolvedValue(2) // ≥1 reviewer -> firm
+    workspaceMemberFindFirst.mockResolvedValue({ user: { id: "u1", name: "Ann Reviewer" } })
+    closeUpdate.mockResolvedValue(closeRow({ state: "locked", lockedById: "u1" }))
+    await lockClose({ closeId: "c1", actorId: "u1" })
+    const snap = closeUpdate.mock.calls[0][0].data.lockSnapshot
+    expect(snap.workspaceModeAtLock).toBe("firm")
+    expect(snap.reviewerOfRecord).toEqual({ userId: "u1", name: "Ann Reviewer" })
+    const event = auditCreate.mock.calls[0][0].data
+    expect(event.payload.workspaceModeAtLock).toBe("firm")
+    expect(event.payload.reviewerOfRecord).toEqual({ userId: "u1", name: "Ann Reviewer" })
+  })
+
+  it("SMB mode: snapshot carries workspaceModeAtLock='smb' + reviewerOfRecord=null; no member lookup (#79)", async () => {
+    closeFindUnique.mockResolvedValue(closeRow({ state: "open" }))
+    gateFindMany.mockResolvedValue([])
+    workspaceFindUnique.mockResolvedValue({ jurisdictionCode: "ZA" })
+    workspaceMemberCount.mockResolvedValue(0) // no reviewers -> smb
+    closeUpdate.mockResolvedValue(closeRow({ state: "locked", lockedById: "u1" }))
+    await lockClose({ closeId: "c1", actorId: "u1" })
+    const snap = closeUpdate.mock.calls[0][0].data.lockSnapshot
+    expect(snap.workspaceModeAtLock).toBe("smb")
+    expect(snap.reviewerOfRecord).toBeNull()
+    expect(workspaceMemberFindFirst).not.toHaveBeenCalled()
+  })
+
+  it("firm mode with a non-signing actor throws CloseLockRequiresReviewerActorError — snapshot needs a reviewer of record (#79)", async () => {
+    closeFindUnique.mockResolvedValue(closeRow({ state: "open" }))
+    gateFindMany.mockResolvedValue([])
+    workspaceFindUnique.mockResolvedValue({ jurisdictionCode: "ZA" })
+    workspaceMemberCount.mockResolvedValue(1)
+    workspaceMemberFindFirst.mockResolvedValue(null) // actor isn't reviewer/owner
+    await expect(lockClose({ closeId: "c1", actorId: "u1" })).rejects.toBeInstanceOf(CloseLockRequiresReviewerActorError)
+    expect(closeUpdate).not.toHaveBeenCalled()
+    expect(auditCreate).not.toHaveBeenCalled()
+  })
+
+  it("carries a null user.name through as null in the snapshot rather than dropping the row (#79)", async () => {
+    closeFindUnique.mockResolvedValue(closeRow({ state: "open" }))
+    gateFindMany.mockResolvedValue([])
+    workspaceFindUnique.mockResolvedValue({ jurisdictionCode: "ZA" })
+    workspaceMemberCount.mockResolvedValue(1)
+    workspaceMemberFindFirst.mockResolvedValue({ user: { id: "u1", name: null } })
+    closeUpdate.mockResolvedValue(closeRow({ state: "locked", lockedById: "u1" }))
+    await lockClose({ closeId: "c1", actorId: "u1" })
+    const snap = closeUpdate.mock.calls[0][0].data.lockSnapshot
+    expect(snap.reviewerOfRecord).toEqual({ userId: "u1", name: null })
   })
 
   it("throws CloseNotFoundError for a missing id, CloseWrongStateError for a locked one", async () => {

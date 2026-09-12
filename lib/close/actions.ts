@@ -25,6 +25,7 @@ import { prisma } from "@/lib/db"
 import { AuditEventType, writeAuditEvent } from "@/lib/audit"
 import { resolveJurisdictionPack, type JurisdictionCode } from "@/lib/jurisdictions"
 import type { Close, CloseItem, Prisma, PrismaClient } from "@/prisma/client"
+import type { WorkspaceMode } from "@/models/workspaces"
 import { descriptorsForClose } from "./item-sets"
 import type { CloseLockSnapshot } from "./types"
 import { computeCloseItems } from "./compute"
@@ -54,6 +55,20 @@ export class CloseLockBlockedByGatesError extends Error {
     super(`Cannot lock close: ${gateIds.length} open hard gate${gateIds.length === 1 ? "" : "s"} against workspace bills`)
     this.name = "CloseLockBlockedByGatesError"
     this.gateIds = gateIds
+  }
+}
+
+/** Raised by lockClose / relockClose in firm mode when the lock actor is not a workspace
+ * member with reviewer or owner capability. Firm mode requires a reviewer-of-record on the
+ * snapshot; a non-signing actor would leave the snapshot without one. */
+export class CloseLockRequiresReviewerActorError extends Error {
+  workspaceId: string
+  actorId: string
+  constructor(workspaceId: string, actorId: string) {
+    super(`Cannot lock close: actor ${actorId} is not a reviewer or owner of workspace ${workspaceId}`)
+    this.name = "CloseLockRequiresReviewerActorError"
+    this.workspaceId = workspaceId
+    this.actorId = actorId
   }
 }
 
@@ -183,6 +198,35 @@ export async function recomputeClose(
   return computeCloseItems({ closeId: input.closeId, actorId: input.actorId ?? null }, client)
 }
 
+/** Derive workspace mode inside the lock transaction so it can't race a role change on the
+ * same workspace: reads reviewer count through the same PrismaLike used by the update. Kept
+ * separate from `models/workspaces.getWorkspaceMode` (which uses the global client) so the
+ * snapshot always sees the same reviewer set the lock is committing against. Decision #41:
+ * firm iff ≥1 reviewer. */
+async function readWorkspaceModeAtLock(workspaceId: string, client: PrismaLike): Promise<WorkspaceMode> {
+  const reviewerCount = await client.workspaceMember.count({ where: { workspaceId, role: "reviewer" } })
+  return reviewerCount > 0 ? "firm" : "smb"
+}
+
+/** Reviewer-of-record for a firm-mode lock: the actor performing the lock. They must be a
+ * workspace member with reviewer or owner capability (both are legitimate sign-off roles per
+ * #41). SMB returns null — SMB workspaces have a signer of record who attests on sign-off
+ * (#77) rather than a distinct reviewer identity. */
+async function pickReviewerOfRecord(
+  workspaceId: string,
+  actorId: string,
+  mode: WorkspaceMode,
+  client: PrismaLike,
+): Promise<CloseLockSnapshot["reviewerOfRecord"]> {
+  if (mode === "smb") return null
+  const member = await client.workspaceMember.findFirst({
+    where: { workspaceId, userId: actorId, role: { in: ["owner", "reviewer"] } },
+    select: { user: { select: { id: true, name: true } } },
+  })
+  if (!member) throw new CloseLockRequiresReviewerActorError(workspaceId, actorId)
+  return { userId: member.user.id, name: member.user.name ?? null }
+}
+
 /** Count open, hard-severity Gate rows for a workspace — the block predicate for lock /
  * relock per the ticket. Returns the ids so the raised error carries them. */
 async function findBlockingHardGates(workspaceId: string, client: PrismaLike): Promise<string[]> {
@@ -210,11 +254,15 @@ async function performLock(
 
   const code = await readWorkspaceJurisdiction(existing.workspaceId, client)
   const pack = resolveJurisdictionPack(code)
+  const workspaceModeAtLock = await readWorkspaceModeAtLock(existing.workspaceId, client)
+  const reviewerOfRecord = await pickReviewerOfRecord(existing.workspaceId, input.actorId, workspaceModeAtLock, client)
   const lockedAt = new Date()
   const snapshot: CloseLockSnapshot = {
     packCode: pack?.code ?? null,
     packVersion: pack?.packVersion ?? null,
     lockedAt: lockedAt.toISOString(),
+    workspaceModeAtLock,
+    reviewerOfRecord,
   }
 
   const close = await client.close.update({
@@ -241,6 +289,8 @@ async function performLock(
         periodMonth: close.periodMonth,
         packCode: snapshot.packCode,
         packVersion: snapshot.packVersion,
+        workspaceModeAtLock: snapshot.workspaceModeAtLock,
+        reviewerOfRecord: snapshot.reviewerOfRecord,
       },
     },
     client,
