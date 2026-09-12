@@ -1,0 +1,14 @@
+# Binary assets: never run these through line-ending normalisation. Without this, git on
+# Windows treats the generated sample PDFs as text and CRLF-mangles them on checkout.
+*.pdf binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.zip binary
