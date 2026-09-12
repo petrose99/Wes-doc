@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -51,6 +52,7 @@ function AccountingConnectionCard({ workspaceId, connection, isOwner, onChanged 
   const [pending, startTransition] = useTransition()
   const [accounts, setAccounts] = useState<{ id: string; name: string }[] | null>(null)
   const [loadingAccounts, setLoadingAccounts] = useState(false)
+  const [disconnectOpen, setDisconnectOpen] = useState(false)
 
   const loadAccounts = () => {
     setLoadingAccounts(true)
@@ -92,11 +94,7 @@ function AccountingConnectionCard({ workspaceId, connection, isOwner, onChanged 
         )}
         {isOwner && (
           <Button type="button" size="sm" variant="ghost" disabled={pending}
-            onClick={() => { if (confirm(`Disconnect ${PROVIDER_LABELS[connection.provider] ?? connection.provider}? Pushes to it will stop.`)) startTransition(async () => {
-              const res = await disconnectIntegrationAction(workspaceId, connection.id)
-              if (res.success) onChanged()
-              else toast.error(res.error || "Could not disconnect")
-            }) }}>
+            onClick={() => setDisconnectOpen(true)}>
             Disconnect
           </Button>
         )}
@@ -127,6 +125,19 @@ function AccountingConnectionCard({ workspaceId, connection, isOwner, onChanged 
           )}
         </div>
       )}
+      <ConfirmDialog
+        open={disconnectOpen}
+        destructive
+        busy={pending}
+        title={`Disconnect ${PROVIDER_LABELS[connection.provider] ?? connection.provider}?`}
+        description="New pushes to this provider will stop. Existing ledger records will not be removed."
+        confirmLabel={pending ? "Disconnecting…" : "Disconnect provider"}
+        onConfirm={() => startTransition(async () => {
+          const res = await disconnectIntegrationAction(workspaceId, connection.id)
+          if (res.success) { setDisconnectOpen(false); onChanged() }
+          else toast.error(res.error || "Could not disconnect")
+        })}
+        onCancel={() => setDisconnectOpen(false)} />
     </li>
   )
 }
@@ -178,6 +189,8 @@ export function IntegrationsManager({
   const [url, setUrl] = useState("")
   const [selectedEvents, setSelectedEvents] = useState<string[]>([])
   const [freshSecret, setFreshSecret] = useState<string | null>(null)
+  const [revokeKey, setRevokeKey] = useState<ApiKey | null>(null)
+  const [deleteEndpoint, setDeleteEndpoint] = useState<Endpoint | null>(null)
 
   const run = (fn: () => Promise<{ success: boolean; error?: string }>, onOk?: () => void) =>
     startTransition(async () => {
@@ -274,7 +287,7 @@ export function IntegrationsManager({
                   <span className="text-xs text-muted-foreground">{key.lastUsedAt ? `used ${new Date(key.lastUsedAt).toLocaleDateString()}` : "never used"}</span>
                   {isOwner && !key.revokedAt && (
                     <Button type="button" size="sm" variant="ghost" disabled={pending}
-                      onClick={() => { if (confirm("Revoke this key? Requests using it will stop working immediately.")) run(() => revokeApiKeyAction(workspaceId, key.id)) }}>
+                      onClick={() => setRevokeKey(key)}>
                       Revoke
                     </Button>
                   )}
@@ -283,6 +296,18 @@ export function IntegrationsManager({
             ))}
             {!apiKeys.length && <li className="text-muted-foreground">No API keys yet.</li>}
           </ul>
+          <ConfirmDialog
+            open={revokeKey !== null}
+            destructive
+            busy={pending}
+            title={`Revoke ${revokeKey?.name ?? "this API key"}?`}
+            description="Requests using this key will stop working immediately. This cannot be undone."
+            confirmLabel={pending ? "Revoking…" : "Revoke API key"}
+            onConfirm={() => {
+              if (!revokeKey) return
+              run(() => revokeApiKeyAction(workspaceId, revokeKey.id), () => setRevokeKey(null))
+            }}
+            onCancel={() => setRevokeKey(null)} />
         </CardContent>
       </Card>
 
@@ -340,7 +365,7 @@ export function IntegrationsManager({
                       {endpoint.status === "active" ? "Disable" : "Enable"}
                     </Button>
                     <Button type="button" size="sm" variant="ghost" disabled={pending}
-                      onClick={() => { if (confirm("Delete this endpoint?")) run(() => deleteWebhookEndpointAction(workspaceId, endpoint.id)) }}>
+                      onClick={() => setDeleteEndpoint(endpoint)}>
                       Delete
                     </Button>
                   </span>
@@ -349,6 +374,18 @@ export function IntegrationsManager({
             ))}
             {!endpoints.length && <li className="text-muted-foreground">No webhook endpoints yet.</li>}
           </ul>
+          <ConfirmDialog
+            open={deleteEndpoint !== null}
+            destructive
+            busy={pending}
+            title="Delete this webhook endpoint?"
+            description={deleteEndpoint ? `${deleteEndpoint.url} will stop receiving document events. This cannot be undone.` : undefined}
+            confirmLabel={pending ? "Deleting…" : "Delete endpoint"}
+            onConfirm={() => {
+              if (!deleteEndpoint) return
+              run(() => deleteWebhookEndpointAction(workspaceId, deleteEndpoint.id), () => setDeleteEndpoint(null))
+            }}
+            onCancel={() => setDeleteEndpoint(null)} />
         </CardContent>
       </Card>
 

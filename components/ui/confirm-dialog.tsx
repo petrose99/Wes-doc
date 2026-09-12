@@ -85,8 +85,8 @@ export function ConfirmDialog({ open, title, description, confirmLabel = "Confir
           {children && <div className="mt-3">{children}</div>}
         </div>
         <div className="flex justify-end gap-2 border-t bg-slate-50 px-5 py-3">
-          <Button type="button" variant="outline" size="sm" disabled={busy} onClick={onCancel}>Cancel</Button>
-          <Button type="button" variant={destructive ? "destructive" : "default"} size="sm" autoFocus={!children} disabled={busy} onClick={onConfirm}>
+          <Button type="button" variant="outline" size="sm" autoFocus={destructive && !children} disabled={busy} onClick={onCancel}>Cancel</Button>
+          <Button type="button" variant={destructive ? "destructive" : "default"} size="sm" autoFocus={!children && !destructive} disabled={busy} onClick={onConfirm}>
             {busy && <Loader2 className="h-4 w-4 animate-spin" />}{confirmLabel}
           </Button>
         </div>
