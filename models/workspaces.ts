@@ -30,6 +30,78 @@ const parseRole = (value: unknown): WorkspaceRole => (value === "owner" ? "owner
  * currently running and happily wave through demoting or removing the last owner. */
 const countOwners = (workspaceId: string) => prisma.workspaceMember.count({ where: { workspaceId, role: "owner" } })
 
+/* ------------------------------------------------------------- workspace mode (#41) --- */
+
+export type WorkspaceMode = "firm" | "smb"
+
+/** Same fresh-read discipline as countOwners: mode/reviewer-count are the invariants the role
+ * mutations below diff against, so any snapshot would race the write that is running right now. */
+const countReviewers = (workspaceId: string) => prisma.workspaceMember.count({ where: { workspaceId, role: "reviewer" } })
+
+/** Workspace mode is derived, not stored: firm when at least one member holds the reviewer role,
+ * else smb. Owners do not implicitly count as reviewers — the two roles are separate strings on
+ * WorkspaceMember, and a firm's owner isn't necessarily its signer of record. Decision #41. */
+export async function getWorkspaceMode(workspaceId: string): Promise<WorkspaceMode> {
+  return (await countReviewers(workspaceId)) > 0 ? "firm" : "smb"
+}
+
+const modeFromReviewerCount = (count: number): WorkspaceMode => (count > 0 ? "firm" : "smb")
+
+const reviewerDelta = (prevRole: string | null, nextRole: string | null) => (nextRole === "reviewer" ? 1 : 0) - (prevRole === "reviewer" ? 1 : 0)
+
+/** Build the audit-event $transaction rows for a role-diff that touched reviewer capability, so
+ * every mutation below emits the same three events (reviewer.added/.removed/mode.changed) from
+ * one place. `prevReviewers` is the count BEFORE the mutation, `delta` is the reviewer change
+ * this mutation carries (−1 lost a reviewer, +1 gained one, 0 unchanged — but reviewer role may
+ * still have moved between users, hence the `targetUserId` on the payload).
+ *
+ * All three ride on DocumentAuditEvent (freeform `type: String`), matching the existing
+ * workspace_* lifecycle events. writeAuditEvent's typed catalog is for gate/close events. */
+function reviewerAuditEventRows(input: {
+  workspaceId: string
+  actorId: string | null
+  targetUserId: string
+  prevReviewers: number
+  delta: -1 | 0 | 1
+  reason?: string
+}, context: Awaited<ReturnType<typeof getRequestAuditContext>>) {
+  const rows: ReturnType<typeof auditEventData>[] = []
+  if (input.delta === 1) {
+    rows.push(auditEventData(
+      { workspaceId: input.workspaceId, actorId: input.actorId, type: "workspace.reviewer.added", detail: { targetUserId: input.targetUserId, reason: input.reason } },
+      context,
+    ))
+  } else if (input.delta === -1) {
+    rows.push(auditEventData(
+      { workspaceId: input.workspaceId, actorId: input.actorId, type: "workspace.reviewer.removed", detail: { targetUserId: input.targetUserId, reason: input.reason } },
+      context,
+    ))
+  }
+  const before = modeFromReviewerCount(input.prevReviewers)
+  const after = modeFromReviewerCount(input.prevReviewers + input.delta)
+  if (before !== after) {
+    rows.push(auditEventData(
+      { workspaceId: input.workspaceId, actorId: input.actorId, type: "workspace.mode.changed", detail: { from: before, to: after, triggeredBy: input.targetUserId } },
+      context,
+    ))
+  }
+  return { rows, before, after }
+}
+
+/** Fire retroactive gate work AFTER commit, on the same after-commit shape the other retroactive
+ * reeval sweeps in lib/gates/* use (see models/automation-config.ts:136). Lazy-imported so the
+ * stub in lib/gates/smb-ceiling.ts (filled in by #76) doesn't get pulled onto every caller's
+ * dependency graph. */
+async function afterModeFlip(workspaceId: string, before: WorkspaceMode, after: WorkspaceMode) {
+  if (before === "smb" && after === "firm") {
+    const { resolveOpenSmbCeilingGatesForWorkspace } = await import("@/lib/gates/smb-ceiling")
+    await resolveOpenSmbCeilingGatesForWorkspace(workspaceId, "workspace_added_reviewer")
+  } else if (before === "firm" && after === "smb") {
+    const { reevaluateOpenSmbCeilingGatesForWorkspace } = await import("@/lib/gates/smb-ceiling")
+    await reevaluateOpenSmbCeilingGatesForWorkspace(workspaceId)
+  }
+}
+
 export async function createWorkspaceForUser(user: Pick<User, "id" | "name" | "email">, options: { name?: string; kind?: WorkspaceKind; country?: string; baseCurrency?: string; timezone?: string; fiscalYearStart?: string } = {}) {
   const workspace = await prisma.workspace.create({
     data: {
@@ -108,13 +180,24 @@ export async function renameWorkspace(workspaceId: string, name: string, actorId
 }
 
 /** Deliberately does NOT re-check any seat limit: there is none anymore, and this exists purely
- * so the owner can reorganise roles. */
-export async function updateWorkspaceMemberRole(input: { workspaceId: string; actorId: string; memberUserId: string; role: WorkspaceRole }) {
+ * so the owner can reorganise roles.
+ *
+ * `confirmLastReviewerRemoval` gates the SMB-mode flip (#41): a role change that drops the last
+ * reviewer throws `last_reviewer_removal_requires_confirmation` unless the caller has already
+ * shown the admin the warning and asserted `confirmLastReviewerRemoval: true`. Prevents an
+ * accidental double-click from silently re-gating every open bill over the ceiling. */
+export async function updateWorkspaceMemberRole(input: { workspaceId: string; actorId: string; memberUserId: string; role: WorkspaceRole; confirmLastReviewerRemoval?: boolean }) {
   const role = parseRole(input.role)
   const member = await prisma.workspaceMember.findUnique({ where: { workspaceId_userId: { workspaceId: input.workspaceId, userId: input.memberUserId } } })
   if (!member) throw new Error("member_not_found")
   if (member.role === "owner" && role !== "owner" && (await countOwners(input.workspaceId)) <= 1) throw new Error("last_owner_required")
+
+  const delta = reviewerDelta(member.role, role) as -1 | 0 | 1
+  const prevReviewers = delta === 0 ? 0 : await countReviewers(input.workspaceId)
+  if (delta === -1 && prevReviewers <= 1 && !input.confirmLastReviewerRemoval) throw new Error("last_reviewer_removal_requires_confirmation")
+
   const context = await getRequestAuditContext()
+  const audit = reviewerAuditEventRows({ workspaceId: input.workspaceId, actorId: input.actorId, targetUserId: input.memberUserId, prevReviewers, delta }, context)
   const [updated] = await prisma.$transaction([
     prisma.workspaceMember.update({ where: { id: member.id }, data: { role } }),
     prisma.documentAuditEvent.create({
@@ -123,14 +206,20 @@ export async function updateWorkspaceMemberRole(input: { workspaceId: string; ac
         context
       ),
     }),
+    ...audit.rows.map((data) => prisma.documentAuditEvent.create({ data })),
   ])
+  await afterModeFlip(input.workspaceId, audit.before, audit.after)
   return updated
 }
 
 /** Removing someone also drops the per-email file shares they hold in this workspace.
  * getFileAccess resolves DocumentFileShare independently of membership, so a removed member who
- * had ever been added to a Share dialog would otherwise keep edit access to those files. */
-async function detachMember(workspaceId: string, memberId: string, email: string, actorId: string | null, type: string) {
+ * had ever been added to a Share dialog would otherwise keep edit access to those files.
+ *
+ * `reviewerAudit` optionally piggybacks the reviewer.removed / mode.changed audit rows onto the
+ * same transaction — used when the detached member held reviewer role, so #41's three events
+ * fire atomically with the delete. */
+async function detachMember(workspaceId: string, memberId: string, email: string, actorId: string | null, type: string, reviewerAudit?: ReturnType<typeof auditEventData>[]) {
   const normalized = email.toLowerCase()
   const context = await getRequestAuditContext()
   await prisma.$transaction([
@@ -138,10 +227,11 @@ async function detachMember(workspaceId: string, memberId: string, email: string
     prisma.documentFileShare.deleteMany({ where: { email: normalized, file: { workspaceId } } }),
     prisma.workspaceInvitation.deleteMany({ where: { workspaceId, email: normalized, acceptedAt: null } }),
     prisma.documentAuditEvent.create({ data: auditEventData({ workspaceId, actorId, type }, context) }),
+    ...(reviewerAudit ?? []).map((data) => prisma.documentAuditEvent.create({ data })),
   ])
 }
 
-export async function removeWorkspaceMember(input: { workspaceId: string; actorId: string; memberUserId: string }) {
+export async function removeWorkspaceMember(input: { workspaceId: string; actorId: string; memberUserId: string; confirmLastReviewerRemoval?: boolean }) {
   if (input.actorId === input.memberUserId) throw new Error("use_leave_workspace")
   const member = await prisma.workspaceMember.findUnique({
     where: { workspaceId_userId: { workspaceId: input.workspaceId, userId: input.memberUserId } },
@@ -149,12 +239,22 @@ export async function removeWorkspaceMember(input: { workspaceId: string; actorI
   })
   if (!member) throw new Error("member_not_found")
   if (member.role === "owner" && (await countOwners(input.workspaceId)) <= 1) throw new Error("last_owner_required")
-  await detachMember(input.workspaceId, member.id, member.user.email, input.actorId, "workspace_member_removed")
+
+  const wasReviewer = member.role === "reviewer"
+  const prevReviewers = wasReviewer ? await countReviewers(input.workspaceId) : 0
+  if (wasReviewer && prevReviewers <= 1 && !input.confirmLastReviewerRemoval) throw new Error("last_reviewer_removal_requires_confirmation")
+
+  const context = await getRequestAuditContext()
+  const audit = wasReviewer
+    ? reviewerAuditEventRows({ workspaceId: input.workspaceId, actorId: input.actorId, targetUserId: input.memberUserId, prevReviewers, delta: -1 }, context)
+    : { rows: [], before: "smb" as WorkspaceMode, after: "smb" as WorkspaceMode }
+  await detachMember(input.workspaceId, member.id, member.user.email, input.actorId, "workspace_member_removed", audit.rows)
+  await afterModeFlip(input.workspaceId, audit.before, audit.after)
 }
 
 /** Leaving a personal workspace is refused rather than handled: it is the user's own default
  * space, and getOrCreateWorkspaceForUser would simply mint a replacement on their next visit. */
-export async function leaveWorkspace(workspaceId: string, userId: string) {
+export async function leaveWorkspace(workspaceId: string, userId: string, options: { confirmLastReviewerRemoval?: boolean } = {}) {
   const member = await prisma.workspaceMember.findUnique({
     where: { workspaceId_userId: { workspaceId, userId } },
     include: { user: { select: { email: true } }, workspace: { select: { kind: true } } },
@@ -165,15 +265,35 @@ export async function leaveWorkspace(workspaceId: string, userId: string) {
     const members = await prisma.workspaceMember.count({ where: { workspaceId } })
     throw new Error(members > 1 ? "transfer_ownership_before_leaving" : "delete_workspace_instead")
   }
-  await detachMember(workspaceId, member.id, member.user.email, userId, "workspace_member_left")
+
+  const wasReviewer = member.role === "reviewer"
+  const prevReviewers = wasReviewer ? await countReviewers(workspaceId) : 0
+  if (wasReviewer && prevReviewers <= 1 && !options.confirmLastReviewerRemoval) throw new Error("last_reviewer_removal_requires_confirmation")
+
+  const context = await getRequestAuditContext()
+  const audit = wasReviewer
+    ? reviewerAuditEventRows({ workspaceId, actorId: userId, targetUserId: userId, prevReviewers, delta: -1, reason: "left_workspace" }, context)
+    : { rows: [], before: "smb" as WorkspaceMode, after: "smb" as WorkspaceMode }
+  await detachMember(workspaceId, member.id, member.user.email, userId, "workspace_member_left", audit.rows)
+  await afterModeFlip(workspaceId, audit.before, audit.after)
 }
 
-export async function transferWorkspaceOwnership(input: { workspaceId: string; actorId: string; targetUserId: string; stepDown?: boolean }) {
+export async function transferWorkspaceOwnership(input: { workspaceId: string; actorId: string; targetUserId: string; stepDown?: boolean; confirmLastReviewerRemoval?: boolean }) {
   if (input.actorId === input.targetUserId) throw new Error("cannot_transfer_to_self")
   const target = await prisma.workspaceMember.findUnique({ where: { workspaceId_userId: { workspaceId: input.workspaceId, userId: input.targetUserId } } })
   if (!target) throw new Error("member_not_found")
   const stepDown = input.stepDown !== false
+
+  // Target's promotion to owner overwrites their previous role, so a reviewer being promoted
+  // silently drops from the reviewer count. Diff before the write so #41's events cover this.
+  const targetWasReviewer = target.role === "reviewer"
+  const prevReviewers = targetWasReviewer ? await countReviewers(input.workspaceId) : 0
+  if (targetWasReviewer && prevReviewers <= 1 && !input.confirmLastReviewerRemoval) throw new Error("last_reviewer_removal_requires_confirmation")
+
   const context = await getRequestAuditContext()
+  const audit = targetWasReviewer
+    ? reviewerAuditEventRows({ workspaceId: input.workspaceId, actorId: input.actorId, targetUserId: input.targetUserId, prevReviewers, delta: -1, reason: "promoted_to_owner" }, context)
+    : { rows: [], before: "smb" as WorkspaceMode, after: "smb" as WorkspaceMode }
   await prisma.$transaction([
     prisma.workspaceMember.update({ where: { workspaceId_userId: { workspaceId: input.workspaceId, userId: input.targetUserId } }, data: { role: "owner" } }),
     ...(stepDown ? [prisma.workspaceMember.update({ where: { workspaceId_userId: { workspaceId: input.workspaceId, userId: input.actorId } }, data: { role: "member" } })] : []),
@@ -183,7 +303,9 @@ export async function transferWorkspaceOwnership(input: { workspaceId: string; a
         context
       ),
     }),
+    ...audit.rows.map((data) => prisma.documentAuditEvent.create({ data })),
   ])
+  await afterModeFlip(input.workspaceId, audit.before, audit.after)
 }
 
 /** The cascade on Workspace drops every child row, but nothing in the database knows about the
@@ -289,14 +411,25 @@ export async function acceptWorkspaceInvitation(token: string, user: Pick<User, 
     throw new Error("invitation_invalid")
   }
   if (invitation.expiresAt < new Date()) throw new Error("invitation_invalid")
+
+  // A pre-existing membership (acceptedAt=null but member row present — the sign-up path can hit
+  // this shape) means we're role-changing, not adding; diff off the current row's role.
+  const existing = await prisma.workspaceMember.findUnique({ where: { workspaceId_userId: { workspaceId: invitation.workspaceId, userId: user.id } } })
+  const nextRole = invitation.role
+  const delta = reviewerDelta(existing?.role ?? null, nextRole) as -1 | 0 | 1
+  const prevReviewers = delta === 0 ? 0 : await countReviewers(invitation.workspaceId)
   const context = await getRequestAuditContext()
+  const audit = reviewerAuditEventRows({ workspaceId: invitation.workspaceId, actorId: user.id, targetUserId: user.id, prevReviewers, delta, reason: "invitation_accepted" }, context)
+
   await prisma.$transaction([
     prisma.workspaceMember.upsert({ where: { workspaceId_userId: { workspaceId: invitation.workspaceId, userId: user.id } }, update: { role: invitation.role }, create: { workspaceId: invitation.workspaceId, userId: user.id, role: invitation.role } }),
     prisma.workspaceInvitation.update({ where: { id: invitation.id }, data: { acceptedAt: new Date() } }),
     prisma.documentAuditEvent.create({
       data: auditEventData({ workspaceId: invitation.workspaceId, actorId: user.id, type: "invitation_accepted", detail: { role: invitation.role } }, context),
     }),
+    ...audit.rows.map((data) => prisma.documentAuditEvent.create({ data })),
   ])
+  await afterModeFlip(invitation.workspaceId, audit.before, audit.after)
   const fullUser = await prisma.user.findUnique({ where: { id: user.id }, select: { id: true, name: true, email: true } })
   if (fullUser) {
     provisionMemberAccount(invitation.workspaceId, { id: fullUser.id, name: fullUser.name ?? "", email: fullUser.email }).catch((err) => {

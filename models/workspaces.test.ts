@@ -7,18 +7,25 @@ vi.mock("@/models/files", () => ({ createFile: vi.fn(), deleteFiles: vi.fn() }))
 vi.mock("@/lib/document-storage", () => ({ deleteDocumentSource: vi.fn() }))
 vi.mock("@/lib/audit-archive", () => ({ archiveWorkspaceAuditEvents: vi.fn().mockResolvedValue({ archived: 0 }) }))
 
+vi.mock("@/lib/gates/smb-ceiling", () => ({
+  resolveOpenSmbCeilingGatesForWorkspace: vi.fn().mockResolvedValue(undefined),
+  reevaluateOpenSmbCeilingGatesForWorkspace: vi.fn().mockResolvedValue(undefined),
+}))
+
 const {
   acceptWorkspaceInvitation,
   createTeamWorkspace,
   createWorkspaceInvitation,
   deleteWorkspace,
   getPendingInvitationForEmail,
+  getWorkspaceMode,
   leaveWorkspace,
   removeWorkspaceMember,
   revokeWorkspaceInvitation,
   transferWorkspaceOwnership,
   updateWorkspaceMemberRole,
 } = await import("@/models/workspaces")
+const smbCeiling = await import("@/lib/gates/smb-ceiling")
 const { prisma } = await import("@/lib/db")
 const { deleteFiles, createFile } = await import("@/models/files")
 
@@ -223,6 +230,124 @@ describe("getPendingInvitationForEmail", () => {
     db.workspaceInvitation = { findFirst: vi.fn() }
     expect(await getPendingInvitationForEmail("   ")).toBeNull()
     expect(db.workspaceInvitation.findFirst).not.toHaveBeenCalled()
+  })
+})
+
+describe("workspace mode derivation (#41)", () => {
+  it("is smb when no member holds the reviewer role", async () => {
+    db.workspaceMember = { count: vi.fn().mockResolvedValue(0) }
+    expect(await getWorkspaceMode("w1")).toBe("smb")
+    expect(db.workspaceMember.count).toHaveBeenCalledWith({ where: { workspaceId: "w1", role: "reviewer" } })
+  })
+
+  it("is firm when at least one reviewer exists", async () => {
+    db.workspaceMember = { count: vi.fn().mockResolvedValue(1) }
+    expect(await getWorkspaceMode("w1")).toBe("firm")
+  })
+})
+
+describe("reviewer audit events (#41)", () => {
+  // Turns a mocked-out audit chain into just the events writeAuditEvent-shaped for assertion:
+  // every documentAuditEvent.create call arrives with { data: <auditEventData return> }, so the
+  // real emissions ride on data.type + data.detail. This mirrors what production writes.
+  const auditTypes = () => db.documentAuditEvent.create.mock.calls.map((call: [{ data: { type: string; detail: unknown } }]) => call[0].data.type)
+  const auditByType = (type: string) => db.documentAuditEvent.create.mock.calls.find((call: [{ data: { type: string; detail: unknown } }]) => call[0].data.type === type)?.[0].data.detail
+
+  it("emits reviewer.added + mode.changed on smb → firm role change", async () => {
+    db.workspaceMember = {
+      findUnique: vi.fn().mockResolvedValue({ id: "m1", role: "member" }),
+      // countOwners is not called (member → reviewer never hits the owner guard) but countReviewers is:
+      // 0 reviewers before, +1 delta → mode flips smb → firm.
+      count: vi.fn().mockResolvedValue(0),
+      update: vi.fn().mockReturnValue({ id: "m1", role: "reviewer" }),
+    }
+    db.documentAuditEvent = { create: vi.fn((args) => args) }
+
+    await updateWorkspaceMemberRole({ workspaceId: "w1", actorId: "u2", memberUserId: "u1", role: "reviewer" })
+
+    expect(auditTypes()).toEqual(expect.arrayContaining(["workspace_member_role_changed", "workspace.reviewer.added", "workspace.mode.changed"]))
+    expect(auditByType("workspace.mode.changed")).toMatchObject({ from: "smb", to: "firm" })
+    expect(smbCeiling.resolveOpenSmbCeilingGatesForWorkspace).toHaveBeenCalledWith("w1", "workspace_added_reviewer")
+  })
+
+  it("refuses to demote the last reviewer without confirmLastReviewerRemoval", async () => {
+    db.workspaceMember = {
+      findUnique: vi.fn().mockResolvedValue({ id: "m1", role: "reviewer" }),
+      count: vi.fn().mockResolvedValue(1),
+      update: vi.fn(),
+    }
+    await expect(updateWorkspaceMemberRole({ workspaceId: "w1", actorId: "u2", memberUserId: "u1", role: "member" })).rejects.toThrow("last_reviewer_removal_requires_confirmation")
+    expect(db.workspaceMember.update).not.toHaveBeenCalled()
+    expect(smbCeiling.reevaluateOpenSmbCeilingGatesForWorkspace).not.toHaveBeenCalled()
+  })
+
+  it("demotes the last reviewer once confirmed, emitting the firm → smb mode.changed event", async () => {
+    db.workspaceMember = {
+      findUnique: vi.fn().mockResolvedValue({ id: "m1", role: "reviewer" }),
+      count: vi.fn().mockResolvedValue(1),
+      update: vi.fn().mockReturnValue({ id: "m1", role: "member" }),
+    }
+    db.documentAuditEvent = { create: vi.fn((args) => args) }
+
+    await updateWorkspaceMemberRole({ workspaceId: "w1", actorId: "u2", memberUserId: "u1", role: "member", confirmLastReviewerRemoval: true })
+
+    expect(auditTypes()).toEqual(expect.arrayContaining(["workspace.reviewer.removed", "workspace.mode.changed"]))
+    expect(auditByType("workspace.mode.changed")).toMatchObject({ from: "firm", to: "smb" })
+    expect(smbCeiling.reevaluateOpenSmbCeilingGatesForWorkspace).toHaveBeenCalledWith("w1")
+  })
+
+  it("keeps mode.changed silent when the reviewer role moves between members", async () => {
+    // Two reviewers before, one demoted → reviewer count drops from 2 to 1, still firm mode.
+    db.workspaceMember = {
+      findUnique: vi.fn().mockResolvedValue({ id: "m1", role: "reviewer" }),
+      count: vi.fn().mockResolvedValue(2),
+      update: vi.fn().mockReturnValue({ id: "m1", role: "member" }),
+    }
+    db.documentAuditEvent = { create: vi.fn((args) => args) }
+
+    await updateWorkspaceMemberRole({ workspaceId: "w1", actorId: "u2", memberUserId: "u1", role: "member" })
+
+    expect(auditTypes()).toContain("workspace.reviewer.removed")
+    expect(auditTypes()).not.toContain("workspace.mode.changed")
+    expect(smbCeiling.reevaluateOpenSmbCeilingGatesForWorkspace).not.toHaveBeenCalled()
+  })
+
+  it("removeWorkspaceMember requires confirmation when the removed member is the last reviewer", async () => {
+    db.workspaceMember = {
+      findUnique: vi.fn().mockResolvedValue({ id: "m1", role: "reviewer", user: { email: "r@example.com" } }),
+      count: vi.fn().mockResolvedValue(1),
+    }
+    await expect(removeWorkspaceMember({ workspaceId: "w1", actorId: "u2", memberUserId: "u1" })).rejects.toThrow("last_reviewer_removal_requires_confirmation")
+  })
+
+  it("acceptWorkspaceInvitation as a reviewer emits reviewer.added and fires the mode-flip hook", async () => {
+    const future = new Date(Date.now() + 60_000)
+    db.workspaceInvitation = { findUnique: vi.fn().mockResolvedValue({ id: "i1", workspaceId: "w1", email: "r@example.com", role: "reviewer", acceptedAt: null, expiresAt: future }), update: vi.fn().mockReturnValue("accept") }
+    db.workspaceMember = { findUnique: vi.fn().mockResolvedValue(null), count: vi.fn().mockResolvedValue(0), upsert: vi.fn().mockReturnValue("upsert") }
+    db.documentAuditEvent = { create: vi.fn((args) => args) }
+    db.user = { findUnique: vi.fn().mockResolvedValue({ id: "u1", name: "R", email: "r@example.com" }) }
+
+    await acceptWorkspaceInvitation("token", { id: "u1", email: "r@example.com" })
+
+    expect(auditTypes()).toEqual(expect.arrayContaining(["invitation_accepted", "workspace.reviewer.added", "workspace.mode.changed"]))
+    expect(smbCeiling.resolveOpenSmbCeilingGatesForWorkspace).toHaveBeenCalledWith("w1", "workspace_added_reviewer")
+  })
+
+  it("transferWorkspaceOwnership promoting the last reviewer demands confirmation", async () => {
+    db.workspaceMember = {
+      findUnique: vi.fn().mockResolvedValue({ id: "m2", role: "reviewer" }),
+      count: vi.fn().mockResolvedValue(1),
+      update: vi.fn((args: unknown) => args),
+    }
+    await expect(transferWorkspaceOwnership({ workspaceId: "w1", actorId: "u1", targetUserId: "u2" })).rejects.toThrow("last_reviewer_removal_requires_confirmation")
+  })
+
+  it("leaveWorkspace as the last reviewer demands confirmation", async () => {
+    db.workspaceMember = {
+      findUnique: vi.fn().mockResolvedValue({ id: "m1", role: "reviewer", user: { email: "r@example.com" }, workspace: { kind: "team" } }),
+      count: vi.fn().mockResolvedValue(1),
+    }
+    await expect(leaveWorkspace("w1", "u1")).rejects.toThrow("last_reviewer_removal_requires_confirmation")
   })
 })
 

@@ -10,10 +10,10 @@ import { prisma } from "@/lib/db"
 import { unscoped } from "@/lib/workspace-scope"
 
 /** Everyone a reminder about this item should go to: the assignee if one is set, otherwise every
- * workspace owner (there is no "reviewer" role to target more narrowly — see the same reasoning
- * in ApprovalWorkflowStage's own doc-comment). Owners of a workspace with no assignee are the
- * fallback because *someone* has to be nudged, and an unassigned task is everyone's responsibility
- * until it isn't. */
+ * workspace owner. The reviewer role does now exist on WorkspaceMember (decision #41) but the
+ * reminder catalog here is item-owner-shaped, not close-sign-off-shaped — an unassigned task is
+ * owned by the workspace, so its owners are the fallback. Reviewers are pulled in specifically
+ * on the close checklist (#42/#77), where signing off is their job. */
 async function resolveRecipients(workspaceId: string, assigneeEmail: string | null): Promise<string[]> {
   if (assigneeEmail) return [assigneeEmail]
   const owners = await unscoped(() => prisma.workspaceMember.findMany({
