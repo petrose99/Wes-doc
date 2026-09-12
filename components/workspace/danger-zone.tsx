@@ -43,7 +43,15 @@ export function WorkspaceDangerZone({ workspaceId, workspaceName, workspaceKind,
         <ConfirmDialog open={leaving} destructive busy={pending} title="Leave this workspace?" description="You lose access to its files immediately." confirmLabel="Leave"
           onCancel={() => setLeaving(false)}
           onConfirm={() => startTransition(async () => {
-            const result = await leaveWorkspaceAction(workspaceId)
+            // Two-phase: the first attempt without the flag lets a firm-mode workspace surface
+            // the SMB-mode warning before the last reviewer actually walks (decision #41). The
+            // retry confirms silently — the user has already opted in by tapping the button in
+            // the warning toast.
+            let result = await leaveWorkspaceAction(workspaceId)
+            if (!result.success && result.error === "last_reviewer_removal_requires_confirmation") {
+              if (!window.confirm("You are the last reviewer. Leaving drops this workspace to SMB mode. Continue?")) return
+              result = await leaveWorkspaceAction(workspaceId, { confirmLastReviewerRemoval: true })
+            }
             if (!result.success) { toast.error(result.error || "Could not leave the workspace"); return }
             escapeToWorkspaceList()
           })} />

@@ -2,7 +2,7 @@ import { ReviewInbox } from "@/components/workspace/review-inbox"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { listReviewTasks, parseReviewTaskStatus, type ReviewTaskStatus } from "@/models/review-tasks"
 import { summarizeDocumentForReview } from "@/models/documents"
-import { getWorkspaceMembers, requireWorkspaceRole } from "@/models/workspaces"
+import { getWorkspaceMembers, getWorkspaceMode, requireWorkspaceRole } from "@/models/workspaces"
 import { getCurrentUser } from "@/lib/auth"
 import { notFound } from "next/navigation"
 import Link from "next/link"
@@ -32,9 +32,10 @@ export default async function ReviewQueuePage({ params, searchParams }: {
   if (!capabilities.has("review-queue")) notFound()
 
   const status = statusParam && statusParam !== "all" ? parseReviewTaskStatus(statusParam) ?? undefined : undefined
-  const [tasks, members] = await Promise.all([
+  const [tasks, members, workspaceMode] = await Promise.all([
     listReviewTasks(workspaceId, status ? { status } : {}),
     getWorkspaceMembers(workspaceId),
+    getWorkspaceMode(workspaceId),
   ])
 
   return <main className="mx-auto w-full max-w-6xl space-y-6 p-6">
@@ -60,6 +61,7 @@ export default async function ReviewQueuePage({ params, searchParams }: {
 
     <ReviewInbox
       workspaceId={workspaceId}
+      workspaceMode={workspaceMode}
       currentStatus={statusParam ?? "open"}
       members={members.map((member) => ({ id: member.userId, name: member.user.name }))}
       tasks={tasks.map((task) => {

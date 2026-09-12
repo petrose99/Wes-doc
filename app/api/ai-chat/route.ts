@@ -66,6 +66,21 @@ How to work:
 - To take an action — approve or reject a review task (plain or a workflow's current stage), decide an expense claim, set a document's coding, create a supplier rule, or push a document to accounting — call the matching tool (approve_review_tasks, reject_review_task, decide_review_task_stage, decide_expense_claim, set_document_coding, create_supplier_rule, push_to_accounting). Every one of these PROPOSES the action; it does not perform it. The tool's result is a summary of what would happen — say what you're proposing and that it's waiting for their confirmation in the panel below. Never claim an action happened, or that a document was pushed, coded, or a task or claim approved, until you see the person confirm it landed.
 - If a tool returns an error, explain what it means in plain terms rather than repeating the error code, and suggest what to check (e.g. "no active accounting connection" means Settings → Integrations needs a connected provider first).`
 
+/** The close-checklist page's assistant (#97). No grid; the finance read tools are the right
+ * substrate for "what is behind this number" questions about the checklist. Decision #41
+ * framing is standing policy here: everything this assistant produces is a working paper for
+ * the person signing the close, never advice. */
+const CLOSE_SYSTEM_PROMPT = `You are the DocuBite close assistant, walking someone through their monthly close checklist: bank reconciliation, AP aging and open exceptions, unposted-bill accruals, the VAT workpaper, and any jurisdiction extras. There is no spreadsheet grid here — work only through your tools.
+
+How to work:
+- The page has already shown the computed checklist; your opening summary of it may be in the conversation. Build on it rather than restating it.
+- Use the finance tools (get_inbox_summary, find_supplier_documents, get_document_details, get_supplier_rules, and the rest that are registered) to answer "what is behind this number" questions — look things up rather than guessing.
+- Answer in plain prose, briefly. No preamble, no restating the question.
+- Everything you produce is a WORKING PAPER for the person signing the close, not advice. Never tell the user what they should file, claim, or deduct; lay out what the records show and let them decide. If asked for advice, say plainly that this is a working paper and the judgement is theirs (or their accountant's).
+- Accrual journal drafts on this page are never posted anywhere — they are copy-out proposals. Say so if the user asks whether something was booked.
+- Sign-off, override, lock and reopen are the user's buttons on the page, not your tools. Point at the control; do not claim you can press it.
+- If the records do not contain what was asked, say so plainly rather than inventing it.`
+
 /** Appended to the system prompt only when the document-search tool is registered (i.e. embeddings
  * are configured). Kept separate so the model is never told about a tool it does not have. */
 const DOCUMENT_SEARCH_PROMPT = `
@@ -154,7 +169,7 @@ export async function POST(request: Request) {
   // — unlike dictation — is exactly where the finance tools/persona belong. Unknown or absent
   // means the sheet, so every existing caller is unaffected.
   const { messages, workspaceId, surface }: { messages: UIMessage[]; workspaceId: string; surface?: string } = await request.json()
-  const hasGrid = surface !== "dictation" && surface !== "finance-inbox"
+  const hasGrid = surface !== "dictation" && surface !== "finance-inbox" && surface !== "close"
   const financeSurfaceAllowed = surface !== "dictation"
 
   if (!workspaceId || !(await getWorkspaceMembership(workspaceId, user.id))) return Response.json({ error: "forbidden" }, { status: 403 })
@@ -377,7 +392,7 @@ export async function POST(request: Request) {
   // rather than fight three near-identical narrowed object types.
   const tools = { ...gridTools, ...searchTools, ...financeTools } as NonNullable<Parameters<typeof streamText>[0]["tools"]>
 
-  const base = surface === "dictation" ? DICTATION_SYSTEM_PROMPT : surface === "finance-inbox" ? FINANCE_INBOX_SYSTEM_PROMPT : SYSTEM_PROMPT
+  const base = surface === "dictation" ? DICTATION_SYSTEM_PROMPT : surface === "finance-inbox" ? FINANCE_INBOX_SYSTEM_PROMPT : surface === "close" ? CLOSE_SYSTEM_PROMPT : SYSTEM_PROMPT
   const withSearch = config.embeddings.enabled ? base + DOCUMENT_SEARCH_PROMPT : base
   const persona = financeAgentEnabled && capabilities ? personaAddendumForIndustry(capabilities.industry) : null
   const system = persona ? `${withSearch}\n\n${persona}` : withSearch

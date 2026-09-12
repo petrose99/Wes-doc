@@ -8,7 +8,7 @@ import { PendingChanges } from "@/components/assistant/pending-changes"
 import { focusRange, runSheetTool, SHEET_TOOL_NAMES, WRITE_TOOLS } from "@/components/assistant/sheet-tools"
 import type { FUniver } from "@univerjs/presets"
 import { useChat } from "@ai-sdk/react"
-import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from "ai"
+import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls, type UIMessage } from "ai"
 import { ArrowUp, ChevronDown, CircleCheck, Loader2, Sparkles, Table2, X } from "lucide-react"
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react"
 
@@ -55,7 +55,7 @@ const FINANCE_PROPOSAL_TOOLS = new Set([
  *
  * Tool calls are executed here in the browser (see sheet-tools.ts) and the results posted back,
  * so the assistant answers from the workbook on screen rather than from the saved snapshot. */
-export function AssistantPanel({ workspaceId, apiRef, onClose, documentSearchEnabled = false, onOpenSource, surface = "sheet", intents, emptyHint, title = "AI Assistant", className, initialMessage }: {
+export function AssistantPanel({ workspaceId, apiRef, onClose, documentSearchEnabled = false, onOpenSource, surface = "sheet", intents, emptyHint, title = "AI Assistant", className, initialMessage, preamble }: {
   workspaceId: string
   /** The live grid. A ref rather than a value because the panel mounts before Univer finishes
    * booting, and a question asked in that window still has to find a workbook to read. On a page
@@ -70,15 +70,24 @@ export function AssistantPanel({ workspaceId, apiRef, onClose, documentSearchEna
   /** Which page is asking. Sent to /api/ai-chat, which registers the spreadsheet tools only for
    * "sheet" — offering the model seven tools that can only answer "the spreadsheet is still
    * loading" wastes its step budget on the way to the same answer. "finance-inbox" (the review
-   * queue) has no grid either, but is where the finance agent's tools/persona are meant to be. */
-  surface?: "sheet" | "dictation" | "finance-inbox"
+   * queue) has no grid either, but is where the finance agent's tools/persona are meant to be.
+   * "close" (#97) is the close-checklist page: no grid, finance tools/persona allowed. */
+  surface?: "sheet" | "dictation" | "finance-inbox" | "close"
   /** Starter prompts for the empty state. Defaults to the spreadsheet's. */
   intents?: string[]
   emptyHint?: string
   title?: string
   className?: string
   initialMessage?: string
+  /** A server-built opening message seeded as the assistant's first transcript entry (#97's
+   * close-page summary). Part of the conversation proper: the model sees it on the first
+   * user turn, so "the delta you mentioned" resolves without a second lookup. */
+  preamble?: string
 }) {
+  // Accepted for API compatibility (library-ask-panel passes it) but not yet wired — kept on
+  // the signature so the call site keeps compiling; the auto-ask behaviour is its own ticket.
+  void initialMessage
+
   const [input, setInput] = useState("")
   const scroller = useRef<HTMLDivElement>(null)
   // Pre-images of everything the assistant has written and the user has not yet ruled on. Held
@@ -87,7 +96,16 @@ export function AssistantPanel({ workspaceId, apiRef, onClose, documentSearchEna
   const pending = useMemo(() => new PendingChanges(), [])
   const [pendingCount, setPendingCount] = useState(0)
 
+  // The preamble is seeded as a real assistant message, not painted over the empty state —
+  // it travels with the transcript so the model has already "said" it. Typed explicitly so
+  // useChat's message generic stays the full UIMessage union rather than narrowing to the
+  // literal's text-only parts.
+  const seededMessages: UIMessage[] | undefined = preamble
+    ? [{ id: "surface-preamble", role: "assistant", parts: [{ type: "text", text: preamble }] }]
+    : undefined
+
   const { messages, sendMessage, addToolResult, status, error } = useChat({
+    messages: seededMessages,
     transport: new DefaultChatTransport({ api: "/api/ai-chat", body: { workspaceId, surface } }),
     // Without this the loop stops dead after the first tool call: the browser runs the tool and
     // records the result, but nothing sends it back, so the model never gets to answer.
@@ -139,21 +157,6 @@ export function AssistantPanel({ workspaceId, apiRef, onClose, documentSearchEna
       </div>
 
       <div ref={scroller} className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-4">
-        {!messages.length && (
-          <div className="space-y-2.5">
-            <p className="text-xs leading-relaxed text-slate-500">
-              {emptyHint ?? (documentSearchEnabled
-                ? "Ask about the data in this sheet — or what the documents behind it actually say."
-                : "Ask about the data in this sheet. The assistant reads the grid as you see it.")}
-            </p>
-            {(intents ?? (documentSearchEnabled ? [...INTENTS, DOCUMENT_INTENT] : INTENTS)).map((intent) => (
-              <button key={intent} type="button" className="block w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-left text-xs text-slate-600 shadow-sm transition-[background-color,border-color,color] duration-150 hover:border-emerald-300 hover:bg-emerald-50/50 hover:text-slate-900" onClick={() => ask(intent)}>
-                {intent}
-              </button>
-            ))}
-          </div>
-        )}
-
         {messages.map((message) => (
           <div key={message.id} className={message.role === "user" ? "ml-6 rounded-xl bg-emerald-700 px-3 py-2.5 text-sm text-white shadow-sm" : "space-y-2 text-sm text-slate-700"}>
             {message.parts.map((part, index) => {
@@ -188,6 +191,24 @@ export function AssistantPanel({ workspaceId, apiRef, onClose, documentSearchEna
             })}
           </div>
         ))}
+
+        {/* Intents stay up until the user speaks — a seeded preamble is an assistant message,
+            so message count alone would hide them before the first question. Rendered after
+            the transcript so the preamble reads first. */}
+        {!messages.some((message) => message.role === "user") && (
+          <div className="space-y-2.5">
+            <p className="text-xs leading-relaxed text-slate-500">
+              {emptyHint ?? (documentSearchEnabled
+                ? "Ask about the data in this sheet — or what the documents behind it actually say."
+                : "Ask about the data in this sheet. The assistant reads the grid as you see it.")}
+            </p>
+            {(intents ?? (documentSearchEnabled ? [...INTENTS, DOCUMENT_INTENT] : INTENTS)).map((intent) => (
+              <button key={intent} type="button" className="block w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-left text-xs text-slate-600 shadow-sm transition-[background-color,border-color,color] duration-150 hover:border-emerald-300 hover:bg-emerald-50/50 hover:text-slate-900" onClick={() => ask(intent)}>
+                {intent}
+              </button>
+            ))}
+          </div>
+        )}
 
         {busy && <p className="flex items-center gap-1.5 text-xs text-slate-400"><Loader2 className="h-3 w-3 animate-spin text-emerald-600" />Thinking…</p>}
         {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{error.message}</p>}

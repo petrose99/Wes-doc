@@ -62,7 +62,12 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx prisma generate
+        # The close campaign (#75-#79, #95-#97) pushed the program past node's default
+        # ~2GB old-space and tsc started OOMing here (exit 134) while passing locally on
+        # roomier machines. Raise the ceiling rather than shrink the type graph.
       - run: npx tsc --noEmit
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
 
   build:
     name: Build
@@ -94,6 +99,9 @@ jobs:
       NEXT_PUBLIC_SUPABASE_URL: https://ci-build.supabase.co
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-build-dummy-anon-key
       SUPABASE_SERVICE_ROLE_KEY: ci-build-dummy-service-role-key
+      # Same heap ceiling as the Type Check job: `next build` OOMs on node's default
+      # ~2GB old-space now that the close campaign has landed.
+      NODE_OPTIONS: --max-old-space-size=6144
     steps:
       - uses: actions/checkout@v7
         with:

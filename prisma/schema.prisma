@@ -74,6 +74,10 @@ model User {
   resolvedGates      Gate[]              @relation("GateResolver")
   createdWarnChecks  WarnCheck[]         @relation("WarnCheckAuthor")
   verifiedSuppliers  Supplier[]          @relation("SupplierVerifier")
+  openedCloses      Close[]              @relation("CloseOpener")
+  lockedCloses      Close[]              @relation("CloseLocker")
+  reopenedCloses    Close[]              @relation("CloseReopener")
+  signedCloseItems  CloseItem[]          @relation("CloseItemSigner")
 
   @@map("users")
 }
@@ -141,6 +145,8 @@ model Workspace {
   workflowAuditEvents AuditEvent[]
   gates           Gate[]
   warnChecks      WarnCheck[]
+  closes          Close[]
+  closeItems      CloseItem[]
   workbooks       SpreadsheetWorkbook[]
   aiFormulaCache  AiFormulaCache[]
   extractionShapes ExtractionShape[]
@@ -1556,12 +1562,14 @@ model HealthScoreConfig {
 
 /// Dext-parity Phase 3 WP3.1: a named, ordered sequence of approval stages a workspace can attach
 /// to a ReviewTask (via ReviewTask.workflowId) instead of the plain single-decision default. Stage
-/// gating is a role check, not a per-stage approver list — there is no "reviewer" role distinct
-/// from plain membership in this app (models/workspaces.ts's WorkspaceRole is just "owner" |
-/// "member"), so a stage that needs to be sensitive marks itself ApprovalWorkflowStage.requireOwner
-/// rather than naming specific approvers. `active: false` retires a workflow without deleting it —
-/// existing ReviewTask rows still pointing at it keep working (workflowId is a plain FK, not
-/// filtered by active), it just stops being offered for new tasks.
+/// gating is a role check, not a per-stage approver list; the reviewer role now exists on
+/// WorkspaceMember (see models/workspaces.ts's WorkspaceRole, "owner" | "reviewer" | "member") but
+/// approval workflows keep the simpler "any signed-in member, or an owner if sensitive" model —
+/// so a stage that needs to be sensitive marks itself ApprovalWorkflowStage.requireOwner rather
+/// than naming specific approvers or requiring the reviewer capability, which is used only by
+/// the SMB-vs-firm workspace-mode derivation (decision #41). `active: false` retires a workflow
+/// without deleting it — existing ReviewTask rows still pointing at it keep working (workflowId
+/// is a plain FK, not filtered by active), it just stops being offered for new tasks.
 model ApprovalWorkflow {
   id          String    @id @default(uuid()) @db.Uuid
   workspaceId String    @map("workspace_id") @db.Uuid
@@ -2504,4 +2512,107 @@ model FxRate {
   @@unique([base, quote, effectiveDate], name: "fx_rates_base_quote_date_key")
   @@index([effectiveDate])
   @@map("fx_rates")
+}
+
+/// Ticket #95 (map #35, decision #42): one row per (workspace, monthly close period). Period
+/// identity is (periodYear, periodMonth) — monthly cadence — and `vatPeriodEnd` is stamped at
+/// open time from the jurisdiction pack's `filings` topic (both ZA VAT201 and LS VAT-12 are
+/// monthly today, so vatPeriodEnd flips true on every open when the pack has a `filings`
+/// block). State is 'open' | 'locked'; reopen flips 'locked' → 'open' rather than creating a
+/// new row, and the sequence-of-events truth lives in audit_events (close.opened /
+/// close.period.locked / close.period.reopened / close.period.relocked).
+///
+/// The lock snapshot is a `lockSnapshot` JSON column carrying `{packCode, packVersion,
+/// lockedAt, workspaceModeAtLock, reviewerOfRecord}` (#79). New fields are added to the
+/// TypeScript shape in `lib/close/types.ts` without a Prisma migration; a data back-fill
+/// migration is only needed when historical rows must gain a required field (as #79 did).
+/// Computation (#96) writes into CloseItem.computedValue; sign-off
+/// (#97) writes into CloseItem.signedAt/signedById. This ticket owns the persistence and the
+/// four lifecycle actions only.
+model Close {
+  id                 String       @id @default(uuid()) @db.Uuid
+  workspaceId        String       @map("workspace_id") @db.Uuid
+  /// Calendar year of the closing period, e.g. 2026.
+  periodYear         Int          @map("period_year")
+  /// Calendar month of the closing period, 1-12 (Jan = 1).
+  periodMonth        Int          @map("period_month")
+  /// 'open' (default at creation) or 'locked'. A reopen returns a locked close to 'open';
+  /// a relock returns it to 'locked'. History lives in audit_events, not extra columns.
+  state              String       @default("open")
+  /// True if the workspace's jurisdiction pack declares a VAT `filings` topic and this month
+  /// is a VAT-period-end month. ZA VAT201 and LS VAT-12 are both monthly today so this stays
+  /// true for every month while the pack has filings; the field exists so a future bi-monthly
+  /// jurisdiction can flip it off on non-return months without changing the caller.
+  vatPeriodEnd       Boolean      @default(false) @map("vat_period_end")
+  /// Jurisdiction pack code/version captured at lock time — null while the close is open.
+  /// Together with `lockSnapshot` they are #79's extension surface.
+  packCode           String?      @map("pack_code")
+  packVersion        String?      @map("pack_version")
+  openedAt           DateTime     @default(now()) @map("opened_at")
+  openedById         String?      @map("opened_by_id") @db.Uuid
+  lockedAt           DateTime?    @map("locked_at")
+  lockedById         String?      @map("locked_by_id") @db.Uuid
+  lastReopenedAt     DateTime?    @map("last_reopened_at")
+  lastReopenedById   String?      @map("last_reopened_by_id") @db.Uuid
+  reopenReason       String?      @map("reopen_reason")
+  /// Written by lockClose/relockClose per `CloseLockSnapshot` in lib/close/types.ts:
+  /// `{ packCode, packVersion, lockedAt, workspaceModeAtLock, reviewerOfRecord }`. Historical
+  /// rows locked before #79 landed are back-filled to workspaceModeAtLock='firm' +
+  /// reviewerOfRecord=null by 20260912030000_backfill_close_lock_snapshot_mode.
+  lockSnapshot       Json?        @map("lock_snapshot")
+  createdAt          DateTime     @default(now()) @map("created_at")
+  updatedAt          DateTime     @updatedAt @map("updated_at")
+
+  workspace          Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  openedBy           User?        @relation("CloseOpener", fields: [openedById], references: [id], onDelete: SetNull)
+  lockedBy           User?        @relation("CloseLocker", fields: [lockedById], references: [id], onDelete: SetNull)
+  lastReopenedBy     User?        @relation("CloseReopener", fields: [lastReopenedById], references: [id], onDelete: SetNull)
+  items              CloseItem[]
+
+  @@unique([workspaceId, periodYear, periodMonth])
+  @@index([workspaceId, state])
+  @@map("closes")
+}
+
+/// One row per checklist line for a given Close. `kind` selects the descriptor from
+/// lib/close/item-sets.ts ('bank-recon', 'ap-aging', 'unposted-bill-accruals', 'vat-workpaper',
+/// 'cross-border-review'); the descriptor is authored in-repo and materialized as an item at
+/// openClose time — a re-open never rewrites existing items and only inserts newly-added
+/// descriptors so any historical rows stay attributable to their sign-off.
+///
+/// `state` is 'pending' | 'signed' | 'override'; only #97 flips signed. `reSignRequired` is
+/// set true by reopenClose so the sign-off surface can force a fresh sign — the ticket calls
+/// this "marks affected items re-sign-required". Computation (#96) fills computedAt /
+/// computedValue; this ticket persists the columns and leaves them null.
+model CloseItem {
+  id                String   @id @default(uuid()) @db.Uuid
+  workspaceId       String   @map("workspace_id") @db.Uuid
+  closeId           String   @map("close_id") @db.Uuid
+  /// Descriptor key from lib/close/item-sets.ts.
+  kind              String
+  /// Human title snapshotted from the descriptor at open time.
+  title             String
+  /// Descriptor's `required` flag snapshotted at open time. Required items block relock; the
+  /// hard-gate check in #96 is what actually enforces it.
+  required          Boolean  @default(true)
+  /// Bank recon is "asserted, soft delta" per #42 — a small variance is tolerated instead of
+  /// hard-blocking. Copied from the descriptor at open time so a later descriptor change does
+  /// not silently rewrite the semantics of an in-flight close.
+  softDelta         Boolean  @default(false) @map("soft_delta")
+  state             String   @default("pending")
+  reSignRequired    Boolean  @default(false) @map("re_sign_required")
+  computedAt        DateTime? @map("computed_at")
+  computedValue     Json?     @map("computed_value")
+  signedAt          DateTime? @map("signed_at")
+  signedById        String?   @map("signed_by_id") @db.Uuid
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  workspace         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  close             Close     @relation(fields: [closeId], references: [id], onDelete: Cascade)
+  signedBy          User?     @relation("CloseItemSigner", fields: [signedById], references: [id], onDelete: SetNull)
+
+  @@unique([closeId, kind])
+  @@index([workspaceId])
+  @@map("close_items")
 }
