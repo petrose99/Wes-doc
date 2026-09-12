@@ -15,7 +15,9 @@
 
 import { prisma } from "@/lib/db"
 import { AuditEventType, writeAuditEvent } from "@/lib/audit"
+import { getWorkspaceMode } from "@/models/workspaces"
 import type { Prisma, PrismaClient } from "@/prisma/client"
+import type { CloseItemAttestation } from "./attestation"
 import { BANK_RECON_DEFAULT_TOLERANCE } from "./compute/bank-recon"
 import type { ComputedBankRecon } from "./compute/types"
 
@@ -52,6 +54,15 @@ export class CloseItemOverrideReasonRequiredError extends Error {
   }
 }
 
+/** Signer of record on an SMB workspace ticked no attestation; a firm workspace never raises
+ * this (reviewer-mode sign-off is its own accountability record). */
+export class CloseItemAttestationRequiredError extends Error {
+  constructor() {
+    super("signCloseItem: SMB sign-off requires an attestation (text + version)")
+    this.name = "CloseItemAttestationRequiredError"
+  }
+}
+
 async function loadItemWithOpenParent(closeItemId: string, client: PrismaLike) {
   const item = await client.closeItem.findUnique({
     where: { id: closeItemId },
@@ -64,12 +75,21 @@ async function loadItemWithOpenParent(closeItemId: string, client: PrismaLike) {
 
 /** Sign one close item. Allowed from any state while the parent close is open — signing an
  * overridden item upgrades the acknowledgement to a full sign. The `reSign` payload flag
- * records whether this sign discharged a reopen's reSignRequired mark. */
+ * records whether this sign discharged a reopen's reSignRequired mark.
+ *
+ * SMB workspaces (no reviewer on the roster — decision #41) additionally REQUIRE
+ * `attestation: {text, version}`: the signer of record ticks the versioned copy from
+ * `lib/close/attestation.ts`, and we emit `close.item.attested` *before* `close.item.signed`
+ * so the trail reads attest → sign, never the other way round. Firm workspaces don't need or
+ * emit attestation even if a caller supplies one — the reviewer role IS the accountability. */
 export async function signCloseItem(
-  input: { closeItemId: string; actorId: string },
+  input: { closeItemId: string; actorId: string; attestation?: CloseItemAttestation },
   client: PrismaLike = prisma,
 ) {
   const item = await loadItemWithOpenParent(input.closeItemId, client)
+  const mode = await getWorkspaceMode(item.workspaceId)
+  if (mode === "smb" && !input.attestation) throw new CloseItemAttestationRequiredError()
+
   const reSign = item.reSignRequired
   const now = new Date()
 
@@ -77,6 +97,33 @@ export async function signCloseItem(
     where: { id: item.id },
     data: { state: "signed", signedAt: now, signedById: input.actorId, reSignRequired: false },
   })
+
+  // Attest-before-sign: written first so audit consumers reading in event order see the
+  // attestation as a precondition of the sign, not an addendum. Firm mode skips entirely.
+  if (mode === "smb" && input.attestation) {
+    await writeAuditEvent(
+      {
+        workspaceId: item.workspaceId,
+        actorId: input.actorId,
+        type: AuditEventType.CLOSE_ITEM_ATTESTED,
+        subjectType: "close_item",
+        subjectId: item.id,
+        payload: {
+          closeId: item.closeId,
+          kind: item.kind,
+          periodYear: item.close.periodYear,
+          periodMonth: item.close.periodMonth,
+          userId: input.actorId,
+          // Both text AND version — rewording the constant with a version bump still lets
+          // future readers reconstruct exactly what this row's signer agreed to.
+          attestationText: input.attestation.text,
+          attestationVersion: input.attestation.version,
+          at: now.toISOString(),
+        },
+      },
+      client,
+    )
+  }
 
   await writeAuditEvent(
     {

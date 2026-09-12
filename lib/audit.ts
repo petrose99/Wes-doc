@@ -110,6 +110,7 @@ export type AuditEventTypeName =
   | "close.item.signed"
   | "close.item.unsigned"
   | "close.item.override"
+  | "close.item.attested"
   | "close.period.locked"
   | "close.period.reopened"
   | "close.period.relocked"
@@ -123,6 +124,11 @@ export const AuditEventType = {
   CLOSE_ITEM_SIGNED: "close.item.signed",
   CLOSE_ITEM_UNSIGNED: "close.item.unsigned",
   CLOSE_ITEM_OVERRIDE: "close.item.override",
+  /** #77: SMB signer-of-record attests on every sign-off, emitted right before
+   * close.item.signed. Payload keeps the versioned attestation text so rewording the constant
+   * doesn't rewrite what past signers actually agreed to — bump SMB_ATTESTATION_VERSION and old
+   * rows keep their old {attestationText, attestationVersion}. Firm workspaces never emit this. */
+  CLOSE_ITEM_ATTESTED: "close.item.attested",
   CLOSE_PERIOD_LOCKED: "close.period.locked",
   CLOSE_PERIOD_REOPENED: "close.period.reopened",
   CLOSE_PERIOD_RELOCKED: "close.period.relocked",

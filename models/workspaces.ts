@@ -30,6 +30,16 @@ const parseRole = (value: unknown): WorkspaceRole => (value === "owner" ? "owner
  * currently running and happily wave through demoting or removing the last owner. */
 const countOwners = (workspaceId: string) => prisma.workspaceMember.count({ where: { workspaceId, role: "owner" } })
 
+/** Decision #41 — workspace mode is derived, not stored: firm when at least one member holds
+ * the reviewer role, else smb. Owners do not implicitly count as reviewers; a firm's owner
+ * isn't necessarily its signer of record. Fresh-read for the same reason as countOwners —
+ * the value gates concurrent mutations, so a cached snapshot would race the write. */
+export type WorkspaceMode = "firm" | "smb"
+export async function getWorkspaceMode(workspaceId: string): Promise<WorkspaceMode> {
+  const reviewers = await prisma.workspaceMember.count({ where: { workspaceId, role: "reviewer" } })
+  return reviewers > 0 ? "firm" : "smb"
+}
+
 export async function createWorkspaceForUser(user: Pick<User, "id" | "name" | "email">, options: { name?: string; kind?: WorkspaceKind; country?: string; baseCurrency?: string; timezone?: string; fiscalYearStart?: string } = {}) {
   const workspace = await prisma.workspace.create({
     data: {

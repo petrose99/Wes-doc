@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { getCurrentUser } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
-import { requireWorkspaceRole } from "@/models/workspaces"
+import { getWorkspaceMode, requireWorkspaceRole, type WorkspaceMode } from "@/models/workspaces"
 import { buildClosePreamble, closePeriodLabel, type PreambleItem } from "@/lib/close/preamble"
 import type { CloseItemKind } from "@/lib/close/types"
 import type {
@@ -23,11 +23,11 @@ import {
   recomputeCloseAction,
   relockCloseAction,
   reopenCloseAction,
-  signCloseItemAction,
   unsignCloseItemAction,
 } from "./actions"
 import { CloseAssistant } from "./close-assistant"
 import { ReasonDialogButton } from "./reason-dialog"
+import { SignForm } from "./sign-form"
 import { VatSheetTabs } from "./vat-sheet-tabs"
 
 export const dynamic = "force-dynamic"
@@ -128,6 +128,7 @@ export default async function ClosePage({ params, searchParams }: {
     computedValue: (item.computedValue as ComputedValue | null) ?? null,
   }))
   const preamble = buildClosePreamble(selected, preambleItems)
+  const workspaceMode = await getWorkspaceMode(workspaceId)
 
   return (
     <main className="space-y-6">
@@ -231,7 +232,7 @@ export default async function ClosePage({ params, searchParams }: {
       {/* One card per checklist item, in descriptor order. */}
       <div className="space-y-4">
         {items.map((item) => (
-          <ItemCard key={item.id} workspaceId={workspaceId} item={item} closeOpen={isOpen} />
+          <ItemCard key={item.id} workspaceId={workspaceId} item={item} closeOpen={isOpen} mode={workspaceMode} />
         ))}
       </div>
     </main>
@@ -269,8 +270,17 @@ function ItemStateChip({ state, reSignRequired }: { state: string; reSignRequire
   )
 }
 
-function ItemCard({ workspaceId, item, closeOpen }: { workspaceId: string; item: ItemRow; closeOpen: boolean }) {
+function ItemCard({ workspaceId, item, closeOpen, mode }: { workspaceId: string; item: ItemRow; closeOpen: boolean; mode: WorkspaceMode }) {
   const value = (item.computedValue as ComputedValue | null) ?? null
+  // Button label + attestation gating diverge by workspace mode (#77). Firm: reviewer sign-off,
+  // no attestation. SMB: signer-of-record ticks the versioned attestation checkbox before the
+  // button unlocks. The unsign + override paths are mode-agnostic — attestation attaches only
+  // to the forward "signed" transition.
+  const isSmb = mode === "smb"
+  const showSignForm = closeOpen && (item.state !== "signed" || item.reSignRequired)
+  const signButtonLabel = isSmb
+    ? item.state === "signed" && item.reSignRequired ? "Re-sign as signer of record" : "Sign off as signer of record"
+    : item.state === "signed" && item.reSignRequired ? "Re-sign as reviewer" : "Sign off as reviewer"
   return (
     <Card>
       <CardHeader>
@@ -280,19 +290,8 @@ function ItemCard({ workspaceId, item, closeOpen }: { workspaceId: string; item:
             <ItemStateChip state={item.state} reSignRequired={item.reSignRequired} />
           </CardTitle>
           <div className="flex items-center gap-2">
-            {closeOpen && item.state !== "signed" && (
-              <form action={signCloseItemAction.bind(null, workspaceId, item.id)}>
-                <button type="submit" className="rounded-md bg-emerald-700 px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-800">
-                  Sign
-                </button>
-              </form>
-            )}
-            {closeOpen && item.state === "signed" && item.reSignRequired && (
-              <form action={signCloseItemAction.bind(null, workspaceId, item.id)}>
-                <button type="submit" className="rounded-md bg-emerald-700 px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-800">
-                  Re-sign
-                </button>
-              </form>
+            {showSignForm && (
+              <SignForm workspaceId={workspaceId} itemId={item.id} isSmb={isSmb} label={signButtonLabel} />
             )}
             {closeOpen && item.state !== "pending" && (
               <form action={unsignCloseItemAction.bind(null, workspaceId, item.id)}>
