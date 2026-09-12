@@ -8,7 +8,7 @@ import { lsFilings } from "./filings"
 import { lsRetention } from "./retention"
 import { lsThresholds } from "./thresholds"
 import { lsBorder } from "./border"
-import { lsWorkpapers } from "./workpapers"
+import { lsWorkpapers, lsWorkpaperGroups } from "./workpapers"
 
 export const lsPack: JurisdictionPack = {
   code: "LS",
@@ -35,4 +35,5 @@ export {
   lsThresholds,
   lsBorder,
   lsWorkpapers,
+  lsWorkpaperGroups,
 }

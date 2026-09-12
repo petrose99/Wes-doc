@@ -26,6 +26,8 @@ function bill(id: string, overrides: Partial<WorkpaperBill> = {}): WorkpaperBill
     supplier: { id: `s-${id}`, country: "LS", vatNumber: null, name: "Local supplier" },
     isImport: false,
     isCapital: false,
+    isService: null,
+    isDeferred: null,
     fieldConfidence: 1,
     codingConfidence: 1,
     ...overrides,
