@@ -6,11 +6,13 @@ vi.mock("next/headers", () => ({
 
 const closeItemFindUnique = vi.fn()
 const closeItemUpdate = vi.fn()
+const workspaceMemberCount = vi.fn()
 const auditCreate = vi.fn()
 
 vi.mock("@/lib/db", () => ({
   prisma: {
     closeItem: { findUnique: closeItemFindUnique, update: closeItemUpdate },
+    workspaceMember: { count: workspaceMemberCount },
     auditEvent: { create: auditCreate },
   },
 }))
@@ -24,8 +26,10 @@ const {
   CloseItemParentLockedError,
   CloseItemWrongStateError,
   CloseItemOverrideReasonRequiredError,
+  CloseItemAttestationRequiredError,
   BankAssertionWrongKindError,
 } = await import("./sign-off")
+const { SMB_ATTESTATION_TEXT_V1, SMB_ATTESTATION_VERSION, currentSmbAttestation } = await import("./attestation")
 
 const itemRow = (over: Record<string, unknown> = {}) => ({
   id: "i1",
@@ -56,8 +60,12 @@ const itemRow = (over: Record<string, unknown> = {}) => ({
 beforeEach(() => {
   closeItemFindUnique.mockReset()
   closeItemUpdate.mockReset()
+  workspaceMemberCount.mockReset()
   auditCreate.mockReset()
   closeItemUpdate.mockImplementation(async (args: { data: Record<string, unknown> }) => ({ ...itemRow(), ...args.data }))
+  // Default all existing tests to firm mode (>=1 reviewer). #77's SMB-specific tests below
+  // override this per-case.
+  workspaceMemberCount.mockResolvedValue(1)
 })
 
 describe("signCloseItem", () => {
@@ -90,6 +98,74 @@ describe("signCloseItem", () => {
   it("throws CloseItemNotFoundError for a missing id", async () => {
     closeItemFindUnique.mockResolvedValue(null)
     await expect(signCloseItem({ closeItemId: "nope", actorId: "u1" })).rejects.toBeInstanceOf(CloseItemNotFoundError)
+  })
+
+  // ---- #77: SMB attestation on sign-off ----------------------------------------------------
+
+  it("firm mode (reviewer >=1) signs off without attestation and emits ONLY close.item.signed", async () => {
+    workspaceMemberCount.mockResolvedValue(1)
+    closeItemFindUnique.mockResolvedValue(itemRow())
+    await signCloseItem({ closeItemId: "i1", actorId: "u1" })
+    expect(auditCreate).toHaveBeenCalledTimes(1)
+    expect(auditCreate.mock.calls[0][0].data.type).toBe("close.item.signed")
+  })
+
+  it("firm mode ignores an attestation the caller supplies — nothing extra emitted", async () => {
+    workspaceMemberCount.mockResolvedValue(1)
+    closeItemFindUnique.mockResolvedValue(itemRow())
+    await signCloseItem({ closeItemId: "i1", actorId: "u1", attestation: currentSmbAttestation() })
+    expect(auditCreate).toHaveBeenCalledTimes(1)
+    expect(auditCreate.mock.calls[0][0].data.type).toBe("close.item.signed")
+  })
+
+  it("SMB mode rejects sign-off with no attestation and writes NOTHING", async () => {
+    workspaceMemberCount.mockResolvedValue(0)
+    closeItemFindUnique.mockResolvedValue(itemRow())
+    await expect(signCloseItem({ closeItemId: "i1", actorId: "u1" })).rejects.toBeInstanceOf(
+      CloseItemAttestationRequiredError,
+    )
+    expect(closeItemUpdate).not.toHaveBeenCalled()
+    expect(auditCreate).not.toHaveBeenCalled()
+  })
+
+  it("SMB mode with attestation emits close.item.attested BEFORE close.item.signed with the versioned payload", async () => {
+    workspaceMemberCount.mockResolvedValue(0)
+    closeItemFindUnique.mockResolvedValue(itemRow())
+    await signCloseItem({
+      closeItemId: "i1",
+      actorId: "signer-1",
+      attestation: currentSmbAttestation(),
+    })
+
+    // Two audit rows, attested first, signed second — the trail reads attest → sign, never the
+    // other way round.
+    expect(auditCreate).toHaveBeenCalledTimes(2)
+    const first = auditCreate.mock.calls[0][0].data
+    const second = auditCreate.mock.calls[1][0].data
+    expect(first.type).toBe("close.item.attested")
+    expect(second.type).toBe("close.item.signed")
+    expect(first.subjectType).toBe("close_item")
+    expect(first.subjectId).toBe("i1")
+    expect(first.payload).toMatchObject({
+      closeId: "c1",
+      kind: "ap-aging",
+      periodYear: 2026,
+      periodMonth: 8,
+      userId: "signer-1",
+      attestationText: SMB_ATTESTATION_TEXT_V1,
+      attestationVersion: SMB_ATTESTATION_VERSION,
+    })
+  })
+
+  it("versioned copy: bumping SMB_ATTESTATION_VERSION would rewrite the constant name, not existing rows", () => {
+    // Contract check — the constants exist and stay coupled. Historical rows keep whatever
+    // text/version they were originally emitted with (guaranteed by writeAuditEvent taking a
+    // literal payload); bumping the version means adding SMB_ATTESTATION_TEXT_V2 and rotating
+    // this constant, so a caller can never accidentally sign under a text/version mismatch.
+    expect(SMB_ATTESTATION_VERSION).toBe("v1")
+    expect(SMB_ATTESTATION_TEXT_V1).toMatch(/no qualified reviewer/i)
+    expect(SMB_ATTESTATION_TEXT_V1).toMatch(/sole responsibility/i)
+    expect(currentSmbAttestation()).toEqual({ text: SMB_ATTESTATION_TEXT_V1, version: SMB_ATTESTATION_VERSION })
   })
 })
 

@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db"
 import {
   CloseAlreadyOpenError,
   CloseLockBlockedByGatesError,
+  currentSmbAttestation,
   lockClose,
   openClose,
   overrideCloseItem,
@@ -15,6 +16,7 @@ import {
   signCloseItem,
   unsignCloseItem,
 } from "@/lib/close"
+import { getWorkspaceMode } from "@/models/workspaces"
 import { requireModule } from "@/lib/modules/capabilities"
 import { requireWorkspaceRole } from "@/models/workspaces"
 import { revalidatePath } from "next/cache"
@@ -115,10 +117,18 @@ export async function reopenCloseAction(workspaceId: string, closeId: string, fo
   redirect(`${closePath(workspaceId)}?period=${periodParam(close.periodYear, close.periodMonth)}`)
 }
 
-export async function signCloseItemAction(workspaceId: string, closeItemId: string) {
+export async function signCloseItemAction(workspaceId: string, closeItemId: string, formData?: FormData) {
   const user = await requireCloseActor(workspaceId)
   await requireWorkspaceItem(workspaceId, closeItemId)
-  await signCloseItem({ closeItemId, actorId: user.id })
+  // SMB workspaces put the versioned checkbox above the button (#77); we accept it as a form
+  // field but re-derive both text and version from source so a tampered client can't submit an
+  // arbitrary attestation string. Firm mode ignores the field entirely — the server enforces the
+  // rule, not the UI.
+  const mode = await getWorkspaceMode(workspaceId)
+  const ticked = mode === "smb" && formData?.get("attestation") === "on"
+  if (mode === "smb" && !ticked) throw new Error("attestation_required")
+  const attestation = ticked ? currentSmbAttestation() : undefined
+  await signCloseItem({ closeItemId, actorId: user.id, attestation })
   revalidatePath(closePath(workspaceId))
 }
 
