@@ -6,8 +6,12 @@
 
 import { gateRegistry } from "./registry"
 import { duplicateGateRunner } from "./duplicate"
+import { jurisdictionValidityRunner } from "./jurisdiction-validity"
+import { matchVarianceGateRunner } from "./match-variance"
 
 gateRegistry.register(duplicateGateRunner)
+gateRegistry.register(jurisdictionValidityRunner)
+gateRegistry.register(matchVarianceGateRunner)
 
 export { gateRegistry, createGateRegistry } from "./registry"
 export type { GateRegistry } from "./registry"
