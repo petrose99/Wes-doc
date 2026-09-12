@@ -29,10 +29,15 @@ export function ConfirmDialog({ open, title, description, confirmLabel = "Confir
 }) {
   const contentRef = useRef<HTMLDivElement>(null)
   const openerRef = useRef<Element | null>(null)
+  const busyRef = useRef(busy)
+  const onCancelRef = useRef(onCancel)
   // Per-instance ids so two ConfirmDialogs mounted concurrently (bulk approve + stage-reject,
   // for example, if both open in quick succession) don't collide on the same aria targets.
   const titleId = useId()
   const descId = useId()
+
+  useEffect(() => { busyRef.current = busy }, [busy])
+  useEffect(() => { onCancelRef.current = onCancel }, [onCancel])
 
   useEffect(() => {
     if (!open) return
@@ -48,7 +53,7 @@ export function ConfirmDialog({ open, title, description, confirmLabel = "Confir
       })
     }
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !busy) { onCancel(); return }
+      if (event.key === "Escape" && !busyRef.current) { onCancelRef.current(); return }
       if (event.key !== "Tab") return
       const container = contentRef.current
       if (!container) return
@@ -68,7 +73,7 @@ export function ConfirmDialog({ open, title, description, confirmLabel = "Confir
       document.body.style.overflow = previousOverflow
       if (openerRef.current instanceof HTMLElement) openerRef.current.focus()
     }
-  }, [open, busy, onCancel])
+  }, [open, children])
 
   // The dialog only ever opens after hydration, so there is nothing to mismatch on the server.
   if (!open || typeof document === "undefined") return null
