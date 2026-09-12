@@ -4,3 +4,4 @@
 export * from "./types"
 export * from "./item-sets"
 export * from "./actions"
+export * from "./compute"

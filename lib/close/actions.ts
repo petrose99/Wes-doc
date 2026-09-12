@@ -27,6 +27,7 @@ import { resolveJurisdictionPack, type JurisdictionCode } from "@/lib/jurisdicti
 import type { Close, CloseItem, Prisma, PrismaClient } from "@/prisma/client"
 import { descriptorsForClose } from "./item-sets"
 import type { CloseLockSnapshot } from "./types"
+import { computeCloseItems } from "./compute"
 
 type PrismaLike = PrismaClient | Prisma.TransactionClient
 
@@ -152,7 +153,34 @@ export async function openClose(
     client,
   )
 
-  return close
+  // Auto-compute on open per #42. Runs after the audit event so `close.opened` appears
+  // before its `close.item.computed` descendants on the trail. Failures inside compute are
+  // swallowed at the item level in `computeCloseItems`; the outer wrapper here catches any
+  // remaining error so a compute failure never breaks the open itself.
+  try {
+    await computeCloseItems({ closeId: close.id, actorId: input.actorId ?? null }, client)
+  } catch (error) {
+    console.error(`[close] auto-compute on open failed for ${close.id}:`, error instanceof Error ? error.message : error)
+  }
+
+  // Return the fresh row (with computedValue populated on each item).
+  const withComputed = await client.close.findUnique({
+    where: { id: close.id },
+    include: { items: true },
+  })
+  return withComputed ?? close
+}
+
+/** Explicit recompute action. Callable from the sign-off UI ("Recompute") or a scheduled
+ * job. Same audit semantics as auto-compute on open — payload-hash idempotency means a
+ * no-op recompute emits no `close.item.computed`. */
+export async function recomputeClose(
+  input: { closeId: string; actorId?: string | null },
+  client: PrismaLike = prisma,
+) {
+  const existing = await client.close.findUnique({ where: { id: input.closeId } })
+  if (!existing) throw new CloseNotFoundError(input.closeId)
+  return computeCloseItems({ closeId: input.closeId, actorId: input.actorId ?? null }, client)
 }
 
 /** Count open, hard-severity Gate rows for a workspace — the block predicate for lock /
