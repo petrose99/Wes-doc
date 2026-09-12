@@ -2,7 +2,7 @@
 // trusts the workspaceId/fileId/templateId it is handed. Callers (upload/zip server actions,
 // future email/API intake) do the auth.
 import { track } from "@/lib/analytics"
-import { JurisdictionRequiredError, requireWorkspaceJurisdiction } from "@/lib/jurisdictions/require"
+import { requireWorkspaceJurisdiction } from "@/lib/jurisdictions/require"
 import { scanDocumentBuffer } from "@/lib/malware-scan"
 import { prisma } from "@/lib/db"
 import { gateRegistry } from "@/lib/gates"

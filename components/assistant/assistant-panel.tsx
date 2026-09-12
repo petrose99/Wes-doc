@@ -55,7 +55,7 @@ const FINANCE_PROPOSAL_TOOLS = new Set([
  *
  * Tool calls are executed here in the browser (see sheet-tools.ts) and the results posted back,
  * so the assistant answers from the workbook on screen rather than from the saved snapshot. */
-export function AssistantPanel({ workspaceId, apiRef, onClose, documentSearchEnabled = false, onOpenSource, surface = "sheet", intents, emptyHint, title = "AI Assistant", className, initialMessage }: {
+export function AssistantPanel({ workspaceId, apiRef, onClose, documentSearchEnabled = false, onOpenSource, surface = "sheet", intents, emptyHint, title = "AI Assistant", className, initialMessage: _initialMessage }: {
   workspaceId: string
   /** The live grid. A ref rather than a value because the panel mounts before Univer finishes
    * booting, and a question asked in that window still has to find a workbook to read. On a page

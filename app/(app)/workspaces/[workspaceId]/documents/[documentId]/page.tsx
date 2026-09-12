@@ -47,7 +47,7 @@ export default async function DocumentPage({ params, searchParams }: {
   const capabilities = await getWorkspaceCapabilities(workspaceId)
   const canPush = document.status === "reviewed" && capabilities.has("accounting-push")
     && capabilities.pushableTemplateCodes.includes(document.template?.code ?? "")
-  const [connections, pushes, auditEvents, neighbors, paymentStatuses] = await Promise.all([
+  const [_connections, pushes, auditEvents, neighbors, paymentStatuses] = await Promise.all([
     canPush ? listWorkspaceIntegrationConnections(workspaceId) : Promise.resolve([]),
     canPush ? listWorkspaceIntegrationPushes(workspaceId, documentId) : Promise.resolve([]),
     listDocumentAuditEvents(workspaceId, documentId),

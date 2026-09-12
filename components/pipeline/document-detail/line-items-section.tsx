@@ -3,7 +3,7 @@
 import { LineItemsEditor } from "@/components/documents/line-items-editor"
 import type { DocumentFieldDefinition } from "@/lib/document-templates"
 import type { Ref } from "@/lib/provenance"
-import { Crosshair, Pencil } from "lucide-react"
+import { Crosshair } from "lucide-react"
 
 function TotalField({ field, value, ref: provenanceRef, onFocusSource }: {
   field: DocumentFieldDefinition

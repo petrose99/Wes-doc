@@ -45,7 +45,7 @@ export default async function WorkspaceHomePage({ params }: {
 
   const documentSearchEnabled = config.embeddings.enabled
 
-  const [pipelineFile, usage, stageCounts, documentsThisMonth, recentFiles, onboardingState, unplacedCount, capabilities] = await Promise.all([
+  const [pipelineFile, usage, stageCounts, documentsThisMonth, recentFiles, onboardingState, _unplacedCount, capabilities] = await Promise.all([
     ensurePipelineFile(workspaceId, user.id),
     getWorkspaceUsage(workspaceId),
     countDocumentsByStage(workspaceId),

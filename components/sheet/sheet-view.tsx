@@ -43,7 +43,7 @@ const DocumentsIcon = () => <Files className="h-4 w-4" />
  * grid's own ribbon, formula bar, sheet tabs and zoom fill everything below. Uploading and
  * extraction happen on the Home/Files hub and the file's own hub page, not here — this surface
  * is for viewing and editing rows that already landed. */
-export function SheetView({ workspaceId, fileId, fileName, linkAccess, snapshot, rev, queuedIds, hasRows, readOnly = false, documentSearchEnabled = false, initialSource }: {
+export function SheetView({ workspaceId, fileId, fileName, linkAccess, snapshot, rev, queuedIds, hasRows: _hasRows, readOnly = false, documentSearchEnabled = false, initialSource }: {
   workspaceId: string
   fileId: string
   fileName: string

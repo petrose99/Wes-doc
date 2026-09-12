@@ -78,7 +78,7 @@ async function main() {
   try {
     const processed = await drainProvisionJobs()
     if (processed > 0) console.log(`Provisioned ${processed} Bigcapital organization(s).\n`)
-  } catch (error) {
+  } catch {
     console.log("Bigcapital provisioning skipped (containers not running?).\n")
   }
 }

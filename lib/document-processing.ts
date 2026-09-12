@@ -1,6 +1,6 @@
 import { requestLLM } from "@/ai/providers/llmProvider"
 import { classifyDocument, type ClassificationResult } from "@/lib/classification"
-import { DOC_TYPE_SPECS, DOC_TYPES, isDocType, resolveDocType, docTypeToLegacyTemplateCode, type DocType, type DocCategory } from "@/lib/doc-types"
+import { DOC_TYPE_SPECS, isDocType, resolveDocType, docTypeToLegacyTemplateCode, type DocType } from "@/lib/doc-types"
 import { inferFieldSnapshot, extractFreeFormProvenance } from "@/lib/extraction/infer-schema"
 import { deriveAdaptiveFields } from "@/lib/adaptive-extraction"
 import { track } from "@/lib/analytics"

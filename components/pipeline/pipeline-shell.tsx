@@ -15,7 +15,7 @@ import type { TouchlessRateStats } from "@/lib/analytics/workspace-analytics"
  * upload entry point, tabs, a filter bar, then the table. A server component: the data (rows,
  * counts) is fetched by the page and handed down; only the list body, its bulk actions, and the
  * upload overlay need client interactivity. */
-export function PipelineShell({ workspaceId, stage, counts, rows, contentMatches, query, flaggedOnly, documentSearchEnabled, upload, touchlessStats, billsSummary, paidSummary, baseCurrency, failedCount = 0, visibleStages }: {
+export function PipelineShell({ workspaceId, stage, counts, rows, contentMatches, query, flaggedOnly: _flaggedOnly, documentSearchEnabled, upload, touchlessStats, billsSummary, paidSummary, baseCurrency, failedCount = 0, visibleStages }: {
   workspaceId: string
   stage: PipelineStage
   counts: Record<PipelineStage, number>

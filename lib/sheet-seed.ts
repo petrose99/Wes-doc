@@ -161,7 +161,7 @@ export function appendRowsToSnapshot(snapshot: WorkbookSnapshot, sheetId: string
 
 /** Removes columns that are entirely empty across all data rows (row 0 is the header).
  * Remaps remaining columns to a contiguous 0..N range so the grid has no gaps. */
-function stripEmptyColumns(cellData: CellMatrix, dataRowCount: number): CellMatrix {
+function stripEmptyColumns(cellData: CellMatrix, _dataRowCount: number): CellMatrix {
   const usedCols = new Set<number>()
   for (const rowStr of Object.keys(cellData)) {
     const rowIdx = Number(rowStr)

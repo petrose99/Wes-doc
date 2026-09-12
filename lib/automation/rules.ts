@@ -3,7 +3,7 @@
  * this document get coded that way" question always has one answer, not one that depends on
  * database row order. Run in the worker post-extraction (lib/document-processing.ts); nothing
  * here touches Prisma. */
-import { DOC_TYPE_SPECS, DOC_TYPES, docTypeToLegacyTemplateCode, legacyTemplateCodeToDocType } from "@/lib/doc-types"
+import { DOC_TYPE_SPECS, DOC_TYPES, docTypeToLegacyTemplateCode } from "@/lib/doc-types"
 import { normalizeSupplierName } from "@/lib/suppliers/normalize"
 
 export type RuleMatcherType = "exact" | "contains"

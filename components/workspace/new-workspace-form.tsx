@@ -77,8 +77,8 @@ export function NewWorkspaceForm({ defaultName, initialCountry }: {
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
-  const countries = useMemo(buildCountryList, [])
-  const currencies = useMemo(buildCurrencyList, [])
+  const countries = useMemo(() => buildCountryList(), [])
+  const currencies = useMemo(() => buildCurrencyList(), [])
   const currencyCodes = useMemo(() => new Set(currencies.map((c) => c.value)), [currencies])
   const countryCodes = useMemo(() => new Set(countries.map((c) => c.value)), [countries])
 

@@ -41,4 +41,6 @@ jobs:
           node-version: "26"
           cache: npm
       - run: npm ci --ignore-scripts
-      - run: npm audit --omit=dev --audit-level=high
+      # Fails on any high/critical advisory in the prod graph except the documented,
+      # justified allowlist inside the script (npm audit itself has no allowlist).
+      - run: node scripts/check-prod-audit.mjs
