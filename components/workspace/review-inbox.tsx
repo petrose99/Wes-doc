@@ -64,14 +64,19 @@ function formatValue(value: unknown): string {
  * the push button reflects "Pushed", immediately) with an undo toast backing out the server change
  * if the person didn't mean it. Shortcuts are ignored while any form control has focus, so they
  * never fight with the create-rule form or a text field. */
-export function ReviewInbox({ workspaceId, tasks, currentStatus, members }: {
+export function ReviewInbox({ workspaceId, tasks, currentStatus, members, workspaceMode }: {
   workspaceId: string
   tasks: ReviewQueueRow[]
   /** The active status tab ("open" by default) — undefined/"all" means no client-side filtering
    * on top of what the server already returned. */
   currentStatus: string | undefined
   members: { id: string; name: string }[]
+  /** #78: firm workspaces route approvals *to* a reviewer; SMB workspaces have no reviewer, so
+   * the approver *is* the signer of record. Drives Approve-button copy on both the bulk bar and
+   * the detail-pane single-approve control. */
+  workspaceMode: "firm" | "smb"
 }) {
+  const approveLabel = workspaceMode === "smb" ? "Approve as signer of record" : "Approve for reviewer"
   const router = useRouter()
   const [optimisticStatus, setOptimisticStatus] = useState<Record<string, string>>({})
   const [selectedId, setSelectedId] = useState<string | null>(tasks[0]?.id ?? null)
@@ -331,10 +336,11 @@ export function ReviewInbox({ workspaceId, tasks, currentStatus, members }: {
   return <div className="space-y-3">
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_420px]">
     <div>
-      {bulkSelected.size > 0 && <div className="sticky top-2 z-10 mb-2 flex items-center gap-2 rounded-md bg-emerald-50 px-3 py-2 text-sm shadow-sm">
+      {bulkSelected.size > 0 && <div className="sticky top-2 z-10 mb-2 flex flex-wrap items-center gap-2 rounded-md bg-emerald-50 px-3 py-2 text-sm shadow-sm">
         <span className="font-medium text-emerald-900">{bulkSelected.size} selected</span>
-        <Button type="button" size="sm" disabled={pending} onClick={() => setConfirming("approved")}>Approve</Button>
+        <Button type="button" size="sm" disabled={pending} onClick={() => setConfirming("approved")}>{approveLabel}</Button>
         <Button type="button" size="sm" variant="destructive" disabled={pending} onClick={() => setConfirming("rejected")}>Reject</Button>
+        {workspaceMode === "smb" && <span className="text-xs text-emerald-800/80">No reviewer on this workspace — you sign as signer of record.</span>}
       </div>}
       <ConfirmDialog
         open={confirming === "approved" || confirming === "rejected"}
@@ -343,8 +349,10 @@ export function ReviewInbox({ workspaceId, tasks, currentStatus, members }: {
         title={`${confirming === "rejected" ? "Reject" : "Approve"} ${bulkSelected.size} document${bulkSelected.size === 1 ? "" : "s"}?`}
         description={confirming === "rejected"
           ? "Every selected document is marked rejected. You can undo from the toast afterwards."
-          : "Every selected document is marked approved — which can auto-publish them and sync them to accounting. Documents still waiting on a paid/unpaid answer are held back."}
-        confirmLabel={confirming === "rejected" ? "Reject all" : "Approve all"}
+          : workspaceMode === "smb"
+            ? "Every selected document is marked approved with you on record as signer — no reviewer on this workspace. This can auto-publish them and sync them to accounting. Documents still waiting on a paid/unpaid answer are held back."
+            : "Every selected document is marked approved — which can auto-publish them and sync them to accounting. Documents still waiting on a paid/unpaid answer are held back."}
+        confirmLabel={confirming === "rejected" ? "Reject all" : approveLabel}
         onConfirm={() => { const status = confirming; setConfirming(null); if (status && status !== "stage-reject") void bulk(status) }}
         onCancel={() => setConfirming(null)} />
       {/* Hoisted out of the detail pane so a mid-flight refetch that nulls `detail` can't unmount
@@ -515,7 +523,7 @@ export function ReviewInbox({ workspaceId, tasks, currentStatus, members }: {
                   return <Button key={option} type="button" size="sm" variant={variant} disabled={current === option || blocked} title={blocked ? "Confirm paid/unpaid first" : undefined}
                     className={`capitalize ${current === option && variant === "outline" ? "border-emerald-700 bg-emerald-50 text-emerald-800 hover:bg-emerald-50" : ""}`}
                     onClick={() => void changeStatus(detail.id, option, current)}>
-                    {option === "approved" ? "Approve" : option === "rejected" ? "Reject" : "Reopen"}
+                    {option === "approved" ? approveLabel : option === "rejected" ? "Reject" : "Reopen"}
                   </Button>
                 })}
               </div>

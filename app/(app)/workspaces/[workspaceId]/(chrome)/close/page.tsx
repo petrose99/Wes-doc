@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { getCurrentUser } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
-import { requireWorkspaceRole } from "@/models/workspaces"
+import { getWorkspaceMode, requireWorkspaceRole, type WorkspaceMode } from "@/models/workspaces"
 import { buildClosePreamble, closePeriodLabel, type PreambleItem } from "@/lib/close/preamble"
 import type { CloseItemKind } from "@/lib/close/types"
 import type {
@@ -71,6 +71,8 @@ export default async function ClosePage({ params, searchParams }: {
   const user = await getCurrentUser()
   await requireWorkspaceRole(workspaceId, user.id)
   if (!(await getWorkspaceCapabilities(workspaceId)).has("close")) notFound()
+  const workspaceMode = await getWorkspaceMode(workspaceId)
+  const signerName = user.name ?? user.email
 
   const closes: CloseRow[] = await prisma.close.findMany({
     where: { workspaceId },
@@ -86,7 +88,7 @@ export default async function ClosePage({ params, searchParams }: {
   if (!selected) {
     return (
       <main className="space-y-6">
-        <Header workspaceId={workspaceId} preamble={null} />
+        <Header workspaceId={workspaceId} preamble={null} workspaceMode={workspaceMode} signerName={signerName} />
         <Card>
           <CardHeader>
             <CardTitle>No close yet</CardTitle>
@@ -131,7 +133,7 @@ export default async function ClosePage({ params, searchParams }: {
 
   return (
     <main className="space-y-6">
-      <Header workspaceId={workspaceId} preamble={preamble} />
+      <Header workspaceId={workspaceId} preamble={preamble} workspaceMode={workspaceMode} signerName={signerName} />
 
       {/* Period picker: every close, newest first, plus the open-next button. */}
       <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -238,15 +240,35 @@ export default async function ClosePage({ params, searchParams }: {
   )
 }
 
-function Header({ workspaceId, preamble }: { workspaceId: string; preamble: string | null }) {
+function Header({ workspaceId, preamble, workspaceMode, signerName }: {
+  workspaceId: string
+  preamble: string | null
+  workspaceMode: WorkspaceMode
+  signerName: string
+}) {
   return (
-    <header className="flex items-end justify-between gap-4">
-      <div>
-        <h1 className="text-3xl font-bold">Close</h1>
-        <p className="mt-1 text-muted-foreground">The monthly close checklist: computed working papers, per-item sign-off, and a period lock.</p>
-      </div>
-      {preamble && <CloseAssistant workspaceId={workspaceId} preamble={preamble} />}
-    </header>
+    <div className="space-y-4">
+      <header className="flex items-end justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold">Close</h1>
+          <p className="mt-1 text-muted-foreground">The monthly close checklist: computed working papers, per-item sign-off, and a period lock.</p>
+        </div>
+        {preamble && <CloseAssistant workspaceId={workspaceId} preamble={preamble} />}
+      </header>
+      {workspaceMode === "smb" && <SmbBanner signerName={signerName} />}
+    </div>
+  )
+}
+
+/** #78: SMB banner rendered *inside* the workpaper header (not app chrome) on the close
+ * checklist, so it travels with the workpaper into any future print/PDF/email export. When
+ * a workspace has no reviewer, the person signing off is the signer of record. */
+function SmbBanner({ signerName }: { signerName: string }) {
+  return (
+    <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+      <span className="font-semibold">No reviewer on this workspace.</span>{" "}
+      Signer of record: <span className="font-semibold">{signerName}</span>.
+    </p>
   )
 }
 
