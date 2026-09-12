@@ -2,10 +2,11 @@
 
 import { renameFileAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
 import { ShareDialog } from "@/components/files/share-dialog"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { ArrowLeft, Globe, Share2 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useState, type ReactNode } from "react"
+import { useRef, useState, type ReactNode } from "react"
 import { toast } from "sonner"
 
 /** The bar across the top of a file: back to Files, the inline-editable filename, and Share.
@@ -24,6 +25,8 @@ export function FileHeader({ workspaceId, fileId, name, linkAccess, status, back
   const [value, setValue] = useState(name)
   const [saved, setSaved] = useState(name)
   const [sharing, setSharing] = useState(false)
+  const [confirmingLeave, setConfirmingLeave] = useState(false)
+  const pendingLeaveHref = useRef<string | null>(null)
 
   // The server is the source of truth after a rename elsewhere (the Files list, another tab).
   const [syncedName, setSyncedName] = useState(name)
@@ -47,13 +50,24 @@ export function FileHeader({ workspaceId, fileId, name, linkAccess, status, back
     router.refresh()
   }
 
+  const resolvedBackHref = backHref ?? `/workspaces/${workspaceId}/worksheets`
+
   return <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2">
-    <Link href={backHref ?? `/workspaces/${workspaceId}/worksheets`} className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+    <Link href={resolvedBackHref} className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-800"
       onClick={(e) => {
-        if (hasUnsavedChanges && !window.confirm("You have unsaved changes. Leave without saving?")) e.preventDefault()
+        if (!hasUnsavedChanges) return
+        e.preventDefault()
+        pendingLeaveHref.current = resolvedBackHref
+        setConfirmingLeave(true)
       }}>
       <ArrowLeft className="h-4 w-4" />{backLabel ?? "Files"}
     </Link>
+    <ConfirmDialog open={confirmingLeave} destructive title="Leave without saving?" description="Your unsaved changes will be lost." confirmLabel="Leave"
+      onCancel={() => setConfirmingLeave(false)}
+      onConfirm={() => {
+        setConfirmingLeave(false)
+        if (pendingLeaveHref.current) router.push(pendingLeaveHref.current)
+      }} />
     <input
       aria-label="File name"
       className="min-w-0 max-w-xs flex-1 rounded border border-transparent bg-transparent px-2 py-1 text-sm font-semibold text-slate-900 hover:border-slate-200 focus:border-slate-300 focus:outline-none"
