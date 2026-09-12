@@ -116,6 +116,14 @@ model Workspace {
   /// pack (or when the pack version changes and the workspace re-confirms). Every
   /// DocumentCheckResult also stamps its packVersion so old checks stay legible after a bump.
   jurisdictionPackVersion String?        @map("jurisdiction_pack_version")
+  /// #84: tri-state workspace enrolment in the deferred-import-VAT scheme (LS defers import
+  /// VAT on qualifying imports to the return rather than paying at the border; other packs
+  /// may add their own semantics later). `null` = not stated (the LS return-form workpaper
+  /// #85 silent-passes imports on this workspace); `true` = enrolled; `false` = explicitly
+  /// not enrolled. Per-bill override lives on `reviewedData.deferredOverride` per the
+  /// projection contract in `lib/jurisdictions/_shared/project-bill.ts` (#82). Only
+  /// meaningful when the projected bill is `isImport = true`; ignored otherwise.
+  deferredVatScheme  Boolean?            @map("deferred_vat_scheme")
   createdAt       DateTime               @default(now()) @map("created_at")
   updatedAt       DateTime               @updatedAt @map("updated_at")
   members         WorkspaceMember[]
