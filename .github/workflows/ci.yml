@@ -62,7 +62,12 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx prisma generate
+        # The close campaign (#75-#79, #95-#97) pushed the program past node's default
+        # ~2GB old-space and tsc started OOMing here (exit 134) while passing locally on
+        # roomier machines. Raise the ceiling rather than shrink the type graph.
       - run: npx tsc --noEmit
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
 
   build:
     name: Build
