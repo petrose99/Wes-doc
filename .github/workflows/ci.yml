@@ -99,6 +99,9 @@ jobs:
       NEXT_PUBLIC_SUPABASE_URL: https://ci-build.supabase.co
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-build-dummy-anon-key
       SUPABASE_SERVICE_ROLE_KEY: ci-build-dummy-service-role-key
+      # Same heap ceiling as the Type Check job: `next build` OOMs on node's default
+      # ~2GB old-space now that the close campaign has landed.
+      NODE_OPTIONS: --max-old-space-size=6144
     steps:
       - uses: actions/checkout@v7
         with:
