@@ -70,9 +70,8 @@ export const MODULES: ModuleDefinition[] = [
 
   // Ticket #95 (map #35): the close checklist is always-on for every finance workspace and
   // has no retroactive back-fill — a workspace only starts having closes from the first
-  // `openClose` call. The module carries no navItems in v1: sign-off UI arrives with #97,
-  // and until then the persistence has no user-facing surface.
-  { key: "close", name: "Close checklist", description: "Monthly close: bank recon, AP aging, unposted accruals, and VAT workpaper.", industry: "finance", tier: "always", activation: "enable" },
+  // `openClose` call. The sign-off surface (#97) lives at /close and registers here.
+  { key: "close", name: "Close checklist", description: "Monthly close: bank recon, AP aging, unposted accruals, and VAT workpaper.", industry: "finance", tier: "always", activation: "enable", navItems: [{ href: "close", label: "Close", icon: "check-circle" }] },
 
   { key: "ai-coding", name: "AI coding fallback", description: "When no supplier rule matches, AI suggests the coding with a confidence score; high-confidence suggestions keep documents touchless.", industry: "finance", tier: "default", activation: "enable" },
   { key: "data-health", name: "Data health", description: "Automated bookkeeping quality audits with source-document-linked findings.", industry: "finance", tier: "always", activation: "enable", navItems: [{ href: "health", label: "Health Checks", icon: "heart-pulse" }] },
