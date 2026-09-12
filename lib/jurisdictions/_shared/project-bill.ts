@@ -28,6 +28,12 @@ export type BillSnapshotInput = {
     vatNumber?: string | null
     name?: string | null
   } | null
+  /** #83: per-bill goods/services override; wins over workspace category-nature default. Only
+   * "goods" / "services" are meaningful; any other string (including "") is treated as null. */
+  natureOverride?: "goods" | "services" | string | null
+  /** #84: per-bill deferred-import-VAT override; wins over workspace `deferredVatScheme`. Only
+   * meaningful when the bill projects as `isImport = true`; ignored otherwise. */
+  deferredOverride?: boolean | null
   fieldConfidence?: number | null
   codingConfidence?: number | null
 }
@@ -40,6 +46,15 @@ export type WorkspaceContext = {
    * country yields `isImport: false` — the pack-level import rules (LS RSA cross-border) apply
    * their own stricter check anyway, so a false negative here is safe. */
   country: string
+  /** #83: dictionary lookup returning the workspace-level nature (goods / services) for a bill
+   * category, or null when the category has no entry. Undefined = no source wired yet: every
+   * bill projects with `isService = null` unless a per-bill `natureOverride` is set. Called
+   * with the raw category string from the bill, before capital/expense narrowing. */
+  getCategoryNature?: (category: string) => "goods" | "services" | null
+  /** #84: workspace enrolment in the deferred-import-VAT scheme. `true` = enrolled, `false` =
+   * explicitly not enrolled, `null`/undefined = not stated. Only consulted when the projected
+   * bill is an import; on non-imports `isDeferred` is always `null`. */
+  deferredVatScheme?: boolean | null
 }
 
 /** Project a bill snapshot pair into `WorkpaperBill`. Returns null when the essentials are
@@ -78,6 +93,16 @@ export function projectWorkpaperBill(
   const rawCategory = (pick("category") ?? "expense") as string
   const category: WorkpaperBill["category"] = rawCategory === "capital" ? "capital" : "expense"
 
+  const rawNatureOverride = pick("natureOverride") as string | null
+  const natureOverride: "goods" | "services" | null =
+    rawNatureOverride === "goods" || rawNatureOverride === "services" ? rawNatureOverride : null
+  const workspaceNature = workspace.getCategoryNature?.(rawCategory) ?? null
+  const resolvedNature = natureOverride ?? workspaceNature
+  const isService: boolean | null =
+    resolvedNature === "services" ? true : resolvedNature === "goods" ? false : null
+
+  const deferredOverride = pick("deferredOverride") as boolean | null
+
   const supplierIn = (reviewedData?.supplier ?? fieldSnapshot?.supplier ?? null)
   const supplierCountry = normaliseCountry(supplierIn?.country ?? null)
   const supplier: WorkpaperBill["supplier"] = {
@@ -90,6 +115,16 @@ export function projectWorkpaperBill(
   const workspaceCountry = normaliseCountry(workspace.country) ?? ""
   const isImport = supplierCountry !== null && supplierCountry !== workspaceCountry
   const isCapital = category === "capital"
+
+  const isDeferred: boolean | null = !isImport
+    ? null
+    : deferredOverride !== null
+      ? deferredOverride
+      : workspace.deferredVatScheme === true
+        ? true
+        : workspace.deferredVatScheme === false
+          ? false
+          : null
 
   return {
     id: billId,
@@ -104,6 +139,8 @@ export function projectWorkpaperBill(
     supplier,
     isImport,
     isCapital,
+    isService,
+    isDeferred,
     fieldConfidence: (pick("fieldConfidence") as number | null) ?? null,
     codingConfidence: (pick("codingConfidence") as number | null) ?? null,
   }

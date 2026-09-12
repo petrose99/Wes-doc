@@ -58,6 +58,16 @@ export type WorkpaperBill = {
   isImport: boolean
   /** Derived from `category === 'capital'` at projection time. */
   isCapital: boolean
+  /** #81/#82: true = services, false = goods, null = substrate has nothing to say (no per-bill
+   * override AND workspace's category-nature dictionary has no entry for the bill's category).
+   * Return-form workpaper columns (LS_VAT12_RETURN) that key on services vs goods treat null as
+   * a selectivity miss and silent-pass the bill; the rate-bucketed reconciliation workpaper
+   * ignores this field. */
+  isService: boolean | null
+  /** #81/#82: true = the deferred-import VAT scheme applies to this import, false = it doesn't,
+   * null = the substrate has nothing to say (non-import, or workspace has no deferred-scheme
+   * enrolment stated). Same silent-pass treatment as `isService` for the return-form columns. */
+  isDeferred: boolean | null
   fieldConfidence: number | null
   codingConfidence: number | null
 }

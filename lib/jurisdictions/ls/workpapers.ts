@@ -4,15 +4,20 @@
  *
  * Consumed by the close checklist's LS VAT return prep item (#42, #47).
  *
- * ## Box codes are deferred
+ * ## Box codes stay undefined — a workpaper-vs-VAT12 shape mismatch
  *
- * The ticket calls for LRA VAT-12 box codes on every VAT column, pulled from #43's SourceRefs.
- * The LS rule pack (parallel to #50 for ZA) is not yet shipped on this branch — the file that
- * would authoritatively declare those box codes (`lib/jurisdictions/ls/filings.ts`) does not
- * exist. This workpaper therefore leaves `box` UNDEFINED on every column: the arithmetic
- * (per-column totals, crossCutting slice) is correct and testable without box codes; form
- * generation waits on the LS rule pack and box codes get added in-place then. This is a
- * cleaner boundary than inventing box codes now.
+ * The LRA VAT-12 form splits inputs six ways: **goods vs services × deferred vs other**
+ * (lines 7a/7b/8a/8b/8c/8d — see `filings.ts` and `input-tax.ts`). This workpaper buckets bills
+ * by **isImport × taxRate ∈ {15, 10, 0}** (the shape decided in #47). Those two splits do NOT
+ * commute — a "local 15%" column mixes 7a (goods) and 7b (services), a "import 15%" column mixes
+ * all four of 8a/8b/8c/8d. Back-filling `box:` codes would require every bill's projection to
+ * carry `isService` and `isDeferred` flags, and those flags need coding classification the app
+ * doesn't currently produce.
+ *
+ * So every VAT column stays `box: undefined`. The workpaper remains valuable as a review sheet
+ * plus the RSA cross-border slice; **return-form generation is a separate ticket** and will
+ * either (a) extend `WorkpaperBill` with `isService`/`isDeferred` and re-bucket the columns, or
+ * (b) ship a second, orthogonal workpaper shaped to the VAT-12 form.
  *
  * ## `isRsaCrossBorder` semantics (#47 Q13)
  *
@@ -25,6 +30,7 @@
  * `<= 90` — that's a rare data-quality edge, but the arithmetic is deliberate: extraction is
  * fallible, and we'd rather include a possibly-future invoice than silently drop it. */
 import type { Period, Workpaper, WorkpaperBill } from "../_shared/workpaper"
+import { lsVat12FieldFor } from "./input-tax"
 
 const LRA_VAT12 = "https://www.rsl.org.ls/"
 
@@ -142,4 +148,136 @@ export const lsVat12: Workpaper = {
   outputVatAsserted: true,
 }
 
-export const lsWorkpapers = [lsVat12] as const
+/** LS_VAT12_RETURN — the return-form audit view, orthogonal to `lsVat12`.
+ *
+ * Where `lsVat12` buckets by `isImport × taxRate ∈ {15, 10, 0}` for reconciliation, this
+ * workpaper cuts by `isImport × isService × isDeferred` — the exact split the LRA VAT-12
+ * return form uses (lines 7a/7b/8a/8b/8c/8d — see filings.ts and input-tax.ts). Every column
+ * carries its LRA VAT-12 box code so the numbers on this sheet map 1:1 to the return.
+ *
+ * Bill selectivity per #82 / this ticket:
+ *   - `isService === null` → silent-pass (the reconciliation workpaper still captures the bill).
+ *   - Import buckets with `isDeferred === null` → silent-pass for the same reason.
+ *   - Local buckets ignore `isDeferred` (the router doesn't consult it there).
+ *   - Zero-rated bills still contribute: `net` normally, `vat = 0` (the vat column simply
+ *     sums to zero for a pure zero-rated slice, matching the pattern on `lsVat12`).
+ *
+ * No `crossCutting` column — the RSA cross-border slice stays on `lsVat12` reconciliation only. */
+
+/** Column spec for a single VAT-12 return line. */
+type ReturnLine = {
+  field: string
+  label: string
+  isImport: boolean
+  isService: boolean
+  isDeferred: boolean | null
+}
+
+const RETURN_LINES: readonly ReturnLine[] = [
+  {
+    field: "vat12.7a",
+    label: "7a — Local purchases of goods",
+    isImport: false,
+    isService: false,
+    isDeferred: null,
+  },
+  {
+    field: "vat12.7b",
+    label: "7b — Local purchases of services",
+    isImport: false,
+    isService: true,
+    isDeferred: null,
+  },
+  {
+    field: "vat12.8a",
+    label: "8a — Imported goods (deferred / IVCF)",
+    isImport: true,
+    isService: false,
+    isDeferred: true,
+  },
+  {
+    field: "vat12.8b",
+    label: "8b — Imported services (deferred / IVCF)",
+    isImport: true,
+    isService: true,
+    isDeferred: true,
+  },
+  {
+    field: "vat12.8c",
+    label: "8c — Imported goods (other)",
+    isImport: true,
+    isService: false,
+    isDeferred: false,
+  },
+  {
+    field: "vat12.8d",
+    label: "8d — Imported services (other)",
+    isImport: true,
+    isService: true,
+    isDeferred: false,
+  },
+] as const
+
+/** Does this bill route to the given return line? Silent-passes bills with the null flags the
+ * router needs to make a decision. */
+function billMatchesLine(bill: WorkpaperBill, line: ReturnLine): boolean {
+  if (bill.isService === null) return false
+  if (bill.isImport && bill.isDeferred === null) return false
+  if (bill.isImport !== line.isImport) return false
+  const routed = lsVat12FieldFor({
+    isImport: bill.isImport,
+    isService: bill.isService,
+    isDeferred: bill.isDeferred ?? undefined,
+  })
+  return routed === line.field
+}
+
+export const lsVat12Return: Workpaper = {
+  id: "LS_VAT12_RETURN",
+  label: "VAT-12 — Return lines 7a–8d (goods/services × deferred split)",
+  sourceRef: LRA_VAT12,
+  cadence: "monthly",
+  columns: RETURN_LINES.flatMap((line) => [
+    {
+      id: `${line.field.replace(".", "_")}_net`,
+      label: `${line.label} — net`,
+      sourceRef: LRA_VAT12,
+      role: "primary" as const,
+      box: `${line.field}.net`,
+      select: (bill: WorkpaperBill) => (billMatchesLine(bill, line) ? bill.net : null),
+    },
+    {
+      id: `${line.field.replace(".", "_")}_vat`,
+      label: `${line.label} — VAT`,
+      sourceRef: LRA_VAT12,
+      role: "primary" as const,
+      box: `${line.field}.vat`,
+      select: (bill: WorkpaperBill) => (billMatchesLine(bill, line) ? bill.vat : null),
+    },
+  ]),
+  outputVatAsserted: true,
+}
+
+/** Close-checklist grouping (#42). The two LS VAT-12 workpapers bundle under a single close
+ * item — reconciliation on one tab, return-line audit on the other — with one sign-off covering
+ * both. Consumed by the close checklist once it lands (no consumer today); ordered so the
+ * reconciliation view appears first (it's the one accountants review before signing the return
+ * numbers). */
+export type WorkpaperGroup = {
+  /** Stable close-checklist item id. */
+  id: string
+  /** Human-readable label the close item renders. */
+  label: string
+  /** Workpaper ids in tab order. Signing off the group signs off every workpaper here. */
+  workpaperIds: readonly string[]
+}
+
+export const lsWorkpaperGroups: readonly WorkpaperGroup[] = [
+  {
+    id: "ls_vat12_workpaper",
+    label: "LS VAT-12 workpaper",
+    workpaperIds: ["LS_VAT12", "LS_VAT12_RETURN"],
+  },
+]
+
+export const lsWorkpapers = [lsVat12, lsVat12Return] as const

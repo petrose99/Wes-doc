@@ -66,6 +66,8 @@ function bill(overrides: Partial<WorkpaperBill> = {}): WorkpaperBill {
     supplier: { id: "s1", country: "ZA", vatNumber: "4001234567", name: "Acme" },
     isImport: false,
     isCapital: false,
+    isService: null,
+    isDeferred: null,
     fieldConfidence: 1,
     codingConfidence: 1,
     ...overrides,
@@ -144,6 +146,129 @@ describe("projectWorkpaperBill", () => {
       null, { country: "ZA" }, "b1",
     )
     expect(p!.taxRate).toBe(15)
+  })
+
+  describe("isService (goods/services nature)", () => {
+    it("is null when the workspace has no getCategoryNature and no per-bill override", () => {
+      const p = projectWorkpaperBill(
+        { invoiceDate: "2026-03-15", net: 100, vat: 15, category: "office_supplies" },
+        null, { country: "ZA" }, "b1",
+      )
+      expect(p!.isService).toBeNull()
+    })
+
+    it("reads from workspace.getCategoryNature on the raw category (called pre-capital-narrowing)", () => {
+      const seen: string[] = []
+      const getCategoryNature = (c: string) => {
+        seen.push(c)
+        return c === "consulting" ? "services" : c === "office_supplies" ? "goods" : null
+      }
+      const services = projectWorkpaperBill(
+        { invoiceDate: "2026-03-15", net: 100, vat: 15, category: "consulting" },
+        null, { country: "ZA", getCategoryNature }, "b1",
+      )
+      expect(services!.isService).toBe(true)
+      const goods = projectWorkpaperBill(
+        { invoiceDate: "2026-03-15", net: 100, vat: 15, category: "office_supplies" },
+        null, { country: "ZA", getCategoryNature }, "b1",
+      )
+      expect(goods!.isService).toBe(false)
+      expect(seen).toEqual(["consulting", "office_supplies"])
+    })
+
+    it("per-bill natureOverride wins over the workspace lookup", () => {
+      const getCategoryNature = () => "services" as const
+      const p = projectWorkpaperBill(
+        { invoiceDate: "2026-03-15", net: 100, vat: 15, category: "consulting", natureOverride: "goods" },
+        null, { country: "ZA", getCategoryNature }, "b1",
+      )
+      expect(p!.isService).toBe(false)
+    })
+
+    it("distinguishes null (nothing to say) from false (goods): three-way tri-state", () => {
+      const nothing = projectWorkpaperBill(
+        { invoiceDate: "2026-03-15", net: 100, vat: 15, category: "x" },
+        null, { country: "ZA", getCategoryNature: () => null }, "b1",
+      )
+      const goods = projectWorkpaperBill(
+        { invoiceDate: "2026-03-15", net: 100, vat: 15, category: "x" },
+        null, { country: "ZA", getCategoryNature: () => "goods" }, "b1",
+      )
+      const services = projectWorkpaperBill(
+        { invoiceDate: "2026-03-15", net: 100, vat: 15, category: "x" },
+        null, { country: "ZA", getCategoryNature: () => "services" }, "b1",
+      )
+      expect(nothing!.isService).toBeNull()
+      expect(goods!.isService).toBe(false)
+      expect(services!.isService).toBe(true)
+    })
+
+    it("ignores garbage natureOverride strings and falls through to the workspace lookup", () => {
+      const p = projectWorkpaperBill(
+        { invoiceDate: "2026-03-15", net: 100, vat: 15, category: "x", natureOverride: "hybrid" },
+        null, { country: "ZA", getCategoryNature: () => "goods" }, "b1",
+      )
+      expect(p!.isService).toBe(false)
+    })
+
+    it("reads override from fieldSnapshot when reviewedData is silent", () => {
+      const p = projectWorkpaperBill(
+        { invoiceDate: "2026-03-15", net: 100, vat: 15 },
+        { natureOverride: "services" },
+        { country: "ZA" }, "b1",
+      )
+      expect(p!.isService).toBe(true)
+    })
+  })
+
+  describe("isDeferred (deferred-import-VAT scheme)", () => {
+    it("is null on non-imports regardless of workspace enrolment or override", () => {
+      const p = projectWorkpaperBill(
+        { invoiceDate: "2026-03-15", net: 100, vat: 15, supplier: { country: "ZA" }, deferredOverride: true },
+        null, { country: "ZA", deferredVatScheme: true }, "b1",
+      )
+      expect(p!.isImport).toBe(false)
+      expect(p!.isDeferred).toBeNull()
+    })
+
+    it("on imports, resolves override → workspace default → null", () => {
+      const overridden = projectWorkpaperBill(
+        { invoiceDate: "2026-03-15", net: 100, vat: 15, supplier: { country: "US" }, deferredOverride: false },
+        null, { country: "ZA", deferredVatScheme: true }, "b1",
+      )
+      expect(overridden!.isDeferred).toBe(false)
+
+      const workspaceDefaultTrue = projectWorkpaperBill(
+        { invoiceDate: "2026-03-15", net: 100, vat: 15, supplier: { country: "US" } },
+        null, { country: "ZA", deferredVatScheme: true }, "b1",
+      )
+      expect(workspaceDefaultTrue!.isDeferred).toBe(true)
+
+      const workspaceDefaultFalse = projectWorkpaperBill(
+        { invoiceDate: "2026-03-15", net: 100, vat: 15, supplier: { country: "US" } },
+        null, { country: "ZA", deferredVatScheme: false }, "b1",
+      )
+      expect(workspaceDefaultFalse!.isDeferred).toBe(false)
+
+      const nothingStated = projectWorkpaperBill(
+        { invoiceDate: "2026-03-15", net: 100, vat: 15, supplier: { country: "US" } },
+        null, { country: "ZA" }, "b1",
+      )
+      expect(nothingStated!.isDeferred).toBeNull()
+    })
+
+    it("distinguishes null (not stated) from false (explicitly not enrolled): tri-state", () => {
+      const explicit = projectWorkpaperBill(
+        { invoiceDate: "2026-03-15", net: 100, vat: 15, supplier: { country: "US" } },
+        null, { country: "ZA", deferredVatScheme: false }, "b1",
+      )
+      const nothing = projectWorkpaperBill(
+        { invoiceDate: "2026-03-15", net: 100, vat: 15, supplier: { country: "US" } },
+        null, { country: "ZA", deferredVatScheme: null }, "b1",
+      )
+      expect(explicit!.isDeferred).toBe(false)
+      expect(nothing!.isDeferred).toBeNull()
+    })
   })
 })
 
