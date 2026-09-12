@@ -73,6 +73,7 @@ model User {
   createdPaymentRuns PaymentRun[]        @relation("PaymentRunCreator")
   resolvedGates      Gate[]              @relation("GateResolver")
   createdWarnChecks  WarnCheck[]         @relation("WarnCheckAuthor")
+  verifiedSuppliers  Supplier[]          @relation("SupplierVerifier")
 
   @@map("users")
 }
@@ -109,6 +110,16 @@ model Workspace {
   /// Deliberately never issued for a clinical workspace — see the same file: unencrypted email
   /// is not an acceptable channel for ePHI, so the route refuses one even if a token existed.
   inboundEmailToken  String?             @unique @map("inbound_email_token")
+  /// Workspace jurisdiction pack code (ZA, LS, GB, US-CA at ship time). AP inbound (email-in,
+  /// upload, API) short-circuits with a typed "workspace needs a jurisdiction" error until this
+  /// is set — see lib/jurisdictions/require.ts. One jurisdiction per workspace for now; multi-
+  /// entity graduates to a future decision. Rule packs live in lib/jurisdictions/<code>/ and
+  /// are read live from code (see #39 in the wayfinder map).
+  jurisdictionCode   String?             @map("jurisdiction_code")
+  /// Stamped from lib/jurisdictions/<code>/index.ts's packVersion when the workspace picks a
+  /// pack (or when the pack version changes and the workspace re-confirms). Every
+  /// DocumentCheckResult also stamps its packVersion so old checks stay legible after a bump.
+  jurisdictionPackVersion String?        @map("jurisdiction_pack_version")
   createdAt       DateTime               @default(now()) @map("created_at")
   updatedAt       DateTime               @updatedAt @map("updated_at")
   members         WorkspaceMember[]
@@ -2094,6 +2105,29 @@ model WorkspaceAutomationConfig {
   /// fields' low confidence block touchless for that template. Empty object = every field
   /// gates (historic behaviour), so opting in is a deliberate one-workspace change.
   criticalFieldsByTemplate Json @default("{}") @map("critical_fields_by_template")
+  /// #55: confidence-per-band gate 5/6 from #40. Shape: `[{ upTo: number|null, min: number }]`
+  /// sorted by `upTo` ascending, last row has `upTo: null` (the open-ended top band). A bill
+  /// whose extraction confidence falls below its band's `min` fires the soft gate. #40 fixed
+  /// the seed at 0.85 / 0.92 / 1.00 across 0–500 / 500–5k / 5k+. Kept separate from
+  /// `amountBands` above because they answer different questions: `amountBands` relaxes the
+  /// autopublish floor, this holds bills that miss the floor in the exception queue.
+  confidenceBands   Json      @default("[{\"upTo\":500,\"min\":0.85},{\"upTo\":5000,\"min\":0.92},{\"upTo\":null,\"min\":1.0}]") @map("confidence_bands")
+
+  /// #54: supplier-trust gate 4/6 from #40. Shape: `{ amount: number, currency?: string }`. A
+  /// bill from an unverified supplier whose total exceeds this threshold fires the soft gate.
+  /// `currency` is optional; unset means "resolve against workspace.baseCurrency at gate-eval
+  /// time" so a base-currency change picks up without a data backfill. #40 fixed the seed at
+  /// local-500.
+  supplierTrustThreshold Json @default("{\"amount\":500}") @map("supplier_trust_threshold")
+
+  /// #53: 2/3-way match variance tolerance (soft gate 3/6 from #40). Shape:
+  /// `{ percent: number, floor: { amount: number, currency?: string } }`. `percent` is a
+  /// fraction (0.02 = 2%). `floor.amount` is the local-currency minimum tolerance so a tiny
+  /// bill's 2% doesn't collapse to pennies; `floor.currency` is omitted by default and read
+  /// off `workspace.baseCurrency` at gate-evaluation time so a workspace that changes its
+  /// base currency picks the new one up. #40 fixed the seed at 2% / 500. Never zero at
+  /// default — a workspace that wants strict matching sets an explicit tolerance object.
+  matchTolerance    Json      @default("{\"percent\":0.02,\"floor\":{\"amount\":500}}") @map("match_tolerance")
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
   workspace         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -2250,6 +2284,15 @@ model Supplier {
   /// = no default (aging falls back to the extracted date or blank). Common values: 0 (due on
   /// receipt), 7, 14, 30, 60.
   paymentTermsDays Int?   @map("payment_terms_days")
+  /// #54: supplier-trust gate 4/6 from #40. `verifiedAt` is set the first time a workspace admin
+  /// confirms this supplier (the exception chip's inline-verify affordance, or a bulk-verify from
+  /// the settings surface). Once set, the trust gate stops firing on this supplier's bills;
+  /// clearing it (never done automatically today) puts them back into the exception queue for the
+  /// threshold. `verifiedById` records the admin who did it. Both null on newcomers, which is
+  /// what makes the gate fire in the first place.
+  verifiedAt    DateTime? @map("verified_at")
+  verifiedById  String?   @map("verified_by_id") @db.Uuid
+  verifiedBy    User?     @relation("SupplierVerifier", fields: [verifiedById], references: [id], onDelete: SetNull)
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
   workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)

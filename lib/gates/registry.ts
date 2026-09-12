@@ -119,11 +119,7 @@ async function upsertGate(
  * that need isolation reach for `createGateRegistry()` directly. */
 export const gateRegistry: GateRegistry = createGateRegistry()
 
-// --- Concrete gate registrations ---------------------------------------------------------
-// Each concrete gate ticket (#51–#56) imports its runner and registers it here. Order is the
-// evaluation order at arrival: hard-blocking gates before soft-tunable ones, and warn-checks
-// last so a workspace's own rules never pre-empt a duplicate or a jurisdiction-validity
-// failure the workspace admin didn't author.
-import { warnChecksGateRunner } from "./warn-checks"
-
-gateRegistry.register(warnChecksGateRunner)
+// Concrete gate registrations live in ./index.ts (the barrel), in #40 order — duplicate first,
+// jurisdiction-validity second, then the soft gates in ticket order, warn-checks last so a
+// workspace's own rules never pre-empt a built-in gate. Registering there rather than here
+// keeps one wiring point that callers can't bypass via import order.
