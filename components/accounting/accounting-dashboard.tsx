@@ -239,6 +239,7 @@ function ReadyToPushList({ workspaceId, connectionId, documents, defaultAccountI
   const [accountOverrides, setAccountOverrides] = useState<Record<string, string>>({})
   const [confirmation, setConfirmation] = useState<{ kind: "one"; document: ReadyToPushDocument } | { kind: "all" } | null>(null)
   const [feedback, setFeedback] = useState<{ tone: "status" | "alert"; message: string } | null>(null)
+  const [batchResults, setBatchResults] = useState<Record<string, { status: "succeeded" | "queued" | "failed"; error?: string }>>({})
 
   const loadAccounts = () => {
     setLoadingAccounts(true)
@@ -291,7 +292,8 @@ function ReadyToPushList({ workspaceId, connectionId, documents, defaultAccountI
       const res = await pushAllReadyDocumentsAction(workspaceId, connectionId, overrides)
       setConfirmation(null)
       if (res.success) {
-        const { pushed, failed } = res.data ?? { pushed: 0, failed: 0 }
+        const { pushed, failed, results = [] } = res.data ?? { pushed: 0, failed: 0, results: [] }
+        setBatchResults(Object.fromEntries(results.map((result) => [result.documentId, { status: result.status, error: result.error }])))
         setFeedback({ tone: failed ? "alert" : "status", message: failed ? `Pushed ${pushed}; ${failed} failed. Review the failed items and retry them.` : `Pushed ${pushed} document${pushed === 1 ? "" : "s"} to Finance` })
         if (failed) toast.warning(`Pushed ${pushed}, ${failed} failed`)
         else toast.success(`Pushed ${pushed} document${pushed === 1 ? "" : "s"}`)
@@ -353,6 +355,9 @@ function ReadyToPushList({ workspaceId, connectionId, documents, defaultAccountI
                   <td className="px-5 py-3">
                     <p className="font-medium text-slate-800">{doc.vendorName}</p>
                     <p className="text-xs text-slate-400">{doc.filename}</p>
+                    {batchResults[doc.id] && <p className={`mt-1 text-xs font-medium ${batchResults[doc.id].status === "failed" ? "text-red-600" : "text-emerald-600"}`}>
+                      {batchResults[doc.id].status === "failed" ? `Failed${batchResults[doc.id].error ? `: ${batchResults[doc.id].error}` : " — retry this item"}` : batchResults[doc.id].status === "queued" ? "Queued" : "Pushed"}
+                    </p>}
                   </td>
                   <td className="px-5 py-3">
                     <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">{doc.category}</span>
@@ -389,7 +394,7 @@ function ReadyToPushList({ workspaceId, connectionId, documents, defaultAccountI
                       disabled={pending}
                       onClick={() => setConfirmation({ kind: "one", document: doc })}
                     >
-                      {pushingId === doc.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><ArrowUpRight className="mr-1 h-3.5 w-3.5" />Push</>}
+                      {pushingId === doc.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><ArrowUpRight className="mr-1 h-3.5 w-3.5" />{batchResults[doc.id]?.status === "failed" ? "Retry" : "Push"}</>}
                     </Button>
                   </td>
                 </tr>

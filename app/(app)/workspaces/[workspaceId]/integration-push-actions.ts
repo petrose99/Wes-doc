@@ -14,7 +14,6 @@ import config from "@/lib/config"
 import { BillMappingError, normalizeBillFromDocument } from "@/lib/integration-bill-mapping"
 import { extractBankStatementPayload } from "@/lib/integrations/bigcapital/bank-statement-mapper"
 import { attemptIntegrationPush, kickIntegrationPushDrain } from "@/lib/integration-push"
-import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { getWorkspaceDocument, listReadyToPushDocuments } from "@/models/documents"
 import { getCategoryAccountMap, upsertWorkspaceIntegrationPush, workspaceIntegrationsPlanEnabled } from "@/models/integrations"
 import { listCategoryAccountMappings, resolveCategoryAccount } from "@/models/category-account-mappings"
@@ -132,7 +131,7 @@ export async function pushAllReadyDocumentsAction(
   workspaceId: string,
   connectionId: string,
   accountOverrides?: Record<string, string>
-): Promise<ActionState<{ pushed: number; failed: number }>> {
+): Promise<ActionState<{ pushed: number; failed: number; results: Array<{ documentId: string; status: "succeeded" | "queued" | "failed"; error?: string }> }>> {
   if (!config.integrations.enabled) return { success: false, error: errorMessage(new Error("integrations_not_available"), NO_ACCESS) }
   const user = await getCurrentUser()
   if (!(await requireMember(workspaceId, user.id))) return { success: false, error: NO_ACCESS }
@@ -141,18 +140,20 @@ export async function pushAllReadyDocumentsAction(
   const ready = await listReadyToPushDocuments(workspaceId, connectionId)
   let pushed = 0
   let failed = 0
+  const results: Array<{ documentId: string; status: "succeeded" | "queued" | "failed"; error?: string }> = []
   for (const doc of ready) {
     try {
       const result = await pushDocumentToConnection(workspaceId, doc.id, connectionId, user.id, accountOverrides?.[doc.id])
-      if (result.status === "failed") failed += 1
-      else pushed += 1
-    } catch {
+      if (result.status === "failed") { failed += 1; results.push({ documentId: doc.id, status: "failed" }) }
+      else { pushed += 1; results.push({ documentId: doc.id, status: result.status === "succeeded" ? "succeeded" : "queued" }) }
+    } catch (error) {
       failed += 1
+      results.push({ documentId: doc.id, status: "failed", error: errorMessage(error, "Could not push this document") })
     }
   }
   await recordDocumentAudit({ workspaceId, actorId: user.id, type: "integration_batch_push", detail: { connectionId, pushed, failed, totalReady: ready.length } })
   revalidatePath(`/workspaces/${workspaceId}/accounting`)
-  return { success: true, data: { pushed, failed } }
+  return { success: true, data: { pushed, failed, results } }
 }
 
 export async function listDocumentPushesAction(workspaceId: string, documentId: string) {
