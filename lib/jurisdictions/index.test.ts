@@ -17,10 +17,17 @@ describe("jurisdiction registry", () => {
     expect(pack?.packVersion).toMatch(/^za-v/)
   })
 
-  it("returns null for a code with no pack file (ZA-only ship is valid)", () => {
-    // LS / GB / US-CA are enumerated in JURISDICTION_CODES but have no PACK_LOADERS entry yet
-    // (their content ships in #43 / #37 / #38). The registry must return null rather than throw.
-    expect(resolveJurisdictionPack("LS")).toBeNull()
+  it("resolves the LS pack with a stable packVersion (added by #74)", () => {
+    const pack = resolveJurisdictionPack("LS")
+    expect(pack).not.toBeNull()
+    expect(pack?.code).toBe("LS")
+    expect(pack?.packVersion).toMatch(/^ls-v/)
+  })
+
+  it("returns null for codes without a pack file yet (GB / US-CA)", () => {
+    // GB / US-CA are enumerated but have no PACK_LOADERS entry (their rule packs are still to ship
+    // — decisions closed in #37 / #38, code is fog beyond map #35). The registry must return null
+    // rather than throw.
     expect(resolveJurisdictionPack("GB")).toBeNull()
     expect(resolveJurisdictionPack("US-CA")).toBeNull()
   })
@@ -32,10 +39,13 @@ describe("jurisdiction registry", () => {
     expect(resolveJurisdictionPack("")).toBeNull()
   })
 
-  it("listAvailableJurisdictions only returns codes with a registered pack", () => {
+  it("listAvailableJurisdictions returns registered packs in JURISDICTION_CODES order", () => {
     const available = listAvailableJurisdictions()
-    expect(available.map((j) => j.code)).toEqual(["ZA"])
+    // ZA sits before LS in JURISDICTION_CODES; the helper preserves that order.
+    expect(available.map((j) => j.code)).toEqual(["ZA", "LS"])
     expect(available[0]).toMatchObject({ code: "ZA", name: "South Africa" })
     expect(available[0].packVersion).toMatch(/^za-v/)
+    expect(available[1]).toMatchObject({ code: "LS", name: "Lesotho" })
+    expect(available[1].packVersion).toMatch(/^ls-v/)
   })
 })

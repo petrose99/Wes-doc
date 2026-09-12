@@ -120,6 +120,14 @@ model Workspace {
   /// pack (or when the pack version changes and the workspace re-confirms). Every
   /// DocumentCheckResult also stamps its packVersion so old checks stay legible after a bump.
   jurisdictionPackVersion String?        @map("jurisdiction_pack_version")
+  /// #84: tri-state workspace enrolment in the deferred-import-VAT scheme (LS defers import
+  /// VAT on qualifying imports to the return rather than paying at the border; other packs
+  /// may add their own semantics later). `null` = not stated (the LS return-form workpaper
+  /// #85 silent-passes imports on this workspace); `true` = enrolled; `false` = explicitly
+  /// not enrolled. Per-bill override lives on `reviewedData.deferredOverride` per the
+  /// projection contract in `lib/jurisdictions/_shared/project-bill.ts` (#82). Only
+  /// meaningful when the projected bill is `isImport = true`; ignored otherwise.
+  deferredVatScheme  Boolean?            @map("deferred_vat_scheme")
   createdAt       DateTime               @default(now()) @map("created_at")
   updatedAt       DateTime               @updatedAt @map("updated_at")
   members         WorkspaceMember[]
@@ -173,6 +181,7 @@ model Workspace {
   ledgerTransactions LedgerTransaction[]
   sheetPlacements DocumentSheetPlacement[]
   categoryAccountMappings CategoryAccountMapping[]
+  categoryNatures    CategoryNature[]
   agentVerdicts AgentVerdict[]
   automationConfig WorkspaceAutomationConfig?
   reviewRoutingRules ReviewRoutingRule[]
@@ -1904,6 +1913,29 @@ model CategoryAccountMapping {
   @@unique([connectionId, category, kind])
   @@index([workspaceId])
   @@map("category_account_mappings")
+}
+
+/// #83: workspace-scoped goods-vs-services classification for the free-form category strings on
+/// bills. The LS VAT-12 return-form workpaper (#85) splits inputs by goods × services × deferred,
+/// and this side table is what makes that split possible without turning `category` into a first-
+/// class model. Mirrors the shape of CategoryAccountMapping — string category key + workspace
+/// scope + unique on (workspaceId, category). No back-fill: rows land only as workspaces set
+/// them during LS onboarding; a bill whose category has no row (and no per-bill override) projects
+/// with `WorkpaperBill.isService = null` and silent-passes return-form columns per #82's contract.
+model CategoryNature {
+  id          String   @id @default(uuid()) @db.Uuid
+  workspaceId String   @map("workspace_id") @db.Uuid
+  category    String
+  /// "goods" | "services". Kept as a String rather than an enum to match the codebase's
+  /// convention for small closed sets that grow by data (Workspace.role, TaxProfile.rates, …).
+  nature      String
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, category])
+  @@index([workspaceId])
+  @@map("category_natures")
 }
 
 /// Data Health Phase B: one bill / expense / bank-transaction row pulled from an
