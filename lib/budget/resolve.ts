@@ -1,5 +1,4 @@
 import { prisma } from "@/lib/db"
-import type { Prisma } from "@/prisma/client"
 import { decimalToNumberOrZero } from "@/lib/money"
 import { checkDocumentAgainstBudgets, type Budget, type BudgetCheckResult, type BudgetDocument } from "./engine"
 

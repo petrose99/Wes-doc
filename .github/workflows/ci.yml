@@ -115,9 +115,19 @@ jobs:
         with:
           persist-credentials: false
       - uses: docker/setup-buildx-action@v4
+      # The single root Dockerfile was split into web and worker images
+      # (see docker-compose.prod.yml); CI must keep both buildable.
       - uses: docker/build-push-action@v7.2.0
         with:
           context: .
+          file: Dockerfile.web
           push: false
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
+      - uses: docker/build-push-action@v7.2.0
+        with:
+          context: .
+          file: Dockerfile.worker
+          push: false
+          cache-from: type=gha,scope=worker
+          cache-to: type=gha,mode=max,scope=worker

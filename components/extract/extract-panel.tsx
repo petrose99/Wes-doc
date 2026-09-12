@@ -1,7 +1,6 @@
 "use client"
 
 import { deleteDocumentsAction, matchDocumentShapeAction, reextractAdaptivelyAction, renameFileAction, reprocessDocumentAction, saveExtractionSheetAction, uploadDocumentsAction, uploadZipAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
-import { ColumnChips } from "@/components/extract/column-chips"
 import { downscaleImage } from "@/components/extract/downscale-image"
 import { FileRow } from "@/components/extract/file-row"
 import { filesFromDataTransfer } from "@/components/extract/folder-traverse"
@@ -66,7 +65,7 @@ function UsageMeter({ usage, inline = false }: { usage: WorkspaceUsage; inline?:
 /** Centered two-column modal (Sources | What to extract): the sheet's own worksheets stay
  * reachable behind the backdrop, and freshly extracted rows reconcile into it once this closes —
  * see ExtractOverlay's doc comment for why the polling instance lives one level up from here. */
-export function ExtractPanel({ workspaceId, fileId, fileName, template, templates, onSelectTemplate, usage, sheetCount, onClose, onDocumentsQueued, statuses }: {
+export function ExtractPanel({ workspaceId, fileId, fileName, template, templates: _templates, onSelectTemplate: _onSelectTemplate, usage, sheetCount, onClose, onDocumentsQueued, statuses }: {
   workspaceId: string
   fileId: string
   /** The file's current display name. Drives auto-naming below: only a file still called
@@ -101,7 +100,7 @@ export function ExtractPanel({ workspaceId, fileId, fileName, template, template
   const [staged, setStaged] = useState<StagedFile[]>([])
   // A ZIP/photo upload that failed for want of a field forces the setup section open even with
   // nothing staged — see ensureSheetSaved.
-  const [setupRevealed, setSetupRevealed] = useState(false)
+  const [_setupRevealed, setSetupRevealed] = useState(false)
   const [dragOver, setDragOver] = useState(false)
   const [busy, setBusy] = useState(false)
   const [shapeChecking, setShapeChecking] = useState(false)
@@ -168,7 +167,7 @@ export function ExtractPanel({ workspaceId, fileId, fileName, template, template
   // Revoking from a ref rather than the effect's closure: with an empty dep list the captured
   // `staged` would be the (empty) first-render one, so every later preview URL would leak.
   const stagedRef = useRef(staged)
-  stagedRef.current = staged
+  useEffect(() => { stagedRef.current = staged }, [staged])
   useEffect(() => () => { for (const row of stagedRef.current) if (row.previewUrl?.startsWith("blob:")) URL.revokeObjectURL(row.previewUrl) }, [])
 
   const acceptFile = (file: File) => acceptedTypes.includes(file.type) && file.size > 0
@@ -479,13 +478,11 @@ export function ExtractPanel({ workspaceId, fileId, fileName, template, template
     } finally { setDeleting(false) }
   }
 
-  const inputClass = "w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500"
   // Fields/instructions/page-range only matter once there's a document to extract from — showing
   // them as fully configurable is setup for a file that isn't there yet. But a file reopened to
   // add more documents can already have fields (from its existing template) with nothing staged
   // this session, and a ZIP/photo attempt can force the section open with nothing staged either —
   // both count as "there's a file" too, just not one sitting in the upload list.
-  const hasFile = staged.length > 0 || fields.length > 0 || setupRevealed
   // Email intake is a real channel now (WP13 + Cloudflare Email Routing), not a "coming soon"
   // placeholder — but there's nothing to do about it *inside* this modal, since a mail arrives on
   // its own schedule. So it links to the workspace's own inbound address instead of pretending to

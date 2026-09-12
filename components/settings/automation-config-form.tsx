@@ -370,7 +370,7 @@ export function AutomationConfigForm({ workspaceId, initial }: { workspaceId: st
             ? touchlessConfirm.estimate.totalRecent === 0
               ? "No documents in the last 30 days to estimate from — this workspace's own history will start filling in as new ones arrive."
               : <>
-                Of the last 30 days' <strong className="tabular-nums">{touchlessConfirm.estimate.totalRecent}</strong> documents,{" "}
+                Of the last 30 days&apos; <strong className="tabular-nums">{touchlessConfirm.estimate.totalRecent}</strong> documents,{" "}
                 about <strong className="tabular-nums">{touchlessConfirm.estimate.eligible}</strong> would have cleared this bar on extraction confidence alone.
                 <span className="mt-1 block text-[11px] text-slate-500">An estimate — checks, policy, and supplier cold-start can still hold a document back even past this line.</span>
               </>

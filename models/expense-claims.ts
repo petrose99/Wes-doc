@@ -9,7 +9,6 @@ import { cache } from "react"
 
 export const EXPENSE_CLAIM_STATUSES = ["draft", "submitted", "approved", "rejected"] as const
 export type ExpenseClaimStatus = (typeof EXPENSE_CLAIM_STATUSES)[number]
-const RESOLVED_STATUSES = new Set<ExpenseClaimStatus>(["approved", "rejected"])
 
 function asNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null

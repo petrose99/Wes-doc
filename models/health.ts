@@ -1,7 +1,7 @@
 // Deliberately NOT a "use server" module, matching every other models/*.ts helper: trusts the
 // workspaceId it is handed. Server actions live in
 // app/(app)/workspaces/[workspaceId]/health-actions.ts and do the auth + capability gate.
-import { SUPPLIER_FIELD_BY_TEMPLATE, type AutomationRuleInput } from "@/lib/automation/rules"
+import { type AutomationRuleInput } from "@/lib/automation/rules"
 import type { MatchCandidateDocument } from "@/lib/bank-match/matcher"
 import { DOC_TYPE_SPECS, DOC_TYPES, resolveDocType, type MatchCandidateFieldMap } from "@/lib/doc-types"
 import { buildConfidenceDriftSql } from "@/lib/health/checks/confidence-drift"

@@ -26,7 +26,7 @@ import { prisma } from "@/lib/db"
 import { normalizeSupplierName } from "@/lib/suppliers/normalize"
 import { resolveGate } from "@/lib/gates/actions"
 import type { GateContext, GateRunner, GateVerdict } from "./types"
-import type { Prisma, PrismaClient, Gate, Document } from "@/prisma/client"
+import type { Prisma, PrismaClient, Document } from "@/prisma/client"
 
 type PrismaLike = PrismaClient | Prisma.TransactionClient
 

@@ -1,6 +1,6 @@
 import { apiError, parseLimit, requireApiAuth } from "@/lib/api-v1"
 import { buildApiDocumentListItem } from "@/lib/webhooks"
-import { DOCUMENT_STATUSES, PIPELINE_STAGES, parseStageAlias } from "@/lib/documents/stages"
+import { DOCUMENT_STATUSES, parseStageAlias } from "@/lib/documents/stages"
 import { createIngestionItem } from "@/lib/ingestion"
 import { JurisdictionRequiredError } from "@/lib/jurisdictions/require"
 import { processDocumentJob } from "@/lib/document-processing"

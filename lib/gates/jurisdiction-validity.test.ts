@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 
 vi.mock("next/headers", () => ({
   headers: vi.fn(() => { throw new Error("no request scope") }),
