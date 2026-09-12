@@ -12,6 +12,7 @@ import {
   updateWarnCheckAction,
 } from "@/app/(app)/workspaces/[workspaceId]/automation/warn-checks/actions"
 import { Button } from "@/components/ui/button"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -49,8 +50,19 @@ export function WarnChecksAdmin({
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState<WarnCheckRow | null>(null)
 
   const refresh = () => startTransition(() => router.refresh())
+
+  const confirmDelete = () => {
+    if (!deleting) return
+    startTransition(async () => {
+      const result = await deleteWarnCheckAction({ workspaceId, id: deleting.id })
+      if ("error" in result) toast.error(result.error)
+      else refresh()
+      setDeleting(null)
+    })
+  }
 
   return (
     <div className="space-y-10">
@@ -122,14 +134,7 @@ export function WarnChecksAdmin({
                       variant="outline"
                       size="sm"
                       disabled={pending}
-                      onClick={() => {
-                        if (!confirm(`Delete "${row.name}"? Past firings stay in history.`)) return
-                        startTransition(async () => {
-                          const result = await deleteWarnCheckAction({ workspaceId, id: row.id })
-                          if ("error" in result) toast.error(result.error)
-                          else refresh()
-                        })
-                      }}
+                      onClick={() => setDeleting(row)}
                     >
                       Delete
                     </Button>
@@ -178,6 +183,17 @@ export function WarnChecksAdmin({
           <code className="font-mono">lib/gates/</code>.
         </p>
       </section>
+
+      <ConfirmDialog
+        open={deleting !== null}
+        destructive
+        busy={pending}
+        title={deleting ? `Delete "${deleting.name}"?` : ""}
+        description="Past firings stay in the exception history. This cannot be undone."
+        confirmLabel={pending ? "Deleting…" : "Delete"}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleting(null)}
+      />
     </div>
   )
 }
