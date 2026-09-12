@@ -26,6 +26,7 @@ import {
   unsignCloseItemAction,
 } from "./actions"
 import { CloseAssistant } from "./close-assistant"
+import { LockConfirmButton } from "./lock-confirm-button"
 import { ReasonDialogButton } from "./reason-dialog"
 import { SignForm } from "./sign-form"
 import { VatSheetTabs } from "./vat-sheet-tabs"
@@ -142,6 +143,11 @@ export default async function ClosePage({ params, searchParams }: {
   const selectedMode: WorkspaceMode = selected.state === "locked" && lockSnapshot ? lockSnapshot.workspaceModeAtLock : workspaceMode
   const selectedSignerName = lockSnapshot?.reviewerOfRecord?.name ?? signerName
 
+  const periodLabel = closePeriodLabel(selected.periodYear, selected.periodMonth)
+  const lockItemSummaries = items.map((item) => ({ title: item.title, state: item.state }))
+  const apAgingValue = items.find((item) => item.kind === "ap-aging")?.computedValue as ComputedApAging | null | undefined
+  const lockHardBlockingCount = apAgingValue?.openExceptions.hardBlockingCount ?? 0
+
   return (
     <main className="space-y-6">
       <Header workspaceId={workspaceId} preamble={preamble} workspaceMode={selectedMode} signerName={selectedSignerName} />
@@ -193,18 +199,24 @@ export default async function ClosePage({ params, searchParams }: {
                 </form>
               )}
               {isOpen && !wasReopened && (
-                <form action={lockCloseAction.bind(null, workspaceId, selected.id)}>
-                  <button type="submit" className="rounded-md bg-emerald-700 px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-800">
-                    Lock period
-                  </button>
-                </form>
+                <LockConfirmButton
+                  action={lockCloseAction.bind(null, workspaceId, selected.id)}
+                  triggerLabel="Lock period"
+                  periodLabel={periodLabel}
+                  relock={false}
+                  items={lockItemSummaries}
+                  hardBlockingCount={lockHardBlockingCount}
+                />
               )}
               {isOpen && wasReopened && (
-                <form action={relockCloseAction.bind(null, workspaceId, selected.id)}>
-                  <button type="submit" className="rounded-md bg-emerald-700 px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-800">
-                    Relock period
-                  </button>
-                </form>
+                <LockConfirmButton
+                  action={relockCloseAction.bind(null, workspaceId, selected.id)}
+                  triggerLabel="Relock period"
+                  periodLabel={periodLabel}
+                  relock={true}
+                  items={lockItemSummaries}
+                  hardBlockingCount={lockHardBlockingCount}
+                />
               )}
               {!isOpen && (
                 <ReasonDialogButton
