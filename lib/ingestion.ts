@@ -2,8 +2,10 @@
 // trusts the workspaceId/fileId/templateId it is handed. Callers (upload/zip server actions,
 // future email/API intake) do the auth.
 import { track } from "@/lib/analytics"
+import { JurisdictionRequiredError, requireWorkspaceJurisdiction } from "@/lib/jurisdictions/require"
 import { scanDocumentBuffer } from "@/lib/malware-scan"
 import { prisma } from "@/lib/db"
+import { gateRegistry } from "@/lib/gates"
 import { createDocumentFromBuffer, documentHash, type DocumentSource } from "@/models/documents"
 import type { IngestionItem } from "@/prisma/client"
 
@@ -46,6 +48,11 @@ export async function createIngestionItem(input: {
    * terminal failure can name who sent it in when notifying the workspace. */
   sourceEmail?: string | null
 }): Promise<IngestionResult> {
+  // #49 short-circuit: every intake channel funnels through here, so refusing an inbound bill on a
+  // workspace with no jurisdictionCode is one check, not four. The upload/API/email callers catch
+  // JurisdictionRequiredError and surface the "pick a jurisdiction" state; nothing is written.
+  await requireWorkspaceJurisdiction(input.workspaceId)
+
   const idempotencyKey = documentHash(input.buffer)
   // Scoped to the file, not the whole workspace: Document's own (fileId, sha256) constraint says
   // the same PDF may deliberately be extracted into two sheets with different columns, and a
@@ -90,6 +97,24 @@ export async function createIngestionItem(input: {
     })
     const item = await upsertItem({ documentId: result.document.id, malwareStatus: "clean", status: result.duplicate ? "duplicate" : "extracting", errorCode: null })
     if (!result.duplicate) await track("document_uploaded", { fileId: input.fileId, documentId: result.document.id, source: input.source }, { workspaceId: input.workspaceId })
+    // Touchless-AP gates from #40 fire here — the one place every arrival channel (email-in,
+    // upload, API, ZIP) funnels through. The registry no-ops with zero registered gates (see
+    // lib/gates/registry.ts), so this scaffolding is invisible until #51–#56 register their
+    // runners. Runs on the "duplicate" branch too: an IngestionItem-level duplicate reuses the
+    // existing Document, which may still have open gates worth re-evaluating.
+    try {
+      await gateRegistry.runOnArrival({
+        workspaceId: input.workspaceId,
+        documentId: result.document.id,
+        document: result.document,
+      })
+    } catch (error) {
+      // The registry catches per-runner errors already; this outer catch handles a failure of
+      // the registry itself (DB down, Prisma client mismatch) and keeps the accepted arrival —
+      // a bill that failed its gate evaluation is still a bill, and re-processing later can
+      // re-run the gates.
+      console.error("[ingestion] gate registry failed:", error instanceof Error ? error.message : error)
+    }
     return { outcome: "accepted", item, document: result.document, job: result.job, duplicateInFile: result.duplicate }
   } catch (error) {
     const errorCode = error instanceof Error ? error.message : "ingestion_failed"

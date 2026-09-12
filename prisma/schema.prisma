@@ -40,6 +40,7 @@ model User {
   workspaceMemberships  WorkspaceMember[]
   sentInvitations       WorkspaceInvitation[] @relation("InvitationSender")
   documentAuditEvents   DocumentAuditEvent[]  @relation("AuditActor")
+  auditEventsActed      AuditEvent[]          @relation("AuditEventActor")
   adminAuditEvents      AdminAuditEvent[]     @relation("AdminAuditActor")
   createdFiles          DocumentFile[]        @relation("FileCreator")
   fileShares            DocumentFileShare[]
@@ -70,6 +71,9 @@ model User {
   routingAssignments ReviewRoutingRule[] @relation("RoutingAssignee")
   matchResolutions   DocumentMatch[]     @relation("MatchResolver")
   createdPaymentRuns PaymentRun[]        @relation("PaymentRunCreator")
+  resolvedGates      Gate[]              @relation("GateResolver")
+  createdWarnChecks  WarnCheck[]         @relation("WarnCheckAuthor")
+  verifiedSuppliers  Supplier[]          @relation("SupplierVerifier")
 
   @@map("users")
 }
@@ -106,6 +110,16 @@ model Workspace {
   /// Deliberately never issued for a clinical workspace — see the same file: unencrypted email
   /// is not an acceptable channel for ePHI, so the route refuses one even if a token existed.
   inboundEmailToken  String?             @unique @map("inbound_email_token")
+  /// Workspace jurisdiction pack code (ZA, LS, GB, US-CA at ship time). AP inbound (email-in,
+  /// upload, API) short-circuits with a typed "workspace needs a jurisdiction" error until this
+  /// is set — see lib/jurisdictions/require.ts. One jurisdiction per workspace for now; multi-
+  /// entity graduates to a future decision. Rule packs live in lib/jurisdictions/<code>/ and
+  /// are read live from code (see #39 in the wayfinder map).
+  jurisdictionCode   String?             @map("jurisdiction_code")
+  /// Stamped from lib/jurisdictions/<code>/index.ts's packVersion when the workspace picks a
+  /// pack (or when the pack version changes and the workspace re-confirms). Every
+  /// DocumentCheckResult also stamps its packVersion so old checks stay legible after a bump.
+  jurisdictionPackVersion String?        @map("jurisdiction_pack_version")
   createdAt       DateTime               @default(now()) @map("created_at")
   updatedAt       DateTime               @updatedAt @map("updated_at")
   members         WorkspaceMember[]
@@ -116,6 +130,9 @@ model Workspace {
   files           DocumentFile[]
   jobs            DocumentProcessingJob[]
   auditEvents     DocumentAuditEvent[]
+  workflowAuditEvents AuditEvent[]
+  gates           Gate[]
+  warnChecks      WarnCheck[]
   workbooks       SpreadsheetWorkbook[]
   aiFormulaCache  AiFormulaCache[]
   extractionShapes ExtractionShape[]
@@ -562,6 +579,7 @@ model Document {
   expenseClaimItems ExpenseClaimItem[]
   healthCheckResults HealthCheckResult[]
   sheetPlacements    DocumentSheetPlacement[]
+  gates              Gate[]
 
   @@unique([fileId, sha256])
   @@index([workspaceId, status])
@@ -832,6 +850,143 @@ model AdminAuditEvent {
   @@index([createdAt])
   @@index([actorId, createdAt])
   @@map("admin_audit_events")
+}
+
+/** Workflow audit trail for the touchless-AP gates (#40) and the close checklist (#42): one row
+ * per state transition on a bill's gate result or a close-item computation/sign-off. Separate
+ * from DocumentAuditEvent, which is the HIPAA §164.312(b) log covering document access; this is
+ * the operational trail auditors and workspace admins read to understand why a bill blocked or
+ * how a period closed. subjectType + subjectId is a soft pointer (not a foreign key) because the
+ * subject may be a bill, close item, or in-flight gate instance whose row lives in another
+ * table, and — like AdminAuditEvent — the subject is sometimes gone by the time anyone reads
+ * the trail. Idempotent by (type, subjectId, payloadHash) so #42's "computed logged only on
+ * value change" rule holds without callers needing to remember to diff first. */
+model AuditEvent {
+  id          String    @id @default(uuid()) @db.Uuid
+  workspaceId String    @map("workspace_id") @db.Uuid
+  /// Nullable because gate/close events emitted by the job worker or a scheduled recompute have
+  /// no user behind them; NOT NULL would force every system emitter to invent a fake actor.
+  actorId     String?   @map("actor_id") @db.Uuid
+  /// The union in lib/audit/events.ts: "gate.blocked" | "gate.overridden" | "gate.resolved" |
+  /// "close.opened" | "close.item.computed" | "close.item.signed" | "close.item.unsigned" |
+  /// "close.item.override" | "close.period.locked" | "close.period.reopened" | "close.period.relocked".
+  /// String, not a Prisma enum, matching DocumentAuditEvent.type — new event types are added
+  /// with a code change and don't need a migration.
+  type        String
+  /// "bill" | "close_item" | "close" | "gate" — namespaces subjectId so the same uuid can
+  /// legitimately appear under two subject types without collision.
+  subjectType String    @map("subject_type")
+  subjectId   String    @map("subject_id") @db.Uuid
+  payload     Json?
+  /// sha256 of the canonicalized payload — the idempotency key. UNIQUE(type, subjectId,
+  /// payloadHash) enforces "same event, same subject, same payload = one row"; a change in any
+  /// field of the payload yields a fresh hash and a new row. Filled by writeAuditEvent, never
+  /// by callers.
+  payloadHash String    @map("payload_hash")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  /// Restrict, not Cascade: workflow evidence must survive the workspace being deleted the same
+  /// way the HIPAA trail does; workspace deletion is expected to archive these first.
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  actor       User?     @relation("AuditEventActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@unique([type, subjectId, payloadHash])
+  @@index([workspaceId, createdAt])
+  @@index([subjectType, subjectId, createdAt])
+  @@index([actorId, createdAt])
+  @@map("audit_events")
+}
+
+/// One control-gate finding against one document (a "bill" in the #40 language). Shared
+/// scaffolding: no rule lives here — each of the six gates from #40 (duplicate, jurisdiction
+/// validity, 2/3-way match, supplier trust, confidence-per-band, warn-checks) is its own
+/// runner in lib/gates/, registered into the shared registry, and this row records what it
+/// found. See lib/gates/registry.ts for the run loop and the AuditEvent pair that always
+/// travels alongside a state change.
+///
+/// One row per (documentId, gateType, firing) — a gate that re-fires on a re-processed bill
+/// upserts by (documentId, gateType) rather than piling up rows. `payload` carries whatever
+/// the runner needs to explain itself (the winning bill's id for duplicate, the invoice-check
+/// failures for jurisdiction, the variance amount for match, etc.); the shape is per-gate.
+model Gate {
+  id             String    @id @default(uuid()) @db.Uuid
+  workspaceId    String    @map("workspace_id") @db.Uuid
+  documentId     String    @map("document_id") @db.Uuid
+  /// Kebab-case identifier for the runner that produced this row: "duplicate", "jurisdiction",
+  /// "match", "trust", "confidence", "warn-checks". Registered by lib/gates/registry.ts. String,
+  /// not a Prisma enum, matching AuditEvent.type — new gate types are a code change, not a
+  /// migration.
+  gateType       String    @map("gate_type")
+  /// "hard" or "soft". Hard gates always block and are read-only in Overview; soft gates are
+  /// workspace-tunable and can be dismissed. Set by the runner, not the caller.
+  severity       String
+  /// "blocked" (fresh finding, still in the exception queue), "overridden" (a human resolved
+  /// it by acknowledging rather than fixing), "resolved" (the underlying condition went away —
+  /// the duplicate resolved itself, the match variance came into tolerance, etc.).
+  state          String    @default("blocked")
+  firedAt        DateTime  @default(now()) @map("fired_at")
+  resolvedAt     DateTime? @map("resolved_at")
+  /// Who overrode/resolved it, when a person did — null for auto-resolve paths (the winning
+  /// duplicate deleted, variance recomputed within tolerance). SetNull so a former member's
+  /// past overrides stay attributed to "someone we no longer have on file" rather than
+  /// disappearing.
+  resolvedBy     String?   @map("resolved_by") @db.Uuid
+  overrideReason String?   @map("override_reason")
+  payload        Json?
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  document    Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  resolver    User?     @relation("GateResolver", fields: [resolvedBy], references: [id], onDelete: SetNull)
+
+  /// A gate re-firing on the same document should replace, not stack — the run loop upserts by
+  /// this key. Deliberately not workspace-scoped: documentId is already workspace-unique.
+  @@unique([documentId, gateType])
+  /// Exception-queue read: "every open gate in this workspace" for the Overview panel.
+  @@index([workspaceId, state])
+  @@map("gates")
+}
+
+/// Workspace-authored soft gate rules ("warn checks"): the extensibility point on top of the
+/// five built-in touchless-AP gates from decision #40. Each row is one rule the workspace
+/// declared — a predicate over a fixed field set, and a message to show when it fires. When
+/// enabled, the warn-checks runner (lib/gates/warn-checks.ts) evaluates every enabled rule on
+/// document arrival and upserts a Gate row per match; the Gate carries the WarnCheck.id and
+/// message in its payload so the exception queue can render the workspace's own wording.
+///
+/// Rules are workspace-only in v1 — no cross-workspace templates and no firm-level rules that
+/// span client workspaces (see #56 out-of-scope + fog #45). Predicates use a narrow expression
+/// language (lib/gates/warn-checks-evaluator.ts), NOT arbitrary JS; that keeps this from
+/// becoming a code-injection surface and lets us reject unknown fields at save time.
+model WarnCheck {
+  id           String    @id @default(uuid()) @db.Uuid
+  workspaceId  String    @map("workspace_id") @db.Uuid
+  /// Short human name shown in the admin list and in the exception queue as the header of the
+  /// finding. Not unique — a workspace may have two rules with the same name that scope to
+  /// different conditions.
+  name         String
+  /// The predicate source, in the warn-checks DSL. Parsed on save (unknown fields rejected)
+  /// and re-parsed at evaluation time (parser is pure). Stored verbatim so the admin edit UI
+  /// can round-trip what the author typed.
+  whenExpr    String    @map("when_expr")
+  /// The message shown to the reviewer when the rule matches. Stored verbatim, rendered as
+  /// text (no HTML) in the exception queue.
+  message     String
+  /// A disabled rule is preserved for history — Gate rows already emitted keep the WarnCheck.id
+  /// in their payload and the admin UI can still show the rule name. Disabling stops future
+  /// firings without deleting the row.
+  enabled     Boolean   @default(true)
+  createdById String    @map("created_by_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy User      @relation("WarnCheckAuthor", fields: [createdById], references: [id], onDelete: Restrict)
+
+  /// Admin list read: "every enabled rule for this workspace" for the runner and the settings
+  /// panel; the sort by createdAt happens in the query.
+  @@index([workspaceId, enabled])
+  @@map("warn_checks")
 }
 
 /** The spreadsheet behind one file: a Univer `IWorkbookData` snapshot holding every tab, its
@@ -1950,6 +2105,29 @@ model WorkspaceAutomationConfig {
   /// fields' low confidence block touchless for that template. Empty object = every field
   /// gates (historic behaviour), so opting in is a deliberate one-workspace change.
   criticalFieldsByTemplate Json @default("{}") @map("critical_fields_by_template")
+  /// #55: confidence-per-band gate 5/6 from #40. Shape: `[{ upTo: number|null, min: number }]`
+  /// sorted by `upTo` ascending, last row has `upTo: null` (the open-ended top band). A bill
+  /// whose extraction confidence falls below its band's `min` fires the soft gate. #40 fixed
+  /// the seed at 0.85 / 0.92 / 1.00 across 0–500 / 500–5k / 5k+. Kept separate from
+  /// `amountBands` above because they answer different questions: `amountBands` relaxes the
+  /// autopublish floor, this holds bills that miss the floor in the exception queue.
+  confidenceBands   Json      @default("[{\"upTo\":500,\"min\":0.85},{\"upTo\":5000,\"min\":0.92},{\"upTo\":null,\"min\":1.0}]") @map("confidence_bands")
+
+  /// #54: supplier-trust gate 4/6 from #40. Shape: `{ amount: number, currency?: string }`. A
+  /// bill from an unverified supplier whose total exceeds this threshold fires the soft gate.
+  /// `currency` is optional; unset means "resolve against workspace.baseCurrency at gate-eval
+  /// time" so a base-currency change picks up without a data backfill. #40 fixed the seed at
+  /// local-500.
+  supplierTrustThreshold Json @default("{\"amount\":500}") @map("supplier_trust_threshold")
+
+  /// #53: 2/3-way match variance tolerance (soft gate 3/6 from #40). Shape:
+  /// `{ percent: number, floor: { amount: number, currency?: string } }`. `percent` is a
+  /// fraction (0.02 = 2%). `floor.amount` is the local-currency minimum tolerance so a tiny
+  /// bill's 2% doesn't collapse to pennies; `floor.currency` is omitted by default and read
+  /// off `workspace.baseCurrency` at gate-evaluation time so a workspace that changes its
+  /// base currency picks the new one up. #40 fixed the seed at 2% / 500. Never zero at
+  /// default — a workspace that wants strict matching sets an explicit tolerance object.
+  matchTolerance    Json      @default("{\"percent\":0.02,\"floor\":{\"amount\":500}}") @map("match_tolerance")
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
   workspace         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -2106,6 +2284,15 @@ model Supplier {
   /// = no default (aging falls back to the extracted date or blank). Common values: 0 (due on
   /// receipt), 7, 14, 30, 60.
   paymentTermsDays Int?   @map("payment_terms_days")
+  /// #54: supplier-trust gate 4/6 from #40. `verifiedAt` is set the first time a workspace admin
+  /// confirms this supplier (the exception chip's inline-verify affordance, or a bulk-verify from
+  /// the settings surface). Once set, the trust gate stops firing on this supplier's bills;
+  /// clearing it (never done automatically today) puts them back into the exception queue for the
+  /// threshold. `verifiedById` records the admin who did it. Both null on newcomers, which is
+  /// what makes the gate fire in the first place.
+  verifiedAt    DateTime? @map("verified_at")
+  verifiedById  String?   @map("verified_by_id") @db.Uuid
+  verifiedBy    User?     @relation("SupplierVerifier", fields: [verifiedById], references: [id], onDelete: SetNull)
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
   workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)

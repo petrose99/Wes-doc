@@ -2,6 +2,7 @@ import { apiError, parseLimit, requireApiAuth } from "@/lib/api-v1"
 import { buildApiDocumentListItem } from "@/lib/webhooks"
 import { DOCUMENT_STATUSES, PIPELINE_STAGES, parseStageAlias } from "@/lib/documents/stages"
 import { createIngestionItem } from "@/lib/ingestion"
+import { JurisdictionRequiredError } from "@/lib/jurisdictions/require"
 import { processDocumentJob } from "@/lib/document-processing"
 import { getFileTemplates, getWorkspaceFile } from "@/models/files"
 import { listDocumentsForApi } from "@/models/integrations"
@@ -85,15 +86,23 @@ export async function POST(req: Request) {
   if (!template) return apiError(400, templateCodeRaw ? "unknown_template" : "no_template_available")
 
   const buffer = Buffer.from(await file.arrayBuffer())
-  const outcome = await createIngestionItem({
-    workspaceId: auth.workspaceId,
-    fileId,
-    templateId: template.id,
-    source: "api",
-    filename: file.name || "upload",
-    mimeType: file.type || "application/octet-stream",
-    buffer,
-  })
+  let outcome
+  try {
+    outcome = await createIngestionItem({
+      workspaceId: auth.workspaceId,
+      fileId,
+      templateId: template.id,
+      source: "api",
+      filename: file.name || "upload",
+      mimeType: file.type || "application/octet-stream",
+      buffer,
+    })
+  } catch (error) {
+    // #49: refuse programmatic ingestion until the workspace picks a jurisdiction. Same code path
+    // as the email-in route and the upload actions — see lib/jurisdictions/require.ts.
+    if (error instanceof JurisdictionRequiredError) return apiError(409, "jurisdiction_required")
+    throw error
+  }
 
   if (outcome.outcome === "rejected") return apiError(422, outcome.errorCode)
   if (outcome.outcome === "duplicate") {
