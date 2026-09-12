@@ -82,6 +82,7 @@ export default async function WorkspaceHomePage({ params }: {
     },
   ].filter((item): item is { key: string; message: string; href: string; icon: typeof SearchCheck } => !!item)
   const [nextAction, ...secondaryQueueItems] = queueItems
+  const hasPriorityAction = Boolean(nextAction)
 
   const showFinancials = capabilities.has("finance-analytics")
   const today = new Date()
@@ -131,7 +132,7 @@ export default async function WorkspaceHomePage({ params }: {
           usage={usage}
           sheetCount={pipelineTemplates.length}
           documentSearchEnabled={documentSearchEnabled}
-          primary
+          primary={!hasPriorityAction}
           redirectTo={`/workspaces/${workspaceId}/pipeline`} />
       </div>
     </header>
@@ -165,9 +166,14 @@ export default async function WorkspaceHomePage({ params }: {
           <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-slate-400">Next best action</p>
           <p className="text-[15.5px] font-bold text-slate-900">All caught up — nothing needs your attention right now.</p>
         </div>
-        <Link href={`/workspaces/${workspaceId}/worksheets`} className="shrink-0 rounded-[11px] border border-[#e6ebf1] px-4 py-2.5 text-[13.5px] font-semibold text-slate-700 hover:bg-slate-50">
-          Browse recent work
-        </Link>
+        <div className="flex shrink-0 flex-wrap gap-2">
+          <Link href={`/workspaces/${workspaceId}/pipeline`} className="rounded-[11px] bg-slate-900 px-4 py-2.5 text-[13.5px] font-semibold text-white hover:bg-slate-800">
+            Upload documents
+          </Link>
+          <Link href={`/workspaces/${workspaceId}/worksheets`} className="rounded-[11px] border border-[#e6ebf1] px-4 py-2.5 text-[13.5px] font-semibold text-slate-700 hover:bg-slate-50">
+            Browse recent work
+          </Link>
+        </div>
       </div>}
     </div>
 
