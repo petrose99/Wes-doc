@@ -4,7 +4,7 @@
 import { track } from "@/lib/analytics"
 import { scanDocumentBuffer } from "@/lib/malware-scan"
 import { prisma } from "@/lib/db"
-import { gateRegistry } from "@/lib/gates/registry"
+import { gateRegistry } from "@/lib/gates"
 import { createDocumentFromBuffer, documentHash, type DocumentSource } from "@/models/documents"
 import type { IngestionItem } from "@/prisma/client"
 
