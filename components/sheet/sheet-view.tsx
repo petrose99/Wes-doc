@@ -43,7 +43,7 @@ const DocumentsIcon = () => <Files className="h-4 w-4" />
  * grid's own ribbon, formula bar, sheet tabs and zoom fill everything below. Uploading and
  * extraction happen on the Home/Files hub and the file's own hub page, not here — this surface
  * is for viewing and editing rows that already landed. */
-export function SheetView({ workspaceId, fileId, fileName, linkAccess, snapshot, rev, queuedIds, hasRows, readOnly = false, documentSearchEnabled = false, initialSource }: {
+export function SheetView({ workspaceId, fileId, fileName, linkAccess, snapshot, rev, queuedIds, hasRows, readOnly = false, documentSearchEnabled = false, initialSource, backHref }: {
   workspaceId: string
   fileId: string
   fileName: string
@@ -59,6 +59,10 @@ export function SheetView({ workspaceId, fileId, fileName, linkAccess, snapshot,
   /** An open-at-page deep link (from the Files content search): open this document over the grid
    * once, at the given page/highlight. Already validated server-side; absent for a normal open. */
   initialSource?: { documentId: string; page: number | null; bbox: [number, number, number, number] | null }
+  /** The worksheets list's own URL, filters included, when the reader arrived from a filtered
+   * list — restores that origin context instead of always dropping back to the unfiltered list
+   * (Wayfinder decision #113). Falls back to the plain worksheets list when absent. */
+  backHref?: string
 }) {
   const [saveState, setSaveState] = useState<SaveState>("idle")
   const [formulaBuilderOpen, setFormulaBuilderOpen] = useState(false)
@@ -316,7 +320,7 @@ export function SheetView({ workspaceId, fileId, fileName, linkAccess, snapshot,
         fileId={fileId}
         name={fileName || "Untitled"}
         linkAccess={linkAccess}
-        backHref={`/workspaces/${workspaceId}/worksheets`}
+        backHref={backHref ?? `/workspaces/${workspaceId}/worksheets`}
         backLabel="Worksheets"
         hasUnsavedChanges={saveState === "saving" || saveState === "error"}
         status={label ? <span className={`text-xs ${saveState === "error" && !readOnly ? "text-destructive" : "text-slate-400"}`}>{label}</span> : null}
