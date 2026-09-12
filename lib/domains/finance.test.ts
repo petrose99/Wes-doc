@@ -7,6 +7,22 @@ describe("FINANCE_TEMPLATES (seeded core)", () => {
     expect(FINANCE_TEMPLATES.map((template) => template.code)).toEqual(["invoice", "receipt", "expense_receipt", "generic"])
   })
 
+  // Regression: lib/gates/jurisdiction-validity.ts's extractInvoiceLike reads these exact keys
+  // (has_tax_invoice_wording, supplier/merchant address, recipient identity) to run the ZA/LS
+  // s20/s24.8 tax-invoice-validity rules. Without them in the extraction schema, every field
+  // reads undefined and the hard gate blocks every invoice and receipt regardless of content —
+  // caught by hand-verifying the sample invoice corpus, not by any prior test.
+  it("invoice and receipt carry the fields the jurisdiction-validity gate needs", () => {
+    const invoiceKeys = parseTemplateFields(FINANCE_TEMPLATES.find((t) => t.code === "invoice")!.fields).map((f) => f.key)
+    expect(invoiceKeys).toEqual(expect.arrayContaining([
+      "has_tax_invoice_wording", "supplier_address", "recipient_name", "recipient_address", "recipient_vat_number",
+    ]))
+    const receiptKeys = parseTemplateFields(FINANCE_TEMPLATES.find((t) => t.code === "receipt")!.fields).map((f) => f.key)
+    expect(receiptKeys).toEqual(expect.arrayContaining([
+      "has_tax_invoice_wording", "merchant_address", "recipient_name", "recipient_address", "recipient_vat_number", "subtotal",
+    ]))
+  })
+
   it("expense_receipt carries the fields a fast-categorization worksheet needs, none hardcoding a category or tax-code vocabulary", () => {
     const template = FINANCE_TEMPLATES.find((t) => t.code === "expense_receipt")!
     const fields = parseTemplateFields(template.fields)
