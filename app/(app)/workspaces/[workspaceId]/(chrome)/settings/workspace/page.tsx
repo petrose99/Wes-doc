@@ -6,7 +6,7 @@ import { MembersTable } from "@/components/workspace/members-table"
 import { TeamWorkspaceForm } from "@/components/workspace/team-workspace-form"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { getCurrentUser } from "@/lib/auth"
-import { getWorkspaceMembers, listWorkspaceInvitations, requireWorkspaceRole } from "@/models/workspaces"
+import { getWorkspaceMembers, getWorkspaceMode, listWorkspaceInvitations, requireWorkspaceRole } from "@/models/workspaces"
 
 export default async function WorkspaceSettingsPage({ params }: { params: Promise<{ workspaceId: string }> }) {
   const { workspaceId } = await params
@@ -15,6 +15,10 @@ export default async function WorkspaceSettingsPage({ params }: { params: Promis
   const members = await getWorkspaceMembers(workspaceId)
   const owner = membership.role === "owner"
   const invitations = owner ? await listWorkspaceInvitations(workspaceId) : []
+  // Derived, not stored (decision #41): firm when at least one member holds reviewer role, else
+  // smb. The card here is descriptive — the ceiling gate itself lives on the automation surface
+  // once #76 ships.
+  const mode = await getWorkspaceMode(workspaceId)
 
   return <main className="space-y-6">
     <header>
@@ -34,8 +38,11 @@ export default async function WorkspaceSettingsPage({ params }: { params: Promis
 
     <Card>
       <CardHeader>
-        <CardTitle>Members</CardTitle>
-        <CardDescription>Owners manage access. Members can upload, review, search, and export documents. {members.length} {members.length === 1 ? "member" : "members"}.</CardDescription>
+        <CardTitle className="flex items-center gap-2">
+          Members
+          <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium uppercase tracking-wide ${mode === "firm" ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" : "bg-muted text-muted-foreground"}`} title={mode === "firm" ? "At least one member holds the reviewer role" : "No members hold the reviewer role"}>{mode} mode</span>
+        </CardTitle>
+        <CardDescription>Owners manage access. Reviewers sign off on close and hold the workspace in firm mode. Members can upload, review, search, and export documents. {members.length} {members.length === 1 ? "member" : "members"}.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <MembersTable

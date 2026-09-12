@@ -1556,12 +1556,14 @@ model HealthScoreConfig {
 
 /// Dext-parity Phase 3 WP3.1: a named, ordered sequence of approval stages a workspace can attach
 /// to a ReviewTask (via ReviewTask.workflowId) instead of the plain single-decision default. Stage
-/// gating is a role check, not a per-stage approver list — there is no "reviewer" role distinct
-/// from plain membership in this app (models/workspaces.ts's WorkspaceRole is just "owner" |
-/// "member"), so a stage that needs to be sensitive marks itself ApprovalWorkflowStage.requireOwner
-/// rather than naming specific approvers. `active: false` retires a workflow without deleting it —
-/// existing ReviewTask rows still pointing at it keep working (workflowId is a plain FK, not
-/// filtered by active), it just stops being offered for new tasks.
+/// gating is a role check, not a per-stage approver list; the reviewer role now exists on
+/// WorkspaceMember (see models/workspaces.ts's WorkspaceRole, "owner" | "reviewer" | "member") but
+/// approval workflows keep the simpler "any signed-in member, or an owner if sensitive" model —
+/// so a stage that needs to be sensitive marks itself ApprovalWorkflowStage.requireOwner rather
+/// than naming specific approvers or requiring the reviewer capability, which is used only by
+/// the SMB-vs-firm workspace-mode derivation (decision #41). `active: false` retires a workflow
+/// without deleting it — existing ReviewTask rows still pointing at it keep working (workflowId
+/// is a plain FK, not filtered by active), it just stops being offered for new tasks.
 model ApprovalWorkflow {
   id          String    @id @default(uuid()) @db.Uuid
   workspaceId String    @map("workspace_id") @db.Uuid

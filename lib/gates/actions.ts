@@ -28,7 +28,7 @@ export class GateNotFoundError extends Error {
  * helper is deliberately unopinionated on severity so #40's read-only-hard-gate rule is enforced
  * once, at the surface the user hits, not scattered across every call site. */
 export async function overrideGate(
-  input: { gateId: string; actorId: string; reason: string },
+  input: { gateId: string; actorId: string; reason: string; actorRoleOverride?: string },
   client: PrismaLike = prisma,
 ): Promise<Gate> {
   const existing = await client.gate.findUnique({ where: { id: input.gateId } })
@@ -53,6 +53,12 @@ export async function overrideGate(
         gateType: gate.gateType,
         documentId: gate.documentId,
         reason: input.reason,
+        // Gate-type-specific stamp on the audit payload. #76 (smb-ceiling) passes
+        // "signer_of_record" here so the trail is unambiguous about who cleared the
+        // ceiling — an SMB workspace has exactly one such actor at the time. Other gate
+        // overrides omit it; the field is only present when a caller chose to name the
+        // role, so the audit shape stays additive.
+        ...(input.actorRoleOverride ? { actorRole: input.actorRoleOverride } : {}),
       },
     },
     client,
