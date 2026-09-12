@@ -1,4 +1,5 @@
 import config from "@/lib/config"
+import { JurisdictionRequiredError, requireWorkspaceJurisdiction } from "@/lib/jurisdictions/require"
 import { processInboundEmail, resolveWorkspaceByInboundToken } from "@/models/inbound-email"
 
 /** Inbound email intake (WP13) — shipped dark: built and tested against recorded provider
@@ -50,6 +51,15 @@ export async function POST(request: Request): Promise<Response> {
   // on why a clinical workspace never even has a token to send to. This check exists anyway in
   // case a workspace's mode changed after a token was issued.
   if (workspace.industry === "healthcare") return Response.json({ error: "disabled_for_clinical" }, { status: 403 })
+
+  // #49: refuse AP inbound until the workspace has picked a jurisdiction. Same code path as the
+  // upload action and the v1 API — see lib/jurisdictions/require.ts.
+  try {
+    await requireWorkspaceJurisdiction(workspace.id)
+  } catch (error) {
+    if (error instanceof JurisdictionRequiredError) return Response.json({ error: "jurisdiction_required" }, { status: 409 })
+    throw error
+  }
 
   try {
     const result = await processInboundEmail({

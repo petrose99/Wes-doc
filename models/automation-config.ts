@@ -39,6 +39,25 @@ const confidenceBandSchema = z.object({
   min: z.number().min(0).max(1),
 })
 
+/** #54 supplier-trust threshold. `currency` is optional — the gate resolves it against
+ * `workspace.baseCurrency` at evaluation time when the setting doesn't pin one, so a
+ * workspace that later changes its base currency doesn't need a manual re-save. */
+const supplierTrustThresholdSchema = z.object({
+  amount: z.number().nonnegative(),
+  currency: z.string().length(3).optional(),
+})
+
+/** #53 match-variance tolerance. `floor.currency` is optional — the gate resolves it against
+ * `workspace.baseCurrency` at evaluation time when the setting doesn't pin one, so a
+ * workspace that later changes its base currency doesn't need a manual re-save. */
+const matchToleranceSchema = z.object({
+  percent: z.number().min(0).max(1),
+  floor: z.object({
+    amount: z.number().nonnegative(),
+    currency: z.string().length(3).optional(),
+  }),
+})
+
 const updateSchema = z.object({
   autonomyLevel: z.enum(["suggest", "auto", "touchless"]).optional(),
   minConfidence: z.number().min(0).max(1).optional(),
@@ -48,6 +67,8 @@ const updateSchema = z.object({
   blockOnWarnChecks: z.boolean().optional(),
   policyText: z.string().max(4000).nullable().optional(),
   confidenceBands: z.array(confidenceBandSchema).max(10).optional(),
+  supplierTrustThreshold: supplierTrustThresholdSchema.optional(),
+  matchTolerance: matchToleranceSchema.optional(),
 })
 
 export type AutomationConfigUpdate = z.infer<typeof updateSchema>
@@ -95,6 +116,9 @@ export async function updateAutomationConfig(input: {
   if (patch.policyText !== undefined) data.policyText = patch.policyText
   if (patch.confidenceBands !== undefined)
     data.confidenceBands = patch.confidenceBands as unknown as Prisma.InputJsonValue
+  if (patch.supplierTrustThreshold !== undefined)
+    data.supplierTrustThreshold = patch.supplierTrustThreshold as unknown as Prisma.InputJsonValue
+  if (patch.matchTolerance !== undefined) data.matchTolerance = patch.matchTolerance as unknown as Prisma.InputJsonValue
 
   const context = await getRequestAuditContext()
   const [updated] = await prisma.$transaction([
@@ -109,14 +133,21 @@ export async function updateAutomationConfig(input: {
     }),
   ])
 
-  // #55 DoD: editing the bands retroactively re-evaluates open confidence-band exceptions.
-  // Runs after the update commits so a downstream error can never leave the workspace with
-  // fresh bands + stale exceptions. Import lazily so this module doesn't drag the gate
-  // runners into every automation-config caller (same lazy-import policy as #53 / #54).
+  // #53/#54/#55 DoD: a settings change retroactively re-evaluates the matching open
+  // exceptions. Runs after the update commits so a downstream error can never leave the
+  // workspace with a fresh setting + stale exceptions. Import lazily so this file, imported
+  // from a "use server" module chain, doesn't drag the gate runners into every caller.
   if (patch.confidenceBands !== undefined) {
     const { reevaluateOpenConfidenceBandGates } = await import("@/lib/gates/confidence-band")
     await reevaluateOpenConfidenceBandGates(input.workspaceId)
   }
-
+  if (patch.supplierTrustThreshold !== undefined) {
+    const { reevaluateOpenSupplierTrustGates } = await import("@/lib/gates/supplier-trust")
+    await reevaluateOpenSupplierTrustGates(input.workspaceId)
+  }
+  if (patch.matchTolerance !== undefined) {
+    const { reevaluateOpenMatchVarianceGates } = await import("@/lib/gates/match-variance")
+    await reevaluateOpenMatchVarianceGates(input.workspaceId)
+  }
   return updated
 }
