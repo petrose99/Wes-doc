@@ -12,6 +12,7 @@ import { zaFilings } from "./filings"
 import { zaRetention } from "./retention"
 import { zaThresholds } from "./thresholds"
 import { zaBorder } from "./border"
+import { zaWorkpapers } from "./workpapers"
 
 export const zaPack: JurisdictionPack = {
   code: "ZA",
@@ -25,8 +26,9 @@ export const zaPack: JurisdictionPack = {
     voluntaryRegistration: zaThresholds.voluntaryRegistration,
   },
   border: zaBorder,
+  workpapers: zaWorkpapers,
 }
 
 export default zaPack
 
-export { zaInvoiceValidity, zaInputTax, zaFilings, zaRetention, zaThresholds, zaBorder }
+export { zaInvoiceValidity, zaInputTax, zaFilings, zaRetention, zaThresholds, zaBorder, zaWorkpapers }
