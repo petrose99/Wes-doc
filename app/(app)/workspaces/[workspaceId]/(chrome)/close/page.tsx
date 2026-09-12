@@ -6,7 +6,7 @@ import { prisma } from "@/lib/db"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { getWorkspaceMode, requireWorkspaceRole, type WorkspaceMode } from "@/models/workspaces"
 import { buildClosePreamble, closePeriodLabel, type PreambleItem } from "@/lib/close/preamble"
-import type { CloseItemKind } from "@/lib/close/types"
+import { readCloseLockSnapshot, type CloseItemKind } from "@/lib/close/types"
 import type {
   ComputedApAging,
   ComputedBankRecon,
@@ -48,6 +48,7 @@ type CloseRow = {
   reopenReason: string | null
   lastReopenedAt: Date | null
   lockedAt: Date | null
+  lockSnapshot: unknown
 }
 
 type ItemRow = {
@@ -77,7 +78,7 @@ export default async function ClosePage({ params, searchParams }: {
   const closes: CloseRow[] = await prisma.close.findMany({
     where: { workspaceId },
     orderBy: [{ periodYear: "desc" }, { periodMonth: "desc" }],
-    select: { id: true, periodYear: true, periodMonth: true, state: true, vatPeriodEnd: true, reopenReason: true, lastReopenedAt: true, lockedAt: true },
+    select: { id: true, periodYear: true, periodMonth: true, state: true, vatPeriodEnd: true, reopenReason: true, lastReopenedAt: true, lockedAt: true, lockSnapshot: true },
   })
 
   const nextPeriod = nextOpenablePeriod(closes)
@@ -130,11 +131,20 @@ export default async function ClosePage({ params, searchParams }: {
     computedValue: (item.computedValue as ComputedValue | null) ?? null,
   }))
   const preamble = buildClosePreamble(selected, preambleItems)
-  const workspaceMode = await getWorkspaceMode(workspaceId)
+
+  /* #79: a locked period renders the identity it had at lock, not the live one — a workspace
+   * that gains or loses its reviewer afterwards must not rewrite what a locked period says
+   * about itself. Open periods (and locked rows predating #79's back-fill, where the reader
+   * returns null) fall back to the live mode read at the top of the page. The SMB banner's
+   * signer name is not in the snapshot: SMB locks carry `reviewerOfRecord: null` by design,
+   * and per-item signer identity lives in the close.item.attested / .signed audit trail. */
+  const lockSnapshot = readCloseLockSnapshot(selected.lockSnapshot)
+  const selectedMode: WorkspaceMode = selected.state === "locked" && lockSnapshot ? lockSnapshot.workspaceModeAtLock : workspaceMode
+  const selectedSignerName = lockSnapshot?.reviewerOfRecord?.name ?? signerName
 
   return (
     <main className="space-y-6">
-      <Header workspaceId={workspaceId} preamble={preamble} workspaceMode={workspaceMode} signerName={signerName} />
+      <Header workspaceId={workspaceId} preamble={preamble} workspaceMode={selectedMode} signerName={selectedSignerName} />
 
       {/* Period picker: every close, newest first, plus the open-next button. */}
       <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -234,7 +244,7 @@ export default async function ClosePage({ params, searchParams }: {
       {/* One card per checklist item, in descriptor order. */}
       <div className="space-y-4">
         {items.map((item) => (
-          <ItemCard key={item.id} workspaceId={workspaceId} item={item} closeOpen={isOpen} mode={workspaceMode} />
+          <ItemCard key={item.id} workspaceId={workspaceId} item={item} closeOpen={isOpen} mode={selectedMode} />
         ))}
       </div>
     </main>

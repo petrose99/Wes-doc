@@ -64,7 +64,8 @@ describe("AuditEventType", () => {
     expect(new Set(Object.values(AuditEventType))).toEqual(new Set([
       "gate.blocked", "gate.overridden", "gate.resolved",
       "close.opened", "close.item.computed", "close.item.signed", "close.item.unsigned",
-      "close.item.override", "close.period.locked", "close.period.reopened", "close.period.relocked",
+      "close.item.override", "close.item.attested", "close.period.locked", "close.period.reopened",
+      "close.period.relocked",
     ]))
   })
 })
