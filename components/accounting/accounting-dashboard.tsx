@@ -65,30 +65,36 @@ function ConnectionCard({ workspaceId, isOwner, connection, job, lastSyncedAt, e
   const [pending, startTransition] = useTransition()
   const [accounts, setAccounts] = useState<{ id: string; name: string }[] | null>(null)
   const [loadingAccounts, setLoadingAccounts] = useState(false)
+  const [feedback, setFeedback] = useState<{ tone: "status" | "alert"; message: string } | null>(null)
 
-  const repair = () => startTransition(async () => {
+  const repair = () => {
+    setFeedback({ tone: "status", message: "Starting connection provisioning…" })
+    startTransition(async () => {
     const res = await repairBigcapitalConnectionAction(workspaceId)
-    if (res.success) { toast.success("Provisioning started"); onChanged() }
-    else toast.error(res.error || "Could not start provisioning")
-  })
+      if (res.success) { setFeedback({ tone: "status", message: "Connection provisioning started" }); toast.success("Provisioning started"); onChanged() }
+      else { const message = res.error || "Could not start provisioning"; setFeedback({ tone: "alert", message }); toast.error(message) }
+    })
+  }
 
   const sync = () => {
     if (!connection) return
+    setFeedback({ tone: "status", message: "Syncing Finance accounts and vendors…" })
     startTransition(async () => {
       const res = await syncAccountingEntitiesAction(workspaceId, connection.id)
-      if (res.success) { toast.success("Synced"); onChanged() }
-      else toast.error(res.error || "Could not sync accounts")
+      if (res.success) { setFeedback({ tone: "status", message: "Finance accounts and vendors synced" }); toast.success("Synced"); onChanged() }
+      else { const message = res.error || "Could not sync accounts"; setFeedback({ tone: "alert", message }); toast.error(message) }
     })
   }
 
   const loadAccounts = () => {
     if (!connection) return
     setLoadingAccounts(true)
+    setFeedback({ tone: "status", message: "Loading Finance expense accounts…" })
     startTransition(async () => {
       const res = await listExpenseAccountsAction(workspaceId, connection.id)
       setLoadingAccounts(false)
-      if (res.success) setAccounts(res.data ?? [])
-      else toast.error(res.error || "Could not load expense accounts")
+      if (res.success) { setAccounts(res.data ?? []); setFeedback({ tone: "status", message: "Finance expense accounts loaded" }) }
+      else { const message = res.error || "Could not load expense accounts"; setFeedback({ tone: "alert", message }); toast.error(message) }
     })
   }
 
@@ -96,10 +102,11 @@ function ConnectionCard({ workspaceId, isOwner, connection, job, lastSyncedAt, e
     if (!connection) return
     const account = accounts?.find((a) => a.id === accountId)
     if (!account) return
+    setFeedback({ tone: "status", message: `Saving ${account.name} as the default expense account…` })
     startTransition(async () => {
       const res = await setDefaultExpenseAccountAction(workspaceId, connection.id, account.id, account.name)
-      if (res.success) onChanged()
-      else toast.error(res.error || "Could not set the default account")
+      if (res.success) { setFeedback({ tone: "status", message: `${account.name} is now the default expense account` }); onChanged() }
+      else { const message = res.error || "Could not set the default account"; setFeedback({ tone: "alert", message }); toast.error(message) }
     })
   }
 
@@ -114,7 +121,7 @@ function ConnectionCard({ workspaceId, isOwner, connection, job, lastSyncedAt, e
       : <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
 
   return (
-    <Card className="overflow-hidden">
+    <Card className="overflow-hidden" aria-busy={pending}>
       <div className={`h-1 ${isActive ? "bg-emerald-500" : needsRepair ? "bg-red-400" : "bg-slate-200"}`} />
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
@@ -124,6 +131,11 @@ function ConnectionCard({ workspaceId, isOwner, connection, job, lastSyncedAt, e
         <CardDescription>Every workspace gets its own isolated accounting organization, created automatically — nothing to connect by hand.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {feedback && (
+          <p role={feedback.tone} aria-live={feedback.tone === "alert" ? "assertive" : "polite"} className={`rounded-md border px-3 py-2 text-sm ${feedback.tone === "alert" ? "border-red-200 bg-red-50 text-red-700" : "border-emerald-200 bg-emerald-50 text-emerald-700"}`}>
+            {feedback.message}
+          </p>
+        )}
         <div className="flex items-center gap-4 rounded-lg border border-slate-100 bg-slate-50/50 px-4 py-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-slate-200">
             {statusIcon}
