@@ -76,6 +76,10 @@ export function SheetView({ workspaceId, fileId, fileName, linkAccess, snapshot,
   // The revision the server settled on after absorbing an extraction, handed to the grid so its
   // next save is not rejected by work it effectively did itself.
   const [adoptRev, setAdoptRev] = useState<number | null>(null)
+  // Durable counterpart to the "changed elsewhere" toast below: a toast alone can be missed or
+  // dismissed, and stale data on a spreadsheet is exactly the kind of outcome that shouldn't live
+  // only in a transient notification (Wayfinder decision #114).
+  const [staleSheet, setStaleSheet] = useState(false)
   const [assistantOpen, setAssistantOpen] = useState(false)
   const apiRef = useRef<FUniver | null>(null)
   const saveNowRef = useRef<(() => Promise<boolean>) | null>(null)
@@ -118,6 +122,7 @@ export function SheetView({ workspaceId, fileId, fileName, linkAccess, snapshot,
   useEffect(() => {
     if (rev <= clientRev.current || rev <= notifiedRev.current) return
     notifiedRev.current = rev
+    setStaleSheet(true)
     toast.info("This sheet changed elsewhere", { description: "Reload to see the latest version.", action: { label: "Reload", onClick: () => window.location.reload() } })
   }, [rev])
 
@@ -340,6 +345,18 @@ export function SheetView({ workspaceId, fileId, fileName, linkAccess, snapshot,
             <Sparkles className="h-3.5 w-3.5" /><span className="sm:hidden">AI</span><span className="hidden sm:inline">AI Assistant</span>
           </button>
         </div> : undefined} />
+
+      {staleSheet && (
+        <div role="status" aria-live="polite" className="flex items-center justify-between gap-3 border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-800">
+          <span>This sheet changed elsewhere. Reloading shows the latest version{!readOnly && saveState !== "saved" && saveState !== "idle" ? " once your current edit finishes saving" : ""}.</span>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="shrink-0 rounded-md border border-amber-300 bg-white px-2 py-1 font-semibold text-amber-800 transition-colors hover:bg-amber-100">
+            Reload
+          </button>
+        </div>
+      )}
 
       <div className="relative flex min-h-0 flex-1">
         <UniverSheetLoader
