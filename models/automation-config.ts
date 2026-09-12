@@ -30,6 +30,15 @@ const amountBandSchema = z.object({
   path: ["max"],
 })
 
+/** #55 confidence-per-band bands. `upTo: null` marks the open-ended top band; every other
+ * row's `upTo` must be a positive number. `min` is the confidence floor (0–1). Sort order
+ * is normalised at gate-eval time (see `coerceConfidenceBands`), so a workspace can save
+ * rows in any order. */
+const confidenceBandSchema = z.object({
+  upTo: z.number().positive().nullable(),
+  min: z.number().min(0).max(1),
+})
+
 /** #54 supplier-trust threshold. `currency` is optional — the gate resolves it against
  * `workspace.baseCurrency` at evaluation time when the setting doesn't pin one, so a
  * workspace that later changes its base currency doesn't need a manual re-save. */
@@ -57,6 +66,7 @@ const updateSchema = z.object({
   amountBands: z.array(amountBandSchema).max(10).optional(),
   blockOnWarnChecks: z.boolean().optional(),
   policyText: z.string().max(4000).nullable().optional(),
+  confidenceBands: z.array(confidenceBandSchema).max(10).optional(),
   supplierTrustThreshold: supplierTrustThresholdSchema.optional(),
   matchTolerance: matchToleranceSchema.optional(),
 })
@@ -104,6 +114,8 @@ export async function updateAutomationConfig(input: {
   if (patch.amountBands !== undefined) data.amountBands = patch.amountBands
   if (patch.blockOnWarnChecks !== undefined) data.blockOnWarnChecks = patch.blockOnWarnChecks
   if (patch.policyText !== undefined) data.policyText = patch.policyText
+  if (patch.confidenceBands !== undefined)
+    data.confidenceBands = patch.confidenceBands as unknown as Prisma.InputJsonValue
   if (patch.supplierTrustThreshold !== undefined)
     data.supplierTrustThreshold = patch.supplierTrustThreshold as unknown as Prisma.InputJsonValue
   if (patch.matchTolerance !== undefined) data.matchTolerance = patch.matchTolerance as unknown as Prisma.InputJsonValue
@@ -121,10 +133,14 @@ export async function updateAutomationConfig(input: {
     }),
   ])
 
-  // #53/#54 DoD: a tolerance or threshold change retroactively re-evaluates the matching open
+  // #53/#54/#55 DoD: a settings change retroactively re-evaluates the matching open
   // exceptions. Runs after the update commits so a downstream error can never leave the
   // workspace with a fresh setting + stale exceptions. Import lazily so this file, imported
   // from a "use server" module chain, doesn't drag the gate runners into every caller.
+  if (patch.confidenceBands !== undefined) {
+    const { reevaluateOpenConfidenceBandGates } = await import("@/lib/gates/confidence-band")
+    await reevaluateOpenConfidenceBandGates(input.workspaceId)
+  }
   if (patch.supplierTrustThreshold !== undefined) {
     const { reevaluateOpenSupplierTrustGates } = await import("@/lib/gates/supplier-trust")
     await reevaluateOpenSupplierTrustGates(input.workspaceId)
