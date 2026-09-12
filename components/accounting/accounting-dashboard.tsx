@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { Label } from "@/components/ui/label"
 import { repairBigcapitalConnectionAction } from "@/app/(app)/workspaces/[workspaceId]/accounting-actions"
 import {
@@ -224,6 +225,7 @@ function ReadyToPushList({ workspaceId, connectionId, documents, defaultAccountI
   const [accounts, setAccounts] = useState<{ id: string; name: string }[] | null>(null)
   const [loadingAccounts, setLoadingAccounts] = useState(false)
   const [accountOverrides, setAccountOverrides] = useState<Record<string, string>>({})
+  const [confirmation, setConfirmation] = useState<{ kind: "one"; document: ReadyToPushDocument } | { kind: "all" } | null>(null)
 
   const loadAccounts = () => {
     setLoadingAccounts(true)
@@ -251,6 +253,7 @@ function ReadyToPushList({ workspaceId, connectionId, documents, defaultAccountI
     startTransition(async () => {
       const res = await pushDocumentToAccountingAction(workspaceId, doc.id, connectionId, accountId)
       setPushingId(null)
+      setConfirmation(null)
       if (res.success) { toast.success(res.data?.status === "succeeded" ? "Pushed to accounting" : "Push queued"); onChanged() }
       else toast.error(res.error || "Could not push this document")
     })
@@ -263,6 +266,7 @@ function ReadyToPushList({ workspaceId, connectionId, documents, defaultAccountI
     }
     startTransition(async () => {
       const res = await pushAllReadyDocumentsAction(workspaceId, connectionId, overrides)
+      setConfirmation(null)
       if (res.success) {
         const { pushed, failed } = res.data ?? { pushed: 0, failed: 0 }
         if (failed) toast.warning(`Pushed ${pushed}, ${failed} failed`)
@@ -272,6 +276,12 @@ function ReadyToPushList({ workspaceId, connectionId, documents, defaultAccountI
         toast.error(res.error || "Could not push documents")
       }
     })
+  }
+
+  const confirmPush = () => {
+    if (!confirmation) return
+    if (confirmation.kind === "one") pushOne(confirmation.document)
+    else pushAll()
   }
 
   if (!documents.length) return null
@@ -289,7 +299,7 @@ function ReadyToPushList({ workspaceId, connectionId, documents, defaultAccountI
           <CardTitle>Ready to push</CardTitle>
           <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-emerald-100 px-1.5 text-xs font-bold text-emerald-700">{documents.length}</span>
         </div>
-        <Button type="button" size="sm" disabled={pending} onClick={pushAll} className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700">
+        <Button type="button" size="sm" disabled={pending} onClick={() => setConfirmation({ kind: "all" })} className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700">
           <ArrowUpRight className="h-3.5 w-3.5" />
           {pending && !pushingId ? "Pushing…" : "Push all"}
         </Button>
@@ -346,7 +356,7 @@ function ReadyToPushList({ workspaceId, connectionId, documents, defaultAccountI
                       variant="outline"
                       className="border-emerald-200 text-emerald-700 hover:border-emerald-300 hover:bg-emerald-50"
                       disabled={pending}
-                      onClick={() => pushOne(doc)}
+                      onClick={() => setConfirmation({ kind: "one", document: doc })}
                     >
                       {pushingId === doc.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><ArrowUpRight className="mr-1 h-3.5 w-3.5" />Push</>}
                     </Button>
@@ -357,6 +367,27 @@ function ReadyToPushList({ workspaceId, connectionId, documents, defaultAccountI
           </table>
         </div>
       </CardContent>
+      <ConfirmDialog
+        open={confirmation !== null}
+        busy={pending}
+        title={confirmation?.kind === "all" ? `Push ${documents.length} documents to Finance?` : `Push ${confirmation?.document.filename ?? "this document"} to Finance?`}
+        description="This creates or updates an external ledger record. Existing successful pushes are skipped; retry only reprocesses failed items."
+        confirmLabel={pending ? "Pushing…" : confirmation?.kind === "all" ? "Push documents" : "Push document"}
+        onConfirm={confirmPush}
+        onCancel={() => setConfirmation(null)}
+      >
+        <div className="max-h-48 space-y-2 overflow-y-auto rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+          {(confirmation?.kind === "one" ? [confirmation.document] : documents).map((doc) => (
+            <div key={doc.id} className="flex items-start justify-between gap-3">
+              <span className="min-w-0">
+                <span className="block truncate font-medium text-slate-800">{doc.filename}</span>
+                <span className="block">Account: {accountLabel(getDocAccount(doc.id, doc))}</span>
+              </span>
+              <span className="shrink-0 font-semibold tabular-nums text-slate-800">{formatAmount(doc.total, doc.currencyCode)}</span>
+            </div>
+          ))}
+        </div>
+      </ConfirmDialog>
     </Card>
   )
 }
