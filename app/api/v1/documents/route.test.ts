@@ -4,6 +4,13 @@ const { integrations } = vi.hoisted(() => ({ integrations: { enabled: true } }))
 vi.mock("@/lib/config", () => ({ default: { get integrations() { return integrations }, app: { baseURL: "https://app.test" } } }))
 vi.mock("@/lib/api-auth", () => ({ authenticateApiRequest: vi.fn() }))
 vi.mock("@/lib/ingestion", () => ({ createIngestionItem: vi.fn() }))
+// #49: route imports JurisdictionRequiredError from lib/jurisdictions/require, which pulls in
+// @/lib/db (unmocked here). Stub the module.
+class MockJurisdictionRequiredError extends Error {
+  readonly code = "JURISDICTION_REQUIRED"
+  constructor(readonly workspaceId: string) { super("jurisdiction_required"); this.name = "JurisdictionRequiredError" }
+}
+vi.mock("@/lib/jurisdictions/require", () => ({ JurisdictionRequiredError: MockJurisdictionRequiredError }))
 vi.mock("@/models/files", () => ({ getWorkspaceFile: vi.fn(), getFileTemplates: vi.fn() }))
 vi.mock("@/models/integrations", () => ({ listDocumentsForApi: vi.fn() }))
 vi.mock("@/lib/document-processing", () => ({ processDocumentJob: vi.fn().mockResolvedValue(undefined) }))
@@ -113,5 +120,18 @@ describe("POST /api/v1/documents", () => {
     const res = await POST(multipart({ file: new File([Buffer.from("bad")], "x.pdf"), file_id: "f1" }))
     expect(res.status).toBe(422)
     expect(await res.json()).toMatchObject({ error: { code: "malware_detected" } })
+  })
+
+  // #49: refuses programmatic ingestion when the workspace has picked no jurisdiction. Matches the
+  // email-in route (409 jurisdiction_required) so callers on either channel see one code path.
+  it("returns 409 jurisdiction_required when the workspace has no jurisdictionCode", async () => {
+    vi.mocked(getWorkspaceFile).mockResolvedValue({ id: "f1" } as never)
+    vi.mocked(getFileTemplates).mockResolvedValue([{ id: "t1", code: "generic" }] as never)
+    vi.mocked(createIngestionItem).mockRejectedValueOnce(new MockJurisdictionRequiredError("w1"))
+
+    const res = await POST(multipart({ file: new File([Buffer.from("hi")], "x.pdf"), file_id: "f1" }))
+
+    expect(res.status).toBe(409)
+    expect(await res.json()).toMatchObject({ error: { code: "jurisdiction_required" } })
   })
 })

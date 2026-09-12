@@ -38,6 +38,17 @@ const supplierTrustThresholdSchema = z.object({
   currency: z.string().length(3).optional(),
 })
 
+/** #53 match-variance tolerance. `floor.currency` is optional — the gate resolves it against
+ * `workspace.baseCurrency` at evaluation time when the setting doesn't pin one, so a
+ * workspace that later changes its base currency doesn't need a manual re-save. */
+const matchToleranceSchema = z.object({
+  percent: z.number().min(0).max(1),
+  floor: z.object({
+    amount: z.number().nonnegative(),
+    currency: z.string().length(3).optional(),
+  }),
+})
+
 const updateSchema = z.object({
   autonomyLevel: z.enum(["suggest", "auto", "touchless"]).optional(),
   minConfidence: z.number().min(0).max(1).optional(),
@@ -47,6 +58,7 @@ const updateSchema = z.object({
   blockOnWarnChecks: z.boolean().optional(),
   policyText: z.string().max(4000).nullable().optional(),
   supplierTrustThreshold: supplierTrustThresholdSchema.optional(),
+  matchTolerance: matchToleranceSchema.optional(),
 })
 
 export type AutomationConfigUpdate = z.infer<typeof updateSchema>
@@ -94,6 +106,7 @@ export async function updateAutomationConfig(input: {
   if (patch.policyText !== undefined) data.policyText = patch.policyText
   if (patch.supplierTrustThreshold !== undefined)
     data.supplierTrustThreshold = patch.supplierTrustThreshold as unknown as Prisma.InputJsonValue
+  if (patch.matchTolerance !== undefined) data.matchTolerance = patch.matchTolerance as unknown as Prisma.InputJsonValue
 
   const context = await getRequestAuditContext()
   const [updated] = await prisma.$transaction([
@@ -108,14 +121,17 @@ export async function updateAutomationConfig(input: {
     }),
   ])
 
-  // #54 DoD: a threshold change retroactively re-evaluates open supplier-trust exceptions.
-  // Runs after the update commits so a downstream error can never leave the workspace with
-  // a fresh threshold + stale exceptions. Import lazily so this module doesn't drag the
-  // gate runners into every automation-config caller.
+  // #53/#54 DoD: a tolerance or threshold change retroactively re-evaluates the matching open
+  // exceptions. Runs after the update commits so a downstream error can never leave the
+  // workspace with a fresh setting + stale exceptions. Import lazily so this file, imported
+  // from a "use server" module chain, doesn't drag the gate runners into every caller.
   if (patch.supplierTrustThreshold !== undefined) {
     const { reevaluateOpenSupplierTrustGates } = await import("@/lib/gates/supplier-trust")
     await reevaluateOpenSupplierTrustGates(input.workspaceId)
   }
-
+  if (patch.matchTolerance !== undefined) {
+    const { reevaluateOpenMatchVarianceGates } = await import("@/lib/gates/match-variance")
+    await reevaluateOpenMatchVarianceGates(input.workspaceId)
+  }
   return updated
 }

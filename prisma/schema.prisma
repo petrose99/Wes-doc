@@ -109,6 +109,16 @@ model Workspace {
   /// Deliberately never issued for a clinical workspace — see the same file: unencrypted email
   /// is not an acceptable channel for ePHI, so the route refuses one even if a token existed.
   inboundEmailToken  String?             @unique @map("inbound_email_token")
+  /// Workspace jurisdiction pack code (ZA, LS, GB, US-CA at ship time). AP inbound (email-in,
+  /// upload, API) short-circuits with a typed "workspace needs a jurisdiction" error until this
+  /// is set — see lib/jurisdictions/require.ts. One jurisdiction per workspace for now; multi-
+  /// entity graduates to a future decision. Rule packs live in lib/jurisdictions/<code>/ and
+  /// are read live from code (see #39 in the wayfinder map).
+  jurisdictionCode   String?             @map("jurisdiction_code")
+  /// Stamped from lib/jurisdictions/<code>/index.ts's packVersion when the workspace picks a
+  /// pack (or when the pack version changes and the workspace re-confirms). Every
+  /// DocumentCheckResult also stamps its packVersion so old checks stay legible after a bump.
+  jurisdictionPackVersion String?        @map("jurisdiction_pack_version")
   createdAt       DateTime               @default(now()) @map("created_at")
   updatedAt       DateTime               @updatedAt @map("updated_at")
   members         WorkspaceMember[]
@@ -2057,6 +2067,15 @@ model WorkspaceAutomationConfig {
   /// time" so a base-currency change picks up without a data backfill. #40 fixed the seed at
   /// local-500.
   supplierTrustThreshold Json @default("{\"amount\":500}") @map("supplier_trust_threshold")
+
+  /// #53: 2/3-way match variance tolerance (soft gate 3/6 from #40). Shape:
+  /// `{ percent: number, floor: { amount: number, currency?: string } }`. `percent` is a
+  /// fraction (0.02 = 2%). `floor.amount` is the local-currency minimum tolerance so a tiny
+  /// bill's 2% doesn't collapse to pennies; `floor.currency` is omitted by default and read
+  /// off `workspace.baseCurrency` at gate-evaluation time so a workspace that changes its
+  /// base currency picks the new one up. #40 fixed the seed at 2% / 500. Never zero at
+  /// default — a workspace that wants strict matching sets an explicit tolerance object.
+  matchTolerance    Json      @default("{\"percent\":0.02,\"floor\":{\"amount\":500}}") @map("match_tolerance")
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
   workspace         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)

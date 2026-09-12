@@ -3,9 +3,21 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 const { inboundEmail } = vi.hoisted(() => ({ inboundEmail: { enabled: true, secret: "test-secret", domain: "inbound.docubite.test" } }))
 vi.mock("@/lib/config", () => ({ default: { get inboundEmail() { return inboundEmail } } }))
 vi.mock("@/models/inbound-email", () => ({ resolveWorkspaceByInboundToken: vi.fn(), processInboundEmail: vi.fn() }))
+// #49: the route now guards on workspace jurisdiction via lib/jurisdictions/require, which imports
+// @/lib/db (unmocked here). Stub the module so existing route tests see the happy path; the
+// dedicated jurisdiction-required test below flips it to throw.
+class MockJurisdictionRequiredError extends Error {
+  readonly code = "JURISDICTION_REQUIRED"
+  constructor(readonly workspaceId: string) { super("jurisdiction_required"); this.name = "JurisdictionRequiredError" }
+}
+vi.mock("@/lib/jurisdictions/require", () => ({
+  JurisdictionRequiredError: MockJurisdictionRequiredError,
+  requireWorkspaceJurisdiction: vi.fn().mockResolvedValue({ jurisdictionCode: "ZA", jurisdictionPackVersion: "za-v0-2026-09" }),
+}))
 
 const { POST } = await import("@/app/api/inbound-email/route")
 const { resolveWorkspaceByInboundToken, processInboundEmail } = await import("@/models/inbound-email")
+const { requireWorkspaceJurisdiction } = await import("@/lib/jurisdictions/require")
 
 /** A recorded-shape Postmark inbound webhook fixture — the format this route is built and tested
  * against per the roadmap, ahead of any real provider being wired up. */
@@ -105,5 +117,18 @@ describe("POST /api/inbound-email", () => {
     await POST(request(postmarkFixture({ Attachments: [{ Name: "invoice.pdf" }] })))
 
     expect(vi.mocked(processInboundEmail).mock.calls[0][0].attachments).toEqual([])
+  })
+
+  // #49: refuses inbound when the workspace has picked no jurisdiction, before processInboundEmail
+  // ever runs. Same rule as the upload action and the v1 API — see lib/jurisdictions/require.ts.
+  it("returns 409 jurisdiction_required when the workspace has no jurisdiction", async () => {
+    vi.mocked(resolveWorkspaceByInboundToken).mockResolvedValue({ id: "w1", industry: "finance" } as never)
+    vi.mocked(requireWorkspaceJurisdiction).mockRejectedValueOnce(new MockJurisdictionRequiredError("w1"))
+
+    const response = await POST(request(postmarkFixture()))
+
+    expect(response.status).toBe(409)
+    expect(await response.json()).toEqual({ error: "jurisdiction_required" })
+    expect(processInboundEmail).not.toHaveBeenCalled()
   })
 })
