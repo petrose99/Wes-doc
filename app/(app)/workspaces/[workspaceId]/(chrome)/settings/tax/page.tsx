@@ -1,9 +1,10 @@
 import { JurisdictionPicker } from "@/components/workspace/jurisdiction-picker"
+import { DeferredVatSchemePicker } from "@/components/workspace/deferred-vat-scheme-picker"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { getCurrentUser } from "@/lib/auth"
 import { listAvailableJurisdictions } from "@/lib/jurisdictions"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
-import { getWorkspaceJurisdictionSummary } from "@/models/jurisdictions"
+import { getWorkspaceJurisdictionSummary, getWorkspaceDeferredVatScheme } from "@/models/jurisdictions"
 import { getTaxProfile } from "@/models/tax-profiles"
 import { requireWorkspaceRole } from "@/models/workspaces"
 import { notFound } from "next/navigation"
@@ -21,9 +22,10 @@ export default async function TaxSettingsPage({ params }: { params: Promise<{ wo
   const membership = await requireWorkspaceRole(workspaceId, user.id)
   if (!(await getWorkspaceCapabilities(workspaceId)).has("jurisdiction")) notFound()
 
-  const [profile, jurisdiction] = await Promise.all([
+  const [profile, jurisdiction, deferredVatScheme] = await Promise.all([
     getTaxProfile(workspaceId),
     getWorkspaceJurisdictionSummary(workspaceId),
+    getWorkspaceDeferredVatScheme(workspaceId),
   ])
   const options = listAvailableJurisdictions()
   const owner = membership.role === "owner"
@@ -57,6 +59,18 @@ export default async function TaxSettingsPage({ params }: { params: Promise<{ wo
           </div>}
           {profile.config.rates.length === 0 && <p className="text-muted-foreground">This region&apos;s rates are set at the state/local level and are not modeled here yet.</p>}
         </div>}
+      </CardContent>
+    </Card>
+
+    <Card>
+      <CardHeader>
+        <CardTitle>Deferred import VAT scheme</CardTitle>
+        <CardDescription>
+          Applies when a jurisdiction lets you defer import VAT to the return rather than paying at the border (Lesotho VAT-12 splits import inputs by this flag). Leave &quot;Not stated&quot; if it doesn&apos;t apply to your workspace &mdash; imports on unset workspaces silent-pass the return-form columns and are unaffected on packs that don&apos;t use the flag.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <DeferredVatSchemePicker workspaceId={workspaceId} current={deferredVatScheme} isOwner={owner} />
       </CardContent>
     </Card>
   </main>

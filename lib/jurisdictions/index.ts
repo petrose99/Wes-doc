@@ -8,6 +8,7 @@
  * `PACK_LOADERS` is a "coming soon" — the picker hides it until the pack ships. */
 import type { JurisdictionCode, JurisdictionPack } from "./types"
 import zaPack from "./za"
+import lsPack from "./ls"
 
 /** Intended pack codes at ship time (ZA / LS / GB / US-CA per #49). A code being listed here is
  * a promise the pack is planned — not that it exists yet. `listAvailableJurisdictions` filters
@@ -29,6 +30,7 @@ export const JURISDICTION_NAMES: Record<JurisdictionCode, string> = {
  * adding a new pack: import it at the top and add the entry here. */
 const PACK_LOADERS: Partial<Record<JurisdictionCode, JurisdictionPack>> = {
   ZA: zaPack,
+  LS: lsPack,
 }
 
 /** Fetch a pack by code, or null if the code isn't known or its pack file isn't present. */

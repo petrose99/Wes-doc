@@ -46,3 +46,24 @@ export async function getWorkspaceJurisdictionSummary(workspaceId: string): Prom
   if (!workspace?.jurisdictionCode) return null
   return { code: workspace.jurisdictionCode as JurisdictionCode, packVersion: workspace.jurisdictionPackVersion }
 }
+
+/** #84: read the workspace's deferred-import-VAT scheme enrolment (tri-state — `null` means
+ * not stated). Consumed by the projection layer's `WorkspaceContext.deferredVatScheme` (see
+ * `lib/jurisdictions/_shared/project-bill.ts`). */
+export async function getWorkspaceDeferredVatScheme(workspaceId: string): Promise<boolean | null> {
+  const workspace = await prisma.workspace.findUnique({
+    where: { id: workspaceId },
+    select: { deferredVatScheme: true },
+  })
+  return workspace?.deferredVatScheme ?? null
+}
+
+/** #84: set the workspace's deferred-import-VAT scheme enrolment. Passing `null` clears the
+ * setting (back to "not stated") — the UI surfaces the flag as a tri-state. Callers must have
+ * verified the user's role first — this trusts the workspaceId. */
+export async function setWorkspaceDeferredVatScheme(workspaceId: string, value: boolean | null): Promise<void> {
+  await prisma.workspace.update({
+    where: { id: workspaceId },
+    data: { deferredVatScheme: value },
+  })
+}

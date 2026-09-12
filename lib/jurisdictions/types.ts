@@ -40,6 +40,7 @@ export type PackTopic =
   | "retention"
   | "thresholds"
   | "border"
+  | "workpapers"
 
 /** Threshold row with an effective-from date so ZA's 1 Apr 2026 R1m→R2.3m jump can coexist with
  * its pre-jump value; consumers pick the row whose window contains the date under test. */
@@ -104,6 +105,10 @@ export type JurisdictionPack = {
     description: string
     rules: Rule<BorderInvoice>[]
   }
+  /** Workpapers this pack contributes (#47/#68). A pack with no workpapers is a valid state —
+   * the close checklist reads `resolveWorkpapersForJurisdiction(pack)` and treats an empty list
+   * as "no automated workpaper for this jurisdiction yet". */
+  workpapers?: readonly import("./_shared/workpaper").Workpaper[]
 }
 
 /** Minimum invoice fields needed to run the s20 checks. Every field is optional so the rules
