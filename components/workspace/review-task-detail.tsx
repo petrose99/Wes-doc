@@ -28,27 +28,34 @@ export function ReviewTaskDetail({ workspaceId, taskId, status, assigneeId, memb
 }) {
   const router = useRouter()
   const [pending, setPending] = useState(false)
+  const [feedback, setFeedback] = useState<{ tone: "status" | "alert"; message: string } | null>(null)
 
   const setStatus = async (next: string) => {
     setPending(true)
+    setFeedback({ tone: "status", message: `Saving status: ${next.replace("_", " ")}…` })
     try {
       const result = await updateReviewTaskStatusAction(workspaceId, taskId, next)
-      if (!result.success) { toast.error(result.error || "Could not update status"); return }
+      if (!result.success) { const message = result.error || "Could not update status"; setFeedback({ tone: "alert", message }); toast.error(message); return }
+      setFeedback({ tone: "status", message: `Status updated to ${next.replace("_", " ")}` })
       toast.success(`Marked ${next.replace("_", " ")}`)
       router.refresh()
     } catch {
+      setFeedback({ tone: "alert", message: "Could not reach the server — status was not changed" })
       toast.error("Could not reach the server")
     } finally { setPending(false) }
   }
 
   const decideStage = async (decision: "approve" | "reject") => {
     setPending(true)
+    setFeedback({ tone: "status", message: `${decision === "approve" ? "Approving" : "Rejecting"} the current stage…` })
     try {
       const result = await decideReviewTaskStageAction(workspaceId, taskId, decision)
-      if (!result.success) { toast.error(result.error || "Could not record that decision"); return }
+      if (!result.success) { const message = result.error || "Could not record that decision"; setFeedback({ tone: "alert", message }); toast.error(message); return }
+      setFeedback({ tone: "status", message: decision === "approve" ? "Stage approved" : "Stage rejected" })
       toast.success(decision === "approve" ? "Stage approved" : "Rejected")
       router.refresh()
     } catch {
+      setFeedback({ tone: "alert", message: "Could not reach the server — decision was not recorded" })
       toast.error("Could not reach the server")
     } finally { setPending(false) }
   }
@@ -56,28 +63,35 @@ export function ReviewTaskDetail({ workspaceId, taskId, status, assigneeId, memb
   const startWorkflow = async (workflowId: string) => {
     if (!workflowId) return
     setPending(true)
+    setFeedback({ tone: "status", message: "Starting approval workflow…" })
     try {
       const result = await startWorkflowOnReviewTaskAction(workspaceId, taskId, workflowId)
-      if (!result.success) { toast.error(result.error || "Could not start that workflow"); return }
+      if (!result.success) { const message = result.error || "Could not start that workflow"; setFeedback({ tone: "alert", message }); toast.error(message); return }
+      setFeedback({ tone: "status", message: "Approval workflow started" })
       toast.success("Workflow started")
       router.refresh()
     } catch {
+      setFeedback({ tone: "alert", message: "Could not reach the server — workflow was not started" })
       toast.error("Could not reach the server")
     } finally { setPending(false) }
   }
 
   const setAssignee = async (value: string) => {
     setPending(true)
+    setFeedback({ tone: "status", message: "Saving assignee…" })
     try {
       const result = await assignReviewTaskAction(workspaceId, taskId, value || null)
-      if (!result.success) { toast.error(result.error || "Could not assign"); return }
+      if (!result.success) { const message = result.error || "Could not assign"; setFeedback({ tone: "alert", message }); toast.error(message); return }
+      setFeedback({ tone: "status", message: value ? "Assignee updated" : "Task unassigned" })
       router.refresh()
     } catch {
+      setFeedback({ tone: "alert", message: "Could not reach the server — assignee was not changed" })
       toast.error("Could not reach the server")
     } finally { setPending(false) }
   }
 
-  return <div className="space-y-4 rounded border p-4">
+  return <div className="space-y-4 rounded border p-4" aria-busy={pending}>
+    {feedback && <p role={feedback.tone} aria-live={feedback.tone === "alert" ? "assertive" : "polite"} className={`text-sm ${feedback.tone === "alert" ? "text-red-600" : "text-slate-600"}`}>{feedback.message}</p>}
     <div>
       <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">Assignee</label>
       <select className="mt-1 w-full rounded-md border px-2.5 py-1.5 text-sm" defaultValue={assigneeId ?? ""} disabled={pending} onChange={(event) => void setAssignee(event.target.value)}>
