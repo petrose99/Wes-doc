@@ -21,7 +21,7 @@ If a request would have you design something and you have not called `impeccable
 
 - Every Wayfinder map that touches a user-facing surface states the Impeccable rule in its `## Notes`, naming the sub-command each ticket should use.
 - A Wayfinder session resolving a design ticket calls `impeccable` as part of resolving it, alongside `grilling` and `domain-modeling`.
-- Where a map carries execution (an override of Wayfinder's plan-only default, stated in its Notes), the Impeccable verification step is part of the ticket's definition of done.
+- Where a map carries execution (an override of Wayfinder's plan-only default, stated in its Notes), Impeccable runs **throughout** the build, not just at its edges — see "Implementing a design ticket" below for the four points it is called at and what closes a ticket.
 - Impeccable findings that contain a real decision become Wayfinder tickets. Impeccable findings that are pure execution do not need a map — hand them to a polish pass.
 
 ### Grilling a design ticket
@@ -57,6 +57,22 @@ The command vocabulary to recommend from:
 | `extract` | Pull reusable tokens and components into the system |
 | `document` | Generate DESIGN.md from what shipped |
 | `polish` | Final quality pass before shipping |
+
+### Implementing a design ticket
+
+Impeccable is not a planning-phase formality that hands off to an unsupervised build. It has a role at four distinct points of every implementation, and skipping the later three is the common failure — the skill gets called once at the start, the build runs for an hour, and nothing checks what actually landed.
+
+**1. Before the first line of code.** Load the skill with the command the resolution's Action Summary names (a build almost always opens with `shape` for anything new, or the specific `layout`/`typeset`/`clarify` command for a narrow refinement). Run `impeccable context` once per session. Then read `craft-floor.md` — before the first edit, not after the first draft. A planning session skips `craft-floor.md`; an implementing session never does.
+
+**2. During the build, per edit.** The design detector hook fires on every Edit/Write to a UI file and pushes findings back into the session. Treat a finding the way you would a failing test: fix it, or persist the narrowest justified ignore with the evidence named in `--reason`. Never add an ignore to push a write through. If the hook is not firing, you are building blind — say so rather than continuing quietly.
+
+**3. After the surface renders, before claiming done.** Verify with the detector, never by eye. The static scan alone is not enough: on this repo's marketing site `impeccable detect --json` returned 5 findings, all false positives, while the in-page `detect.js` overlay against the running dev server returned 172 real ones. Run the browser overlay for anything viewable. Record before/after counts on the ticket.
+
+**4. The closing pass.** End with `polish`, and with `audit` for anything that changed responsive behaviour, contrast, or focus order. Impeccable's own guidance caps this: build fully, inspect once in a batched round covering desktop and mobile together, fix everything it shows in one batch, confirm with at most one more round, then stop. Bounded passes, not an open-ended self-QA loop.
+
+**What a ticket's definition of done means.** On a map that carries execution, "done" is not "the code compiles and the page looks right." It is: the Action Summary's commands were actually run, the detector was run in-browser, before/after counts are on the ticket, and `polish` closed it out. A ticket closed without those is closed early.
+
+**Findings split two ways.** A finding that contains a real decision — one where a reasonable person could pick either way, or that contradicts a decision already on a map — becomes a Wayfinder ticket rather than a silent fix during the build. A finding that is pure execution is fixed in place and needs no map.
 
 Design decisions already made live on the maps; check them before re-deciding anything:
 
