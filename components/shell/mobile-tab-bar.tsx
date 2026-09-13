@@ -46,7 +46,7 @@ export function MobileTabBar({ workspaceId, pipelineReviewCount = 0, sheetsUnpla
       const badge = "badge" in tab ? tab.badge : undefined
       return <Link key={tab.href} href={tab.href}
         aria-current={active ? "page" : undefined}
-        className={`relative flex flex-col items-center gap-1 p-1 text-[10.5px] ${active ? "font-semibold text-emerald-700" : "font-medium text-slate-400"}`}>
+        className={`relative flex flex-col items-center gap-1 rounded-md p-1 text-[10.5px] outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 ${active ? "font-semibold text-emerald-700" : "font-medium text-slate-400"}`}>
         <tab.icon className="h-[21px] w-[21px]" />
         {badge != null && <span className="absolute left-[calc(50%+8px)] top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-indigo-600 px-1 text-[10px] font-bold text-white">{badge}</span>}
         {tab.label}
