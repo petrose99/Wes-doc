@@ -11,7 +11,7 @@ export function Faq() {
             Questions people <span className="text-emerald-600">ask first</span>
           </h2>
           <p className="mt-4 leading-7 text-stone-600">
-            Anything else, <Link href="/demo" className="font-medium text-emerald-800 underline underline-offset-4">book a demo</Link> and ask it live.
+            Anything else, <Link href="/demo" className="font-medium text-emerald-800 underline underline-offset-4">request a demo</Link> and ask it live.
           </p>
         </div>
 

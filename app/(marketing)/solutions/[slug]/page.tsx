@@ -37,7 +37,7 @@ export default async function SolutionPage({ params }: { params: Promise<{ slug:
           href="/demo"
           className="group mt-8 inline-flex h-12 items-center justify-center gap-2 rounded-full bg-emerald-950 px-7 text-base font-semibold text-white shadow-sm transition-colors hover:bg-emerald-900"
         >
-          Book a demo<ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+          Request a demo<ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
         </Link>
         <p className="mt-3 text-sm text-stone-500">No credit card required</p>
 

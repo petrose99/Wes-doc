@@ -10,10 +10,22 @@ import { CheckCircle2 } from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
 
-function Field({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
+/** Mirrors the zod schema in `demo/actions.ts` so a mistake is named beside the field that caused it
+ * instead of arriving as one line under the button after a round trip. The server stays the
+ * authority — this only moves the same three rules earlier. Keep the two in step. */
+const RULES = {
+  name: (value: string) => (value.trim().length < 2 ? "Please give us a name we can use" : null),
+  email: (value: string) => (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim()) ? null : "That does not look like an email address"),
+  company: (value: string) => (value.trim().length < 2 ? "Please tell us where you work" : null),
+} as const
+
+type FieldName = keyof typeof RULES
+
+function Field({ label, name, error, children, hint }: { label: string; name?: string; error?: string; children: React.ReactNode; hint?: string }) {
   return <label className="flex flex-col gap-1.5">
     <span className="text-sm font-medium text-stone-800">{label}</span>
     {children}
+    {error && <span id={`${name}-error`} className="text-sm font-medium text-red-700">{error}</span>}
     {hint && <span className="text-xs text-stone-500">{hint}</span>}
   </label>
 }
@@ -22,6 +34,7 @@ export function DemoForm() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [sent, setSent] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<FieldName, string>>>({})
 
   if (sent) {
     return (
@@ -29,18 +42,45 @@ export function DemoForm() {
         <CheckCircle2 className="mx-auto h-9 w-9 text-emerald-700" strokeWidth={1.6} />
         <h2 className="mt-4 font-display text-2xl font-bold tracking-[-0.02em] text-stone-900">Request received</h2>
         <p className="mx-auto mt-2 max-w-sm leading-7 text-stone-600">
-          We will reply from the support inbox within one business day to find a time. Bring your most awkward document.
+          A person reads this, not a sequencer. We will reply from the support inbox within one business day to find a
+          time — bring your most awkward document to the call.
         </p>
       </div>
     )
   }
 
+  /* Validate on blur, never while typing: an error that appears on the third keystroke of an email
+     address is telling the user they are wrong before they have finished being right. */
+  const validateField = (field: FieldName, value: string) =>
+    setFieldErrors((previous) => ({ ...previous, [field]: RULES[field](value) ?? undefined }))
+
+  const clearField = (field: FieldName) => setFieldErrors((previous) => ({ ...previous, [field]: undefined }))
+
+  const fieldProps = (field: FieldName) => ({
+    onBlur: (event: React.FocusEvent<HTMLInputElement>) => validateField(field, event.target.value),
+    onChange: () => fieldErrors[field] && clearField(field),
+    "aria-invalid": Boolean(fieldErrors[field]),
+    "aria-describedby": fieldErrors[field] ? `${field}-error` : undefined,
+  })
+
   const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    const data = new FormData(event.currentTarget)
+
+    const found = Object.fromEntries(
+      (Object.keys(RULES) as FieldName[])
+        .map((field) => [field, RULES[field](String(data.get(field) || ""))])
+        .filter(([, message]) => message)
+    ) as Partial<Record<FieldName, string>>
+    if (Object.keys(found).length) {
+      setFieldErrors(found)
+      return
+    }
+
     setBusy(true)
     setError(null)
     try {
-      const result = await submitDemoRequest(new FormData(event.currentTarget))
+      const result = await submitDemoRequest(data)
       if (!result.ok) {
         setError(result.error)
         return
@@ -55,10 +95,16 @@ export function DemoForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-4 rounded-[2rem] rounded-tr-md border border-stone-200 bg-white p-6 shadow-[0_28px_70px_-48px_rgba(41,37,36,.5)] sm:p-8">
-      <Field label="Your name"><Input name="name" required autoComplete="name" placeholder="Alex Moreau" /></Field>
-      <Field label="Work email"><Input name="email" type="email" required autoComplete="email" placeholder="alex@yourfirm.com" /></Field>
-      <Field label="Company"><Input name="company" required autoComplete="organization" placeholder="Moreau &amp; Co Bookkeeping" /></Field>
+    <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4 rounded-[2rem] rounded-tr-md border border-stone-200 bg-white p-6 shadow-[0_28px_70px_-48px_rgba(41,37,36,.5)] sm:p-8">
+      <Field label="Your name" name="name" error={fieldErrors.name}>
+        <Input name="name" required autoComplete="name" placeholder="Alex Moreau" {...fieldProps("name")} />
+      </Field>
+      <Field label="Work email" name="email" error={fieldErrors.email}>
+        <Input name="email" type="email" required autoComplete="email" placeholder="alex@yourfirm.com" {...fieldProps("email")} />
+      </Field>
+      <Field label="Company" name="company" error={fieldErrors.company}>
+        <Input name="company" required autoComplete="organization" placeholder="Moreau &amp; Co Bookkeeping" {...fieldProps("company")} />
+      </Field>
       <Field label="Monthly document volume">
         <NativeSelect name="volume" defaultValue={VOLUME_OPTIONS[1]} className="w-full">
           {VOLUME_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}

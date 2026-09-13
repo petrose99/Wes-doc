@@ -63,7 +63,7 @@ export function Hero() {
               Start 14-day free trial
             </Link>
             <Link href="/demo" className="inline-flex h-12 items-center rounded-[10px] border border-stone-200 bg-white px-6 text-[0.98rem] font-semibold text-stone-900 shadow-sm transition-colors hover:bg-stone-50">
-              Book a demo
+              Request a demo
             </Link>
           </div>
           <p className="mt-3.5 text-[0.82rem] text-stone-500">No card required. Files held in private encrypted storage.</p>

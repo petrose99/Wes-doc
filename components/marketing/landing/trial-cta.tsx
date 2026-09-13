@@ -21,7 +21,7 @@ export function TrialCta() {
             Start 14-day free trial
           </Link>
           <Link href="/demo" className="inline-flex h-[50px] items-center rounded-[10px] border border-stone-200 bg-white px-6.5 text-base font-semibold text-stone-900 shadow-sm transition-colors hover:bg-stone-50">
-            Book a demo
+            Request a demo
           </Link>
         </div>
         <p className="mt-3.5 text-[0.83rem] text-stone-500">No card required. You still pay from your own bank — DocuBite prepares the file, your bank sends the money.</p>

@@ -60,10 +60,10 @@ export default function SolutionsPage() {
             Put your worst-looking document through it first.
           </h2>
           <p className="relative mx-auto mt-4 max-w-lg leading-7 text-emerald-100/75">
-            Book a demo and bring a sample — we&apos;ll build the template with you, live.
+            Request a demo and bring a sample — we&apos;ll build the template with you, live.
           </p>
           <div className="relative mt-7 flex flex-wrap items-center justify-center gap-3">
-            <Link href="/demo" className="group inline-flex h-12 items-center justify-center gap-1.5 rounded-full bg-white px-7 text-[15px] font-semibold text-emerald-950">Book a demo<ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" /></Link>
+            <Link href="/demo" className="group inline-flex h-12 items-center justify-center gap-1.5 rounded-full bg-white px-7 text-[15px] font-semibold text-emerald-950">Request a demo<ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" /></Link>
           </div>
         </div>
       </div>

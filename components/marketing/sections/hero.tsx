@@ -11,7 +11,7 @@ const COPY: Record<HeroVariant, { eyebrowBadge: string | null; headline: React.R
     headline: <>Turn what&apos;s on paper into <span className="text-emerald-600">data you can trust.</span></>,
     subhead: "DocuBite reads the invoices, receipts and bank statements your work runs on — scans, photos and handwriting included — into a live sheet where every value traces back to the exact spot it came from.",
     ctaHref: "/demo",
-    ctaLabel: "Book a 20-minute demo",
+    ctaLabel: "Request a demo",
     ctaNote: "No credit card required · see it on your own documents",
     anchorHref: "#how",
     anchorLabel: "See how it reads ↓",

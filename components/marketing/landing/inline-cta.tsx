@@ -22,7 +22,7 @@ export function InlineTrialCta() {
             Start 14-day free trial
           </Link>
           <Link href="/demo" className="inline-flex h-11 items-center rounded-[10px] border border-stone-200 bg-white px-5 text-sm font-semibold text-stone-900 shadow-sm transition-colors hover:bg-stone-50">
-            Book a demo
+            Request a demo
           </Link>
         </div>
       </div>
