@@ -288,7 +288,7 @@ if (process.env.NODE_ENV === "production" && process.env.NEXT_PHASE !== "phase-p
 export const isGoogleAuthEnabled = Boolean(env.NEXT_PUBLIC_GOOGLE_CLIENT_ID)
 
 const config = {
-  app: { title: "DocuBite", description: "Take a bite out of document busywork. DocuBite reads invoices, receipts and bank statements — even handwritten and scanned ones — into a live sheet where every value traces to its source, and reports on whole folders: what's missing, what's duplicated, what needs a look.", version: packageJson.version || "0.0.1", baseURL: env.BASE_URL, supportEmail: "support@docubite.com" },
+  app: { title: "DocuBite", description: "Take a bite out of document busywork. DocuBite reads invoices, receipts and bank statements into a live sheet where every value traces to its source, and reports on whole folders: what's missing, what's duplicated, what needs a look.", version: packageJson.version || "0.0.1", baseURL: env.BASE_URL, supportEmail: "support@docubite.com" },
   ai: { openaiApiKey: env.OPENAI_API_KEY, openaiModelName: env.OPENAI_MODEL_NAME, geminiApiKey: env.GEMINI_API_KEY, geminiModelName: env.GEMINI_MODEL_NAME, provider: env.AI_PROVIDER },
   documents: {
     maxFileSizeBytes: 50 * 1024 * 1024,

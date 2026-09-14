@@ -18,12 +18,12 @@ const MOMENTS = [
   {
     moment: "200 mixed files land on you at quarter-end",
     byHand: "Sort by type yourself, eyeball for duplicates, and hope nothing's missing until reconciliation says otherwise.",
-    withDocuBite: "Grouped by type and supplier, duplicates paired, missing periods named — before you open a single file.",
+    withDocuBite: "Grouped by type and supplier, duplicates paired, missing periods named before you open a single file.",
   },
   {
     moment: "An error is sitting in the data",
     byHand: "You meet it at month-end, in a reconciliation that won't balance, weeks after it was typed.",
-    withDocuBite: "Checks catch it in review — line items that don't sum, a missing VAT number — while it's still one document, not a journal.",
+    withDocuBite: "Checks catch it in review: line items that don't sum or a missing VAT number, while it's still one document, not a journal.",
   },
   {
     moment: "Someone asks where a number came from",
@@ -38,22 +38,22 @@ export function Comparison() {
   const { ref, played } = usePlayOnScroll(0.15)
 
   return (
-    <section id="comparison" ref={ref} className="bg-cream-50 py-16 md:py-30">
+    <section id="comparison" ref={ref} className="bg-white py-16 md:py-30">
       <div className="mx-auto max-w-6xl px-5">
-        <h2 className="text-balance font-display text-[clamp(2.2rem,3.8vw,3.4rem)] font-extrabold leading-[1.06] tracking-[-0.035em] text-stone-900">
+        <h2 className="text-balance font-display text-[clamp(2.2rem,3.8vw,3.4rem)] font-extrabold leading-[1.06] tracking-[-0.035em] text-slate-900">
           The same three moments, done two ways
         </h2>
-        <p className="mt-4.5 max-w-[40rem] text-pretty text-[1.12rem] leading-[1.6] text-stone-600">
-          Where the work actually gets hard — and where an afternoon turns into a click.
+        <p className="mt-4.5 max-w-[40rem] text-pretty text-[1.12rem] leading-[1.6] text-slate-600">
+          Where the work actually gets hard, and where an afternoon turns into a click.
         </p>
 
-        <div className="mt-10 overflow-hidden rounded-2xl border border-cream-200 bg-white shadow-[0_1px_2px_rgba(28,25,23,.04),0_20px_48px_rgba(28,25,23,.08)] md:mt-13">
+        <div className="mt-10 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(28,25,23,.04),0_20px_48px_rgba(28,25,23,.08)] md:mt-13">
           {/* Column headings, said once. Hidden where the table stacks — each answer carries its
               own label there instead, so a phone reader is never guessing which side they are on. */}
           <div className={`hidden md:grid ${COLS}`}>
             <div aria-hidden />
             <div className="px-6 pb-3 pt-6">
-              <span className="text-[0.68rem] font-bold uppercase tracking-[.07em] text-stone-400">By hand</span>
+              <span className="text-[0.68rem] font-bold uppercase tracking-[.07em] text-slate-600">By hand</span>
             </div>
             <div className="bg-emerald-50 px-7 pb-3 pt-6">
               <span className="text-[0.68rem] font-bold uppercase tracking-[.07em] text-emerald-700">With DocuBite</span>
@@ -62,15 +62,15 @@ export function Comparison() {
 
           {MOMENTS.map((row, i) => (
             <div key={row.moment} className={`grid ${COLS}`}>
-              <div className="border-t border-cream-200 px-6 pb-5 pt-6 md:pl-7">
-                <p className="text-pretty font-display text-[1.2rem] font-bold leading-[1.32] tracking-[-0.015em] text-stone-900 md:text-[1.26rem]">
+              <div className="border-t border-slate-200 px-6 pb-5 pt-6 md:pl-7">
+                <p className="text-pretty font-display text-[1.2rem] font-bold leading-[1.32] tracking-[-0.015em] text-slate-900 md:text-[1.26rem]">
                   {row.moment}
                 </p>
               </div>
 
-              <div className="border-t border-cream-200 px-6 pb-6 md:pt-6">
-                <span className="mb-2 block text-[0.68rem] font-bold uppercase tracking-[.07em] text-stone-400 md:hidden">By hand</span>
-                <p className="text-pretty text-[1.01rem] leading-[1.62] text-stone-500">{row.byHand}</p>
+              <div className="border-t border-slate-200 px-6 pb-6 md:pt-6">
+                <span className="mb-2 block text-[0.68rem] font-bold uppercase tracking-[.07em] text-slate-600 md:hidden">By hand</span>
+                <p className="text-pretty text-[1.01rem] leading-[1.62] text-slate-600">{row.byHand}</p>
               </div>
 
               <div

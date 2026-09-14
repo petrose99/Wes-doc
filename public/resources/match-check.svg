@@ -1,0 +1,19 @@
+<svg width="1200" height="700" viewBox="0 0 1200 700" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="700" rx="18" fill="#F8FAFC"/>
+  <path d="M190 92C190 81 199 72 210 72H1016C1027 72 1036 81 1036 92V604C1036 615 1027 624 1016 624H210C199 624 190 615 190 604V92Z" fill="#FFFDF8" stroke="#CBD5E1" stroke-width="3"/>
+  <path d="M190 154H1036" stroke="#E2E8F0" stroke-width="3"/>
+  <path d="M242 116H405" stroke="#0F172A" stroke-width="12" stroke-linecap="round"/>
+  <path d="M885 111H982" stroke="#047857" stroke-width="10" stroke-linecap="round"/>
+  <text x="242" y="212" fill="#64748B" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="700" letter-spacing="3">MATCH REVIEW</text>
+  <text x="242" y="275" fill="#0F172A" font-family="Arial, sans-serif" font-size="42" font-weight="700">Order · receipt · invoice</text>
+  <rect x="242" y="320" width="716" height="94" rx="10" fill="#ECFDF5"/>
+  <circle cx="287" cy="367" r="22" fill="#047857"/>
+  <path d="M277 367L284 374L298 358" stroke="white" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="332" y="360" fill="#064E3B" font-family="Inter, Arial, sans-serif" font-size="23" font-weight="700">3-way match</text>
+  <text x="332" y="390" fill="#065F46" font-family="Inter, Arial, sans-serif" font-size="20">2 lines · quantities within tolerance</text>
+  <path d="M242 468H958" stroke="#CBD5E1" stroke-width="3"/>
+  <text x="242" y="520" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="21">Invoice total</text>
+  <text x="958" y="520" text-anchor="end" fill="#0F172A" font-family="Inter, Arial, sans-serif" font-size="23" font-weight="700">£2,475.60</text>
+  <text x="242" y="568" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="21">Next step</text>
+  <text x="958" y="568" text-anchor="end" fill="#047857" font-family="Inter, Arial, sans-serif" font-size="23" font-weight="700">Ready for review</text>
+</svg>

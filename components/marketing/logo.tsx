@@ -28,7 +28,7 @@ export function Logo({ className, tone = "brand", markClassName }: { className?:
   return (
     <span className={cn("inline-flex items-center gap-2", className)}>
       <BiteMark tone={tone} className={cn("h-7 w-7 shrink-0", markClassName)} />
-      <span className={cn("font-display text-[1.35rem] font-bold leading-none tracking-[-0.03em]", tone === "inverse" ? "text-white" : "text-stone-900")}>
+      <span className={cn("font-display text-[1.35rem] font-bold leading-none tracking-[-0.03em]", tone === "inverse" ? "text-white" : "text-slate-900")}>
         DocuBite
       </span>
     </span>

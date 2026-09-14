@@ -23,10 +23,10 @@ type FieldName = keyof typeof RULES
 
 function Field({ label, name, error, children, hint }: { label: string; name?: string; error?: string; children: React.ReactNode; hint?: string }) {
   return <label className="flex flex-col gap-1.5">
-    <span className="text-sm font-medium text-stone-800">{label}</span>
+    <span className="text-sm font-medium text-slate-800">{label}</span>
     {children}
     {error && <span id={`${name}-error`} className="text-sm font-medium text-red-700">{error}</span>}
-    {hint && <span className="text-xs text-stone-500">{hint}</span>}
+    {hint && <span className="text-xs text-slate-600">{hint}</span>}
   </label>
 }
 
@@ -40,10 +40,10 @@ export function DemoForm() {
     return (
       <div className="rounded-[2rem] rounded-tr-md border border-emerald-200 bg-emerald-50 p-8 text-center">
         <CheckCircle2 className="mx-auto h-9 w-9 text-emerald-700" strokeWidth={1.6} />
-        <h2 className="mt-4 font-display text-2xl font-bold tracking-[-0.02em] text-stone-900">Request received</h2>
-        <p className="mx-auto mt-2 max-w-sm leading-7 text-stone-600">
+        <h2 className="mt-4 font-display text-2xl font-bold tracking-[-0.02em] text-slate-900">Request received</h2>
+        <p className="mx-auto mt-2 max-w-sm leading-7 text-slate-600">
           A person reads this, not a sequencer. We will reply from the support inbox within one business day to find a
-          time — bring your most awkward document to the call.
+          time — bring a real document you would like to discuss.
         </p>
       </div>
     )
@@ -95,7 +95,7 @@ export function DemoForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4 rounded-[2rem] rounded-tr-md border border-stone-200 bg-white p-6 shadow-[0_28px_70px_-48px_rgba(41,37,36,.5)] sm:p-8">
+    <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4 rounded-[2rem] rounded-tr-md bg-white p-6 shadow-[0_28px_70px_-48px_rgba(41,37,36,.5)] sm:p-8">
       <Field label="Your name" name="name" error={fieldErrors.name}>
         <Input name="name" required autoComplete="name" placeholder="Alex Moreau" {...fieldProps("name")} />
       </Field>
@@ -111,7 +111,7 @@ export function DemoForm() {
         </NativeSelect>
       </Field>
       <Field label="Anything we should look at?" hint="Optional — the document type that gives you the most trouble is the most useful thing to tell us.">
-        <Textarea name="message" rows={4} placeholder="We process about 400 handwritten delivery notes a month…" />
+        <Textarea name="message" rows={4} placeholder="We process about 400 supplier invoices a month…" />
       </Field>
 
       {/* Honeypot: hidden from people, filled in by bots. See submitDemoRequest. */}

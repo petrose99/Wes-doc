@@ -96,7 +96,7 @@ export function SignupForm({ defaultEmail, redirectTo = "/workspaces", googleEna
         <PasswordField label="Password" name="password" value={password} onChange={setPassword} autoComplete="new-password" minLength={MIN_PASSWORD_LENGTH} />
         <p className="-mt-2 text-xs text-slate-500">At least {MIN_PASSWORD_LENGTH} characters, including a number and a special character.</p>
 
-        <SubmitButton busy={busy}>{busy ? "Creating your workspace…" : "Start free trial"}</SubmitButton>
+        <SubmitButton busy={busy}>{busy ? "Creating your workspace…" : "Create your workspace"}</SubmitButton>
 
         {error && <FormError>{error}</FormError>}
       </form>

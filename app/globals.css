@@ -3,13 +3,6 @@
 @custom-variant dark (&:where(.dark, .dark *));
 @config "../tailwind.config.ts";
 
-/* Warm paper cream for the marketing site only — the app shell keeps its slate/white tokens. */
-@theme {
-  --color-cream-50: #FBF7F0;
-  --color-cream-100: #F5EEE1;
-  --color-cream-200: #EDE3D0;
-}
-
 /* The palette is emerald on a cool slate neutral ramp — the colours the app shell already uses
  * for its brand mark, active nav item and links. The stock shadcn tokens these replaced were a
  * near-black primary (240 5.9% 10%) on cool blue-grey neutrals, so every Button rendered flat

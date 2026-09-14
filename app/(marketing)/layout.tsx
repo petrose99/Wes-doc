@@ -27,14 +27,24 @@ export default async function MarketingLayout({ children }: { children: React.Re
     getSession().catch(() => null),
     new Promise<null>((resolve) => setTimeout(() => resolve(null), SESSION_LOOKUP_TIMEOUT_MS)),
   ])
-  const user = session ? await getUserBySupabaseUserId(session.user.id) : null
-  const workspace = user ? (await getWorkspacesForUser(user.id))[0] : null
-  const workspaceHref = user ? (workspace ? `/workspaces/${workspace.id}` : "/workspaces") : undefined
+  let workspaceHref: string | undefined
+  if (session) {
+    try {
+      const user = await getUserBySupabaseUserId(session.user.id)
+      const workspace = user ? (await getWorkspacesForUser(user.id))[0] : null
+      workspaceHref = user ? (workspace ? `/workspaces/${workspace.id}` : "/workspaces") : undefined
+    } catch {
+      // A stale session or unavailable local database must not replace a public page with the
+      // global error screen. The signed-out nav is the safe, honest fallback until the next
+      // request can resolve the local account and workspace again.
+      workspaceHref = undefined
+    }
+  }
 
   return (
-    <div className="flex min-h-screen flex-col bg-cream-50 text-stone-900">
+    <div className="flex min-h-screen flex-col bg-white text-slate-900">
       <MarketingNav workspaceHref={workspaceHref} />
-      <main className="flex-1">{children}</main>
+      <main id="main-content" className="flex-1">{children}</main>
       <MarketingFooter />
     </div>
   )

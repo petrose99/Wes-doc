@@ -1,7 +1,6 @@
 "use client"
 
 import {
-  Camera,
   ChevronDown,
   ClipboardList,
   FileCheck,
@@ -9,13 +8,10 @@ import {
   FileText,
   FlaskConical,
   Landmark,
-  Layers,
   Mail,
   Package,
-  PenLine,
   Plus,
   Receipt,
-  ScanLine,
   ShieldCheck,
   Truck,
   type LucideIcon,
@@ -37,16 +33,12 @@ const ICONS = {
   FileCheck,
   ClipboardList,
   FileSignature,
-  PenLine,
-  ScanLine,
-  Camera,
-  Layers,
 } satisfies Record<string, LucideIcon>
 
 export type DocCard = { name: string; text: string; icon: keyof typeof ICONS }
 
-/** The card grid used for both "by document type" and "by document quality" on the solutions
- * page. `collapseAfter` keeps the long by-type list (a dozen-plus entries once every vertical
+/** The card grid used for the document-type list on the solutions page. `collapseAfter` keeps the
+ * long by-type list (a dozen-plus entries once every vertical
  * gets its own row) from turning the page into one long scroll — it renders behind a "Show all"
  * toggle instead of being cut down to a shorter, less complete list. */
 export function DocTypeGrid({ cards, showCustomCard, collapseAfter }: { cards: DocCard[]; showCustomCard?: boolean; collapseAfter?: number }) {
@@ -63,11 +55,11 @@ export function DocTypeGrid({ cards, showCustomCard, collapseAfter }: { cards: D
             <a
               key={card.name}
               href="#cta"
-              className="flex flex-col rounded-[1.375rem] rounded-tr-md border border-stone-200 bg-white p-5 transition-shadow hover:shadow-[0_24px_60px_-40px_rgba(41,37,36,.5)]"
+              className="flex flex-col rounded-[1.375rem] rounded-tr-md border border-slate-200 bg-white p-5 transition-shadow hover:shadow-[0_24px_60px_-40px_rgba(41,37,36,.5)]"
             >
               <span className="flex h-[38px] w-[38px] items-center justify-center rounded-xl rounded-tr-sm bg-emerald-50 text-emerald-700"><Icon className="h-[18px] w-[18px]" /></span>
-              <span className="mt-3.5 font-display text-[17px] font-bold tracking-[-0.02em] text-stone-900">{card.name}</span>
-              <span className="mt-1.5 flex-1 text-[13.5px] leading-[1.5] text-stone-600">{card.text}</span>
+              <span className="mt-3.5 font-display text-[17px] font-bold tracking-[-0.02em] text-slate-900">{card.name}</span>
+              <span className="mt-1.5 flex-1 text-[13.5px] leading-[1.5] text-slate-600">{card.text}</span>
             </a>
           )
         })}
@@ -77,8 +69,8 @@ export function DocTypeGrid({ cards, showCustomCard, collapseAfter }: { cards: D
             className="flex flex-col rounded-[1.375rem] rounded-tr-md border border-dashed border-emerald-200 bg-emerald-50/40 p-5 transition-shadow hover:shadow-[0_24px_60px_-40px_rgba(41,37,36,.5)]"
           >
             <span className="flex h-[38px] w-[38px] items-center justify-center rounded-xl rounded-tr-sm bg-emerald-50 text-emerald-700"><Plus className="h-[18px] w-[18px]" /></span>
-            <span className="mt-3.5 font-display text-[17px] font-bold tracking-[-0.02em] text-stone-900">Your document</span>
-            <span className="mt-1.5 flex-1 text-[13.5px] leading-[1.5] text-stone-600">Define your own fields with a custom template</span>
+            <span className="mt-3.5 font-display text-[17px] font-bold tracking-[-0.02em] text-slate-900">Your document</span>
+            <span className="mt-1.5 flex-1 text-[13.5px] leading-[1.5] text-slate-600">Define your own fields with a custom template</span>
           </a>
         )}
       </div>

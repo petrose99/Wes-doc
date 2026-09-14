@@ -10,6 +10,15 @@ const nextConfig: NextConfig = {
   // different cause (the terminal tool's cwd, not Turbopack) — but Next's own docs are explicit
   // that an ambiguous root changes what gets resolved, so pinning it is worth doing regardless.
   turbopack: { root: import.meta.dirname },
+  async redirects() {
+    return [
+      { source: "/solutions/invoices", destination: "/product/extraction", permanent: true },
+      { source: "/solutions/receipts", destination: "/product/extraction", permanent: true },
+      { source: "/solutions/expense-receipts", destination: "/product/extraction", permanent: true },
+      { source: "/solutions/bank-statements", destination: "/product/extraction", permanent: true },
+      { source: "/solutions/scanned-pdfs", destination: "/product/extraction", permanent: true },
+    ]
+  },
   async headers() {
     // Baseline browser protections. The Content-Security-Policy itself lives in proxy.ts now, not
     // here: an enforced, nonce-based script-src has to be generated per-request (a fresh nonce

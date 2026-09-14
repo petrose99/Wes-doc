@@ -1,6 +1,7 @@
 "use client"
 
 import { GROW, IN, POP, usePlayOnScroll } from "@/components/marketing/landing/_lib/use-play-on-scroll"
+import { MOCK_TYPE } from "@/components/marketing/landing/_lib/mock-scale"
 import { Check, Sparkles } from "lucide-react"
 
 /** Automation — the product stops asking questions it already knows the answer to.
@@ -34,7 +35,7 @@ const POINTS = [
   },
   {
     title: "It ties the paperwork together",
-    body: "Purchase order to invoice to receipt, and bank lines to the invoices they paid — matched for you, so accepting one closes the loop in the ledger too.",
+    body: "Purchase order to invoice to receipt, and bank lines to the invoices they paid, matched for you so accepting one closes the loop in the ledger too.",
   },
 ]
 
@@ -52,46 +53,39 @@ export function Automation() {
     <section
       id="automation"
       ref={ref}
-      className="relative overflow-hidden border-y border-cream-200 bg-cream-50 py-16 md:py-24"
+      className="relative overflow-hidden border-y border-slate-200 bg-white py-16 md:py-24"
     >
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -right-40 top-1/4 h-[30rem] w-[30rem] rounded-full"
-        style={{ background: "radial-gradient(circle, rgba(16,185,129,.12), transparent 70%)" }}
-      />
-
       <div className="relative mx-auto max-w-6xl px-5">
         <div className="max-w-[44rem]">
-          <span className="text-[0.74rem] font-bold uppercase tracking-[.08em] text-emerald-700">Controls</span>
-          <h2 className="mt-3 text-balance font-display text-[clamp(2.05rem,3.4vw,3rem)] font-extrabold leading-[1.05] tracking-[-0.035em] text-stone-950">
+            <h2 className="text-balance font-display text-[clamp(2.05rem,3.4vw,3rem)] font-extrabold leading-[1.05] tracking-[-0.035em] text-slate-950">
             It watches how you code, then stops asking
           </h2>
-          <p className="mt-5 text-pretty text-[1.06rem] leading-[1.62] text-stone-600">
+          <p className="mt-5 max-w-[36rem] text-pretty text-[1.06rem] leading-[1.62] text-slate-600">
             Three invoices from the same supplier, coded the same way, and the fourth codes itself. Nothing
-            switches on by itself, though — you decide how far the pipeline may go without you, and you can see
+            switches on by itself, though; you decide how far the pipeline may go without you, and you can see
             exactly how much of last month actually went through untouched before you move it again.
           </p>
         </div>
 
         <div className="mt-10 flex flex-wrap items-start gap-8 md:gap-12">
           <div className="min-w-0 flex-1 basis-[430px]">
-            <div className="overflow-hidden rounded-2xl border border-cream-200 bg-white shadow-[0_1px_2px_rgba(28,25,23,.04),0_18px_44px_rgba(28,25,23,.09)]">
+            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(28,25,23,.04),0_18px_44px_rgba(28,25,23,.09)]">
               <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-3.5">
-                <span className="truncate font-display text-[0.95rem] font-bold text-slate-900">Northwind Trading</span>
-                <span className="shrink-0 text-[0.72rem] font-semibold text-slate-400">Coding history</span>
+                <span className={`min-w-0 break-words font-display font-bold text-slate-900 ${MOCK_TYPE.evidence}`}>Northwind Trading</span>
+                <span className={`shrink-0 font-semibold text-slate-600 ${MOCK_TYPE.supporting}`}>Coding history</span>
               </div>
 
               <div className="flex flex-col gap-2 px-5 py-4">
                 {HISTORY.map((row) => (
                   <div
                     key={row.doc}
-                    className={`flex items-center gap-3 rounded-lg border border-slate-100 bg-slate-50/70 px-3 py-2.5 ${played ? IN : ""}`}
+                    className={`flex items-center gap-3 border-b border-slate-100 px-3 py-2.5 last:border-b-0 ${played ? IN : ""}`}
                     style={played ? { animationDelay: `${row.delay}s` } : undefined}
                   >
                     <Check aria-hidden className="h-3.5 w-3.5 shrink-0 text-emerald-600" strokeWidth={2.8} />
-                    <span className="min-w-0 flex-1 truncate text-[0.8rem] font-semibold text-slate-800">{row.doc}</span>
-                    <span className="shrink-0 text-[0.72rem] text-slate-400">{row.month}</span>
-                    <span className="shrink-0 rounded bg-white px-1.5 py-0.5 font-mono text-[0.7rem] text-slate-600 ring-1 ring-slate-200">
+                    <span className={`min-w-0 flex-1 break-words font-semibold text-slate-800 ${MOCK_TYPE.evidence}`}>{row.doc}</span>
+                    <span className={`shrink-0 text-slate-600 ${MOCK_TYPE.supporting}`}>{row.month}</span>
+                    <span className={`shrink-0 rounded bg-white px-1.5 py-0.5 font-mono text-slate-600 ring-1 ring-slate-200 ${MOCK_TYPE.supporting}`}>
                       6000
                     </span>
                   </div>
@@ -103,50 +97,50 @@ export function Automation() {
                 style={played ? { animationDelay: "1.2s" } : undefined}
               >
                 <Sparkles aria-hidden className="h-4 w-4 shrink-0 text-emerald-700" strokeWidth={2.2} />
-                <p className="text-[0.84rem] font-semibold text-emerald-900">
+                <p className={`font-semibold text-emerald-900 ${MOCK_TYPE.evidence}`}>
                   Codes itself from here. The AI is not asked again.
                 </p>
               </div>
             </div>
 
-            <dl className="mt-7 divide-y divide-cream-200 border-t border-cream-200">
+            <dl className="mt-7 divide-y divide-slate-200 border-t border-slate-200">
               {POINTS.map((point) => (
                 <div key={point.title} className="py-4">
-                  <dt className="font-display text-[1.02rem] font-bold tracking-[-0.01em] text-stone-900">{point.title}</dt>
-                  <dd className="mt-1.5 text-pretty text-[0.94rem] leading-[1.58] text-stone-600">{point.body}</dd>
+                  <dt className="font-display text-[1.02rem] font-bold tracking-[-0.01em] text-slate-900">{point.title}</dt>
+                  <dd className="mt-1.5 max-w-[32rem] text-pretty text-[0.94rem] leading-[1.58] text-slate-600">{point.body}</dd>
                 </div>
               ))}
             </dl>
           </div>
 
           <div className="min-w-0 flex-1 basis-[380px]">
-            <h3 className="font-display text-[1.05rem] font-bold tracking-[-0.02em] text-stone-900">How far it may go is your call</h3>
+            <h3 className="font-display text-[1.05rem] font-bold tracking-[-0.02em] text-slate-900">How far it may go is your call</h3>
             <div className="mt-3.5 flex flex-col gap-2">
               {RUNGS.map((rung, i) => (
                 <div
                   key={rung.name}
-                  className={`rounded-xl border bg-white p-4 ${rung.lit ? "border-emerald-200 shadow-panel" : "border-cream-200"}`}
+                  className={`rounded-xl border bg-white p-4 ${rung.lit ? "border-emerald-200 shadow-panel" : "border-slate-200"}`}
                 >
-                  <span className="mb-3 block h-1 overflow-hidden rounded-full bg-stone-100" aria-hidden>
+                  <span className="mb-3 block h-1 overflow-hidden rounded-full bg-slate-100" aria-hidden>
                     <span
-                      className={`block h-full origin-left rounded-full ${rung.lit ? "bg-emerald-600" : "bg-stone-200"} ${played ? GROW : ""}`}
+                      className={`block h-full origin-left rounded-full ${rung.lit ? "bg-emerald-600" : "bg-slate-200"} ${played ? GROW : ""}`}
                       style={{ width: rung.lit ? "100%" : "22%", ...(played ? { animationDelay: `${0.2 + i * 0.12}s` } : {}) }}
                     />
                   </span>
                   <div className="flex flex-wrap items-baseline gap-x-2">
-                    <h4 className="font-display text-[1rem] font-bold tracking-[-0.01em] text-stone-900">{rung.name}</h4>
-                    {rung.lit && <span className="text-[0.72rem] font-bold text-emerald-700">Where everyone starts</span>}
+                    <h4 className={`font-display font-bold tracking-[-0.01em] text-slate-900 ${MOCK_TYPE.evidence}`}>{rung.name}</h4>
+                    {rung.lit && <span className={`font-bold text-emerald-700 ${MOCK_TYPE.supporting}`}>Where everyone starts</span>}
                   </div>
-                  <p className="mt-1 text-pretty text-[0.88rem] leading-[1.5] text-stone-600">{rung.body}</p>
+                  <p className={`mt-1 text-pretty text-slate-600 ${MOCK_TYPE.evidence}`}>{rung.body}</p>
                 </div>
               ))}
             </div>
 
-            <div className="mt-6 rounded-xl border border-cream-200 bg-white/70 p-4">
-              <h4 className="font-display text-[0.98rem] font-bold tracking-[-0.01em] text-stone-900">What still stops it</h4>
+            <div className="mt-6 rounded-xl border border-slate-200 bg-white/70 p-4">
+              <h4 className={`font-display font-bold tracking-[-0.01em] text-slate-900 ${MOCK_TYPE.evidence}`}>What still stops it</h4>
               <ul className="mt-2 flex flex-col gap-1.5">
                 {GUARDS.map((guard) => (
-                  <li key={guard} className="flex items-start gap-2 text-[0.86rem] leading-[1.5] text-stone-600">
+                  <li key={guard} className={`flex items-start gap-2 text-slate-600 ${MOCK_TYPE.evidence}`}>
                     <span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-emerald-600" aria-hidden />
                     {guard}
                   </li>

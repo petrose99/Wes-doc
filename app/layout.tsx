@@ -1,4 +1,3 @@
-import { InstallPrompt } from "@/components/shell/install-prompt"
 import config from "@/lib/config"
 import type { Metadata, Viewport } from "next"
 import { Bricolage_Grotesque } from "next/font/google"
@@ -70,7 +69,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     // hydrates, so server and client markup differ on this one element by design. It suppresses
     // the warning for <html> only — children still report mismatches normally.
     <html lang="en" suppressHydrationWarning className={`${inter.variable} ${display.variable}`}>
-      <body className="min-h-screen bg-white antialiased"><InstallPrompt />{children}</body>
+      <body className="min-h-screen bg-white antialiased">
+        {children}
+      </body>
     </html>
   )
 }
