@@ -132,6 +132,11 @@ model Workspace {
   /// projection contract in `lib/jurisdictions/_shared/project-bill.ts` (#82). Only
   /// meaningful when the projected bill is `isImport = true`; ignored otherwise.
   deferredVatScheme  Boolean?            @map("deferred_vat_scheme")
+  /// #206: acceptable overage, as a percentage of ordered quantity, before the PO/invoice
+  /// line-consumption check flags a description group as over-invoiced. Separate from
+  /// DocumentCheckResult's amount-level tolerance (lib/checks/types.ts's amountTolerance) —
+  /// this one governs quantity, not currency amount.
+  poQuantityTolerancePercent Float       @default(5) @map("po_quantity_tolerance_percent")
   createdAt       DateTime               @default(now()) @map("created_at")
   updatedAt       DateTime               @updatedAt @map("updated_at")
   members         WorkspaceMember[]

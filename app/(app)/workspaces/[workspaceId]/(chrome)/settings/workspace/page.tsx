@@ -1,6 +1,7 @@
 import { ResetTourButton } from "@/components/onboarding/reset-tour-button"
 import { WorkspaceAiToggle } from "@/components/workspace/ai-toggle"
 import { WorkspaceDangerZone } from "@/components/workspace/danger-zone"
+import { PoQuantityTolerance } from "@/components/workspace/po-quantity-tolerance"
 import { InvitePanel } from "@/components/workspace/invite-panel"
 import { MembersTable } from "@/components/workspace/members-table"
 import { TeamWorkspaceForm } from "@/components/workspace/team-workspace-form"
@@ -63,6 +64,16 @@ export default async function WorkspaceSettingsPage({ params }: { params: Promis
         <InvitePanel workspaceId={workspaceId} invitations={invitations.map((invitation) => ({ id: invitation.id, email: invitation.email, role: invitation.role, expiresAt: invitation.expiresAt.toISOString() }))} />
       </CardContent>
     </Card>}
+
+    <Card>
+      <CardHeader>
+        <CardTitle>Matching</CardTitle>
+        <CardDescription>Controls for automated PO/invoice/receipt matching checks.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <PoQuantityTolerance workspaceId={workspaceId} percent={membership.workspace.poQuantityTolerancePercent} />
+      </CardContent>
+    </Card>
 
     <Card>
       <CardHeader>

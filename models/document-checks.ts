@@ -5,6 +5,7 @@ import { track } from "@/lib/analytics"
 import { recordSystemAudit } from "@/lib/audit"
 import { checkInvoiceArithmetic } from "@/lib/checks/arithmetic"
 import { checkLineItemArithmetic } from "@/lib/checks/line-item-arithmetic"
+import { checkPoLineConsumption, type PoLineConsumptionInput } from "@/lib/checks/po-line-consumption"
 import { checkAmountAnomaly } from "@/lib/checks/amount-anomaly"
 import { checkBankDetails } from "@/lib/checks/bank-details"
 import { checkPdfForensics, readPdfForensicSignals } from "@/lib/checks/pdf-forensics"
@@ -84,6 +85,13 @@ export async function runDeterministicChecks(input: { workspaceId: string; docum
       if (arithmetic) results.push(arithmetic)
       const lineArithmetic = checkLineItemArithmetic({ currencyCode, lineItems })
       if (lineArithmetic) results.push(lineArithmetic)
+    }
+
+    // #206: cumulative PO/invoice line-consumption, only meaningful once this invoice is matched
+    // to a PO (lib/matching engine's po_to_invoice edge).
+    if (map.lineItems) {
+      const poConsumption = await checkPoLineConsumptionAgainstMatchedPo(input.workspaceId, document.id, map.lineItems, values)
+      if (poConsumption) results.push(poConsumption)
     }
 
     if (map.openingBalance && map.closingBalance) {
@@ -211,6 +219,49 @@ async function persistCheckResult(workspaceId: string, documentId: string, resul
   } catch (error) {
     console.error("[checks] check.failed webhook emit failed:", error instanceof Error ? error.message : error)
   }
+}
+
+/** #206 wiring: finds the PO this invoice matched to (lib/matching's po_to_invoice edge), pulls
+ * its line items plus every sibling invoice already matched to the same PO, and hands the pooled
+ * consumption to the pure checker. Skips silently when the invoice has no PO match yet — the
+ * check only makes sense once matching has run. */
+async function checkPoLineConsumptionAgainstMatchedPo(workspaceId: string, documentId: string, lineItemsKey: string, currentValues: Record<string, unknown>): Promise<CheckResult | null> {
+  try {
+    const match = await prisma.documentMatch.findFirst({ where: { workspaceId, matchType: "po_to_invoice", targetId: documentId }, select: { sourceId: true } })
+    if (!match) return null
+    const po = await prisma.document.findFirst({ where: { id: match.sourceId, workspaceId }, select: { reviewedData: true, rawExtraction: true } })
+    const poValues = (po?.reviewedData ?? po?.rawExtraction ?? {}) as Record<string, unknown>
+    const poLineItems = parseLineItemsForConsumption(poValues[lineItemsKey])
+    if (!poLineItems.length) return null
+
+    const siblingMatches = await prisma.documentMatch.findMany({ where: { workspaceId, matchType: "po_to_invoice", sourceId: match.sourceId, targetId: { not: documentId } }, select: { targetId: true } })
+    const siblings = siblingMatches.length ? await prisma.document.findMany({ where: { workspaceId, id: { in: siblingMatches.map((s) => s.targetId) } }, select: { id: true, reviewedData: true } }) : []
+
+    const invoiceLineItems: PoLineConsumptionInput["invoiceLineItems"] = parseLineItemsForConsumption(currentValues[lineItemsKey]).map((item, rowIndex) => ({ documentId, rowIndex, ...item }))
+    for (const sibling of siblings) {
+      const values = (sibling.reviewedData ?? {}) as Record<string, unknown>
+      invoiceLineItems.push(...parseLineItemsForConsumption(values[lineItemsKey]).map((item, rowIndex) => ({ documentId: sibling.id, rowIndex, ...item })))
+    }
+
+    const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId }, select: { poQuantityTolerancePercent: true } })
+    return checkPoLineConsumption({
+      poLineItems,
+      invoiceLineItems,
+      tolerancePercent: workspace?.poQuantityTolerancePercent ?? 5,
+      currentDocumentId: documentId,
+    })
+  } catch (error) {
+    console.error("[checks] po line consumption lookup failed:", error instanceof Error ? error.message : error)
+    return null
+  }
+}
+
+function parseLineItemsForConsumption(value: unknown): Array<{ description: string | null; quantity: number | null }> {
+  if (!Array.isArray(value)) return []
+  return value.map((item) => {
+    const row = item as Record<string, unknown> | null
+    return { description: asString(row?.description), quantity: asNumber(row?.quantity) }
+  })
 }
 
 /** A2.2 wiring: resolves the extracted supplier through the A5 registry, compares this document's

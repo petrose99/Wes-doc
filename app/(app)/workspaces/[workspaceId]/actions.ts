@@ -430,6 +430,20 @@ export async function setWorkspaceAiAction(workspaceId: string, enabled: boolean
   } catch { return { success: false, error: "Could not change the AI setting" } }
 }
 
+/** #206: the acceptable overage (percent of ordered quantity) before the PO/invoice line-
+ * consumption check flags a description group. 0-100 is the sane range for a percentage read
+ * as "how far over is still fine" — anything beyond that isn't a tolerance any more. */
+export async function setPoQuantityToleranceAction(workspaceId: string, percent: number): Promise<ActionState<null>> {
+  const user = await getCurrentUser()
+  if (!(await requireMember(workspaceId, user.id, ["owner"]))) return { success: false, error: NO_ACCESS }
+  if (!Number.isFinite(percent) || percent < 0 || percent > 100) return { success: false, error: "Enter a percentage between 0 and 100" }
+  try {
+    await prisma.workspace.update({ where: { id: workspaceId }, data: { poQuantityTolerancePercent: percent } })
+    revalidatePath(paths(workspaceId).workspace)
+    return { success: true, data: null }
+  } catch { return { success: false, error: "Could not change the tolerance setting" } }
+}
+
 /** F15: turning hipaaMode on immediately forces every file's linkAccess back to "none" — the
  * whole point is that no file in a hipaaMode workspace should be openable by a bare URL, and
  * leaving already-shared links live until someone happens to touch them would defeat that. This
