@@ -176,6 +176,20 @@ export async function reclassifyDocumentAction(workspaceId: string, documentId: 
   return { success: true, data: null }
 }
 
+/** #215: lets a list-screen row (Invoices, Receipts) expand the standalone document detail pane
+ * in place instead of navigating away. Reuses `DocumentDetailPage`'s existing data-fetch and
+ * `<SplitPane>` render as-is — Server Actions can return JSX in this Next.js version, and the
+ * returned node hydrates its client parts normally when a Client Component stores it in state.
+ * The standalone `/documents/[documentId]` route is untouched, so deep links and back/forward
+ * keep working exactly as before. */
+export async function getInlineDocumentDetailAction(workspaceId: string, documentId: string, stage?: string) {
+  const { DocumentDetailPage } = await import("./documents/[documentId]/page")
+  return DocumentDetailPage({
+    params: Promise.resolve({ workspaceId, documentId }),
+    searchParams: Promise.resolve({ stage }),
+  })
+}
+
 export async function saveDocumentReviewAction(workspaceId: string, documentId: string, formData: FormData): Promise<ActionState<null>> {
   const user = await getCurrentUser()
   if (!(await requireMember(workspaceId, user.id))) return { success: false, error: NO_ACCESS }

@@ -1,0 +1,245 @@
+"use client"
+
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { useState } from "react"
+import { toast } from "sonner"
+import { CheckCircle2, Download, Loader2, Trash2 } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
+import { ListScreenBulkActionBar } from "@/components/list-screen/list-screen-shell"
+import { InlineDocumentPanel } from "@/components/list-screen/inline-document-panel"
+import { bulkExportDocumentsAction, deletePipelineDocumentsAction, moveDocumentsToStageAction } from "@/app/(app)/workspaces/[workspaceId]/pipeline-actions"
+import { getInlineDocumentDetailAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
+import { downloadCsv } from "@/lib/client/download-csv"
+import type { BillRow } from "@/models/bills"
+import type { AgingBucket } from "@/lib/bills/due-date"
+import type { ReactNode } from "react"
+
+/** #213: Invoices row-selection + bulk action bar (Approve / Export / Prepare payment run /
+ * Delete — #179 point 3). Selection state lives here, one level above the table rows, since the
+ * bulk bar and the checkboxes both need it. #215 adds in-place split-pane row expansion — clicking
+ * a row's supplier link toggles the inline panel instead of navigating away; the standalone
+ * `/documents/[documentId]` route is untouched underneath for deep links and back/forward. */
+export function InvoiceTable({ workspaceId, basePath, bills, payableDocumentIds, preparePaymentRunAction }: {
+  workspaceId: string
+  basePath: string
+  bills: BillRow[]
+  payableDocumentIds: string[]
+  preparePaymentRunAction: (formData: FormData) => Promise<void>
+}) {
+  const router = useRouter()
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [busy, setBusy] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const loadDetail = (documentId: string): Promise<ReactNode> => getInlineDocumentDetailAction(workspaceId, documentId)
+
+  const selectedIds = [...selected]
+  const payableSelected = selectedIds.filter((id) => payableDocumentIds.includes(id))
+  const allSelected = bills.length > 0 && selected.size === bills.length
+
+  const toggle = (id: string) => setSelected((prev) => {
+    const next = new Set(prev)
+    if (next.has(id)) next.delete(id); else next.add(id)
+    return next
+  })
+  const toggleAll = () => setSelected(allSelected ? new Set() : new Set(bills.map((bill) => bill.documentId)))
+  const clearSelection = () => setSelected(new Set())
+
+  const approve = async () => {
+    setBusy(true)
+    try {
+      const result = await moveDocumentsToStageAction(workspaceId, selectedIds, "approved")
+      if (!result.success) { toast.error(result.error || "Approve failed"); return }
+      const approved = result.data?.approved ?? 0
+      const heldBack = result.data?.heldBack ?? 0
+      if (approved > 0 && heldBack === 0) toast.success(`Approved ${approved}`)
+      else if (approved > 0) toast.warning(`Approved ${approved} — ${heldBack} held back (missing required fields or document type)`)
+      else toast.warning(`Nothing approved — ${heldBack} still missing required fields or a document type.`)
+      clearSelection()
+      router.refresh()
+    } catch {
+      toast.error("Could not reach the server")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const exportCsv = async () => {
+    setBusy(true)
+    try {
+      const result = await bulkExportDocumentsAction(workspaceId, selectedIds)
+      if (!result.success || !result.data) { toast.error(result.error || "Export failed"); return }
+      downloadCsv(result.data.csv, "invoices.csv")
+      toast.success(`Exported ${selectedIds.length}`)
+    } catch {
+      toast.error("Could not reach the server")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const remove = async () => {
+    setConfirmingDelete(false)
+    setBusy(true)
+    try {
+      const result = await deletePipelineDocumentsAction(workspaceId, selectedIds)
+      if (!result.success) { toast.error(result.error || "Delete failed"); return }
+      toast.success(`Deleted ${result.data?.deleted ?? selectedIds.length}`)
+      clearSelection()
+      router.refresh()
+    } catch {
+      toast.error("Could not reach the server")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const dis = busy || selectedIds.length === 0
+
+  return <>
+    {selectedIds.length > 0 && <ListScreenBulkActionBar selectedCount={selectedIds.length}>
+      <Button type="button" size="sm" disabled={dis} onClick={() => void approve()}>
+        {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}Approve
+      </Button>
+      <Button type="button" size="sm" variant="outline" disabled={dis} onClick={() => void exportCsv()}>
+        {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}Export
+      </Button>
+      {payableSelected.length > 0 && (
+        <form action={preparePaymentRunAction}>
+          {payableSelected.map((id) => <input key={id} type="hidden" name="documentId" value={id} />)}
+          <Button type="submit" size="sm" variant="outline" disabled={busy}>
+            Prepare payment run ({payableSelected.length})
+          </Button>
+        </form>
+      )}
+      <Button type="button" size="sm" variant="destructive" disabled={dis} onClick={() => setConfirmingDelete(true)}>
+        <Trash2 className="h-3.5 w-3.5" />Delete
+      </Button>
+    </ListScreenBulkActionBar>}
+
+    <div className="-mx-6 overflow-x-auto">
+      <table className="w-full min-w-[760px] text-sm">
+        <thead>
+          <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
+            <th className="w-9 px-4 py-2">
+              <label className="flex h-6 w-6 cursor-pointer items-center justify-center">
+                <input type="checkbox" aria-label="Select all invoices" checked={allSelected} onChange={toggleAll} className="h-4 w-4 rounded border-slate-300" />
+              </label>
+            </th>
+            <th className="px-4 py-2 font-medium">Supplier</th>
+            <th className="px-4 py-2 font-medium">Invoice #</th>
+            <th className="px-4 py-2 font-medium">Amount</th>
+            <th className="px-4 py-2 font-medium">Due</th>
+            <th className="px-4 py-2 font-medium">Aging</th>
+            <th className="px-4 py-2 font-medium">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {bills.map((bill) => (
+            <BillTableRow key={bill.documentId} basePath={basePath} bill={bill} selected={selected.has(bill.documentId)}
+              expanded={expandedId === bill.documentId}
+              onToggle={() => toggle(bill.documentId)}
+              onToggleExpand={() => setExpandedId((current) => (current === bill.documentId ? null : bill.documentId))}
+              loadDetail={loadDetail} />
+          ))}
+        </tbody>
+      </table>
+    </div>
+
+    <ConfirmDialog
+      open={confirmingDelete}
+      destructive
+      busy={busy}
+      title={`Delete ${selectedIds.length} invoice${selectedIds.length === 1 ? "" : "s"}?`}
+      description="This removes their extracted rows and the uploaded sources behind them. This cannot be undone."
+      confirmLabel={busy ? "Deleting…" : "Delete"}
+      onConfirm={() => void remove()}
+      onCancel={() => setConfirmingDelete(false)} />
+  </>
+}
+
+/** Row height matches the 62px figure measured live from the Vic.ai tour and recorded on #182 —
+ * not re-derived here. py-[19.5px] on the cells plus the 1px border below gets a 62px row. The
+ * supplier link toggles the #215 inline detail panel instead of navigating; a modified click
+ * (ctrl/cmd/middle-click, or "open in new tab") still follows the href to the standalone route. */
+function BillTableRow({ basePath, bill, selected, expanded, onToggle, onToggleExpand, loadDetail }: {
+  basePath: string
+  bill: BillRow
+  selected: boolean
+  expanded: boolean
+  onToggle: () => void
+  onToggleExpand: () => void
+  loadDetail: (documentId: string) => Promise<ReactNode>
+}) {
+  return (
+    <>
+      <tr className={`border-b border-slate-100 transition-colors hover:bg-slate-50 ${selected || expanded ? "bg-emerald-50/40" : ""}`} style={{ height: 62 }}>
+        <td className="px-4 py-2.5"><input type="checkbox" aria-label={`Select ${bill.supplier ?? "invoice"}`} checked={selected} onChange={onToggle} className="h-4 w-4 rounded border-slate-300" /></td>
+        <td className="px-4 py-2.5">
+          <Link href={`${basePath}/${bill.documentId}`} aria-expanded={expanded}
+            className="text-slate-800 hover:text-emerald-700 hover:underline"
+            onClick={(e) => {
+              if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button === 1) return
+              e.preventDefault()
+              onToggleExpand()
+            }}>
+            {bill.supplier ?? <span className="italic text-slate-400">unknown supplier</span>}
+          </Link>
+          <div className="text-xs text-slate-500 truncate max-w-[240px]">{bill.filename}</div>
+        </td>
+        <td className="px-4 py-2.5 text-slate-600">{bill.invoiceNumber ?? "—"}</td>
+        <td className="px-4 py-2.5 tabular-nums text-slate-800">{bill.total !== null ? formatMoney(bill.total, bill.currencyCode) : "—"}</td>
+        <td className="px-4 py-2.5 tabular-nums text-slate-600">
+          {bill.dueDate ? bill.dueDate.toISOString().slice(0, 10) : "—"}
+          {bill.dueDate && !bill.extractedDueDate && <span className="ml-1 text-[10px] uppercase tracking-wide text-slate-400">inferred</span>}
+        </td>
+        <td className="px-4 py-2.5">
+          <BucketPill bucket={bill.agingBucket} />
+        </td>
+        <td className="px-4 py-2.5">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {bill.paymentStatus && (
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">{bill.paymentStatus}</span>
+            )}
+            {bill.blockedByCheck && (
+              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800" title={bill.openCheckCodes.join(", ")}>
+                blocked ({bill.openCheckCodes.length})
+              </span>
+            )}
+            {!bill.paymentStatus && !bill.blockedByCheck && (
+              <span className="text-xs text-slate-400">—</span>
+            )}
+          </div>
+        </td>
+      </tr>
+      {expanded && (
+        <tr>
+          <td colSpan={7} className="p-0">
+            <InlineDocumentPanel documentId={bill.documentId} loadDetail={loadDetail} onClose={onToggleExpand} />
+          </td>
+        </tr>
+      )}
+    </>
+  )
+}
+
+function BucketPill({ bucket }: { bucket: AgingBucket | null }) {
+  if (!bucket) return <span className="text-xs text-slate-400">—</span>
+  const cls =
+    bucket === "current" ? "bg-emerald-50 text-emerald-700" :
+    bucket === "1-30" ? "bg-yellow-50 text-yellow-800" :
+    bucket === "31-60" ? "bg-orange-50 text-orange-800" :
+    "bg-red-50 text-red-800"
+  return <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${cls}`}>{bucket === "current" ? "Current" : `${bucket}d`}</span>
+}
+
+function formatMoney(amount: number, currency?: string | null): string {
+  const currencyCode = currency && /^[A-Z]{3}$/.test(currency) ? currency : "USD"
+  try {
+    return new Intl.NumberFormat("en", { style: "currency", currency: currencyCode, maximumFractionDigits: 0 }).format(amount)
+  } catch {
+    return `${amount.toFixed(0)} ${currency ?? ""}`.trim()
+  }
+}
