@@ -165,7 +165,11 @@ function ReceiptTableRow({ basePath, receipt, selected, expanded, onToggle, onTo
   return (
     <>
       <tr className={`border-b border-slate-100 transition-colors hover:bg-slate-50 ${selected || expanded ? "bg-emerald-50/40" : ""}`} style={{ height: 62 }}>
-        <td className="px-4 py-2.5"><input type="checkbox" aria-label={`Select ${receipt.merchant ?? "receipt"}`} checked={selected} onChange={onToggle} className="h-4 w-4 rounded border-slate-300" /></td>
+        <td className="px-4 py-2.5">
+          <label className="flex h-6 w-6 cursor-pointer items-center justify-center">
+            <input type="checkbox" aria-label={`Select ${receipt.merchant ?? "receipt"}`} checked={selected} onChange={onToggle} className="h-4 w-4 rounded border-slate-300" />
+          </label>
+        </td>
         <td className="px-4 py-2.5">
           <Link href={`${basePath}/${receipt.documentId}`} aria-expanded={expanded}
             className="text-slate-800 hover:text-emerald-700 hover:underline"
