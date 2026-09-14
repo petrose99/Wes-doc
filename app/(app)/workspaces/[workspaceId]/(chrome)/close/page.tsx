@@ -237,8 +237,8 @@ export default async function ClosePage({ params, searchParams }: {
             {blockedCount > 0 && (
               <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
                 Lock blocked: {blockedCount} open hard gate{blockedCount === 1 ? "" : "s"} against this workspace&rsquo;s bills.{" "}
-                <Link href={`/workspaces/${workspaceId}/bills?blocked=1`} className="font-semibold underline underline-offset-2">
-                  Review the blocked bills
+                <Link href={`/workspaces/${workspaceId}/invoices?blocked=1`} className="font-semibold underline underline-offset-2">
+                  Review the blocked invoices
                 </Link>{" "}
                 and clear the exceptions, then lock again.
               </p>
@@ -462,13 +462,13 @@ function ApAgingBody({ workspaceId, value }: { workspaceId: string; value: Compu
       {hardBlockingCount > 0 ? (
         <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-800">
           <span className="font-bold">{hardBlockingCount} hard-blocking exception{hardBlockingCount === 1 ? "" : "s"}</span> — the period cannot lock until these clear.{" "}
-          <Link href={`/workspaces/${workspaceId}/bills?blocked=1`} className="font-semibold underline underline-offset-2">Open the blocked bills</Link>
+          <Link href={`/workspaces/${workspaceId}/invoices?blocked=1`} className="font-semibold underline underline-offset-2">Open the blocked invoices</Link>
           {softCount > 0 && <span className="ml-1 text-red-700">(+{softCount} soft)</span>}
         </p>
       ) : (
         <p className="text-slate-600">
           {softCount > 0
-            ? <>No hard-blocking exceptions; <Link href={`/workspaces/${workspaceId}/bills`} className="underline underline-offset-2">{softCount} soft exception{softCount === 1 ? "" : "s"}</Link> to review.</>
+            ? <>No hard-blocking exceptions; <Link href={`/workspaces/${workspaceId}/invoices`} className="underline underline-offset-2">{softCount} soft exception{softCount === 1 ? "" : "s"}</Link> to review.</>
             : "No open exceptions."}
         </p>
       )}

@@ -10,6 +10,8 @@ import type { BlocksSidecar, DocumentProvenance } from "@/lib/provenance"
 import { repairMissingBboxes } from "@/lib/provenance"
 import { prisma } from "@/lib/db"
 import { buildFieldRationales, type FieldRationale } from "@/lib/rationale"
+import { fieldsFromCheckDetail, type FieldCheck } from "@/components/pipeline/document-detail/check-types"
+import type { CheckStatus } from "@/lib/checks/types"
 import { documentBlocksKey, readDocumentBlocks } from "@/lib/document-storage"
 import { parseStageAlias, type PipelineStage } from "@/lib/documents/stages"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
@@ -21,7 +23,8 @@ import { getOpenReviewTaskForDocument } from "@/models/review-tasks"
 import { listWorkspaceIntegrationConnections, listWorkspaceIntegrationPushes } from "@/models/integrations"
 import { getDocumentPaymentStatuses } from "@/models/ledger-payments"
 import { requireWorkspaceRole } from "@/models/workspaces"
-import { notFound } from "next/navigation"
+import { documentDestinationPath } from "@/lib/typed-destinations"
+import { notFound, redirect } from "next/navigation"
 
 /** The pipeline's split-pane document detail: source viewer on the left, tabbed
  * Details/Note/History on the right, provenance-aware field-click highlighting, and prev/next
@@ -31,7 +34,7 @@ import { notFound } from "next/navigation"
  * is right for settings pages but leaves no room for a source viewer next to the form. Same URL
  * as before ((chrome) is a route group, so this move doesn't change the path), just outside that
  * layout, so it gets the workspace shell's full-bleed width instead. */
-export default async function DocumentPage({ params, searchParams }: {
+export async function DocumentDetailPage({ params, searchParams }: {
   params: Promise<{ workspaceId: string; documentId: string }>
   searchParams: Promise<{ stage?: string; page?: string; bb?: string }>
 }) {
@@ -47,7 +50,7 @@ export default async function DocumentPage({ params, searchParams }: {
   const capabilities = await getWorkspaceCapabilities(workspaceId)
   const canPush = document.status === "reviewed" && capabilities.has("accounting-push")
     && capabilities.pushableTemplateCodes.includes(document.template?.code ?? "")
-  const [connections, pushes, auditEvents, neighbors, paymentStatuses] = await Promise.all([
+  const [, pushes, auditEvents, neighbors, paymentStatuses] = await Promise.all([
     canPush ? listWorkspaceIntegrationConnections(workspaceId) : Promise.resolve([]),
     canPush ? listWorkspaceIntegrationPushes(workspaceId, documentId) : Promise.resolve([]),
     listDocumentAuditEvents(workspaceId, documentId),
@@ -98,6 +101,20 @@ export default async function DocumentPage({ params, searchParams }: {
   })
   const rationales: Record<string, FieldRationale> = {}
   for (const r of rationaleList) rationales[r.fieldKey] = r
+
+  // #202: per-cell check results — CheckResult.fields (persisted in `detail.fields`, see
+  // models/document-checks.ts) is what lets the UI anchor a check to the exact field it compared
+  // instead of a checkCode -> fieldKeys lookup table that could drift from the check itself.
+  const checkResults = await prisma.documentCheckResult.findMany({ where: { workspaceId, documentId } })
+  const checks: FieldCheck[] = checkResults.map((row) => ({
+    id: row.id,
+    checkCode: row.checkCode,
+    status: row.status === "escalated" ? "warn" : (row.status as CheckStatus),
+    message: row.message,
+    fields: fieldsFromCheckDetail(row.detail),
+    detail: (row.detail && typeof row.detail === "object" ? row.detail as Record<string, unknown> : undefined),
+    escalated: row.status === "escalated",
+  }))
 
   const saveReview = async (formData: FormData) => { "use server"; await saveDocumentReviewAction(workspaceId, documentId, formData) }
   const supplierValue = data.vendor ?? data.merchant
@@ -244,6 +261,7 @@ export default async function DocumentPage({ params, searchParams }: {
     canCreateRule={canCreateRule}
     defaultSupplier={supplier}
     rationales={rationales}
+    checks={checks}
     matchKind={matchKind}
     bankMatches={matchKind ? <MatchPanel
       workspaceId={workspaceId}
@@ -261,4 +279,21 @@ export default async function DocumentPage({ params, searchParams }: {
     documentMatches={documentMatches.length ? <DocumentMatchesPanel workspaceId={workspaceId} matches={documentMatches} /> : null}
     stageIndicator={stageIndicator}
   />
+}
+
+export default async function LegacyDocumentPage({ params, searchParams }: {
+  params: Promise<{ workspaceId: string; documentId: string }>
+  searchParams: Promise<{ stage?: string; page?: string; bb?: string }>
+}) {
+  const { workspaceId, documentId } = await params
+  const query = await searchParams
+  const document = await getWorkspaceDocument(workspaceId, documentId)
+  if (!document) notFound()
+
+  const redirectQuery = new URLSearchParams()
+  for (const key of ["stage", "page", "bb"] as const) {
+    if (query[key]) redirectQuery.set(key, query[key]!)
+  }
+  const suffix = redirectQuery.toString() ? `?${redirectQuery.toString()}` : ""
+  redirect(`${documentDestinationPath(`/workspaces/${workspaceId}`, document)}${suffix}`)
 }

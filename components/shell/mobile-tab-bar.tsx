@@ -5,7 +5,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 
 /** Mobile bottom tab bar. Five slots, mirroring the desktop rail's primary spine:
- * Dashboard, Documents, Worksheets, Finance (when the ledger integration is enabled) or Archive
+ * Dashboard, Invoices, Worksheets, Finance (when the ledger integration is enabled) or Archive
  * as a fallback fifth slot, then More. Same core-first framing as the desktop rail so a person on
  * mobile learns the same shape of the product as a person on desktop.
  *
@@ -27,7 +27,7 @@ export function MobileTabBar({ workspaceId, pipelineReviewCount = 0, sheetsUnpla
 
   const tabs = [
     { href: base, label: "Dashboard", icon: BarChart3, exact: true, badge: undefined as number | undefined },
-    { href: `${base}/pipeline`, label: "Documents", icon: ListChecks, exact: false, badge: pipelineReviewCount > 0 ? pipelineReviewCount : undefined },
+    { href: `${base}/invoices`, label: "Invoices", icon: ListChecks, exact: false, badge: pipelineReviewCount > 0 ? pipelineReviewCount : undefined },
     { href: `${base}/worksheets`, label: "Worksheets", icon: Table2, exact: false, badge: sheetsUnplacedCount > 0 ? sheetsUnplacedCount : undefined },
     fifthSlot,
     { href: `${base}/settings/workspace`, label: "More", icon: MoreHorizontal, exact: false, badge: undefined as number | undefined },
@@ -40,7 +40,7 @@ export function MobileTabBar({ workspaceId, pipelineReviewCount = 0, sheetsUnpla
         : pathname === tab.href
           || pathname.startsWith(`${tab.href}/`)
           || (tab.label === "More" && pathname.startsWith(`${base}/settings`))
-          || (tab.label === "Documents" && (pathname.startsWith(`${base}/pipeline`) || pathname.startsWith(`${base}/documents`) || pathname.startsWith(`${base}/review`) || pathname.startsWith(`${base}/bills`)))
+          || (tab.label === "Invoices" && (pathname.startsWith(`${base}/pipeline`) || pathname.startsWith(`${base}/documents`) || pathname.startsWith(`${base}/review`) || pathname.startsWith(`${base}/bills`) || pathname.startsWith(`${base}/invoices`)))
           || (tab.label === "Worksheets" && (pathname.startsWith(`${base}/worksheets`) || pathname.startsWith(`${base}/files`)))
           || (tab.label === "Finance" && pathname.startsWith(`${base}/accounting`))
       const badge = "badge" in tab ? tab.badge : undefined

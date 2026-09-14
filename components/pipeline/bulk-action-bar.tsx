@@ -9,6 +9,7 @@ import { reextractAdaptivelyAction, reprocessDocumentAction } from "@/app/(app)/
 import { Button } from "@/components/ui/button"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { Dialog } from "@/components/ui/dialog"
+import { ListScreenBulkActionBar } from "@/components/list-screen/list-screen-shell"
 import type { PipelineStage } from "@/lib/documents/stages"
 import { CheckCircle2, Combine, Loader2, RotateCw, Sparkles, Table2, Trash2 } from "lucide-react"
 import Link from "next/link"
@@ -131,8 +132,7 @@ export function BulkActionBar({ workspaceId, stage, selectedIds, selectedFileId,
   const none = selectedIds.length === 0
   const dis = busy || none
 
-  return <div className="flex flex-wrap items-center gap-2 border-b bg-slate-50 px-6 py-2.5 text-sm">
-    {!none && <span className="font-medium text-slate-700">{selectedIds.length} selected</span>}
+  return <ListScreenBulkActionBar selectedCount={selectedIds.length}>
 
     {stage === "review" && <Button type="button" size="sm" disabled={dis} onClick={() => setConfirmingApprove(true)}>
       <CheckCircle2 className="h-3.5 w-3.5" />Approve
@@ -206,5 +206,5 @@ export function BulkActionBar({ workspaceId, stage, selectedIds, selectedFileId,
         <Button asChild variant="outline"><Link href={sheetsHref ? `${sheetsHref}&mode=separate` : ""} onClick={() => setShowSheetChoice(false)}>Separate worksheet per document</Link></Button>
       </div>
     </Dialog>
-  </div>
+  </ListScreenBulkActionBar>
 }

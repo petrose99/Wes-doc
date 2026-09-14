@@ -19,6 +19,11 @@ async function requireExpenseClaimsMember(workspaceId: string, userId: string) {
   return membership
 }
 
+function revalidateExpenseClaims(workspaceId: string) {
+  revalidatePath(paths(workspaceId).receipts)
+  revalidatePath(paths(workspaceId).expenses)
+}
+
 export async function createExpenseClaimAction(workspaceId: string, formData: FormData): Promise<ActionState<{ id: string }>> {
   const user = await getCurrentUser()
   if (!(await requireExpenseClaimsMember(workspaceId, user.id))) return { success: false, error: NO_ACCESS }
@@ -27,7 +32,7 @@ export async function createExpenseClaimAction(workspaceId: string, formData: Fo
   if (!documentIds.length) return { success: false, error: "Select at least one receipt" }
   try {
     const claim = await createExpenseClaim({ workspaceId, submitterId: user.id, title: title || null, documentIds })
-    revalidatePath(paths(workspaceId).expenses)
+    revalidateExpenseClaims(workspaceId)
     return { success: true, data: { id: claim.id } }
   } catch (error) { return { success: false, error: errorMessage(error, "Could not create the claim") } }
 }
@@ -41,7 +46,7 @@ export async function deleteExpenseClaimAction(workspaceId: string, claimId: str
   if (submitterId !== user.id && membership.role !== "owner") return { success: false, error: NO_ACCESS }
   try {
     await deleteExpenseClaim(workspaceId, claimId)
-    revalidatePath(paths(workspaceId).expenses)
+    revalidateExpenseClaims(workspaceId)
     return { success: true, data: null }
   } catch (error) { return { success: false, error: errorMessage(error, "Could not delete the claim") } }
 }
@@ -55,7 +60,7 @@ export async function addExpenseClaimItemsAction(workspaceId: string, claimId: s
   if (submitterId !== user.id && membership.role !== "owner") return { success: false, error: NO_ACCESS }
   try {
     await addExpenseClaimItems(workspaceId, claimId, documentIds)
-    revalidatePath(paths(workspaceId).expenses)
+    revalidateExpenseClaims(workspaceId)
     return { success: true, data: null }
   } catch (error) { return { success: false, error: errorMessage(error, "Could not add those receipts") } }
 }
@@ -67,7 +72,7 @@ export async function removeExpenseClaimItemAction(workspaceId: string, claimId:
   if (submitterId !== user.id && membership.role !== "owner") return { success: false, error: NO_ACCESS }
   try {
     await removeExpenseClaimItem(workspaceId, claimId, itemId)
-    revalidatePath(paths(workspaceId).expenses)
+    revalidateExpenseClaims(workspaceId)
     return { success: true, data: null }
   } catch (error) { return { success: false, error: errorMessage(error, "Could not remove that receipt") } }
 }
@@ -79,7 +84,7 @@ export async function submitExpenseClaimAction(workspaceId: string, claimId: str
   if (submitterId !== user.id && membership.role !== "owner") return { success: false, error: NO_ACCESS }
   try {
     await submitExpenseClaim({ workspaceId, claimId, actorId: user.id, workflowId })
-    revalidatePath(paths(workspaceId).expenses)
+    revalidateExpenseClaims(workspaceId)
     return { success: true, data: null }
   } catch (error) { return { success: false, error: errorMessage(error, "Could not submit the claim") } }
 }
@@ -100,7 +105,7 @@ export async function decideExpenseClaimAction(workspaceId: string, claimId: str
       if (actorRole !== "owner") return { success: false, error: NO_ACCESS }
       await updateExpenseClaimStatus({ workspaceId, claimId, status: decision === "approve" ? "approved" : "rejected", actorId: user.id })
     }
-    revalidatePath(paths(workspaceId).expenses)
+    revalidateExpenseClaims(workspaceId)
     return { success: true, data: null }
   } catch (error) { return { success: false, error: errorMessage(error, "Could not record that decision") } }
 }

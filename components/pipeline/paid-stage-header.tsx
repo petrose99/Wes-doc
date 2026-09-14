@@ -38,8 +38,8 @@ export function PaidStageHeader({ workspaceId, summary, currency }: {
           </div>
         </div>
       </div>
-      <Link href={`/workspaces/${workspaceId}/bills`} className="shrink-0 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900">
-        Open bills cockpit →
+      <Link href={`/workspaces/${workspaceId}/invoices`} className="shrink-0 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900">
+        Open Invoices →
       </Link>
     </div>
   </div>

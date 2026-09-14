@@ -1,24 +1,24 @@
 "use client"
 
-import { Landmark, ListChecks, Table2, type LucideIcon } from "lucide-react"
+import { ClipboardCheck, Landmark, Receipt, Table2, type LucideIcon } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
 /** The workspace pulse card. Rendered inside the sidebar in place of the compact icon strip when a
  * person is inside a sheet or a document detail — a room they used to enter with the door closing
- * behind them. The pulse card is the mini-map: three rows, one per primary destination, each
+ * behind them. The pulse card is the mini-map: typed intake rows plus the main outcome surfaces, each
  * carrying the same "something is waiting on you" count the full rail's badges do.
  *
  * The point is not just reachability (the compact icon strip already did that); the point is that
  * the workspace's living state stays visible. If two documents just landed in review while you were
- * inside a worksheet, the Documents row goes from muted to lit without you leaving the sheet.
+ * inside a worksheet, the Invoices row goes from muted to lit without you leaving the sheet.
  *
  * Row weight (muted vs lit) is the signal, not the count text alone — a screen at a glance still
  * reads "nothing waiting" or "three surfaces want you" without parsing numbers. Zero rows stay
  * present but muted so the workspace shape is constant; only urgency varies.
  *
  * Finance row is only rendered when the ledger integration is enabled deployment-wide. When it
- * isn't, the pulse card is a two-row shape and does not leave a placeholder — the workspace
+ * isn't, the pulse card omits Finance rather than leaving a placeholder — the workspace
  * genuinely does not have a Finance surface in that deployment. */
 export function WorkspacePulse({ workspaceId, documentsCount, worksheetsCount, financeCount, accountingEnabled }: {
   workspaceId: string
@@ -35,7 +35,10 @@ export function WorkspacePulse({ workspaceId, documentsCount, worksheetsCount, f
   const base = `/workspaces/${workspaceId}`
 
   const rows: { href: string; label: string; icon: LucideIcon; count: number; matches: string[] }[] = [
-    { href: `${base}/pipeline`, label: "Documents", icon: ListChecks, count: documentsCount, matches: [`${base}/pipeline`, `${base}/documents`, `${base}/review`, `${base}/bills`] },
+    { href: `${base}/invoices`, label: "Invoices", icon: Receipt, count: documentsCount, matches: [`${base}/pipeline`, `${base}/documents`, `${base}/review`, `${base}/bills`, `${base}/invoices`] },
+    { href: `${base}/purchase-orders`, label: "Purchase Orders", icon: ClipboardCheck, count: 0, matches: [`${base}/purchase-orders`] },
+    { href: `${base}/receipts`, label: "Receipts", icon: Receipt, count: 0, matches: [`${base}/receipts`, `${base}/expenses`] },
+    { href: `${base}/bank-statements`, label: "Bank Statements", icon: Landmark, count: 0, matches: [`${base}/bank-statements`] },
     { href: `${base}/worksheets`, label: "Worksheets", icon: Table2, count: worksheetsCount, matches: [`${base}/worksheets`, `${base}/files`] },
     ...(accountingEnabled ? [{ href: `${base}/finance`, label: "Finance", icon: Landmark, count: financeCount, matches: [`${base}/finance`, `${base}/accounting`] }] : []),
   ]

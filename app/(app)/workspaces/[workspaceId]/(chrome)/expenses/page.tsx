@@ -8,7 +8,7 @@ import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { listApprovalWorkflows } from "@/models/approval-workflows"
 import { listExpenseClaims, listUnclaimedExpenseReceiptDocuments } from "@/models/expense-claims"
 import { requireWorkspaceRole } from "@/models/workspaces"
-import { notFound } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
 
 export const dynamic = "force-dynamic"
 
@@ -23,7 +23,7 @@ function receiptSummary(document: { reviewedData: unknown }): { merchant: string
  * claim, optionally routed through an ApprovalWorkflow (Phase 3 WP3.1/3.2) the same way a
  * ReviewTask can be. Everyone with the module can see every claim (approving someone else's claim
  * requires seeing it), but only the submitter or an owner can create/submit/delete their own. */
-export default async function ExpenseClaimsPage({ params }: { params: Promise<{ workspaceId: string }> }) {
+export async function ExpenseClaimsPage({ params }: { params: Promise<{ workspaceId: string }> }) {
   const { workspaceId } = await params
   const user = await getCurrentUser()
   const membership = await requireWorkspaceRole(workspaceId, user.id)
@@ -87,4 +87,14 @@ export default async function ExpenseClaimsPage({ params }: { params: Promise<{ 
       </CardContent>
     </Card>
   </main>
+}
+
+export default async function LegacyExpensesPage({ params, searchParams }: {
+  params: Promise<{ workspaceId: string }>
+  searchParams: Promise<{ mode?: string }>
+}) {
+  const { workspaceId } = await params
+  const { mode } = await searchParams
+  if (mode === "claims") return ExpenseClaimsPage({ params: Promise.resolve({ workspaceId }) })
+  redirect(`/workspaces/${workspaceId}/receipts?mode=claims`)
 }

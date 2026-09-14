@@ -5,6 +5,7 @@ import { listWorkspaceBills, type BillRow, type BillsSummary } from "@/models/bi
 import { requireWorkspaceRole } from "@/models/workspaces"
 import type { AgingBucket } from "@/lib/bills/due-date"
 import { preparePaymentRunAction } from "./actions"
+import { redirect } from "next/navigation"
 
 export const dynamic = "force-dynamic"
 
@@ -12,9 +13,11 @@ export const dynamic = "force-dynamic"
  * workspace has extracted, grouped by aging bucket, with payment status from the ledger sync
  * and a "blocked by check" flag surfaced on every row. Read-only for now — resolution actions
  * (approve, push, pay) live on the underlying document detail page. */
-export default async function BillsPage({ params, searchParams }: {
+export async function BillsPage({ params, searchParams, pathSegment = "invoices", title = "Invoices" }: {
   params: Promise<{ workspaceId: string }>
   searchParams: Promise<{ blocked?: string; unpaid?: string }>
+  pathSegment?: string
+  title?: string
 }) {
   const { workspaceId } = await params
   const { blocked, unpaid } = await searchParams
@@ -24,6 +27,7 @@ export default async function BillsPage({ params, searchParams }: {
 
   const onlyBlocked = blocked === "1"
   const onlyUnpaid = unpaid === "1"
+  const basePath = `/workspaces/${workspaceId}/${pathSegment}`
   const { bills, summary } = await listWorkspaceBills({ workspaceId, onlyBlocked, onlyUnpaid })
   // Only bills with a total AND an unblocked status are candidates for a payment run.
   const payableBills = bills.filter((b) => !b.blockedByCheck && b.total !== null && b.total > 0 && (!b.paymentStatus || !["paid", "reconciled"].includes(b.paymentStatus.toLowerCase())))
@@ -35,13 +39,13 @@ export default async function BillsPage({ params, searchParams }: {
     <main className="space-y-6">
       <header className="flex items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Bills</h1>
-          <p className="mt-1 text-muted-foreground">Every extracted invoice, grouped by aging bucket. Payment status is synced from your ledger.</p>
+            <h1 className="text-3xl font-bold">{title}</h1>
+            <p className="mt-1 text-muted-foreground">Every extracted invoice, grouped by aging bucket. Payment status is synced from your ledger.</p>
         </div>
         <div className="flex gap-2 text-sm">
-          <FilterLink href={`/workspaces/${workspaceId}/bills`} active={!onlyBlocked && !onlyUnpaid}>All</FilterLink>
-          <FilterLink href={`/workspaces/${workspaceId}/bills?unpaid=1`} active={onlyUnpaid && !onlyBlocked}>Unpaid</FilterLink>
-          <FilterLink href={`/workspaces/${workspaceId}/bills?blocked=1`} active={onlyBlocked && !onlyUnpaid}>Blocked by a check</FilterLink>
+          <FilterLink href={basePath} active={!onlyBlocked && !onlyUnpaid}>All</FilterLink>
+          <FilterLink href={`${basePath}?unpaid=1`} active={onlyUnpaid && !onlyBlocked}>Unpaid</FilterLink>
+          <FilterLink href={`${basePath}?blocked=1`} active={onlyBlocked && !onlyUnpaid}>Blocked by a check</FilterLink>
         </div>
       </header>
 
@@ -54,9 +58,9 @@ export default async function BillsPage({ params, searchParams }: {
       {isOwner && payableBills.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Prepare a payment run</CardTitle>
-            <CardDescription>
-              Generate a ZA EFT CSV for {payableBills.length} unpaid, unblocked bill{payableBills.length === 1 ? "" : "s"}. Upload the file to your bank&rsquo;s bulk-payment portal — DocuBite does not move money itself.
+              <CardTitle>Prepare a payment run</CardTitle>
+              <CardDescription>
+              Generate a ZA EFT CSV for {payableBills.length} unpaid, unblocked invoice{payableBills.length === 1 ? "" : "s"}. Upload the file to your bank&rsquo;s bulk-payment portal — DocuBite does not move money itself.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -67,7 +71,7 @@ export default async function BillsPage({ params, searchParams }: {
               <button type="submit" className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700">
                 Prepare payment run
               </button>
-              <span className="text-xs text-slate-500">Bills without a supplier bank account are dropped from the file — set the account on the supplier record and re-run.</span>
+              <span className="text-xs text-slate-500">Invoices without a supplier bank account are dropped from the file — set the account on the supplier record and re-run.</span>
             </form>
           </CardContent>
         </Card>
@@ -75,15 +79,15 @@ export default async function BillsPage({ params, searchParams }: {
 
       <Card>
         <CardHeader>
-          <CardTitle>{bills.length} bill{bills.length === 1 ? "" : "s"}</CardTitle>
+          <CardTitle>{bills.length} invoice{bills.length === 1 ? "" : "s"}</CardTitle>
           <CardDescription>Newest first. Click a row to open its extraction detail.</CardDescription>
         </CardHeader>
         <CardContent>
           {bills.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              {onlyBlocked || onlyUnpaid
-                ? "No bills match the current filter."
-                : "No bills yet. Bills appear here once an invoice is extracted and approved."}
+                {onlyBlocked || onlyUnpaid
+                ? "No invoices match the current filter."
+                : "No invoices yet. Invoices appear here once an invoice is extracted and approved."}
             </p>
           ) : (
             <div className="-mx-6 overflow-x-auto">
@@ -100,7 +104,7 @@ export default async function BillsPage({ params, searchParams }: {
                 </thead>
                 <tbody>
                   {bills.map((bill) => (
-                    <BillTableRow key={bill.documentId} workspaceId={workspaceId} bill={bill} />
+                    <BillTableRow key={bill.documentId} basePath={basePath} bill={bill} />
                   ))}
                 </tbody>
               </table>
@@ -110,6 +114,19 @@ export default async function BillsPage({ params, searchParams }: {
       </Card>
     </main>
   )
+}
+
+export default async function LegacyBillsPage({ params, searchParams }: {
+  params: Promise<{ workspaceId: string }>
+  searchParams: Promise<{ blocked?: string; unpaid?: string }>
+}) {
+  const { workspaceId } = await params
+  const { blocked, unpaid } = await searchParams
+  const query = new URLSearchParams()
+  if (blocked === "1") query.set("blocked", "1")
+  if (unpaid === "1") query.set("unpaid", "1")
+  const suffix = query.toString() ? `?${query.toString()}` : ""
+  redirect(`/workspaces/${workspaceId}/invoices${suffix}`)
 }
 
 function SummaryCard({ label, data }: { label: string; data: { count: number; total: number } }) {
@@ -124,11 +141,11 @@ function SummaryCard({ label, data }: { label: string; data: { count: number; to
   )
 }
 
-function BillTableRow({ workspaceId, bill }: { workspaceId: string; bill: BillRow }) {
+function BillTableRow({ basePath, bill }: { basePath: string; bill: BillRow }) {
   return (
     <tr className="border-b border-slate-100 transition-colors hover:bg-slate-50">
       <td className="px-4 py-2.5">
-        <Link href={`/workspaces/${workspaceId}/documents/${bill.documentId}`} className="text-slate-800 hover:text-emerald-700 hover:underline">
+        <Link href={`${basePath}/${bill.documentId}`} className="text-slate-800 hover:text-emerald-700 hover:underline">
           {bill.supplier ?? <span className="italic text-slate-400">unknown supplier</span>}
         </Link>
         <div className="text-xs text-slate-500 truncate max-w-[240px]">{bill.filename}</div>

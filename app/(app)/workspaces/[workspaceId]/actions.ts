@@ -217,6 +217,22 @@ export async function saveDocumentReviewAction(workspaceId: string, documentId: 
   } catch { return { success: false, error: "Check the field values" } }
 }
 
+/** A reviewer flags a check as "the document is wrong" rather than "the extraction misread it"
+ * (#202) — distinct from fixing the cell, which just corrects the reviewed value. Marks the
+ * check row `escalated` (status is a plain string column, no migration needed) and writes a
+ * document audit event so #210's Exceptions queue has a trail to query once it exists; this
+ * ticket doesn't build that queue, only the signal it will read. */
+export async function escalateCheckAction(workspaceId: string, documentId: string, checkCode: string): Promise<ActionState<null>> {
+  const user = await getCurrentUser()
+  if (!(await requireMember(workspaceId, user.id))) return { success: false, error: NO_ACCESS }
+  const check = await prisma.documentCheckResult.findUnique({ where: { documentId_checkCode: { documentId, checkCode } } })
+  if (!check || check.workspaceId !== workspaceId || check.documentId !== documentId) return { success: false, error: "Check not found" }
+  await prisma.documentCheckResult.update({ where: { id: check.id }, data: { status: "escalated" } })
+  await recordDocumentAudit({ workspaceId, documentId, actorId: user.id, type: "check.escalated", detail: { checkCode, previousStatus: check.status } })
+  revalidatePath(`${paths(workspaceId).documents}/${documentId}`)
+  return { success: true, data: null }
+}
+
 export async function createDocumentTemplateAction(workspaceId: string, formData: FormData): Promise<ActionState<null>> {
   const user = await getCurrentUser()
   if (!(await requireMember(workspaceId, user.id, ["owner"]))) return { success: false, error: NO_ACCESS }

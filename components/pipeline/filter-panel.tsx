@@ -1,5 +1,6 @@
 "use client"
 
+import { ListScreenToolbar } from "@/components/list-screen/list-screen-shell"
 import { Sparkles, Search } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useEffect, useState } from "react"
@@ -29,7 +30,7 @@ export function FilterPanel({ query, documentSearchEnabled }: { query: string; d
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value])
 
-  return <div className="flex flex-wrap items-center gap-3 border-b bg-slate-50/60 px-6 py-3">
+  return <ListScreenToolbar>
     <div className="relative w-80 max-w-full">
       <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
       <input className="w-full rounded-md border border-slate-300 bg-white py-1.5 pl-8 pr-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500"
@@ -41,5 +42,5 @@ export function FilterPanel({ query, documentSearchEnabled }: { query: string; d
         <Sparkles className="h-3.5 w-3.5" />Also searching what&apos;s inside each document
       </span>
     )}
-  </div>
+  </ListScreenToolbar>
 }

@@ -3,14 +3,13 @@ import { track } from "@/lib/analytics"
 import { auditEventData, getRequestAuditContext, recordDocumentAudit } from "@/lib/audit"
 import { SUPPLIER_FIELD_BY_TEMPLATE } from "@/lib/automation/rules"
 import config from "@/lib/config"
-import { isPushableDocument, PaidStatus, resolveDocType } from "@/lib/doc-types"
+import { isPushableDocument, PaidStatus, type DocType } from "@/lib/doc-types"
 import { findMissingRequiredFields, parseTemplateFields, validateDocumentValues } from "@/lib/document-templates"
 import { deleteDocumentSource, documentBlocksKey, documentStorageKey, putDocumentSource } from "@/lib/document-storage"
 import { projectDocumentFields } from "@/lib/field-projection"
-import { LOW_CONFIDENCE, PIPELINE_STAGES, stageToStatusFilter, type PipelineStage } from "@/lib/documents/stages"
+import { LOW_CONFIDENCE, PIPELINE_STAGES, type PipelineStage } from "@/lib/documents/stages"
 import { applyFxToDocument } from "@/lib/fx/apply-to-document"
 import { normalizeBillFromDocument } from "@/lib/integration-bill-mapping"
-import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { unscoped } from "@/lib/workspace-scope"
 import type { DocumentProvenance } from "@/lib/provenance"
 import { replaceDocumentFieldValues } from "@/models/document-field-values"
@@ -198,7 +197,7 @@ export function stageWhereClause(stage: PipelineStage): Prisma.DocumentWhereInpu
  * status. It composes with (does not replace) `status`, though callers normally pass one or the
  * other. Archive is its own axis: every stage except "archive" implicitly excludes an archived
  * document, so a document doesn't linger on "Ready" after being archived from it. */
-export async function listWorkspaceDocuments(workspaceId: string, filters: { status?: string; query?: string; templateId?: string; fileId?: string; stage?: PipelineStage; documentIds?: string[] } = {}) {
+export async function listWorkspaceDocuments(workspaceId: string, filters: { status?: string; query?: string; templateId?: string; fileId?: string; stage?: PipelineStage; documentIds?: string[]; docType?: DocType } = {}) {
   const where: Prisma.DocumentWhereInput = {
     workspaceId,
     ...(filters.fileId ? { fileId: filters.fileId } : {}),
@@ -207,6 +206,15 @@ export async function listWorkspaceDocuments(workspaceId: string, filters: { sta
     ...(filters.stage ? stageWhereClause(filters.stage) : {}),
     ...(filters.query?.trim() ? { OR: [{ searchText: { contains: filters.query.trim(), mode: "insensitive" as const } }, { ocrText: { contains: filters.query.trim(), mode: "insensitive" as const } }] } : {}),
     ...(filters.templateId ? { templateId: filters.templateId } : {}),
+    ...(filters.docType ? {
+      OR: [
+        { docType: filters.docType },
+        ...(filters.docType === "invoice" ? [{ docType: null, template: { code: { in: ["invoice", "expense"] } } }] : []),
+        ...(filters.docType === "receipt" ? [{ docType: null, template: { code: { in: ["receipt", "expense_receipt"] } } }] : []),
+        ...(filters.docType === "bank_statement" ? [{ docType: null, template: { code: "bank_statement" } }] : []),
+        ...(filters.docType === "purchase_order" ? [{ docType: null, template: { code: "purchase_order" } }] : []),
+      ],
+    } : {}),
   }
   return prisma.document.findMany({ where, include: { template: { include: { versions: { take: 1, orderBy: { createdAt: "desc" } } } }, templateVersion: true }, orderBy: { receivedAt: "desc" }, take: 100 })
 }
