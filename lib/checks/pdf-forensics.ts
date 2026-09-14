@@ -67,7 +67,7 @@ export function checkPdfForensics(signals: PdfForensicSignals): CheckResult | nu
   }
   if (!mismatches.length) return null
   return {
-    checkCode: "pdf_forensics",
+    checkCode: "pdf_forensics", fields: [],
     status: "warn",
     message: `PDF metadata looks edited after generation: ${mismatches.join("; ")}.`,
     detail: { mismatches, signals: signals as unknown as Record<string, unknown> },

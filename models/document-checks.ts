@@ -4,6 +4,7 @@
 import { track } from "@/lib/analytics"
 import { recordSystemAudit } from "@/lib/audit"
 import { checkInvoiceArithmetic } from "@/lib/checks/arithmetic"
+import { checkLineItemArithmetic } from "@/lib/checks/line-item-arithmetic"
 import { checkAmountAnomaly } from "@/lib/checks/amount-anomaly"
 import { checkBankDetails } from "@/lib/checks/bank-details"
 import { checkPdfForensics, readPdfForensicSignals } from "@/lib/checks/pdf-forensics"
@@ -66,7 +67,14 @@ export async function runDeterministicChecks(input: { workspaceId: string; docum
     const values = (document.reviewedData ?? {}) as Record<string, unknown>
     const get = (key: keyof CheckFieldMap) => (map[key] ? values[map[key] as string] : undefined)
     const currencyCode = asString(get("currency"))
-    const lineItems = Array.isArray(get("lineItems")) ? (get("lineItems") as unknown[]).map((item) => ({ amount: asNumber((item as Record<string, unknown> | null)?.amount) })) : []
+    const lineItems = Array.isArray(get("lineItems")) ? (get("lineItems") as unknown[]).map((item) => {
+      const row = item as Record<string, unknown> | null
+      return {
+        quantity: asNumber(row?.quantity),
+        unitPrice: asNumber(row?.unit_price),
+        amount: asNumber(row?.amount),
+      }
+    }) : []
 
     const results: CheckResult[] = []
 
@@ -74,6 +82,8 @@ export async function runDeterministicChecks(input: { workspaceId: string; docum
       const otherCharges = Array.isArray(get("otherCharges")) ? (get("otherCharges") as unknown[]).map((item) => ({ amount: asNumber((item as Record<string, unknown> | null)?.amount) })) : []
       const arithmetic = checkInvoiceArithmetic({ currencyCode, subtotal: asNumber(get("subtotal")), taxTotal: asNumber(get("taxTotal")), shippingTotal: asNumber(get("shippingTotal")), otherCharges, total: asNumber(get("total")), lineItems })
       if (arithmetic) results.push(arithmetic)
+      const lineArithmetic = checkLineItemArithmetic({ currencyCode, lineItems })
+      if (lineArithmetic) results.push(lineArithmetic)
     }
 
     if (map.openingBalance && map.closingBalance) {
@@ -139,7 +149,10 @@ export async function runDeterministicChecks(input: { workspaceId: string; docum
       // A2.3: infer credit-note-ness deterministically — negative total OR the template's own
       // documentType is a credit note. Consumers already know the sign; nothing else changes.
       const isCreditNote = totalValue !== null && totalValue < 0
-      const identity: DocumentIdentity = { documentId: document.id, supplier: asString(get("supplier")), invoiceNumber: asString(get("invoiceNumber")), total: totalValue, currencyCode, isCreditNote }
+      const identity: DocumentIdentity = {
+        documentId: document.id, supplier: asString(get("supplier")), invoiceNumber: asString(get("invoiceNumber")), total: totalValue, currencyCode, isCreditNote,
+        fieldKeys: { supplier: map.supplier, invoiceNumber: map.invoiceNumber, total: map.total },
+      }
       results.push(...(await checkDuplicates(input.workspaceId, document.templateId, identity, map)))
       const resubmission = await checkSuspiciousResubmission(input.workspaceId, document.id, identity)
       if (resubmission) results.push(resubmission)
@@ -174,10 +187,11 @@ export async function runDeterministicChecks(input: { workspaceId: string; docum
 
 async function persistCheckResult(workspaceId: string, documentId: string, result: CheckResult): Promise<void> {
   const status = result.status === "fail" && !FAIL_BY_DEFAULT.has(result.checkCode) && result.checkCode !== "duplicate" ? "warn" : result.status
+  const detail = result.detail || result.fields ? { ...(result.detail ?? {}), fields: result.fields ?? [] } : null
   await prisma.documentCheckResult.upsert({
     where: { documentId_checkCode: { documentId, checkCode: result.checkCode } },
-    create: { workspaceId, documentId, checkCode: result.checkCode, status, message: result.message, detail: (result.detail ?? null) as Prisma.InputJsonValue },
-    update: { status, message: result.message, detail: (result.detail ?? null) as Prisma.InputJsonValue },
+    create: { workspaceId, documentId, checkCode: result.checkCode, status, message: result.message, detail: detail as Prisma.InputJsonValue },
+    update: { status, message: result.message, detail: detail as Prisma.InputJsonValue },
   })
   if (status === "pass") return
 
@@ -344,7 +358,7 @@ async function checkSplitInvoicesAgainstHistory(workspaceId: string, templateId:
       .filter((v): v is number => typeof v === "number" && v > 0)
     const allThresholds = [...routingThresholds, ...budgetThresholds]
     const approvalThreshold = allThresholds.length ? Math.min(...allThresholds) : 1000
-    return checkSplitInvoices({ candidateAmount: amount, candidateDate: date, siblings: window, approvalThreshold })
+    return checkSplitInvoices({ candidateAmount: amount, candidateDate: date, siblings: window, approvalThreshold, fieldKeys: { amount: map.total, date: map.date } })
   } catch (error) {
     console.error("[checks] split-invoice lookup failed:", error instanceof Error ? error.message : error)
     return null
@@ -354,7 +368,7 @@ async function checkSplitInvoicesAgainstHistory(workspaceId: string, templateId:
 async function checkDuplicates(workspaceId: string, templateId: string | null, identity: DocumentIdentity, map: CheckFieldMap): Promise<CheckResult[]> {
   const ingestion = await prisma.ingestionItem.findFirst({ where: { workspaceId, documentId: identity.documentId }, select: { status: true } })
   if (ingestion?.status === "duplicate") {
-    return [{ checkCode: "duplicate", status: "fail", message: "This exact file was already ingested into this workspace.", detail: { exact: true } }]
+    return [{ checkCode: "duplicate", status: "fail", fields: [map.total ?? "total", map.supplier ?? "supplier", map.invoiceNumber ?? "invoice_number"], message: "This exact file was already ingested into this workspace.", detail: { exact: true } }]
   }
   if (!templateId || !map.supplier || !map.invoiceNumber || !map.total) return []
   const siblings = await prisma.document.findMany({
@@ -404,7 +418,7 @@ async function checkSuspiciousResubmission(workspaceId: string, documentId: stri
     return asString(values[candidateMap.supplier])?.trim().toLowerCase() === supplier && asString(values[candidateMap.invoiceNumber])?.trim().toLowerCase() === invoiceNumber
   })
   if (!match) return null
-  return { checkCode: "suspicious_resubmission", status: "warn", message: "Same supplier and invoice number as a document rejected in a previous review.", detail: { rejectedDocumentId: match.id } }
+  return { checkCode: "suspicious_resubmission", status: "warn", fields: [identity.fieldKeys?.supplier ?? "supplier", identity.fieldKeys?.invoiceNumber ?? "invoice_number"], message: "Same supplier and invoice number as a document rejected in a previous review.", detail: { rejectedDocumentId: match.id } }
 }
 
 async function siblingStatementPeriods(workspaceId: string, templateId: string | null, documentId: string, accountNumber: string, map: CheckFieldMap) {

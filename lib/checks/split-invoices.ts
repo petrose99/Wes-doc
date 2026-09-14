@@ -16,6 +16,7 @@ export type SplitInvoiceInput = {
   windowDays?: number
   /** How close to the threshold (as a fraction) the sum must sit for a flag. Default 0.9. */
   crowdingFactor?: number
+  fieldKeys?: { amount?: string; date?: string }
 }
 
 const DEFAULT_WINDOW = 7
@@ -40,7 +41,7 @@ export function checkSplitInvoices(input: SplitInvoiceInput): CheckResult | null
 
   return {
     checkCode: "split_invoice",
-    status: "warn",
+    status: "warn", fields: [input.fieldKeys?.amount ?? "total", input.fieldKeys?.date ?? "issue_date"],
     message: `${inWindow.length + 1} invoices in ${window} days from this supplier total ${totalSpend.toFixed(2)}, crowding the ${input.approvalThreshold} approval threshold while each stays below it.`,
     detail: {
       windowDays: window, approvalThreshold: input.approvalThreshold, totalSpend,

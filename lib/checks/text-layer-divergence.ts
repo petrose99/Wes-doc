@@ -32,7 +32,7 @@ export function checkTextLayerDivergence(input: { textLayer: string | null; ocrT
   if (jaccard >= 0.7) return null
 
   return {
-    checkCode: "text_layer_mismatch",
+    checkCode: "text_layer_mismatch", fields: [],
     status: "warn",
     message: `PDF text layer and OCR pass disagree on money-shaped tokens (jaccard ${jaccard.toFixed(2)}; ${missingFromOcr.length} in text layer only, ${missingFromLayer.length} in OCR only).`,
     detail: {

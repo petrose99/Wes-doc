@@ -4,6 +4,10 @@ export type CheckResult = {
   checkCode: string
   status: CheckStatus
   message: string
+  /** Field paths this check actually compared. Nested paths use the persisted form names,
+   * e.g. `line_items[0].amount`; keeping the anchor beside the producer avoids a UI lookup table
+   * drifting away from the check's inputs. */
+  fields?: string[]
   detail?: Record<string, unknown>
 }
 

@@ -5,10 +5,12 @@ import { CreateReviewTaskButton } from "@/components/documents/create-review-tas
 import { DeleteDocumentButton } from "@/components/documents/delete-document-button"
 import { FieldRow } from "@/components/pipeline/document-detail/field-row"
 import { LineItemsSection } from "@/components/pipeline/document-detail/line-items-section"
+import { checkAppliesToField, type FieldCheck } from "@/components/pipeline/document-detail/check-types"
+import { parseLiveCheckValues, rebuildLiveChecks } from "@/components/pipeline/document-detail/live-checks"
 import { StageIndicator, type StageStep } from "@/components/pipeline/document-detail/stage-indicator"
 import { useFieldNav } from "@/components/pipeline/document-detail/use-field-nav"
 import { archiveDocumentsAction, flagDocumentsAction, moveDocumentsToStageAction, updateDocumentNoteAction } from "@/app/(app)/workspaces/[workspaceId]/pipeline-actions"
-import { setDocumentTypeAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
+import { escalateCheckAction, setDocumentTypeAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { SourceViewer, type ProvenanceTarget, type SourceDocument } from "@/components/viewer/source-preview"
@@ -19,7 +21,7 @@ import type { FieldRationale } from "@/lib/rationale"
 import { Archive, ArrowDown, ArrowLeft, ArrowUp, Building2, CheckCircle2, ChevronLeft, ChevronRight, Eye, EyeOff, Flag, Loader2, Maximize2, Minimize2, PanelLeftClose, PanelLeftOpen } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useState, type ReactNode } from "react"
+import { useRef, useState, type ReactNode } from "react"
 import { toast } from "sonner"
 
 type Tab = "details" | "note" | "activity"
@@ -39,7 +41,7 @@ const DOC_TYPE_LABELS: Record<"expense" | "sale" | "bank_statement" | "other", s
 export function SplitPane({
   workspaceId, source, fields, data, fieldConfidence, provenanceFields, provenanceItems, initialTarget, conflictingLabels, missingRequiredFields,
   saveReview, documentType: initialDocumentType, note: initialNote, auditEvents, prevHref, nextHref, position, stage, afterActionHref,
-  header, canPush, pushCard, canCreateRule, defaultSupplier, matchKind, bankMatches, documentMatches, paymentStatus, rationales, fxBadge, stageIndicator,
+  header, canPush, pushCard, canCreateRule, defaultSupplier, matchKind, bankMatches, documentMatches, paymentStatus, rationales, checks, fxBadge, stageIndicator,
 }: {
   workspaceId: string
   source: SourceDocument
@@ -70,6 +72,9 @@ export function SplitPane({
   documentMatches?: ReactNode
   paymentStatus?: string | null
   rationales?: Record<string, FieldRationale>
+  /** Deterministic check results for this document, already resolved to the persisted form paths
+   * they compared (#202). Empty for document types with no applicable checks. */
+  checks?: FieldCheck[]
   fxBadge?: ReactNode
   /** The five-step Extracted → Checks → Approval → Sync → Pay indicator. Derived at the page
    * level so this client component doesn't need to pull in review-task/integration-push readers. */
@@ -323,6 +328,9 @@ export function SplitPane({
               provenanceItems={provenanceItems}
               summaryFields={summaryFields}
               rationales={rationales ?? null}
+              checks={checks ?? []}
+              workspaceId={workspaceId}
+              documentId={header.documentId}
               setTarget={setTarget}
             />
 
@@ -364,7 +372,7 @@ export function SplitPane({
 
 /** A4: the inner form that owns the field-nav state. Split out of SplitPane so the hook can
  * derive its ordering directly from formFields without SplitPane touching field-nav internals. */
-function FieldNavForm({ saveReview, docType, formFields, data, fieldConfidence, provenanceFields, provenanceItems, summaryFields, rationales, setTarget }: {
+function FieldNavForm({ saveReview, docType, formFields, data, fieldConfidence, provenanceFields, provenanceItems, summaryFields, rationales, checks, workspaceId, documentId, setTarget }: {
   saveReview: (formData: FormData) => void | Promise<void>
   docType: string | null
   formFields: DocumentFieldDefinition[]
@@ -374,14 +382,31 @@ function FieldNavForm({ saveReview, docType, formFields, data, fieldConfidence, 
   provenanceItems: Record<string, (Ref | null)[]>
   summaryFields: DocumentFieldDefinition[]
   rationales: Record<string, FieldRationale> | null
+  checks: FieldCheck[]
+  workspaceId: string
+  documentId: string
   setTarget: (target: ProvenanceTarget) => void
 }) {
   const navItems = formFields.map((field) => ({ key: field.key, confidence: fieldConfidence[field.key] ?? null, type: field.type }))
   const nav = useFieldNav(navItems)
+  const formRef = useRef<HTMLFormElement>(null)
+  const [liveChecks, setLiveChecks] = useState(checks)
   // One summary line in place of the per-field "Extracted" badges the audit had FieldRow drop:
   // says how many fields landed, and how many of those are worth a second look.
   const extractedCount = formFields.filter((field) => data[field.key] !== undefined && data[field.key] !== null && data[field.key] !== "").length
-  return <form action={saveReview} className="space-y-3" onKeyDown={nav.onFormKeyDown}>
+
+  const recompute = () => {
+    if (!formRef.current) return
+    setLiveChecks(rebuildLiveChecks(checks, parseLiveCheckValues(new FormData(formRef.current)), true))
+  }
+
+  const onEscalate = async (check: FieldCheck) => {
+    setLiveChecks((prev) => prev.map((c) => (c.checkCode === check.checkCode ? { ...c, escalated: true } : c)))
+    const result = await escalateCheckAction(workspaceId, documentId, check.checkCode)
+    if (!result.success) toast.error(result.error || "Could not escalate this check")
+  }
+
+  return <form ref={formRef} action={saveReview} className="space-y-3" onKeyDown={nav.onFormKeyDown} onInput={recompute}>
     {extractedCount > 0 && <p className="text-xs text-slate-500">
       All {extractedCount} field{extractedCount === 1 ? "" : "s"} extracted{nav.totalSuspects > 0 ? ` — ${nav.totalSuspects} low-confidence` : ""}.
     </p>}
@@ -390,8 +415,10 @@ function FieldNavForm({ saveReview, docType, formFields, data, fieldConfidence, 
       <button type="button" className="rounded-md border border-amber-300 bg-white px-2 py-0.5 font-medium text-amber-800 hover:bg-amber-100" onClick={() => nav.focusNext()}>Next suspect</button>
     </div>}
     {formFields.map((field) => field.type === "array"
-      ? <LineItemsSection key={field.key} field={field} value={data[field.key]} fieldKey={field.key} summaryFields={summaryFields} fieldValues={data} provenanceFields={provenanceFields} provenanceItems={provenanceItems[field.key] ?? []} onFocusSource={setTarget} />
+      ? <LineItemsSection key={field.key} field={field} value={data[field.key]} fieldKey={field.key} summaryFields={summaryFields} fieldValues={data} provenanceFields={provenanceFields} provenanceItems={provenanceItems[field.key] ?? []} onFocusSource={setTarget}
+          checks={liveChecks.filter((check) => check.fields.some((f) => f === field.key || f.startsWith(`${field.key}[`)))} onEscalate={onEscalate} />
       : <FieldRow key={field.key} field={field} value={data[field.key]} confidence={fieldConfidence[field.key] ?? null} ref={provenanceFields[field.key] ?? null} onFocusSource={setTarget} rationale={rationales?.[field.key] ?? null}
+          checks={liveChecks.filter((check) => checkAppliesToField(check, field.key))} onEscalate={onEscalate}
           registerNav={nav.registerField} isCurrent={nav.currentKey === field.key} isCompleted={nav.completedKeys.has(field.key)} />)}
     <div className="flex items-center gap-3 border-t border-slate-100 pt-3">
       <button type="submit" disabled={!docType} className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40" title={!docType ? "Choose Expense or Sale first" : undefined}>

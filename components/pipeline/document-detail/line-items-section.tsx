@@ -3,6 +3,7 @@
 import { LineItemsEditor } from "@/components/documents/line-items-editor"
 import type { DocumentFieldDefinition } from "@/lib/document-templates"
 import type { Ref } from "@/lib/provenance"
+import type { FieldCheck } from "@/components/pipeline/document-detail/check-types"
 import { Crosshair, Pencil } from "lucide-react"
 
 function TotalField({ field, value, ref: provenanceRef, onFocusSource }: {
@@ -27,7 +28,7 @@ function TotalField({ field, value, ref: provenanceRef, onFocusSource }: {
   </div>
 }
 
-export function LineItemsSection({ field, value, fieldKey, summaryFields, fieldValues, provenanceFields, provenanceItems, onFocusSource }: {
+export function LineItemsSection({ field, value, fieldKey, summaryFields, fieldValues, provenanceFields, provenanceItems, onFocusSource, checks = [], onEscalate }: {
   field: DocumentFieldDefinition
   value: unknown
   fieldKey: string
@@ -36,6 +37,8 @@ export function LineItemsSection({ field, value, fieldKey, summaryFields, fieldV
   provenanceFields: Record<string, Ref>
   provenanceItems: (Ref | null)[]
   onFocusSource: (target: { page: number; bbox: Ref["bbox"]; quote: string }) => void
+  checks?: FieldCheck[]
+  onEscalate?: (check: FieldCheck) => void
 }) {
   return <div className="space-y-2">
     <div className="flex items-center gap-2 px-1">
@@ -43,7 +46,7 @@ export function LineItemsSection({ field, value, fieldKey, summaryFields, fieldV
       <div className="h-px flex-1 bg-slate-100" />
     </div>
     {field.itemFields?.length
-      ? <LineItemsEditor fieldKey={fieldKey} itemFields={field.itemFields} initialRows={Array.isArray(value) ? value as Array<Record<string, unknown>> : []} provenanceItems={provenanceItems} onFocusSource={onFocusSource} />
+      ? <LineItemsEditor fieldKey={fieldKey} itemFields={field.itemFields} initialRows={Array.isArray(value) ? value as Array<Record<string, unknown>> : []} provenanceItems={provenanceItems} onFocusSource={onFocusSource} checks={checks} onEscalate={onEscalate} />
       : <textarea id={fieldKey} name={fieldKey} defaultValue={Array.isArray(value) ? JSON.stringify(value) : ""} placeholder="JSON array" className="min-h-24 w-full rounded-lg border border-slate-200 bg-slate-50/50 px-3 py-2 font-mono text-sm" />}
     {summaryFields.length > 0 && <div className="flex flex-wrap items-center justify-end gap-4 rounded-lg border border-slate-100 bg-slate-50/80 px-4 py-2.5">
       {summaryFields.map((summaryField) => <TotalField key={summaryField.key} field={summaryField} value={fieldValues[summaryField.key]} ref={provenanceFields[summaryField.key] ?? null} onFocusSource={onFocusSource} />)}

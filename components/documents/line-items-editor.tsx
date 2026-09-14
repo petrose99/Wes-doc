@@ -2,8 +2,10 @@
 
 import type { DocumentItemFieldDefinition } from "@/lib/document-templates"
 import type { Ref } from "@/lib/provenance"
+import { CheckGlyph, RationalePopover } from "@/components/pipeline/document-detail/rationale-popover"
+import type { FieldCheck } from "@/components/pipeline/document-detail/check-types"
 import { Crosshair, Plus, Trash2 } from "lucide-react"
-import { useState } from "react"
+import { useRef, useState } from "react"
 
 type Row = { id: number; values: Record<string, unknown> }
 
@@ -21,17 +23,21 @@ const hasValue = (value: unknown) => value !== undefined && value !== null && va
  * visible even empty, since a missing required value is itself worth seeing). On a document with
  * no line items yet (a fresh row for someone to fill in by hand), nothing has "not been
  * extracted" yet, so every column shows. */
-export function LineItemsEditor({ fieldKey, itemFields, initialRows, provenanceItems, onFocusSource }: {
+export function LineItemsEditor({ fieldKey, itemFields, initialRows, provenanceItems, onFocusSource, checks = [], onEscalate }: {
   fieldKey: string
   itemFields: DocumentItemFieldDefinition[]
   initialRows: Array<Record<string, unknown>>
   provenanceItems?: (Ref | null)[]
   onFocusSource?: (target: { page: number; bbox: Ref["bbox"]; quote: string }) => void
+  checks?: FieldCheck[]
+  onEscalate?: (check: FieldCheck) => void
 }) {
   const [rows, setRows] = useState<Row[]>(() => {
     const seed = initialRows.length ? initialRows : [{}]
     return seed.map((values, index) => ({ id: index, values }))
   })
+  const [openCell, setOpenCell] = useState<string | null>(null)
+  const cellRefs = useRef(new Map<string, HTMLInputElement | HTMLSelectElement>())
   const columns = initialRows.length
     ? itemFields.filter((item) => item.required || initialRows.some((row) => hasValue(row[item.key])))
     : itemFields
@@ -58,21 +64,33 @@ export function LineItemsEditor({ fieldKey, itemFields, initialRows, provenanceI
               const inputId = `${fieldKey}-${row.id}-${item.key}`
               const name = `${fieldKey}[${index}][${item.key}]`
               const raw = row.values[item.key]
-              return <td key={item.key} className="border-b border-slate-100 p-0">
+              const fieldPath = `${fieldKey}[${index}].${item.key}`
+              const cellChecks = checks.filter((check) => check.fields.includes(fieldPath))
+              const checkDescriptionId = `${fieldPath}-check-description`
+              const cellId = `${fieldKey}-${row.id}-${item.key}`
+              return <td key={item.key} className="relative border-b border-slate-100 p-0">
                 {item.type === "boolean" ? (
                   <label className="flex h-full items-center justify-center gap-1.5 px-2 py-1.5 text-xs text-slate-600">
-                    <input id={inputId} name={name} type="checkbox" className="h-3.5 w-3.5 accent-emerald-600" value="true" defaultChecked={raw === true} />
+                    <input id={inputId} name={name} type="checkbox" aria-describedby={cellChecks.length ? checkDescriptionId : undefined} className="h-3.5 w-3.5 accent-emerald-600" value="true" defaultChecked={raw === true} />
                   </label>
                 ) : item.type === "enum" ? (
-                  <select id={inputId} name={name} defaultValue={typeof raw === "string" ? raw : ""} className={`${cellInputClass} appearance-none`}>
-                    <option value="">—</option>
-                    {item.options?.map((option) => <option key={option} value={option}>{option}</option>)}
-                  </select>
+                  <div className="relative flex items-center">
+                    <select ref={(element) => { if (element) cellRefs.current.set(cellId, element); else cellRefs.current.delete(cellId) }} id={inputId} name={name} aria-describedby={cellChecks.length ? checkDescriptionId : undefined} defaultValue={typeof raw === "string" ? raw : ""} className={`${cellInputClass} appearance-none ${cellChecks.length ? "pr-8" : ""}`}>
+                      <option value="">—</option>
+                      {item.options?.map((option) => <option key={option} value={option}>{option}</option>)}
+                    </select>
+                    <span className="absolute right-1 top-1/2 -translate-y-1/2"><CheckGlyph checks={cellChecks} onOpen={() => setOpenCell(cellId)} /></span>
+                  </div>
                 ) : (
-                  <input id={inputId} name={name} type={item.type === "number" ? "number" : item.type === "date" ? "date" : "text"} step={item.type === "number" ? "any" : undefined}
-                    className={`${cellInputClass} ${item.type === "number" ? "text-right tabular-nums" : ""}`}
-                    defaultValue={typeof raw === "string" || typeof raw === "number" ? String(raw) : ""} />
+                  <div className="relative flex items-center">
+                    <input ref={(element) => { if (element) cellRefs.current.set(cellId, element); else cellRefs.current.delete(cellId) }} id={inputId} name={name} type={item.type === "number" ? "number" : item.type === "date" ? "date" : "text"} step={item.type === "number" ? "any" : undefined} aria-describedby={cellChecks.length ? checkDescriptionId : undefined}
+                      className={`${cellInputClass} ${item.type === "number" ? "text-right tabular-nums" : ""} ${cellChecks.length ? "pr-8" : ""}`}
+                      defaultValue={typeof raw === "string" || typeof raw === "number" ? String(raw) : ""} />
+                    <span className="absolute right-1 top-1/2 -translate-y-1/2"><CheckGlyph checks={cellChecks} onOpen={() => setOpenCell(cellId)} /></span>
+                  </div>
                 )}
+                {cellChecks.length > 0 && <span id={checkDescriptionId} className="sr-only">{cellChecks.map((check) => check.stale ? `${check.message} Not rechecked after this edit.` : check.message).join(" ")}</span>}
+                {openCell === cellId && <RationalePopover rationale={null} mismatchChecks={cellChecks} onClose={() => setOpenCell(null)} onFix={() => cellRefs.current.get(cellId)?.focus()} onEscalate={onEscalate} />}
               </td>
             })}
             <td className="border-b border-slate-100 px-1 text-center">

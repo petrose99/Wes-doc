@@ -22,10 +22,10 @@ export function checkVatNumber(input: VatNumberInput): CheckResult | null {
 
   const normalized = input.vatNumber.replace(/\s+/g, "")
   if (pattern.test(normalized)) {
-    return { checkCode: "vat_number_format", status: "pass", message: "Supplier VAT number matches the expected format.", detail: { vatNumber: input.vatNumber } }
+    return { checkCode: "vat_number_format", status: "pass", fields: ["supplier_vat_number"], message: "Supplier VAT number matches the expected format.", detail: { vatNumber: input.vatNumber } }
   }
   return {
-    checkCode: "vat_number_format", status: "warn",
+    checkCode: "vat_number_format", status: "warn", fields: ["supplier_vat_number"],
     message: `Supplier VAT number "${input.vatNumber}" does not match the expected format for this tax region.`,
     detail: { vatNumber: input.vatNumber },
   }

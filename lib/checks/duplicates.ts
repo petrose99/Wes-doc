@@ -12,6 +12,7 @@ export type DocumentIdentity = {
    * absolute total but this document being a credit note is the "cancelling" case, not a real
    * duplicate. */
   isCreditNote?: boolean
+  fieldKeys?: { supplier?: string; invoiceNumber?: string; total?: string }
 }
 
 /** A2.3: fold an invoice-number for comparison. Providers write "INV-2026/0442" and
@@ -80,9 +81,10 @@ export function findNearDuplicate(candidate: DocumentIdentity, others: DocumentI
     if (levenshteinAtMost(otherInvoiceNumber, invoiceNumber, 1) <= 1) { match = other; fuzzy = true }
   }
 
-  if (!match) return { checkCode: "duplicate", status: "pass", message: "No near-duplicate found." }
+  const fields = [candidate.fieldKeys?.supplier ?? "supplier", candidate.fieldKeys?.invoiceNumber ?? "invoice_number", candidate.fieldKeys?.total ?? "total"]
+  if (!match) return { checkCode: "duplicate", status: "pass", message: "No near-duplicate found.", fields }
   return {
-    checkCode: "duplicate", status: "warn", detail: { matchedDocumentId: match.documentId, fuzzy },
+    checkCode: "duplicate", status: "warn", fields, detail: { matchedDocumentId: match.documentId, fuzzy },
     message: fuzzy
       ? "Same supplier and total as another document; invoice number differs by one character (likely OCR error or duplicate submission)."
       : "Same supplier, invoice number, and total as another document already in this workspace.",

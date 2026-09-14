@@ -29,7 +29,7 @@ export function checkBankDetails(input: {
   if (!known) {
     return {
       checkCode: "bank_detail_change",
-      status: "pass",
+      status: "pass", fields: ["payment_iban"],
       message: `First bank details on file for ${input.supplierName ?? "this supplier"} (${maskIban(extracted)}).`,
       detail: { firstSeen: true, iban: extracted },
     }
@@ -37,14 +37,14 @@ export function checkBankDetails(input: {
   if (known === extracted) {
     return {
       checkCode: "bank_detail_change",
-      status: "pass",
+      status: "pass", fields: ["payment_iban"],
       message: "Payment details match the supplier's bank details on file.",
       detail: { iban: extracted },
     }
   }
   return {
     checkCode: "bank_detail_change",
-    status: "fail",
+    status: "fail", fields: ["payment_iban"],
     message: `Payment IBAN changed for ${input.supplierName ?? "this supplier"}: ${maskIban(known)} on file, this document says ${maskIban(extracted)}. Verify with the supplier through a known channel before paying.`,
     detail: { knownIban: known, extractedIban: extracted },
   }
