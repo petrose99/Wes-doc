@@ -106,7 +106,7 @@ export async function getReviewTaskDetailAction(workspaceId: string, taskId: str
   const fields = parseTemplateFields(task.document.fieldSnapshot)
   const values = (task.document.reviewedData ?? task.document.rawExtraction ?? {}) as Record<string, unknown>
   const workflowsEnabled = capabilities.has("approval-workflows")
-  const [checkResults, connections, appliedRule, template, availableWorkflows, lastPush] = await Promise.all([
+  const [checkResults, connections, appliedRule, template, availableWorkflows, lastPush, stageDecisionEvents] = await Promise.all([
     prisma.documentCheckResult.findMany({ where: { workspaceId, documentId: task.document.id }, orderBy: { checkCode: "asc" } }),
     capabilities.has("accounting-push") ? listWorkspaceIntegrationConnections(workspaceId) : Promise.resolve([]),
     task.document.appliedRuleId ? prisma.automationRule.findUnique({ where: { id: task.document.appliedRuleId }, select: { name: true } }) : Promise.resolve(null),
@@ -120,6 +120,13 @@ export async function getReviewTaskDetailAction(workspaceId: string, taskId: str
       orderBy: { completedAt: "desc" },
       select: { completedAt: true, provider: true, connection: { select: { tenantName: true, provider: true } } },
     }) : Promise.resolve(null),
+    // #209: per-actor decision history for the mobile approval timeline — sourced from the audit
+    // trail decideReviewTaskStage already writes, rather than a new table.
+    workflowsEnabled && task.workflowId ? prisma.documentAuditEvent.findMany({
+      where: { workspaceId, documentId: task.document.id, type: "review_task_stage_decided" },
+      orderBy: { createdAt: "asc" },
+      select: { detail: true, createdAt: true, actor: { select: { name: true, email: true } } },
+    }) : Promise.resolve([]),
   ])
   const activeConnection = connections.find((connection) => connection.status === "active") ?? null
   const canPush = task.document.status === "reviewed" && Boolean(activeConnection)
@@ -133,9 +140,16 @@ export async function getReviewTaskDetailAction(workspaceId: string, taskId: str
   const workflow = task.workflow && task.currentStageIndex !== null ? (() => {
     const stages = task.workflow!.stages.map((stage) => ({ stageIndex: stage.stageIndex, name: stage.name, requireOwner: stage.requireOwner, approverIds: stage.approverIds ?? [], minAmount: stage.minAmount !== null && stage.minAmount !== undefined ? Number(stage.minAmount) : null }))
     const currentStage = findCurrentStage(stages, task.currentStageIndex!)
+    // Per-stage actor + decision, for the mobile vertical timeline (#209) — the desktop chain only
+    // ever needed the current stage's name, but a timeline has to show who cleared each prior one.
+    const decisions = stageDecisionEvents.map((event) => {
+      const detail = event.detail as { stageIndex: number; stageName: string; decision: "approve" | "reject" } | null
+      return detail ? { stageIndex: detail.stageIndex, stageName: detail.stageName, decision: detail.decision, actorName: event.actor?.name || event.actor?.email || "Unknown", decidedAt: event.createdAt.toISOString() } : null
+    }).filter((decision): decision is NonNullable<typeof decision> => decision !== null)
     return {
       id: task.workflow!.id, name: task.workflow!.name, stages, currentStageIndex: task.currentStageIndex!,
       canDecideCurrentStage: currentStage ? canDecideStage({ stage: currentStage, actorRole: membership.role === "owner" ? "owner" : "member", actorId: user.id }) : false,
+      decisions,
     }
   })() : null
 

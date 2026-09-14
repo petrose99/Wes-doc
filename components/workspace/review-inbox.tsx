@@ -6,7 +6,7 @@ import { DocumentPreview } from "@/components/documents/document-preview"
 import { AutomationRuleForm } from "@/components/workspace/automation-rule-form"
 import { Button } from "@/components/ui/button"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
-import { Bot, CheckCircle2 } from "lucide-react"
+import { ArrowLeft, Bot, CheckCircle2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
@@ -49,6 +49,12 @@ function ConfidenceDot({ score }: { score: number | null }) {
   // emerald "good" and red "bad" ends.
   const color = score >= 0.8 ? "bg-emerald-500" : score >= 0.5 ? "bg-amber-500" : "bg-red-500"
   return <span className={`inline-block h-2 w-2 rounded-full ${color}`} title={`Lowest field confidence: ${Math.round(score * 100)}%`} />
+}
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (!parts.length) return "?"
+  return (parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase()
 }
 
 function formatValue(value: unknown): string {
@@ -98,6 +104,11 @@ export function ReviewInbox({ workspaceId, tasks, currentStatus, members, worksp
    * took. Cleared whenever the dialog closes so a stale note never rides along on the next reject. */
   const [rejectNote, setRejectNote] = useState("")
   const detailTaskIdRef = useRef<string | null>(null)
+  /** #209: below `lg`, tapping a card opens a full-screen detail view rather than sharing the
+   * desktop split pane — kept as its own flag (not derived from selectedId) so the mobile "back"
+   * button can close the detail without losing the selection the effectiveSelectedId logic below
+   * would otherwise just re-snap to the first visible row. */
+  const [mobileDetailOpen, setMobileDetailOpen] = useState(false)
 
   // Adjusted during render (React's own recommended pattern for "reset derived state when a prop
   // changes") rather than in an effect: the server already refetched a tab-filtered list on
@@ -334,7 +345,54 @@ export function ReviewInbox({ workspaceId, tasks, currentStatus, members, worksp
   </div>
 
   return <div className="space-y-3">
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_420px]">
+    <MobileApprovalQueue
+      tasks={visibleTasks}
+      optimisticStatus={optimisticStatus}
+      selectedId={effectiveSelectedId}
+      open={mobileDetailOpen}
+      detail={detail}
+      detailLoading={detailLoading}
+      pending={pending}
+      approveLabel={approveLabel}
+      onSelect={(id) => { setSelectedId(id); setMobileDetailOpen(true) }}
+      onBack={() => setMobileDetailOpen(false)}
+      onApprove={(taskId) => {
+        if (detail?.workflow) { if (detail.workflow.canDecideCurrentStage) void decideStage(taskId, "approve"); return }
+        if (detail?.document.paymentConfirmationRequired && !detail.document.paymentStatus) { toast.warning("Confirm paid/unpaid first"); return }
+        void changeStatus(taskId, "approved", optimisticStatus[taskId] ?? tasks.find((task) => task.id === taskId)?.status ?? "open")
+      }}
+      onReject={(taskId) => {
+        if (detail?.workflow) { setConfirming("stage-reject"); return }
+        void changeStatus(taskId, "rejected", optimisticStatus[taskId] ?? tasks.find((task) => task.id === taskId)?.status ?? "open")
+      }}
+    />
+    {/* Hoisted above the desktop-only grid (and out of the detail pane) so it fires from either
+        surface, and so a mid-flight refetch that nulls `detail` can't unmount it under the user;
+        the task id is read from the selection at confirm time. */}
+    <ConfirmDialog
+      open={confirming === "stage-reject"}
+      destructive
+      busy={pending}
+      title="Reject this stage?"
+      description="The document is marked rejected at this stage of its approval workflow, and its run ends."
+      confirmLabel="Reject"
+      onConfirm={() => {
+        const taskId = effectiveSelectedId
+        const note = rejectNote.trim()
+        setConfirming(null)
+        setRejectNote("")
+        if (taskId) void decideStage(taskId, "reject", note || undefined)
+      }}
+      onCancel={() => { setConfirming(null); setRejectNote("") }}>
+      <textarea
+        value={rejectNote}
+        onChange={(event) => setRejectNote(event.target.value)}
+        rows={2}
+        maxLength={2000}
+        placeholder="Why? (optional — recorded in the document's activity)"
+        className="w-full rounded-md border px-2.5 py-1.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-600" />
+    </ConfirmDialog>
+    <div className="hidden gap-4 lg:grid lg:grid-cols-[minmax(0,1fr)_420px]">
     <div>
       {bulkSelected.size > 0 && <div className="sticky top-2 z-10 mb-2 flex flex-wrap items-center gap-2 rounded-md bg-emerald-50 px-3 py-2 text-sm shadow-sm">
         <span className="font-medium text-emerald-900">{bulkSelected.size} selected</span>
@@ -355,31 +413,6 @@ export function ReviewInbox({ workspaceId, tasks, currentStatus, members, worksp
         confirmLabel={confirming === "rejected" ? "Reject all" : approveLabel}
         onConfirm={() => { const status = confirming; setConfirming(null); if (status && status !== "stage-reject") void bulk(status) }}
         onCancel={() => setConfirming(null)} />
-      {/* Hoisted out of the detail pane so a mid-flight refetch that nulls `detail` can't unmount
-          the open dialog under the user; the task id is read from the selection at confirm time. */}
-      <ConfirmDialog
-        open={confirming === "stage-reject"}
-        destructive
-        busy={pending}
-        title="Reject this stage?"
-        description="The document is marked rejected at this stage of its approval workflow, and its run ends."
-        confirmLabel="Reject"
-        onConfirm={() => {
-          const taskId = effectiveSelectedId
-          const note = rejectNote.trim()
-          setConfirming(null)
-          setRejectNote("")
-          if (taskId) void decideStage(taskId, "reject", note || undefined)
-        }}
-        onCancel={() => { setConfirming(null); setRejectNote("") }}>
-        <textarea
-          value={rejectNote}
-          onChange={(event) => setRejectNote(event.target.value)}
-          rows={2}
-          maxLength={2000}
-          placeholder="Why? (optional — recorded in the document's activity)"
-          className="w-full rounded-md border px-2.5 py-1.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-600" />
-      </ConfirmDialog>
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr className="border-b text-left text-slate-500">
@@ -603,5 +636,156 @@ export function ReviewInbox({ workspaceId, tasks, currentStatus, members, worksp
       )}
     </div>
     </div>
+  </div>
+}
+
+/** #209: the mobile re-composition of the Approval queue — Vic.ai's pattern, not a responsive
+ * mirror of the desktop table+pane. Below `lg`, rows become tappable cards and the selected
+ * document opens as a full-screen sheet with a vertical actor-avatar timeline (mobile-only;
+ * desktop keeps #179's step-by-step chain unchanged) and a fixed bottom Approve/Reject bar sized
+ * for a thumb. Reuses the same task/detail data and server actions as the desktop pane — this is
+ * purely a different layout over the same state. */
+function MobileApprovalQueue({ tasks, optimisticStatus, selectedId, open, detail, detailLoading, pending, approveLabel, onSelect, onBack, onApprove, onReject }: {
+  tasks: ReviewQueueRow[]
+  optimisticStatus: Record<string, string>
+  selectedId: string | null
+  open: boolean
+  detail: TaskDetail
+  detailLoading: boolean
+  pending: boolean
+  approveLabel: string
+  onSelect: (taskId: string) => void
+  onBack: () => void
+  onApprove: (taskId: string) => void
+  onReject: (taskId: string) => void
+}) {
+  const selectedTask = tasks.find((task) => task.id === selectedId) ?? null
+
+  if (open && selectedTask) {
+    const isWorkflow = detail && detail.id === selectedTask.id ? detail.workflow : null
+    const currentStatus = optimisticStatus[selectedTask.id] ?? selectedTask.status
+    const resolved = currentStatus === "approved" || currentStatus === "rejected"
+    const canAct = detailLoading || detail?.id !== selectedTask.id ? false : isWorkflow ? isWorkflow.canDecideCurrentStage && !resolved : !resolved
+    return <div className="fixed inset-0 z-40 flex flex-col bg-white lg:hidden">
+      <div className="flex items-center gap-2 border-b px-3 py-3">
+        <button type="button" onClick={onBack} aria-label="Back to queue" className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-slate-100">
+          <ArrowLeft className="h-5 w-5 text-slate-700" />
+        </button>
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-semibold text-slate-900">{selectedTask.document.review.supplier ?? "Unknown supplier"}</p>
+          <p className="truncate text-xs text-slate-500">{selectedTask.document.filename}</p>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-4 pb-28">
+        {detailLoading || !detail || detail.id !== selectedTask.id ? (
+          <div className="space-y-3">
+            <div className="h-4 w-2/3 animate-pulse rounded bg-slate-100" />
+            <div className="h-40 animate-pulse rounded bg-slate-100" />
+          </div>
+        ) : <>
+          {detail.document.storageKey
+            ? <DocumentPreview src={`/api/documents/${detail.document.id}/source`} filename={detail.document.filename} mimeType={detail.document.mimeType} className="h-48 rounded border" />
+            : <p className="rounded border border-dashed p-4 text-center text-xs text-slate-400">Source not available</p>}
+
+          <div className="mt-4 flex items-center justify-between text-sm">
+            <span className="text-slate-500">{selectedTask.document.review.category}</span>
+            <span className="font-semibold text-slate-900">{selectedTask.document.review.total ?? "—"}</span>
+          </div>
+
+          {isWorkflow ? (
+            <div className="mt-5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{isWorkflow.name}</p>
+              <ol className="mt-3 space-y-4 border-l-2 border-slate-200 pl-4">
+                {isWorkflow.stages.map((stage) => {
+                  const decision = isWorkflow.decisions.find((entry) => entry.stageIndex === stage.stageIndex)
+                  const isCurrent = stage.stageIndex === isWorkflow.currentStageIndex
+                  const isPast = decision || stage.stageIndex < isWorkflow.currentStageIndex
+                  const dotColor = decision?.decision === "reject" ? "bg-red-500" : isPast ? "bg-emerald-600" : isCurrent ? "bg-indigo-600" : "bg-slate-300"
+                  return <li key={stage.stageIndex} className="relative">
+                    <span className={`absolute -left-[21px] top-0.5 h-3 w-3 rounded-full ring-4 ring-white ${dotColor}`} />
+                    <div className="flex items-center justify-between gap-2">
+                      <p className={`text-sm font-medium ${isCurrent ? "text-indigo-900" : "text-slate-800"}`}>{stage.name}</p>
+                      {decision && <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-200 text-[10px] font-semibold text-slate-700" title={decision.actorName}>{initials(decision.actorName)}</span>}
+                    </div>
+                    {decision ? (
+                      <p className={`text-xs ${decision.decision === "reject" ? "text-red-600" : "text-emerald-700"}`}>
+                        {decision.decision === "reject" ? "Rejected" : "Approved"} by {decision.actorName}
+                      </p>
+                    ) : isCurrent ? (
+                      <p className="text-xs text-indigo-700">Waiting on this stage{stage.requireOwner ? " (owner only)" : ""}</p>
+                    ) : (
+                      <p className="text-xs text-slate-400">Not reached yet</p>
+                    )}
+                  </li>
+                })}
+              </ol>
+              {isWorkflow.canDecideCurrentStage === false && !resolved && (
+                <p className="mt-3 text-xs text-indigo-700">Only a workspace owner can decide this stage.</p>
+              )}
+            </div>
+          ) : (
+            <p className="mt-5 text-sm font-medium capitalize text-slate-600">{currentStatus.replace("_", " ")}</p>
+          )}
+
+          {detail.document.paymentConfirmationRequired && !detail.document.paymentStatus && (
+            <p className="mt-3 text-xs text-amber-700">Confirm paid/unpaid on the full view before this can be approved.</p>
+          )}
+
+          {detail.checkResults.length > 0 && <div className="mt-5">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Checks</h3>
+            <ul className="mt-1.5 space-y-1.5 text-sm">
+              {detail.checkResults.map((check) => (
+                <li key={check.id} className="flex items-start gap-2">
+                  <span className={`mt-0.5 shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold capitalize ${check.status === "fail" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>{check.status}</span>
+                  <span className="text-slate-600">{check.message}</span>
+                </li>
+              ))}
+            </ul>
+          </div>}
+        </>}
+      </div>
+
+      {/* Fixed, thumb-reachable — Vic.ai's mobile approval pattern, not the desktop inline buttons. */}
+      <div className="fixed inset-x-0 bottom-0 flex gap-3 border-t bg-white p-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]">
+        <button type="button" disabled={!canAct || pending}
+          onClick={() => onReject(selectedTask.id)}
+          className="flex-1 rounded-lg border border-red-300 py-3 text-sm font-semibold text-red-700 disabled:opacity-40">
+          Reject
+        </button>
+        <button type="button" disabled={!canAct || pending}
+          onClick={() => onApprove(selectedTask.id)}
+          className="flex-1 rounded-lg bg-emerald-700 py-3 text-sm font-semibold text-white disabled:opacity-40">
+          {isWorkflow ? "Approve stage" : approveLabel}
+        </button>
+      </div>
+    </div>
+  }
+
+  return <div className="space-y-2 lg:hidden">
+    {tasks.map((task) => {
+      const status = optimisticStatus[task.id] ?? task.status
+      return <button key={task.id} type="button" onClick={() => onSelect(task.id)}
+        className="block w-full rounded-lg border p-3 text-left active:bg-slate-50">
+        <div className="flex items-center justify-between gap-2">
+          <span className="flex min-w-0 items-center gap-1.5 font-medium text-slate-900">
+            <ConfidenceDot score={task.document.minConfidence} />
+            <span className="truncate">{task.document.review.supplier ?? "Unknown supplier"}</span>
+          </span>
+          <span className="shrink-0 rounded-full border px-2 py-0.5 text-xs font-medium capitalize text-slate-600">{status.replace("_", " ")}</span>
+        </div>
+        <div className="mt-1 flex items-center justify-between text-sm text-slate-500">
+          <span>{task.document.review.category}</span>
+          <span className="font-medium text-slate-900">{task.document.review.total ?? "—"}</span>
+        </div>
+        {task.document.checks.length > 0 && <div className="mt-2 flex flex-wrap gap-1">
+          {task.document.checks.map((check) => (
+            <span key={check.code} className={`rounded-full px-2 py-0.5 text-xs font-medium ${check.status === "fail" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-800"}`}>
+              {CHECK_LABELS[check.code] ?? check.code}
+            </span>
+          ))}
+        </div>}
+      </button>
+    })}
   </div>
 }
