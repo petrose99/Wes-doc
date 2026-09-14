@@ -19,10 +19,13 @@ const BUCKET_LABEL: Record<AgingBucket | "unknown", string> = {
   unknown: "No due date",
 }
 
-export function SyncedStageHeader({ workspaceId, summary, currency }: {
+export function SyncedStageHeader({ workspaceId, summary, currency, showLink = true }: {
   workspaceId: string
   summary: BillsSummary
   currency: string
+  /** Off on the Invoices page itself, where "Open Invoices →" would point back at the page
+   * already being viewed. */
+  showLink?: boolean
 }) {
   const formatMoney = (value: number) => {
     try {
@@ -46,9 +49,9 @@ export function SyncedStageHeader({ workspaceId, summary, currency }: {
           </div>
         })}
       </div>
-      <Link href={`/workspaces/${workspaceId}/invoices`} className="shrink-0 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900">
+      {showLink && <Link href={`/workspaces/${workspaceId}/invoices`} className="shrink-0 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900">
         Open Invoices →
-      </Link>
+      </Link>}
     </div>
   </div>
 }

@@ -32,6 +32,13 @@ export type BillRow = {
   reviewedAt: Date | null
   blockedByCheck: boolean
   openCheckCodes: string[]
+  /** Invoice Approval, per #211's filter-chip taxonomy. Derived from the document's most recent
+   * ReviewTask: "approved" once resolved with no rejection, "rejected" once rejected, "in_progress"
+   * while a task is being worked, "not_started" while one sits open/unclaimed, and "approved" by
+   * default once the document itself is reviewed with no task at all (nothing left to approve).
+   * There is no model concept of a "cancelled" approval — the taxonomy's Cancelled value has no
+   * backing state and is intentionally not emitted here. */
+  approvalStatus: "not_started" | "in_progress" | "approved" | "rejected"
 }
 
 export type BillsSummary = Record<AgingBucket | "unknown", { count: number; total: number }>
@@ -72,6 +79,12 @@ export async function listWorkspaceBills(input: {
   limit?: number
   onlyBlocked?: boolean
   onlyUnpaid?: boolean
+  /** #211's Status filter-chip group. "unreviewed"/"reviewed" map onto doc.status; there is no
+   * model field for the taxonomy's Posted/Exported/Transferred values (no push/ledger status of
+   * that shape exists), so "paid" stands in as the only real "closed" state. */
+  statusFilter?: "unreviewed" | "reviewed" | "paid"
+  /** #211's Invoice Approval filter-chip group. See BillRow.approvalStatus. */
+  approvalFilter?: BillRow["approvalStatus"]
 }): Promise<{ bills: BillRow[]; summary: BillsSummary }> {
   const asOf = input.asOf ?? new Date()
   const limit = input.limit ?? 500
@@ -94,7 +107,7 @@ export async function listWorkspaceBills(input: {
   if (!documents.length) return { bills: [], summary: emptySummary() }
 
   const documentIds = documents.map((d) => d.id)
-  const [paymentStatuses, openCheckTasks, suppliers] = await Promise.all([
+  const [paymentStatuses, openCheckTasks, suppliers, latestReviewTasks] = await Promise.all([
     getDocumentPaymentStatuses(input.workspaceId, documentIds),
     prisma.reviewTask.findMany({
       where: { workspaceId: input.workspaceId, documentId: { in: documentIds }, reason: "check_failed", status: { in: ["open", "in_review"] } },
@@ -103,6 +116,11 @@ export async function listWorkspaceBills(input: {
     prisma.supplier.findMany({
       where: { workspaceId: input.workspaceId },
       select: { id: true, normalizedKey: true, paymentTermsDays: true },
+    }),
+    prisma.reviewTask.findMany({
+      where: { workspaceId: input.workspaceId, documentId: { in: documentIds } },
+      select: { documentId: true, status: true, createdAt: true },
+      orderBy: { createdAt: "desc" },
     }),
   ])
 
@@ -113,6 +131,12 @@ export async function listWorkspaceBills(input: {
     const list = openChecksByDoc.get(task.documentId) ?? []
     list.push(code)
     openChecksByDoc.set(task.documentId, list)
+  }
+  // First hit per document wins — the query is already newest-first, so this is each document's
+  // most recent ReviewTask of any reason.
+  const latestReviewTaskByDoc = new Map<string, "open" | "in_review" | "approved" | "rejected">()
+  for (const task of latestReviewTasks) {
+    if (!latestReviewTaskByDoc.has(task.documentId)) latestReviewTaskByDoc.set(task.documentId, task.status as "open" | "in_review" | "approved" | "rejected")
   }
 
   const bills: BillRow[] = []
@@ -133,6 +157,12 @@ export async function listWorkspaceBills(input: {
     const bucket = agingBucket(dueDate, asOf)
     const openChecks = openChecksByDoc.get(doc.id) ?? []
     const paymentRow = paymentStatuses.get(doc.id)
+    const latestTaskStatus = latestReviewTaskByDoc.get(doc.id)
+    const approvalStatus: BillRow["approvalStatus"] =
+      latestTaskStatus === "rejected" ? "rejected" :
+      latestTaskStatus === "in_review" ? "in_progress" :
+      latestTaskStatus === "open" ? "not_started" :
+      "approved"
     bills.push({
       documentId: doc.id,
       filename: doc.filename,
@@ -152,12 +182,17 @@ export async function listWorkspaceBills(input: {
       reviewedAt: doc.reviewedAt,
       blockedByCheck: openChecks.length > 0,
       openCheckCodes: openChecks,
+      approvalStatus,
     })
   }
 
   const filtered = bills.filter((bill) => {
     if (input.onlyBlocked && !bill.blockedByCheck) return false
     if (input.onlyUnpaid && bill.paymentStatus && ["paid", "reconciled"].includes(bill.paymentStatus.toLowerCase())) return false
+    if (input.statusFilter === "unreviewed" && bill.status === "reviewed") return false
+    if (input.statusFilter === "reviewed" && bill.status !== "reviewed") return false
+    if (input.statusFilter === "paid" && !(bill.paymentStatus && ["paid", "reconciled"].includes(bill.paymentStatus.toLowerCase()))) return false
+    if (input.approvalFilter && bill.approvalStatus !== input.approvalFilter) return false
     return true
   })
 

@@ -1,82 +1,78 @@
 import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { getCurrentUser } from "@/lib/auth"
-import { listWorkspaceBills, type BillRow, type BillsSummary } from "@/models/bills"
+import { listWorkspaceBills, type BillRow } from "@/models/bills"
 import { requireWorkspaceRole } from "@/models/workspaces"
 import type { AgingBucket } from "@/lib/bills/due-date"
 import { preparePaymentRunAction } from "./actions"
 import { redirect } from "next/navigation"
+import { ListScreenShell, ListScreenBulkActionBar } from "@/components/list-screen/list-screen-shell"
+import { SyncedStageHeader } from "@/components/pipeline/synced-stage-header"
+import { InvoiceFilterChips } from "@/components/typed-destinations/invoice-filter-chips"
 
 export const dynamic = "force-dynamic"
 
-/** WP-AP2: AP aging / bills cockpit. One page a controller can open to see every invoice this
- * workspace has extracted, grouped by aging bucket, with payment status from the ledger sync
- * and a "blocked by check" flag surfaced on every row. Read-only for now — resolution actions
- * (approve, push, pay) live on the underlying document detail page. */
+/** WP-AP2 / #211: AP aging / bills cockpit, rendered on the shared list-screen shell. One page a
+ * controller can open to see every invoice this workspace has extracted, filterable by Status and
+ * Invoice Approval, with payment status from the ledger sync and a "blocked by check" flag
+ * surfaced on every row. Read-only for now — resolution actions (approve, push, pay) live on the
+ * underlying document detail page; in-place row expansion is #213, not this ticket. */
 export async function BillsPage({ params, searchParams, pathSegment = "invoices", title = "Invoices" }: {
   params: Promise<{ workspaceId: string }>
-  searchParams: Promise<{ blocked?: string; unpaid?: string }>
+  searchParams: Promise<{ blocked?: string; unpaid?: string; status?: string; approval?: string }>
   pathSegment?: string
   title?: string
 }) {
   const { workspaceId } = await params
-  const { blocked, unpaid } = await searchParams
+  const { blocked, unpaid, status, approval } = await searchParams
   const user = await getCurrentUser()
   const membership = await requireWorkspaceRole(workspaceId, user.id)
   const isOwner = membership.role === "owner"
 
   const onlyBlocked = blocked === "1"
   const onlyUnpaid = unpaid === "1"
+  const statusFilter = status === "unreviewed" || status === "reviewed" || status === "paid" ? status : undefined
+  const approvalFilter: BillRow["approvalStatus"] | undefined =
+    approval === "not_started" || approval === "in_progress" || approval === "approved" || approval === "rejected" ? approval : undefined
   const basePath = `/workspaces/${workspaceId}/${pathSegment}`
-  const { bills, summary } = await listWorkspaceBills({ workspaceId, onlyBlocked, onlyUnpaid })
+  const { bills, summary } = await listWorkspaceBills({ workspaceId, onlyBlocked, onlyUnpaid, statusFilter, approvalFilter })
   // Only bills with a total AND an unblocked status are candidates for a payment run.
   const payableBills = bills.filter((b) => !b.blockedByCheck && b.total !== null && b.total > 0 && (!b.paymentStatus || !["paid", "reconciled"].includes(b.paymentStatus.toLowerCase())))
   const preparePaymentRunActionBound = preparePaymentRunAction.bind(null, workspaceId)
+  const hasFilter = onlyBlocked || onlyUnpaid || !!statusFilter || !!approvalFilter
 
-  const buckets: (AgingBucket | "unknown")[] = ["current", "1-30", "31-60", "61-90", "90+", "unknown"]
-
-  return (
-    <main className="space-y-6">
-      <header className="flex items-end justify-between gap-4">
-        <div>
-            <h1 className="text-3xl font-bold">{title}</h1>
-            <p className="mt-1 text-muted-foreground">Every extracted invoice, grouped by aging bucket. Payment status is synced from your ledger.</p>
-        </div>
-        <div className="flex gap-2 text-sm">
-          <FilterLink href={basePath} active={!onlyBlocked && !onlyUnpaid}>All</FilterLink>
-          <FilterLink href={`${basePath}?unpaid=1`} active={onlyUnpaid && !onlyBlocked}>Unpaid</FilterLink>
-          <FilterLink href={`${basePath}?blocked=1`} active={onlyBlocked && !onlyUnpaid}>Blocked by a check</FilterLink>
-        </div>
-      </header>
-
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-6">
-        {buckets.map((bucket) => (
-          <SummaryCard key={bucket} label={bucketLabel(bucket)} data={summary[bucket]} />
-        ))}
+  return <ListScreenShell
+    header={<div className="flex flex-wrap items-end justify-between gap-4 border-b px-6 py-4">
+      <div>
+        <h1 className="text-xl font-bold text-slate-900">{title}</h1>
+        <p className="mt-1 text-sm text-slate-500">Every extracted invoice, filterable by status and approval. Payment status is synced from your ledger.</p>
       </div>
-
+      <div className="flex gap-2 text-sm">
+        <FilterLink href={basePath} active={!onlyBlocked && !onlyUnpaid}>All</FilterLink>
+        <FilterLink href={`${basePath}?unpaid=1`} active={onlyUnpaid && !onlyBlocked}>Unpaid</FilterLink>
+        <FilterLink href={`${basePath}?blocked=1`} active={onlyBlocked && !onlyUnpaid}>Blocked by a check</FilterLink>
+      </div>
+    </div>}
+    beforeToolbar={<SyncedStageHeader workspaceId={workspaceId} summary={summary} currency="USD" showLink={false} />}
+    toolbar={<>
+      <InvoiceFilterChips basePath={basePath} status={statusFilter} approval={approvalFilter}
+        extraParams={{ blocked: onlyBlocked ? "1" : undefined, unpaid: onlyUnpaid ? "1" : undefined }} />
       {isOwner && payableBills.length > 0 && (
-        <Card>
-          <CardHeader>
-              <CardTitle>Prepare a payment run</CardTitle>
-              <CardDescription>
-              Generate a ZA EFT CSV for {payableBills.length} unpaid, unblocked invoice{payableBills.length === 1 ? "" : "s"}. Upload the file to your bank&rsquo;s bulk-payment portal — DocuBite does not move money itself.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form action={preparePaymentRunActionBound} className="flex flex-wrap items-center gap-3">
-              {payableBills.map((bill) => (
-                <input key={bill.documentId} type="hidden" name="documentId" value={bill.documentId} />
-              ))}
-              <button type="submit" className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700">
-                Prepare payment run
-              </button>
-              <span className="text-xs text-slate-500">Invoices without a supplier bank account are dropped from the file — set the account on the supplier record and re-run.</span>
-            </form>
-          </CardContent>
-        </Card>
+        <ListScreenBulkActionBar selectedCount={0}>
+          <form action={preparePaymentRunActionBound} className="flex flex-wrap items-center gap-3">
+            {payableBills.map((bill) => (
+              <input key={bill.documentId} type="hidden" name="documentId" value={bill.documentId} />
+            ))}
+            <span className="font-medium text-slate-700">Prepare a payment run</span>
+            <button type="submit" className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700">
+              Generate ZA EFT CSV ({payableBills.length})
+            </button>
+            <span className="text-xs text-slate-500">Invoices without a supplier bank account are dropped — set it on the supplier record and re-run.</span>
+          </form>
+        </ListScreenBulkActionBar>
       )}
-
+    </>}>
+    <main className="p-6">
       <Card>
         <CardHeader>
           <CardTitle>{bills.length} invoice{bills.length === 1 ? "" : "s"}</CardTitle>
@@ -85,7 +81,7 @@ export async function BillsPage({ params, searchParams, pathSegment = "invoices"
         <CardContent>
           {bills.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-                {onlyBlocked || onlyUnpaid
+                {hasFilter
                 ? "No invoices match the current filter."
                 : "No invoices yet. Invoices appear here once an invoice is extracted and approved."}
             </p>
@@ -113,7 +109,7 @@ export async function BillsPage({ params, searchParams, pathSegment = "invoices"
         </CardContent>
       </Card>
     </main>
-  )
+  </ListScreenShell>
 }
 
 export default async function LegacyBillsPage({ params, searchParams }: {
@@ -127,18 +123,6 @@ export default async function LegacyBillsPage({ params, searchParams }: {
   if (unpaid === "1") query.set("unpaid", "1")
   const suffix = query.toString() ? `?${query.toString()}` : ""
   redirect(`/workspaces/${workspaceId}/invoices${suffix}`)
-}
-
-function SummaryCard({ label, data }: { label: string; data: { count: number; total: number } }) {
-  return (
-    <Card>
-      <CardContent className="p-4">
-        <div className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</div>
-        <div className="mt-1 text-2xl font-bold text-slate-900">{data.count}</div>
-        <div className="text-xs text-slate-500">{data.total ? `${formatMoney(data.total)} total` : "—"}</div>
-      </CardContent>
-    </Card>
-  )
 }
 
 function BillTableRow({ basePath, bill }: { basePath: string; bill: BillRow }) {
@@ -196,17 +180,6 @@ function FilterLink({ href, active, children }: { href: string; active: boolean;
   )
 }
 
-function bucketLabel(bucket: AgingBucket | "unknown"): string {
-  switch (bucket) {
-    case "current": return "Current"
-    case "1-30": return "1–30d"
-    case "31-60": return "31–60d"
-    case "61-90": return "61–90d"
-    case "90+": return "90+ days"
-    case "unknown": return "No due date"
-  }
-}
-
 function formatMoney(amount: number, currency?: string | null): string {
   const currencyCode = currency && /^[A-Z]{3}$/.test(currency) ? currency : "USD"
   try {
@@ -216,5 +189,3 @@ function formatMoney(amount: number, currency?: string | null): string {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-type _Summary = BillsSummary
