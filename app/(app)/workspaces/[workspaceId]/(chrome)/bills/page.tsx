@@ -74,7 +74,7 @@ export default async function BillsPage({ params, searchParams }: {
         </Card>
       )}
 
-      {variant && bills.length > 0 ? (
+      {variant ? (
         <DensityRowPrototype workspaceId={workspaceId} bills={bills} />
       ) : (
       <Card>

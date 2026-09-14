@@ -28,6 +28,19 @@ import { useEffect, useMemo, useState } from "react"
 import type { BillRow } from "@/models/bills"
 import type { AgingBucket } from "@/lib/bills/due-date"
 
+// Fallback rows for a workspace with no real bills yet — this prototype is about row density,
+// not real data, so an empty workspace shouldn't block reacting to it. PROTOTYPE ONLY.
+const SAMPLE_BILLS: BillRow[] = [
+  { documentId: "sample-1", filename: "INV-4471.pdf", supplier: "Northwind Trading", supplierId: null, total: 2475.60, currencyCode: "USD", invoiceNumber: "INV-4471", documentDate: null, extractedDueDate: null, dueDate: null, agingBucket: "current", paymentStatus: null, paidAmount: null, paidAt: null, status: "approved", reviewedAt: null, blockedByCheck: false, openCheckCodes: [] },
+  { documentId: "sample-2", filename: "scan_0043.jpg", supplier: "Bell & Sons Hardware", supplierId: null, total: 86.40, currencyCode: "USD", invoiceNumber: "B-0043", documentDate: null, extractedDueDate: null, dueDate: null, agingBucket: "1-30", paymentStatus: null, paidAmount: null, paidAt: null, status: "approved", reviewedAt: null, blockedByCheck: false, openCheckCodes: [] },
+  { documentId: "sample-3", filename: "receipt-cafe.heic", supplier: "Provisions Co.", supplierId: null, total: 19.20, currencyCode: "USD", invoiceNumber: null, documentDate: null, extractedDueDate: null, dueDate: null, agingBucket: "31-60", paymentStatus: null, paidAmount: null, paidAt: null, status: "review", reviewedAt: null, blockedByCheck: false, openCheckCodes: [] },
+  { documentId: "sample-4", filename: "EDF-energy.pdf", supplier: "EDF Energy", supplierId: null, total: 318.09, currencyCode: "USD", invoiceNumber: "EDF-9921", documentDate: null, extractedDueDate: null, dueDate: null, agingBucket: "61-90", paymentStatus: null, paidAmount: null, paidAt: null, status: "approved", reviewedAt: null, blockedByCheck: false, openCheckCodes: [] },
+  { documentId: "sample-5", filename: "merck-invoice-0312.pdf", supplier: "Merck KGaA", supplierId: null, total: 5210.00, currencyCode: "USD", invoiceNumber: "M-0312", documentDate: null, extractedDueDate: null, dueDate: null, agingBucket: "90+", paymentStatus: null, paidAmount: null, paidAt: null, status: "review", reviewedAt: null, blockedByCheck: false, openCheckCodes: [] },
+  { documentId: "sample-6", filename: "sigma-aldrich-mar.pdf", supplier: "Sigma-Aldrich Chemie GmbH", supplierId: null, total: 1420.50, currencyCode: "USD", invoiceNumber: "SA-2291", documentDate: null, extractedDueDate: null, dueDate: null, agingBucket: "current", paymentStatus: null, paidAmount: null, paidAt: null, status: "approved", reviewedAt: null, blockedByCheck: false, openCheckCodes: [] },
+  { documentId: "sample-7", filename: "statement-feb.pdf", supplier: "Metro Bank", supplierId: null, total: null, currencyCode: "USD", invoiceNumber: null, documentDate: null, extractedDueDate: null, dueDate: null, agingBucket: null, paymentStatus: null, paidAmount: null, paidAt: null, status: "approved", reviewedAt: null, blockedByCheck: false, openCheckCodes: [] },
+  { documentId: "sample-8", filename: "IMG_3312.jpg", supplier: "Tokyo Office Supply", supplierId: null, total: 99.10, currencyCode: "USD", invoiceNumber: null, documentDate: null, extractedDueDate: null, dueDate: null, agingBucket: "1-30", paymentStatus: null, paidAmount: null, paidAt: null, status: "review", reviewedAt: null, blockedByCheck: true, openCheckCodes: ["duplicate"] },
+]
+
 type Variant = "A" | "B" | "C"
 const VARIANTS: { key: Variant; label: string; rowPad: string; fontSize: string }[] = [
   { key: "A", label: "A — Comfortable (56px)", rowPad: "py-3.5", fontSize: "text-sm" },
@@ -97,7 +110,8 @@ function ConfidenceField({ label, value }: { label: string; value: number }) {
   )
 }
 
-export function DensityRowPrototype({ workspaceId, bills }: { workspaceId: string; bills: BillRow[] }) {
+export function DensityRowPrototype({ workspaceId, bills: realBills }: { workspaceId: string; bills: BillRow[] }) {
+  const bills = realBills.length > 0 ? realBills : SAMPLE_BILLS
   const router = useRouter()
   const searchParams = useSearchParams()
   const variant = (searchParams.get("variant") as Variant) ?? "B"
