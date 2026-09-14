@@ -5,6 +5,7 @@ import { listWorkspaceBills, type BillRow, type BillsSummary } from "@/models/bi
 import { requireWorkspaceRole } from "@/models/workspaces"
 import type { AgingBucket } from "@/lib/bills/due-date"
 import { preparePaymentRunAction } from "./actions"
+import { DensityRowPrototype } from "./prototype-density-row"
 
 export const dynamic = "force-dynamic"
 
@@ -14,10 +15,10 @@ export const dynamic = "force-dynamic"
  * (approve, push, pay) live on the underlying document detail page. */
 export default async function BillsPage({ params, searchParams }: {
   params: Promise<{ workspaceId: string }>
-  searchParams: Promise<{ blocked?: string; unpaid?: string }>
+  searchParams: Promise<{ blocked?: string; unpaid?: string; variant?: string }>
 }) {
   const { workspaceId } = await params
-  const { blocked, unpaid } = await searchParams
+  const { blocked, unpaid, variant } = await searchParams
   const user = await getCurrentUser()
   const membership = await requireWorkspaceRole(workspaceId, user.id)
   const isOwner = membership.role === "owner"
@@ -73,6 +74,9 @@ export default async function BillsPage({ params, searchParams }: {
         </Card>
       )}
 
+      {variant && bills.length > 0 ? (
+        <DensityRowPrototype workspaceId={workspaceId} bills={bills} />
+      ) : (
       <Card>
         <CardHeader>
           <CardTitle>{bills.length} bill{bills.length === 1 ? "" : "s"}</CardTitle>
@@ -108,6 +112,7 @@ export default async function BillsPage({ params, searchParams }: {
           )}
         </CardContent>
       </Card>
+      )}
     </main>
   )
 }
