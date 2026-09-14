@@ -143,6 +143,7 @@ model Workspace {
   invitations     WorkspaceInvitation[]
   templates       DocumentTemplate[]
   documents       Document[]
+  institutions    Institution[]
   folders         DocumentFolder[]
   files           DocumentFile[]
   jobs            DocumentProcessingJob[]
@@ -532,6 +533,10 @@ model Document {
   /// can be archived at any lifecycle point, and modelling it as a boolean-ish timestamp avoids
   /// rewriting `status` history. Null means not archived. See lib/documents/stages.ts.
   archivedAt        DateTime?                @map("archived_at")
+  /// #207: the bank/financial institution a person has asserted this bank_statement document
+  /// belongs to. Assertion is authoritative (#178's rule) — never AI-classified. Null for every
+  /// non-statement document and for a statement not yet asserted.
+  institutionId     String?                  @map("institution_id") @db.Uuid
   /// A reviewer's manual "look at this" flag on the pipeline list, independent of status/confidence.
   /// Attributable like transcriptEdited* below: a flag without a flagger would be half a record.
   flaggedAt         DateTime?                @map("flagged_at")
@@ -580,6 +585,7 @@ model Document {
   paymentConfirmedBy User?                   @relation("DocumentPaymentConfirmer", fields: [paymentConfirmedById], references: [id], onDelete: SetNull)
   parentDocument    Document?                @relation("DocumentSplit", fields: [parentDocumentId], references: [id], onDelete: SetNull)
   childDocuments    Document[]               @relation("DocumentSplit")
+  institution       Institution?             @relation(fields: [institutionId], references: [id], onDelete: SetNull)
   jobs              DocumentProcessingJob[]
   auditEvents       DocumentAuditEvent[]
   chunks            DocumentChunk[]
@@ -602,6 +608,7 @@ model Document {
   gates              Gate[]
 
   @@unique([fileId, sha256])
+  @@index([institutionId])
   @@index([workspaceId, status])
   @@index([workspaceId, receivedAt])
   @@index([fileId, receivedAt])
@@ -2620,4 +2627,30 @@ model CloseItem {
   @@unique([closeId, kind])
   @@index([workspaceId])
   @@map("close_items")
+}
+
+/// #207: a bank/financial institution a person has asserted a bank_statement document belongs
+/// to (#178's "user asserts, assertion is authoritative" rule — never AI-classified). Distinct
+/// from Supplier: an institution issues statements about the workspace's own accounts, it is not
+/// a party the workspace pays. `savedLayout` is the reference layout the drift check
+/// (lib/checks/statement-layout-drift.ts) diffs every later statement against — null until the
+/// first statement for this institution is confirmed, which is a real "not applicable" state,
+/// not an absence (#183's inventory requirement).
+model Institution {
+  id            String     @id @default(uuid()) @db.Uuid
+  workspaceId   String     @map("workspace_id") @db.Uuid
+  name          String
+  normalizedKey String     @map("normalized_key")
+  /// {columns: string[], headerLabels: Record<string,string>, dateFormat: string, amountFormat: string}
+  /// — see StatementLayout in lib/checks/statement-layout-drift.ts. Page/section structure is
+  /// deliberately excluded: too fragile, varies within a single bank's own statements.
+  savedLayout   Json?      @map("saved_layout")
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
+  workspace     Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  documents     Document[]
+
+  @@unique([workspaceId, normalizedKey])
+  @@index([workspaceId])
+  @@map("institutions")
 }

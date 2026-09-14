@@ -6,6 +6,7 @@ import { recordSystemAudit } from "@/lib/audit"
 import { checkInvoiceArithmetic } from "@/lib/checks/arithmetic"
 import { checkLineItemArithmetic } from "@/lib/checks/line-item-arithmetic"
 import { checkPoLineConsumption, type PoLineConsumptionInput } from "@/lib/checks/po-line-consumption"
+import { deriveStatementLayout, evaluateStatementDrift, type StatementLayout } from "@/lib/checks/statement-layout-drift"
 import { checkAmountAnomaly } from "@/lib/checks/amount-anomaly"
 import { checkBankDetails } from "@/lib/checks/bank-details"
 import { checkPdfForensics, readPdfForensicSignals } from "@/lib/checks/pdf-forensics"
@@ -58,7 +59,7 @@ export async function runDeterministicChecks(input: { workspaceId: string; docum
   try {
     const document = await prisma.document.findFirst({
       where: { id: input.documentId, workspaceId: input.workspaceId },
-      select: { id: true, templateId: true, reviewedData: true, mimeType: true, ocrText: true, docType: true, template: { select: { code: true } } },
+      select: { id: true, templateId: true, reviewedData: true, mimeType: true, ocrText: true, docType: true, institutionId: true, template: { select: { code: true } } },
     })
     if (!document) return
     const docType = resolveDocType(document)
@@ -105,6 +106,15 @@ export async function runDeterministicChecks(input: { workspaceId: string; docum
       }) : []
       const balance = checkStatementBalance({ currencyCode, openingBalance: asNumber(get("openingBalance")), closingBalance: asNumber(get("closingBalance")), transactions, accounts })
       if (balance) results.push(balance)
+
+      // #207: layout drift, only meaningful once a person has asserted an institution for this
+      // statement. First statement for a newly-asserted institution has nothing to diff
+      // against — this call learns the layout instead of judging it.
+      if (document.institutionId) {
+        const rawTransactions = Array.isArray(get("transactions")) ? (get("transactions") as unknown[]).filter((row): row is Record<string, unknown> => typeof row === "object" && row !== null) : []
+        const drift = await checkStatementDriftAgainstInstitution(input.workspaceId, document.institutionId, rawTransactions)
+        if (drift) results.push(drift)
+      }
     }
 
     const taxProfile = map.taxTotal || map.supplierVatNumber ? await getTaxProfile(input.workspaceId) : null
@@ -218,6 +228,29 @@ async function persistCheckResult(workspaceId: string, documentId: string, resul
     if (emitted.queued > 0) await kickWebhookDrain().catch(() => {})
   } catch (error) {
     console.error("[checks] check.failed webhook emit failed:", error instanceof Error ? error.message : error)
+  }
+}
+
+/** #207 wiring: reads the institution's saved layout, evaluates drift, and — for the first
+ * statement seen for a newly-asserted institution — learns the layout instead of judging it
+ * (there is nothing to diff against yet, per #183's inventory requirement that "not applicable"
+ * be a real, distinguishable state). Confirmed drift never auto-updates the saved layout; only a
+ * reviewer choosing "Accept as new layout" does that (that UI flow is #220's scope). */
+async function checkStatementDriftAgainstInstitution(workspaceId: string, institutionId: string, transactions: Array<Record<string, unknown>>): Promise<CheckResult | null> {
+  try {
+    const institution = await prisma.institution.findFirst({ where: { id: institutionId, workspaceId }, select: { savedLayout: true } })
+    if (!institution) return null
+    const savedLayout = institution.savedLayout as StatementLayout | null
+    const result = evaluateStatementDrift({ transactions, savedLayout })
+    if (result.kind === "not_applicable" && transactions.length) {
+      await prisma.institution.update({ where: { id: institutionId }, data: { savedLayout: deriveStatementLayout(transactions) as unknown as Prisma.InputJsonValue } })
+      return null
+    }
+    if (result.kind !== "drift") return null
+    return { checkCode: "statement_layout_drift", status: "warn", message: `This statement's layout differs from the saved layout for this institution: ${result.changes.join("; ")}`, detail: { changes: result.changes, layout: result.layout } }
+  } catch (error) {
+    console.error("[checks] statement layout drift lookup failed:", error instanceof Error ? error.message : error)
+    return null
   }
 }
 
