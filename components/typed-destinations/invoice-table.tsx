@@ -12,7 +12,7 @@ import { InlineDocumentPanel } from "@/components/list-screen/inline-document-pa
 import { SelectionAuditPanel } from "@/components/list-screen/selection-audit-panel"
 import { OverrideModeBar, useOverrideMode } from "@/components/list-screen/override-mode"
 import { bulkExportDocumentsAction, deletePipelineDocumentsAction, moveDocumentsToStageAction } from "@/app/(app)/workspaces/[workspaceId]/pipeline-actions"
-import { getInlineDocumentDetailAction, getSelectionAuditPanelDataAction, overrideGateAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
+import { cancelInvoiceAction, getInlineDocumentDetailAction, getSelectionAuditPanelDataAction, overrideGateAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
 import { downloadCsv } from "@/lib/client/download-csv"
 import { ConfidenceField, StatusGlyph, TouchlessPill } from "@/components/typed-destinations/row-signals"
 import { DueDateCountdownBadge, ReviewSlaCountdownBadge } from "@/components/documents/countdown-badge"
@@ -49,6 +49,11 @@ export function InvoiceTable({ workspaceId, basePath, bills, payableDocumentIds,
   const loadAuditPanelData = (documentId: string) => getSelectionAuditPanelDataAction(workspaceId, documentId)
   const overrideGate = async (gateId: string, formData: FormData) => {
     const result = await overrideGateAction(workspaceId, gateId, formData)
+    if (result.success) router.refresh()
+    return result
+  }
+  const cancelInvoice = async (documentId: string, formData: FormData) => {
+    const result = await cancelInvoiceAction(workspaceId, documentId, formData)
     if (result.success) router.refresh()
     return result
   }
@@ -163,7 +168,9 @@ export function InvoiceTable({ workspaceId, basePath, bills, payableDocumentIds,
       {/* #198: selection-triggered Audit/Approval panel — shown when exactly one row is
           checkbox-selected, so a single document's history has an unambiguous subject. */}
       {selectedIds.length === 1 && <SelectionAuditPanel key={selectedIds[0]} documentId={selectedIds[0]} loadData={loadAuditPanelData} onClose={clearSelection}
-        overrideModeActive={overrideMode.active} onOverrideGate={overrideGate} />}
+        overrideModeActive={overrideMode.active} onOverrideGate={overrideGate}
+        cancelInfo={cancelInfoFor(billsById.get(selectedIds[0]))}
+        onCancel={(formData) => cancelInvoice(selectedIds[0], formData)} />}
 
       <div className={`min-w-0 flex-1 overflow-x-auto ${selectedIds.length === 1 ? "" : "-mx-6"}`}>
         <table className="w-full min-w-[760px] text-sm">
@@ -295,6 +302,11 @@ function BillTableRow({ basePath, bill, selected, expanded, onToggle, onToggleEx
         </td>
         <td className="px-4 py-2.5">
           <div className="flex flex-wrap items-center gap-1.5">
+            {bill.cancelledAt && (
+              <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-600" title={bill.cancelledReason ?? undefined}>
+                Cancelled
+              </span>
+            )}
             {bill.touchless && <TouchlessPill minConfidencePercent={minConfidencePercent} />}
             <ReviewSlaCountdownBadge openedAt={bill.reviewTaskOpenedAt} slaHours={DEFAULT_REVIEW_SLA_HOURS} />
             {bill.paymentStatus && (
@@ -310,7 +322,7 @@ function BillTableRow({ basePath, bill, selected, expanded, onToggle, onToggleEx
                 Needs attention
               </span>
             )}
-            {!bill.touchless && !bill.paymentStatus && !bill.blockedByCheck && !needsAttention && (
+            {!bill.cancelledAt && !bill.touchless && !bill.paymentStatus && !bill.blockedByCheck && !needsAttention && (
               <span className="text-xs text-slate-400">—</span>
             )}
           </div>
@@ -325,6 +337,17 @@ function BillTableRow({ basePath, bill, selected, expanded, onToggle, onToggleEx
       )}
     </>
   )
+}
+
+/** #220: an already-cancelled row hides the control entirely (nothing left to cancel, and no
+ * un-cancel affordance to offer instead) — everything else routes through the disabled+explained
+ * path so the constraint is always visible, not just absent. */
+function cancelInfoFor(bill: BillRow | undefined): { canCancel: boolean; disabledReason: string | null } | null {
+  if (!bill || bill.cancelledAt) return null
+  const status = bill.paymentStatus?.toLowerCase() ?? null
+  if (status === "synced") return { canCancel: false, disabledReason: "This invoice has already been synced to your ledger and can no longer be cancelled." }
+  if (status === "paid" || status === "reconciled") return { canCancel: false, disabledReason: "This invoice has already been paid and can no longer be cancelled." }
+  return { canCancel: true, disabledReason: null }
 }
 
 function formatMoney(amount: number, currency?: string | null): string {

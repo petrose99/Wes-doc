@@ -36,9 +36,13 @@ export type BillRow = {
    * ReviewTask: "approved" once resolved with no rejection, "rejected" once rejected, "in_progress"
    * while a task is being worked, "not_started" while one sits open/unclaimed, and "approved" by
    * default once the document itself is reviewed with no task at all (nothing left to approve).
-   * There is no model concept of a "cancelled" approval — the taxonomy's Cancelled value has no
-   * backing state and is intentionally not emitted here. */
-  approvalStatus: "not_started" | "in_progress" | "approved" | "rejected"
+   * #220: "cancelled" takes priority over all of the above once `cancelledAt` is set — a cancelled
+   * invoice's ReviewTask history stops mattering to this taxonomy. */
+  approvalStatus: "not_started" | "in_progress" | "approved" | "rejected" | "cancelled"
+  /** #220: when this invoice was terminally cancelled (manual, reason-required, no un-cancel
+   * affordance). Null for every non-cancelled invoice. */
+  cancelledAt: Date | null
+  cancelledReason: string | null
   /** When the document's most recent ReviewTask was opened, but only while it's still open/
    * in_review — null once it resolves (approved/rejected) or if there was never a ReviewTask.
    * #208's Review SLA countdown badge times its clock from this. */
@@ -94,8 +98,9 @@ export async function listWorkspaceBills(input: {
   onlyUnpaid?: boolean
   /** #211's Status filter-chip group. "unreviewed"/"reviewed" map onto doc.status; there is no
    * model field for the taxonomy's Posted/Exported/Transferred values (no push/ledger status of
-   * that shape exists), so "paid" stands in as the only real "closed" state. */
-  statusFilter?: "unreviewed" | "reviewed" | "paid"
+   * that shape exists), so "paid" stands in as the only real "closed" state. #220 adds "synced":
+   * pushed successfully but not yet confirmed paid by the ledger — see BillRow.paymentStatus. */
+  statusFilter?: "unreviewed" | "reviewed" | "synced" | "paid"
   /** #211's Invoice Approval filter-chip group. See BillRow.approvalStatus. */
   approvalFilter?: BillRow["approvalStatus"]
   /** #201's "Touchless" system saved view: rows that went out with no human review. */
@@ -114,6 +119,7 @@ export async function listWorkspaceBills(input: {
     },
     select: {
       id: true, filename: true, status: true, reviewedAt: true, reviewedData: true, confidence: true,
+      cancelledAt: true, cancelledReason: true,
       template: { select: { code: true } },
     },
     orderBy: { receivedAt: "desc" },
@@ -180,6 +186,7 @@ export async function listWorkspaceBills(input: {
     const latestTask = latestReviewTaskByDoc.get(doc.id)
     const latestTaskStatus = latestTask?.status
     const approvalStatus: BillRow["approvalStatus"] =
+      doc.cancelledAt ? "cancelled" :
       latestTaskStatus === "rejected" ? "rejected" :
       latestTaskStatus === "in_review" ? "in_progress" :
       latestTaskStatus === "open" ? "not_started" :
@@ -205,6 +212,8 @@ export async function listWorkspaceBills(input: {
       blockedByCheck: openChecks.length > 0,
       openCheckCodes: openChecks,
       approvalStatus,
+      cancelledAt: doc.cancelledAt,
+      cancelledReason: doc.cancelledReason,
       reviewTaskOpenedAt,
       fieldConfidence: (doc.confidence as Record<string, unknown> | null)?.fieldConfidence as Record<string, number> ?? {},
       touchless: touchlessDocIds.has(doc.id),
@@ -216,6 +225,7 @@ export async function listWorkspaceBills(input: {
     if (input.onlyUnpaid && bill.paymentStatus && ["paid", "reconciled"].includes(bill.paymentStatus.toLowerCase())) return false
     if (input.statusFilter === "unreviewed" && bill.status === "reviewed") return false
     if (input.statusFilter === "reviewed" && bill.status !== "reviewed") return false
+    if (input.statusFilter === "synced" && bill.paymentStatus?.toLowerCase() !== "synced") return false
     if (input.statusFilter === "paid" && !(bill.paymentStatus && ["paid", "reconciled"].includes(bill.paymentStatus.toLowerCase()))) return false
     if (input.approvalFilter && bill.approvalStatus !== input.approvalFilter) return false
     if (input.onlyTouchless && !bill.touchless) return false

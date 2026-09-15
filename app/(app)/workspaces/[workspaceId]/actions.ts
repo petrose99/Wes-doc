@@ -17,7 +17,7 @@ import { scanDocumentBuffer } from "@/lib/malware-scan"
 import { parsePageRange } from "@/lib/page-range"
 import { refreshDocumentReadiness } from "@/lib/readiness/refresh"
 import { expandZipBuffer } from "@/lib/zip-ingestion"
-import { deleteWorkspaceDocuments, getDocumentsStatus, getWorkspaceDocument, markDocumentsReviewed, requeueAdaptiveExtraction, requeueDocumentExtraction, updateDocumentField, updateDocumentReview, validateDocumentInput } from "@/models/documents"
+import { cancelDocument, deleteWorkspaceDocuments, DocumentCancellationBlockedError, getDocumentsStatus, getWorkspaceDocument, markDocumentsReviewed, requeueAdaptiveExtraction, requeueDocumentExtraction, updateDocumentField, updateDocumentReview, validateDocumentInput } from "@/models/documents"
 import { listDocumentAuditEvents, listDocumentStageDecisions } from "@/models/audit-events"
 import { getActiveWorkflowStageState } from "@/models/review-tasks"
 import { overrideGate } from "@/lib/gates/actions"
@@ -360,6 +360,27 @@ export async function acceptStatementLayoutAction(workspaceId: string, documentI
   if (!result.success) return { success: false, error: result.error }
   await recordDocumentAudit({ workspaceId, documentId, actorId: user.id, type: "check.layout_accepted", detail: { checkCode: "statement_layout_drift" } })
   revalidatePath(`${paths(workspaceId).documents}/${documentId}`)
+  return { success: true, data: null }
+}
+
+/** #220: single-row terminal cancellation of an invoice, bound to a `ReasonDialogButton` next to
+ * the selection panel's other document-level actions. The reason-required contract is `cancel
+ * Document`'s, not re-validated here beyond pulling it off the form. */
+export async function cancelInvoiceAction(workspaceId: string, documentId: string, formData: FormData): Promise<ActionState<null>> {
+  const user = await getCurrentUser()
+  if (!(await requireMember(workspaceId, user.id))) return { success: false, error: NO_ACCESS }
+  const reason = String(formData.get("reason") || "").trim()
+  if (!reason) return { success: false, error: "A reason is required" }
+  try {
+    await cancelDocument({ workspaceId, documentId, actorId: user.id, reason })
+  } catch (error) {
+    if (error instanceof DocumentCancellationBlockedError) return { success: false, error: `Can't cancel — this invoice is already ${error.paymentStatus}` }
+    if (error instanceof Error && error.message === "document_already_cancelled") return { success: false, error: "This invoice is already cancelled" }
+    if (error instanceof Error && error.message === "document_not_found") return { success: false, error: "Invoice not found" }
+    return { success: false, error: "Could not cancel this invoice" }
+  }
+  revalidatePath(`${paths(workspaceId).documents}/${documentId}`)
+  revalidatePath(paths(workspaceId).pipeline)
   return { success: true, data: null }
 }
 

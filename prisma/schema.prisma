@@ -48,6 +48,7 @@ model User {
   editedTranscripts     Document[]            @relation("TranscriptEditor")
   flaggedDocuments      Document[]            @relation("DocumentFlagger")
   paymentConfirmedDocuments Document[]        @relation("DocumentPaymentConfirmer")
+  cancelledDocuments    Document[]            @relation("DocumentCanceller")
   listPreferences       UserListPreference[]
   savedViews            SavedView[]
   sheetPlacements       DocumentSheetPlacement[] @relation("PlacementPlacer")
@@ -558,6 +559,13 @@ model Document {
   paymentStatus       String?   @map("payment_status")
   paymentConfirmedAt  DateTime? @map("payment_confirmed_at")
   paymentConfirmedById String?  @map("payment_confirmed_by_id") @db.Uuid
+  /// #220: terminal manual cancellation of an invoice — independent of the ReviewTask approval
+  /// chain and of the ledger sync. Hard-blocked once the document is Synced or Paid (checked in
+  /// models/documents.ts::cancelDocument, not enforced at the DB layer). No un-cancel affordance:
+  /// once set, these three columns never clear.
+  cancelledAt         DateTime? @map("cancelled_at")
+  cancelledReason     String?   @map("cancelled_reason")
+  cancelledById       String?   @map("cancelled_by_id") @db.Uuid
   /// FX conversion into the workspace's base currency, frozen at the time it was applied so a
   /// later shift in the underlying feed does not silently re-price historical documents. Written
   /// after review by lib/fx/apply-to-document.ts once total + currency_code are known:
@@ -587,6 +595,7 @@ model Document {
   transcriptEditedBy User?                   @relation("TranscriptEditor", fields: [transcriptEditedById], references: [id], onDelete: SetNull)
   flaggedBy         User?                    @relation("DocumentFlagger", fields: [flaggedById], references: [id], onDelete: SetNull)
   paymentConfirmedBy User?                   @relation("DocumentPaymentConfirmer", fields: [paymentConfirmedById], references: [id], onDelete: SetNull)
+  cancelledBy       User?                    @relation("DocumentCanceller", fields: [cancelledById], references: [id], onDelete: SetNull)
   parentDocument    Document?                @relation("DocumentSplit", fields: [parentDocumentId], references: [id], onDelete: SetNull)
   childDocuments    Document[]               @relation("DocumentSplit")
   institution       Institution?             @relation(fields: [institutionId], references: [id], onDelete: SetNull)

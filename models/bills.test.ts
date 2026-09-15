@@ -122,6 +122,32 @@ describe("listWorkspaceBills", () => {
     expect(res.bills[0].paidAmount).toBe(100)
   })
 
+  it("filters to synced bills via the Status chip (#220)", async () => {
+    db.document.findMany.mockResolvedValue([
+      { id: "d1", filename: "a.pdf", status: "reviewed", reviewedAt: new Date(), template: { code: "invoice" }, reviewedData: { total: 100 } },
+      { id: "d2", filename: "b.pdf", status: "reviewed", reviewedAt: new Date(), template: { code: "invoice" }, reviewedData: { total: 200 } },
+    ])
+    vi.mocked(getDocumentPaymentStatuses).mockResolvedValue(
+      new Map([["d1", { paymentStatus: "synced", dueAmount: null, paidAmount: null, syncedAt: new Date() }]]),
+    )
+    const res = await listWorkspaceBills({ workspaceId: "w1", statusFilter: "synced" })
+    expect(res.bills.map((b) => b.documentId)).toEqual(["d1"])
+  })
+
+  it("marks a cancelled invoice's approvalStatus as cancelled regardless of its ReviewTask history (#220)", async () => {
+    db.document.findMany.mockResolvedValue([
+      { id: "d1", filename: "a.pdf", status: "reviewed", reviewedAt: new Date(), template: { code: "invoice" }, reviewedData: { total: 100 }, cancelledAt: new Date("2026-09-15T00:00:00Z"), cancelledReason: "Duplicate of INV-2" },
+    ])
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    db.reviewTask.findMany.mockImplementation((args: any) => {
+      if (args?.where?.reason === "check_failed") return Promise.resolve([])
+      return Promise.resolve([{ documentId: "d1", status: "approved", createdAt: new Date("2026-09-10T00:00:00Z") }])
+    })
+    const res = await listWorkspaceBills({ workspaceId: "w1" })
+    expect(res.bills[0].approvalStatus).toBe("cancelled")
+    expect(res.bills[0].cancelledReason).toBe("Duplicate of INV-2")
+  })
+
   it("flags a bill touchless only when it has a push.touchless_enqueued audit event", async () => {
     db.document.findMany.mockResolvedValue([
       { id: "d1", filename: "a.pdf", status: "reviewed", reviewedAt: new Date(), template: { code: "invoice" }, reviewedData: { total: 100 } },

@@ -6,14 +6,14 @@ import type { BillRow } from "@/models/bills"
  * (not a client component) so the filtered view stays a plain, shareable, refreshable URL, matching
  * the rest of this route's filters.
  *
- * Status only has real backing for Unreviewed/Reviewed/Paid — the taxonomy's Closed values
- * (Posted/Exported/Transferred) have no matching model field (no push/ledger status of that shape
- * exists yet), so "Paid" stands in as the only real "closed" state; recorded as a finding on #211
- * rather than inventing the other three. Invoice Approval has no "Cancelled" state for the same
- * reason — ReviewTask only has open/in_review/approved/rejected. */
+ * Status has real backing for Unreviewed/Reviewed/Synced/Paid (#220 adds Synced: pushed but not
+ * yet confirmed paid by the ledger) — the taxonomy's remaining Closed values (Posted/Exported/
+ * Transferred) still have no matching model field, so "Paid" stays the only other real "closed"
+ * state; recorded as a finding on #211 rather than inventing the other two. Invoice Approval's
+ * Cancelled (#220) is backed by Document.cancelledAt, independent of ReviewTask. */
 export function InvoiceFilterChips({ basePath, status, approval, extraParams, leading }: {
   basePath: string
-  status?: "unreviewed" | "reviewed" | "paid"
+  status?: "unreviewed" | "reviewed" | "synced" | "paid"
   approval?: BillRow["approvalStatus"]
   /** Other query params on this route (blocked/unpaid) to preserve across chip clicks. */
   extraParams?: Record<string, string | undefined>
@@ -37,6 +37,7 @@ export function InvoiceFilterChips({ basePath, status, approval, extraParams, le
       <Chip href={withParams({ status: undefined })} active={!status}>All</Chip>
       <Chip href={withParams({ status: "unreviewed" })} active={status === "unreviewed"}>Unreviewed</Chip>
       <Chip href={withParams({ status: "reviewed" })} active={status === "reviewed"}>Reviewed</Chip>
+      <Chip href={withParams({ status: "synced" })} active={status === "synced"}>Synced</Chip>
       <Chip href={withParams({ status: "paid" })} active={status === "paid"}>Paid</Chip>
     </ChipGroup>
     <ChipGroup label="Invoice Approval">
@@ -45,6 +46,7 @@ export function InvoiceFilterChips({ basePath, status, approval, extraParams, le
       <Chip href={withParams({ approval: "in_progress" })} active={approval === "in_progress"}>In progress</Chip>
       <Chip href={withParams({ approval: "approved" })} active={approval === "approved"}>Approved</Chip>
       <Chip href={withParams({ approval: "rejected" })} active={approval === "rejected"}>Rejected</Chip>
+      <Chip href={withParams({ approval: "cancelled" })} active={approval === "cancelled"}>Cancelled</Chip>
     </ChipGroup>
   </ListScreenToolbar>
 }

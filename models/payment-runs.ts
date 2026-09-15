@@ -53,6 +53,10 @@ export async function preparePaymentRun(input: {
   const skipped: Array<{ documentId: string; reason: string }> = []
   for (const bill of selected) {
     if (alreadyIds.has(bill.documentId)) { skipped.push({ documentId: bill.documentId, reason: "already_in_active_run" }); continue }
+    // #220: server-side defense in depth — the client already excludes a cancelled invoice from
+    // payableDocumentIds, but a payment file is money leaving the workspace, so this doesn't rely
+    // on that alone.
+    if (bill.cancelledAt) { skipped.push({ documentId: bill.documentId, reason: "cancelled" }); continue }
     if (bill.total === null || bill.total <= 0) { skipped.push({ documentId: bill.documentId, reason: "missing_amount" }); continue }
     if (!bill.supplier) { skipped.push({ documentId: bill.documentId, reason: "missing_supplier" }); continue }
     const bank = bill.supplierId ? bankBySupplier.get(bill.supplierId) : null

@@ -225,8 +225,11 @@ export function SplitPane({
         {DOC_TYPE_LABELS[docType]}
       </span>}
 
-      {paymentStatus && <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${paymentStatus === "paid" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : paymentStatus === "partial" ? "border-amber-200 bg-amber-50 text-amber-700" : "border-red-200 bg-red-50 text-red-700"}`}>
-        {paymentStatus === "paid" ? "Paid" : paymentStatus === "partial" ? "Partially paid" : "Unpaid"}
+      {/* #220: "synced" means the push succeeded but the ledger hasn't confirmed a payment status
+          yet — distinct from (and must not fall into) the "Unpaid" bucket below, which is a
+          confirmed negative answer, not an absence of one. */}
+      {paymentStatus && <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${paymentStatus === "paid" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : paymentStatus === "partial" ? "border-amber-200 bg-amber-50 text-amber-700" : paymentStatus === "synced" ? "border-slate-200 bg-slate-50 text-slate-700" : "border-red-200 bg-red-50 text-red-700"}`}>
+        {paymentStatus === "paid" ? "Paid" : paymentStatus === "partial" ? "Partially paid" : paymentStatus === "synced" ? "Synced" : "Unpaid"}
       </span>}
 
       <div className="mx-2 h-5 w-px bg-slate-200" />

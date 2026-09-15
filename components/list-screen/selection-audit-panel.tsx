@@ -30,7 +30,7 @@ const TAB_ORDER: Tab[] = ["approval", "audit", "gates"]
  * new — it groups `review_task_stage_decided` audit events into a step chain. #203 adds "Gates":
  * this row's open exceptions, with the Override control that only does anything while the
  * screen's Override Mode is on (see OverrideModeBar). */
-export function SelectionAuditPanel({ documentId, loadData, onClose, overrideModeActive, onOverrideGate }: {
+export function SelectionAuditPanel({ documentId, loadData, onClose, overrideModeActive, onOverrideGate, cancelInfo, onCancel }: {
   documentId: string
   loadData: (documentId: string) => Promise<SelectionAuditPanelData | null>
   onClose: () => void
@@ -41,6 +41,11 @@ export function SelectionAuditPanel({ documentId, loadData, onClose, overrideMod
    * inline in the dialog. On success the panel re-fetches so the overridden gate drops off the
    * open-exceptions list immediately. */
   onOverrideGate: (gateId: string, formData: FormData) => Promise<{ success: boolean; error?: string }>
+  /** #220: the "Cancel invoice" control, next to Approve/Reject. Optional — only Invoices wire
+   * this; Receipts/POs/Bank Statements have no cancellation concept yet. Null hides the control
+   * entirely rather than rendering it always-disabled, since a receipt has nothing to explain. */
+  cancelInfo?: { canCancel: boolean; disabledReason: string | null } | null
+  onCancel?: (formData: FormData) => Promise<{ success: boolean; error?: string }>
 }) {
   const [tab, setTab] = useState<Tab>("approval")
   const [data, setData] = useState<SelectionAuditPanelData | null>(null)
@@ -81,6 +86,22 @@ export function SelectionAuditPanel({ documentId, loadData, onClose, overrideMod
           <X className="h-4 w-4" />
         </button>
       </div>
+
+      {cancelInfo && onCancel && (
+        <div className="border-b border-slate-100 px-3 py-2">
+          <ReasonDialogButton
+            action={onCancel}
+            triggerLabel="Cancel invoice…"
+            title="Cancel this invoice"
+            description="Terminal — there is no way to un-cancel once confirmed. The reason is recorded on the audit trail."
+            submitLabel="Cancel invoice"
+            placeholder="Why is this invoice being cancelled?"
+            tone="amber"
+            disabled={!cancelInfo.canCancel}
+            disabledHint={cancelInfo.disabledReason ?? undefined}
+          />
+        </div>
+      )}
 
       <div className="flex gap-0.5 border-b border-slate-100 px-2 pt-1" role="tablist" aria-label="History view"
         onKeyDown={(e) => {

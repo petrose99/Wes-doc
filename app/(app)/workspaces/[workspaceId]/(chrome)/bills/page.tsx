@@ -39,9 +39,9 @@ export async function BillsPage({ params, searchParams, pathSegment = "invoices"
   const onlyBlocked = blocked === "1"
   const onlyUnpaid = unpaid === "1"
   const onlyTouchless = touchless === "1"
-  const statusFilter = status === "unreviewed" || status === "reviewed" || status === "paid" ? status : undefined
+  const statusFilter = status === "unreviewed" || status === "reviewed" || status === "synced" || status === "paid" ? status : undefined
   const approvalFilter: BillRow["approvalStatus"] | undefined =
-    approval === "not_started" || approval === "in_progress" || approval === "approved" || approval === "rejected" ? approval : undefined
+    approval === "not_started" || approval === "in_progress" || approval === "approved" || approval === "rejected" || approval === "cancelled" ? approval : undefined
   const basePath = `/workspaces/${workspaceId}/${pathSegment}`
   const [{ bills, summary }, minConfidencePercent, savedViews, touchlessTrend] = await Promise.all([
     listWorkspaceBills({ workspaceId, onlyBlocked, onlyUnpaid, statusFilter, approvalFilter, onlyTouchless }),
@@ -54,8 +54,11 @@ export async function BillsPage({ params, searchParams, pathSegment = "invoices"
     ...(onlyTouchless ? { touchless: "1" } : {}), ...(statusFilter ? { status: statusFilter } : {}),
     ...(approvalFilter ? { approval: approvalFilter } : {}),
   }
-  // Only bills with a total AND an unblocked status are candidates for a payment run.
-  const payableBills = bills.filter((b) => !b.blockedByCheck && b.total !== null && b.total > 0 && (!b.paymentStatus || !["paid", "reconciled"].includes(b.paymentStatus.toLowerCase())))
+  // Only bills with a total AND an unblocked status are candidates for a payment run. #220: a
+  // cancelled invoice is excluded too — there's nothing left to pay once cancelled. "synced"
+  // (pushed but unconfirmed by the ledger) stays eligible, unchanged from before #220 gave that
+  // state a name: it was already absent from the ["paid","reconciled"] exclusion list.
+  const payableBills = bills.filter((b) => !b.blockedByCheck && !b.cancelledAt && b.total !== null && b.total > 0 && (!b.paymentStatus || !["paid", "reconciled"].includes(b.paymentStatus.toLowerCase())))
   const preparePaymentRunActionBound = preparePaymentRunAction.bind(null, workspaceId)
   const payableDocumentIds = isOwner ? payableBills.map((bill) => bill.documentId) : []
   const hasFilter = onlyBlocked || onlyUnpaid || !!statusFilter || !!approvalFilter || onlyTouchless

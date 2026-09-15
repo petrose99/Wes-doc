@@ -17,6 +17,7 @@ import { recordCodingCorrection } from "@/models/coding-corrections"
 import { recordFieldCorrection } from "@/models/field-corrections"
 import { resetSupplierStreak } from "@/models/suppliers"
 import { listWorkspaceIntegrationPushes } from "@/models/integrations"
+import { getDocumentPaymentStatuses } from "@/models/ledger-payments"
 import { emitWorkspaceEvent } from "@/lib/webhooks"
 import { resolveDuplicateGatesAgainst } from "@/lib/gates/duplicate"
 import { kickWebhookDrain } from "@/lib/webhook-delivery"
@@ -860,6 +861,44 @@ export async function requeueAdaptiveExtraction(workspaceId: string, documentId:
     prisma.documentAuditEvent.create({ data: auditEventData({ workspaceId, documentId: document.id, type: "extraction_requeued" }, context) }),
   ])
   return job
+}
+
+export class DocumentCancellationBlockedError extends Error {
+  constructor(public readonly paymentStatus: string) {
+    super(`Cannot cancel a document that is already ${paymentStatus}`)
+    this.name = "DocumentCancellationBlockedError"
+  }
+}
+
+/** #220: terminal manual cancellation of an invoice. Independent of both the ReviewTask approval
+ * chain and the ledger sync, following the `overrideGate()`/`writeAuditEvent` shape elsewhere in
+ * this codebase (reason + attribution + audit event) even though this isn't a Gate. Hard-blocked
+ * once the ledger sync reports the document Synced or Paid/Reconciled (see
+ * models/ledger-payments.ts) — cancelling something the accounting provider already has a record
+ * of would leave that record dangling with nothing on this side pointing at it. Auto-resolves any
+ * still-open ReviewTask for the document, since there's nothing left to approve or reject once
+ * cancelled; "rejected" is the closest existing terminal ReviewTaskStatus (there is no dedicated
+ * "cancelled" task state). No un-cancel affordance — cancelledAt/cancelledReason/cancelledById
+ * are set once and never cleared. */
+export async function cancelDocument(input: { workspaceId: string; documentId: string; actorId: string; reason: string }): Promise<Document> {
+  const reason = input.reason.trim()
+  if (!reason) throw new Error("cancellation_reason_required")
+  const document = await prisma.document.findFirst({ where: { id: input.documentId, workspaceId: input.workspaceId }, select: { id: true, cancelledAt: true } })
+  if (!document) throw new Error("document_not_found")
+  if (document.cancelledAt) throw new Error("document_already_cancelled")
+
+  const paymentStatuses = await getDocumentPaymentStatuses(input.workspaceId, [document.id])
+  const paymentStatus = paymentStatuses.get(document.id)?.paymentStatus?.toLowerCase() ?? null
+  if (paymentStatus && ["synced", "paid", "reconciled"].includes(paymentStatus)) throw new DocumentCancellationBlockedError(paymentStatus)
+
+  const context = await getRequestAuditContext()
+  const now = new Date()
+  const [updated] = await prisma.$transaction([
+    prisma.document.update({ where: { id: document.id }, data: { cancelledAt: now, cancelledReason: reason, cancelledById: input.actorId } }),
+    prisma.reviewTask.updateMany({ where: { workspaceId: input.workspaceId, documentId: document.id, status: { in: ["open", "in_review"] } }, data: { status: "rejected", resolvedAt: now } }),
+    prisma.documentAuditEvent.create({ data: auditEventData({ workspaceId: input.workspaceId, documentId: document.id, actorId: input.actorId, type: "invoice.cancelled", detail: { reason } }, context) }),
+  ])
+  return updated
 }
 
 export function documentDataForExport(document: Pick<Document, "filename" | "status" | "receivedAt" | "reviewedData">) {
