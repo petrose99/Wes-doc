@@ -64,5 +64,5 @@ export type OnboardingStepKey = (typeof ONBOARDING_STEPS)[number]["key"]
 export const TOUR_STEPS = [
   { target: "extraction", title: "Documents", description: "Add and review documents here — through Inbox, Review, Approved, Synced, and Paid." },
   { target: "library", title: "Archive", description: "Your permanent, searchable document record." },
-  { target: "sheets", title: "Worksheets", description: "Spreadsheets with AI — pull documents in and compute." },
+  // No Worksheets step: the surface is unplugged (#238), so the tour no longer describes it.
 ] as const

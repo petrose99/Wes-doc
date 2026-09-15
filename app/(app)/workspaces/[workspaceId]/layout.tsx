@@ -5,7 +5,6 @@ import { getCurrentUser, getSession } from "@/lib/auth"
 import config from "@/lib/config"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { createClient } from "@/lib/supabase/server"
-import { countReviewedUnplaced } from "@/models/document-sheet-placements"
 import { countDocumentsByStage } from "@/models/documents"
 import { countOpenExceptions } from "@/models/exceptions"
 import { countOpenReviewTasks } from "@/models/review-tasks"
@@ -44,15 +43,12 @@ export default async function WorkspaceLayout({ children, params }: { children: 
   // pipelineReviewCount feeds the sidebar's Pipeline nav badge — read on every navigation the same
   // way workspaces/capabilities already are, since it's cheap (one grouped count query) and the
   // badge needs to stay current without the reader having to visit Pipeline first.
-  const [workspaces, capabilities, pipelineCounts, sheetsUnplacedCount, openExceptionsCount] = await Promise.all([
+  const [workspaces, capabilities, pipelineCounts, openExceptionsCount] = await Promise.all([
     getWorkspacesForUser(user.id),
     getWorkspaceCapabilities(workspaceId),
     countDocumentsByStage(workspaceId),
-    // Reviewed documents that haven't been placed into a sheet yet — the "something is waiting for
-    // you in Worksheets" signal, parallel to pipelineReviewCount for Documents. Cheap, one grouped
-    // count query, fetched every navigation so the rail badge stays live.
-    countReviewedUnplaced(workspaceId),
     // #210: the Exceptions rail badge — same cheap-and-always-fresh treatment as the other counts.
+    // (#238: the Worksheets unplaced count is gone with the surface it pointed at.)
     countOpenExceptions(workspaceId),
   ])
 
@@ -73,7 +69,6 @@ export default async function WorkspaceLayout({ children, params }: { children: 
       accountingEnabled={config.integrations.bigcapital.enabled}
       pipelineReviewCount={pipelineCounts.review}
       reviewTaskCount={reviewTaskCount}
-      sheetsUnplacedCount={sheetsUnplacedCount}
       /* pipelineCounts.approved is the Approved-stage count from countDocumentsByStage: documents
        * past review and waiting to push to the ledger. Only meaningful when accountingEnabled;
        * the sidebar itself hides the Finance badge otherwise. */
@@ -82,7 +77,7 @@ export default async function WorkspaceLayout({ children, params }: { children: 
     <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-[radial-gradient(1200px_480px_at_100%_-10%,rgba(4,120,87,0.05),transparent_60%),#fafbfc]">
       <MobileHeader workspaceId={workspaceId} workspaces={switchable} user={{ name: user.name, email: user.email }} />
       <div id="main" role="main" tabIndex={-1} className="flex min-h-0 flex-1 flex-col pb-[72px] md:pb-0">{children}</div>
-      <MobileTabBar workspaceId={workspaceId} pipelineReviewCount={pipelineCounts.review} sheetsUnplacedCount={sheetsUnplacedCount} accountingEnabled={config.integrations.bigcapital.enabled} />
+      <MobileTabBar workspaceId={workspaceId} pipelineReviewCount={pipelineCounts.review} openExceptionsCount={openExceptionsCount} accountingEnabled={config.integrations.bigcapital.enabled} />
     </div>
   </div>
 }

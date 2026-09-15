@@ -41,7 +41,7 @@ export default async function TemplatesPage({ params }: { params: Promise<{ work
         const availablePacks = domainPacks.filter((pack) => pack.adapters.some((adapter) => !presentCodes.has(adapter.code)))
         return <Card key={file.id}>
           <CardHeader>
-            <CardTitle><Link className="hover:underline" href={`/workspaces/${workspaceId}/worksheets/${file.id}/sheet`}>{file.name}</Link></CardTitle>
+            <CardTitle>{file.name}</CardTitle>
             <CardDescription>{fileTemplates.length} worksheet{fileTemplates.length === 1 ? "" : "s"}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">

@@ -45,9 +45,10 @@ describe("TOUR_STEPS", () => {
   // A bare length assertion did not catch the bug this replaces: a fourth "search" step pointed at
   // components/shell/global-search.tsx, which is never imported anywhere, so the tour reached a
   // final step with nothing to spotlight. Pin the targets themselves — they must each match a
-  // tourTarget rendered in components/shell/sidebar.tsx.
+  // tourTarget rendered in components/shell/sidebar.tsx. "sheets" left with the Worksheets rail
+  // entry when the surface was unplugged (#238).
   it("spotlights only targets the shell actually renders", () => {
-    expect(TOUR_STEPS.map((step) => step.target)).toEqual(["extraction", "library", "sheets"])
+    expect(TOUR_STEPS.map((step) => step.target)).toEqual(["extraction", "library"])
   })
 
   it("every step has a target, title, and description", () => {

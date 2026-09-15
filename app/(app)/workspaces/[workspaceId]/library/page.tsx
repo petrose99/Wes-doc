@@ -1,7 +1,6 @@
 import { LibraryAskPanel } from "@/components/library/library-ask-panel"
 import { LibraryFacetBar } from "@/components/library/library-facet-bar"
 import { LibraryPagination } from "@/components/library/library-pagination"
-import { LibraryPickList } from "@/components/library/library-pick-list"
 import { LibraryDocumentGrid, LibraryDocumentList, LibrarySearchResults } from "@/components/library/library-results"
 import { LibraryToolbar } from "@/components/library/library-toolbar"
 import { getCurrentUser } from "@/lib/auth"
@@ -32,7 +31,10 @@ export default async function LibraryPage({ params, searchParams }: {
 
   const search = query.q?.trim() || ""
   const scope: LibraryScope = isValidScope(query.scope) ? query.scope : "smart"
-  const pickMode = query.pick === "sheet"
+  // #238: `?pick=sheet` was the Worksheets surface borrowing the Archive to choose documents.
+  // Worksheets is unplugged, so the Archive is only ever the Archive now; the pick list component
+  // stays on disk for a re-link.
+  const pickMode = false
   const aiMode = query.mode === "ai"
   const view = query.view === "list" ? "list" : "grid"
   const basePath = `/workspaces/${workspaceId}/library`
@@ -100,7 +102,7 @@ export default async function LibraryPage({ params, searchParams }: {
           <p className="mt-1 text-sm text-slate-500">
             {pickMode
               ? "Pick the documents you want — the sheet will use their extracted fields as columns."
-              : "Every document that's been through extraction — browse, search, and pull into a worksheet."}
+              : "Every document that's been through extraction — browse and search the permanent record."}
           </p>
         </header>
 
@@ -125,19 +127,7 @@ export default async function LibraryPage({ params, searchParams }: {
         />
 
         {documents.length > 0 ? (
-          pickMode ? (
-            <LibraryPickList
-              workspaceId={workspaceId}
-              documents={documents.map((doc) => ({
-                id: doc.id,
-                filename: doc.filename,
-                supplier: doc.review.supplier,
-                category: doc.review.category,
-                total: doc.review.total,
-                templateName: doc.template?.name ?? null,
-              }))}
-            />
-          ) : isRanked ? (
+          isRanked ? (
             <LibrarySearchResults
               documents={documents}
               snippets={searchOutcome.snippets}

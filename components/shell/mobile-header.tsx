@@ -15,7 +15,7 @@ export function MobileHeader({ workspaceId, workspaces, user }: {
   const initial = (user.name || user.email).trim().charAt(0).toUpperCase() || "?"
 
   return <header className="flex shrink-0 items-center gap-2.5 border-b border-[#eef2f6] bg-[rgba(250,251,252,0.9)] px-4 pb-2.5 pt-3 backdrop-blur-[10px] md:hidden">
-    <Link href={`/workspaces/${workspaceId}`} className="shrink-0">
+    <Link href={`/workspaces/${workspaceId}/invoices`} className="shrink-0" aria-label="DocuBite home">
       <BiteMark className="h-7 w-7" />
     </Link>
     <div className="min-w-0 flex-1">

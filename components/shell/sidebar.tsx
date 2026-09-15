@@ -6,8 +6,8 @@ import { SwitchableWorkspace, WorkspaceSwitcher } from "@/components/workspace/s
 import { BiteMark } from "@/components/marketing/logo"
 import { WorkspacePulse } from "@/components/shell/workspace-pulse"
 import { MODULES } from "@/lib/modules"
-import { TYPED_DESTINATIONS } from "@/lib/typed-destinations"
-import { AlertTriangle, BarChart3, CheckCircle2, ClipboardCheck, Files, HeartPulse, History, Landmark, Library, Mic, PanelLeftClose, PanelLeftOpen, Percent, Receipt, Settings, Table2, Wallet, Workflow, Zap } from "lucide-react"
+import { isUnpluggedPath } from "@/lib/unplugged"
+import { AlertTriangle, CheckCircle2, ClipboardCheck, Files, HeartPulse, History, Landmark, Library, PanelLeftClose, PanelLeftOpen, Percent, Receipt, Settings, Wallet, Workflow, Zap } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useEffect, useState } from "react"
@@ -19,10 +19,9 @@ const QUEUE_SEGMENTS = ["invoices", "purchase-orders", "receipts", "bank-stateme
  * A string in the registry rather than the component itself keeps lib/modules free of a React/UI
  * dependency — it's read by server code (capabilities, seeds) that has no business importing icons.
  * Settings-tagged module items (Rules, Tax, Approvals) don't render here at all — they show up in
- * components/shell/settings-nav.tsx instead. */
+ * components/shell/settings-nav.tsx instead, and unplugged surfaces (lib/unplugged) never render. */
 const ICONS: Record<string, typeof Files> = {
   inbox: ClipboardCheck,
-  mic: Mic,
   "heart-pulse": HeartPulse,
   zap: Zap,
   "check-circle": CheckCircle2,
@@ -37,15 +36,17 @@ const ICONS: Record<string, typeof Files> = {
  * promise the label keeps. When every primary is quiet the label drops one notch and a "you're
  * caught up" line takes over, so an empty rail reads as a win rather than a vacuum.
  *
- * Four typed intake destinations sit in two peer pairs, followed by Worksheets and Finance. The
- * entries keep identical weight and badge treatment; a hairline break separates the matching pair
- * from the receipts/reconciliation pair without adding another caption to the rail.
+ * Four typed intake destinations sit in two peer pairs, followed by Exceptions, Controls, Finance
+ * and Archive. There is no Dashboard entry: the workspace home is the Invoices queue (#238), and
+ * the logo goes there. The entries keep identical weight and badge treatment; a hairline break
+ * separates the matching pair from the receipts/reconciliation pair without adding another
+ * caption to the rail.
  *
  * On sheet-mode and document-detail pages the rail replaces its icon column with a
  * <WorkspacePulse /> card — a mini-map of the workspace's living state, three rows mirroring the
  * three primaries with the same badges. The workspace stays visibly alive inside those surfaces
  * instead of vanishing behind the door of a full-screen room. */
-export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, accountingEnabled = false, pipelineReviewCount = 0, reviewTaskCount = 0, sheetsUnplacedCount = 0, financePushableCount = 0, openExceptionsCount = 0 }: {
+export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, accountingEnabled = false, pipelineReviewCount = 0, reviewTaskCount = 0, financePushableCount = 0, openExceptionsCount = 0 }: {
   workspaceId: string
   workspaces: SwitchableWorkspace[]
   user: { name: string; email: string }
@@ -61,10 +62,6 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
   /** countOpenReviewTasks — retained on the prop signature for API stability; not surfaced as its
    * own rail badge, since pipelineReviewCount already carries that signal on Invoices. */
   reviewTaskCount?: number
-  /** countReviewedUnplaced — documents extracted and ready to land in a worksheet. Surfaced on the
-   * Worksheets rail entry as the parallel of pipelineReviewCount, so the app points *at* Worksheets
-   * from every page. */
-  sheetsUnplacedCount?: number
   /** counts.approved from countDocumentsByStage — documents past review, waiting to push to the
    * ledger. Only meaningful when accountingEnabled is true. */
   financePushableCount?: number
@@ -72,9 +69,11 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
   openExceptionsCount?: number
 }) {
   void reviewTaskCount
-  void TYPED_DESTINATIONS
   const pathname = usePathname()
   const base = `/workspaces/${workspaceId}`
+  // #238: the workspace home is the Invoices queue; link there directly rather than through the
+  // index route's redirect.
+  const home = `${base}/invoices`
 
   // #225: on a Queue screen (and its `/<queue>/<id>` deep links, which render the same screen)
   // the rail collapses to a 56px icon rail so the queue gets the work area. It expands over the
@@ -105,22 +104,22 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
   const moduleWorkItems = MODULES
     .filter((module) => enabled.has(module.key))
     .flatMap((module) => module.navItems ?? [])
-    .filter((item) => !item.href.startsWith("settings/") && item.href !== "expenses" && item.href !== "dictation" && item.href !== "health")
+    .filter((item) => !item.href.startsWith("settings/") && item.href !== "health" && !isUnpluggedPath(`${base}/${item.href}`))
     .map((item) => ({ href: `${base}/${item.href}`, label: item.label, icon: ICONS[item.icon] ?? Files, exact: false }))
 
   // Controls (the touchless-automation module's nav item) is hoisted out of the module bucket
   // into the primary spine, directly under the typed intake group: it is the levers that govern the document
   // pipeline, so adjacency to the pipeline it controls is the information architecture.
   const controlsItem = moduleWorkItems.find((item) => item.href === `${base}/automation`)
+  // The review-queue module's "Review" item is dropped (#238): since #225 every queue is the
+  // review surface, so a second entry for the same job was a second grammar.
   const otherModuleItems = moduleWorkItems.filter((item) => item.href !== `${base}/review` && item.href !== `${base}/automation`)
 
   // Primary spine, in workflow order: the four typed intake destinations, then Exceptions
   // (escalated work needing attention, per #210 — organize: same tier as the typed destinations
   // by weight/badge treatment, not paired with any of them since it has no document-type sibling
   // and cuts across all four), then Controls (their governing levers), Finance (booked outcome),
-  // Archive (the permanent record everything lands in), and Worksheets (compute over any of it)
-  // closing the group.
-  const dashboardItem = { href: base, label: "Dashboard", icon: BarChart3, exact: true, badge: undefined as number | undefined }
+  // and Archive (the permanent record everything lands in) closing the group.
   const typedDestinationGroups = [
     [
       { href: `${base}/invoices`, label: "Invoices", icon: Receipt, exact: false },
@@ -140,7 +139,6 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
     // Hubdoc both name this surface Archive). Route stays /library — same label-over-URL stance
     // as Controls (/automation) and Finance's /accounting redirect.
     { href: `${base}/library`, label: "Archive", icon: Library, exact: false, tourTarget: "library" as const },
-    { href: `${base}/worksheets`, label: "Worksheets", icon: Table2, exact: false, badge: sheetsUnplacedCount > 0 ? sheetsUnplacedCount : undefined, tourTarget: "sheets" as const },
   ]
 
   // Secondary destinations: per-workspace module extras only. Under a hairline, no caption — the
@@ -156,7 +154,7 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
   // Sum across primary badges tells us whether the TODAY label is a promise or a reward. When the
   // total is zero every primary is quiet, and the "you're caught up" line reads under the group
   // instead of a promise the badges are supposed to keep.
-  const todayTotal = (pipelineReviewCount || 0) + (sheetsUnplacedCount || 0) + (accountingEnabled ? (financePushableCount || 0) : 0) + (openExceptionsCount || 0)
+  const todayTotal = (pipelineReviewCount || 0) + (accountingEnabled ? (financePushableCount || 0) : 0) + (openExceptionsCount || 0)
 
   const isActive = (item: { href: string; label: string; exact: boolean }) => item.exact
     ? pathname === item.href
@@ -167,11 +165,8 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
       || (item.label === "Invoices" && (pathname.startsWith(`${base}/pipeline`) || pathname.startsWith(`${base}/documents`) || pathname.startsWith(`${base}/review`) || pathname.startsWith(`${base}/bills`)))
       || (item.label === "Invoices" && pathname.startsWith(`${base}/invoices`))
       || (item.label === "Purchase Orders" && pathname.startsWith(`${base}/purchase-orders`))
-      || (item.label === "Receipts" && (pathname.startsWith(`${base}/receipts`) || pathname.startsWith(`${base}/expenses`)))
+      || (item.label === "Receipts" && pathname.startsWith(`${base}/receipts`))
       || (item.label === "Bank Statements" && pathname.startsWith(`${base}/bank-statements`))
-      // Worksheets stays lit across its surface (index, file hub, grid) and on the legacy /files
-      // URLs that redirect here so old bookmarks keep working.
-      || (item.label === "Worksheets" && (pathname.startsWith(`${base}/worksheets`) || pathname.startsWith(`${base}/files`)))
       // Finance keeps its rail lit on the legacy /accounting URL too, which redirects here.
       || (item.label === "Finance" && pathname.startsWith(`${base}/accounting`))
 
@@ -204,7 +199,7 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
   // content on hover/focus so the queue never reflows while the operator glances at a label.
   return <aside className={`group/rail relative hidden shrink-0 md:flex ${compact ? "w-14" : "w-[236px]"}`}>
   <div className={`flex flex-col gap-0.5 border-r border-slate-200 bg-slate-100 py-3.5 transition-shadow duration-150 ease-out ${compact ? "absolute inset-y-0 left-0 z-30 w-14 overflow-hidden px-2 group-hover/rail:w-[236px] group-hover/rail:px-3 group-hover/rail:shadow-[8px_0_24px_-16px_rgba(15,23,42,0.35)] group-focus-within/rail:w-[236px] group-focus-within/rail:px-3 group-focus-within/rail:shadow-[8px_0_24px_-16px_rgba(15,23,42,0.35)]" : "w-full px-3"}`}>
-    <Link href={base} className="flex items-center gap-2 px-1.5 py-1" aria-label="DocuBite home">
+    <Link href={home} className="flex items-center gap-2 px-1.5 py-1" aria-label="DocuBite home">
       <BiteMark className="h-7 w-7 shrink-0" />
       <span className={`truncate text-sm font-bold font-display text-slate-900 ${labelClass}`}>DocuBite</span>
     </Link>
@@ -220,7 +215,6 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
         <WorkspacePulse
           workspaceId={workspaceId}
           documentsCount={pipelineReviewCount}
-          worksheetsCount={sheetsUnplacedCount}
           financeCount={financePushableCount}
           accountingEnabled={accountingEnabled}
         />
@@ -228,7 +222,6 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
         <>
           {todayLabel}
           <div className="space-y-1">
-            {navLink(dashboardItem)}
             {typedDestinationGroups.map((group, index) => (
               <div key={index} role="group" aria-label={index === 0 ? "Invoices and purchase orders" : "Receipts and bank statements"} className={index === 1 ? "border-t border-slate-200/80 pt-1" : "space-y-0.5"}>
                 {group.map(navLink)}

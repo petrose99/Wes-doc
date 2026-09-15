@@ -55,6 +55,11 @@ const envSchema = z.object({
   // production — config.auth.devBypass below is also gated on NODE_ENV, and the production unset
   // guard still refuses to boot without real Supabase secrets regardless of this flag.
   DEV_AUTH_BYPASS: z.enum(["true", "false"]).default("false"),
+  // #238: the workspace home is the Invoices queue (CONTEXT.md "Workspace home"). "dashboard"
+  // keeps the old overview page reachable at /workspaces/<id>/dashboard and lands there instead,
+  // for one release, so a deployment can step back if the queue landing surprises anyone. Then
+  // the flag and the page go.
+  DASHBOARD_LANDING: z.enum(["queue", "dashboard"]).default("queue"),
   RESEND_API_KEY: z.string().default("please-set-your-resend-api-key-here"),
   RESEND_FROM_EMAIL: z.string().default("DocuBite <user@localhost>"),
   // NEXT_PUBLIC_ because components/auth/google-button.tsx reads it in the browser — Google
@@ -389,6 +394,9 @@ const config = {
     rlsEnabled: env.DB_RLS_ENABLED === "true",
   },
   security: { cspEnforce: env.CSP_ENFORCE === "true" },
+  /** #238: where /workspaces/<id> lands. `dashboardLanding` is the one-release escape hatch that
+   * also keeps /workspaces/<id>/dashboard open; off, that address is not found. */
+  workspace: { dashboardLanding: env.DASHBOARD_LANDING === "dashboard" },
   fx: {
     frankfurterBase: env.FRANKFURTER_API_BASE.replace(/\/+$/, ""),
     fastratesKey: env.FASTRATES_API_KEY || "",
