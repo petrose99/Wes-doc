@@ -96,6 +96,22 @@ _Avoid_: Terms code, "2-10-30"
 A DocuBite-side fact that an amount was paid against an invoice on a date, by a batch or by hand (Mark as paid). An invoice's paid state is derived from the ledger when it confirms payment, otherwise from its payment records. A payment record can be removed with a reason.
 _Avoid_: Mark as paid (the action, not the record), settlement, ledger payment (that is the ledger's own line)
 
+**Company**:
+The user-facing name for a team workspace in Admin and the switcher: one legal or financial entity with its own currency, tax jurisdiction, suppliers, ledger and members. "Workspace" remains the storage and address term. The auto-created personal workspace is shown as Personal, never as a company.
+_Avoid_: Entity (Vic's word), tenant, client (that is who the company belongs to)
+
+**Organization**:
+A named group of companies an accountant or finance team runs under one login. Belonging to an organization never by itself opens any of its companies; access to each company is granted separately, with its own role.
+_Avoid_: Firm (the derived workspace mode), account, tenant
+
+**Admin**:
+The desktop-only area, reached from the bottom of the rail, that holds every setting: Organization (Dashboard, Companies, Users) and the current Company (Configuration, Approval Flows, PO Mismatch Flows, Suppliers, Integrations). Account-level settings (security, sign out) live in the account menu, not in Admin. Admin › Dashboard is the per-company triage rollup for an organization with more than one company; it is not the workspace home.
+_Avoid_: Settings (as the area's name), Controls (folded into Configuration), preferences
+
+**Configuration**:
+The Admin section that says what a company's queues and Detail pane show and what may happen without a person: the per-type field table (Editable, Required, Width), the autonomy level and what blocks a publish, tax, email intake and what is switched on. Every switch carries one sentence saying what it changes.
+_Avoid_: Automation settings, workspace settings
+
 **Immersive surface**:
 A document-detail or worksheet page that temporarily takes over the viewport while preserving workspace identity, a clear return action, and relevant workspace status.
 
