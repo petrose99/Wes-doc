@@ -246,7 +246,7 @@ function QueueScreenInner<T>({
                 {selectable && <th scope="col" className="w-10 px-3 py-2">
                   <input type="checkbox" aria-label={`Select all ${title.toLowerCase()}`} checked={allChecked} onChange={toggleAll} className="h-4 w-4 rounded border-slate-300 accent-emerald-700" />
                 </th>}
-                {leading && <th scope="col" className="w-8 px-1 py-2"><span className="sr-only">State</span></th>}
+                {leading && <th scope="col" className="w-8 px-1 py-2"><span className="sr-only">Mark</span></th>}
                 {visibleColumns.map((column) => <th key={column.key} scope="col" className={`px-3 py-2 font-medium ${column.className ?? ""}`}>{column.label}</th>)}
               </tr>
             </thead>
@@ -255,7 +255,7 @@ function QueueScreenInner<T>({
                 const id = rowId(row)
                 const isOpen = id === openId
                 const isChecked = checked.has(id)
-                return <tr key={id} aria-selected={isOpen} style={{ height: 62 }}
+                return <tr key={id} aria-current={isOpen ? "true" : undefined} style={{ height: 62 }}
                   className={`group cursor-pointer border-b border-slate-100 transition-colors ${isOpen ? "bg-emerald-50/60" : isChecked ? "bg-slate-50" : "hover:bg-slate-50"}`}
                   onClick={(event) => {
                     if ((event.target as HTMLElement).closest(INTERACTIVE)) return
@@ -269,6 +269,7 @@ function QueueScreenInner<T>({
                     {columnIndex === 0
                       ? <button type="button" ref={(el) => { if (el) triggerRefs.current.set(id, el); else triggerRefs.current.delete(id) }}
                         aria-expanded={isOpen} aria-controls={DETAIL_PANE_ID}
+                        aria-label={[rowTitle(row), rowSubtitle?.(row)].filter(Boolean).join(" · ")}
                         onClick={() => (isOpen ? close() : open(id))}
                         className="block w-full min-w-0 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2">
                         {column.render(row)}

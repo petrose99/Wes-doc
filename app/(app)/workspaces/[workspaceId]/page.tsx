@@ -9,6 +9,8 @@ import { getCurrentUser } from "@/lib/auth"
 import { parseTemplateFields } from "@/lib/document-templates"
 import { countDocumentsByStage, countDocumentsThisMonth, countFailedDocuments, countToReviewByFile, flaggedFieldsFromConfidence, listWorkspaceDocuments, summarizeDocumentForReview } from "@/models/documents"
 import { countReviewedUnplaced } from "@/models/document-sheet-placements"
+import { listWorkspaceBills } from "@/models/bills"
+import { AgingSummary } from "@/components/dashboard/aging-summary"
 import { ensurePipelineFile, getFileTemplates, listRecentFiles } from "@/models/files"
 import { getWorkspaceUsage, requireWorkspaceRole } from "@/models/workspaces"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
@@ -98,9 +100,12 @@ export default async function WorkspaceHomePage({ params }: {
     return [{ id: candidate.id, code: candidate.code, name: candidate.name, multiRow: candidate.multiRow, documentCount: 0, fields: parseTemplateFields(version.fields), prompt: version.prompt || "" }]
   })
 
-  const [needsReview, recentFileReviewCounts] = await Promise.all([
+  // #225: the aging totals that left the Invoices header live here. Unpaid only — a paid
+  // invoice has no age worth reporting — and the panel hides nothing: an empty summary says so.
+  const [needsReview, recentFileReviewCounts, { summary: agingSummary }] = await Promise.all([
     listWorkspaceDocuments(workspaceId, { stage: "review" }),
     countToReviewByFile(workspaceId, recentFiles.map((file) => file.id)),
+    listWorkspaceBills({ workspaceId, onlyUnpaid: true }),
   ])
 
   const stats = [
@@ -117,7 +122,7 @@ export default async function WorkspaceHomePage({ params }: {
     <WelcomeTour workspaceId={workspaceId} tourSeen={onboardingState.tourSeen} />
     <header className="flex flex-wrap items-end justify-between gap-4">
       <div>
-        <p className="mb-1.5 text-[11.5px] font-bold uppercase tracking-[0.08em] text-[#0f9d6f] md:text-xs">{greeting(new Date())}, {(user.name || user.email).split(" ")[0]}</p>
+        <p className="mb-1.5 text-[11.5px] font-bold uppercase tracking-[0.08em] text-emerald-700 md:text-xs">{greeting(new Date())}, {(user.name || user.email).split(" ")[0]}</p>
         <div className="flex items-center gap-2">
           <h1 className="font-display text-[25px] font-extrabold leading-[1.15] tracking-[-0.025em] text-slate-900 md:text-[33px] md:leading-normal">Welcome back to {membership.workspace.name}</h1>
         </div>
@@ -144,7 +149,7 @@ export default async function WorkspaceHomePage({ params }: {
         <div className="flex flex-wrap items-center gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600"><nextAction.icon className="h-[19px] w-[19px]" /></span>
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-slate-400">Next best action</p>
+            <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-slate-500">Next best action</p>
             <p className="text-[15.5px] font-bold text-slate-900">{nextAction.message}</p>
           </div>
           <Link href={nextAction.href} className="shrink-0 rounded-[11px] bg-slate-900 px-4 py-2.5 text-[13.5px] font-semibold text-white hover:bg-slate-800">
@@ -163,7 +168,7 @@ export default async function WorkspaceHomePage({ params }: {
       </> : <div className="flex flex-wrap items-center gap-3">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700"><CheckCircle2 className="h-[19px] w-[19px]" /></span>
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-slate-400">Next best action</p>
+          <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-slate-500">Next best action</p>
           <p className="text-[15.5px] font-bold text-slate-900">All caught up — nothing needs your attention right now.</p>
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
@@ -197,7 +202,7 @@ export default async function WorkspaceHomePage({ params }: {
           <h2 className="text-[15px] font-bold text-slate-900">Recent files</h2>
           <Link href={`/workspaces/${workspaceId}/worksheets`} className="text-[13px] font-semibold text-emerald-700 hover:text-emerald-800">View all</Link>
         </div>
-        {recentFiles.length === 0 ? <p className="px-5 py-10 text-center text-sm text-slate-400">No files yet — add a document to get started.</p> : <div>
+        {recentFiles.length === 0 ? <p className="px-5 py-10 text-center text-sm text-slate-500">No files yet — add a document to get started.</p> : <div>
           {recentFiles.map((file) => {
             const reviewCount = recentFileReviewCounts[file.id] ?? 0
             return <Link key={file.id} href={`/workspaces/${workspaceId}/worksheets/${file.id}/sheet`} className="flex items-center gap-3 border-b px-5 py-3 last:border-b-0 hover:bg-slate-50">
@@ -221,7 +226,7 @@ export default async function WorkspaceHomePage({ params }: {
           <h2 className="text-[15px] font-bold text-slate-900">Needs your review</h2>
           {stageCounts.review > 0 && <span className="ml-auto rounded-full bg-indigo-50 px-2.5 py-0.5 text-[11.5px] font-bold text-indigo-700">{stageCounts.review}</span>}
         </div>
-        {needsReview.length === 0 ? <p className="py-6 text-center text-sm text-slate-400">Nothing needs a look right now.</p> : <>
+        {needsReview.length === 0 ? <p className="py-6 text-center text-sm text-slate-500">Nothing needs a look right now.</p> : <>
           {needsReview.slice(0, 3).map((doc) => {
             const reasons = flaggedFieldsFromConfidence(doc.confidence).slice(0, 2).map(formatFieldKey)
             const review = summarizeDocumentForReview(doc, membership.workspace.baseCurrency)
@@ -239,6 +244,8 @@ export default async function WorkspaceHomePage({ params }: {
         </Link>
       </div>
     </div>
+
+    <AgingSummary workspaceId={workspaceId} summary={agingSummary} formatMoney={formatMoney} />
 
     {analytics && <>
       <HeadlineCards
