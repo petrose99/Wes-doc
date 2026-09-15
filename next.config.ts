@@ -10,6 +10,9 @@ const nextConfig: NextConfig = {
   // different cause (the terminal tool's cwd, not Turbopack) — but Next's own docs are explicit
   // that an ambiguous root changes what gets resolved, so pinning it is worth doing regardless.
   turbopack: { root: import.meta.dirname },
+  // Dev-only: lets HMR/dev-overlay requests through when the dev server is viewed via a tunnel
+  // hostname rather than localhost. Comma-separated; ignored by `next start`.
+  allowedDevOrigins: (process.env.DEV_ALLOWED_ORIGINS ?? "").split(",").map((s) => s.trim()).filter(Boolean),
   async redirects() {
     return [
       { source: "/solutions/invoices", destination: "/product/extraction", permanent: true },

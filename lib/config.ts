@@ -51,6 +51,10 @@ const envSchema = z.object({
   // proper per-project control if that ever needs to be more than one number for one deployment.
   SESSION_IDLE_TIMEOUT_MINUTES: z.coerce.number().int().positive().default(30 * 24 * 60),
   DISABLE_SIGNUP: z.enum(["true", "false"]).default("false"),
+  // Local-only: skip Supabase entirely and treat every request as a fixed dev user. Inert in
+  // production — config.auth.devBypass below is also gated on NODE_ENV, and the production unset
+  // guard still refuses to boot without real Supabase secrets regardless of this flag.
+  DEV_AUTH_BYPASS: z.enum(["true", "false"]).default("false"),
   RESEND_API_KEY: z.string().default("please-set-your-resend-api-key-here"),
   RESEND_FROM_EMAIL: z.string().default("DocuBite <user@localhost>"),
   // NEXT_PUBLIC_ because components/auth/google-button.tsx reads it in the browser — Google
@@ -360,7 +364,14 @@ const config = {
     kmsKeyId: env.STORAGE_KMS_KEY_ID || env.AWS_S3_KMS_KEY_ID,
   },
   aws: { region: env.AWS_REGION, internalWorkerSecret: env.INTERNAL_WORKER_SECRET, malwareScanUrl: env.MALWARE_SCAN_URL },
-  auth: { loginUrl: "/login", disableSignup: env.DISABLE_SIGNUP === "true", idleTimeoutMinutes: env.SESSION_IDLE_TIMEOUT_MINUTES },
+  auth: {
+    loginUrl: "/login",
+    disableSignup: env.DISABLE_SIGNUP === "true",
+    idleTimeoutMinutes: env.SESSION_IDLE_TIMEOUT_MINUTES,
+    // Never true under `next build`/`next start` — Next forces NODE_ENV=production there, so the
+    // env var alone cannot switch auth off in a deployed container.
+    devBypass: process.env.NODE_ENV !== "production" && env.DEV_AUTH_BYPASS === "true",
+  },
   // The project itself, plus the two keys: anonKey is safe in the browser (Postgres RLS is what
   // actually protects data reached through it — irrelevant here since this project is Auth-only
   // and holds no application tables), serviceRoleKey bypasses RLS entirely and is used only from
