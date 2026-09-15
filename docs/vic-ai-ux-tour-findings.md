@@ -148,3 +148,27 @@ Each item ties to a specific screen/behavior above. None of these require adopti
 15. **Don't over-invest in screens Vic.ai itself treats as secondary.** Attachments has no guided tour and isn't in Vic.ai's own list of flagship modules — a signal that a generic document-library view is lower priority than the AI-review, matching, approval, and payment workflows. DocuBite should calibrate effort the same way rather than polishing every screen equally.
 
 do other changes as the skill suggest, i want more of this style of vic ai
+---
+
+## 6. Verified walkthrough, 2026-09-15 (all five modules, headless Chromium, 1440×900)
+
+Walked every module of the tour end to end — Admin View (6 steps), Autonomous Invoice Processing (8), Approvals (13), Autonomous PO Matching (11), Payments (16). Screenshots in `docs/vic-ai-tour-2026-09-15/`, alongside DocuBite's Invoices screen the same day for comparison. Sections 1–5 above hold; these are the measurements and corrections that matter for map #177.
+
+**Queue composition (Invoices, Bill Pay, Purchase Orders, Payment Batches — identical shape)**
+- Table is full-bleed across the app frame (~1370px of 1440). No reading column, no card. Rows are 62px.
+- Header is one band (~115px): `View • Default / <view name>` column on the left · `Sort` · `Filters` as **summary chips** (`Status | Open Invoices`, `Invoice Approval | 4 Approved or …`). Clicking a chip opens a **facet dropdown** with hierarchical sub-toggles (Open Bills → Unpaid / Partially Paid / Rejected / Voided; Closed Bills → Pending / Scheduled / Paid), vendor and date inputs, and Cancel / Apply. The taxonomy is never laid out inline.
+- Bulk action bar is its own row above the table head, shown once anything is checked: count badge · context actions (Post / Export / Delete / Approval ▾ / More ▾ on Invoices; Create Batch Payment / Mark as Paid / Set Bank Account on Bill Pay; Approve / Reject on Ready to Approve).
+- Payment Batches is the one queue with a metric above it: a **single** progress bar (Early Payment Savings, saved-of-possible, period selector) over Pending Approval / Paid tabs. One bar, not a strip of cards.
+
+**Row interactions**
+- **Row click does two things at once:** the row **expands in place** (Expenses / Items tabs, GL line table, `View PO` toggle, per-line Status labels, `Enter Manual Match Mode`) **and** a **right-hand source pane** (~490px ≈ 36%) opens with the PDF, zoom, page nav, Edit ▾, download, open-in-new-tab. The list stays on the left, columns narrowed.
+- **Checkbox select opens Audit / Approval on the left** (~312px), replacing the View column. Audit is a flat log with "Refresh audit log"; Approval is STEP n → Rejected/Approved with named users, reason, and an INITIATED footer.
+- **Batch detail (Payments) opens as a wide right sheet** (~1100px ≈ 78%) with a summary strip (submitted by, bills, total, bank) and a **sticky bottom action bar** (Reject / Approve & Pay). Same sticky bottom bar as the mobile approval screen.
+- Per-cell confidence underline has **three** states in the PO view: green (confident), yellow (partial), grey (no prediction). Section 2 above only mentioned green.
+- PO-backed invoices live on the **Invoices** queue with a `PO` badge on the Type chip (red numbered badge = mismatches). The Purchase Orders screen is only the imported PO list (Status, Type, Vendor, Buyer, PO Number, Amount, Currency, Created). Matching is resolved on the invoice row, not on the PO screen.
+- Bill Pay rows: Terms (`2-10-30`), countdown badge (`Expires in N Days` / `N Days Away` / `N Days Overdue`), Est. Arrival Date with method, and **Amount To Pay with the discounted amount over the struck-through due amount** — the inline-adjustment pattern #188 generalised.
+
+**What this corrects in DocuBite's reading of Vic**
+- #198's left-side History panel and #215's below-row expansion were both Vic-faithful. They failed in DocuBite because the work area was 800px, not because the placement was wrong.
+- #211's eleven inline filter pills across two rows are not Vic's shape; Vic shows summary chips and a facet panel.
+- Map #177's standing note that DocuBite keeps a *combined* fields+source pane (from #179) is the one deliberate departure; Vic splits fields (in-row) from source (right pane). #224 records the consequence: with a combined ~60% pane, History moves into that pane as tabs instead of a left panel.
