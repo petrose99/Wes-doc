@@ -14,8 +14,9 @@ import { OverrideModeBar, useOverrideMode } from "@/components/list-screen/overr
 import { bulkExportDocumentsAction, deletePipelineDocumentsAction, moveDocumentsToStageAction } from "@/app/(app)/workspaces/[workspaceId]/pipeline-actions"
 import { cancelInvoiceAction, getInlineDocumentDetailAction, getSelectionAuditPanelDataAction, overrideGateAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
 import { downloadCsv } from "@/lib/client/download-csv"
-import { ConfidenceField, StatusGlyph, TouchlessPill } from "@/components/typed-destinations/row-signals"
+import { ConfidenceField, ProcessingStateGlyph } from "@/components/typed-destinations/row-signals"
 import { minConfidenceFromPercent } from "@/lib/documents/confidence-state"
+import { processingState } from "@/lib/documents/processing-state"
 import { DueDateCountdownBadge, ReviewSlaCountdownBadge } from "@/components/documents/countdown-badge"
 import { DEFAULT_REVIEW_SLA_HOURS } from "@/lib/documents/countdown"
 import { BulkApproveReceiptModal, EligibilityStrip, ItemizedRecapTable, type ItemizedRecord } from "@/components/typed-destinations/bulk-approve-receipt"
@@ -182,7 +183,7 @@ export function InvoiceTable({ workspaceId, basePath, bills, payableDocumentIds,
                   <input type="checkbox" aria-label="Select all invoices" checked={allSelected} onChange={toggleAll} className="h-4 w-4 rounded border-slate-300" />
                 </label>
               </th>
-              <th className="w-8 px-2 py-2" aria-hidden />
+              <th className="w-8 px-2 py-2"><span className="sr-only">Processing state</span></th>
               <th className="px-4 py-2 font-medium">Supplier</th>
               <th className="px-4 py-2 font-medium">Invoice #</th>
               <th className="px-4 py-2 font-medium">Amount</th>
@@ -276,7 +277,10 @@ function BillTableRow({ basePath, bill, selected, expanded, onToggle, onToggleEx
           </label>
         </td>
         <td className="px-2 py-2.5">
-          <StatusGlyph bucket={bill.agingBucket} />
+          <ProcessingStateGlyph
+            state={processingState({ approvalStatus: bill.approvalStatus, blockedByCheck: bill.blockedByCheck, escalated: bill.escalated, touchless: bill.touchless, status: bill.status })}
+            minConfidencePercent={minConfidencePercent}
+          />
         </td>
         <td className="px-4 py-2.5">
           <Link href={`${basePath}/${bill.documentId}`} aria-expanded={expanded}
@@ -320,7 +324,6 @@ function BillTableRow({ basePath, bill, selected, expanded, onToggle, onToggleEx
                 Cancelled
               </span>
             )}
-            {bill.touchless && <TouchlessPill minConfidencePercent={minConfidencePercent} />}
             <ReviewSlaCountdownBadge openedAt={bill.reviewTaskOpenedAt} slaHours={DEFAULT_REVIEW_SLA_HOURS} />
             {bill.paymentStatus && (
               <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">{bill.paymentStatus}</span>
@@ -335,7 +338,8 @@ function BillTableRow({ basePath, bill, selected, expanded, onToggle, onToggleEx
                 Needs attention
               </span>
             )}
-            {!bill.cancelledAt && !bill.touchless && !bill.paymentStatus && !bill.blockedByCheck && !needsAttention && (
+            {/* Touchless no longer renders here (#223) — the processing-state glyph carries it now. */}
+            {!bill.cancelledAt && !bill.paymentStatus && !bill.blockedByCheck && !needsAttention && (
               <span className="text-xs text-slate-400">—</span>
             )}
           </div>

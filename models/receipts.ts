@@ -33,6 +33,13 @@ export type ReceiptRow = {
   /** #200: same touchless signal as BillRow.touchless — a `push.touchless_enqueued` document-audit
    * event exists for this receipt. */
   touchless: boolean
+  /** #223 (Wayfinder map #177): same open-escalation signal as BillRow.escalated. */
+  escalated: boolean
+  /** #223: same "most recent ReviewTask" projection as BillRow.approvalStatus (models/bills.ts),
+   * minus "cancelled" — receipts have no cancellation path. Feeds the row's processing-state glyph
+   * (`lib/documents/processing-state.ts`); no filter-chip taxonomy reads this today, unlike
+   * Invoices' Invoice Approval group. */
+  approvalStatus: "not_started" | "in_progress" | "approved" | "rejected"
 }
 
 /** Loads receipts for a workspace. Bounded (up to `limit`, default 500), same reasoning as
@@ -66,7 +73,7 @@ export async function listWorkspaceReceipts(input: {
   if (!documents.length) return { receipts: [] }
 
   const documentIds = documents.map((d) => d.id)
-  const [openCheckTasks, claimItems, touchlessEvents, latestReviewTasks] = await Promise.all([
+  const [openCheckTasks, claimItems, touchlessEvents, latestReviewTasks, openEscalations] = await Promise.all([
     prisma.reviewTask.findMany({
       where: { workspaceId: input.workspaceId, documentId: { in: documentIds }, reason: "check_failed", status: { in: ["open", "in_review"] } },
       select: { documentId: true, detail: true },
@@ -86,8 +93,14 @@ export async function listWorkspaceReceipts(input: {
       select: { documentId: true, status: true, createdAt: true },
       orderBy: { createdAt: "desc" },
     }),
+    // #223: same open-escalation shape as models/bills.ts.
+    prisma.documentCheckResult.findMany({
+      where: { workspaceId: input.workspaceId, documentId: { in: documentIds }, status: "escalated", OR: [{ escalationStatus: null }, { escalationStatus: { in: ["open", "in_review"] } }] },
+      select: { documentId: true },
+    }),
   ])
   const touchlessDocIds = new Set(touchlessEvents.map((e) => e.documentId))
+  const escalatedDocIds = new Set(openEscalations.map((e) => e.documentId))
 
   const openChecksByDoc = new Map<string, string[]>()
   for (const task of openCheckTasks) {
@@ -110,6 +123,13 @@ export async function listWorkspaceReceipts(input: {
     const claim = claimByDoc.get(doc.id) ?? null
     const latestTask = latestReviewTaskByDoc.get(doc.id)
     const reviewTaskOpenedAt = latestTask?.status === "open" || latestTask?.status === "in_review" ? latestTask.createdAt : null
+    // Same derivation as BillRow.approvalStatus, minus "cancelled": "approved" by default once
+    // the document itself is reviewed with no task at all (nothing left to approve).
+    const approvalStatus: ReceiptRow["approvalStatus"] =
+      latestTask?.status === "rejected" ? "rejected" :
+      latestTask?.status === "in_review" ? "in_progress" :
+      latestTask?.status === "open" ? "not_started" :
+      "approved"
     return {
       documentId: doc.id,
       filename: doc.filename,
@@ -127,6 +147,8 @@ export async function listWorkspaceReceipts(input: {
       reviewTaskOpenedAt,
       fieldConfidence: (doc.confidence as Record<string, unknown> | null)?.fieldConfidence as Record<string, number> ?? {},
       touchless: touchlessDocIds.has(doc.id),
+      escalated: escalatedDocIds.has(doc.id),
+      approvalStatus,
     }
   })
 

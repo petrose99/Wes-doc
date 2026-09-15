@@ -56,6 +56,10 @@ export type BillRow = {
    * document-audit event exists for it. Drives the Touchless pill; there is no "pending" state (a
    * document either has the event or it doesn't, nothing to poll for). */
   touchless: boolean
+  /** #223 (Wayfinder map #177): an open (not yet resolved) escalation exists on this document —
+   * a `DocumentCheckResult` with `status: "escalated"` and `escalationStatus` null/open/in_review.
+   * Folds into the row's Needs attention processing state; see `lib/documents/processing-state.ts`. */
+  escalated: boolean
 }
 
 export type BillsSummary = Record<AgingBucket | "unknown", { count: number; total: number }>
@@ -128,7 +132,7 @@ export async function listWorkspaceBills(input: {
   if (!documents.length) return { bills: [], summary: emptySummary() }
 
   const documentIds = documents.map((d) => d.id)
-  const [paymentStatuses, openCheckTasks, suppliers, latestReviewTasks, touchlessEvents] = await Promise.all([
+  const [paymentStatuses, openCheckTasks, suppliers, latestReviewTasks, touchlessEvents, openEscalations] = await Promise.all([
     getDocumentPaymentStatuses(input.workspaceId, documentIds),
     prisma.reviewTask.findMany({
       where: { workspaceId: input.workspaceId, documentId: { in: documentIds }, reason: "check_failed", status: { in: ["open", "in_review"] } },
@@ -147,8 +151,15 @@ export async function listWorkspaceBills(input: {
       where: { workspaceId: input.workspaceId, documentId: { in: documentIds }, type: "push.touchless_enqueued" },
       select: { documentId: true },
     }),
+    // #223: same open-escalation shape as models/exceptions.ts::listOpenExceptions, scoped to the
+    // ids already in hand — a null escalationStatus predates the #210 migration and counts as open.
+    prisma.documentCheckResult.findMany({
+      where: { workspaceId: input.workspaceId, documentId: { in: documentIds }, status: "escalated", OR: [{ escalationStatus: null }, { escalationStatus: { in: ["open", "in_review"] } }] },
+      select: { documentId: true },
+    }),
   ])
   const touchlessDocIds = new Set(touchlessEvents.map((e) => e.documentId))
+  const escalatedDocIds = new Set(openEscalations.map((e) => e.documentId))
 
   const supplierByKey = new Map(suppliers.map((s) => [s.normalizedKey, s]))
   const openChecksByDoc = new Map<string, string[]>()
@@ -217,6 +228,7 @@ export async function listWorkspaceBills(input: {
       reviewTaskOpenedAt,
       fieldConfidence: (doc.confidence as Record<string, unknown> | null)?.fieldConfidence as Record<string, number> ?? {},
       touchless: touchlessDocIds.has(doc.id),
+      escalated: escalatedDocIds.has(doc.id),
     })
   }
 

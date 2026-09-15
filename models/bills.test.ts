@@ -17,6 +17,7 @@ beforeEach(() => {
   db.reviewTask = { findMany: vi.fn().mockResolvedValue([]) }
   db.supplier = { findMany: vi.fn().mockResolvedValue([]) }
   db.documentAuditEvent = { findMany: vi.fn().mockResolvedValue([]) }
+  db.documentCheckResult = { findMany: vi.fn().mockResolvedValue([]) }
 })
 
 describe("listWorkspaceBills", () => {
@@ -157,5 +158,16 @@ describe("listWorkspaceBills", () => {
     const res = await listWorkspaceBills({ workspaceId: "w1" })
     expect(res.bills.find((b) => b.documentId === "d1")?.touchless).toBe(true)
     expect(res.bills.find((b) => b.documentId === "d2")?.touchless).toBe(false)
+  })
+
+  it("flags a bill escalated only when it has an open DocumentCheckResult escalation (#223)", async () => {
+    db.document.findMany.mockResolvedValue([
+      { id: "d1", filename: "a.pdf", status: "reviewed", reviewedAt: new Date(), template: { code: "invoice" }, reviewedData: { total: 100 } },
+      { id: "d2", filename: "b.pdf", status: "reviewed", reviewedAt: new Date(), template: { code: "invoice" }, reviewedData: { total: 200 } },
+    ])
+    db.documentCheckResult.findMany.mockResolvedValue([{ documentId: "d1" }])
+    const res = await listWorkspaceBills({ workspaceId: "w1" })
+    expect(res.bills.find((b) => b.documentId === "d1")?.escalated).toBe(true)
+    expect(res.bills.find((b) => b.documentId === "d2")?.escalated).toBe(false)
   })
 })

@@ -14,8 +14,9 @@ import { OverrideModeBar, useOverrideMode } from "@/components/list-screen/overr
 import { bulkExportDocumentsAction, deletePipelineDocumentsAction, moveDocumentsToStageAction } from "@/app/(app)/workspaces/[workspaceId]/pipeline-actions"
 import { getInlineDocumentDetailAction, getSelectionAuditPanelDataAction, overrideGateAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
 import { downloadCsv } from "@/lib/client/download-csv"
-import { ConfidenceField, TouchlessPill } from "@/components/typed-destinations/row-signals"
+import { ConfidenceField, ProcessingStateGlyph } from "@/components/typed-destinations/row-signals"
 import { minConfidenceFromPercent } from "@/lib/documents/confidence-state"
+import { processingState } from "@/lib/documents/processing-state"
 import { ReviewSlaCountdownBadge } from "@/components/documents/countdown-badge"
 import { DEFAULT_REVIEW_SLA_HOURS } from "@/lib/documents/countdown"
 import { BulkApproveReceiptModal, EligibilityStrip, ItemizedRecapTable, type ItemizedRecord } from "@/components/typed-destinations/bulk-approve-receipt"
@@ -157,6 +158,7 @@ export function ReceiptTable({ workspaceId, basePath, receipts, minConfidencePer
                   <input type="checkbox" aria-label="Select all receipts" checked={allSelected} onChange={toggleAll} className="h-4 w-4 rounded border-slate-300" />
                 </label>
               </th>
+              <th className="w-8 px-2 py-2"><span className="sr-only">Processing state</span></th>
               <th className="px-4 py-2 font-medium">Merchant</th>
               <th className="px-4 py-2 font-medium">Receipt #</th>
               <th className="px-4 py-2 font-medium">Amount</th>
@@ -233,6 +235,12 @@ function ReceiptTableRow({ basePath, receipt, selected, expanded, onToggle, onTo
             <input type="checkbox" aria-label={`Select ${receipt.merchant ?? "receipt"}`} checked={selected} onChange={onToggle} className="h-4 w-4 rounded border-slate-300" />
           </label>
         </td>
+        <td className="px-2 py-2.5">
+          <ProcessingStateGlyph
+            state={processingState({ approvalStatus: receipt.approvalStatus, blockedByCheck: receipt.blockedByCheck, escalated: receipt.escalated, touchless: receipt.touchless, status: receipt.status })}
+            minConfidencePercent={minConfidencePercent}
+          />
+        </td>
         <td className="px-4 py-2.5">
           <Link href={`${basePath}/${receipt.documentId}`} aria-expanded={expanded}
             className="text-slate-800 hover:text-emerald-700 hover:underline"
@@ -264,7 +272,7 @@ function ReceiptTableRow({ basePath, receipt, selected, expanded, onToggle, onTo
         </td>
         <td className="px-4 py-2.5">
           <div className="flex flex-wrap items-center gap-1.5">
-            {receipt.touchless && <TouchlessPill minConfidencePercent={minConfidencePercent} />}
+            {/* Touchless no longer renders here (#223) — the processing-state glyph carries it now. */}
             <ReviewSlaCountdownBadge openedAt={receipt.reviewTaskOpenedAt} slaHours={DEFAULT_REVIEW_SLA_HOURS} />
             <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium capitalize text-slate-700">{receipt.status.replaceAll("_", " ")}</span>
             {receipt.blockedByCheck && (
@@ -285,7 +293,7 @@ function ReceiptTableRow({ basePath, receipt, selected, expanded, onToggle, onTo
       </tr>
       {expanded && (
         <tr>
-          <td colSpan={7} className="p-0">
+          <td colSpan={8} className="p-0">
             <InlineDocumentPanel documentId={receipt.documentId} loadDetail={loadDetail} onClose={onToggleExpand} />
           </td>
         </tr>
