@@ -35,6 +35,22 @@ The typed destination for a bank statement. The reviewer asserts the issuing ins
 A tri-valued (pass/warn/fail), explainable comparison that states in plain language why a value is flagged, anchored to the field, cell, or row it concerns. "Mismatch" names one Check status, not the category.
 _Avoid_: Discrepancy, issue, error (as the umbrella term)
 
+**Line match**:
+An invoice line's assigned Purchase Order line — guessed by description similarity, or set by hand in Match manually. A line below the similarity threshold has no line match and is not compared.
+_Avoid_: Line pairing, line mapping
+
+**Match manually**:
+The named in-row mode on an invoice's line items that confirms, replaces or rejects its Purchase Order and reassigns line matches; the checks re-run when it is left. It changes the facts and needs no reason; it is not Override Mode, which accepts a variance with a reason.
+_Avoid_: Manual Match Mode (Vic's name), re-match, Override (for a match change)
+
+**Override Mode**:
+The screen-scoped mode in which a soft check or gate can be overridden, each override attributed and recorded with a required reason. Hard gates are out of its reach.
+_Avoid_: Bypass, force approve
+
+**Fully invoiced**:
+A Purchase Order whose every line has been invoiced to at least its ordered quantity. Derived, never set by hand.
+_Avoid_: Closed PO, consumed
+
 **Saved view**:
 A named, reusable filter/sort/column configuration on a list screen. System views are seeded per screen and are not editable or deletable; a user can duplicate one into an editable, optionally shared, view.
 
