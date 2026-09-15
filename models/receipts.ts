@@ -24,6 +24,8 @@ export type ReceiptRow = {
    * "unclaimed"; nothing here changes ExpenseClaimItem's uniqueness (one claim per document). */
   claimId: string | null
   claimStatus: "draft" | "submitted" | "approved" | "rejected" | null
+  /** Per-field extraction confidence (0-1), same shape/source as BillRow.fieldConfidence. */
+  fieldConfidence: Record<string, number>
 }
 
 /** Loads receipts for a workspace. Bounded (up to `limit`, default 500), same reasoning as
@@ -46,7 +48,7 @@ export async function listWorkspaceReceipts(input: {
       template: { code: { in: ["receipt", "expense_receipt"] } },
     },
     select: {
-      id: true, filename: true, status: true, reviewedAt: true, reviewedData: true,
+      id: true, filename: true, status: true, reviewedAt: true, reviewedData: true, confidence: true,
       template: { select: { code: true } },
     },
     orderBy: { receivedAt: "desc" },
@@ -93,6 +95,7 @@ export async function listWorkspaceReceipts(input: {
       openCheckCodes: openChecks,
       claimId: claim?.id ?? null,
       claimStatus: (claim?.status as ReceiptRow["claimStatus"]) ?? null,
+      fieldConfidence: (doc.confidence as Record<string, unknown> | null)?.fieldConfidence as Record<string, number> ?? {},
     }
   })
 

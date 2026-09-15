@@ -13,6 +13,7 @@ import { SelectionAuditPanel } from "@/components/list-screen/selection-audit-pa
 import { bulkExportDocumentsAction, deletePipelineDocumentsAction, moveDocumentsToStageAction } from "@/app/(app)/workspaces/[workspaceId]/pipeline-actions"
 import { getInlineDocumentDetailAction, getSelectionAuditPanelDataAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
 import { downloadCsv } from "@/lib/client/download-csv"
+import { ConfidenceField } from "@/components/typed-destinations/row-signals"
 import type { ReceiptRow } from "@/models/receipts"
 import type { ReactNode } from "react"
 
@@ -186,12 +187,18 @@ function ReceiptTableRow({ basePath, receipt, selected, expanded, onToggle, onTo
               e.preventDefault()
               onToggleExpand()
             }}>
-            {receipt.merchant ?? <span className="italic text-slate-400">unknown merchant</span>}
+            <ConfidenceField label="Merchant" value={receipt.fieldConfidence.merchant}>
+              {receipt.merchant ?? <span className="italic text-slate-400">unknown merchant</span>}
+            </ConfidenceField>
           </Link>
           <div className="text-xs text-slate-500 truncate max-w-[240px]">{receipt.filename}</div>
         </td>
         <td className="px-4 py-2.5 text-slate-600">{receipt.receiptNumber ?? "—"}</td>
-        <td className="px-4 py-2.5 tabular-nums text-slate-800">{receipt.total !== null ? formatMoney(receipt.total, receipt.currencyCode) : "—"}</td>
+        <td className="px-4 py-2.5 tabular-nums text-slate-800">
+          <ConfidenceField label="Amount" value={receipt.fieldConfidence.total ?? receipt.fieldConfidence.amount}>
+            {receipt.total !== null ? formatMoney(receipt.total, receipt.currencyCode) : "—"}
+          </ConfidenceField>
+        </td>
         <td className="px-4 py-2.5 tabular-nums text-slate-600">{receipt.purchaseDate ? receipt.purchaseDate.toISOString().slice(0, 10) : "—"}</td>
         <td className="px-4 py-2.5">
           <div className="flex flex-wrap items-center gap-1.5">

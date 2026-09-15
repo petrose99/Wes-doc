@@ -13,8 +13,8 @@ import { SelectionAuditPanel } from "@/components/list-screen/selection-audit-pa
 import { bulkExportDocumentsAction, deletePipelineDocumentsAction, moveDocumentsToStageAction } from "@/app/(app)/workspaces/[workspaceId]/pipeline-actions"
 import { getInlineDocumentDetailAction, getSelectionAuditPanelDataAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
 import { downloadCsv } from "@/lib/client/download-csv"
+import { AgingBadge, ConfidenceField, StatusGlyph } from "@/components/typed-destinations/row-signals"
 import type { BillRow } from "@/models/bills"
-import type { AgingBucket } from "@/lib/bills/due-date"
 import type { ReactNode } from "react"
 
 /** #213: Invoices row-selection + bulk action bar (Approve / Export / Prepare payment run /
@@ -135,6 +135,7 @@ export function InvoiceTable({ workspaceId, basePath, bills, payableDocumentIds,
                   <input type="checkbox" aria-label="Select all invoices" checked={allSelected} onChange={toggleAll} className="h-4 w-4 rounded border-slate-300" />
                 </label>
               </th>
+              <th className="w-8 px-2 py-2" aria-hidden />
               <th className="px-4 py-2 font-medium">Supplier</th>
               <th className="px-4 py-2 font-medium">Invoice #</th>
               <th className="px-4 py-2 font-medium">Amount</th>
@@ -189,6 +190,9 @@ function BillTableRow({ basePath, bill, selected, expanded, onToggle, onToggleEx
             <input type="checkbox" aria-label={`Select ${bill.supplier ?? "invoice"}`} checked={selected} onChange={onToggle} className="h-4 w-4 rounded border-slate-300" />
           </label>
         </td>
+        <td className="px-2 py-2.5">
+          <StatusGlyph bucket={bill.agingBucket} />
+        </td>
         <td className="px-4 py-2.5">
           <Link href={`${basePath}/${bill.documentId}`} aria-expanded={expanded}
             className="text-slate-800 hover:text-emerald-700 hover:underline"
@@ -197,18 +201,24 @@ function BillTableRow({ basePath, bill, selected, expanded, onToggle, onToggleEx
               e.preventDefault()
               onToggleExpand()
             }}>
-            {bill.supplier ?? <span className="italic text-slate-400">unknown supplier</span>}
+            <ConfidenceField label="Supplier" value={bill.fieldConfidence.vendor ?? bill.fieldConfidence.merchant}>
+              {bill.supplier ?? <span className="italic text-slate-400">unknown supplier</span>}
+            </ConfidenceField>
           </Link>
           <div className="text-xs text-slate-500 truncate max-w-[240px]">{bill.filename}</div>
         </td>
         <td className="px-4 py-2.5 text-slate-600">{bill.invoiceNumber ?? "—"}</td>
-        <td className="px-4 py-2.5 tabular-nums text-slate-800">{bill.total !== null ? formatMoney(bill.total, bill.currencyCode) : "—"}</td>
+        <td className="px-4 py-2.5 tabular-nums text-slate-800">
+          <ConfidenceField label="Amount" value={bill.fieldConfidence.total ?? bill.fieldConfidence.amount}>
+            {bill.total !== null ? formatMoney(bill.total, bill.currencyCode) : "—"}
+          </ConfidenceField>
+        </td>
         <td className="px-4 py-2.5 tabular-nums text-slate-600">
           {bill.dueDate ? bill.dueDate.toISOString().slice(0, 10) : "—"}
           {bill.dueDate && !bill.extractedDueDate && <span className="ml-1 text-[10px] uppercase tracking-wide text-slate-400">inferred</span>}
         </td>
         <td className="px-4 py-2.5">
-          <BucketPill bucket={bill.agingBucket} />
+          <AgingBadge bucket={bill.agingBucket} />
         </td>
         <td className="px-4 py-2.5">
           <div className="flex flex-wrap items-center gap-1.5">
@@ -228,23 +238,13 @@ function BillTableRow({ basePath, bill, selected, expanded, onToggle, onToggleEx
       </tr>
       {expanded && (
         <tr>
-          <td colSpan={7} className="p-0">
+          <td colSpan={8} className="p-0">
             <InlineDocumentPanel documentId={bill.documentId} loadDetail={loadDetail} onClose={onToggleExpand} />
           </td>
         </tr>
       )}
     </>
   )
-}
-
-function BucketPill({ bucket }: { bucket: AgingBucket | null }) {
-  if (!bucket) return <span className="text-xs text-slate-400">—</span>
-  const cls =
-    bucket === "current" ? "bg-emerald-50 text-emerald-700" :
-    bucket === "1-30" ? "bg-yellow-50 text-yellow-800" :
-    bucket === "31-60" ? "bg-orange-50 text-orange-800" :
-    "bg-red-50 text-red-800"
-  return <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${cls}`}>{bucket === "current" ? "Current" : `${bucket}d`}</span>
 }
 
 function formatMoney(amount: number, currency?: string | null): string {

@@ -39,6 +39,11 @@ export type BillRow = {
    * There is no model concept of a "cancelled" approval — the taxonomy's Cancelled value has no
    * backing state and is intentionally not emitted here. */
   approvalStatus: "not_started" | "in_progress" | "approved" | "rejected"
+  /** Per-field extraction confidence (0-1), keyed the same as `reviewedData` ("vendor"/"merchant",
+   * "total"/"amount"). Read from `document.confidence.fieldConfidence` — #199's row anatomy uses
+   * this to underline the supplier/amount cells; absent for a field means no confidence was
+   * recorded (e.g. manually entered), not zero confidence. */
+  fieldConfidence: Record<string, number>
 }
 
 export type BillsSummary = Record<AgingBucket | "unknown", { count: number; total: number }>
@@ -98,7 +103,7 @@ export async function listWorkspaceBills(input: {
       template: { code: "invoice" },
     },
     select: {
-      id: true, filename: true, status: true, reviewedAt: true, reviewedData: true,
+      id: true, filename: true, status: true, reviewedAt: true, reviewedData: true, confidence: true,
       template: { select: { code: true } },
     },
     orderBy: { receivedAt: "desc" },
@@ -183,6 +188,7 @@ export async function listWorkspaceBills(input: {
       blockedByCheck: openChecks.length > 0,
       openCheckCodes: openChecks,
       approvalStatus,
+      fieldConfidence: (doc.confidence as Record<string, unknown> | null)?.fieldConfidence as Record<string, number> ?? {},
     })
   }
 
