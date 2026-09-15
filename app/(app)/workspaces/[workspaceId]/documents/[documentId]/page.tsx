@@ -20,6 +20,7 @@ import { listDocumentAuditEvents } from "@/models/audit-events"
 import { getWorkspaceDocument, listWorkspaceDocuments } from "@/models/documents"
 import { getFewShotExamples } from "@/models/field-corrections"
 import { getOpenReviewTaskForDocument } from "@/models/review-tasks"
+import { listWorkspaceInstitutions } from "@/models/institutions"
 import { listWorkspaceIntegrationConnections, listWorkspaceIntegrationPushes } from "@/models/integrations"
 import { getDocumentPaymentStatuses } from "@/models/ledger-payments"
 import { requireWorkspaceRole } from "@/models/workspaces"
@@ -68,6 +69,11 @@ export async function DocumentDetailPage({ params, searchParams }: {
   const sidecar: BlocksSidecar | null = blocksJson ? (() => { try { return JSON.parse(blocksJson) as BlocksSidecar } catch { return null } })() : null
   const provenance = rawProvenance && sidecar ? repairMissingBboxes(rawProvenance, sidecar, data) : rawProvenance
   const codingData = (document.codingData as Record<string, unknown> | null) ?? {}
+
+  // #217: the Institution picker + saved-layout drift banner only apply to bank statements —
+  // skip the extra query for every other document type.
+  const institutions = codingData.documentType === "bank_statement" ? await listWorkspaceInstitutions(workspaceId) : []
+  const institutionName = document.institutionId ? institutions.find((institution) => institution.id === document.institutionId)?.name ?? null : null
 
   const templateCode = document.template?.code ?? ""
   const fewShotExamples = templateCode ? await getFewShotExamples(workspaceId, templateCode) : []
@@ -278,6 +284,9 @@ export async function DocumentDetailPage({ params, searchParams }: {
     /> : null}
     documentMatches={documentMatches.length ? <DocumentMatchesPanel workspaceId={workspaceId} matches={documentMatches} /> : null}
     stageIndicator={stageIndicator}
+    institutions={institutions}
+    institutionId={document.institutionId}
+    institutionName={institutionName}
   />
 }
 

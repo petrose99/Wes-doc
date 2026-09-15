@@ -29,6 +29,8 @@ import { revalidatePath } from "next/cache"
 import { after } from "next/server"
 import { z } from "zod"
 import { errorMessage, NO_ACCESS, paths, requireMember, sheetPath } from "./action-helpers"
+import { runDeterministicChecks } from "@/models/document-checks"
+import { acceptStatementLayoutAsNew, resolveOrCreateInstitution } from "@/models/institutions"
 
 const templateForm = z.object({ name: z.string().trim().min(2).max(80), code: z.string().regex(/^[a-z][a-z0-9_]{1,62}$/), fields: z.string().min(2), prompt: z.string().max(2000).optional() })
 
@@ -155,6 +157,40 @@ export async function setDocumentTypeAction(workspaceId: string, documentId: str
   await prisma.document.update({ where: { id: documentId }, data: { codingData: { ...prev, documentType, documentTypeSource: "human", categoryConfirmed: true } as Prisma.InputJsonValue } })
   revalidatePath(`${paths(workspaceId).documents}/${documentId}`)
   return { success: true, data: null }
+}
+
+const assertInstitutionForm = z.object({
+  institutionId: z.string().trim().min(1).optional(),
+  newInstitutionName: z.string().trim().min(1).max(120).optional(),
+}).refine((v) => v.institutionId || v.newInstitutionName, { message: "Pick an institution or name a new one" })
+
+/** #217: the bank-statement sibling of setDocumentTypeAction above — "user asserts which
+ * Institution this statement belongs to, assertion is authoritative" (#178), no AI
+ * classification. Picking an existing Institution or naming a new one both land here; a new name
+ * resolves through resolveOrCreateInstitution so a duplicate name (by another reviewer, or a
+ * double click) reuses the same row instead of erroring on the `[workspaceId, normalizedKey]`
+ * uniqueness. Re-runs the deterministic checks synchronously afterward — the layout-drift check
+ * (#207) has nothing to compare until an institution is asserted, so the pane would otherwise
+ * show its "not applicable" calm state until the next unrelated reprocess. */
+export async function assertInstitutionAction(workspaceId: string, documentId: string, input: { institutionId?: string; newInstitutionName?: string }): Promise<ActionState<{ institutionId: string; institutionName: string }>> {
+  const user = await getCurrentUser()
+  if (!(await requireMember(workspaceId, user.id))) return { success: false, error: NO_ACCESS }
+  const parsed = assertInstitutionForm.safeParse(input)
+  if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? "Pick an institution or name a new one" }
+  const document = await getWorkspaceDocument(workspaceId, documentId)
+  if (!document) return { success: false, error: "Document not found" }
+  try {
+    const institution = parsed.data.institutionId
+      ? await prisma.institution.findFirst({ where: { id: parsed.data.institutionId, workspaceId } })
+      : await resolveOrCreateInstitution(workspaceId, parsed.data.newInstitutionName!)
+    if (!institution) return { success: false, error: "Institution not found" }
+    await prisma.document.update({ where: { id: documentId }, data: { institutionId: institution.id } })
+    await runDeterministicChecks({ workspaceId, documentId })
+    revalidatePath(`${paths(workspaceId).documents}/${documentId}`)
+    return { success: true, data: { institutionId: institution.id, institutionName: institution.name } }
+  } catch (error) {
+    return { success: false, error: errorMessage(error, "Could not save the institution") }
+  }
 }
 
 export async function reclassifyDocumentAction(workspaceId: string, documentId: string, docType: string): Promise<ActionState<null>> {
@@ -296,6 +332,23 @@ export async function escalateCheckAction(workspaceId: string, documentId: strin
   await recordDocumentAudit({ workspaceId, documentId, actorId: user.id, type: "check.escalated", detail: { checkCode, previousStatus: check.status } })
   revalidatePath(`${paths(workspaceId).documents}/${documentId}`)
   revalidatePath(paths(workspaceId).exceptions)
+  return { success: true, data: null }
+}
+
+/** #217: the drift banner's "Accept as new layout" action — the sibling of escalateCheckAction
+ * above for the statement_layout_drift check specifically. Where escalateCheckAction says "the
+ * document is wrong, route it to a human" and deliberately leaves the saved layout untouched,
+ * this says "the document is right, the institution's layout genuinely changed" and overwrites
+ * Institution.savedLayout with this statement's derived shape (models/institutions.ts). Confirmed
+ * drift never auto-updates the saved layout per #207/#217's resolution — only this explicit
+ * reviewer action does. */
+export async function acceptStatementLayoutAction(workspaceId: string, documentId: string): Promise<ActionState<null>> {
+  const user = await getCurrentUser()
+  if (!(await requireMember(workspaceId, user.id))) return { success: false, error: NO_ACCESS }
+  const result = await acceptStatementLayoutAsNew(workspaceId, documentId)
+  if (!result.success) return { success: false, error: result.error }
+  await recordDocumentAudit({ workspaceId, documentId, actorId: user.id, type: "check.layout_accepted", detail: { checkCode: "statement_layout_drift" } })
+  revalidatePath(`${paths(workspaceId).documents}/${documentId}`)
   return { success: true, data: null }
 }
 

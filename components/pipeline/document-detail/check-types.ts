@@ -33,6 +33,7 @@ export function checkLabel(checkCode: string): string {
     split_invoice: "Split invoice",
     vat_number_format: "VAT format",
     vendor_onboarding: "Supplier review",
+    statement_layout_drift: "Statement layout",
   }
   return labels[checkCode] ?? "Check"
 }

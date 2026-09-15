@@ -11,6 +11,8 @@ import { StageIndicator, type StageStep } from "@/components/pipeline/document-d
 import { useFieldNav } from "@/components/pipeline/document-detail/use-field-nav"
 import { archiveDocumentsAction, flagDocumentsAction, moveDocumentsToStageAction, updateDocumentNoteAction } from "@/app/(app)/workspaces/[workspaceId]/pipeline-actions"
 import { escalateCheckAction, setDocumentTypeAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
+import { InstitutionAssert } from "@/components/pipeline/document-detail/institution-assert"
+import { StatementDriftBanner } from "@/components/pipeline/document-detail/statement-drift-banner"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { SourceViewer, type ProvenanceTarget, type SourceDocument } from "@/components/viewer/source-preview"
@@ -42,6 +44,7 @@ export function SplitPane({
   workspaceId, source, fields, data, fieldConfidence, provenanceFields, provenanceItems, initialTarget, conflictingLabels, missingRequiredFields,
   saveReview, documentType: initialDocumentType, note: initialNote, auditEvents, prevHref, nextHref, position, stage, afterActionHref,
   header, canPush, pushCard, canCreateRule, defaultSupplier, matchKind, bankMatches, documentMatches, paymentStatus, rationales, checks, fxBadge, stageIndicator,
+  institutions, institutionId, institutionName,
 }: {
   workspaceId: string
   source: SourceDocument
@@ -79,6 +82,11 @@ export function SplitPane({
   /** The five-step Extracted → Checks → Approval → Sync → Pay indicator. Derived at the page
    * level so this client component doesn't need to pull in review-task/integration-push readers. */
   stageIndicator?: StageStep[]
+  /** #217: this workspace's Institutions, for the bank-statement assert control — empty/unused
+   * for any other document type. */
+  institutions?: Array<{ id: string; name: string }>
+  institutionId?: string | null
+  institutionName?: string | null
 }) {
   const router = useRouter()
   const [tab, setTab] = useState<Tab>("details")
@@ -259,6 +267,15 @@ export function SplitPane({
       <StageIndicator steps={stageIndicator} />
     </div>}
 
+    {/* #217: the drift banner (or its calm "first statement" reading) always renders first among
+        this pane's banners/notices, above the generic missing-fields one below. */}
+    {docType === "bank_statement" && institutionId && <StatementDriftBanner
+      workspaceId={workspaceId}
+      documentId={header.documentId}
+      institutionName={institutionName ?? null}
+      driftCheck={(checks ?? []).find((check) => check.checkCode === "statement_layout_drift") ?? null}
+    />}
+
     {/* Alert banner */}
     {(missingRequiredFields.length > 0 || conflictingLabels.length > 0) && <div className="border-b border-indigo-200 bg-indigo-50 px-6 py-2 text-sm text-indigo-700">
       {missingRequiredFields.length > 0 && <p>Missing required fields: <strong>{missingRequiredFields.join(", ")}</strong></p>}
@@ -314,6 +331,17 @@ export function SplitPane({
                 </div>
               </div>
             )}
+
+            {/* #217: a bank statement needs an asserted Institution before the layout-drift
+                check (#207) has anything to compare against — same "user asserts, assertion is
+                authoritative" rule as the document-type control just above. */}
+            {docType === "bank_statement" && <InstitutionAssert
+              workspaceId={workspaceId}
+              documentId={header.documentId}
+              institutions={institutions ?? []}
+              institutionId={institutionId ?? null}
+              institutionName={institutionName ?? null}
+            />}
 
             {/* Review form — A4.1 field navigation: land on the lowest-confidence field first,
                 Enter = confirm-and-advance. Non-array fields are what the nav visits; the array
