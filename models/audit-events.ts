@@ -192,3 +192,28 @@ export async function listDocumentAuditEvents(workspaceId: string, documentId: s
     actorName: event.actor?.name || event.actor?.email || null,
   }))
 }
+
+/** #198: one document's approval step-chain — every `review_task_stage_decided` event (written by
+ * decideReviewTaskStage, see models/review-tasks.ts) grouped into the per-stage shape the
+ * Approval tab renders, oldest stage first. Only stages that have actually been decided appear;
+ * a stage still awaiting a decision has no event yet and is left off rather than guessed at. */
+export async function listDocumentStageDecisions(workspaceId: string, documentId: string) {
+  const events = await prisma.documentAuditEvent.findMany({
+    where: { workspaceId, documentId, type: "review_task_stage_decided" },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, createdAt: true, detail: true, actor: { select: { name: true, email: true } } },
+  })
+  return events.map((event) => {
+    const detail = event.detail as { stageIndex: number; stageName: string; decision: "approve" | "reject"; note?: string } | null
+    if (!detail) return null
+    return {
+      id: event.id,
+      stageIndex: detail.stageIndex,
+      stageName: detail.stageName,
+      decision: detail.decision,
+      note: detail.note ?? null,
+      actorName: event.actor?.name || event.actor?.email || "Unknown",
+      decidedAt: event.createdAt,
+    }
+  }).filter((decision): decision is NonNullable<typeof decision> => decision !== null)
+}

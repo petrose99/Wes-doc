@@ -9,8 +9,9 @@ import { Button } from "@/components/ui/button"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { ListScreenBulkActionBar } from "@/components/list-screen/list-screen-shell"
 import { InlineDocumentPanel } from "@/components/list-screen/inline-document-panel"
+import { SelectionAuditPanel } from "@/components/list-screen/selection-audit-panel"
 import { bulkExportDocumentsAction, deletePipelineDocumentsAction, moveDocumentsToStageAction } from "@/app/(app)/workspaces/[workspaceId]/pipeline-actions"
-import { getInlineDocumentDetailAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
+import { getInlineDocumentDetailAction, getSelectionAuditPanelDataAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
 import { downloadCsv } from "@/lib/client/download-csv"
 import type { BillRow } from "@/models/bills"
 import type { AgingBucket } from "@/lib/bills/due-date"
@@ -34,6 +35,7 @@ export function InvoiceTable({ workspaceId, basePath, bills, payableDocumentIds,
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const loadDetail = (documentId: string): Promise<ReactNode> => getInlineDocumentDetailAction(workspaceId, documentId)
+  const loadAuditPanelData = (documentId: string) => getSelectionAuditPanelDataAction(workspaceId, documentId)
 
   const selectedIds = [...selected]
   const payableSelected = selectedIds.filter((id) => payableDocumentIds.includes(id))
@@ -119,33 +121,39 @@ export function InvoiceTable({ workspaceId, basePath, bills, payableDocumentIds,
       </Button>
     </ListScreenBulkActionBar>}
 
-    <div className="-mx-6 overflow-x-auto">
-      <table className="w-full min-w-[760px] text-sm">
-        <thead>
-          <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
-            <th className="w-9 px-4 py-2">
-              <label className="flex h-6 w-6 cursor-pointer items-center justify-center">
-                <input type="checkbox" aria-label="Select all invoices" checked={allSelected} onChange={toggleAll} className="h-4 w-4 rounded border-slate-300" />
-              </label>
-            </th>
-            <th className="px-4 py-2 font-medium">Supplier</th>
-            <th className="px-4 py-2 font-medium">Invoice #</th>
-            <th className="px-4 py-2 font-medium">Amount</th>
-            <th className="px-4 py-2 font-medium">Due</th>
-            <th className="px-4 py-2 font-medium">Aging</th>
-            <th className="px-4 py-2 font-medium">Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {bills.map((bill) => (
-            <BillTableRow key={bill.documentId} basePath={basePath} bill={bill} selected={selected.has(bill.documentId)}
-              expanded={expandedId === bill.documentId}
-              onToggle={() => toggle(bill.documentId)}
-              onToggleExpand={() => setExpandedId((current) => (current === bill.documentId ? null : bill.documentId))}
-              loadDetail={loadDetail} />
-          ))}
-        </tbody>
-      </table>
+    <div className="flex items-start gap-4">
+      {/* #198: selection-triggered Audit/Approval panel — shown when exactly one row is
+          checkbox-selected, so a single document's history has an unambiguous subject. */}
+      {selectedIds.length === 1 && <SelectionAuditPanel key={selectedIds[0]} documentId={selectedIds[0]} loadData={loadAuditPanelData} onClose={clearSelection} />}
+
+      <div className={`min-w-0 flex-1 overflow-x-auto ${selectedIds.length === 1 ? "" : "-mx-6"}`}>
+        <table className="w-full min-w-[760px] text-sm">
+          <thead>
+            <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
+              <th className="w-9 px-4 py-2">
+                <label className="flex h-6 w-6 cursor-pointer items-center justify-center">
+                  <input type="checkbox" aria-label="Select all invoices" checked={allSelected} onChange={toggleAll} className="h-4 w-4 rounded border-slate-300" />
+                </label>
+              </th>
+              <th className="px-4 py-2 font-medium">Supplier</th>
+              <th className="px-4 py-2 font-medium">Invoice #</th>
+              <th className="px-4 py-2 font-medium">Amount</th>
+              <th className="px-4 py-2 font-medium">Due</th>
+              <th className="px-4 py-2 font-medium">Aging</th>
+              <th className="px-4 py-2 font-medium">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {bills.map((bill) => (
+              <BillTableRow key={bill.documentId} basePath={basePath} bill={bill} selected={selected.has(bill.documentId)}
+                expanded={expandedId === bill.documentId}
+                onToggle={() => toggle(bill.documentId)}
+                onToggleExpand={() => setExpandedId((current) => (current === bill.documentId ? null : bill.documentId))}
+                loadDetail={loadDetail} />
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <ConfirmDialog

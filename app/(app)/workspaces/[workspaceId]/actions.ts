@@ -18,6 +18,7 @@ import { parsePageRange } from "@/lib/page-range"
 import { refreshDocumentReadiness } from "@/lib/readiness/refresh"
 import { expandZipBuffer } from "@/lib/zip-ingestion"
 import { deleteWorkspaceDocuments, getDocumentsStatus, getWorkspaceDocument, markDocumentsReviewed, requeueAdaptiveExtraction, requeueDocumentExtraction, updateDocumentField, updateDocumentReview, validateDocumentInput } from "@/models/documents"
+import { listDocumentAuditEvents, listDocumentStageDecisions } from "@/models/audit-events"
 import { addDomainPackToFile, createFile, createFolder, deleteFileIfEmpty, deleteFiles, deleteFolder, duplicateFile, getFileTemplates, getWorkspaceFile, listFileShares, moveToFolder, removeFileShare, renameFile, renameFolder, setLinkAccess, touchFile, upsertFileShare } from "@/models/files"
 import { getCurrentUser } from "@/lib/auth"
 import { prisma } from "@/lib/db"
@@ -188,6 +189,22 @@ export async function getInlineDocumentDetailAction(workspaceId: string, documen
     params: Promise.resolve({ workspaceId, documentId }),
     searchParams: Promise.resolve({ stage }),
   })
+}
+
+/** #198: data for the selection-triggered Audit/Approval panel on the Invoices/Receipts list
+ * screens — the flat audit log (same shape as split-pane's Activity tab) plus the approval
+ * step-chain grouped from `review_task_stage_decided` events. */
+export async function getSelectionAuditPanelDataAction(workspaceId: string, documentId: string) {
+  const user = await getCurrentUser()
+  if (!(await requireMember(workspaceId, user.id))) return null
+  const [auditEvents, stageDecisions] = await Promise.all([
+    listDocumentAuditEvents(workspaceId, documentId),
+    listDocumentStageDecisions(workspaceId, documentId),
+  ])
+  return {
+    auditEvents: auditEvents.map((event) => ({ id: event.id, label: event.label, createdAt: event.createdAt.toISOString(), actorName: event.actorName })),
+    stageDecisions: stageDecisions.map((decision) => ({ ...decision, decidedAt: decision.decidedAt.toISOString() })),
+  }
 }
 
 export async function saveDocumentReviewAction(workspaceId: string, documentId: string, formData: FormData): Promise<ActionState<null>> {
