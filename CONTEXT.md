@@ -119,7 +119,8 @@ A document-detail or worksheet page that temporarily takes over the viewport whi
 A typed destination's list view (Invoices, Purchase Orders, Receipts, Bank Statements, Exceptions). The queue fills the work area; selecting a row opens the Detail pane beside it, and the operator never leaves the screen to review, approve, or resolve a row.
 
 **Detail pane**:
-The single right-hand pane on a Queue screen that shows the selected row's extracted fields beside its source document, with its approval chain, audit trail, and open checks as tabs. There is one Detail pane per Queue screen; it is the only place a row's detail opens in place.
+The single right-hand pane on a Queue screen that shows the selected row's extracted fields beside its source document, with its approval chain, audit trail, and open checks as tabs. There is one Detail pane per Queue screen; it is the only place a row's detail opens in place. On a phone the same pane opens full-screen over the queue, with the source document stacked above the fields and the decision bar at the bottom; it is still the Detail pane, not a second screen.
+_Avoid_: Approval Context (Vic's separate phone screen — DocuBite has one pane), detail sheet
 
 **Origin context**:
 The workspace, list, filters, position, and workflow state from which a user opened a detail or action surface. Returning from that surface restores the origin context whenever it still exists.
