@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { toast } from "sonner"
 import { CheckCircle2, Download, Loader2, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -15,6 +15,7 @@ import { bulkExportDocumentsAction, deletePipelineDocumentsAction, moveDocuments
 import { getInlineDocumentDetailAction, getSelectionAuditPanelDataAction, overrideGateAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
 import { downloadCsv } from "@/lib/client/download-csv"
 import { AgingBadge, ConfidenceField, StatusGlyph, TouchlessPill } from "@/components/typed-destinations/row-signals"
+import { BulkApproveReceiptModal, EligibilityStrip, ItemizedRecapTable, type ItemizedRecord } from "@/components/typed-destinations/bulk-approve-receipt"
 import type { BillRow } from "@/models/bills"
 import type { ReactNode } from "react"
 
@@ -35,8 +36,13 @@ export function InvoiceTable({ workspaceId, basePath, bills, payableDocumentIds,
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [busy, setBusy] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [confirmingApprove, setConfirmingApprove] = useState(false)
+  const [confirmingPaymentRun, setConfirmingPaymentRun] = useState(false)
+  const [approveReceipt, setApproveReceipt] = useState<{ approved: ItemizedRecord[]; heldBack: ItemizedRecord[] } | null>(null)
+  const [needsAttention, setNeedsAttention] = useState<Set<string>>(new Set())
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const overrideMode = useOverrideMode()
+  const paymentRunFormRef = useRef<HTMLFormElement>(null)
   const loadDetail = (documentId: string): Promise<ReactNode> => getInlineDocumentDetailAction(workspaceId, documentId)
   const loadAuditPanelData = (documentId: string) => getSelectionAuditPanelDataAction(workspaceId, documentId)
   const overrideGate = async (gateId: string, formData: FormData) => {
@@ -48,6 +54,16 @@ export function InvoiceTable({ workspaceId, basePath, bills, payableDocumentIds,
   const selectedIds = [...selected]
   const payableSelected = selectedIds.filter((id) => payableDocumentIds.includes(id))
   const allSelected = bills.length > 0 && selected.size === bills.length
+  const billsById = new Map(bills.map((bill) => [bill.documentId, bill]))
+  // Eligibility proxy: the actual hold-back reason (missing required fields/document type) isn't
+  // exposed on BillRow, so `blockedByCheck` — the same signal `payableDocumentIds` is filtered by
+  // server-side — is the best pre-action signal available without a round trip. See #204's note
+  // on EligibilityStrip.
+  const eligibleForApproval = selectedIds.filter((id) => !billsById.get(id)?.blockedByCheck)
+  const toRecord = (id: string): ItemizedRecord => {
+    const bill = billsById.get(id)
+    return { id, type: "Invoice", vendor: bill?.supplier ?? null, number: bill?.invoiceNumber ?? null, amount: bill?.total ?? null, currencyCode: bill?.currencyCode ?? null, dateLabel: "Due", date: bill?.dueDate ?? null }
+  }
 
   const toggle = (id: string) => setSelected((prev) => {
     const next = new Set(prev)
@@ -57,16 +73,24 @@ export function InvoiceTable({ workspaceId, basePath, bills, payableDocumentIds,
   const toggleAll = () => setSelected(allSelected ? new Set() : new Set(bills.map((bill) => bill.documentId)))
   const clearSelection = () => setSelected(new Set())
 
-  const approve = async () => {
+  const runApprove = async () => {
+    setConfirmingApprove(false)
     setBusy(true)
     try {
       const result = await moveDocumentsToStageAction(workspaceId, selectedIds, "approved")
       if (!result.success) { toast.error(result.error || "Approve failed"); return }
-      const approved = result.data?.approved ?? 0
-      const heldBack = result.data?.heldBack ?? 0
-      if (approved > 0 && heldBack === 0) toast.success(`Approved ${approved}`)
-      else if (approved > 0) toast.warning(`Approved ${approved} — ${heldBack} held back (missing required fields or document type)`)
-      else toast.warning(`Nothing approved — ${heldBack} still missing required fields or a document type.`)
+      const approvedIds = result.data?.approvedIds ?? []
+      const heldBackIds = selectedIds.filter((id) => !approvedIds.includes(id))
+      // #204's "Needs attention" badge: held-back documents aren't queryable server-side (the
+      // hold-back reason isn't persisted anywhere), so this only lasts for the current session's
+      // client state — cleared once a row is re-approved successfully, and lost on a hard reload.
+      setNeedsAttention((prev) => {
+        const next = new Set(prev)
+        for (const id of heldBackIds) next.add(id)
+        for (const id of approvedIds) next.delete(id)
+        return next
+      })
+      setApproveReceipt({ approved: approvedIds.map(toRecord), heldBack: heldBackIds.map(toRecord) })
       clearSelection()
       router.refresh()
     } catch {
@@ -112,19 +136,21 @@ export function InvoiceTable({ workspaceId, basePath, bills, payableDocumentIds,
     <OverrideModeBar active={overrideMode.active} onToggle={overrideMode.toggle} />
 
     {selectedIds.length > 0 && <ListScreenBulkActionBar selectedCount={selectedIds.length}>
-      <Button type="button" size="sm" disabled={dis} onClick={() => void approve()}>
+      <Button type="button" size="sm" disabled={dis} onClick={() => setConfirmingApprove(true)}>
         {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}Approve
       </Button>
       <Button type="button" size="sm" variant="outline" disabled={dis} onClick={() => void exportCsv()}>
         {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}Export
       </Button>
       {payableSelected.length > 0 && (
-        <form action={preparePaymentRunAction}>
-          {payableSelected.map((id) => <input key={id} type="hidden" name="documentId" value={id} />)}
-          <Button type="submit" size="sm" variant="outline" disabled={busy}>
+        <>
+          <form ref={paymentRunFormRef} action={preparePaymentRunAction} className="hidden">
+            {payableSelected.map((id) => <input key={id} type="hidden" name="documentId" value={id} />)}
+          </form>
+          <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => setConfirmingPaymentRun(true)}>
             Prepare payment run ({payableSelected.length})
           </Button>
-        </form>
+        </>
       )}
       <Button type="button" size="sm" variant="destructive" disabled={dis} onClick={() => setConfirmingDelete(true)}>
         <Trash2 className="h-3.5 w-3.5" />Delete
@@ -161,7 +187,8 @@ export function InvoiceTable({ workspaceId, basePath, bills, payableDocumentIds,
                 expanded={expandedId === bill.documentId}
                 onToggle={() => toggle(bill.documentId)}
                 onToggleExpand={() => setExpandedId((current) => (current === bill.documentId ? null : bill.documentId))}
-                loadDetail={loadDetail} minConfidencePercent={minConfidencePercent} />
+                loadDetail={loadDetail} minConfidencePercent={minConfidencePercent}
+                needsAttention={needsAttention.has(bill.documentId)} />
             ))}
           </tbody>
         </table>
@@ -177,6 +204,37 @@ export function InvoiceTable({ workspaceId, basePath, bills, payableDocumentIds,
       confirmLabel={busy ? "Deleting…" : "Delete"}
       onConfirm={() => void remove()}
       onCancel={() => setConfirmingDelete(false)} />
+
+    {/* #204: pre-action eligibility strip + recap, Approve and Prepare payment run only, per #185. */}
+    <ConfirmDialog
+      open={confirmingApprove}
+      busy={busy}
+      title={`Approve ${selectedIds.length} invoice${selectedIds.length === 1 ? "" : "s"}?`}
+      confirmLabel={busy ? "Approving…" : `Approve Invoices (${eligibleForApproval.length})`}
+      onConfirm={() => void runApprove()}
+      onCancel={() => setConfirmingApprove(false)}>
+      <div className="space-y-2">
+        <EligibilityStrip eligible={eligibleForApproval.length} total={selectedIds.length} />
+        <ItemizedRecapTable records={selectedIds.map(toRecord)} />
+      </div>
+    </ConfirmDialog>
+
+    <ConfirmDialog
+      open={confirmingPaymentRun}
+      busy={busy}
+      title={`Prepare a payment run for ${payableSelected.length} invoice${payableSelected.length === 1 ? "" : "s"}?`}
+      description="Downloads a payment file for the eligible invoices below."
+      confirmLabel={`Prepare Payment Run (${payableSelected.length})`}
+      onConfirm={() => { setConfirmingPaymentRun(false); paymentRunFormRef.current?.requestSubmit() }}
+      onCancel={() => setConfirmingPaymentRun(false)}>
+      <div className="space-y-2">
+        <EligibilityStrip eligible={payableSelected.length} total={selectedIds.length} />
+        <ItemizedRecapTable records={payableSelected.map(toRecord)} />
+      </div>
+    </ConfirmDialog>
+
+    <BulkApproveReceiptModal open={approveReceipt !== null} onClose={() => setApproveReceipt(null)}
+      approved={approveReceipt?.approved ?? []} heldBack={approveReceipt?.heldBack ?? []} />
   </>
 }
 
@@ -184,7 +242,7 @@ export function InvoiceTable({ workspaceId, basePath, bills, payableDocumentIds,
  * not re-derived here. py-[19.5px] on the cells plus the 1px border below gets a 62px row. The
  * supplier link toggles the #215 inline detail panel instead of navigating; a modified click
  * (ctrl/cmd/middle-click, or "open in new tab") still follows the href to the standalone route. */
-function BillTableRow({ basePath, bill, selected, expanded, onToggle, onToggleExpand, loadDetail, minConfidencePercent }: {
+function BillTableRow({ basePath, bill, selected, expanded, onToggle, onToggleExpand, loadDetail, minConfidencePercent, needsAttention }: {
   basePath: string
   bill: BillRow
   selected: boolean
@@ -193,6 +251,7 @@ function BillTableRow({ basePath, bill, selected, expanded, onToggle, onToggleEx
   onToggleExpand: () => void
   loadDetail: (documentId: string) => Promise<ReactNode>
   minConfidencePercent: number
+  needsAttention: boolean
 }) {
   return (
     <>
@@ -243,7 +302,12 @@ function BillTableRow({ basePath, bill, selected, expanded, onToggle, onToggleEx
                 blocked ({bill.openCheckCodes.length})
               </span>
             )}
-            {!bill.touchless && !bill.paymentStatus && !bill.blockedByCheck && (
+            {needsAttention && (
+              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800" title="Held back from a recent bulk Approve — missing required fields or a document type.">
+                Needs attention
+              </span>
+            )}
+            {!bill.touchless && !bill.paymentStatus && !bill.blockedByCheck && !needsAttention && (
               <span className="text-xs text-slate-400">—</span>
             )}
           </div>

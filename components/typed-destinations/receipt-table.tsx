@@ -15,6 +15,7 @@ import { bulkExportDocumentsAction, deletePipelineDocumentsAction, moveDocuments
 import { getInlineDocumentDetailAction, getSelectionAuditPanelDataAction, overrideGateAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
 import { downloadCsv } from "@/lib/client/download-csv"
 import { ConfidenceField, TouchlessPill } from "@/components/typed-destinations/row-signals"
+import { BulkApproveReceiptModal, EligibilityStrip, ItemizedRecapTable, type ItemizedRecord } from "@/components/typed-destinations/bulk-approve-receipt"
 import type { ReceiptRow } from "@/models/receipts"
 import type { ReactNode } from "react"
 
@@ -35,6 +36,9 @@ export function ReceiptTable({ workspaceId, basePath, receipts, minConfidencePer
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [busy, setBusy] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [confirmingApprove, setConfirmingApprove] = useState(false)
+  const [approveReceipt, setApproveReceipt] = useState<{ approved: ItemizedRecord[]; heldBack: ItemizedRecord[] } | null>(null)
+  const [needsAttention, setNeedsAttention] = useState<Set<string>>(new Set())
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const overrideMode = useOverrideMode()
   const loadDetail = (documentId: string): Promise<ReactNode> => getInlineDocumentDetailAction(workspaceId, documentId)
@@ -47,6 +51,14 @@ export function ReceiptTable({ workspaceId, basePath, receipts, minConfidencePer
 
   const selectedIds = [...selected]
   const allSelected = receipts.length > 0 && selected.size === receipts.length
+  const receiptsById = new Map(receipts.map((receipt) => [receipt.documentId, receipt]))
+  // Same eligibility proxy as InvoiceTable (see its EligibilityStrip note): `blockedByCheck` is
+  // the best available pre-action signal.
+  const eligibleForApproval = selectedIds.filter((id) => !receiptsById.get(id)?.blockedByCheck)
+  const toRecord = (id: string): ItemizedRecord => {
+    const receipt = receiptsById.get(id)
+    return { id, type: "Receipt", vendor: receipt?.merchant ?? null, number: receipt?.receiptNumber ?? null, amount: receipt?.total ?? null, currencyCode: receipt?.currencyCode ?? null, dateLabel: "Date", date: receipt?.purchaseDate ?? null }
+  }
 
   const toggle = (id: string) => setSelected((prev) => {
     const next = new Set(prev)
@@ -56,16 +68,21 @@ export function ReceiptTable({ workspaceId, basePath, receipts, minConfidencePer
   const toggleAll = () => setSelected(allSelected ? new Set() : new Set(receipts.map((receipt) => receipt.documentId)))
   const clearSelection = () => setSelected(new Set())
 
-  const approve = async () => {
+  const runApprove = async () => {
+    setConfirmingApprove(false)
     setBusy(true)
     try {
       const result = await moveDocumentsToStageAction(workspaceId, selectedIds, "approved")
       if (!result.success) { toast.error(result.error || "Approve failed"); return }
-      const approved = result.data?.approved ?? 0
-      const heldBack = result.data?.heldBack ?? 0
-      if (approved > 0 && heldBack === 0) toast.success(`Approved ${approved}`)
-      else if (approved > 0) toast.warning(`Approved ${approved} — ${heldBack} held back (missing required fields or document type)`)
-      else toast.warning(`Nothing approved — ${heldBack} still missing required fields or a document type.`)
+      const approvedIds = result.data?.approvedIds ?? []
+      const heldBackIds = selectedIds.filter((id) => !approvedIds.includes(id))
+      setNeedsAttention((prev) => {
+        const next = new Set(prev)
+        for (const id of heldBackIds) next.add(id)
+        for (const id of approvedIds) next.delete(id)
+        return next
+      })
+      setApproveReceipt({ approved: approvedIds.map(toRecord), heldBack: heldBackIds.map(toRecord) })
       clearSelection()
       router.refresh()
     } catch {
@@ -111,7 +128,7 @@ export function ReceiptTable({ workspaceId, basePath, receipts, minConfidencePer
     <OverrideModeBar active={overrideMode.active} onToggle={overrideMode.toggle} />
 
     {selectedIds.length > 0 && <ListScreenBulkActionBar selectedCount={selectedIds.length}>
-      <Button type="button" size="sm" disabled={dis} onClick={() => void approve()}>
+      <Button type="button" size="sm" disabled={dis} onClick={() => setConfirmingApprove(true)}>
         {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}Approve
       </Button>
       <Button type="button" size="sm" variant="outline" disabled={dis} onClick={() => void exportCsv()}>
@@ -151,7 +168,8 @@ export function ReceiptTable({ workspaceId, basePath, receipts, minConfidencePer
                 expanded={expandedId === receipt.documentId}
                 onToggle={() => toggle(receipt.documentId)}
                 onToggleExpand={() => setExpandedId((current) => (current === receipt.documentId ? null : receipt.documentId))}
-                loadDetail={loadDetail} minConfidencePercent={minConfidencePercent} />
+                loadDetail={loadDetail} minConfidencePercent={minConfidencePercent}
+                needsAttention={needsAttention.has(receipt.documentId)} />
             ))}
           </tbody>
         </table>
@@ -167,13 +185,30 @@ export function ReceiptTable({ workspaceId, basePath, receipts, minConfidencePer
       confirmLabel={busy ? "Deleting…" : "Delete"}
       onConfirm={() => void remove()}
       onCancel={() => setConfirmingDelete(false)} />
+
+    {/* #204: pre-action eligibility strip + recap, per #185. Receipts have no payment run. */}
+    <ConfirmDialog
+      open={confirmingApprove}
+      busy={busy}
+      title={`Approve ${selectedIds.length} receipt${selectedIds.length === 1 ? "" : "s"}?`}
+      confirmLabel={busy ? "Approving…" : `Approve Receipts (${eligibleForApproval.length})`}
+      onConfirm={() => void runApprove()}
+      onCancel={() => setConfirmingApprove(false)}>
+      <div className="space-y-2">
+        <EligibilityStrip eligible={eligibleForApproval.length} total={selectedIds.length} />
+        <ItemizedRecapTable records={selectedIds.map(toRecord)} />
+      </div>
+    </ConfirmDialog>
+
+    <BulkApproveReceiptModal open={approveReceipt !== null} onClose={() => setApproveReceipt(null)}
+      approved={approveReceipt?.approved ?? []} heldBack={approveReceipt?.heldBack ?? []} />
   </>
 }
 
 /** Row height matches the 62px figure measured live from the Vic.ai tour and recorded on #182.
  * #215: the merchant link toggles the inline detail panel instead of navigating; a modified click
  * (ctrl/cmd/middle-click) still follows the href to the standalone route. */
-function ReceiptTableRow({ basePath, receipt, selected, expanded, onToggle, onToggleExpand, loadDetail, minConfidencePercent }: {
+function ReceiptTableRow({ basePath, receipt, selected, expanded, onToggle, onToggleExpand, loadDetail, minConfidencePercent, needsAttention }: {
   basePath: string
   receipt: ReceiptRow
   selected: boolean
@@ -182,6 +217,7 @@ function ReceiptTableRow({ basePath, receipt, selected, expanded, onToggle, onTo
   onToggleExpand: () => void
   loadDetail: (documentId: string) => Promise<ReactNode>
   minConfidencePercent: number
+  needsAttention: boolean
 }) {
   return (
     <>
@@ -219,6 +255,11 @@ function ReceiptTableRow({ basePath, receipt, selected, expanded, onToggle, onTo
             {receipt.blockedByCheck && (
               <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800" title={receipt.openCheckCodes.join(", ")}>
                 blocked ({receipt.openCheckCodes.length})
+              </span>
+            )}
+            {needsAttention && (
+              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800" title="Held back from a recent bulk Approve — missing required fields or a document type.">
+                Needs attention
               </span>
             )}
           </div>
