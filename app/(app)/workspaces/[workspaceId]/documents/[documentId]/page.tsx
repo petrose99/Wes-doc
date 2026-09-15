@@ -163,11 +163,15 @@ export async function DocumentDetailPage({ params, searchParams, embedded = fals
   const stageQuery = stage ? `?stage=${stage}` : ""
   const prevHref = stage && neighborIndex > 0 ? `/workspaces/${workspaceId}/documents/${neighbors[neighborIndex - 1].id}${stageQuery}` : null
   const nextHref = stage && neighborIndex >= 0 && neighborIndex < neighbors.length - 1 ? `/workspaces/${workspaceId}/documents/${neighbors[neighborIndex + 1].id}${stageQuery}` : null
+  // #249: `/pipeline` has had no nav entry since #238 — falling back to it here and on the Back
+  // link below stranded the reader on an orphaned surface. The typed destination (#178's own
+  // redirect target below) is where every document actually lives now.
+  const typedDestinationHref = documentDestinationPath(`/workspaces/${workspaceId}`, document)
   // Where a stage-changing action (Archive / Move to Ready) sends the reader next: the following
   // document in the same filtered queue if there is one, otherwise back to the list — mirroring
   // the "advance to the next item" behavior of a review queue, rather than stranding them on a
   // document that no longer belongs on the tab they were just working through.
-  const afterActionHref = nextHref ?? (stage ? `/workspaces/${workspaceId}/pipeline?stage=${stage}` : `/workspaces/${workspaceId}/pipeline`)
+  const afterActionHref = nextHref ?? typedDestinationHref
   const position = stage && neighborIndex >= 0 ? { index: neighborIndex + 1, total: neighbors.length } : null
 
   // Five-step lifecycle indicator. Derived server-side so the client SplitPane doesn't have to
@@ -254,6 +258,7 @@ export async function DocumentDetailPage({ params, searchParams, embedded = fals
     position={position}
     stage={stage}
     afterActionHref={afterActionHref}
+    backHref={typedDestinationHref}
     header={{
       filename: document.filename, documentId: document.id, fileId: document.fileId, status: document.status,
       flagged: document.flaggedAt !== null,

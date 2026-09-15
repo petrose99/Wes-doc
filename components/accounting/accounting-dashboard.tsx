@@ -15,7 +15,9 @@ import {
   pushDocumentToAccountingAction,
 } from "@/app/(app)/workspaces/[workspaceId]/integration-push-actions"
 import type { ReadyToPushDocument } from "@/models/documents"
+import { documentDestinationPath } from "@/lib/typed-destinations"
 import { ArrowUpRight, CheckCircle2, CircleDot, FileText, Loader2, RefreshCw, ShieldAlert, Wallet } from "lucide-react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState, useTransition } from "react"
 import { toast } from "sonner"
@@ -223,10 +225,14 @@ function formatAmount(total: number, currencyCode: string | null): string {
  * per-row Push button, plus a header Push all that runs the same push server-side for the whole
  * set. Only rendered once the connection is itself pushable (active + default account chosen) —
  * the caller (AccountingDashboard) gates on that the same way PushToAccountingCard does per document. */
-function ReadyToPushList({ workspaceId, connectionId, documents, defaultAccountId, defaultAccountName, categoryAccountMap, onChanged }: {
+function ReadyToPushList({ workspaceId, connectionId, documents, notPushableCount, defaultAccountId, defaultAccountName, categoryAccountMap, onChanged }: {
   workspaceId: string
   connectionId: string
   documents: ReadyToPushDocument[]
+  /** #249: approved documents `listReadyToPushDocuments` held back for having no usable total —
+   * previously dropped with no trace, so this list could read fewer rows than the pipeline's own
+   * "Approved" count with no explanation. */
+  notPushableCount: number
   defaultAccountId: string
   defaultAccountName: string | null
   categoryAccountMap: Record<string, string>
@@ -312,7 +318,7 @@ function ReadyToPushList({ workspaceId, connectionId, documents, defaultAccountI
     else pushAll()
   }
 
-  if (!documents.length) return null
+  if (!documents.length && !notPushableCount) return null
 
   const accountLabel = (accountId: string) => {
     if (accounts) return accounts.find((a) => a.id === accountId)?.name ?? accountId
@@ -327,10 +333,10 @@ function ReadyToPushList({ workspaceId, connectionId, documents, defaultAccountI
           <CardTitle>Ready to push</CardTitle>
           <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-emerald-100 px-1.5 text-xs font-bold text-emerald-700">{documents.length}</span>
         </div>
-        <Button type="button" size="sm" disabled={pending} onClick={() => setConfirmation({ kind: "all" })} className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700">
+        {documents.length > 0 && <Button type="button" size="sm" disabled={pending} onClick={() => setConfirmation({ kind: "all" })} className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700">
           <ArrowUpRight className="h-3.5 w-3.5" />
           {pending && !pushingId ? "Pushing…" : "Push all"}
-        </Button>
+        </Button>}
       </CardHeader>
       <CardContent className="p-0">
         {feedback && (
@@ -338,7 +344,12 @@ function ReadyToPushList({ workspaceId, connectionId, documents, defaultAccountI
             {feedback.message}
           </p>
         )}
-        <div className="overflow-x-auto">
+        {notPushableCount > 0 && (
+          <p className="border-b border-amber-100 bg-amber-50 px-5 py-2.5 text-xs text-amber-800">
+            {notPushableCount} more approved document{notPushableCount === 1 ? "" : "s"} {notPushableCount === 1 ? "has" : "have"} no usable total, so {notPushableCount === 1 ? "it isn't" : "they aren't"} shown here — fix the amount on the document, then it will appear.
+          </p>
+        )}
+        {documents.length === 0 ? null : <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50/50 text-left text-[11px] uppercase tracking-wider text-slate-400">
@@ -354,7 +365,11 @@ function ReadyToPushList({ workspaceId, connectionId, documents, defaultAccountI
                 <tr key={doc.id} className="border-b border-slate-100 transition-colors last:border-0 hover:bg-slate-50/50">
                   <td className="px-5 py-3">
                     <p className="font-medium text-slate-800">{doc.vendorName}</p>
-                    <p className="text-xs text-slate-400">{doc.filename}</p>
+                    {/* #249: a failed push's reason had nowhere to send the reader to actually fix
+                     * it — link the filename to the document's typed destination. */}
+                    <Link href={documentDestinationPath(`/workspaces/${workspaceId}`, { id: doc.id, docType: doc.docType })} className="text-xs text-slate-400 underline-offset-2 hover:text-emerald-700 hover:underline">
+                      {doc.filename}
+                    </Link>
                     {batchResults[doc.id] && <p className={`mt-1 text-xs font-medium ${batchResults[doc.id].status === "failed" ? "text-red-600" : "text-emerald-600"}`}>
                       {batchResults[doc.id].status === "failed" ? `Failed${batchResults[doc.id].error ? `: ${batchResults[doc.id].error}` : " — retry this item"}` : batchResults[doc.id].status === "queued" ? "Queued" : "Pushed"}
                     </p>}
@@ -401,13 +416,13 @@ function ReadyToPushList({ workspaceId, connectionId, documents, defaultAccountI
               ))}
             </tbody>
           </table>
-        </div>
+        </div>}
       </CardContent>
       <ConfirmDialog
         open={confirmation !== null}
         busy={pending}
         title={confirmation?.kind === "all" ? `Push ${documents.length} documents to Finance?` : `Push ${confirmation?.document.filename ?? "this document"} to Finance?`}
-        description="This creates or updates an external ledger record. Existing successful pushes are skipped; retry only reprocesses failed items."
+        description="This creates or updates a record in the built-in ledger. Existing successful pushes are skipped; retry only reprocesses failed items."
         confirmLabel={pending ? "Pushing…" : confirmation?.kind === "all" ? "Push documents" : "Push document"}
         onConfirm={confirmPush}
         onCancel={() => setConfirmation(null)}
@@ -428,7 +443,7 @@ function ReadyToPushList({ workspaceId, connectionId, documents, defaultAccountI
   )
 }
 
-export function AccountingDashboard({ workspaceId, isOwner, apiBase: _apiBase, connection, job, lastSyncedAt, entityCounts, readyToPush, categoryAccountMap }: {
+export function AccountingDashboard({ workspaceId, isOwner, apiBase: _apiBase, connection, job, lastSyncedAt, entityCounts, readyToPush, notPushableCount, categoryAccountMap }: {
   workspaceId: string
   isOwner: boolean
   apiBase: string
@@ -437,6 +452,7 @@ export function AccountingDashboard({ workspaceId, isOwner, apiBase: _apiBase, c
   lastSyncedAt: Date | null
   entityCounts: { accounts: number; vendors: number }
   readyToPush: ReadyToPushDocument[]
+  notPushableCount: number
   categoryAccountMap: Record<string, string>
 }) {
   const router = useRouter()
@@ -448,7 +464,7 @@ export function AccountingDashboard({ workspaceId, isOwner, apiBase: _apiBase, c
     <div className="space-y-6">
       <ConnectionCard workspaceId={workspaceId} isOwner={isOwner} connection={connection} job={job} lastSyncedAt={lastSyncedAt} entityCounts={entityCounts} onChanged={onChanged} />
       {pushable && connection && connection.defaultExpenseAccountId && (
-        <ReadyToPushList workspaceId={workspaceId} connectionId={connection.id} documents={readyToPush} defaultAccountId={connection.defaultExpenseAccountId} defaultAccountName={connection.defaultExpenseAccountName ?? null} categoryAccountMap={categoryAccountMap} onChanged={onChanged} />
+        <ReadyToPushList workspaceId={workspaceId} connectionId={connection.id} documents={readyToPush} notPushableCount={notPushableCount} defaultAccountId={connection.defaultExpenseAccountId} defaultAccountName={connection.defaultExpenseAccountName ?? null} categoryAccountMap={categoryAccountMap} onChanged={onChanged} />
       )}
     </div>
   )

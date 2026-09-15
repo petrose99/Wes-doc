@@ -32,7 +32,7 @@ function DocIcon({ templateCode }: { templateCode: string | null }) {
 }
 
 function TemplateBadge({ name }: { name: string }) {
-  return <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-medium text-indigo-600">{name}</span>
+  return <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-600">{name}</span>
 }
 
 function formatDate(date: Date): string {
@@ -54,19 +54,19 @@ export function LibraryDocumentGrid({ documents, basePath }: { documents: Librar
               <p className="truncate text-sm font-semibold text-slate-800 group-hover:text-emerald-700">
                 {doc.review.supplier ?? "Unknown supplier"}
               </p>
-              <p className="truncate text-xs text-slate-400">{doc.filename}</p>
+              <p className="truncate text-xs text-slate-500">{doc.filename}</p>
             </div>
             {doc.flaggedAt && <Flag className="h-3.5 w-3.5 shrink-0 text-amber-400" />}
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
             {doc.template && <TemplateBadge name={doc.template.name} />}
-            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">{doc.review.category}</span>
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">{doc.review.category}</span>
           </div>
-          <div className="mt-auto flex items-center justify-between text-xs text-slate-400">
+          <div className="mt-auto flex items-center justify-between text-xs text-slate-500">
             <span>{formatDate(doc.receivedAt)}</span>
             <div className="flex items-center gap-1.5">
               {doc.review.converted && <span className="text-[11px] text-slate-500">{doc.review.converted}</span>}
-              {doc.review.fxPending && <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-800"><AlertTriangle className="h-2.5 w-2.5" />FX pending</span>}
+              {doc.review.fxPending && <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-800"><AlertTriangle className="h-2.5 w-2.5" />FX pending</span>}
               {doc.review.total && <span className="font-semibold text-slate-700">{doc.review.total}</span>}
             </div>
           </div>
@@ -94,13 +94,13 @@ export function LibraryDocumentList({ documents, basePath }: { documents: Librar
               {doc.template && <TemplateBadge name={doc.template.name} />}
               {doc.flaggedAt && <Flag className="h-3 w-3 text-amber-400" />}
             </div>
-            <div className="flex items-center gap-2 text-xs text-slate-400">
+            <div className="flex items-center gap-2 text-xs text-slate-500">
               <span className="truncate">{doc.filename}</span>
               <span>·</span>
               <span>{doc.review.category}</span>
               {doc.review.total && <><span>·</span><span className="font-medium text-slate-600">{doc.review.total}</span></>}
               {doc.review.converted && <><span>·</span><span className="text-slate-500">{doc.review.converted}</span></>}
-              {doc.review.fxPending && <><span>·</span><span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-800"><AlertTriangle className="h-2.5 w-2.5" />FX pending</span></>}
+              {doc.review.fxPending && <><span>·</span><span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-800"><AlertTriangle className="h-2.5 w-2.5" />FX pending</span></>}
               <span>·</span>
               <span>{formatDate(doc.receivedAt)}</span>
             </div>
@@ -121,7 +121,7 @@ export function LibrarySearchResults({ documents, snippets, query, degraded, bas
 }) {
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-2 text-xs text-slate-400">
+      <div className="flex items-center gap-2 text-xs text-slate-500">
         <span className="font-medium">Top {documents.length} matches</span>
         {degraded && (
           <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-amber-700">
@@ -148,14 +148,14 @@ export function LibrarySearchResults({ documents, snippets, query, degraded, bas
                   </span>
                   {doc.template && <TemplateBadge name={doc.template.name} />}
                   {snippet?.page != null && (
-                    <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-400">p.{snippet.page}</span>
+                    <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-600">p.{snippet.page}</span>
                   )}
                 </div>
-                <div className="flex items-center gap-2 text-xs text-slate-400">
+                <div className="flex items-center gap-2 text-xs text-slate-500">
                   <span>{doc.review.category}</span>
                   {doc.review.total && <><span>·</span><span className="font-medium text-slate-600">{doc.review.total}</span></>}
                   {doc.review.converted && <><span>·</span><span className="text-slate-500">{doc.review.converted}</span></>}
-                  {doc.review.fxPending && <><span>·</span><span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-800"><AlertTriangle className="h-2.5 w-2.5" />FX pending</span></>}
+                  {doc.review.fxPending && <><span>·</span><span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-800"><AlertTriangle className="h-2.5 w-2.5" />FX pending</span></>}
                   <span>·</span>
                   <span>{formatDate(doc.receivedAt)}</span>
                 </div>

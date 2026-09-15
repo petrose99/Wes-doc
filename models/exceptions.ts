@@ -25,6 +25,12 @@ export type ExceptionRow = {
   assigneeId: string | null
   assigneeName: string | null
   escalatedAt: Date
+  /** #249: an escalated invoice carried no invoice number or due state at all, unlike every other
+   * typed queue. Extracted-only (no supplier payment-terms fallback, unlike `models/bills.ts` —
+   * this row doesn't join Supplier), so null on a doc type with no `invoice_number`/`due_date`
+   * field, or when the extraction simply didn't find one. */
+  invoiceNumber: string | null
+  dueDate: Date | null
 }
 
 function asString(value: unknown): string | null {
@@ -32,6 +38,11 @@ function asString(value: unknown): string | null {
 }
 function asNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null
+}
+function asDate(value: unknown): Date | null {
+  if (typeof value !== "string") return null
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? null : parsed
 }
 
 function docTypeLabel(docType: string | null): string {
@@ -70,6 +81,8 @@ export async function listOpenExceptions(workspaceId: string): Promise<Exception
       assigneeId: row.escalationAssignee?.id ?? null,
       assigneeName: row.escalationAssignee?.name || row.escalationAssignee?.email || null,
       escalatedAt: row.updatedAt,
+      invoiceNumber: asString(values["invoice_number"]),
+      dueDate: asDate(values["due_date"]),
     }
   })
 }
@@ -79,4 +92,25 @@ export async function countOpenExceptions(workspaceId: string): Promise<number> 
   return prisma.documentCheckResult.count({
     where: { workspaceId, status: "escalated", OR: [{ escalationStatus: null }, { escalationStatus: { in: ["open", "in_review"] } }] },
   })
+}
+
+export type DocumentEscalation = { id: string; checkCode: string; message: string; escalationStatus: ExceptionStatus; escalatedAt: Date }
+
+/** #249: the Detail pane's Checks tab (`ChecksTab`) only ever read `Gate` rows, so a document
+ * whose only open issue is an escalated check (#210's Exceptions mechanism, which deliberately
+ * does not reuse `Gate` — see #210's resolution) rendered "No open checks" even while it sat on
+ * the Exceptions queue. Same open/in_review set as `listOpenExceptions`, scoped to one document. */
+export async function listOpenEscalationsForDocument(workspaceId: string, documentId: string): Promise<DocumentEscalation[]> {
+  const rows = await prisma.documentCheckResult.findMany({
+    where: { workspaceId, documentId, status: "escalated", OR: [{ escalationStatus: null }, { escalationStatus: { in: ["open", "in_review"] } }] },
+    select: { id: true, checkCode: true, message: true, escalationStatus: true, updatedAt: true },
+    orderBy: { updatedAt: "desc" },
+  })
+  return rows.map((row) => ({
+    id: row.id,
+    checkCode: row.checkCode,
+    message: row.message,
+    escalationStatus: (row.escalationStatus as ExceptionStatus | null) ?? "open",
+    escalatedAt: row.updatedAt,
+  }))
 }

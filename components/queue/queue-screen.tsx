@@ -134,6 +134,22 @@ function QueueScreenInner<T>({
   // on nothing. Derived, not synced: `openRow` is already null in that case, and the URL is
   // corrected the next time the operator opens or closes a row.
 
+  // #249: the row *behind an already-open pane* leaving the filtered set — typically the row's
+  // own Approve/Resolve action moving it out of the view it was opened from — is a different case
+  // from the deep-link one above and needs its own cleanup: `close()` so the URL and column
+  // widths reset, plus a toast, since the pane otherwise just vanishes with no explanation beyond
+  // whatever toast the action itself already fired. Skipped on first render (`prevIds` still
+  // null) so a stale deep link stays silent, per the comment above.
+  const prevIdsRef = useRef<string[] | null>(null)
+  useEffect(() => {
+    const prevIds = prevIdsRef.current
+    if (prevIds && openId && prevIds.includes(openId) && !ids.includes(openId)) {
+      toast.info("Closed — this row no longer matches the current view.")
+      close()
+    }
+    prevIdsRef.current = ids
+  }, [ids, openId, close])
+
   // ↑/↓ move the selection and Escape closes, from anywhere on the screen except inside a field
   // the operator is typing in.
   useEffect(() => {

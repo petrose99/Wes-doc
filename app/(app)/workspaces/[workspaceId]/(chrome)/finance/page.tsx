@@ -33,9 +33,10 @@ export default async function FinancePage({ params, searchParams }: { params: Pr
   // Same "pushable" gate PushToAccountingCard uses on a single document: an active connection with
   // a default expense account chosen. No point loading the ready list otherwise — nothing could push.
   const pushable = connection?.status === "active" && !!connection.defaultExpenseAccountId
-  const [readyToPush, inferredMap, explicitMappings] = pushable
+  const [readyResult, inferredMap, explicitMappings] = pushable
     ? await Promise.all([listReadyToPushDocuments(workspaceId, connection.id), getCategoryAccountMap(workspaceId, connection.id), listCategoryAccountMappings(connection.id)])
-    : [[], {}, []]
+    : [{ documents: [], droppedCount: 0 }, {}, []]
+  const { documents: readyToPush, droppedCount: notPushableCount } = readyResult
   const categoryAccountMap = { ...inferredMap }
   for (const m of explicitMappings) { categoryAccountMap[m.category] = m.accountExternalId }
 
@@ -68,6 +69,7 @@ export default async function FinancePage({ params, searchParams }: { params: Pr
       lastSyncedAt={lastSyncedAt}
       entityCounts={entityCounts}
       readyToPush={readyToPush}
+      notPushableCount={notPushableCount}
       categoryAccountMap={categoryAccountMap}
     />
   </main>

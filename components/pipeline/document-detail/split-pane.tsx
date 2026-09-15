@@ -42,7 +42,7 @@ const DOC_TYPE_LABELS: Record<"expense" | "sale" | "bank_statement" | "other", s
 
 export function SplitPane({
   workspaceId, source, fields, data, fieldConfidence, provenanceFields, provenanceItems, initialTarget, conflictingLabels, missingRequiredFields,
-  saveReview, documentType: initialDocumentType, note: initialNote, auditEvents, prevHref, nextHref, position, stage, afterActionHref,
+  saveReview, documentType: initialDocumentType, note: initialNote, auditEvents, prevHref, nextHref, position, stage, afterActionHref, backHref,
   header, canPush, pushCard, canCreateRule, defaultSupplier, matchKind, bankMatches, documentMatches, paymentStatus, rationales, checks, fxBadge, stageIndicator,
   institutions, institutionId, institutionName, embedded = false, history, initialTab,
 }: {
@@ -65,6 +65,9 @@ export function SplitPane({
   position: { index: number; total: number } | null
   stage: PipelineStage | "archive" | null
   afterActionHref: string
+  /** #249: where "Back" (standalone/`!embedded` mode only) returns to — this document's typed
+   * destination (`documentDestinationPath`), not the nav-less `/pipeline` route. */
+  backHref: string
   header: { filename: string; documentId: string; fileId: string; status: string; flagged: boolean; reviewLink: { href: string; label: string } | null }
   canPush: boolean
   pushCard: ReactNode
@@ -229,7 +232,7 @@ export function SplitPane({
     <div className={`flex items-center gap-2 border-b border-slate-200 px-4 py-2 ${embedded ? "overflow-x-auto sm:flex-wrap" : "flex-wrap"}`}>
       {embedded && <span className="min-w-0 flex-1 sm:hidden" aria-hidden />}
       {!embedded && <>
-        <Link href={stage ? `/workspaces/${workspaceId}/pipeline?stage=${stage}` : `/workspaces/${workspaceId}/pipeline`} className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-800">
+        <Link href={backHref} className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-800">
           <ArrowLeft className="h-4 w-4" />Back
         </Link>
         <div className="mx-2 h-5 w-px bg-slate-200" />
@@ -436,7 +439,7 @@ export function SplitPane({
           </div>}
 
           {tab === "checks" && history && <div className={`mx-auto p-6 ${layout === "details-only" ? "max-w-2xl" : ""}`}>
-            <ChecksTab workspaceId={workspaceId} gates={history.gates} />
+            <ChecksTab workspaceId={workspaceId} gates={history.gates} escalations={history.escalations} />
           </div>}
         </div>
       </div>}

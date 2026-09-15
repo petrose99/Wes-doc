@@ -57,8 +57,11 @@ export async function InvoicesQueuePage({ params, searchParams, selectedDocument
     ...(approvalFilter ? { approval: approvalFilter } : {}), ...(agingFilter.size ? { aging: [...agingFilter].join(",") } : {}),
   }
   // Only bills with a total AND an unblocked status are candidates for a payment run. #220: a
-  // cancelled invoice is excluded too. "synced" (pushed but unconfirmed) stays eligible.
-  const payableBills = bills.filter((b) => !b.blockedByCheck && !b.cancelledAt && b.total !== null && b.total > 0 && (!b.paymentStatus || !["paid", "reconciled"].includes(b.paymentStatus.toLowerCase())))
+  // cancelled invoice is excluded too. "synced" (pushed but unconfirmed) stays eligible. #249: an
+  // invoice must be Approved before it can be paid — the ledger push list (listReadyToPushDocuments)
+  // already gates on the equivalent "approved" pipeline stage; a payment run moves real money, so it
+  // can't be looser than a bookkeeping sync.
+  const payableBills = bills.filter((b) => !b.blockedByCheck && !b.cancelledAt && b.approvalStatus === "approved" && b.total !== null && b.total > 0 && (!b.paymentStatus || !["paid", "reconciled"].includes(b.paymentStatus.toLowerCase())))
   const payableDocumentIds = isOwner ? payableBills.map((bill) => bill.documentId) : []
   const trend = touchlessTrend.trend ? `${touchlessTrend.trend.deltaPercentagePoints > 0 ? "+" : ""}${touchlessTrend.trend.deltaPercentagePoints}pt` : null
 

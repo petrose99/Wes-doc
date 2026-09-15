@@ -22,6 +22,7 @@ import { listDocumentAuditEvents, listDocumentStageDecisions } from "@/models/au
 import { getActiveWorkflowStageState } from "@/models/review-tasks"
 import { overrideGate } from "@/lib/gates/actions"
 import { listOpenGatesForDocument, overrideEligibility } from "@/lib/gates/list"
+import { listOpenEscalationsForDocument } from "@/models/exceptions"
 import { addDomainPackToFile, createFile, createFolder, deleteFileIfEmpty, deleteFiles, deleteFolder, duplicateFile, getFileTemplates, getWorkspaceFile, listFileShares, moveToFolder, removeFileShare, renameFile, renameFolder, setLinkAccess, touchFile, upsertFileShare } from "@/models/files"
 import { getCurrentUser } from "@/lib/auth"
 import { prisma } from "@/lib/db"
@@ -224,11 +225,12 @@ export async function reclassifyDocumentAction(workspaceId: string, documentId: 
 export async function getSelectionAuditPanelDataAction(workspaceId: string, documentId: string) {
   const user = await getCurrentUser()
   if (!(await requireMember(workspaceId, user.id))) return null
-  const [auditEvents, stageDecisions, gates, stageState] = await Promise.all([
+  const [auditEvents, stageDecisions, gates, stageState, escalations] = await Promise.all([
     listDocumentAuditEvents(workspaceId, documentId),
     listDocumentStageDecisions(workspaceId, documentId),
     listOpenGatesForDocument(workspaceId, documentId),
     getActiveWorkflowStageState(workspaceId, documentId),
+    listOpenEscalationsForDocument(workspaceId, documentId),
   ])
   // #218: a stage only reads as "Pending" while its task is still open/in_review (stageState is
   // null once resolved or workflow-less) and it hasn't already produced a review_task_stage_decided
@@ -253,6 +255,13 @@ export async function getSelectionAuditPanelDataAction(workspaceId: string, docu
         refusalReason: eligibility.overridable ? null : eligibility.reason,
       }
     }),
+    escalations: escalations.map((escalation) => ({
+      id: escalation.id,
+      checkCode: escalation.checkCode,
+      message: escalation.message,
+      escalationStatus: escalation.escalationStatus,
+      escalatedAt: escalation.escalatedAt.toISOString(),
+    })),
   }
 }
 

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 vi.mock("@/lib/db", () => ({ prisma: {} }))
 
-const { listOpenExceptions, countOpenExceptions } = await import("@/models/exceptions")
+const { listOpenExceptions, countOpenExceptions, listOpenEscalationsForDocument } = await import("@/models/exceptions")
 const { prisma } = await import("@/lib/db")
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -50,6 +50,34 @@ describe("listOpenExceptions", () => {
     expect(rows[0]).toMatchObject({ escalationStatus: "in_review", assigneeId: "u1", assigneeName: "Alex Reviewer" })
   })
 
+  // #249: an escalated invoice carried no invoice number or due state at all, unlike every other
+  // typed queue's row.
+  it("projects invoice_number and due_date off reviewedData", async () => {
+    db.documentCheckResult.findMany.mockResolvedValue([
+      {
+        id: "c4", documentId: "d4", checkCode: "invoice_arithmetic", message: "Totals do not add up",
+        escalationStatus: "open", updatedAt: new Date(), escalationAssignee: null,
+        document: { filename: "acme.pdf", docType: "invoice", reviewedData: { vendor: "Acme Ltd", total: 250, invoice_number: "INV-42", due_date: "2026-09-30" } },
+      },
+    ])
+    const rows = await listOpenExceptions("w1")
+    expect(rows[0].invoiceNumber).toBe("INV-42")
+    expect(rows[0].dueDate).toEqual(new Date("2026-09-30"))
+  })
+
+  it("leaves invoiceNumber/dueDate null on a doc type with no such fields (e.g. a bank statement)", async () => {
+    db.documentCheckResult.findMany.mockResolvedValue([
+      {
+        id: "c5", documentId: "d5", checkCode: "statement_balance", message: "Balance mismatch",
+        escalationStatus: "open", updatedAt: new Date(), escalationAssignee: null,
+        document: { filename: "statement.pdf", docType: "bank_statement", reviewedData: { closing_balance: 500 } },
+      },
+    ])
+    const rows = await listOpenExceptions("w1")
+    expect(rows[0].invoiceNumber).toBeNull()
+    expect(rows[0].dueDate).toBeNull()
+  })
+
   it("falls back to the filename when no vendor/merchant/supplier field is present", async () => {
     db.documentCheckResult.findMany.mockResolvedValue([
       {
@@ -71,5 +99,24 @@ describe("countOpenExceptions", () => {
     expect(db.documentCheckResult.count).toHaveBeenCalledWith({
       where: { workspaceId: "w1", status: "escalated", OR: [{ escalationStatus: null }, { escalationStatus: { in: ["open", "in_review"] } }] },
     })
+  })
+})
+
+// #249: the Detail pane's Checks tab only read `Gate` rows, so a document whose only open issue
+// was an escalated check rendered "No open checks" even while it sat on the Exceptions queue.
+describe("listOpenEscalationsForDocument", () => {
+  it("returns an empty list when the document has no open escalation", async () => {
+    expect(await listOpenEscalationsForDocument("w1", "d1")).toEqual([])
+  })
+
+  it("scopes the same open/in_review-or-unset predicate to one document", async () => {
+    db.documentCheckResult.findMany.mockResolvedValue([
+      { id: "c1", checkCode: "invoice_arithmetic", message: "Totals do not add up", escalationStatus: null, updatedAt: new Date("2026-09-15T00:00:00Z") },
+    ])
+    const rows = await listOpenEscalationsForDocument("w1", "d1")
+    expect(rows).toEqual([{ id: "c1", checkCode: "invoice_arithmetic", message: "Totals do not add up", escalationStatus: "open", escalatedAt: new Date("2026-09-15T00:00:00Z") }])
+    expect(db.documentCheckResult.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { workspaceId: "w1", documentId: "d1", status: "escalated", OR: [{ escalationStatus: null }, { escalationStatus: { in: ["open", "in_review"] } }] },
+    }))
   })
 })

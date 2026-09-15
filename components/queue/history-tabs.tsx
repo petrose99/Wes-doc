@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { ReasonDialogButton } from "@/components/list-screen/reason-dialog-button"
@@ -17,6 +18,10 @@ export type DocumentHistory = {
   /** `overridable`/`refusalReason` come from the server's own `overrideEligibility` — the client
    * never decides on its own that a check is a hard gate. */
   gates: Array<{ id: string; gateType: string; severity: "hard" | "soft"; firedAt: string; overridable: boolean; refusalReason: string | null }>
+  /** #249: escalated `DocumentCheckResult` rows still open on this document — #210's Exceptions
+   * mechanism, which is deliberately not a `Gate` (a document can carry more than one simultaneous
+   * escalation; `Gate` is unique per gateType). Resolved from the Exceptions queue, not here. */
+  escalations: Array<{ id: string; checkCode: string; message: string; escalationStatus: "open" | "in_review" | "resolved"; escalatedAt: string }>
 }
 
 /** #218: decided stages first (oldest first), then the not-yet-decided stages of the same active
@@ -81,13 +86,27 @@ function gateTypeLabel(gateType: string): string {
  * control regardless of severity — a hard gate's is always disabled with the server's own refusal
  * copy rather than omitted; a soft gate's is disabled only until Override Mode is on. The mode
  * itself is toggled from the queue header's overflow menu (#225 removed the permanent strip). */
-export function ChecksTab({ workspaceId, gates }: { workspaceId: string; gates: DocumentHistory["gates"] }) {
+export function ChecksTab({ workspaceId, gates, escalations }: { workspaceId: string; gates: DocumentHistory["gates"]; escalations: DocumentHistory["escalations"] }) {
   const router = useRouter()
   const overrideMode = useOverrideMode()
   const [overridden, setOverridden] = useState<Set<string>>(new Set())
   const open = gates.filter((gate) => !overridden.has(gate.id))
-  if (open.length === 0) return <p className="text-sm text-slate-500">No open checks on this document.</p>
+  if (open.length === 0 && escalations.length === 0) return <p className="text-sm text-slate-500">No open checks on this document.</p>
   return <ul className="space-y-2">
+    {escalations.map((escalation) => <li key={`escalation-${escalation.id}`} className="rounded-md border border-slate-200 px-3 py-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-medium text-slate-800">{escalation.checkCode.replaceAll("_", " ")}</span>
+        <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700">
+          {escalation.escalationStatus === "in_review" ? "In review" : "Escalated"}
+        </span>
+      </div>
+      <p className="mt-0.5 text-xs text-slate-500">{escalation.message}</p>
+      <div className="mt-1.5">
+        <Link href={`/workspaces/${workspaceId}/exceptions`} className="text-xs font-medium text-emerald-700 hover:text-emerald-800 hover:underline">
+          Resolve in Exceptions →
+        </Link>
+      </div>
+    </li>)}
     {open.map((gate) => {
       const label = gateTypeLabel(gate.gateType)
       const disabled = !gate.overridable || !overrideMode.active
