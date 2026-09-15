@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Operator working day</title>
+<style>
+  :root{
+    --bg:#f8fafc; --panel:#ffffff; --ink:#0f172a; --muted:#475569; --line:#cbd5e1;
+    --lane:#f1f5f9; --ok:#047857; --okbg:#ecfdf5; --seam:#b91c1c; --seambg:#fef2f2;
+    --fog:#6d28d9; --fogbg:#f5f3ff; --polish:#b45309; --polishbg:#fffbeb;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0b1220; --panel:#111a2e; --ink:#e2e8f0; --muted:#94a3b8; --line:#334155;
+      --lane:#0f172a; --ok:#6ee7b7; --okbg:#052e22; --seam:#fca5a5; --seambg:#3b0a0a;
+      --fog:#c4b5fd; --fogbg:#2e1065; --polish:#fcd34d; --polishbg:#3b2506;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0b1220; --panel:#111a2e; --ink:#e2e8f0; --muted:#94a3b8; --line:#334155;
+    --lane:#0f172a; --ok:#6ee7b7; --okbg:#052e22; --seam:#fca5a5; --seambg:#3b0a0a;
+    --fog:#c4b5fd; --fogbg:#2e1065; --polish:#fcd34d; --polishbg:#3b2506;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:24px 16px 48px}
+  header{max-width:1400px;margin:0 auto 16px}
+  h1{font-size:20px;margin:0 0 4px;letter-spacing:-0.01em}
+  header p{margin:0;color:var(--muted);max-width:70ch}
+  .legend{display:flex;flex-wrap:wrap;gap:8px 16px;margin:12px 0 0;font-size:12px;color:var(--muted)}
+  .legend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+  .legend .s::before{background:var(--seam)} .legend .p::before{background:var(--polish)} .legend .f::before{background:var(--fog)} .legend .o::before{background:var(--ok)}
+  .wrap{max-width:1400px;margin:0 auto;overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+  table{border-collapse:collapse;min-width:1180px;width:100%}
+  th,td{border:1px solid var(--line);vertical-align:top;padding:8px 10px;text-align:left}
+  thead th{position:sticky;top:0;background:var(--lane);font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);z-index:1}
+  thead th small{display:block;text-transform:none;letter-spacing:0;font-weight:400;color:var(--muted)}
+  tbody th{background:var(--lane);width:120px;font-size:13px}
+  tbody th small{display:block;font-weight:400;color:var(--muted);font-size:12px}
+  .step{font-weight:600;margin:0 0 4px}
+  .note{color:var(--muted);font-size:12.5px;margin:0 0 6px}
+  .tag{display:inline-block;font-size:11px;font-weight:600;padding:1px 6px;border-radius:999px;border:1px solid;margin:2px 4px 0 0;text-decoration:none}
+  .tag.s{color:var(--seam);background:var(--seambg);border-color:var(--seam)}
+  .tag.p{color:var(--polish);background:var(--polishbg);border-color:var(--polish)}
+  .tag.f{color:var(--fog);background:var(--fogbg);border-color:var(--fog)}
+  .tag.o{color:var(--ok);background:var(--okbg);border-color:var(--ok)}
+  td.dim{color:var(--muted);font-size:12.5px}
+  .arrow{color:var(--muted)}
+  footer{max-width:1400px;margin:12px auto 0;color:var(--muted);font-size:12px}
+  a{color:inherit}
+</style>
+</head>
+<body>
+<header>
+  <h1>The operator's working day</h1>
+  <p>DocuBite after #238, charted for ticket #239 on map #226. Lanes are people; columns are the stages of a recurring day. Read left to right. A red tag is a hand-off that fails today and has a decision ticket; an amber tag is a defect on the polish task; purple is fog on the map.</p>
+  <div class="legend"><span class="s">Seam, decision ticket</span><span class="p">Polish task #249</span><span class="f">Fog on the map</span><span class="o">Decided on #239</span></div>
+</header>
+<div class="wrap">
+<table>
+  <thead>
+    <tr>
+      <th>Lane</th>
+      <th>Before<small>intake</small></th>
+      <th>Open<small>workspace → Invoices</small></th>
+      <th>Work<small>the five queues</small></th>
+      <th>Blocked<small>a check fails</small></th>
+      <th>Approve<small>Ready to Approve</small></th>
+      <th>Ledger &amp; pay<small>Owner</small></th>
+      <th>Lookup<small>supplier calls</small></th>
+      <th>Done<small>for today</small></th>
+      <th>Month-end<small>Close</small></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>Reviewer<small>prepares rows</small></th>
+      <td>
+        <p class="step">Email forward · API · upload</p>
+        <p class="note">No queue, rail item or phone tab offers upload; inbound address only under Settings.</p>
+        <a class="tag s" href="https://github.com/petrose99/docubite/issues/243">#243 intake</a>
+        <a class="tag p" href="https://github.com/petrose99/docubite/issues/249">dead phone upload</a>
+      </td>
+      <td>
+        <p class="step">Lands on Invoices</p>
+        <p class="note">Badge counts review items, header counts filtered rows.</p>
+        <a class="tag s" href="https://github.com/petrose99/docubite/issues/233">#233 one vocabulary</a>
+        <a class="tag s" href="https://github.com/petrose99/docubite/issues/241">#241 first-run help</a>
+      </td>
+      <td>
+        <p class="step">Invoices → POs → Receipts → Bank Statements → Exceptions</p>
+        <p class="note">Row → Detail pane in place; ↑/↓/Esc; stay on the row after a decision. Rail links drop filters and sort.</p>
+        <a class="tag o" href="#">order, stay-on-row</a>
+        <a class="tag s" href="https://github.com/petrose99/docubite/issues/244">#244 way back</a>
+        <a class="tag p" href="https://github.com/petrose99/docubite/issues/249">vanishing pane</a>
+        <a class="tag s" href="https://github.com/petrose99/docubite/issues/247">#247 expense claim</a>
+      </td>
+      <td>
+        <p class="step">Checks tab owns resolution</p>
+        <p class="note">Exceptions lists the same rows; today its row carries no invoice number or amount and has no way back. Six status answers, two disagree.</p>
+        <a class="tag o" href="#">Checks tab owns it</a>
+        <a class="tag s" href="https://github.com/petrose99/docubite/issues/244">#244 way back</a>
+        <a class="tag p" href="https://github.com/petrose99/docubite/issues/249">Checks tab · row identity</a>
+      </td>
+      <td>
+        <p class="step">Start an Approval</p>
+        <p class="note">From the Invoices bulk bar (#227). Nothing tells the Approver.</p>
+        <span class="arrow">→ Approver lane</span>
+      </td>
+      <td class="dim">—</td>
+      <td>
+        <p class="step">Archive, a side path</p>
+        <p class="note">Second grammar; lists in-approval invoices; opening a card drops origin context.</p>
+        <a class="tag s" href="https://github.com/petrose99/docubite/issues/245">#245 Archive's fate</a>
+        <a class="tag s" href="https://github.com/petrose99/docubite/issues/244">#244 way back</a>
+        <a class="tag p" href="https://github.com/petrose99/docubite/issues/249">10px text · contrast</a>
+      </td>
+      <td>
+        <p class="step">Empty queue = done</p>
+        <p class="note">No summary surface; the empty state carries the day's outcome; badges at zero.</p>
+        <a class="tag o" href="#">decided</a>
+      </td>
+      <td class="dim">—</td>
+    </tr>
+    <tr>
+      <th>Approver<small>decides stages; phone lane</small></th>
+      <td class="dim">—</td>
+      <td>
+        <p class="step">Learns by habit</p>
+        <p class="note">Rail badge on Ready to Approve is the only signal; the phone has no rail.</p>
+        <a class="tag s" href="https://github.com/petrose99/docubite/issues/246">#246 notification</a>
+      </td>
+      <td class="dim">Read-only elsewhere on the phone.</td>
+      <td>
+        <p class="step">Not eligible stays visible</p>
+        <p class="note">Hard check failed or escalation open; reason on the row (#227).</p>
+      </td>
+      <td>
+        <p class="step">Approve · Reject · Send back</p>
+        <p class="note">Same pane, read-only fields, sticky footer; Server-confirmed, no optimistic removal. Phone: open → Ready to Approve → Approval Context → decide → back.</p>
+        <a class="tag o" href="#">phone = this lane only</a>
+        <a class="tag s" href="https://github.com/petrose99/docubite/issues/232">#232 phone screens</a>
+        <a class="tag s" href="https://github.com/petrose99/docubite/issues/236">#236 build</a>
+      </td>
+      <td class="dim">—</td>
+      <td class="dim">—</td>
+      <td class="dim">Ready to Approve empty.</td>
+      <td class="dim">—</td>
+    </tr>
+    <tr>
+      <th>Owner<small>ledger, payment, period</small></th>
+      <td class="dim">Sets the inbound address once.</td>
+      <td class="dim">—</td>
+      <td class="dim">—</td>
+      <td class="dim">—</td>
+      <td class="dim">Decides where no stage names anyone.</td>
+      <td>
+        <p class="step">Push to ledger · payment run</p>
+        <p class="note">Finance is off the daily route. Push lives twice, outcome not durable, failed row has no link; payment run has no approval gate and no home after download.</p>
+        <a class="tag o" href="#">Finance not daily</a>
+        <a class="tag s" href="https://github.com/petrose99/docubite/issues/248">#248 Finance's shape</a>
+        <a class="tag s" href="https://github.com/petrose99/docubite/issues/229">#229 Bill Pay</a>
+        <a class="tag p" href="https://github.com/petrose99/docubite/issues/249">approval gate · failed push</a>
+      </td>
+      <td class="dim">—</td>
+      <td class="dim">—</td>
+      <td>
+        <p class="step">Close</p>
+        <p class="note">Period lock, sign/override per item. Bank reconciliation is answered here and on Health Checks.</p>
+        <a class="tag s" href="https://github.com/petrose99/docubite/issues/231">#231 Admin</a>
+        <a class="tag f" href="#">Health vs Close</a>
+        <a class="tag f" href="#">multi-workspace day</a>
+      </td>
+    </tr>
+  </tbody>
+</table>
+</div>
+<footer>Evidence: critiques in <code>.impeccable/critique/2026-09-15T22-25-51Z__*</code> (Exceptions 24/40 · Finance 14/40 · Archive 17/40) and the Invoices baseline 25/40. Full map: <a href="./operator-working-day.md">operator-working-day.md</a>.</footer>
+</body>
+</html>
