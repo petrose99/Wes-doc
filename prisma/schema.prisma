@@ -73,6 +73,8 @@ model User {
   matchResolutions   DocumentMatch[]     @relation("MatchResolver")
   createdPaymentRuns PaymentRun[]        @relation("PaymentRunCreator")
   resolvedGates      Gate[]              @relation("GateResolver")
+  assignedExceptions DocumentCheckResult[] @relation("CheckResultEscalationAssignee")
+  resolvedExceptions DocumentCheckResult[] @relation("CheckResultEscalationResolver")
   createdWarnChecks  WarnCheck[]         @relation("WarnCheckAuthor")
   verifiedSuppliers  Supplier[]          @relation("SupplierVerifier")
   openedCloses      Close[]              @relation("CloseOpener")
@@ -1344,9 +1346,9 @@ model DocumentCheckResult {
   workspaceId String    @map("workspace_id") @db.Uuid
   documentId  String    @map("document_id") @db.Uuid
   /// invoice_arithmetic | statement_balance | duplicate | missing_statement_period |
-  /// tax_consistency | suspicious_resubmission | vat_number_format
+  /// tax_consistency | suspicious_resubmission | vat_number_format | statement_layout_drift
   checkCode   String    @map("check_code")
-  /// pass | warn | fail
+  /// pass | warn | fail | escalated
   status      String
   message     String
   detail      Json?
@@ -1355,8 +1357,27 @@ model DocumentCheckResult {
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   document    Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
+  /// #210 (Wayfinder map 177): the escalation lifecycle for a check a reviewer flagged as "the
+  /// document is wrong" (`status: "escalated"`), separate from `status` — `status` is the check's
+  /// own pass/warn/fail/escalated evaluation, these fields are the Exceptions queue's work state
+  /// on top of it. Deliberately not a Gate row: Gate is unique per (documentId, gateType), one row
+  /// per document per runner, which can't express "one row per escalated check" when a document
+  /// has several escalated checks at once. Null until a check is escalated.
+  /// open (unassigned) | in_review (picked up) | resolved
+  escalationStatus         String?   @map("escalation_status")
+  escalationAssigneeId     String?   @map("escalation_assignee_id") @db.Uuid
+  /// corrected | vendor_accepted | false_positive — set together with escalationResolvedAt/By.
+  escalationResolution     String?   @map("escalation_resolution")
+  escalationResolutionNote String?   @map("escalation_resolution_note")
+  escalationResolvedById   String?   @map("escalation_resolved_by_id") @db.Uuid
+  escalationResolvedAt     DateTime? @map("escalation_resolved_at")
+  escalationAssignee       User?     @relation("CheckResultEscalationAssignee", fields: [escalationAssigneeId], references: [id], onDelete: SetNull)
+  escalationResolvedBy     User?     @relation("CheckResultEscalationResolver", fields: [escalationResolvedById], references: [id], onDelete: SetNull)
+
   @@unique([documentId, checkCode])
   @@index([workspaceId, status])
+  /// The Exceptions queue's read: every open/in-review escalation in this workspace.
+  @@index([workspaceId, escalationStatus])
   @@map("document_check_results")
 }
 

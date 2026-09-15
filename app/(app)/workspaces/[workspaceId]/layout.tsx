@@ -7,6 +7,7 @@ import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { createClient } from "@/lib/supabase/server"
 import { countReviewedUnplaced } from "@/models/document-sheet-placements"
 import { countDocumentsByStage } from "@/models/documents"
+import { countOpenExceptions } from "@/models/exceptions"
 import { countOpenReviewTasks } from "@/models/review-tasks"
 import { getWorkspaceMembership, getWorkspacesForUser } from "@/models/workspaces"
 import { redirect } from "next/navigation"
@@ -43,7 +44,7 @@ export default async function WorkspaceLayout({ children, params }: { children: 
   // pipelineReviewCount feeds the sidebar's Pipeline nav badge — read on every navigation the same
   // way workspaces/capabilities already are, since it's cheap (one grouped count query) and the
   // badge needs to stay current without the reader having to visit Pipeline first.
-  const [workspaces, capabilities, pipelineCounts, sheetsUnplacedCount] = await Promise.all([
+  const [workspaces, capabilities, pipelineCounts, sheetsUnplacedCount, openExceptionsCount] = await Promise.all([
     getWorkspacesForUser(user.id),
     getWorkspaceCapabilities(workspaceId),
     countDocumentsByStage(workspaceId),
@@ -51,6 +52,8 @@ export default async function WorkspaceLayout({ children, params }: { children: 
     // you in Worksheets" signal, parallel to pipelineReviewCount for Documents. Cheap, one grouped
     // count query, fetched every navigation so the rail badge stays live.
     countReviewedUnplaced(workspaceId),
+    // #210: the Exceptions rail badge — same cheap-and-always-fresh treatment as the other counts.
+    countOpenExceptions(workspaceId),
   ])
 
   // The Review rail entry carries an open-task badge for the same reason Extraction does: the
@@ -74,7 +77,8 @@ export default async function WorkspaceLayout({ children, params }: { children: 
       /* pipelineCounts.approved is the Approved-stage count from countDocumentsByStage: documents
        * past review and waiting to push to the ledger. Only meaningful when accountingEnabled;
        * the sidebar itself hides the Finance badge otherwise. */
-      financePushableCount={pipelineCounts.approved} />
+      financePushableCount={pipelineCounts.approved}
+      openExceptionsCount={openExceptionsCount} />
     <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-[radial-gradient(1200px_480px_at_100%_-10%,rgba(4,120,87,0.05),transparent_60%),#fafbfc]">
       <MobileHeader workspaceId={workspaceId} workspaces={switchable} user={{ name: user.name, email: user.email }} />
       <div id="main" role="main" tabIndex={-1} className="flex min-h-0 flex-1 flex-col pb-[72px] md:pb-0">{children}</div>

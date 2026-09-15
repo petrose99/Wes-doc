@@ -7,7 +7,7 @@ import { BiteMark } from "@/components/marketing/logo"
 import { WorkspacePulse } from "@/components/shell/workspace-pulse"
 import { MODULES } from "@/lib/modules"
 import { TYPED_DESTINATIONS } from "@/lib/typed-destinations"
-import { BarChart3, CheckCircle2, ClipboardCheck, Files, HeartPulse, History, Landmark, Library, Mic, Percent, Receipt, Settings, Table2, Wallet, Workflow, Zap } from "lucide-react"
+import { AlertTriangle, BarChart3, CheckCircle2, ClipboardCheck, Files, HeartPulse, History, Landmark, Library, Mic, Percent, Receipt, Settings, Table2, Wallet, Workflow, Zap } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
@@ -41,7 +41,7 @@ const ICONS: Record<string, typeof Files> = {
  * <WorkspacePulse /> card — a mini-map of the workspace's living state, three rows mirroring the
  * three primaries with the same badges. The workspace stays visibly alive inside those surfaces
  * instead of vanishing behind the door of a full-screen room. */
-export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, accountingEnabled = false, pipelineReviewCount = 0, reviewTaskCount = 0, sheetsUnplacedCount = 0, financePushableCount = 0 }: {
+export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, accountingEnabled = false, pipelineReviewCount = 0, reviewTaskCount = 0, sheetsUnplacedCount = 0, financePushableCount = 0, openExceptionsCount = 0 }: {
   workspaceId: string
   workspaces: SwitchableWorkspace[]
   user: { name: string; email: string }
@@ -64,6 +64,8 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
   /** counts.approved from countDocumentsByStage — documents past review, waiting to push to the
    * ledger. Only meaningful when accountingEnabled is true. */
   financePushableCount?: number
+  /** #210: open+in_review escalated-check count — countOpenExceptions. */
+  openExceptionsCount?: number
 }) {
   void reviewTaskCount
   const pathname = usePathname()
@@ -88,9 +90,12 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
   const controlsItem = moduleWorkItems.find((item) => item.href === `${base}/automation`)
   const otherModuleItems = moduleWorkItems.filter((item) => item.href !== `${base}/review` && item.href !== `${base}/automation`)
 
-  // Primary spine, in workflow order: the four typed intake destinations, then Controls (their
-  // governing levers), Finance (booked outcome), Archive (the permanent record everything lands
-  // in), and Worksheets (compute over any of it) closing the group.
+  // Primary spine, in workflow order: the four typed intake destinations, then Exceptions
+  // (escalated work needing attention, per #210 — organize: same tier as the typed destinations
+  // by weight/badge treatment, not paired with any of them since it has no document-type sibling
+  // and cuts across all four), then Controls (their governing levers), Finance (booked outcome),
+  // Archive (the permanent record everything lands in), and Worksheets (compute over any of it)
+  // closing the group.
   const dashboardItem = { href: base, label: "Dashboard", icon: BarChart3, exact: true, badge: undefined as number | undefined }
   const typedDestinationGroups = [
     [
@@ -102,7 +107,9 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
       { href: `${base}/bank-statements`, label: "Bank Statements", icon: Landmark, exact: false },
     ],
   ]
+  const exceptionsItem = { href: `${base}/exceptions`, label: "Exceptions", icon: AlertTriangle, exact: false, badge: openExceptionsCount > 0 ? openExceptionsCount : undefined }
   const primaryItems = [
+    exceptionsItem,
     ...(controlsItem ? [controlsItem] : []),
     ...(accountingEnabled ? [{ href: `${base}/finance`, label: "Finance", icon: Landmark, exact: false, badge: financePushableCount > 0 ? financePushableCount : undefined }] : []),
     // "Archive" is the accountant's own word for the permanent source-document record (Dext and
@@ -125,7 +132,7 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
   // Sum across primary badges tells us whether the TODAY label is a promise or a reward. When the
   // total is zero every primary is quiet, and the "you're caught up" line reads under the group
   // instead of a promise the badges are supposed to keep.
-  const todayTotal = (pipelineReviewCount || 0) + (sheetsUnplacedCount || 0) + (accountingEnabled ? (financePushableCount || 0) : 0)
+  const todayTotal = (pipelineReviewCount || 0) + (sheetsUnplacedCount || 0) + (accountingEnabled ? (financePushableCount || 0) : 0) + (openExceptionsCount || 0)
 
   const isActive = (item: { href: string; label: string; exact: boolean }) => item.exact
     ? pathname === item.href
