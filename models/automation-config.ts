@@ -80,6 +80,16 @@ export async function getOrCreateAutomationConfig(workspaceId: string) {
   return prisma.workspaceAutomationConfig.create({ data: { workspaceId } })
 }
 
+/** #200: the Touchless pill's tooltip states the confidence floor plainly ("Sent automatically —
+ * all fields ≥ N%"). A read-only percent, not the create-on-miss getOrCreateAutomationConfig — a
+ * list-screen render should never have the side effect of writing a config row into existence.
+ * Falls back to the schema's own default (0.85) for a workspace with no config row yet, same
+ * number `WorkspaceAutomationConfig.minConfidence` defaults to. */
+export async function getMinConfidencePercent(workspaceId: string): Promise<number> {
+  const config = await prisma.workspaceAutomationConfig.findUnique({ where: { workspaceId }, select: { minConfidence: true } })
+  return Math.round((config?.minConfidence ?? 0.85) * 100)
+}
+
 /** Read the persisted autonomy level. Falls back to the legacy touchlessEnabled bool for
  * config rows written before autonomyLevel existed. */
 export function deriveAutonomyLevel(config: {

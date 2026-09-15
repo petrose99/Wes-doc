@@ -13,7 +13,7 @@ import { SelectionAuditPanel } from "@/components/list-screen/selection-audit-pa
 import { bulkExportDocumentsAction, deletePipelineDocumentsAction, moveDocumentsToStageAction } from "@/app/(app)/workspaces/[workspaceId]/pipeline-actions"
 import { getInlineDocumentDetailAction, getSelectionAuditPanelDataAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
 import { downloadCsv } from "@/lib/client/download-csv"
-import { ConfidenceField } from "@/components/typed-destinations/row-signals"
+import { ConfidenceField, TouchlessPill } from "@/components/typed-destinations/row-signals"
 import type { ReceiptRow } from "@/models/receipts"
 import type { ReactNode } from "react"
 
@@ -24,10 +24,11 @@ import type { ReactNode } from "react"
  * aging/payment state) and the payment-run action differ enough that a shared abstraction would
  * need type-branching for a single-use case — not worth it per this project's simplicity rule.
  * #215 adds in-place split-pane row expansion, same pattern as InvoiceTable. */
-export function ReceiptTable({ workspaceId, basePath, receipts }: {
+export function ReceiptTable({ workspaceId, basePath, receipts, minConfidencePercent }: {
   workspaceId: string
   basePath: string
   receipts: ReceiptRow[]
+  minConfidencePercent: number
 }) {
   const router = useRouter()
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -140,7 +141,7 @@ export function ReceiptTable({ workspaceId, basePath, receipts }: {
                 expanded={expandedId === receipt.documentId}
                 onToggle={() => toggle(receipt.documentId)}
                 onToggleExpand={() => setExpandedId((current) => (current === receipt.documentId ? null : receipt.documentId))}
-                loadDetail={loadDetail} />
+                loadDetail={loadDetail} minConfidencePercent={minConfidencePercent} />
             ))}
           </tbody>
         </table>
@@ -162,7 +163,7 @@ export function ReceiptTable({ workspaceId, basePath, receipts }: {
 /** Row height matches the 62px figure measured live from the Vic.ai tour and recorded on #182.
  * #215: the merchant link toggles the inline detail panel instead of navigating; a modified click
  * (ctrl/cmd/middle-click) still follows the href to the standalone route. */
-function ReceiptTableRow({ basePath, receipt, selected, expanded, onToggle, onToggleExpand, loadDetail }: {
+function ReceiptTableRow({ basePath, receipt, selected, expanded, onToggle, onToggleExpand, loadDetail, minConfidencePercent }: {
   basePath: string
   receipt: ReceiptRow
   selected: boolean
@@ -170,6 +171,7 @@ function ReceiptTableRow({ basePath, receipt, selected, expanded, onToggle, onTo
   onToggle: () => void
   onToggleExpand: () => void
   loadDetail: (documentId: string) => Promise<ReactNode>
+  minConfidencePercent: number
 }) {
   return (
     <>
@@ -202,6 +204,7 @@ function ReceiptTableRow({ basePath, receipt, selected, expanded, onToggle, onTo
         <td className="px-4 py-2.5 tabular-nums text-slate-600">{receipt.purchaseDate ? receipt.purchaseDate.toISOString().slice(0, 10) : "—"}</td>
         <td className="px-4 py-2.5">
           <div className="flex flex-wrap items-center gap-1.5">
+            {receipt.touchless && <TouchlessPill minConfidencePercent={minConfidencePercent} />}
             <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium capitalize text-slate-700">{receipt.status.replaceAll("_", " ")}</span>
             {receipt.blockedByCheck && (
               <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800" title={receipt.openCheckCodes.join(", ")}>

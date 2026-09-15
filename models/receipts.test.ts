@@ -14,6 +14,7 @@ beforeEach(() => {
   db.document = { findMany: vi.fn().mockResolvedValue([]) }
   db.reviewTask = { findMany: vi.fn().mockResolvedValue([]) }
   db.expenseClaimItem = { findMany: vi.fn().mockResolvedValue([]) }
+  db.documentAuditEvent = { findMany: vi.fn().mockResolvedValue([]) }
 })
 
 describe("listWorkspaceReceipts", () => {
@@ -56,5 +57,16 @@ describe("listWorkspaceReceipts", () => {
     db.expenseClaimItem.findMany.mockResolvedValue([{ documentId: "d1", claim: { id: "c1", status: "draft" } }])
     const res = await listWorkspaceReceipts({ workspaceId: "w1", claimFilter: "claimed" })
     expect(res.receipts.map((r) => r.documentId)).toEqual(["d1"])
+  })
+
+  it("flags a receipt touchless only when it has a push.touchless_enqueued audit event", async () => {
+    db.document.findMany.mockResolvedValue([
+      { id: "d1", filename: "a.pdf", status: "reviewed", reviewedAt: new Date(), template: { code: "receipt" }, reviewedData: {} },
+      { id: "d2", filename: "b.pdf", status: "reviewed", reviewedAt: new Date(), template: { code: "receipt" }, reviewedData: {} },
+    ])
+    db.documentAuditEvent.findMany.mockResolvedValue([{ documentId: "d1" }])
+    const res = await listWorkspaceReceipts({ workspaceId: "w1" })
+    expect(res.receipts.find((r) => r.documentId === "d1")?.touchless).toBe(true)
+    expect(res.receipts.find((r) => r.documentId === "d2")?.touchless).toBe(false)
   })
 })

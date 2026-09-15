@@ -75,3 +75,21 @@ export function AgingBadge({ bucket }: { bucket: AgingBucket | null }) {
   const { text, cls } = AGING_LABEL[bucket]
   return <span className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ${cls}`}>{text}</span>
 }
+
+/** #200, per #181's resolution: the list's only per-record touchless signal. Two states — this
+ * pill, or nothing — no "pending" state (rejected on #181 as race-condition-prone). Reuses the
+ * existing STATUS_BADGE pill shape (`components/pipeline/document-list.tsx`); violet is unclaimed
+ * by the risk palette (emerald=ready, amber=low-confidence, red=failed, indigo=needs_review,
+ * slate=queued), signalling "automation happened" rather than a risk level. Per-field confidence
+ * stays detail-only (#181) — this pill is a process fact, not a quality endorsement, which is why
+ * the tooltip says "sent automatically", not "high confidence". */
+export function TouchlessPill({ minConfidencePercent }: { minConfidencePercent: number }) {
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded bg-violet-100 px-1.5 py-0.5 text-xs font-medium text-violet-700"
+      title={`Sent automatically — all fields ≥ ${minConfidencePercent}%`}
+    >
+      Touchless
+    </span>
+  )
+}

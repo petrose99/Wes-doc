@@ -26,6 +26,9 @@ export type ReceiptRow = {
   claimStatus: "draft" | "submitted" | "approved" | "rejected" | null
   /** Per-field extraction confidence (0-1), same shape/source as BillRow.fieldConfidence. */
   fieldConfidence: Record<string, number>
+  /** #200: same touchless signal as BillRow.touchless — a `push.touchless_enqueued` document-audit
+   * event exists for this receipt. */
+  touchless: boolean
 }
 
 /** Loads receipts for a workspace. Bounded (up to `limit`, default 500), same reasoning as
@@ -57,7 +60,7 @@ export async function listWorkspaceReceipts(input: {
   if (!documents.length) return { receipts: [] }
 
   const documentIds = documents.map((d) => d.id)
-  const [openCheckTasks, claimItems] = await Promise.all([
+  const [openCheckTasks, claimItems, touchlessEvents] = await Promise.all([
     prisma.reviewTask.findMany({
       where: { workspaceId: input.workspaceId, documentId: { in: documentIds }, reason: "check_failed", status: { in: ["open", "in_review"] } },
       select: { documentId: true, detail: true },
@@ -66,7 +69,12 @@ export async function listWorkspaceReceipts(input: {
       where: { workspaceId: input.workspaceId, documentId: { in: documentIds } },
       select: { documentId: true, claim: { select: { id: true, status: true } } },
     }),
+    prisma.documentAuditEvent.findMany({
+      where: { workspaceId: input.workspaceId, documentId: { in: documentIds }, type: "push.touchless_enqueued" },
+      select: { documentId: true },
+    }),
   ])
+  const touchlessDocIds = new Set(touchlessEvents.map((e) => e.documentId))
 
   const openChecksByDoc = new Map<string, string[]>()
   for (const task of openCheckTasks) {
@@ -96,6 +104,7 @@ export async function listWorkspaceReceipts(input: {
       claimId: claim?.id ?? null,
       claimStatus: (claim?.status as ReceiptRow["claimStatus"]) ?? null,
       fieldConfidence: (doc.confidence as Record<string, unknown> | null)?.fieldConfidence as Record<string, number> ?? {},
+      touchless: touchlessDocIds.has(doc.id),
     }
   })
 

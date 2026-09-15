@@ -3,6 +3,7 @@ import { Plus } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { getCurrentUser } from "@/lib/auth"
 import { listWorkspaceReceipts } from "@/models/receipts"
+import { getMinConfidencePercent } from "@/models/automation-config"
 import { requireWorkspaceRole } from "@/models/workspaces"
 import { ListScreenShell } from "@/components/list-screen/list-screen-shell"
 import { ReceiptFilterChips } from "@/components/typed-destinations/receipt-filter-chips"
@@ -29,7 +30,10 @@ export default async function ReceiptsPage({ params, searchParams }: {
   const basePath = `/workspaces/${workspaceId}/receipts`
   const statusFilter = status === "unreviewed" || status === "reviewed" ? status : undefined
   const claimFilter = claim === "unclaimed" || claim === "claimed" ? claim : undefined
-  const { receipts } = await listWorkspaceReceipts({ workspaceId, statusFilter, claimFilter })
+  const [{ receipts }, minConfidencePercent] = await Promise.all([
+    listWorkspaceReceipts({ workspaceId, statusFilter, claimFilter }),
+    getMinConfidencePercent(workspaceId),
+  ])
   const hasFilter = !!statusFilter || !!claimFilter
 
   return <ListScreenShell
@@ -58,7 +62,7 @@ export default async function ReceiptsPage({ params, searchParams }: {
                 : "No receipts yet. Receipts appear here once a receipt is extracted."}
             </p>
           ) : (
-            <ReceiptTable workspaceId={workspaceId} basePath={basePath} receipts={receipts} />
+            <ReceiptTable workspaceId={workspaceId} basePath={basePath} receipts={receipts} minConfidencePercent={minConfidencePercent} />
           )}
         </CardContent>
       </Card>

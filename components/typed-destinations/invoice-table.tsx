@@ -13,7 +13,7 @@ import { SelectionAuditPanel } from "@/components/list-screen/selection-audit-pa
 import { bulkExportDocumentsAction, deletePipelineDocumentsAction, moveDocumentsToStageAction } from "@/app/(app)/workspaces/[workspaceId]/pipeline-actions"
 import { getInlineDocumentDetailAction, getSelectionAuditPanelDataAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
 import { downloadCsv } from "@/lib/client/download-csv"
-import { AgingBadge, ConfidenceField, StatusGlyph } from "@/components/typed-destinations/row-signals"
+import { AgingBadge, ConfidenceField, StatusGlyph, TouchlessPill } from "@/components/typed-destinations/row-signals"
 import type { BillRow } from "@/models/bills"
 import type { ReactNode } from "react"
 
@@ -22,12 +22,13 @@ import type { ReactNode } from "react"
  * bulk bar and the checkboxes both need it. #215 adds in-place split-pane row expansion — clicking
  * a row's supplier link toggles the inline panel instead of navigating away; the standalone
  * `/documents/[documentId]` route is untouched underneath for deep links and back/forward. */
-export function InvoiceTable({ workspaceId, basePath, bills, payableDocumentIds, preparePaymentRunAction }: {
+export function InvoiceTable({ workspaceId, basePath, bills, payableDocumentIds, preparePaymentRunAction, minConfidencePercent }: {
   workspaceId: string
   basePath: string
   bills: BillRow[]
   payableDocumentIds: string[]
   preparePaymentRunAction: (formData: FormData) => Promise<void>
+  minConfidencePercent: number
 }) {
   const router = useRouter()
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -150,7 +151,7 @@ export function InvoiceTable({ workspaceId, basePath, bills, payableDocumentIds,
                 expanded={expandedId === bill.documentId}
                 onToggle={() => toggle(bill.documentId)}
                 onToggleExpand={() => setExpandedId((current) => (current === bill.documentId ? null : bill.documentId))}
-                loadDetail={loadDetail} />
+                loadDetail={loadDetail} minConfidencePercent={minConfidencePercent} />
             ))}
           </tbody>
         </table>
@@ -173,7 +174,7 @@ export function InvoiceTable({ workspaceId, basePath, bills, payableDocumentIds,
  * not re-derived here. py-[19.5px] on the cells plus the 1px border below gets a 62px row. The
  * supplier link toggles the #215 inline detail panel instead of navigating; a modified click
  * (ctrl/cmd/middle-click, or "open in new tab") still follows the href to the standalone route. */
-function BillTableRow({ basePath, bill, selected, expanded, onToggle, onToggleExpand, loadDetail }: {
+function BillTableRow({ basePath, bill, selected, expanded, onToggle, onToggleExpand, loadDetail, minConfidencePercent }: {
   basePath: string
   bill: BillRow
   selected: boolean
@@ -181,6 +182,7 @@ function BillTableRow({ basePath, bill, selected, expanded, onToggle, onToggleEx
   onToggle: () => void
   onToggleExpand: () => void
   loadDetail: (documentId: string) => Promise<ReactNode>
+  minConfidencePercent: number
 }) {
   return (
     <>
@@ -222,6 +224,7 @@ function BillTableRow({ basePath, bill, selected, expanded, onToggle, onToggleEx
         </td>
         <td className="px-4 py-2.5">
           <div className="flex flex-wrap items-center gap-1.5">
+            {bill.touchless && <TouchlessPill minConfidencePercent={minConfidencePercent} />}
             {bill.paymentStatus && (
               <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">{bill.paymentStatus}</span>
             )}
@@ -230,7 +233,7 @@ function BillTableRow({ basePath, bill, selected, expanded, onToggle, onToggleEx
                 blocked ({bill.openCheckCodes.length})
               </span>
             )}
-            {!bill.paymentStatus && !bill.blockedByCheck && (
+            {!bill.touchless && !bill.paymentStatus && !bill.blockedByCheck && (
               <span className="text-xs text-slate-400">—</span>
             )}
           </div>

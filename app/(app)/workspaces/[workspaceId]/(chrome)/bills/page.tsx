@@ -2,6 +2,7 @@ import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { getCurrentUser } from "@/lib/auth"
 import { listWorkspaceBills, type BillRow } from "@/models/bills"
+import { getMinConfidencePercent } from "@/models/automation-config"
 import { requireWorkspaceRole } from "@/models/workspaces"
 import { preparePaymentRunAction } from "./actions"
 import { redirect } from "next/navigation"
@@ -36,7 +37,10 @@ export async function BillsPage({ params, searchParams, pathSegment = "invoices"
   const approvalFilter: BillRow["approvalStatus"] | undefined =
     approval === "not_started" || approval === "in_progress" || approval === "approved" || approval === "rejected" ? approval : undefined
   const basePath = `/workspaces/${workspaceId}/${pathSegment}`
-  const { bills, summary } = await listWorkspaceBills({ workspaceId, onlyBlocked, onlyUnpaid, statusFilter, approvalFilter })
+  const [{ bills, summary }, minConfidencePercent] = await Promise.all([
+    listWorkspaceBills({ workspaceId, onlyBlocked, onlyUnpaid, statusFilter, approvalFilter }),
+    getMinConfidencePercent(workspaceId),
+  ])
   // Only bills with a total AND an unblocked status are candidates for a payment run.
   const payableBills = bills.filter((b) => !b.blockedByCheck && b.total !== null && b.total > 0 && (!b.paymentStatus || !["paid", "reconciled"].includes(b.paymentStatus.toLowerCase())))
   const preparePaymentRunActionBound = preparePaymentRunAction.bind(null, workspaceId)
@@ -72,7 +76,7 @@ export async function BillsPage({ params, searchParams, pathSegment = "invoices"
                 : "No invoices yet. Invoices appear here once an invoice is extracted and approved."}
             </p>
           ) : (
-            <InvoiceTable workspaceId={workspaceId} basePath={basePath} bills={bills} payableDocumentIds={payableDocumentIds} preparePaymentRunAction={preparePaymentRunActionBound} />
+            <InvoiceTable workspaceId={workspaceId} basePath={basePath} bills={bills} payableDocumentIds={payableDocumentIds} preparePaymentRunAction={preparePaymentRunActionBound} minConfidencePercent={minConfidencePercent} />
           )}
         </CardContent>
       </Card>

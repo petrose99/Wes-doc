@@ -44,6 +44,10 @@ export type BillRow = {
    * this to underline the supplier/amount cells; absent for a field means no confidence was
    * recorded (e.g. manually entered), not zero confidence. */
   fieldConfidence: Record<string, number>
+  /** #200: whether this invoice's push went out with no human review — a `push.touchless_enqueued`
+   * document-audit event exists for it. Drives the Touchless pill; there is no "pending" state (a
+   * document either has the event or it doesn't, nothing to poll for). */
+  touchless: boolean
 }
 
 export type BillsSummary = Record<AgingBucket | "unknown", { count: number; total: number }>
@@ -112,7 +116,7 @@ export async function listWorkspaceBills(input: {
   if (!documents.length) return { bills: [], summary: emptySummary() }
 
   const documentIds = documents.map((d) => d.id)
-  const [paymentStatuses, openCheckTasks, suppliers, latestReviewTasks] = await Promise.all([
+  const [paymentStatuses, openCheckTasks, suppliers, latestReviewTasks, touchlessEvents] = await Promise.all([
     getDocumentPaymentStatuses(input.workspaceId, documentIds),
     prisma.reviewTask.findMany({
       where: { workspaceId: input.workspaceId, documentId: { in: documentIds }, reason: "check_failed", status: { in: ["open", "in_review"] } },
@@ -127,7 +131,12 @@ export async function listWorkspaceBills(input: {
       select: { documentId: true, status: true, createdAt: true },
       orderBy: { createdAt: "desc" },
     }),
+    prisma.documentAuditEvent.findMany({
+      where: { workspaceId: input.workspaceId, documentId: { in: documentIds }, type: "push.touchless_enqueued" },
+      select: { documentId: true },
+    }),
   ])
+  const touchlessDocIds = new Set(touchlessEvents.map((e) => e.documentId))
 
   const supplierByKey = new Map(suppliers.map((s) => [s.normalizedKey, s]))
   const openChecksByDoc = new Map<string, string[]>()
@@ -189,6 +198,7 @@ export async function listWorkspaceBills(input: {
       openCheckCodes: openChecks,
       approvalStatus,
       fieldConfidence: (doc.confidence as Record<string, unknown> | null)?.fieldConfidence as Record<string, number> ?? {},
+      touchless: touchlessDocIds.has(doc.id),
     })
   }
 
