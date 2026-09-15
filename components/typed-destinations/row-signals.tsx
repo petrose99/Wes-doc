@@ -35,7 +35,11 @@ export function ConfidenceField({ label, value, children }: { label: string; val
   )
 }
 
-/** One shape per aging bucket, per #187: colour alone never carries the status (WCAG 1.4.1). */
+/** One shape per aging bucket, per #187: colour alone never carries the status (WCAG 1.4.1).
+ * The bucket's own text label moved to `DueDateCountdownBadge` in
+ * `components/documents/countdown-badge.tsx` (#208, generalizing away from the 5-bucket aging
+ * ramp this file used to render as `AgingBadge`); this glyph stays here as the compact icon
+ * companion column. */
 export function StatusGlyph({ bucket }: { bucket: AgingBucket | null }) {
   if (!bucket) return <span className="inline-flex h-4 w-4 items-center justify-center text-slate-400" aria-hidden>—</span>
   if (bucket === "current") {
@@ -58,22 +62,6 @@ export function StatusGlyph({ bucket }: { bucket: AgingBucket | null }) {
       <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.72-1.36 3.486 0l6.516 11.598c.75 1.334-.213 2.98-1.743 2.98H3.484c-1.53 0-2.493-1.646-1.743-2.98L8.257 3.1zM11 13a1 1 0 10-2 0 1 1 0 002 0zm-.25-5.25a.75.75 0 00-1.5 0v3.5a.75.75 0 001.5 0v-3.5z" clipRule="evenodd" />
     </svg>
   )
-}
-
-const AGING_LABEL: Record<AgingBucket, { text: string; cls: string }> = {
-  current: { text: "On track", cls: "bg-emerald-50 text-emerald-700" },
-  "1-30": { text: "1–30 days overdue", cls: "bg-yellow-50 text-yellow-800" },
-  "31-60": { text: "31–60 days overdue", cls: "bg-orange-50 text-orange-800" },
-  "61-90": { text: "61–90 days overdue", cls: "bg-red-50 text-red-800" },
-  "90+": { text: "90+ days overdue", cls: "bg-red-100 text-red-900" },
-}
-
-/** Full text at every render — never abbreviated to "31-60d" or an icon. #187 flags this as the
- * one place density directly collides with the colour-alone rule, so text wins over compactness. */
-export function AgingBadge({ bucket }: { bucket: AgingBucket | null }) {
-  if (!bucket) return <span className="text-xs text-slate-400">—</span>
-  const { text, cls } = AGING_LABEL[bucket]
-  return <span className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ${cls}`}>{text}</span>
 }
 
 /** #200, per #181's resolution: the list's only per-record touchless signal. Two states — this

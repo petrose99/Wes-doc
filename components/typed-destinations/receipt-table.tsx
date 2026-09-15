@@ -15,6 +15,8 @@ import { bulkExportDocumentsAction, deletePipelineDocumentsAction, moveDocuments
 import { getInlineDocumentDetailAction, getSelectionAuditPanelDataAction, overrideGateAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
 import { downloadCsv } from "@/lib/client/download-csv"
 import { ConfidenceField, TouchlessPill } from "@/components/typed-destinations/row-signals"
+import { ReviewSlaCountdownBadge } from "@/components/documents/countdown-badge"
+import { DEFAULT_REVIEW_SLA_HOURS } from "@/lib/documents/countdown"
 import { BulkApproveReceiptModal, EligibilityStrip, ItemizedRecapTable, type ItemizedRecord } from "@/components/typed-destinations/bulk-approve-receipt"
 import type { ReceiptRow } from "@/models/receipts"
 import type { ReactNode } from "react"
@@ -251,6 +253,7 @@ function ReceiptTableRow({ basePath, receipt, selected, expanded, onToggle, onTo
         <td className="px-4 py-2.5">
           <div className="flex flex-wrap items-center gap-1.5">
             {receipt.touchless && <TouchlessPill minConfidencePercent={minConfidencePercent} />}
+            <ReviewSlaCountdownBadge openedAt={receipt.reviewTaskOpenedAt} slaHours={DEFAULT_REVIEW_SLA_HOURS} />
             <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium capitalize text-slate-700">{receipt.status.replaceAll("_", " ")}</span>
             {receipt.blockedByCheck && (
               <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800" title={receipt.openCheckCodes.join(", ")}>

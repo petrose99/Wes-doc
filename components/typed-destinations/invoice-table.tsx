@@ -14,7 +14,9 @@ import { OverrideModeBar, useOverrideMode } from "@/components/list-screen/overr
 import { bulkExportDocumentsAction, deletePipelineDocumentsAction, moveDocumentsToStageAction } from "@/app/(app)/workspaces/[workspaceId]/pipeline-actions"
 import { getInlineDocumentDetailAction, getSelectionAuditPanelDataAction, overrideGateAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
 import { downloadCsv } from "@/lib/client/download-csv"
-import { AgingBadge, ConfidenceField, StatusGlyph, TouchlessPill } from "@/components/typed-destinations/row-signals"
+import { ConfidenceField, StatusGlyph, TouchlessPill } from "@/components/typed-destinations/row-signals"
+import { DueDateCountdownBadge, ReviewSlaCountdownBadge } from "@/components/documents/countdown-badge"
+import { DEFAULT_REVIEW_SLA_HOURS } from "@/lib/documents/countdown"
 import { BulkApproveReceiptModal, EligibilityStrip, ItemizedRecapTable, type ItemizedRecord } from "@/components/typed-destinations/bulk-approve-receipt"
 import type { BillRow } from "@/models/bills"
 import type { ReactNode } from "react"
@@ -289,11 +291,12 @@ function BillTableRow({ basePath, bill, selected, expanded, onToggle, onToggleEx
           {bill.dueDate && !bill.extractedDueDate && <span className="ml-1 text-[10px] uppercase tracking-wide text-slate-400">inferred</span>}
         </td>
         <td className="px-4 py-2.5">
-          <AgingBadge bucket={bill.agingBucket} />
+          <DueDateCountdownBadge dueDate={bill.dueDate} />
         </td>
         <td className="px-4 py-2.5">
           <div className="flex flex-wrap items-center gap-1.5">
             {bill.touchless && <TouchlessPill minConfidencePercent={minConfidencePercent} />}
+            <ReviewSlaCountdownBadge openedAt={bill.reviewTaskOpenedAt} slaHours={DEFAULT_REVIEW_SLA_HOURS} />
             {bill.paymentStatus && (
               <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">{bill.paymentStatus}</span>
             )}

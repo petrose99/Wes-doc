@@ -39,6 +39,10 @@ export type BillRow = {
    * There is no model concept of a "cancelled" approval — the taxonomy's Cancelled value has no
    * backing state and is intentionally not emitted here. */
   approvalStatus: "not_started" | "in_progress" | "approved" | "rejected"
+  /** When the document's most recent ReviewTask was opened, but only while it's still open/
+   * in_review — null once it resolves (approved/rejected) or if there was never a ReviewTask.
+   * #208's Review SLA countdown badge times its clock from this. */
+  reviewTaskOpenedAt: Date | null
   /** Per-field extraction confidence (0-1), keyed the same as `reviewedData` ("vendor"/"merchant",
    * "total"/"amount"). Read from `document.confidence.fieldConfidence` — #199's row anatomy uses
    * this to underline the supplier/amount cells; absent for a field means no confidence was
@@ -150,9 +154,9 @@ export async function listWorkspaceBills(input: {
   }
   // First hit per document wins — the query is already newest-first, so this is each document's
   // most recent ReviewTask of any reason.
-  const latestReviewTaskByDoc = new Map<string, "open" | "in_review" | "approved" | "rejected">()
+  const latestReviewTaskByDoc = new Map<string, { status: "open" | "in_review" | "approved" | "rejected"; createdAt: Date }>()
   for (const task of latestReviewTasks) {
-    if (!latestReviewTaskByDoc.has(task.documentId)) latestReviewTaskByDoc.set(task.documentId, task.status as "open" | "in_review" | "approved" | "rejected")
+    if (!latestReviewTaskByDoc.has(task.documentId)) latestReviewTaskByDoc.set(task.documentId, { status: task.status as "open" | "in_review" | "approved" | "rejected", createdAt: task.createdAt })
   }
 
   const bills: BillRow[] = []
@@ -173,12 +177,14 @@ export async function listWorkspaceBills(input: {
     const bucket = agingBucket(dueDate, asOf)
     const openChecks = openChecksByDoc.get(doc.id) ?? []
     const paymentRow = paymentStatuses.get(doc.id)
-    const latestTaskStatus = latestReviewTaskByDoc.get(doc.id)
+    const latestTask = latestReviewTaskByDoc.get(doc.id)
+    const latestTaskStatus = latestTask?.status
     const approvalStatus: BillRow["approvalStatus"] =
       latestTaskStatus === "rejected" ? "rejected" :
       latestTaskStatus === "in_review" ? "in_progress" :
       latestTaskStatus === "open" ? "not_started" :
       "approved"
+    const reviewTaskOpenedAt = latestTaskStatus === "open" || latestTaskStatus === "in_review" ? latestTask!.createdAt : null
     bills.push({
       documentId: doc.id,
       filename: doc.filename,
@@ -199,6 +205,7 @@ export async function listWorkspaceBills(input: {
       blockedByCheck: openChecks.length > 0,
       openCheckCodes: openChecks,
       approvalStatus,
+      reviewTaskOpenedAt,
       fieldConfidence: (doc.confidence as Record<string, unknown> | null)?.fieldConfidence as Record<string, number> ?? {},
       touchless: touchlessDocIds.has(doc.id),
     })

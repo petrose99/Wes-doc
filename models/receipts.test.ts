@@ -59,6 +59,20 @@ describe("listWorkspaceReceipts", () => {
     expect(res.receipts.map((r) => r.documentId)).toEqual(["d1"])
   })
 
+  it("times the Review SLA clock from the most recent still-open ReviewTask", async () => {
+    db.document.findMany.mockResolvedValue([
+      { id: "d1", filename: "a.pdf", status: "needs_review", reviewedAt: null, template: { code: "receipt" }, reviewedData: {} },
+    ])
+    const openedAt = new Date("2026-09-10T00:00:00Z")
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    db.reviewTask.findMany.mockImplementation((args: any) => {
+      if (args?.where?.reason === "check_failed") return Promise.resolve([])
+      return Promise.resolve([{ documentId: "d1", status: "in_review", createdAt: openedAt }])
+    })
+    const res = await listWorkspaceReceipts({ workspaceId: "w1" })
+    expect(res.receipts[0].reviewTaskOpenedAt).toEqual(openedAt)
+  })
+
   it("flags a receipt touchless only when it has a push.touchless_enqueued audit event", async () => {
     db.document.findMany.mockResolvedValue([
       { id: "d1", filename: "a.pdf", status: "reviewed", reviewedAt: new Date(), template: { code: "receipt" }, reviewedData: {} },

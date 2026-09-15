@@ -81,6 +81,35 @@ describe("listWorkspaceBills", () => {
     expect(res.bills.map((b) => b.documentId)).toEqual(["d1"])
   })
 
+  it("times the Review SLA clock from the most recent still-open ReviewTask of any reason", async () => {
+    db.document.findMany.mockResolvedValue([
+      { id: "d1", filename: "a.pdf", status: "needs_review", reviewedAt: null, template: { code: "invoice" }, reviewedData: { total: 100 } },
+    ])
+    const openedAt = new Date("2026-09-10T00:00:00Z")
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    db.reviewTask.findMany.mockImplementation((args: any) => {
+      if (args?.where?.reason === "check_failed") return Promise.resolve([])
+      return Promise.resolve([{ documentId: "d1", status: "open", createdAt: openedAt }])
+    })
+    const res = await listWorkspaceBills({ workspaceId: "w1" })
+    expect(res.bills[0].approvalStatus).toBe("not_started")
+    expect(res.bills[0].reviewTaskOpenedAt).toEqual(openedAt)
+  })
+
+  it("leaves reviewTaskOpenedAt null once the latest ReviewTask has resolved", async () => {
+    db.document.findMany.mockResolvedValue([
+      { id: "d1", filename: "a.pdf", status: "reviewed", reviewedAt: new Date(), template: { code: "invoice" }, reviewedData: { total: 100 } },
+    ])
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    db.reviewTask.findMany.mockImplementation((args: any) => {
+      if (args?.where?.reason === "check_failed") return Promise.resolve([])
+      return Promise.resolve([{ documentId: "d1", status: "approved", createdAt: new Date("2026-09-10T00:00:00Z") }])
+    })
+    const res = await listWorkspaceBills({ workspaceId: "w1" })
+    expect(res.bills[0].approvalStatus).toBe("approved")
+    expect(res.bills[0].reviewTaskOpenedAt).toBeNull()
+  })
+
   it("carries the ledger payment status when a bill has been synced", async () => {
     db.document.findMany.mockResolvedValue([
       { id: "d1", filename: "a.pdf", status: "reviewed", reviewedAt: new Date(), template: { code: "invoice" }, reviewedData: { total: 100 } },

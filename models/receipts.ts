@@ -24,6 +24,10 @@ export type ReceiptRow = {
    * "unclaimed"; nothing here changes ExpenseClaimItem's uniqueness (one claim per document). */
   claimId: string | null
   claimStatus: "draft" | "submitted" | "approved" | "rejected" | null
+  /** When the document's most recent ReviewTask was opened, but only while it's still open/
+   * in_review — null once it resolves or if there was never a ReviewTask. Same convention as
+   * BillRow.reviewTaskOpenedAt; #208's Review SLA countdown badge times its clock from this. */
+  reviewTaskOpenedAt: Date | null
   /** Per-field extraction confidence (0-1), same shape/source as BillRow.fieldConfidence. */
   fieldConfidence: Record<string, number>
   /** #200: same touchless signal as BillRow.touchless — a `push.touchless_enqueued` document-audit
@@ -62,7 +66,7 @@ export async function listWorkspaceReceipts(input: {
   if (!documents.length) return { receipts: [] }
 
   const documentIds = documents.map((d) => d.id)
-  const [openCheckTasks, claimItems, touchlessEvents] = await Promise.all([
+  const [openCheckTasks, claimItems, touchlessEvents, latestReviewTasks] = await Promise.all([
     prisma.reviewTask.findMany({
       where: { workspaceId: input.workspaceId, documentId: { in: documentIds }, reason: "check_failed", status: { in: ["open", "in_review"] } },
       select: { documentId: true, detail: true },
@@ -74,6 +78,13 @@ export async function listWorkspaceReceipts(input: {
     prisma.documentAuditEvent.findMany({
       where: { workspaceId: input.workspaceId, documentId: { in: documentIds }, type: "push.touchless_enqueued" },
       select: { documentId: true },
+    }),
+    // #208: same "most recent ReviewTask of any reason" projection models/bills.ts already does,
+    // to time the Review SLA countdown badge from when the still-open task was created.
+    prisma.reviewTask.findMany({
+      where: { workspaceId: input.workspaceId, documentId: { in: documentIds } },
+      select: { documentId: true, status: true, createdAt: true },
+      orderBy: { createdAt: "desc" },
     }),
   ])
   const touchlessDocIds = new Set(touchlessEvents.map((e) => e.documentId))
@@ -87,10 +98,18 @@ export async function listWorkspaceReceipts(input: {
   }
   const claimByDoc = new Map(claimItems.map((item) => [item.documentId, item.claim]))
 
+  // First hit per document wins — the query is already newest-first.
+  const latestReviewTaskByDoc = new Map<string, { status: string; createdAt: Date }>()
+  for (const task of latestReviewTasks) {
+    if (!latestReviewTaskByDoc.has(task.documentId)) latestReviewTaskByDoc.set(task.documentId, { status: task.status, createdAt: task.createdAt })
+  }
+
   const receipts: ReceiptRow[] = documents.map((doc) => {
     const values = (doc.reviewedData ?? {}) as Record<string, unknown>
     const openChecks = openChecksByDoc.get(doc.id) ?? []
     const claim = claimByDoc.get(doc.id) ?? null
+    const latestTask = latestReviewTaskByDoc.get(doc.id)
+    const reviewTaskOpenedAt = latestTask?.status === "open" || latestTask?.status === "in_review" ? latestTask.createdAt : null
     return {
       documentId: doc.id,
       filename: doc.filename,
@@ -105,6 +124,7 @@ export async function listWorkspaceReceipts(input: {
       openCheckCodes: openChecks,
       claimId: claim?.id ?? null,
       claimStatus: (claim?.status as ReceiptRow["claimStatus"]) ?? null,
+      reviewTaskOpenedAt,
       fieldConfidence: (doc.confidence as Record<string, unknown> | null)?.fieldConfidence as Record<string, number> ?? {},
       touchless: touchlessDocIds.has(doc.id),
     }

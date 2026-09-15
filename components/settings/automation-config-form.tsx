@@ -11,6 +11,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { SettingToggle } from "@/components/settings/setting-toggle"
 import type { TouchlessImpactEstimate } from "@/lib/analytics/workspace-analytics"
 
 type Level = "suggest" | "auto" | "touchless"
@@ -62,6 +63,7 @@ function AmountBandRow({ band, onChange, onRemove }: {
   const minId = useId()
   const maxId = useId()
   const confId = useId()
+  const trustedId = useId()
   const invertedRange = band.max !== null && band.max < band.min
   return <div className="rounded-md border border-[#e6ebf1] p-4">
     <div className="grid grid-cols-1 items-end gap-3 sm:grid-cols-[1fr_1fr_1fr_auto_auto]">
@@ -97,10 +99,14 @@ function AmountBandRow({ band, onChange, onRemove }: {
           className="mt-1 tabular-nums"
         />
       </div>
-      <label className="flex items-center gap-2 pb-2.5 text-[13px] text-slate-700">
-        <input type="checkbox" checked={band.requireVerifiedSupplier ?? false} onChange={(e) => onChange({ requireVerifiedSupplier: e.target.checked || undefined })} className="h-4 w-4 accent-emerald-700" />
-        <span>Trusted suppliers only</span>
-      </label>
+      <SettingToggle
+        id={trustedId}
+        variant="inline"
+        label="Trusted suppliers only"
+        explanation="Only a supplier you've already verified qualifies for this band's lower confidence bar."
+        checked={band.requireVerifiedSupplier ?? false}
+        onChange={(checked) => onChange({ requireVerifiedSupplier: checked || undefined })}
+      />
       <button type="button" onClick={onRemove} className="pb-2.5 text-[13px] font-medium text-red-700 hover:underline">
         Remove
       </button>
@@ -282,32 +288,20 @@ export function AutomationConfigForm({ workspaceId, initial }: { workspaceId: st
 
       <Panel title="What blocks a publish" note="Conditions that send a document to review no matter how confident the coding is.">
         <div className="divide-y divide-[#f1f5f9]">
-          <label htmlFor="requirePolicyPass" className="flex cursor-pointer items-start gap-3 py-3 first:pt-0">
-            <input
-              id="requirePolicyPass"
-              type="checkbox"
-              checked={requirePolicyPass}
-              onChange={(e) => setRequirePolicyPass(e.target.checked)}
-              className="mt-0.5 h-4 w-4 accent-emerald-700"
-            />
-            <span>
-              <span className="block text-sm text-slate-900">The policy check has to pass</span>
-              <span className="block text-xs text-slate-500">A document the policy rejects, or that the check could not evaluate, goes to a person.</span>
-            </span>
-          </label>
-          <label htmlFor="blockOnWarnChecks" className="flex cursor-pointer items-start gap-3 py-3">
-            <input
-              id="blockOnWarnChecks"
-              type="checkbox"
-              checked={blockOnWarnChecks}
-              onChange={(e) => setBlockOnWarnChecks(e.target.checked)}
-              className="mt-0.5 h-4 w-4 accent-emerald-700"
-            />
-            <span>
-              <span className="block text-sm text-slate-900">Any warning stops it, not just a failure</span>
-              <span className="block text-xs text-slate-500">Stricter: arithmetic and duplicate warnings hold the document back too.</span>
-            </span>
-          </label>
+          <SettingToggle
+            id="requirePolicyPass"
+            label="The policy check has to pass"
+            explanation="A document the policy rejects, or that the check could not evaluate, goes to a person."
+            checked={requirePolicyPass}
+            onChange={setRequirePolicyPass}
+          />
+          <SettingToggle
+            id="blockOnWarnChecks"
+            label="Any warning stops it, not just a failure"
+            explanation="Stricter: arithmetic and duplicate warnings hold the document back too."
+            checked={blockOnWarnChecks}
+            onChange={setBlockOnWarnChecks}
+          />
         </div>
       </Panel>
 
