@@ -47,7 +47,26 @@ _Avoid_: Discrepancy, issue, error (as the umbrella term)
 A named, reusable filter/sort/column configuration on a list screen. System views are seeded per screen and are not editable or deletable; a user can duplicate one into an editable, optionally shared, view.
 
 **Work item**:
-A single unit of pending work surfaced in a Next-action queue — a document awaiting review, a match awaiting confirmation, or an approval awaiting a decision.
+A single unit of pending work surfaced in a Next-action queue — a document awaiting review or a match awaiting confirmation. An approval awaiting a decision is an Approval, not a work item; it is worked by an Approver, not an assignee.
+
+**Approval**:
+A run started on an invoice by a person, moving through the stages of an approval flow until it is approved, rejected, or sent back for review. An invoice nobody has started an approval on is under review, not awaiting approval.
+_Avoid_: Review task (the storage record), sign-off (as the umbrella term)
+
+**Approver**:
+The person who can decide the current stage of an Approval — a stage's named approver, or any owner where the stage names nobody. Distinct from an assignee, who works a review.
+_Avoid_: Reviewer (that is who prepares the row), assignee
+
+**Ready to Approve**:
+The personal system view on the Approvals destination: every Approval whose current stage the signed-in person can decide, including rows that are not yet eligible, shown with the reason. The badge on the rail counts this view and nothing else.
+_Avoid_: Pending approvals (that is the workspace-wide count), inbox
+
+**Send back for review**:
+The reversible middle path on an Approval: the stage is not decided, the invoice returns to review with a required reason, and the run can be restarted. Reject ends the run.
+_Avoid_: Reopen, cancel (that withdraws a run before any stage is decided)
+
+**Not eligible**:
+An Approval that is visible to its Approver but cannot be decided yet because a hard check failed or an escalation is open on the invoice. Never hidden, never overridable from Approvals; the reason is shown on the row.
 
 **Immersive surface**:
 A document-detail or worksheet page that temporarily takes over the viewport while preserving workspace identity, a clear return action, and relevant workspace status.
