@@ -1,0 +1,44 @@
+# Wayfinder autopilot
+
+Works a Wayfinder map unattended: one fresh Claude session per frontier
+ticket, answering grilling questions with the `➡️` recommendation, writing a
+report per ticket, tearing down each session's processes before the next.
+
+## Run
+
+```bash
+scripts/wayfinder-autopilot/run.sh <map> --dry-run            # print the ticket order, do nothing
+scripts/wayfinder-autopilot/run.sh <map> --max 1              # one ticket, check the report
+scripts/wayfinder-autopilot/run.sh <map> --detach             # whole frontier, survives the terminal
+scripts/wayfinder-autopilot/run.sh <map> --ticket 251         # one named ticket
+scripts/wayfinder-autopilot/run.sh <map> --detach --after-pid <pid>   # queue behind a running session
+```
+
+Watch: `tail -f docs/wayfinder-reports/<map>/detached.out`.
+Stop: `kill <driver pid>` (current ticket finishes, nothing new starts).
+
+Needs `.claude/settings.local.json` to allow `Bash(scripts/wayfinder-autopilot/run.sh:*)`
+if Claude itself is to launch it; `/wayfinder` is `disable-model-invocation`,
+so the driver passes it as the `-p` prompt, which counts as a user invocation.
+
+## Files
+
+- `run.sh` — driver: frontier query (open, unassigned, all blockers closed, in
+  sub-issue order), per-session `setsid claude -p "/wayfinder <map> <ticket>"`,
+  process-group teardown + stray dev-server/Chromium sweep, run log, retry of
+  `Autopilot: partial —` tickets (3 attempts), claim release on failure.
+- `brief.md` — appended system prompt: standing delegation (take the
+  recommended answer, never AskUserQuestion, never remove a feature without
+  owner sign-off), one ticket per session, build → score → improve on
+  execution tickets with the CLAUDE.md bar as definition of done, mandatory
+  report format, leave the machine clean.
+- Output: `docs/wayfinder-reports/<map>/<ticket>.md` (per-ticket report with
+  the Q&A table of answers taken on the owner's behalf), `run-log.md`,
+  `logs/*.jsonl` (full stream-json transcripts).
+
+## Tuning
+
+- `ALLOWED_TOOLS` in `run.sh`: sessions run in `acceptEdits` with this
+  allowlist; a denied command shows up in the report as "denied". Widen here.
+- `MAX_ATTEMPTS` in `run.sh`: retries for partial execution tickets.
+- Typical times on map #226: grilling tickets 6–16 min; execution tickets longer.
