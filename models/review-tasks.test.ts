@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 vi.mock("@/lib/db", () => ({ prisma: {} }))
 
-const { assignReviewTask, bulkUpdateReviewTaskStatus, createReviewTask, decideReviewTaskStage, parseReviewTaskStatus, updateReviewTaskStatus } = await import("@/models/review-tasks")
+const { assignReviewTask, bulkUpdateReviewTaskStatus, createReviewTask, decideReviewTaskStage, getActiveWorkflowStageState, parseReviewTaskStatus, updateReviewTaskStatus } = await import("@/models/review-tasks")
 const { prisma } = await import("@/lib/db")
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -335,5 +335,28 @@ describe("payment status gate on approval", () => {
       expect(result).toEqual({ updated: 0, blockedTaskIds: ["t1"], documentIds: [] })
       expect(db.$transaction).not.toHaveBeenCalled()
     })
+  })
+})
+
+describe("getActiveWorkflowStageState", () => {
+  it("returns null when the document has no active workflow task", async () => {
+    db.reviewTask = { findFirst: vi.fn().mockResolvedValue(null) }
+    expect(await getActiveWorkflowStageState("w1", "d1")).toBeNull()
+  })
+
+  it("returns the stage list and current index for an in-review workflow task", async () => {
+    db.reviewTask = {
+      findFirst: vi.fn().mockResolvedValue({
+        currentStageIndex: 1,
+        workflow: { stages: [{ stageIndex: 0, name: "First pass" }, { stageIndex: 1, name: "Manager" }, { stageIndex: 2, name: "Owner" }] },
+      }),
+    }
+    expect(await getActiveWorkflowStageState("w1", "d1")).toEqual({
+      currentStageIndex: 1,
+      stages: [{ stageIndex: 0, name: "First pass" }, { stageIndex: 1, name: "Manager" }, { stageIndex: 2, name: "Owner" }],
+    })
+    expect(db.reviewTask.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: { workspaceId: "w1", documentId: "d1", workflowId: { not: null }, status: { in: ["open", "in_review"] } },
+    }))
   })
 })

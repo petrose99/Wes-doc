@@ -256,6 +256,26 @@ export async function bulkUpdateReviewTaskStatus(input: { workspaceId: string; t
   return { updated: approvable.length, blockedTaskIds, documentIds: approvable.map((task) => task.documentId) }
 }
 
+/** #218: the workflow's full stage list plus where the task currently sits, for the Approval tab's
+ * pending-stage rows. Only an active (open/in_review) task has stages left to decide — a settled
+ * task's ApprovalStepChain is already fully explained by listDocumentStageDecisions, so this
+ * returns null once the document's workflow task is resolved (or it never had one). Deliberately
+ * the raw workflow stage list, not applicableStages()-filtered: decideReviewTaskStage itself
+ * doesn't apply the amount threshold either (see its own toWorkflowStageInputs call above), so
+ * showing anything narrower here would claim a precision the decision path doesn't have yet. */
+export async function getActiveWorkflowStageState(workspaceId: string, documentId: string) {
+  const task = await prisma.reviewTask.findFirst({
+    where: { workspaceId, documentId, workflowId: { not: null }, status: { in: ["open", "in_review"] } },
+    select: {
+      currentStageIndex: true,
+      workflow: { select: { stages: { orderBy: { stageIndex: "asc" }, select: { stageIndex: true, name: true } } } },
+    },
+    orderBy: { createdAt: "desc" },
+  })
+  if (!task || !task.workflow || task.currentStageIndex === null) return null
+  return { currentStageIndex: task.currentStageIndex, stages: task.workflow.stages }
+}
+
 /** Assignment is its own audit event, distinct from a status change — "who is responsible" and
  * "what happened to it" are different questions a compliance review might ask separately. */
 export async function assignReviewTask(input: { workspaceId: string; taskId: string; assigneeId: string | null; actorId: string }) {

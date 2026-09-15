@@ -19,6 +19,7 @@ import { refreshDocumentReadiness } from "@/lib/readiness/refresh"
 import { expandZipBuffer } from "@/lib/zip-ingestion"
 import { deleteWorkspaceDocuments, getDocumentsStatus, getWorkspaceDocument, markDocumentsReviewed, requeueAdaptiveExtraction, requeueDocumentExtraction, updateDocumentField, updateDocumentReview, validateDocumentInput } from "@/models/documents"
 import { listDocumentAuditEvents, listDocumentStageDecisions } from "@/models/audit-events"
+import { getActiveWorkflowStageState } from "@/models/review-tasks"
 import { overrideGate } from "@/lib/gates/actions"
 import { listOpenGatesForDocument, overrideEligibility } from "@/lib/gates/list"
 import { addDomainPackToFile, createFile, createFolder, deleteFileIfEmpty, deleteFiles, deleteFolder, duplicateFile, getFileTemplates, getWorkspaceFile, listFileShares, moveToFolder, removeFileShare, renameFile, renameFolder, setLinkAccess, touchFile, upsertFileShare } from "@/models/files"
@@ -237,14 +238,24 @@ export async function getInlineDocumentDetailAction(workspaceId: string, documen
 export async function getSelectionAuditPanelDataAction(workspaceId: string, documentId: string) {
   const user = await getCurrentUser()
   if (!(await requireMember(workspaceId, user.id))) return null
-  const [auditEvents, stageDecisions, gates] = await Promise.all([
+  const [auditEvents, stageDecisions, gates, stageState] = await Promise.all([
     listDocumentAuditEvents(workspaceId, documentId),
     listDocumentStageDecisions(workspaceId, documentId),
     listOpenGatesForDocument(workspaceId, documentId),
+    getActiveWorkflowStageState(workspaceId, documentId),
   ])
+  // #218: a stage only reads as "Pending" while its task is still open/in_review (stageState is
+  // null once resolved or workflow-less) and it hasn't already produced a review_task_stage_decided
+  // event — decidedIndexes covers the (rare but possible) case of a stage re-decided after a
+  // workflow restart, where an earlier index could otherwise show as both decided and pending.
+  const decidedIndexes = new Set(stageDecisions.map((decision) => decision.stageIndex))
+  const pendingStages = stageState
+    ? stageState.stages.filter((stage) => stage.stageIndex >= stageState.currentStageIndex && !decidedIndexes.has(stage.stageIndex))
+    : []
   return {
     auditEvents: auditEvents.map((event) => ({ id: event.id, label: event.label, createdAt: event.createdAt.toISOString(), actorName: event.actorName })),
     stageDecisions: stageDecisions.map((decision) => ({ ...decision, decidedAt: decision.decidedAt.toISOString() })),
+    pendingStages: pendingStages.map((stage) => ({ stageIndex: stage.stageIndex, stageName: stage.name })),
     gates: gates.map((gate) => {
       const eligibility = overrideEligibility(gate.severity)
       return {

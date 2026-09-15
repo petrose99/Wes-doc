@@ -7,6 +7,11 @@ import { ReasonDialogButton } from "@/components/list-screen/reason-dialog-butto
 export type SelectionAuditPanelData = {
   auditEvents: Array<{ id: string; label: string; createdAt: string; actorName: string | null }>
   stageDecisions: Array<{ id: string; stageIndex: number; stageName: string; decision: "approve" | "reject"; note: string | null; actorName: string; decidedAt: string }>
+  /** #218: stages of the document's active workflow task that haven't been decided yet — empty
+   * once the task settles (approved/rejected) or when the document has no workflow at all. Ordered
+   * by stageIndex, same as stageDecisions, so the two lists concatenate into one chronological
+   * chain. */
+  pendingStages: Array<{ stageIndex: number; stageName: string }>
   /** #203: every still-open (blocked) Gate row against this document. `overridable`/`refusalReason`
    * come from the server's own `lib/gates/list.ts::overrideEligibility` call, not re-derived here —
    * the client never decides on its own that a gate is a hard gate. */
@@ -14,6 +19,8 @@ export type SelectionAuditPanelData = {
 }
 
 type Tab = "audit" | "approval" | "gates"
+
+const TAB_ORDER: Tab[] = ["approval", "audit", "gates"]
 
 /** #198: the selection-triggered left-side panel on the Invoices/Receipts list screens. Opens
  * when exactly one row's checkbox is selected (see InvoiceTable/ReceiptTable) — a second,
@@ -57,7 +64,8 @@ export function SelectionAuditPanel({ documentId, loadData, onClose, overrideMod
   }, [])
 
   const tabButton = (value: Tab, label: string, count?: number) => <button type="button" key={value}
-    aria-selected={tab === value} role="tab"
+    id={`selection-audit-tab-${value}`} aria-selected={tab === value} aria-controls="selection-audit-tabpanel"
+    role="tab" tabIndex={tab === value ? 0 : -1}
     className={`flex items-center gap-1.5 rounded-t-md border-b-2 px-3 py-2 text-sm font-medium transition-colors ${tab === value ? "border-emerald-600 text-emerald-700" : "border-transparent text-slate-500 hover:text-slate-700"}`}
     onClick={() => setTab(value)}>
     {label}
@@ -74,18 +82,28 @@ export function SelectionAuditPanel({ documentId, loadData, onClose, overrideMod
         </button>
       </div>
 
-      <div className="flex gap-0.5 border-b border-slate-100 px-2 pt-1" role="tablist" aria-label="History view">
+      <div className="flex gap-0.5 border-b border-slate-100 px-2 pt-1" role="tablist" aria-label="History view"
+        onKeyDown={(e) => {
+          if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return
+          e.preventDefault()
+          const currentIndex = TAB_ORDER.indexOf(tab)
+          const nextIndex = (currentIndex + (e.key === "ArrowRight" ? 1 : TAB_ORDER.length - 1)) % TAB_ORDER.length
+          const next = TAB_ORDER[nextIndex]
+          setTab(next)
+          document.getElementById(`selection-audit-tab-${next}`)?.focus()
+        }}>
         {tabButton("approval", "Approval")}
         {tabButton("audit", "Audit")}
         {tabButton("gates", "Gates", data?.gates.length)}
       </div>
 
-      <div className="max-h-[70vh] min-h-[12rem] overflow-y-auto p-3" role="tabpanel">
+      <div id="selection-audit-tabpanel" aria-labelledby={`selection-audit-tab-${tab}`}
+        className="max-h-[70vh] min-h-[12rem] overflow-y-auto p-3" role="tabpanel">
         {error ? <p className="text-sm text-red-600">{error}</p>
           : !data ? <div className="flex items-center justify-center gap-2 py-10 text-sm text-slate-400">
               <Loader2 className="h-4 w-4 animate-spin" /> Loading…
             </div>
-          : tab === "approval" ? <ApprovalStepChain decisions={data.stageDecisions} />
+          : tab === "approval" ? <ApprovalStepChain decisions={data.stageDecisions} pendingStages={data.pendingStages} />
           : tab === "audit" ? <AuditLog events={data.auditEvents} />
           : <GatesTab gates={data.gates} overrideModeActive={overrideModeActive}
               onOverride={async (gateId, formData) => {
@@ -165,8 +183,13 @@ function GateRow({ gate, overrideModeActive, onOverride }: {
   )
 }
 
-function ApprovalStepChain({ decisions }: { decisions: SelectionAuditPanelData["stageDecisions"] }) {
-  if (decisions.length === 0) return <p className="text-sm text-slate-400">No approval decisions yet.</p>
+/** #218: decided stages render first (oldest first, matching listDocumentStageDecisions'
+ * ordering), then any not-yet-decided stages of the same active workflow task as "Pending" rows —
+ * so the chain reads as one continuous sequence rather than stopping short with no sense of what's
+ * left. A rejected task's remaining stages never reach here: pendingStages comes back empty once
+ * the task is resolved (see getActiveWorkflowStageState). */
+function ApprovalStepChain({ decisions, pendingStages }: { decisions: SelectionAuditPanelData["stageDecisions"]; pendingStages: SelectionAuditPanelData["pendingStages"] }) {
+  if (decisions.length === 0 && pendingStages.length === 0) return <p className="text-sm text-slate-400">No approval decisions yet.</p>
   return <ol className="space-y-3">
     {decisions.map((decision) => {
       const rejected = decision.decision === "reject"
@@ -187,6 +210,19 @@ function ApprovalStepChain({ decisions }: { decisions: SelectionAuditPanelData["
         </div>
       </li>
     })}
+    {pendingStages.map((stage) => <li key={`pending-${stage.stageIndex}`} className="flex gap-2.5">
+      <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[11px] font-semibold text-slate-400">
+        {stage.stageIndex + 1}
+      </span>
+      <div className="min-w-0">
+        <p className="text-sm text-slate-500">
+          <span className="font-medium">Step {stage.stageIndex + 1}</span>
+          {" — "}
+          <span>Pending</span>
+        </p>
+        <p className="text-xs text-slate-400">{stage.stageName}</p>
+      </div>
+    </li>)}
   </ol>
 }
 
