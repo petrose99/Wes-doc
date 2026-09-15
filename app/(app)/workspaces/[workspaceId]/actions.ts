@@ -19,6 +19,8 @@ import { refreshDocumentReadiness } from "@/lib/readiness/refresh"
 import { expandZipBuffer } from "@/lib/zip-ingestion"
 import { deleteWorkspaceDocuments, getDocumentsStatus, getWorkspaceDocument, markDocumentsReviewed, requeueAdaptiveExtraction, requeueDocumentExtraction, updateDocumentField, updateDocumentReview, validateDocumentInput } from "@/models/documents"
 import { listDocumentAuditEvents, listDocumentStageDecisions } from "@/models/audit-events"
+import { overrideGate } from "@/lib/gates/actions"
+import { listOpenGatesForDocument, overrideEligibility } from "@/lib/gates/list"
 import { addDomainPackToFile, createFile, createFolder, deleteFileIfEmpty, deleteFiles, deleteFolder, duplicateFile, getFileTemplates, getWorkspaceFile, listFileShares, moveToFolder, removeFileShare, renameFile, renameFolder, setLinkAccess, touchFile, upsertFileShare } from "@/models/files"
 import { getCurrentUser } from "@/lib/auth"
 import { prisma } from "@/lib/db"
@@ -193,18 +195,50 @@ export async function getInlineDocumentDetailAction(workspaceId: string, documen
 
 /** #198: data for the selection-triggered Audit/Approval panel on the Invoices/Receipts list
  * screens — the flat audit log (same shape as split-pane's Activity tab) plus the approval
- * step-chain grouped from `review_task_stage_decided` events. */
+ * step-chain grouped from `review_task_stage_decided` events. #203 adds this document's open
+ * gates, each pre-flagged with the server's own hard/soft override eligibility so the client
+ * never has to re-derive the read-only-hard-gate rule itself. */
 export async function getSelectionAuditPanelDataAction(workspaceId: string, documentId: string) {
   const user = await getCurrentUser()
   if (!(await requireMember(workspaceId, user.id))) return null
-  const [auditEvents, stageDecisions] = await Promise.all([
+  const [auditEvents, stageDecisions, gates] = await Promise.all([
     listDocumentAuditEvents(workspaceId, documentId),
     listDocumentStageDecisions(workspaceId, documentId),
+    listOpenGatesForDocument(workspaceId, documentId),
   ])
   return {
     auditEvents: auditEvents.map((event) => ({ id: event.id, label: event.label, createdAt: event.createdAt.toISOString(), actorName: event.actorName })),
     stageDecisions: stageDecisions.map((decision) => ({ ...decision, decidedAt: decision.decidedAt.toISOString() })),
+    gates: gates.map((gate) => {
+      const eligibility = overrideEligibility(gate.severity)
+      return {
+        id: gate.id,
+        gateType: gate.gateType,
+        severity: gate.severity,
+        firedAt: gate.firedAt.toISOString(),
+        overridable: eligibility.overridable,
+        refusalReason: eligibility.overridable ? null : eligibility.reason,
+      }
+    }),
   }
+}
+
+/** #203: Override Mode's per-gate action. Refuses a hard gate as defense in depth even though the
+ * UI never renders an enabled control for one (per #40/#51's read-only-hard-gate rule, PR #109) —
+ * this is the surface-level enforcement point that rule expects, not `overrideGate` itself (see
+ * lib/gates/actions.ts's own comment on why it stays unopinionated about severity). */
+export async function overrideGateAction(workspaceId: string, gateId: string, formData: FormData): Promise<ActionState<null>> {
+  const user = await getCurrentUser()
+  if (!(await requireMember(workspaceId, user.id))) return { success: false, error: NO_ACCESS }
+  const gate = await prisma.gate.findUnique({ where: { id: gateId } })
+  if (!gate || gate.workspaceId !== workspaceId) return { success: false, error: "Gate not found" }
+  const eligibility = overrideEligibility(gate.severity)
+  if (!eligibility.overridable) return { success: false, error: eligibility.reason }
+  const reason = String(formData.get("reason") ?? "").trim()
+  if (!reason) return { success: false, error: "A reason is required to override this gate." }
+  await overrideGate({ gateId, actorId: user.id, reason })
+  revalidatePath(`${paths(workspaceId).documents}/${gate.documentId}`)
+  return { success: true, data: null }
 }
 
 export async function saveDocumentReviewAction(workspaceId: string, documentId: string, formData: FormData): Promise<ActionState<null>> {

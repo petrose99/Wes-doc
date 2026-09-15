@@ -10,8 +10,9 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { ListScreenBulkActionBar } from "@/components/list-screen/list-screen-shell"
 import { InlineDocumentPanel } from "@/components/list-screen/inline-document-panel"
 import { SelectionAuditPanel } from "@/components/list-screen/selection-audit-panel"
+import { OverrideModeBar, useOverrideMode } from "@/components/list-screen/override-mode"
 import { bulkExportDocumentsAction, deletePipelineDocumentsAction, moveDocumentsToStageAction } from "@/app/(app)/workspaces/[workspaceId]/pipeline-actions"
-import { getInlineDocumentDetailAction, getSelectionAuditPanelDataAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
+import { getInlineDocumentDetailAction, getSelectionAuditPanelDataAction, overrideGateAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
 import { downloadCsv } from "@/lib/client/download-csv"
 import { AgingBadge, ConfidenceField, StatusGlyph, TouchlessPill } from "@/components/typed-destinations/row-signals"
 import type { BillRow } from "@/models/bills"
@@ -35,8 +36,14 @@ export function InvoiceTable({ workspaceId, basePath, bills, payableDocumentIds,
   const [busy, setBusy] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const overrideMode = useOverrideMode()
   const loadDetail = (documentId: string): Promise<ReactNode> => getInlineDocumentDetailAction(workspaceId, documentId)
   const loadAuditPanelData = (documentId: string) => getSelectionAuditPanelDataAction(workspaceId, documentId)
+  const overrideGate = async (gateId: string, formData: FormData) => {
+    const result = await overrideGateAction(workspaceId, gateId, formData)
+    if (result.success) router.refresh()
+    return result
+  }
 
   const selectedIds = [...selected]
   const payableSelected = selectedIds.filter((id) => payableDocumentIds.includes(id))
@@ -102,6 +109,8 @@ export function InvoiceTable({ workspaceId, basePath, bills, payableDocumentIds,
   const dis = busy || selectedIds.length === 0
 
   return <>
+    <OverrideModeBar active={overrideMode.active} onToggle={overrideMode.toggle} />
+
     {selectedIds.length > 0 && <ListScreenBulkActionBar selectedCount={selectedIds.length}>
       <Button type="button" size="sm" disabled={dis} onClick={() => void approve()}>
         {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}Approve
@@ -125,7 +134,8 @@ export function InvoiceTable({ workspaceId, basePath, bills, payableDocumentIds,
     <div className="flex items-start gap-4">
       {/* #198: selection-triggered Audit/Approval panel — shown when exactly one row is
           checkbox-selected, so a single document's history has an unambiguous subject. */}
-      {selectedIds.length === 1 && <SelectionAuditPanel key={selectedIds[0]} documentId={selectedIds[0]} loadData={loadAuditPanelData} onClose={clearSelection} />}
+      {selectedIds.length === 1 && <SelectionAuditPanel key={selectedIds[0]} documentId={selectedIds[0]} loadData={loadAuditPanelData} onClose={clearSelection}
+        overrideModeActive={overrideMode.active} onOverrideGate={overrideGate} />}
 
       <div className={`min-w-0 flex-1 overflow-x-auto ${selectedIds.length === 1 ? "" : "-mx-6"}`}>
         <table className="w-full min-w-[760px] text-sm">

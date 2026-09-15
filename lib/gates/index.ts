@@ -33,6 +33,13 @@ export type { GateRegistry } from "./registry"
 export type { GateContext, GateRunner, GateVerdict } from "./types"
 export { overrideGate, resolveGate, GateNotFoundError } from "./actions"
 export {
+  listOpenGatesForDocument,
+  listOpenGatesForDocuments,
+  overrideEligibility,
+  HARD_GATE_OVERRIDE_REFUSAL_REASON,
+} from "./list"
+export type { OpenGateSummary, GateOverrideEligibility } from "./list"
+export {
   duplicateGateRunner,
   createDuplicateGateRunner,
   resolveDuplicateGatesAgainst,
