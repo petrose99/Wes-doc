@@ -15,6 +15,7 @@ import { bulkExportDocumentsAction, deletePipelineDocumentsAction, moveDocuments
 import { getInlineDocumentDetailAction, getSelectionAuditPanelDataAction, overrideGateAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
 import { downloadCsv } from "@/lib/client/download-csv"
 import { ConfidenceField, TouchlessPill } from "@/components/typed-destinations/row-signals"
+import { minConfidenceFromPercent } from "@/lib/documents/confidence-state"
 import { ReviewSlaCountdownBadge } from "@/components/documents/countdown-badge"
 import { DEFAULT_REVIEW_SLA_HOURS } from "@/lib/documents/countdown"
 import { BulkApproveReceiptModal, EligibilityStrip, ItemizedRecapTable, type ItemizedRecord } from "@/components/typed-destinations/bulk-approve-receipt"
@@ -221,6 +222,9 @@ function ReceiptTableRow({ basePath, receipt, selected, expanded, onToggle, onTo
   minConfidencePercent: number
   needsAttention: boolean
 }) {
+  // #219: same single floor as InvoiceTable — the workspace minConfidence behind the Touchless pill.
+  // Same rule too: no value shown, no confidence claimed.
+  const minConfidence = minConfidenceFromPercent(minConfidencePercent)
   return (
     <>
       <tr className={`border-b border-slate-100 transition-colors hover:bg-slate-50 ${selected || expanded ? "bg-emerald-50/40" : ""}`} style={{ height: 62 }}>
@@ -237,19 +241,27 @@ function ReceiptTableRow({ basePath, receipt, selected, expanded, onToggle, onTo
               e.preventDefault()
               onToggleExpand()
             }}>
-            <ConfidenceField label="Merchant" value={receipt.fieldConfidence.merchant}>
+            <ConfidenceField label="Merchant" value={receipt.merchant ? receipt.fieldConfidence.merchant : undefined} minConfidence={minConfidence}>
               {receipt.merchant ?? <span className="italic text-slate-400">unknown merchant</span>}
             </ConfidenceField>
           </Link>
           <div className="text-xs text-slate-500 truncate max-w-[240px]">{receipt.filename}</div>
         </td>
-        <td className="px-4 py-2.5 text-slate-600">{receipt.receiptNumber ?? "—"}</td>
+        <td className="px-4 py-2.5 text-slate-600">
+          <ConfidenceField label="Receipt number" value={receipt.receiptNumber ? receipt.fieldConfidence.receipt_number : undefined} minConfidence={minConfidence}>
+            {receipt.receiptNumber ?? "—"}
+          </ConfidenceField>
+        </td>
         <td className="px-4 py-2.5 tabular-nums text-slate-800">
-          <ConfidenceField label="Amount" value={receipt.fieldConfidence.total ?? receipt.fieldConfidence.amount}>
+          <ConfidenceField label="Amount" value={receipt.total !== null ? receipt.fieldConfidence.total ?? receipt.fieldConfidence.amount : undefined} minConfidence={minConfidence}>
             {receipt.total !== null ? formatMoney(receipt.total, receipt.currencyCode) : "—"}
           </ConfidenceField>
         </td>
-        <td className="px-4 py-2.5 tabular-nums text-slate-600">{receipt.purchaseDate ? receipt.purchaseDate.toISOString().slice(0, 10) : "—"}</td>
+        <td className="px-4 py-2.5 tabular-nums text-slate-600">
+          <ConfidenceField label="Date" value={receipt.purchaseDate ? receipt.fieldConfidence.purchase_date : undefined} minConfidence={minConfidence}>
+            {receipt.purchaseDate ? receipt.purchaseDate.toISOString().slice(0, 10) : "—"}
+          </ConfidenceField>
+        </td>
         <td className="px-4 py-2.5">
           <div className="flex flex-wrap items-center gap-1.5">
             {receipt.touchless && <TouchlessPill minConfidencePercent={minConfidencePercent} />}

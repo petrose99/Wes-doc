@@ -15,6 +15,7 @@ import { bulkExportDocumentsAction, deletePipelineDocumentsAction, moveDocuments
 import { cancelInvoiceAction, getInlineDocumentDetailAction, getSelectionAuditPanelDataAction, overrideGateAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
 import { downloadCsv } from "@/lib/client/download-csv"
 import { ConfidenceField, StatusGlyph, TouchlessPill } from "@/components/typed-destinations/row-signals"
+import { minConfidenceFromPercent } from "@/lib/documents/confidence-state"
 import { DueDateCountdownBadge, ReviewSlaCountdownBadge } from "@/components/documents/countdown-badge"
 import { DEFAULT_REVIEW_SLA_HOURS } from "@/lib/documents/countdown"
 import { BulkApproveReceiptModal, EligibilityStrip, ItemizedRecapTable, type ItemizedRecord } from "@/components/typed-destinations/bulk-approve-receipt"
@@ -262,6 +263,10 @@ function BillTableRow({ basePath, bill, selected, expanded, onToggle, onToggleEx
   minConfidencePercent: number
   needsAttention: boolean
 }) {
+  // #219: one floor for every underline in the row — the workspace minConfidence the Touchless
+  // tooltip already quotes — so the underlines and the pill tell one story. A cell with no value
+  // to show passes no confidence either: a claim under an em dash would be a claim about nothing.
+  const minConfidence = minConfidenceFromPercent(minConfidencePercent)
   return (
     <>
       <tr className={`border-b border-slate-100 transition-colors hover:bg-slate-50 ${selected || expanded ? "bg-emerald-50/40" : ""}`} style={{ height: 62 }}>
@@ -281,20 +286,28 @@ function BillTableRow({ basePath, bill, selected, expanded, onToggle, onToggleEx
               e.preventDefault()
               onToggleExpand()
             }}>
-            <ConfidenceField label="Supplier" value={bill.fieldConfidence.vendor ?? bill.fieldConfidence.merchant}>
+            <ConfidenceField label="Supplier" value={bill.supplier ? bill.fieldConfidence.vendor ?? bill.fieldConfidence.merchant : undefined} minConfidence={minConfidence}>
               {bill.supplier ?? <span className="italic text-slate-400">unknown supplier</span>}
             </ConfidenceField>
           </Link>
           <div className="text-xs text-slate-500 truncate max-w-[240px]">{bill.filename}</div>
         </td>
-        <td className="px-4 py-2.5 text-slate-600">{bill.invoiceNumber ?? "—"}</td>
+        <td className="px-4 py-2.5 text-slate-600">
+          <ConfidenceField label="Invoice number" value={bill.invoiceNumber ? bill.fieldConfidence.invoice_number : undefined} minConfidence={minConfidence}>
+            {bill.invoiceNumber ?? "—"}
+          </ConfidenceField>
+        </td>
         <td className="px-4 py-2.5 tabular-nums text-slate-800">
-          <ConfidenceField label="Amount" value={bill.fieldConfidence.total ?? bill.fieldConfidence.amount}>
+          <ConfidenceField label="Amount" value={bill.total !== null ? bill.fieldConfidence.total ?? bill.fieldConfidence.amount : undefined} minConfidence={minConfidence}>
             {bill.total !== null ? formatMoney(bill.total, bill.currencyCode) : "—"}
           </ConfidenceField>
         </td>
         <td className="px-4 py-2.5 tabular-nums text-slate-600">
-          {bill.dueDate ? bill.dueDate.toISOString().slice(0, 10) : "—"}
+          {/* An inferred due date (payment terms, not the page) is not an extraction claim — it
+              keeps its "inferred" tag and gets no confidence underline. */}
+          <ConfidenceField label="Due date" value={bill.extractedDueDate ? bill.fieldConfidence.due_date : undefined} minConfidence={minConfidence}>
+            {bill.dueDate ? bill.dueDate.toISOString().slice(0, 10) : "—"}
+          </ConfidenceField>
           {bill.dueDate && !bill.extractedDueDate && <span className="ml-1 text-[10px] uppercase tracking-wide text-slate-400">inferred</span>}
         </td>
         <td className="px-4 py-2.5">

@@ -71,6 +71,10 @@ An action whose durable or external effect is not treated as complete until the 
 A document whose extracted fields all met the workspace's confidence threshold and was pushed to the ledger without a human review step. Shown on a record as a fact once it has happened, not as a prediction or a pending state.
 _Avoid_: Auto-approved, zero-touch
 
+**Confidence threshold**:
+The single workspace-set score an extracted field must reach to count as confident. It is the same floor Touchless is judged against, so a field that clears it in a queue row would also clear it for Touchless. A field entered by a person, or never scored by extraction, has no confidence and shows no confidence claim at all — absence means "not an AI claim", not "low".
+_Avoid_: High confidence, low confidence (as if they were fixed numbers), the internal stage cutoff or amount-band floors (those are gates, not the user-facing threshold)
+
 ## Public marketing and coverage
 
 **Supported coverage**:

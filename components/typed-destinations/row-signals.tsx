@@ -1,34 +1,46 @@
 import type { AgingBucket } from "@/lib/bills/due-date"
+import { confidenceState, type ConfidenceState } from "@/lib/documents/confidence-state"
 
 /** Row anatomy promoted from the `prototype/dense-operator-row` branch (#182, resolved on Wayfinder
  * map #177) into production. Shared between InvoiceTable and ReceiptTable so the status glyph,
  * confidence underline, and aging badge render identically on both surfaces.
  *
- * Confidence border colours (emerald/amber/red-700) are the prototype's own choice, confirmed
- * against a white/slate-50 row background at >=4.5:1. Checked here against the other real row
- * background this ticket flagged as unmeasured — the `bg-emerald-50` (#ecfdf5) selected-row tint —
- * and all three clear WCAG's 3:1 non-text (border) contrast requirement by a wide margin, since
- * emerald-50 is a near-white tint and every border shade is a dark 700. */
+ * Border colours (emerald/amber-700) were confirmed against a white/slate-50 row background at
+ * >=4.5:1 and against the `bg-emerald-50` (#ecfdf5) selected-row tint, where both clear WCAG's
+ * 3:1 non-text (border) contrast requirement by a wide margin — emerald-50 is a near-white tint
+ * and each border shade is a dark 700. */
 
-const CONFIDENCE_LOW = 0.65
-const CONFIDENCE_HIGH = 0.85
-
-function confidenceBorderClass(value: number): string {
-  if (value >= CONFIDENCE_HIGH) return "border-emerald-700"
-  if (value >= CONFIDENCE_LOW) return "border-amber-700"
-  return "border-red-700"
+/** Two states, one floor, and never colour alone (#219): confident is a solid emerald rule,
+ * below-threshold a dashed amber one, so the pair stays distinguishable for a colour-blind
+ * operator scanning fifty rows. Vic.ai's own two-state green/amber underline, plus the style
+ * difference `PRODUCT.md`'s "no color-only state" commitment requires. */
+const CONFIDENCE_UNDERLINE: Record<ConfidenceState, { className: string; word: string }> = {
+  confident: { className: "border-solid border-emerald-700", word: "confident" },
+  below: { className: "border-dashed border-amber-700", word: "below threshold" },
 }
 
-/** Underlines a field's rendered value with a confidence-coded border. Renders its children
- * unstyled when no confidence score was recorded for the field (manual entry, or a field the
- * extraction pipeline never scored) — absence of a signal is not the same as low confidence. */
-export function ConfidenceField({ label, value, children }: { label: string; value: number | undefined; children: React.ReactNode }) {
-  if (value === undefined) return <>{children}</>
+/** Underlines a field's rendered value with its confidence state against the workspace floor
+ * (`minConfidence`, the Touchless threshold — see `lib/documents/confidence-state.ts`). Renders
+ * its children unstyled when no confidence score was recorded for the field (manual entry, or a
+ * field the extraction pipeline never scored) — absence of a signal is a defined "no AI claim",
+ * not low confidence. Every extracted-field column in a row wraps its value in one of these, so
+ * no scored field goes silently unmarked (#181's objection, answered on #219). */
+export function ConfidenceField({ label, value, minConfidence, children }: {
+  label: string
+  value: number | undefined
+  /** 0-1 scale, the workspace's `minConfidence`. */
+  minConfidence: number
+  children: React.ReactNode
+}) {
+  const state = confidenceState(value, minConfidence)
+  if (state === null || value === undefined) return <>{children}</>
+  const { className, word } = CONFIDENCE_UNDERLINE[state]
+  const percent = Math.round(value * 100)
   return (
     <span
-      className={`inline-block border-b-2 pb-px ${confidenceBorderClass(value)}`}
-      aria-label={`${label}, ${Math.round(value * 100)}% confidence`}
-      title={`${Math.round(value * 100)}% confidence`}
+      className={`inline-block border-b-2 pb-px ${className}`}
+      aria-label={`${label}, ${percent}% confidence, ${word}`}
+      title={`${percent}% confidence — ${word} (floor ${Math.round(minConfidence * 100)}%)`}
     >
       {children}
     </span>

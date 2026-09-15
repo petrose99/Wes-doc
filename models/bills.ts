@@ -48,9 +48,9 @@ export type BillRow = {
    * #208's Review SLA countdown badge times its clock from this. */
   reviewTaskOpenedAt: Date | null
   /** Per-field extraction confidence (0-1), keyed the same as `reviewedData` ("vendor"/"merchant",
-   * "total"/"amount"). Read from `document.confidence.fieldConfidence` — #199's row anatomy uses
-   * this to underline the supplier/amount cells; absent for a field means no confidence was
-   * recorded (e.g. manually entered), not zero confidence. */
+   * "total"/"amount", "invoice_number", "due_date"). Read from `document.confidence.fieldConfidence`
+   * — #199/#219's row anatomy underlines every extracted-field cell from it; absent for a field
+   * means no confidence was recorded (e.g. manually entered), not zero confidence. */
   fieldConfidence: Record<string, number>
   /** #200: whether this invoice's push went out with no human review — a `push.touchless_enqueued`
    * document-audit event exists for it. Drives the Touchless pill; there is no "pending" state (a
