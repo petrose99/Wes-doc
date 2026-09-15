@@ -4,10 +4,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { getCurrentUser } from "@/lib/auth"
 import { listWorkspaceReceipts } from "@/models/receipts"
 import { getMinConfidencePercent } from "@/models/automation-config"
-import { requireWorkspaceRole } from "@/models/workspaces"
+import { requireWorkspaceRole, type WorkspaceRole } from "@/models/workspaces"
+import { listSavedViews } from "@/models/saved-views"
+import { createSavedViewAction, deleteSavedViewAction, duplicateSavedViewAction, renameSavedViewAction, saveFiltersToViewAction, shareSavedViewAction } from "../saved-views-actions"
 import { ListScreenShell } from "@/components/list-screen/list-screen-shell"
 import { ReceiptFilterChips } from "@/components/typed-destinations/receipt-filter-chips"
 import { ReceiptTable } from "@/components/typed-destinations/receipt-table"
+import { SavedViewPicker } from "@/components/typed-destinations/saved-view-picker"
 import { ExpenseClaimsPage } from "../expenses/page"
 
 export const dynamic = "force-dynamic"
@@ -20,21 +23,28 @@ export const dynamic = "force-dynamic"
  * expense-claims workflow (unchanged, absorbed per #195). */
 export default async function ReceiptsPage({ params, searchParams }: {
   params: Promise<{ workspaceId: string }>
-  searchParams: Promise<{ mode?: string; status?: string; claim?: string }>
+  searchParams: Promise<{ mode?: string; status?: string; claim?: string; touchless?: string; view?: string }>
 }) {
   const { workspaceId } = await params
-  const { mode, status, claim } = await searchParams
+  const { mode, status, claim, touchless, view: selectedViewId } = await searchParams
   if (mode === "claims") return ExpenseClaimsPage({ params: Promise.resolve({ workspaceId }) })
 
-  await getCurrentUser().then((user) => requireWorkspaceRole(workspaceId, user.id))
+  const user = await getCurrentUser()
+  const membership = await requireWorkspaceRole(workspaceId, user.id)
   const basePath = `/workspaces/${workspaceId}/receipts`
   const statusFilter = status === "unreviewed" || status === "reviewed" ? status : undefined
   const claimFilter = claim === "unclaimed" || claim === "claimed" ? claim : undefined
-  const [{ receipts }, minConfidencePercent] = await Promise.all([
-    listWorkspaceReceipts({ workspaceId, statusFilter, claimFilter }),
+  const onlyTouchless = touchless === "1"
+  const [{ receipts }, minConfidencePercent, savedViews] = await Promise.all([
+    listWorkspaceReceipts({ workspaceId, statusFilter, claimFilter, onlyTouchless }),
     getMinConfidencePercent(workspaceId),
+    listSavedViews({ workspaceId, viewKey: "receipts", userId: user.id }),
   ])
-  const hasFilter = !!statusFilter || !!claimFilter
+  const currentViewFilters: Record<string, string> = {
+    ...(statusFilter ? { status: statusFilter } : {}), ...(claimFilter ? { claim: claimFilter } : {}),
+    ...(onlyTouchless ? { touchless: "1" } : {}),
+  }
+  const hasFilter = !!statusFilter || !!claimFilter || onlyTouchless
 
   return <ListScreenShell
     header={<div className="flex flex-wrap items-end justify-between gap-4 border-b px-6 py-4">
@@ -47,7 +57,16 @@ export default async function ReceiptsPage({ params, searchParams }: {
         Create expense claim
       </Link>
     </div>}
-    toolbar={<ReceiptFilterChips basePath={basePath} status={statusFilter} claim={claimFilter} />}>
+    toolbar={<ReceiptFilterChips basePath={basePath} status={statusFilter} claim={claimFilter}
+      extraParams={{ touchless: onlyTouchless ? "1" : undefined }}
+      leading={<SavedViewPicker views={savedViews} selectedViewId={selectedViewId ?? null} currentFilters={currentViewFilters}
+        currentUserId={user.id} currentUserRole={membership.role as WorkspaceRole}
+        createAction={createSavedViewAction.bind(null, workspaceId, "receipts", basePath)}
+        duplicateAction={duplicateSavedViewAction.bind(null, workspaceId, "receipts", basePath)}
+        renameAction={renameSavedViewAction.bind(null, workspaceId, basePath)}
+        saveFiltersAction={saveFiltersToViewAction.bind(null, workspaceId, basePath)}
+        deleteAction={deleteSavedViewAction.bind(null, workspaceId, basePath)}
+        shareAction={shareSavedViewAction.bind(null, workspaceId, basePath)} />} />}>
     <main className="p-6">
       <Card>
         <CardHeader>

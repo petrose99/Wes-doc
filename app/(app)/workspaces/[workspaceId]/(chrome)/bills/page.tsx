@@ -3,13 +3,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { getCurrentUser } from "@/lib/auth"
 import { listWorkspaceBills, type BillRow } from "@/models/bills"
 import { getMinConfidencePercent } from "@/models/automation-config"
-import { requireWorkspaceRole } from "@/models/workspaces"
+import { requireWorkspaceRole, type WorkspaceRole } from "@/models/workspaces"
+import { listSavedViews } from "@/models/saved-views"
+import { createSavedViewAction, deleteSavedViewAction, duplicateSavedViewAction, renameSavedViewAction, saveFiltersToViewAction, shareSavedViewAction } from "../saved-views-actions"
 import { preparePaymentRunAction } from "./actions"
 import { redirect } from "next/navigation"
 import { ListScreenShell } from "@/components/list-screen/list-screen-shell"
 import { SyncedStageHeader } from "@/components/pipeline/synced-stage-header"
 import { InvoiceFilterChips } from "@/components/typed-destinations/invoice-filter-chips"
 import { InvoiceTable } from "@/components/typed-destinations/invoice-table"
+import { SavedViewPicker } from "@/components/typed-destinations/saved-view-picker"
 
 export const dynamic = "force-dynamic"
 
@@ -21,31 +24,38 @@ export const dynamic = "force-dynamic"
  * split-pane row expansion is #214, split off from #213. */
 export async function BillsPage({ params, searchParams, pathSegment = "invoices", title = "Invoices" }: {
   params: Promise<{ workspaceId: string }>
-  searchParams: Promise<{ blocked?: string; unpaid?: string; status?: string; approval?: string }>
+  searchParams: Promise<{ blocked?: string; unpaid?: string; status?: string; approval?: string; touchless?: string; view?: string }>
   pathSegment?: string
   title?: string
 }) {
   const { workspaceId } = await params
-  const { blocked, unpaid, status, approval } = await searchParams
+  const { blocked, unpaid, status, approval, touchless, view: selectedViewId } = await searchParams
   const user = await getCurrentUser()
   const membership = await requireWorkspaceRole(workspaceId, user.id)
   const isOwner = membership.role === "owner"
 
   const onlyBlocked = blocked === "1"
   const onlyUnpaid = unpaid === "1"
+  const onlyTouchless = touchless === "1"
   const statusFilter = status === "unreviewed" || status === "reviewed" || status === "paid" ? status : undefined
   const approvalFilter: BillRow["approvalStatus"] | undefined =
     approval === "not_started" || approval === "in_progress" || approval === "approved" || approval === "rejected" ? approval : undefined
   const basePath = `/workspaces/${workspaceId}/${pathSegment}`
-  const [{ bills, summary }, minConfidencePercent] = await Promise.all([
-    listWorkspaceBills({ workspaceId, onlyBlocked, onlyUnpaid, statusFilter, approvalFilter }),
+  const [{ bills, summary }, minConfidencePercent, savedViews] = await Promise.all([
+    listWorkspaceBills({ workspaceId, onlyBlocked, onlyUnpaid, statusFilter, approvalFilter, onlyTouchless }),
     getMinConfidencePercent(workspaceId),
+    listSavedViews({ workspaceId, viewKey: "invoices", userId: user.id }),
   ])
+  const currentViewFilters: Record<string, string> = {
+    ...(onlyBlocked ? { blocked: "1" } : {}), ...(onlyUnpaid ? { unpaid: "1" } : {}),
+    ...(onlyTouchless ? { touchless: "1" } : {}), ...(statusFilter ? { status: statusFilter } : {}),
+    ...(approvalFilter ? { approval: approvalFilter } : {}),
+  }
   // Only bills with a total AND an unblocked status are candidates for a payment run.
   const payableBills = bills.filter((b) => !b.blockedByCheck && b.total !== null && b.total > 0 && (!b.paymentStatus || !["paid", "reconciled"].includes(b.paymentStatus.toLowerCase())))
   const preparePaymentRunActionBound = preparePaymentRunAction.bind(null, workspaceId)
   const payableDocumentIds = isOwner ? payableBills.map((bill) => bill.documentId) : []
-  const hasFilter = onlyBlocked || onlyUnpaid || !!statusFilter || !!approvalFilter
+  const hasFilter = onlyBlocked || onlyUnpaid || !!statusFilter || !!approvalFilter || onlyTouchless
 
   return <ListScreenShell
     header={<div className="flex flex-wrap items-end justify-between gap-4 border-b px-6 py-4">
@@ -61,7 +71,15 @@ export async function BillsPage({ params, searchParams, pathSegment = "invoices"
     </div>}
     beforeToolbar={<SyncedStageHeader workspaceId={workspaceId} summary={summary} currency="USD" showLink={false} />}
     toolbar={<InvoiceFilterChips basePath={basePath} status={statusFilter} approval={approvalFilter}
-      extraParams={{ blocked: onlyBlocked ? "1" : undefined, unpaid: onlyUnpaid ? "1" : undefined }} />}>
+      extraParams={{ blocked: onlyBlocked ? "1" : undefined, unpaid: onlyUnpaid ? "1" : undefined, touchless: onlyTouchless ? "1" : undefined }}
+      leading={<SavedViewPicker views={savedViews} selectedViewId={selectedViewId ?? null} currentFilters={currentViewFilters}
+        currentUserId={user.id} currentUserRole={membership.role as WorkspaceRole}
+        createAction={createSavedViewAction.bind(null, workspaceId, "invoices", basePath)}
+        duplicateAction={duplicateSavedViewAction.bind(null, workspaceId, "invoices", basePath)}
+        renameAction={renameSavedViewAction.bind(null, workspaceId, basePath)}
+        saveFiltersAction={saveFiltersToViewAction.bind(null, workspaceId, basePath)}
+        deleteAction={deleteSavedViewAction.bind(null, workspaceId, basePath)}
+        shareAction={shareSavedViewAction.bind(null, workspaceId, basePath)} />} />}>
     <main className="p-6">
       <Card>
         <CardHeader>

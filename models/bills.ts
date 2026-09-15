@@ -94,6 +94,8 @@ export async function listWorkspaceBills(input: {
   statusFilter?: "unreviewed" | "reviewed" | "paid"
   /** #211's Invoice Approval filter-chip group. See BillRow.approvalStatus. */
   approvalFilter?: BillRow["approvalStatus"]
+  /** #201's "Touchless" system saved view: rows that went out with no human review. */
+  onlyTouchless?: boolean
 }): Promise<{ bills: BillRow[]; summary: BillsSummary }> {
   const asOf = input.asOf ?? new Date()
   const limit = input.limit ?? 500
@@ -209,6 +211,7 @@ export async function listWorkspaceBills(input: {
     if (input.statusFilter === "reviewed" && bill.status !== "reviewed") return false
     if (input.statusFilter === "paid" && !(bill.paymentStatus && ["paid", "reconciled"].includes(bill.paymentStatus.toLowerCase()))) return false
     if (input.approvalFilter && bill.approvalStatus !== input.approvalFilter) return false
+    if (input.onlyTouchless && !bill.touchless) return false
     return true
   })
 

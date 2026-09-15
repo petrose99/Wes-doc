@@ -5,14 +5,18 @@ import { ListScreenToolbar } from "@/components/list-screen/list-screen-shell"
  * pattern: Status (unreviewed/reviewed) and Claim (unclaimed/claimed — whether the receipt has
  * been absorbed into an expense claim). Link-based so the filtered view stays a plain, shareable,
  * refreshable URL, matching the rest of this route's filters. */
-export function ReceiptFilterChips({ basePath, status, claim }: {
+export function ReceiptFilterChips({ basePath, status, claim, extraParams, leading }: {
   basePath: string
   status?: "unreviewed" | "reviewed"
   claim?: "unclaimed" | "claimed"
+  /** Other query params on this route (touchless) to preserve across chip clicks. */
+  extraParams?: Record<string, string | undefined>
+  /** #201's saved-view picker: leftmost in this toolbar row. */
+  leading?: React.ReactNode
 }) {
   const withParams = (params: Record<string, string | undefined>) => {
     const search = new URLSearchParams()
-    for (const [key, value] of Object.entries({ status, claim, ...params })) {
+    for (const [key, value] of Object.entries({ status, claim, ...extraParams, ...params })) {
       if (value) search.set(key, value)
     }
     const qs = search.toString()
@@ -20,6 +24,7 @@ export function ReceiptFilterChips({ basePath, status, claim }: {
   }
 
   return <ListScreenToolbar>
+    {leading}
     <ChipGroup label="Status">
       <Chip href={withParams({ status: undefined })} active={!status}>All</Chip>
       <Chip href={withParams({ status: "unreviewed" })} active={status === "unreviewed"}>Unreviewed</Chip>

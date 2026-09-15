@@ -41,6 +41,8 @@ export async function listWorkspaceReceipts(input: {
   statusFilter?: "unreviewed" | "reviewed"
   /** Claim filter-chip group: whether the receipt has been absorbed into an expense claim yet. */
   claimFilter?: "unclaimed" | "claimed"
+  /** #201's "Touchless" system saved view: rows that went out with no human review. */
+  onlyTouchless?: boolean
 }): Promise<{ receipts: ReceiptRow[] }> {
   const limit = input.limit ?? 500
 
@@ -113,6 +115,7 @@ export async function listWorkspaceReceipts(input: {
     if (input.statusFilter === "reviewed" && receipt.status !== "reviewed") return false
     if (input.claimFilter === "unclaimed" && receipt.claimId !== null) return false
     if (input.claimFilter === "claimed" && receipt.claimId === null) return false
+    if (input.onlyTouchless && !receipt.touchless) return false
     return true
   })
 

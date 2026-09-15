@@ -49,6 +49,7 @@ model User {
   flaggedDocuments      Document[]            @relation("DocumentFlagger")
   paymentConfirmedDocuments Document[]        @relation("DocumentPaymentConfirmer")
   listPreferences       UserListPreference[]
+  savedViews            SavedView[]
   sheetPlacements       DocumentSheetPlacement[] @relation("PlacementPlacer")
   decidedFieldSuggestions FieldSuggestion[]   @relation("FieldSuggestionDecider")
   createdApiKeys        WorkspaceApiKey[]     @relation("ApiKeyCreator")
@@ -187,6 +188,7 @@ model Workspace {
   expenseClaims ExpenseClaim[]
   expenseClaimItems ExpenseClaimItem[]
   listPreferences UserListPreference[]
+  savedViews SavedView[]
   healthCheckResults HealthCheckResult[]
   healthScores HealthScore[]
   healthScoreConfigs HealthScoreConfig[]
@@ -2102,6 +2104,33 @@ model UserListPreference {
 
   @@unique([userId, workspaceId, viewKey])
   @@map("user_list_preferences")
+}
+
+/// #180/#201: a named, savable set of columns/filters/sort for a list screen (`viewKey`, same
+/// vocabulary as `UserListPreference.viewKey` — "invoices", "receipts", ...), separate from
+/// `UserListPreference` which stays the unwired per-user "current selection" state. `ownerId: null`
+/// means workspace-shared; `isSystem` views are seeded per screen and are not user-editable/-deletable
+/// ("Duplicate as new view" forks one into an editable copy instead). `scopeToCurrentUser` expresses
+/// a personal-inbox-shaped system view (e.g. "Assigned to me") without a separate concept.
+model SavedView {
+  id                 String    @id @default(uuid()) @db.Uuid
+  workspaceId        String    @map("workspace_id") @db.Uuid
+  viewKey            String    @map("view_key")
+  name               String
+  ownerId            String?   @map("owner_id") @db.Uuid
+  isSystem           Boolean   @default(false) @map("is_system")
+  scopeToCurrentUser Boolean   @default(false) @map("scope_to_current_user")
+  columns            Json
+  filters            Json
+  sort               Json
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+  workspace          Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  owner              User?     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, viewKey, name])
+  @@index([workspaceId, viewKey])
+  @@map("saved_views")
 }
 
 /// Cached LLM verdict for policy evaluation, approval context, and match explanation agents.

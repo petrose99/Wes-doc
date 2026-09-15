@@ -11,12 +11,16 @@ import type { BillRow } from "@/models/bills"
  * exists yet), so "Paid" stands in as the only real "closed" state; recorded as a finding on #211
  * rather than inventing the other three. Invoice Approval has no "Cancelled" state for the same
  * reason — ReviewTask only has open/in_review/approved/rejected. */
-export function InvoiceFilterChips({ basePath, status, approval, extraParams }: {
+export function InvoiceFilterChips({ basePath, status, approval, extraParams, leading }: {
   basePath: string
   status?: "unreviewed" | "reviewed" | "paid"
   approval?: BillRow["approvalStatus"]
   /** Other query params on this route (blocked/unpaid) to preserve across chip clicks. */
   extraParams?: Record<string, string | undefined>
+  /** #201's saved-view picker: sits leftmost in this same toolbar row, ahead of both chip groups —
+   * "left of the search box" in the ticket's language, and there is no search box on this route
+   * yet, so leftmost is the whole of it. */
+  leading?: React.ReactNode
 }) {
   const withParams = (params: Record<string, string | undefined>) => {
     const search = new URLSearchParams()
@@ -28,6 +32,7 @@ export function InvoiceFilterChips({ basePath, status, approval, extraParams }: 
   }
 
   return <ListScreenToolbar>
+    {leading}
     <ChipGroup label="Status">
       <Chip href={withParams({ status: undefined })} active={!status}>All</Chip>
       <Chip href={withParams({ status: "unreviewed" })} active={status === "unreviewed"}>Unreviewed</Chip>
