@@ -71,6 +71,10 @@ An action whose durable or external effect is not treated as complete until the 
 A document whose extracted fields all met the workspace's confidence threshold and was pushed to the ledger without a human review step. Shown on a record as a fact once it has happened, not as a prediction or a pending state.
 _Avoid_: Auto-approved, zero-touch
 
+**Processing state**:
+Where a queue row stands in the intake → review → approval path, shown as one mark at the row's leading edge. Exactly one of, in precedence order: Cancelled, Needs attention (a check blocked it, an escalation is open, or an approval was rejected), In review, Touchless, Approved. Ledger facts such as Synced or Paid are not processing states and are shown separately. Due-date urgency is not a processing state either.
+_Avoid_: Status (the column of pills is broader), aging (that is the due-date signal)
+
 **Confidence threshold**:
 The single workspace-set score an extracted field must reach to count as confident. It is the same floor Touchless is judged against, so a field that clears it in a queue row would also clear it for Touchless. A field entered by a person, or never scored by extraction, has no confidence and shows no confidence claim at all — absence means "not an AI claim", not "low".
 _Avoid_: High confidence, low confidence (as if they were fixed numbers), the internal stage cutoff or amount-band floors (those are gates, not the user-facing threshold)
