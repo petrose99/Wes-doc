@@ -8,9 +8,11 @@ import { requireWorkspaceRole, type WorkspaceRole } from "@/models/workspaces"
 import { listSavedViews } from "@/models/saved-views"
 import { createSavedViewAction, deleteSavedViewAction, duplicateSavedViewAction, renameSavedViewAction, saveFiltersToViewAction, shareSavedViewAction } from "../saved-views-actions"
 import { ListScreenShell } from "@/components/list-screen/list-screen-shell"
+import { formatPercent, MetricStrip } from "@/components/typed-destinations/metric-strip"
 import { ReceiptFilterChips } from "@/components/typed-destinations/receipt-filter-chips"
 import { ReceiptTable } from "@/components/typed-destinations/receipt-table"
 import { SavedViewPicker } from "@/components/typed-destinations/saved-view-picker"
+import { getDocumentMatchRateStats } from "@/lib/analytics/workspace-analytics"
 import { ExpenseClaimsPage } from "../expenses/page"
 
 export const dynamic = "force-dynamic"
@@ -35,10 +37,11 @@ export default async function ReceiptsPage({ params, searchParams }: {
   const statusFilter = status === "unreviewed" || status === "reviewed" ? status : undefined
   const claimFilter = claim === "unclaimed" || claim === "claimed" ? claim : undefined
   const onlyTouchless = touchless === "1"
-  const [{ receipts }, minConfidencePercent, savedViews] = await Promise.all([
+  const [{ receipts }, minConfidencePercent, savedViews, matchRate] = await Promise.all([
     listWorkspaceReceipts({ workspaceId, statusFilter, claimFilter, onlyTouchless }),
     getMinConfidencePercent(workspaceId),
     listSavedViews({ workspaceId, viewKey: "receipts", userId: user.id }),
+    getDocumentMatchRateStats(workspaceId, "receipt", ["invoice_to_receipt", "po_to_receipt"]),
   ])
   const currentViewFilters: Record<string, string> = {
     ...(statusFilter ? { status: statusFilter } : {}), ...(claimFilter ? { claim: claimFilter } : {}),
@@ -57,6 +60,8 @@ export default async function ReceiptsPage({ params, searchParams }: {
         Create expense claim
       </Link>
     </div>}
+    beforeToolbar={<MetricStrip label="Reconciliation-match rate" value={formatPercent(matchRate.matchRate)}
+      sampleLabel={`${matchRate.matched} of ${matchRate.total}, last 30 days`} />}
     toolbar={<ReceiptFilterChips basePath={basePath} status={statusFilter} claim={claimFilter}
       extraParams={{ touchless: onlyTouchless ? "1" : undefined }}
       leading={<SavedViewPicker views={savedViews} selectedViewId={selectedViewId ?? null} currentFilters={currentViewFilters}

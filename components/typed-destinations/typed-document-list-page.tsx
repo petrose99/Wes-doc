@@ -1,5 +1,6 @@
 import { FileText, Plus } from "lucide-react"
 import Link from "next/link"
+import type { ReactNode } from "react"
 
 import { getCurrentUser } from "@/lib/auth"
 import { type DocType, resolveDocTypeSpec } from "@/lib/doc-types"
@@ -7,12 +8,16 @@ import { documentDestinationPath } from "@/lib/typed-destinations"
 import { listWorkspaceDocuments, summarizeDocumentForReview } from "@/models/documents"
 import { requireWorkspaceRole } from "@/models/workspaces"
 
-export async function TypedDocumentListPage({ params, docType, title, description, action }: {
+export async function TypedDocumentListPage({ params, docType, title, description, action, metric }: {
   params: Promise<{ workspaceId: string }>
   docType: DocType
   title: string
   description: string
   action?: { href: string; label: string }
+  /** #205's one-metric header strip — a `MetricStrip`, rendered below the header and above the
+   * queue. Optional so a demoted type's Archive listing (which this component also serves) stays
+   * unchanged. */
+  metric?: ReactNode
 }) {
   const { workspaceId } = await params
   const user = await getCurrentUser()
@@ -34,6 +39,8 @@ export async function TypedDocumentListPage({ params, docType, title, descriptio
           </Link>
         )}
       </header>
+
+      {metric}
 
       <section aria-labelledby={`${docType}-queue-heading`}>
         <div className="mb-3 flex items-center gap-2">

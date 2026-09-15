@@ -12,7 +12,9 @@ import { ListScreenShell } from "@/components/list-screen/list-screen-shell"
 import { SyncedStageHeader } from "@/components/pipeline/synced-stage-header"
 import { InvoiceFilterChips } from "@/components/typed-destinations/invoice-filter-chips"
 import { InvoiceTable } from "@/components/typed-destinations/invoice-table"
+import { formatPercent, MetricStrip } from "@/components/typed-destinations/metric-strip"
 import { SavedViewPicker } from "@/components/typed-destinations/saved-view-picker"
+import { getTouchlessRateTrend } from "@/lib/analytics/workspace-analytics"
 
 export const dynamic = "force-dynamic"
 
@@ -41,10 +43,11 @@ export async function BillsPage({ params, searchParams, pathSegment = "invoices"
   const approvalFilter: BillRow["approvalStatus"] | undefined =
     approval === "not_started" || approval === "in_progress" || approval === "approved" || approval === "rejected" ? approval : undefined
   const basePath = `/workspaces/${workspaceId}/${pathSegment}`
-  const [{ bills, summary }, minConfidencePercent, savedViews] = await Promise.all([
+  const [{ bills, summary }, minConfidencePercent, savedViews, touchlessTrend] = await Promise.all([
     listWorkspaceBills({ workspaceId, onlyBlocked, onlyUnpaid, statusFilter, approvalFilter, onlyTouchless }),
     getMinConfidencePercent(workspaceId),
     listSavedViews({ workspaceId, viewKey: "invoices", userId: user.id }),
+    getTouchlessRateTrend(workspaceId),
   ])
   const currentViewFilters: Record<string, string> = {
     ...(onlyBlocked ? { blocked: "1" } : {}), ...(onlyUnpaid ? { unpaid: "1" } : {}),
@@ -69,7 +72,12 @@ export async function BillsPage({ params, searchParams, pathSegment = "invoices"
         <FilterLink href={`${basePath}?blocked=1`} active={onlyBlocked && !onlyUnpaid}>Blocked by a check</FilterLink>
       </div>
     </div>}
-    beforeToolbar={<SyncedStageHeader workspaceId={workspaceId} summary={summary} currency="USD" showLink={false} />}
+    beforeToolbar={<>
+      <MetricStrip label="Touchless rate" value={formatPercent(touchlessTrend.touchlessRate)}
+        sampleLabel={`${touchlessTrend.totalPushedTouchless} of ${touchlessTrend.totalExtracted}, last 30 days`}
+        trend={touchlessTrend.trend ? { direction: touchlessTrend.trend.direction, deltaLabel: `${touchlessTrend.trend.deltaPercentagePoints > 0 ? "+" : ""}${touchlessTrend.trend.deltaPercentagePoints}pt vs. prior 30 days` } : null} />
+      <SyncedStageHeader workspaceId={workspaceId} summary={summary} currency="USD" showLink={false} />
+    </>}
     toolbar={<InvoiceFilterChips basePath={basePath} status={statusFilter} approval={approvalFilter}
       extraParams={{ blocked: onlyBlocked ? "1" : undefined, unpaid: onlyUnpaid ? "1" : undefined, touchless: onlyTouchless ? "1" : undefined }}
       leading={<SavedViewPicker views={savedViews} selectedViewId={selectedViewId ?? null} currentFilters={currentViewFilters}
