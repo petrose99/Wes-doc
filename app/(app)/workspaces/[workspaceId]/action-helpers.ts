@@ -6,7 +6,10 @@ import { revalidatePath } from "next/cache"
 
 /** `documents` is only the detail-page prefix — there is no document list page; the sheet is
  * the view of that data, so document mutations revalidate the file's `sheet`. */
-export const paths = (workspaceId: string) => ({ overview: `/workspaces/${workspaceId}`, documents: `/workspaces/${workspaceId}/documents`, pipeline: `/workspaces/${workspaceId}/pipeline`, files: `/workspaces/${workspaceId}/worksheets`, dictation: `/workspaces/${workspaceId}/dictation`, templates: `/workspaces/${workspaceId}/settings/templates`, reports: `/workspaces/${workspaceId}/settings/reports`, workspace: `/workspaces/${workspaceId}/settings/workspace`, integrations: `/workspaces/${workspaceId}/settings/integrations`, tax: `/workspaces/${workspaceId}/settings/tax`, review: `/workspaces/${workspaceId}/review`, rules: `/workspaces/${workspaceId}/settings/rules`, modules: `/workspaces/${workspaceId}/settings/modules`, settingsEmail: `/workspaces/${workspaceId}/settings/email`, approvals: `/workspaces/${workspaceId}/automation/approvals`, receipts: `/workspaces/${workspaceId}/receipts`, expenses: `/workspaces/${workspaceId}/expenses`, accounting: `/workspaces/${workspaceId}/accounting`, exceptions: `/workspaces/${workspaceId}/exceptions` })
+// `approvals` already named the Approval-workflows settings page (/automation/approvals) before
+// #236 gave the destination itself a URL — kept as `approvalWorkflowSettings` there and reused
+// here for the new queue routes so neither call site silently starts pointing somewhere else.
+export const paths = (workspaceId: string) => ({ overview: `/workspaces/${workspaceId}`, documents: `/workspaces/${workspaceId}/documents`, pipeline: `/workspaces/${workspaceId}/pipeline`, files: `/workspaces/${workspaceId}/worksheets`, dictation: `/workspaces/${workspaceId}/dictation`, templates: `/workspaces/${workspaceId}/settings/templates`, reports: `/workspaces/${workspaceId}/settings/reports`, workspace: `/workspaces/${workspaceId}/settings/workspace`, integrations: `/workspaces/${workspaceId}/settings/integrations`, tax: `/workspaces/${workspaceId}/settings/tax`, review: `/workspaces/${workspaceId}/review`, rules: `/workspaces/${workspaceId}/settings/rules`, modules: `/workspaces/${workspaceId}/settings/modules`, settingsEmail: `/workspaces/${workspaceId}/settings/email`, approvalWorkflowSettings: `/workspaces/${workspaceId}/automation/approvals`, receipts: `/workspaces/${workspaceId}/receipts`, expenses: `/workspaces/${workspaceId}/expenses`, accounting: `/workspaces/${workspaceId}/accounting`, exceptions: `/workspaces/${workspaceId}/exceptions`, approvalsInvoices: `/workspaces/${workspaceId}/approvals/invoices`, approvalsPoMismatches: `/workspaces/${workspaceId}/approvals/po-mismatches` })
 
 /** Revalidates the whole workspace segment layout, not just one page — needed whenever a change
  * (module toggle, rename, ownership transfer) should update the persistent sidebar, which the
@@ -49,6 +52,11 @@ const BILLING_MESSAGES: Record<string, string> = {
   stage_requires_owner: "Only a workspace owner can decide this stage.",
   review_task_already_has_workflow: "This review task already has a workflow attached.",
   review_task_not_open: "This review task has already moved past open — a workflow can only be started while it's open.",
+  // #236: Approvals — Send back for review / Cancel.
+  review_task_not_in_review: "This Approval isn't currently awaiting a decision.",
+  reason_required: "A reason is required.",
+  approval_already_advanced: "A stage has already been decided on this Approval — send it back for review instead of cancelling it.",
+  gate_not_found: "That check no longer exists.",
   payment_status_required: "Confirm whether this has been paid before approving it.",
   // Dext-parity Phase 3 WP3.3: expense claims.
   expense_claim_not_found: "That expense claim no longer exists.",

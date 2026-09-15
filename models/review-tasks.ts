@@ -226,6 +226,55 @@ export async function decideReviewTaskStage(input: { workspaceId: string; taskId
   return updated
 }
 
+/** CONTEXT.md's "Send back for review" (#236): the reversible middle path on an Approval — the
+ * current stage is not decided, the invoice returns to review with a required reason, and the
+ * run can be restarted. Distinct from `decideReviewTaskStage`'s "reject" (terminal) and from a
+ * `cancelApprovalOnDocument`-style withdrawal before any stage was decided: this can fire from
+ * any stage, decided-on-so-far or not, and always clears the workflow entirely rather than
+ * rewinding to an earlier stage index — "restarted" means a fresh Start Approval, not a resumed
+ * one, so a workspace that edited its workflow's stages in the meantime never has an orphaned
+ * mid-run task pointed at a stage list that changed under it. */
+export async function sendReviewTaskBackForReview(input: { workspaceId: string; taskId: string; actorId: string; reason: string }) {
+  const task = await prisma.reviewTask.findFirst({
+    where: { id: input.taskId, workspaceId: input.workspaceId },
+    select: { id: true, documentId: true, workflowId: true, status: true, currentStageIndex: true },
+  })
+  if (!task) throw new Error("review_task_not_found")
+  if (!task.workflowId || task.currentStageIndex === null) throw new Error("review_task_has_no_workflow")
+  if (task.status !== "in_review") throw new Error("review_task_not_in_review")
+  const reason = input.reason.trim()
+  if (!reason) throw new Error("reason_required")
+  const context = await getRequestAuditContext()
+  const [updated] = await prisma.$transaction([
+    prisma.reviewTask.update({ where: { id: task.id }, data: { status: "open", workflowId: null, currentStageIndex: null, resolvedAt: null } }),
+    prisma.documentAuditEvent.create({ data: auditEventData({ workspaceId: input.workspaceId, documentId: task.documentId, actorId: input.actorId, type: "review_task_sent_back", detail: { reason } }, context) }),
+  ])
+  return updated
+}
+
+/** CONTEXT.md's "Send back for review" `_Avoid_` line distinguishes this from "cancel (that
+ * withdraws a run before any stage is decided)" — decision #7's bulk "Start / Cancel" pair on the
+ * Invoices bulk-action bar. Cancel only ever undoes an approval that hasn't had a single stage
+ * decided yet (still sitting at stage 0, nothing on the audit trail): once a stage has cleared,
+ * the run has real history and the only way back is Send back (with a reason) or a terminal
+ * Reject, never a silent Cancel. No reason required, matching Start's own low-ceremony shape. */
+export async function cancelApprovalOnDocument(input: { workspaceId: string; taskId: string; actorId: string }) {
+  const task = await prisma.reviewTask.findFirst({
+    where: { id: input.taskId, workspaceId: input.workspaceId },
+    select: { id: true, documentId: true, workflowId: true, status: true, currentStageIndex: true },
+  })
+  if (!task) throw new Error("review_task_not_found")
+  if (!task.workflowId || task.currentStageIndex === null) throw new Error("review_task_has_no_workflow")
+  if (task.status !== "in_review") throw new Error("review_task_not_in_review")
+  if (task.currentStageIndex !== 0) throw new Error("approval_already_advanced")
+  const context = await getRequestAuditContext()
+  const [updated] = await prisma.$transaction([
+    prisma.reviewTask.update({ where: { id: task.id }, data: { status: "open", workflowId: null, currentStageIndex: null, resolvedAt: null } }),
+    prisma.documentAuditEvent.create({ data: auditEventData({ workspaceId: input.workspaceId, documentId: task.documentId, actorId: input.actorId, type: "review_task_approval_cancelled" }, context) }),
+  ])
+  return updated
+}
+
 /** Scoped updateMany, per the roadmap's "bulk actions = scoped updateMany" — but a per-row audit
  * event still has to exist for each task actually changed, since the audit trail is what has to
  * answer "who approved this specific document" later, not just "a bulk approval happened". */

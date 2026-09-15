@@ -7,13 +7,13 @@ import { BiteMark } from "@/components/marketing/logo"
 import { WorkspacePulse } from "@/components/shell/workspace-pulse"
 import { MODULES } from "@/lib/modules"
 import { isUnpluggedPath } from "@/lib/unplugged"
-import { AlertTriangle, CheckCircle2, ClipboardCheck, Files, HeartPulse, History, Landmark, Library, PanelLeftClose, PanelLeftOpen, Percent, Receipt, Settings, Wallet, Workflow, Zap } from "lucide-react"
+import { AlertTriangle, BadgeCheck, CheckCircle2, ClipboardCheck, Files, HeartPulse, History, Landmark, Library, PanelLeftClose, PanelLeftOpen, Percent, Receipt, Settings, Wallet, Workflow, Zap } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useEffect, useState } from "react"
 
 const RAIL_PIN_KEY = "docubite.rail.pinned"
-const QUEUE_SEGMENTS = ["invoices", "purchase-orders", "receipts", "bank-statements", "exceptions"]
+const QUEUE_SEGMENTS = ["invoices", "purchase-orders", "receipts", "bank-statements", "exceptions", "approvals"]
 
 /** Maps a ModuleDefinition.navItems[].icon string (lib/modules) to the lucide component it names.
  * A string in the registry rather than the component itself keeps lib/modules free of a React/UI
@@ -46,7 +46,7 @@ const ICONS: Record<string, typeof Files> = {
  * <WorkspacePulse /> card — a mini-map of the workspace's living state, three rows mirroring the
  * three primaries with the same badges. The workspace stays visibly alive inside those surfaces
  * instead of vanishing behind the door of a full-screen room. */
-export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, accountingEnabled = false, pipelineReviewCount = 0, reviewTaskCount = 0, financePushableCount = 0, openExceptionsCount = 0 }: {
+export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, accountingEnabled = false, pipelineReviewCount = 0, reviewTaskCount = 0, financePushableCount = 0, openExceptionsCount = 0, approvalsReadyCount = 0 }: {
   workspaceId: string
   workspaces: SwitchableWorkspace[]
   user: { name: string; email: string }
@@ -67,6 +67,9 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
   financePushableCount?: number
   /** #210: open+in_review escalated-check count — countOpenExceptions. */
   openExceptionsCount?: number
+  /** #236: countReadyToApprove(workspaceId, currentUser) — the signed-in person's own
+   * Ready-to-Approve count across BOTH Approvals queues, never the workspace-wide count. */
+  approvalsReadyCount?: number
 }) {
   void reviewTaskCount
   const pathname = usePathname()
@@ -131,8 +134,14 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
     ],
   ]
   const exceptionsItem = { href: `${base}/exceptions`, label: "Exceptions", icon: AlertTriangle, exact: false, badge: openExceptionsCount > 0 ? openExceptionsCount : undefined }
+  // #236: Approvals sits right after Exceptions (map's Notes: "after Exceptions, before
+  // Worksheets" — Worksheets is unplugged per #237/#238, so Exceptions is the item it actually
+  // lands beside). Its badge is the signed-in person's own Ready-to-Approve count, never the
+  // workspace-wide total — see CONTEXT.md's "Ready to Approve".
+  const approvalsItem = { href: `${base}/approvals/invoices`, label: "Approvals", icon: BadgeCheck, exact: false, badge: approvalsReadyCount > 0 ? approvalsReadyCount : undefined }
   const primaryItems = [
     exceptionsItem,
+    approvalsItem,
     ...(controlsItem ? [controlsItem] : []),
     ...(accountingEnabled ? [{ href: `${base}/finance`, label: "Finance", icon: Landmark, exact: false, badge: financePushableCount > 0 ? financePushableCount : undefined }] : []),
     // "Archive" is the accountant's own word for the permanent source-document record (Dext and
@@ -154,7 +163,7 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
   // Sum across primary badges tells us whether the TODAY label is a promise or a reward. When the
   // total is zero every primary is quiet, and the "you're caught up" line reads under the group
   // instead of a promise the badges are supposed to keep.
-  const todayTotal = (pipelineReviewCount || 0) + (accountingEnabled ? (financePushableCount || 0) : 0) + (openExceptionsCount || 0)
+  const todayTotal = (pipelineReviewCount || 0) + (accountingEnabled ? (financePushableCount || 0) : 0) + (openExceptionsCount || 0) + (approvalsReadyCount || 0)
 
   const isActive = (item: { href: string; label: string; exact: boolean }) => item.exact
     ? pathname === item.href
@@ -167,6 +176,7 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
       || (item.label === "Purchase Orders" && pathname.startsWith(`${base}/purchase-orders`))
       || (item.label === "Receipts" && pathname.startsWith(`${base}/receipts`))
       || (item.label === "Bank Statements" && pathname.startsWith(`${base}/bank-statements`))
+      || (item.label === "Approvals" && pathname.startsWith(`${base}/approvals`))
       // Finance keeps its rail lit on the legacy /accounting URL too, which redirects here.
       || (item.label === "Finance" && pathname.startsWith(`${base}/accounting`))
 

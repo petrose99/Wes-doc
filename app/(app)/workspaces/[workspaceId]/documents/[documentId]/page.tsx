@@ -36,12 +36,15 @@ import { notFound, redirect } from "next/navigation"
  * is right for settings pages but leaves no room for a source viewer next to the form. Same URL
  * as before ((chrome) is a route group, so this move doesn't change the path), just outside that
  * layout, so it gets the workspace shell's full-bleed width instead. */
-export async function DocumentDetailPage({ params, searchParams, embedded = false, history = null }: {
+export async function DocumentDetailPage({ params, searchParams, embedded = false, history = null, initialTab }: {
   params: Promise<{ workspaceId: string; documentId: string }>
   searchParams: Promise<{ stage?: string; page?: string; bb?: string }>
   /** #225: rendered inside a Queue screen's Detail pane (see `getQueueDetailAction`). */
   embedded?: boolean
   history?: DocumentHistory | null
+  /** #236: which tab the embedded pane opens on — Approvals opens straight to "approval",
+   * PO Mismatches to "checks". Undefined keeps every other queue's existing "details" default. */
+  initialTab?: "details" | "note" | "activity" | "approval" | "checks"
 }) {
   const { workspaceId, documentId } = await params
   const { stage: stageParam, page: pageParam, bb: bbParam } = await searchParams
@@ -254,7 +257,10 @@ export async function DocumentDetailPage({ params, searchParams, embedded = fals
     header={{
       filename: document.filename, documentId: document.id, fileId: document.fileId, status: document.status,
       flagged: document.flaggedAt !== null,
-      reviewLink: reviewQueueEnabled && openReviewTask ? { href: `/workspaces/${workspaceId}/review/${openReviewTask.id}`, label: openReviewTask.status === "in_review" ? "In review" : "Open — view review task" } : null,
+      // #236: /review is retired — the same open ReviewTask is now viewed from the Approvals
+      // destination's Detail pane (its Approval tab reads "No approval steps yet" gracefully for
+      // a workflow-less task, since most ReviewTasks aren't Approvals at all — decision #1).
+      reviewLink: reviewQueueEnabled && openReviewTask ? { href: `/workspaces/${workspaceId}/approvals/invoices/${documentId}`, label: openReviewTask.status === "in_review" ? "In review" : "Open — view review task" } : null,
     }}
     canPush={canPush}
     paymentStatus={paymentStatuses.get(documentId)?.paymentStatus ?? null}
@@ -293,6 +299,7 @@ export async function DocumentDetailPage({ params, searchParams, embedded = fals
     institutionName={institutionName}
     embedded={embedded}
     history={history}
+    initialTab={initialTab}
   />
 }
 

@@ -48,7 +48,7 @@ export async function createApprovalWorkflowAction(workspaceId: string, formData
   if (!stages.length) return { success: false, error: "Add at least one named stage" }
   try {
     const workflow = await createApprovalWorkflow({ workspaceId, name, stages, createdById: user.id })
-    revalidatePath(paths(workspaceId).approvals)
+    revalidatePath(paths(workspaceId).approvalWorkflowSettings)
     return { success: true, data: { id: workflow.id } }
   } catch (error) { return { success: false, error: errorMessage(error, "Could not create the workflow") } }
 }
@@ -58,7 +58,7 @@ export async function setApprovalWorkflowActiveAction(workspaceId: string, workf
   if (!(await requireApprovalsOwner(workspaceId, user.id))) return { success: false, error: NO_ACCESS }
   try {
     await updateApprovalWorkflow({ workspaceId, workflowId, active })
-    revalidatePath(paths(workspaceId).approvals)
+    revalidatePath(paths(workspaceId).approvalWorkflowSettings)
     return { success: true, data: null }
   } catch (error) { return { success: false, error: errorMessage(error, "Could not update the workflow") } }
 }
@@ -68,7 +68,7 @@ export async function deleteApprovalWorkflowAction(workspaceId: string, workflow
   if (!(await requireApprovalsOwner(workspaceId, user.id))) return { success: false, error: NO_ACCESS }
   try {
     await deleteApprovalWorkflow(workspaceId, workflowId)
-    revalidatePath(paths(workspaceId).approvals)
+    revalidatePath(paths(workspaceId).approvalWorkflowSettings)
     return { success: true, data: null }
   } catch (error) { return { success: false, error: errorMessage(error, "Could not delete the workflow") } }
 }

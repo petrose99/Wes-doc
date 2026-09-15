@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 vi.mock("@/lib/db", () => ({ prisma: {} }))
 
 const {
-  createApprovalWorkflow, deleteApprovalWorkflow, replaceApprovalWorkflowStages, startWorkflowOnReviewTask, updateApprovalWorkflow,
+  createApprovalWorkflow, deleteApprovalWorkflow, replaceApprovalWorkflowStages, startApprovalOnInvoice, startWorkflowOnReviewTask, updateApprovalWorkflow,
 } = await import("@/models/approval-workflows")
 const { prisma } = await import("@/lib/db")
 
@@ -98,5 +98,42 @@ describe("startWorkflowOnReviewTask", () => {
     await startWorkflowOnReviewTask({ workspaceId: "w1", taskId: "t1", workflowId: "wf1", actorId: "u1" })
 
     expect(db.reviewTask.update).toHaveBeenCalledWith({ where: { id: "t1" }, data: { workflowId: "wf1", currentStageIndex: 0, status: "in_review" } })
+  })
+})
+
+describe("startApprovalOnInvoice", () => {
+  it("refuses an unknown workflow", async () => {
+    db.reviewTask = { findFirst: vi.fn().mockResolvedValue(null) }
+    db.approvalWorkflow = { findFirst: vi.fn().mockResolvedValue(null) }
+    await expect(startApprovalOnInvoice({ workspaceId: "w1", documentId: "d1", workflowId: "wf1", actorId: "u1" })).rejects.toThrow("approval_workflow_not_found")
+  })
+
+  it("refuses an invoice that already has an Approval in flight", async () => {
+    db.reviewTask = { findFirst: vi.fn().mockResolvedValue({ id: "t1", workflowId: "wf-old", status: "in_review" }) }
+    db.approvalWorkflow = { findFirst: vi.fn().mockResolvedValue({ id: "wf1" }) }
+    await expect(startApprovalOnInvoice({ workspaceId: "w1", documentId: "d1", workflowId: "wf1", actorId: "u1" })).rejects.toThrow("review_task_already_has_workflow")
+  })
+
+  it("attaches the workflow to an existing open, workflow-less task", async () => {
+    db.reviewTask = { findFirst: vi.fn().mockResolvedValue({ id: "t1", workflowId: null, status: "open" }), update: vi.fn().mockReturnValue("update") }
+    db.approvalWorkflow = { findFirst: vi.fn().mockResolvedValue({ id: "wf1" }) }
+    db.documentAuditEvent = { create: vi.fn().mockReturnValue("audit") }
+
+    await startApprovalOnInvoice({ workspaceId: "w1", documentId: "d1", workflowId: "wf1", actorId: "u1" })
+
+    expect(db.reviewTask.update).toHaveBeenCalledWith({ where: { id: "t1" }, data: { workflowId: "wf1", currentStageIndex: 0, status: "in_review" } })
+  })
+
+  it("creates a fresh task at stage 0 when the invoice has no ReviewTask at all", async () => {
+    db.reviewTask = { findFirst: vi.fn().mockResolvedValue(null), create: vi.fn().mockReturnValue("create-task") }
+    db.approvalWorkflow = { findFirst: vi.fn().mockResolvedValue({ id: "wf1" }) }
+    db.document = { findFirst: vi.fn().mockResolvedValue({ id: "d1" }) }
+    db.documentAuditEvent = { create: vi.fn().mockReturnValue("audit") }
+
+    await startApprovalOnInvoice({ workspaceId: "w1", documentId: "d1", workflowId: "wf1", actorId: "u1" })
+
+    expect(db.reviewTask.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ workspaceId: "w1", documentId: "d1", workflowId: "wf1", currentStageIndex: 0, status: "in_review" }),
+    }))
   })
 })

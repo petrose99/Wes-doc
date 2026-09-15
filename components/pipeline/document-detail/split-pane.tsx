@@ -14,14 +14,13 @@ import { escalateCheckAction, setDocumentTypeAction } from "@/app/(app)/workspac
 import { InstitutionAssert } from "@/components/pipeline/document-detail/institution-assert"
 import { StatementDriftBanner } from "@/components/pipeline/document-detail/statement-drift-banner"
 import { ApprovalStepChain, AuditLog, ChecksTab, type DocumentHistory } from "@/components/queue/history-tabs"
-import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { SourceViewer, type ProvenanceTarget, type SourceDocument } from "@/components/viewer/source-preview"
 import type { DocumentFieldDefinition } from "@/lib/document-templates"
 import type { PipelineStage } from "@/lib/documents/stages"
 import type { Ref } from "@/lib/provenance"
 import type { FieldRationale } from "@/lib/rationale"
-import { Archive, ArrowDown, ArrowLeft, ArrowUp, Building2, CheckCircle2, ChevronLeft, ChevronRight, Eye, EyeOff, Flag, Loader2, Maximize2, Minimize2, PanelLeftClose, PanelLeftOpen } from "lucide-react"
+import { Archive, ArrowDown, ArrowLeft, ArrowUp, Building2, CheckCircle2, ChevronLeft, ChevronRight, Flag, Loader2, Maximize2, Minimize2, PanelLeftClose, PanelLeftOpen } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useRef, useState, type ReactNode } from "react"
@@ -45,7 +44,7 @@ export function SplitPane({
   workspaceId, source, fields, data, fieldConfidence, provenanceFields, provenanceItems, initialTarget, conflictingLabels, missingRequiredFields,
   saveReview, documentType: initialDocumentType, note: initialNote, auditEvents, prevHref, nextHref, position, stage, afterActionHref,
   header, canPush, pushCard, canCreateRule, defaultSupplier, matchKind, bankMatches, documentMatches, paymentStatus, rationales, checks, fxBadge, stageIndicator,
-  institutions, institutionId, institutionName, embedded = false, history,
+  institutions, institutionId, institutionName, embedded = false, history, initialTab,
 }: {
   workspaceId: string
   source: SourceDocument
@@ -96,9 +95,12 @@ export function SplitPane({
   /** #225: the Approval / Audit / Checks tabs' data, loaded with the document so they sit in the
    * same tab strip as Details and Note. Only supplied in embedded mode. */
   history?: DocumentHistory | null
+  /** #236: which tab this pane opens on — Approvals opens straight to "approval", PO Mismatches
+   * to "checks". Undefined keeps the historic "details" default for every other queue. */
+  initialTab?: Tab
 }) {
   const router = useRouter()
-  const [tab, setTab] = useState<Tab>("details")
+  const [tab, setTab] = useState<Tab>(initialTab ?? "details")
   const [target, setTarget] = useState<ProvenanceTarget | null>(initialTarget)
   const [note, setNote] = useState(initialNote)
   const [savingNote, setSavingNote] = useState(false)
@@ -216,6 +218,11 @@ export function SplitPane({
 
   const showSource = layout === "split" || layout === "source-only"
   const showDetails = layout === "split" || layout === "details-only"
+  // #236: "extracted fields are read-only while a stage is pending" (decision #6) — derived from
+  // the same `history.pendingStages` the Approval tab already renders, so it applies wherever a
+  // workflow is mid-run (Invoices' own Detail pane included, not just Approvals'), with no new
+  // prop for a caller to remember to pass.
+  const fieldsReadOnly = embedded && !!history && history.pendingStages.length > 0
 
   return <div className={`flex flex-col overflow-hidden ${embedded ? "h-full min-h-0 bg-white" : "h-screen bg-slate-50"}`}>
     {/* Top bar */}
@@ -371,24 +378,32 @@ export function SplitPane({
               institutionName={institutionName ?? null}
             />}
 
+            {/* Decision #6: a stage is still pending on this invoice's Approval, so its extracted
+                fields are locked rather than editable underneath a decision in flight. */}
+            {fieldsReadOnly && <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              Fields are locked while an approval decision is pending on this invoice.
+            </p>}
+
             {/* Review form — A4.1 field navigation: land on the lowest-confidence field first,
                 Enter = confirm-and-advance. Non-array fields are what the nav visits; the array
                 editor has its own confidence signal and its own keyboard flow. */}
-            <FieldNavForm
-              saveReview={saveReview}
-              docType={docType}
-              formFields={formFields}
-              data={data}
-              fieldConfidence={fieldConfidence}
-              provenanceFields={provenanceFields}
-              provenanceItems={provenanceItems}
-              summaryFields={summaryFields}
-              rationales={rationales ?? null}
-              checks={checks ?? []}
-              workspaceId={workspaceId}
-              documentId={header.documentId}
-              setTarget={setTarget}
-            />
+            <fieldset disabled={fieldsReadOnly} className="min-w-0">
+              <FieldNavForm
+                saveReview={saveReview}
+                docType={docType}
+                formFields={formFields}
+                data={data}
+                fieldConfidence={fieldConfidence}
+                provenanceFields={provenanceFields}
+                provenanceItems={provenanceItems}
+                summaryFields={summaryFields}
+                rationales={rationales ?? null}
+                checks={checks ?? []}
+                workspaceId={workspaceId}
+                documentId={header.documentId}
+                setTarget={setTarget}
+              />
+            </fieldset>
 
             {fxBadge && <div className="pt-2">{fxBadge}</div>}
             {canPush && <div className="pt-2">{pushCard}</div>}

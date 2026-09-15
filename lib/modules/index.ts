@@ -43,7 +43,12 @@ export const MODULES: ModuleDefinition[] = [
   { key: "assistant", name: "AI Assistant", description: "Ask questions and take actions across your workspace.", industry: "core", tier: "always", activation: "enable" },
   { key: "reports", name: "Reports", description: "Draft and export reports from extracted data.", industry: "core", tier: "always", activation: "enable" },
 
-  { key: "review-queue", name: "Review queue", description: "Triage incoming documents that need a person to look at them.", industry: "finance", tier: "always", activation: "enable", navItems: [{ href: "review", label: "Review", icon: "inbox" }] },
+  // #236: renamed from "Review queue" — the module still gates the same capability
+  // (createReviewTask, decideReviewTaskStage, …), but the user-facing surface is now the
+  // Approvals destination (Ready to Approve / PO Mismatches), not a standalone Review queue.
+  // navItems dropped: the sidebar hardcodes the Approvals rail entry the same way it already
+  // does for Exceptions, rather than driving it off a module nav item.
+  { key: "review-queue", name: "Approvals", description: "Route submitted invoices through approval stages, and triage documents that need a person to look at them first.", industry: "finance", tier: "always", activation: "enable" },
   // Approval workflows is workflow *configuration*, reachable from the Automation page's own tabs
   // (Approvals lives at /automation/approvals). It used to declare a sidebar navItem, which
   // produced a duplicate "Approvals" rail entry alongside Automation itself — the audit flagged

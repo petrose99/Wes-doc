@@ -13,7 +13,7 @@ A feature the product no longer shows or routes to, kept only so it can be broug
 _Avoid_: Hidden, deprecated, legacy
 
 **Core workflow destinations**:
-Invoices, Purchase Orders, Receipts, Bank Statements, Exceptions, Finance, and Archive: the permission-filtered peer surfaces representing typed intake, escalated work, booked outcome, and the permanent source record. The four typed intake destinations replace the former single "Documents" surface.
+Invoices, Purchase Orders, Receipts, Bank Statements, Exceptions, Approvals, Finance, and Archive: the permission-filtered peer surfaces representing typed intake, escalated work, decision-in-flight work, booked outcome, and the permanent source record. The four typed intake destinations replace the former single "Documents" surface.
 
 **Document**:
 The storage-and-extraction primitive underlying every typed destination. Every Invoice, Purchase Order, Receipt, and Bank Statement is a Document, but "Document" is no longer itself a user-facing destination — the user asserts which typed destination a Document belongs to at upload time, and that assertion is authoritative.

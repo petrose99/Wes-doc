@@ -2,6 +2,7 @@
 // these helpers trust the workspaceId they are handed. Server actions (WP3.2) will do the auth +
 // capability gate before calling into here.
 import { auditEventData, getRequestAuditContext } from "@/lib/audit"
+import { createReviewTask } from "@/models/review-tasks"
 import { prisma } from "@/lib/db"
 import { cache } from "react"
 
@@ -71,6 +72,32 @@ export async function replaceApprovalWorkflowStages(input: { workspaceId: string
     prisma.approvalWorkflowStage.createMany({ data: input.stages.map((stage, stageIndex) => ({ workflowId: workflow.id, workspaceId: input.workspaceId, stageIndex, name: stage.name, requireOwner: stage.requireOwner ?? false, approverIds: stage.approverIds ?? [], minAmount: stage.minAmount ?? null })) }),
   ])
   return getApprovalWorkflow(input.workspaceId, workflow.id)
+}
+
+/** #236: "Start Approval" on an invoice — the Invoices bulk-action bar's `Approval ▾ → Start`.
+ * Most documents have no ReviewTask at all until something flags them for review (decision #1's
+ * five workflow-less call sites); an invoice a person wants to start an Approval on manually may
+ * be one of those. Rather than making every caller check for an existing open task first, this
+ * finds one or creates it: an existing open (no-workflow-yet) task gets the workflow attached
+ * (`startWorkflowOnReviewTask`'s own refusals still apply — already-workflowed, already-resolved);
+ * with no task at all, a fresh one is created directly at stage 0/`in_review`
+ * (`createReviewTask`'s own `workflowId` option), skipping the intermediate "open" state a
+ * document that has never been reviewed has no reason to sit in. Refuses a document that already
+ * has an unresolved task WITH a workflow — that invoice already has an Approval in flight, and
+ * starting a second one on top would race the first. */
+export async function startApprovalOnInvoice(input: { workspaceId: string; documentId: string; workflowId: string; actorId: string }) {
+  const [existingTask, workflow] = await Promise.all([
+    prisma.reviewTask.findFirst({
+      where: { workspaceId: input.workspaceId, documentId: input.documentId, status: { in: ["open", "in_review"] } },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, workflowId: true, status: true },
+    }),
+    prisma.approvalWorkflow.findFirst({ where: { id: input.workflowId, workspaceId: input.workspaceId }, select: { id: true } }),
+  ])
+  if (!workflow) throw new Error("approval_workflow_not_found")
+  if (existingTask?.workflowId) throw new Error("review_task_already_has_workflow")
+  if (existingTask) return startWorkflowOnReviewTask({ workspaceId: input.workspaceId, taskId: existingTask.id, workflowId: input.workflowId, actorId: input.actorId })
+  return createReviewTask({ workspaceId: input.workspaceId, documentId: input.documentId, reason: "manual", createdById: input.actorId, workflowId: input.workflowId })
 }
 
 /** Deleting a workflow never deletes the ReviewTasks that pointed at it — ReviewTask.workflowId is
