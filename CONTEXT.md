@@ -5,23 +5,15 @@ This glossary defines the product language used for the authenticated workspace 
 ## Authenticated workspace experience
 
 **Workspace home**:
-The first authenticated surface for a workspace, oriented around the user's next meaningful piece of work.
-_Avoid_: Dashboard, landing page
+The Invoices queue. Opening a workspace lands the user on their work, not on a summary of it; "what needs me" is read from the rail badges and the queue's own counts. There is no separate overview surface.
+_Avoid_: Dashboard, landing page, overview, next best action
 
-**Next-action queue**:
-The permission-filtered set of work items that can move a workspace forward, ordered by blockage, urgency, and financial consequence.
-_Avoid_: To-do list, activity feed
-
-**Next best action**:
-The single highest-priority item presented to the user, with a concise explanation of why it is currently first.
-_Avoid_: Recommendation, suggestion
-
-**Caught-up state**:
-The workspace-home state shown when no review, recovery, or placement work is pending; it offers upload and workspace-browsing as secondary actions.
-_Avoid_: Empty state, zero state
+**Unplugged surface**:
+A feature the product no longer shows or routes to, kept only so it can be brought back deliberately. Worksheets, Expenses and Dictation are unplugged. An unplugged surface has no navigation entry, no row or bulk action, no badge, and its addresses do not open.
+_Avoid_: Hidden, deprecated, legacy
 
 **Core workflow destinations**:
-Invoices, Purchase Orders, Receipts, Bank Statements, Worksheets, Finance, and Archive: the permission-filtered peer surfaces representing typed intake, computation, booked outcome, and the permanent source record. The four typed intake destinations replace the former single "Documents" surface.
+Invoices, Purchase Orders, Receipts, Bank Statements, Exceptions, Finance, and Archive: the permission-filtered peer surfaces representing typed intake, escalated work, booked outcome, and the permanent source record. The four typed intake destinations replace the former single "Documents" surface.
 
 **Document**:
 The storage-and-extraction primitive underlying every typed destination. Every Invoice, Purchase Order, Receipt, and Bank Statement is a Document, but "Document" is no longer itself a user-facing destination — the user asserts which typed destination a Document belongs to at upload time, and that assertion is authoritative.
