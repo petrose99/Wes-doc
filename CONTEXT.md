@@ -142,8 +142,12 @@ A document whose extracted fields all met the workspace's confidence threshold a
 _Avoid_: Auto-approved, zero-touch
 
 **Processing state**:
-Where a queue row stands in the intake → review → approval path, shown as one mark at the row's leading edge. Exactly one of, in precedence order: Cancelled, Needs attention (a check blocked it, an escalation is open, or an approval was rejected), In review, Touchless, Approved. Ledger facts such as Synced or Paid are not processing states and are shown separately. Due-date urgency is not a processing state either.
-_Avoid_: Status (the column of pills is broader), aging (that is the due-date signal)
+Where a queue row stands in the intake → review → approval path, shown as one mark at the row's leading edge. Exactly one of, in precedence order: Cancelled, Needs attention (a check blocked it, an escalation is open, or an approval was rejected), In review, Touchless, Approved. Ledger facts such as Synced or Paid are not processing states and are shown separately. Due-date urgency is not a processing state either. These five words are the only words the app uses for where a document stands — the row, the Detail pane's status line, the stepper and the Approval tab all say the same one, derived the same way. A document nobody has opened yet is In review.
+_Avoid_: Status (the column of pills is broader), aging (that is the due-date signal), Unreviewed / Reviewed / Signed off / Awaiting approval (synonyms the surfaces used to invent), the stored status values (queued, needs review, ready for review, reviewed — persistence words, never shown)
+
+**Status line**:
+The one line at the top of the Detail pane that states the row's processing state and the fact behind it — who decided, when, or what is holding it: "Approved by Nadia K. · 12 Sep 2026", "In review · opened 3 days ago", "Needs attention · 2 open checks", "Touchless · sent automatically", "Cancelled · duplicate". Ledger facts follow as their own mark. It replaces the pane's separate status pill; the Approval tab holds the full trail behind it.
+_Avoid_: pane pill, status badge
 
 **Confidence threshold**:
 The single workspace-set score an extracted field must reach to count as confident. It is the same floor Touchless is judged against, so a field that clears it in a queue row would also clear it for Touchless. A field entered by a person, or never scored by extraction, has no confidence and shows no confidence claim at all — absence means "not an AI claim", not "low".
