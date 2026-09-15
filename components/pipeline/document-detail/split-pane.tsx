@@ -13,6 +13,7 @@ import { archiveDocumentsAction, flagDocumentsAction, moveDocumentsToStageAction
 import { escalateCheckAction, setDocumentTypeAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
 import { InstitutionAssert } from "@/components/pipeline/document-detail/institution-assert"
 import { StatementDriftBanner } from "@/components/pipeline/document-detail/statement-drift-banner"
+import { ApprovalStepChain, AuditLog, ChecksTab, type DocumentHistory } from "@/components/queue/history-tabs"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { SourceViewer, type ProvenanceTarget, type SourceDocument } from "@/components/viewer/source-preview"
@@ -26,7 +27,7 @@ import { useRouter } from "next/navigation"
 import { useRef, useState, type ReactNode } from "react"
 import { toast } from "sonner"
 
-type Tab = "details" | "note" | "activity"
+type Tab = "details" | "note" | "activity" | "approval" | "checks"
 type PanelLayout = "split" | "source-only" | "details-only"
 
 /** Shared label map for the four document-type states. Extracted so the chip in the top bar, the
@@ -44,7 +45,7 @@ export function SplitPane({
   workspaceId, source, fields, data, fieldConfidence, provenanceFields, provenanceItems, initialTarget, conflictingLabels, missingRequiredFields,
   saveReview, documentType: initialDocumentType, note: initialNote, auditEvents, prevHref, nextHref, position, stage, afterActionHref,
   header, canPush, pushCard, canCreateRule, defaultSupplier, matchKind, bankMatches, documentMatches, paymentStatus, rationales, checks, fxBadge, stageIndicator,
-  institutions, institutionId, institutionName,
+  institutions, institutionId, institutionName, embedded = false, history,
 }: {
   workspaceId: string
   source: SourceDocument
@@ -87,6 +88,14 @@ export function SplitPane({
   institutions?: Array<{ id: string; name: string }>
   institutionId?: string | null
   institutionName?: string | null
+  /** #225: rendered inside a Queue screen's Detail pane rather than as a standalone route. The
+   * pane owns the frame (title, close, ↑/↓, the sticky Approve/Reject bar), so embedded mode
+   * drops the Back link, prev/next, the standalone Approve button and the `h-screen` root, and
+   * stacks source over fields below `lg` where the pane is a full-screen sheet. */
+  embedded?: boolean
+  /** #225: the Approval / Audit / Checks tabs' data, loaded with the document so they sit in the
+   * same tab strip as Details and Note. Only supplied in embedded mode. */
+  history?: DocumentHistory | null
 }) {
   const router = useRouter()
   const [tab, setTab] = useState<Tab>("details")
@@ -153,7 +162,7 @@ export function SplitPane({
       const result = await archiveDocumentsAction(workspaceId, [header.documentId], true)
       if (!result.success) { toast.error(result.error || "Could not archive this document"); return }
       toast.success("Archived")
-      router.push(afterActionHref)
+      if (!embedded) router.push(afterActionHref)
       router.refresh()
     } catch {
       toast.error("Could not reach the server")
@@ -192,9 +201,12 @@ export function SplitPane({
     })
   }
 
-  const tabButton = (value: Tab, label: string) => <button type="button" key={value}
-    className={`rounded-t-md border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${tab === value ? "border-emerald-600 text-emerald-700" : "border-transparent text-slate-500 hover:text-slate-700"}`}
-    onClick={() => setTab(value)}>{label}</button>
+  const tabButton = (value: Tab, label: string, count?: number) => <button type="button" key={value} role="tab" aria-selected={tab === value}
+    className={`flex items-center gap-1.5 whitespace-nowrap rounded-t-md border-b-2 px-3 py-2.5 text-sm font-medium transition-colors ${tab === value ? "border-emerald-700 text-emerald-800" : "border-transparent text-slate-600 hover:text-slate-900"}`}
+    onClick={() => setTab(value)}>
+    {label}
+    {!!count && <span className="rounded-full bg-amber-100 px-1.5 py-px text-xs font-semibold tabular-nums text-amber-800">{count}</span>}
+  </button>
 
   const toolbarBtn = "inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 shadow-sm hover:bg-slate-50 hover:text-slate-800 disabled:pointer-events-none disabled:opacity-40 transition-colors"
 
@@ -205,16 +217,20 @@ export function SplitPane({
   const showSource = layout === "split" || layout === "source-only"
   const showDetails = layout === "split" || layout === "details-only"
 
-  return <div className="flex h-screen flex-col overflow-hidden bg-slate-50">
+  return <div className={`flex flex-col overflow-hidden ${embedded ? "h-full min-h-0 bg-white" : "h-screen bg-slate-50"}`}>
     {/* Top bar */}
-    <div className="flex items-center gap-2 border-b border-slate-200 bg-white px-4 py-2">
-      <Link href={stage ? `/workspaces/${workspaceId}/pipeline?stage=${stage}` : `/workspaces/${workspaceId}/pipeline`} className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700">
-        <ArrowLeft className="h-4 w-4" />Back
-      </Link>
+    <div className={`flex items-center gap-2 border-b border-slate-200 px-4 py-2 ${embedded ? "overflow-x-auto sm:flex-wrap" : "flex-wrap"}`}>
+      {embedded && <span className="min-w-0 flex-1 sm:hidden" aria-hidden />}
+      {!embedded && <>
+        <Link href={stage ? `/workspaces/${workspaceId}/pipeline?stage=${stage}` : `/workspaces/${workspaceId}/pipeline`} className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-800">
+          <ArrowLeft className="h-4 w-4" />Back
+        </Link>
+        <div className="mx-2 h-5 w-px bg-slate-200" />
+      </>}
 
-      <div className="mx-2 h-5 w-px bg-slate-200" />
-
-      <h1 className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-800" title={header.filename}>{header.filename}</h1>
+      {embedded
+        ? <span className="hidden min-w-0 flex-1 truncate text-sm text-slate-600 sm:inline" title={header.filename}>{header.filename}</span>
+        : <h1 className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-800" title={header.filename}>{header.filename}</h1>}
 
       <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${statusColor}`}>
         {header.status.replaceAll("_", " ")}
@@ -234,15 +250,15 @@ export function SplitPane({
 
       <div className="mx-2 h-5 w-px bg-slate-200" />
 
-      <button type="button" title={flagged ? "Remove flag" : "Flag for attention"} disabled={busyAction === "flag"} onClick={() => void toggleFlag()}
-        className={`rounded-lg p-1.5 transition-colors ${flagged ? "bg-indigo-50 text-indigo-500" : "text-slate-400 hover:bg-slate-100 hover:text-slate-600"}`}>
+      <button type="button" title={flagged ? "Remove flag" : "Flag for attention"} aria-label={flagged ? "Remove flag" : "Flag for attention"} aria-pressed={flagged} disabled={busyAction === "flag"} onClick={() => void toggleFlag()}
+        className={`rounded-lg p-1.5 transition-colors ${flagged ? "bg-indigo-50 text-indigo-600" : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"}`}>
         <Flag className={`h-4 w-4 ${flagged ? "fill-indigo-400" : ""}`} />
       </button>
 
       {/* Keyed off the document's own status, not the ?stage= the reader arrived from — a doc
           opened from search (no stage param) still needs its Approve button. Hidden once the
           document is reviewed: it's already approved, re-approving is a no-op. */}
-      {header.status !== "reviewed" && header.status !== "queued" && header.status !== "failed" && stage !== "archive" && <button type="button" disabled={busyAction === "ready"} onClick={() => void moveToReady()} className={toolbarBtn}>
+      {!embedded && header.status !== "reviewed" && header.status !== "queued" && header.status !== "failed" && stage !== "archive" && <button type="button" disabled={busyAction === "ready"} onClick={() => void moveToReady()} className={toolbarBtn}>
         {busyAction === "ready" ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}Approve
       </button>}
       {stage !== "archive" && <button type="button" disabled={busyAction === "archive"} onClick={() => void archive()} className={toolbarBtn}>
@@ -256,17 +272,19 @@ export function SplitPane({
       <div className="mx-2 h-5 w-px bg-slate-200" />
 
       {/* Layout toggle */}
-      <button type="button" onClick={cycleLayout} title={layout === "split" ? "Expand details" : layout === "details-only" ? "Show source only" : "Split view"} className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600">
+      <button type="button" onClick={cycleLayout} title={layout === "split" ? "Expand details" : layout === "details-only" ? "Show source only" : "Split view"} aria-label={layout === "split" ? "Expand details" : layout === "details-only" ? "Show source only" : "Split view"} className="hidden rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 lg:inline-flex">
         {layout === "split" ? <Maximize2 className="h-4 w-4" /> : layout === "details-only" ? <PanelLeftOpen className="h-4 w-4" /> : <Minimize2 className="h-4 w-4" />}
       </button>
 
-      {position && <span className="text-xs tabular-nums text-slate-400">{position.index}/{position.total}</span>}
-      <Link href={prevHref ?? "#"} aria-disabled={!prevHref} className={`rounded-lg p-1 ${prevHref ? "text-slate-500 hover:bg-slate-100 hover:text-slate-700" : "pointer-events-none text-slate-300"}`}><ChevronLeft className="h-4 w-4" /></Link>
-      <Link href={nextHref ?? "#"} aria-disabled={!nextHref} className={`rounded-lg p-1 ${nextHref ? "text-slate-500 hover:bg-slate-100 hover:text-slate-700" : "pointer-events-none text-slate-300"}`}><ChevronRight className="h-4 w-4" /></Link>
+      {!embedded && <>
+        {position && <span className="text-xs tabular-nums text-slate-500">{position.index}/{position.total}</span>}
+        <Link href={prevHref ?? "#"} aria-disabled={!prevHref} aria-label="Previous document" className={`rounded-lg p-1 ${prevHref ? "text-slate-500 hover:bg-slate-100 hover:text-slate-700" : "pointer-events-none text-slate-300"}`}><ChevronLeft className="h-4 w-4" /></Link>
+        <Link href={nextHref ?? "#"} aria-disabled={!nextHref} aria-label="Next document" className={`rounded-lg p-1 ${nextHref ? "text-slate-500 hover:bg-slate-100 hover:text-slate-700" : "pointer-events-none text-slate-300"}`}><ChevronRight className="h-4 w-4" /></Link>
+      </>}
     </div>
 
     {/* Five-step lifecycle: Extracted → Checks → Approval → Sync → Pay. See stage-indicator.tsx. */}
-    {stageIndicator && stageIndicator.length > 0 && <div className="border-b border-slate-200 bg-white">
+    {stageIndicator && stageIndicator.length > 0 && <div className="border-b border-slate-200">
       <StageIndicator steps={stageIndicator} />
     </div>}
 
@@ -285,10 +303,11 @@ export function SplitPane({
       {conflictingLabels.length > 0 && <p>Pages disagreed on: <strong>{conflictingLabels.join(", ")}</strong> — please confirm against the source.</p>}
     </div>}
 
-    {/* Main content area */}
-    <div className="flex min-h-0 flex-1 overflow-hidden">
+    {/* Main content area. Embedded below `lg` (the pane is a full-screen sheet there) the source
+        stacks above the fields at a fixed height so both stay reachable without a second sheet. */}
+    <div className={`flex min-h-0 flex-1 overflow-hidden ${embedded ? "flex-col lg:flex-row" : ""}`}>
       {/* Source panel */}
-      {showSource && <div className={`flex min-h-0 flex-col overflow-hidden border-r border-slate-200 bg-white transition-[flex-basis] duration-200 ${layout === "source-only" ? "flex-1" : "basis-[52%]"}`}>
+      {showSource && <div className={`flex min-h-0 flex-col overflow-hidden border-slate-200 transition-[flex-basis] duration-200 ${embedded ? "h-[38vh] shrink-0 border-b lg:h-auto lg:shrink lg:border-b-0 lg:border-r" : "border-r bg-white"} ${layout === "source-only" ? "flex-1" : "lg:basis-[52%]"}`}>
         {layout !== "split" && <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2">
           <span className="text-xs font-medium uppercase tracking-wider text-slate-400">Source document</span>
           <button type="button" onClick={() => setLayout("split")} className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600" title="Split view">
@@ -299,12 +318,18 @@ export function SplitPane({
       </div>}
 
       {/* Details panel */}
-      {showDetails && <div className={`flex min-h-0 flex-col overflow-hidden bg-white transition-[flex-basis] duration-200 ${layout === "details-only" ? "flex-1" : "basis-[48%]"}`}>
-        <div className="flex items-center border-b border-slate-100">
-          <div className="flex gap-0.5 px-3 pt-1">
+      {showDetails && <div className={`flex min-h-0 flex-col overflow-hidden transition-[flex-basis] duration-200 ${embedded ? "" : "bg-white"} ${layout === "details-only" ? "flex-1" : embedded ? "min-h-0 flex-1 lg:flex-none lg:basis-[48%]" : "basis-[48%]"}`}>
+        <div className="flex items-center shadow-[inset_0_-1px_0_0_theme(colors.slate.100)]">
+          <div className="flex gap-0.5 overflow-x-auto px-3 pt-1" role="tablist" aria-label="Document detail">
             {tabButton("details", "Details")}
             {tabButton("note", "Note")}
-            {tabButton("activity", "Activity")}
+            {embedded && history
+              ? <>
+                {tabButton("approval", "Approval")}
+                {tabButton("activity", "Audit")}
+                {tabButton("checks", "Checks", history.gates.length)}
+              </>
+              : tabButton("activity", "Activity")}
           </div>
           {layout !== "split" && <button type="button" onClick={() => setLayout("split")} className="ml-auto mr-3 rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600" title="Split view">
             <PanelLeftOpen className="h-4 w-4" />
@@ -382,18 +407,21 @@ export function SplitPane({
           {tab === "note" && <div className={`mx-auto space-y-3 p-6 ${layout === "details-only" ? "max-w-2xl" : ""}`}>
             <textarea className="min-h-48 w-full rounded-lg border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm transition-colors focus:border-emerald-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100" placeholder="A note only your team sees — not sent anywhere, not part of the extracted data."
               value={note} onChange={(event) => setNote(event.target.value)} />
-            <button type="button" disabled={savingNote} className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:opacity-40" onClick={() => void saveNote()}>
+            <button type="button" disabled={savingNote} className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-800 disabled:opacity-40" onClick={() => void saveNote()}>
               {savingNote && <Loader2 className="h-4 w-4 animate-spin" />}Save note
             </button>
           </div>}
 
           {tab === "activity" && <div className={`mx-auto p-6 ${layout === "details-only" ? "max-w-2xl" : ""}`}>
-            {auditEvents.length === 0 ? <p className="text-sm text-slate-400">No activity recorded yet.</p> : <div className="space-y-1">
-              {auditEvents.map((event) => <div key={event.id} className="flex items-center justify-between gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-slate-50">
-                <span className="text-sm text-slate-700">{event.label}</span>
-                <span className="shrink-0 text-xs text-slate-400">{event.actorName ?? "System"} · {new Date(event.createdAt).toLocaleString()}</span>
-              </div>)}
-            </div>}
+            <AuditLog events={history?.auditEvents ?? auditEvents} />
+          </div>}
+
+          {tab === "approval" && history && <div className={`mx-auto p-6 ${layout === "details-only" ? "max-w-2xl" : ""}`}>
+            <ApprovalStepChain decisions={history.stageDecisions} pendingStages={history.pendingStages} />
+          </div>}
+
+          {tab === "checks" && history && <div className={`mx-auto p-6 ${layout === "details-only" ? "max-w-2xl" : ""}`}>
+            <ChecksTab workspaceId={workspaceId} gates={history.gates} />
           </div>}
         </div>
       </div>}
@@ -452,7 +480,7 @@ function FieldNavForm({ saveReview, docType, formFields, data, fieldConfidence, 
           checks={liveChecks.filter((check) => checkAppliesToField(check, field.key))} onEscalate={onEscalate}
           registerNav={nav.registerField} isCurrent={nav.currentKey === field.key} isCompleted={nav.completedKeys.has(field.key)} />)}
     <div className="flex items-center gap-3 border-t border-slate-100 pt-3">
-      <button type="submit" disabled={!docType} className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40" title={!docType ? "Choose Expense or Sale first" : undefined}>
+      <button type="submit" disabled={!docType} className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40" title={!docType ? "Choose Expense or Sale first" : undefined}>
         <CheckCircle2 className="h-4 w-4" />Save review
       </button>
       {!docType && <span className="text-xs text-amber-600">Choose a document type first</span>}

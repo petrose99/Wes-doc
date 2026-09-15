@@ -28,6 +28,8 @@ export type ReceiptRow = {
    * in_review — null once it resolves or if there was never a ReviewTask. Same convention as
    * BillRow.reviewTaskOpenedAt; #208's Review SLA countdown badge times its clock from this. */
   reviewTaskOpenedAt: Date | null
+  /** #225: same as BillRow.openReviewTaskId. */
+  openReviewTaskId: string | null
   /** Per-field extraction confidence (0-1), same shape/source as BillRow.fieldConfidence. */
   fieldConfidence: Record<string, number>
   /** #200: same touchless signal as BillRow.touchless — a `push.touchless_enqueued` document-audit
@@ -90,7 +92,7 @@ export async function listWorkspaceReceipts(input: {
     // to time the Review SLA countdown badge from when the still-open task was created.
     prisma.reviewTask.findMany({
       where: { workspaceId: input.workspaceId, documentId: { in: documentIds } },
-      select: { documentId: true, status: true, createdAt: true },
+      select: { id: true, documentId: true, status: true, createdAt: true },
       orderBy: { createdAt: "desc" },
     }),
     // #223: same open-escalation shape as models/bills.ts.
@@ -112,9 +114,9 @@ export async function listWorkspaceReceipts(input: {
   const claimByDoc = new Map(claimItems.map((item) => [item.documentId, item.claim]))
 
   // First hit per document wins — the query is already newest-first.
-  const latestReviewTaskByDoc = new Map<string, { status: string; createdAt: Date }>()
+  const latestReviewTaskByDoc = new Map<string, { id: string; status: string; createdAt: Date }>()
   for (const task of latestReviewTasks) {
-    if (!latestReviewTaskByDoc.has(task.documentId)) latestReviewTaskByDoc.set(task.documentId, { status: task.status, createdAt: task.createdAt })
+    if (!latestReviewTaskByDoc.has(task.documentId)) latestReviewTaskByDoc.set(task.documentId, { id: task.id, status: task.status, createdAt: task.createdAt })
   }
 
   const receipts: ReceiptRow[] = documents.map((doc) => {
@@ -145,6 +147,7 @@ export async function listWorkspaceReceipts(input: {
       claimId: claim?.id ?? null,
       claimStatus: (claim?.status as ReceiptRow["claimStatus"]) ?? null,
       reviewTaskOpenedAt,
+      openReviewTaskId: reviewTaskOpenedAt ? latestTask!.id : null,
       fieldConfidence: (doc.confidence as Record<string, unknown> | null)?.fieldConfidence as Record<string, number> ?? {},
       touchless: touchlessDocIds.has(doc.id),
       escalated: escalatedDocIds.has(doc.id),

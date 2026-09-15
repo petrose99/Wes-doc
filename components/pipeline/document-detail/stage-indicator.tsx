@@ -43,12 +43,12 @@ export function StageIndicator({ steps }: { steps: StageStep[] }) {
         : step.state === "current" ? Icon
         : Circle
       const DotIcon = dotIcon
-      return <li key={step.key} className="flex min-w-0 items-center gap-1.5">
+      return <li key={step.key} className="flex shrink-0 items-center gap-1.5">
         {index > 0 && <span className={`hidden h-px w-4 shrink-0 sm:block ${steps[index - 1].state === "done" ? "bg-emerald-300" : "bg-slate-200"}`} aria-hidden="true" />}
         <div className={`flex min-w-0 items-center gap-1.5 rounded-full border px-2 py-0.5 ${stateClass}`} title={step.detail}>
           <DotIcon className="h-3 w-3 shrink-0" />
           <span className="truncate font-medium">{step.label}</span>
-          {step.detail && step.state !== "upcoming" && <span className="hidden truncate text-[10px] opacity-80 md:inline">— {step.detail}</span>}
+          {step.detail && step.state !== "upcoming" && <span className="hidden truncate text-[11px] opacity-90 md:inline">— {step.detail}</span>}
         </div>
       </li>
     })}

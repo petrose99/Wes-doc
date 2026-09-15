@@ -29,57 +29,75 @@ export function ReasonDialogButton({
   disabledHint?: string
 }) {
   const [open, setOpen] = useState(false)
-  const [reason, setReason] = useState("")
-  const [error, setError] = useState<string | null>(null)
-  const [pending, startTransition] = useTransition()
 
   const triggerCls = tone === "amber"
     ? "rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-800 transition-colors hover:bg-amber-100 disabled:opacity-40"
     : "rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-40"
-
-  const close = () => { setOpen(false); setError(null) }
 
   return (
     <div>
       <button type="button" className={triggerCls} disabled={disabled} title={disabled ? disabledHint : undefined} onClick={() => setOpen(true)}>
         {triggerLabel}
       </button>
-      {disabled && disabledHint && <p className="mt-1 max-w-[16rem] text-xs text-slate-400">{disabledHint}</p>}
-      <Dialog open={open} title={title} description={description} onClose={() => { if (!pending) close() }}>
-        <form
-          className="space-y-3 px-5 py-4"
-          onSubmit={(event) => {
-            event.preventDefault()
-            if (!reason.trim() || pending) return
-            const formData = new FormData()
-            formData.set("reason", reason.trim())
-            startTransition(async () => {
-              const result = await action(formData)
-              if (!result.success) { setError(result.error ?? "Couldn't record the override."); return }
-              setOpen(false)
-              setReason("")
-              setError(null)
-            })
-          }}>
-          <textarea
-            name="reason"
-            rows={3}
-            required
-            value={reason}
-            placeholder={placeholder}
-            className="w-full resize-none rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm transition-colors focus:border-emerald-400 focus:bg-white focus:outline-none"
-            onChange={(event) => setReason(event.target.value)} />
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          <div className="flex justify-end gap-2">
-            <button type="button" className="rounded-md px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100" disabled={pending} onClick={close}>
-              Cancel
-            </button>
-            <button type="submit" className="rounded-md bg-emerald-700 px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-800 disabled:opacity-40" disabled={pending || !reason.trim()}>
-              {pending ? "Working…" : submitLabel}
-            </button>
-          </div>
-        </form>
-      </Dialog>
+      {disabled && disabledHint && <p className="mt-1 max-w-[16rem] text-xs text-slate-500">{disabledHint}</p>}
+      <ReasonDialog open={open} onClose={() => setOpen(false)} action={action} title={title} description={description} submitLabel={submitLabel} placeholder={placeholder} />
     </div>
+  )
+}
+
+/** #225: the dialog on its own, for callers whose trigger lives somewhere the dialog cannot —
+ * a Detail pane's overflow menu closes (and unmounts its items) the moment a dialog opens over
+ * it, so the menu item only flips `open` and the dialog mounts beside the pane instead. */
+export function ReasonDialog({ open, onClose, action, title, description, submitLabel, placeholder }: {
+  open: boolean
+  onClose: () => void
+  action: (formData: FormData) => Promise<{ success: boolean; error?: string }>
+  title: string
+  description: string
+  submitLabel: string
+  placeholder: string
+}) {
+  const [reason, setReason] = useState("")
+  const [error, setError] = useState<string | null>(null)
+  const [pending, startTransition] = useTransition()
+
+  const close = () => { onClose(); setError(null) }
+
+  return (
+    <Dialog open={open} title={title} description={description} onClose={() => { if (!pending) close() }}>
+      <form
+        className="space-y-3 px-5 py-4"
+        onSubmit={(event) => {
+          event.preventDefault()
+          if (!reason.trim() || pending) return
+          const formData = new FormData()
+          formData.set("reason", reason.trim())
+          startTransition(async () => {
+            const result = await action(formData)
+            if (!result.success) { setError(result.error ?? "Couldn't record that."); return }
+            onClose()
+            setReason("")
+            setError(null)
+          })
+        }}>
+        <textarea
+          name="reason"
+          rows={3}
+          required
+          value={reason}
+          placeholder={placeholder}
+          className="w-full resize-none rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm transition-colors focus:border-emerald-400 focus:bg-white focus:outline-none"
+          onChange={(event) => setReason(event.target.value)} />
+        {error && <p className="text-sm text-red-700">{error}</p>}
+        <div className="flex justify-end gap-2">
+          <button type="button" className="rounded-md px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100" disabled={pending} onClick={close}>
+            Cancel
+          </button>
+          <button type="submit" className="rounded-md bg-emerald-700 px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-800 disabled:opacity-40" disabled={pending || !reason.trim()}>
+            {pending ? "Working…" : submitLabel}
+          </button>
+        </div>
+      </form>
+    </Dialog>
   )
 }

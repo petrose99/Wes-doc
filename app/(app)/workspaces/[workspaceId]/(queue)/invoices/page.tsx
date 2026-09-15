@@ -1,0 +1,81 @@
+import { getCurrentUser } from "@/lib/auth"
+import { listWorkspaceBills, type BillRow } from "@/models/bills"
+import { getMinConfidencePercent } from "@/models/automation-config"
+import { requireWorkspaceRole, type WorkspaceRole } from "@/models/workspaces"
+import { listSavedViews } from "@/models/saved-views"
+import { createSavedViewAction, deleteSavedViewAction, duplicateSavedViewAction, renameSavedViewAction, saveFiltersToViewAction, shareSavedViewAction } from "@/app/(app)/workspaces/[workspaceId]/(chrome)/saved-views-actions"
+import { preparePaymentRunAction } from "@/app/(app)/workspaces/[workspaceId]/(chrome)/bills/actions"
+import { InvoiceQueue } from "@/components/queue/invoice-queue"
+import { QueueStat } from "@/components/queue/queue-stat"
+import { SavedViewPicker } from "@/components/typed-destinations/saved-view-picker"
+import { getTouchlessRateTrend } from "@/lib/analytics/workspace-analytics"
+import type { AgingBucket } from "@/lib/bills/due-date"
+
+export const dynamic = "force-dynamic"
+
+export type InvoiceSearchParams = { blocked?: string; unpaid?: string; status?: string; approval?: string; touchless?: string; aging?: string; view?: string; sort?: string }
+
+/** #225: Invoices on the Queue screen. Filters stay plain URL params (shareable, refreshable,
+ * saveable as a view); the aging chip group filters here after the fetch since `agingBucket` is
+ * derived per row, and the per-bucket totals now live on the Dashboard. */
+export async function InvoicesQueuePage({ params, searchParams, selectedDocumentId = null }: {
+  params: Promise<{ workspaceId: string }>
+  searchParams: Promise<InvoiceSearchParams>
+  selectedDocumentId?: string | null
+}) {
+  const { workspaceId } = await params
+  const { blocked, unpaid, status, approval, touchless, aging, view: selectedViewId } = await searchParams
+  const user = await getCurrentUser()
+  const membership = await requireWorkspaceRole(workspaceId, user.id)
+  const isOwner = membership.role === "owner"
+
+  const onlyBlocked = blocked === "1"
+  const onlyUnpaid = unpaid === "1"
+  const onlyTouchless = touchless === "1"
+  const statusFilter = status === "unreviewed" || status === "reviewed" || status === "synced" || status === "paid" ? status : undefined
+  const approvalFilter: BillRow["approvalStatus"] | undefined =
+    approval === "not_started" || approval === "in_progress" || approval === "approved" || approval === "rejected" || approval === "cancelled" ? approval : undefined
+  const agingFilter = new Set((aging ?? "").split(",").filter((value): value is AgingBucket | "none" => ["current", "1-30", "31-60", "61-90", "90+", "none"].includes(value)))
+  const basePath = `/workspaces/${workspaceId}/invoices`
+  const [{ bills: allBills }, minConfidencePercent, savedViews, touchlessTrend] = await Promise.all([
+    listWorkspaceBills({ workspaceId, onlyBlocked, onlyUnpaid, statusFilter, approvalFilter, onlyTouchless }),
+    getMinConfidencePercent(workspaceId),
+    listSavedViews({ workspaceId, viewKey: "invoices", userId: user.id }),
+    getTouchlessRateTrend(workspaceId),
+  ])
+  const bills = agingFilter.size === 0 ? allBills : allBills.filter((bill) => agingFilter.has(bill.agingBucket ?? "none"))
+  const currentViewFilters: Record<string, string> = {
+    ...(onlyBlocked ? { blocked: "1" } : {}), ...(onlyUnpaid ? { unpaid: "1" } : {}),
+    ...(onlyTouchless ? { touchless: "1" } : {}), ...(statusFilter ? { status: statusFilter } : {}),
+    ...(approvalFilter ? { approval: approvalFilter } : {}), ...(agingFilter.size ? { aging: [...agingFilter].join(",") } : {}),
+  }
+  // Only bills with a total AND an unblocked status are candidates for a payment run. #220: a
+  // cancelled invoice is excluded too. "synced" (pushed but unconfirmed) stays eligible.
+  const payableBills = bills.filter((b) => !b.blockedByCheck && !b.cancelledAt && b.total !== null && b.total > 0 && (!b.paymentStatus || !["paid", "reconciled"].includes(b.paymentStatus.toLowerCase())))
+  const payableDocumentIds = isOwner ? payableBills.map((bill) => bill.documentId) : []
+  const trend = touchlessTrend.trend ? `${touchlessTrend.trend.deltaPercentagePoints > 0 ? "+" : ""}${touchlessTrend.trend.deltaPercentagePoints}pt` : null
+
+  return <InvoiceQueue
+    workspaceId={workspaceId}
+    basePath={basePath}
+    bills={bills}
+    payableDocumentIds={payableDocumentIds}
+    preparePaymentRunAction={preparePaymentRunAction.bind(null, workspaceId)}
+    minConfidencePercent={minConfidencePercent}
+    initialSelectedId={selectedDocumentId}
+    stat={<QueueStat label="Touchless" value={`${Math.round(touchlessTrend.touchlessRate * 100)}%`}
+      detail={`${touchlessTrend.totalPushedTouchless} of ${touchlessTrend.totalExtracted} sent without review, last 30 days${trend ? `, ${trend} vs. prior 30` : ""}`}
+      trend={touchlessTrend.trend?.direction ?? null} />}
+    views={<SavedViewPicker views={savedViews} selectedViewId={selectedViewId ?? null} currentFilters={currentViewFilters}
+      currentUserId={user.id} currentUserRole={membership.role as WorkspaceRole}
+      createAction={createSavedViewAction.bind(null, workspaceId, "invoices", basePath)}
+      duplicateAction={duplicateSavedViewAction.bind(null, workspaceId, "invoices", basePath)}
+      renameAction={renameSavedViewAction.bind(null, workspaceId, basePath)}
+      saveFiltersAction={saveFiltersToViewAction.bind(null, workspaceId, basePath)}
+      deleteAction={deleteSavedViewAction.bind(null, workspaceId, basePath)}
+      shareAction={shareSavedViewAction.bind(null, workspaceId, basePath)} />} />
+}
+
+export default function InvoicesPage({ params, searchParams }: { params: Promise<{ workspaceId: string }>; searchParams: Promise<InvoiceSearchParams> }) {
+  return InvoicesQueuePage({ params, searchParams })
+}

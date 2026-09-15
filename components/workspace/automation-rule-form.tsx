@@ -25,7 +25,7 @@ export function AutomationRuleForm({ workspaceId, defaultSupplier, accountOption
     } finally { setPending(false) }
   }
 
-  return <form action={submit} className="grid gap-3 rounded border p-4 sm:grid-cols-2">
+  return <form action={submit} className="grid gap-3 sm:grid-cols-2">
     <div className="sm:col-span-2">
       <label className="block text-xs font-medium text-slate-500">Rule name (optional)</label>
       <input name="name" defaultValue={defaultSupplier} className="mt-1 w-full rounded-md border px-2.5 py-1.5 text-sm" placeholder="e.g. Meridian Print" />

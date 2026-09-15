@@ -16,12 +16,12 @@ export function WorkspaceSwitcher({ workspaces, workspaceId }: { workspaces: Swi
   return <Popover open={open} onOpenChange={setOpen}>
     <PopoverTrigger asChild>
       <button type="button" className="flex w-full items-center gap-2 rounded-[11px] border border-transparent px-2 py-[7px] text-left transition-colors hover:border-[#dbe3ea] hover:bg-white hover:shadow-[0_1px_3px_rgba(15,23,42,0.06)]" aria-label="Switch workspace">
-        <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[9px] bg-[linear-gradient(135deg,#065f46,#0f9d6f)] text-[11px] font-bold text-white shadow-[0_1px_2px_rgba(4,120,87,0.35)]">
+        <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[9px] bg-[linear-gradient(135deg,#064e3b,#047857)] text-[11px] font-bold text-white shadow-[0_1px_2px_rgba(4,120,87,0.35)]">
           {(current?.name || "W").trim().charAt(0).toUpperCase()}
         </span>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-medium text-slate-800">{current?.name || "Workspace"}</span>
-          <span className="block truncate text-xs text-slate-400">{current?.kind === "team" ? "Team workspace" : "Personal workspace"}</span>
+          <span className="block truncate text-xs text-slate-500">{current?.kind === "team" ? "Team workspace" : "Personal workspace"}</span>
         </span>
         <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-slate-400" />
       </button>

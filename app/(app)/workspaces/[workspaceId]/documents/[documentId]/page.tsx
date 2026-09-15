@@ -1,5 +1,6 @@
 import { saveDocumentReviewAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
 import { SplitPane } from "@/components/pipeline/document-detail/split-pane"
+import type { DocumentHistory } from "@/components/queue/history-tabs"
 import { FxConversionBadge } from "@/components/documents/fx-conversion-badge"
 import { MatchPanel } from "@/components/bank-match/match-panel"
 import { DocumentMatchesPanel } from "@/components/matching/document-matches-panel"
@@ -35,9 +36,12 @@ import { notFound, redirect } from "next/navigation"
  * is right for settings pages but leaves no room for a source viewer next to the form. Same URL
  * as before ((chrome) is a route group, so this move doesn't change the path), just outside that
  * layout, so it gets the workspace shell's full-bleed width instead. */
-export async function DocumentDetailPage({ params, searchParams }: {
+export async function DocumentDetailPage({ params, searchParams, embedded = false, history = null }: {
   params: Promise<{ workspaceId: string; documentId: string }>
   searchParams: Promise<{ stage?: string; page?: string; bb?: string }>
+  /** #225: rendered inside a Queue screen's Detail pane (see `getQueueDetailAction`). */
+  embedded?: boolean
+  history?: DocumentHistory | null
 }) {
   const { workspaceId, documentId } = await params
   const { stage: stageParam, page: pageParam, bb: bbParam } = await searchParams
@@ -287,6 +291,8 @@ export async function DocumentDetailPage({ params, searchParams }: {
     institutions={institutions}
     institutionId={document.institutionId}
     institutionName={institutionName}
+    embedded={embedded}
+    history={history}
   />
 }
 

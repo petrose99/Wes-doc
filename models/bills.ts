@@ -47,6 +47,9 @@ export type BillRow = {
    * in_review — null once it resolves (approved/rejected) or if there was never a ReviewTask.
    * #208's Review SLA countdown badge times its clock from this. */
   reviewTaskOpenedAt: Date | null
+  /** #225: the id of that same open/in_review ReviewTask, so the Detail pane's Approve / Reject
+   * bar can decide it directly. Null whenever `reviewTaskOpenedAt` is null. */
+  openReviewTaskId: string | null
   /** Per-field extraction confidence (0-1), keyed the same as `reviewedData` ("vendor"/"merchant",
    * "total"/"amount", "invoice_number", "due_date"). Read from `document.confidence.fieldConfidence`
    * — #199/#219's row anatomy underlines every extracted-field cell from it; absent for a field
@@ -144,7 +147,7 @@ export async function listWorkspaceBills(input: {
     }),
     prisma.reviewTask.findMany({
       where: { workspaceId: input.workspaceId, documentId: { in: documentIds } },
-      select: { documentId: true, status: true, createdAt: true },
+      select: { id: true, documentId: true, status: true, createdAt: true },
       orderBy: { createdAt: "desc" },
     }),
     prisma.documentAuditEvent.findMany({
@@ -171,9 +174,9 @@ export async function listWorkspaceBills(input: {
   }
   // First hit per document wins — the query is already newest-first, so this is each document's
   // most recent ReviewTask of any reason.
-  const latestReviewTaskByDoc = new Map<string, { status: "open" | "in_review" | "approved" | "rejected"; createdAt: Date }>()
+  const latestReviewTaskByDoc = new Map<string, { id: string; status: "open" | "in_review" | "approved" | "rejected"; createdAt: Date }>()
   for (const task of latestReviewTasks) {
-    if (!latestReviewTaskByDoc.has(task.documentId)) latestReviewTaskByDoc.set(task.documentId, { status: task.status as "open" | "in_review" | "approved" | "rejected", createdAt: task.createdAt })
+    if (!latestReviewTaskByDoc.has(task.documentId)) latestReviewTaskByDoc.set(task.documentId, { id: task.id, status: task.status as "open" | "in_review" | "approved" | "rejected", createdAt: task.createdAt })
   }
 
   const bills: BillRow[] = []
@@ -226,6 +229,7 @@ export async function listWorkspaceBills(input: {
       cancelledAt: doc.cancelledAt,
       cancelledReason: doc.cancelledReason,
       reviewTaskOpenedAt,
+      openReviewTaskId: reviewTaskOpenedAt ? latestTask!.id : null,
       fieldConfidence: (doc.confidence as Record<string, unknown> | null)?.fieldConfidence as Record<string, number> ?? {},
       touchless: touchlessDocIds.has(doc.id),
       escalated: escalatedDocIds.has(doc.id),

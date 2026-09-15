@@ -11,7 +11,7 @@ export type { ProvenanceTarget }
 /** pdf.js and the canvas rendering it drives are browser-only and weigh far more than the rest of
  * the sheet; loaded through next/dynamic({ ssr: false }) so none of it reaches the server render or
  * the main bundle until a PDF is actually previewed. */
-const ProvenancePdf = dynamic(() => import("./provenance-pdf"), { ssr: false, loading: () => <div className="flex flex-1 items-center justify-center bg-slate-100 text-sm text-slate-400">Loading viewer…</div> })
+const ProvenancePdf = dynamic(() => import("./provenance-pdf"), { ssr: false, loading: () => <div className="flex flex-1 items-center justify-center bg-slate-100 text-sm text-slate-600">Loading viewer…</div> })
 
 /** The document a row came from, floating over the grid, optionally scrolled and highlighted to
  * the exact spot a value was read from.

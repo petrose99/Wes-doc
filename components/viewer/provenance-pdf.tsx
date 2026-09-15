@@ -104,8 +104,8 @@ export default function ProvenancePdf({ href, target }: { href: string; target?:
   return (
     <div className="relative flex min-h-0 flex-1 flex-col bg-slate-100">
       <style>{"@keyframes dbProvPulse{0%{background:rgba(52,211,153,0.55)}100%{background:rgba(52,211,153,0.25)}}"}</style>
-      {status === "error" && <div className="flex flex-1 items-center justify-center text-sm text-slate-500">Could not render this PDF. <a href={href} target="_blank" rel="noreferrer" className="ml-1 text-emerald-700 underline">Open it directly</a>.</div>}
-      {status === "loading" && <div className="flex flex-1 items-center justify-center text-sm text-slate-400">Loading document…</div>}
+      {status === "error" && <div className="flex flex-1 items-center justify-center text-sm text-slate-600">Could not render this PDF. <a href={href} target="_blank" rel="noreferrer" className="ml-1 text-emerald-700 underline">Open it directly</a>.</div>}
+      {status === "loading" && <div className="flex flex-1 items-center justify-center text-sm text-slate-600">Loading document…</div>}
       <div ref={hostRef} className={`min-h-0 flex-1 overflow-auto p-4 pb-16 ${status === "ready" ? "" : "hidden"}`} />
       {status === "ready" && (
         <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center">

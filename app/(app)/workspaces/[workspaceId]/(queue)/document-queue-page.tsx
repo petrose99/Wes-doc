@@ -1,0 +1,69 @@
+import type { ReactNode } from "react"
+import { getCurrentUser } from "@/lib/auth"
+import type { DocType } from "@/lib/doc-types"
+import { listWorkspaceDocuments, summarizeDocumentForReview } from "@/models/documents"
+import { listWorkspaceInstitutions } from "@/models/institutions"
+import { requireWorkspaceRole } from "@/models/workspaces"
+import { DocumentQueue, type DocumentQueueRow } from "@/components/queue/document-queue"
+import type { ItemizedRecord } from "@/components/typed-destinations/bulk-approve-receipt"
+
+const STATUSES = new Set(["queued", "needs_review", "ready_for_review", "reviewed", "failed"])
+
+/** #225: Purchase Orders and Bank Statements on the Queue screen. Both still read the generic
+ * document list (no dedicated row model yet — see the map's "Not yet specified"), mapped to the
+ * serializable row the client queue renders. */
+export async function DocumentQueuePage({ params, searchParams, docType, title, noun, itemType, supplierLabel, stat, emptyBody, selectedDocumentId = null }: {
+  params: Promise<{ workspaceId: string }>
+  searchParams: Promise<{ status?: string; sort?: string }>
+  docType: DocType
+  title: string
+  noun: string
+  itemType: ItemizedRecord["type"]
+  supplierLabel?: string
+  stat?: ReactNode
+  emptyBody: string
+  selectedDocumentId?: string | null
+}) {
+  const { workspaceId } = await params
+  const { status } = await searchParams
+  const user = await getCurrentUser()
+  const membership = await requireWorkspaceRole(workspaceId, user.id)
+  const isBank = docType === "bank_statement"
+  const [documents, institutions] = await Promise.all([
+    listWorkspaceDocuments(workspaceId, { docType, status: status && STATUSES.has(status) ? status : undefined }),
+    isBank ? listWorkspaceInstitutions(workspaceId) : Promise.resolve([]),
+  ])
+  const institutionName = new Map(institutions.map((institution) => [institution.id, institution.name]))
+  const rows: DocumentQueueRow[] = documents.map((document) => {
+    const review = summarizeDocumentForReview(document, membership.workspace.baseCurrency)
+    const reviewed = (document.reviewedData as Record<string, unknown> | null) ?? {}
+    // A statement has no supplier: its account holder names the row, and its closing balance is
+    // the one amount worth a column.
+    const accountHolder = typeof reviewed.account_holder === "string" ? reviewed.account_holder : null
+    const closing = typeof reviewed.closing_balance === "number" ? reviewed.closing_balance : null
+    return {
+      id: document.id,
+      filename: document.filename,
+      status: document.status,
+      receivedAt: document.receivedAt,
+      supplier: review.supplier ?? (isBank ? accountHolder : null),
+      total: review.total ?? (isBank && closing !== null ? new Intl.NumberFormat("en", { style: "currency", currency: membership.workspace.baseCurrency ?? "USD", maximumFractionDigits: 0 }).format(closing) : null),
+      category: review.category,
+      institution: isBank && document.institutionId ? institutionName.get(document.institutionId) ?? null : null,
+    }
+  })
+  const segment = docType === "purchase_order" ? "purchase-orders" : "bank-statements"
+
+  return <DocumentQueue
+    workspaceId={workspaceId}
+    basePath={`/workspaces/${workspaceId}/${segment}`}
+    title={title}
+    noun={noun}
+    itemType={itemType}
+    rows={rows}
+    supplierLabel={supplierLabel}
+    stat={stat}
+    initialSelectedId={selectedDocumentId}
+    emptyBody={emptyBody}
+    showInstitution={isBank} />
+}
