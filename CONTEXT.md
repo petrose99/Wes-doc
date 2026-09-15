@@ -20,7 +20,7 @@ The storage-and-extraction primitive underlying every typed destination. Every I
 _Avoid_: Using "Document" as a destination name; unclassified/pending-classification states
 
 **Invoice**:
-The typed destination for a bill received from a supplier. Absorbs the former Documents/Bills surface, including its aging and payment-run workflow, now expressed as filter chips and saved views.
+The typed destination for a bill received from a supplier. Absorbs the former Documents/Bills surface; aging is a filter chip and a saved view here, and paying an approved invoice happens on Bill Pay, not on this queue.
 
 **Purchase Order**:
 The typed destination for a purchase order, paired with Invoices for matching and cumulative line-item comparison against what has already been invoiced against it.
@@ -75,6 +75,26 @@ _Avoid_: Reopen, cancel (that withdraws a run before any stage is decided)
 
 **Not eligible**:
 An Approval that is visible to its Approver but cannot be decided yet because a hard check failed or an escalation is open on the invoice. Never hidden, never overridable from Approvals; the reason is shown on the row.
+
+**Bill Pay**:
+The queue of approved, unpaid invoices from which payment batches are created. An invoice reaches it only once its processing state is Approved; one that cannot be paid yet (no supplier bank details) stays visible with the reason.
+_Avoid_: Payables, payment run (the queue), pay list
+
+**Payment batch**:
+A named set of approved invoices, one payer account and one currency, submitted by a member for an owner's decision. Pending approval, then Approved (its payment file can be downloaded), then Paid; or Rejected with a reason. Whether the file has been downloaded is a fact shown on the batch, not a state. A batch never moves money.
+_Avoid_: Payment run, remittance (that is the advice sent to the supplier), transfer
+
+**Payer account**:
+A named workspace bank account a payment batch is to be paid from — a label that tells the uploader which bank portal the file belongs to. DocuBite never holds the account's credentials and the file never carries its number.
+_Avoid_: Pay From (Vic's column label is fine on screen; the concept is the payer account), funding source, bank connection
+
+**Payment terms**:
+A supplier's net days and, when offered, an early-payment discount: the percent and the days within which it applies, shown as "2/10 net 30". A supplier without a discount shows no discount claim and no discount countdown.
+_Avoid_: Terms code, "2-10-30"
+
+**Payment record**:
+A DocuBite-side fact that an amount was paid against an invoice on a date, by a batch or by hand (Mark as paid). An invoice's paid state is derived from the ledger when it confirms payment, otherwise from its payment records. A payment record can be removed with a reason.
+_Avoid_: Mark as paid (the action, not the record), settlement, ledger payment (that is the ledger's own line)
 
 **Immersive surface**:
 A document-detail or worksheet page that temporarily takes over the viewport while preserving workspace identity, a clear return action, and relevant workspace status.
