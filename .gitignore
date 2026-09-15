@@ -61,6 +61,7 @@ pgdata
 
 # Local git worktrees
 .worktrees/
+.claude/worktrees/
 
 .vercel
 .impeccable/hook.cache.json
