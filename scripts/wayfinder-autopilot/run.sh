@@ -127,6 +127,10 @@ MODEL_STRONG="${WAYFINDER_MODEL_STRONG:-}"          # empty = the user's default
 MODEL_CHEAP="${WAYFINDER_MODEL_CHEAP:-}"
 [ -f "$ROOT/.claude/wayfinder-autopilot/config.sh" ] && . "$ROOT/.claude/wayfinder-autopilot/config.sh"
 MODEL_CHEAP="${MODEL_CHEAP:-$MODEL_STRONG}"
+# EFFORT (optional, per-project or WAYFINDER_EFFORT): pinned per session with
+# --effort so the autopilot never inherits whatever the user's own /model
+# choice wrote into ~/.claude/settings.json. Empty = inherit.
+EFFORT="${WAYFINDER_EFFORT:-${EFFORT:-}}"
 # MODEL_EXEC_FIRST (optional, per-project): execution tickets start on this
 # model; a ticket left "Autopilot: partial —" is retried on MODEL_STRONG.
 model_for() {   # $1 ticket, $2 attempt number (1-based)
@@ -158,7 +162,7 @@ while [ "$n" -lt "$MAX" ]; do
   n=$((n+1))
   TT="$(title "$T")"
   MODEL="$(model_for "$T" $(( ${ATTEMPTS[$T]:-0} + 1 )))"
-  echo "=== [$n/$MAX] #$T — $TT  [${MODEL:-default model}]"
+  echo "=== [$n/$MAX] #$T — $TT  [${MODEL:-default model}${EFFORT:+ · $EFFORT}]"
   if [ "$DRY" = 1 ]; then SKIP[$T]=1; continue; fi
 
   # Start each session on a clean box: if a dev server or headless browser is
@@ -185,6 +189,7 @@ while [ "$n" -lt "$MAX" ]; do
     setsid claude -p "/wayfinder $MAP $T" \
       --append-system-prompt-file "$RUN_BRIEF" \
       ${MODEL:+--model "$MODEL"} \
+      ${EFFORT:+--effort "$EFFORT"} \
       --permission-mode acceptEdits \
       --allowedTools "${ALLOWED_TOOLS[@]}" \
       --disallowedTools AskUserQuestion \
