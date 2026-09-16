@@ -257,7 +257,15 @@ while [ "$n" -lt "$MAX" ]; do
     UNIT="wayfinder-$MAP-$T-$(date +%s).scope"
     SCOPE=(systemd-run --user --scope -q --unit "$UNIT" -p "MemoryMax=$MEM_MAX" -p "MemoryHigh=$MEM_HIGH" -p "MemorySwapMax=2G")
   fi
+  # The context guard: the driver writes the session's context size to
+  # $CTXF every 30s; at the soft cap it touches $CTXF.signal and the
+  # PostToolUse hook (scripts/wayfinder-autopilot/hooks/context-guard.sh,
+  # wired in .claude/settings.json) tells the session to hand off. The hard
+  # stop is the soft cap plus the hand-off allowance.
+  CTXF="$LOGS/ctx-$T"; echo "0 0" > "$CTXF"; rm -f "$CTXF.signal"
   ( cd "$ROOT" && NODE_OPTIONS="${WAYFINDER_NODE_OPTIONS:---max-old-space-size=3072}" \
+    WAYFINDER_CTX_FILE="$CTXF" WAYFINDER_HANDOFF_FILE="$OUT/$T.handoff.md" WAYFINDER_TICKET="$T" WAYFINDER_MAP="$MAP" \
+    WAYFINDER_HANDOFF_ALLOWANCE_K="$(( ${WAYFINDER_HANDOFF_ALLOWANCE:-30000} / 1000 ))" \
     setsid "${SCOPE[@]}" claude -p "/wayfinder $MAP $T" \
       --append-system-prompt-file "$RUN_BRIEF" \
       ${MODEL:+--model "$MODEL"} \
@@ -276,14 +284,14 @@ while [ "$n" -lt "$MAX" ]; do
   # post a partial hand-off so the driver retries with a fresh context, tear
   # the session down.
   MAX_S="${WAYFINDER_SESSION_MAX_SECONDS:-12600}"
-  MAX_CTX="${WAYFINDER_SESSION_MAX_TOKENS:-${SESSION_MAX_TOKENS:-150000}}"
-  # The spec phase front-loads the intent and impeccable skills, the
-  # references, the map and the spec it writes — ~140K before the critic
-  # runs, in under 60 turns (#257: capped at 152K after 10 min, twice). It is
-  # short, so the quadratic cost is small; give it room. Build and close keep
-  # the default: they are the long phases.
-  [ "$PHASE" = spec ] && MAX_CTX="${WAYFINDER_SPEC_MAX_TOKENS:-${SPEC_MAX_TOKENS:-200000}}"   # baseline ~42K; grillings finish under this; a build hands off at a milestone and continues — every turn past here pays for context it barely uses
-  CAPPED=""
+  # Soft cap: the hand-off line (default 150K). Crossing it asks the session
+  # to hand off, through the hook. Hard cap: soft + the hand-off allowance
+  # (default 30K) — the tokens spent writing the hand-off, committing and
+  # posting do not count against the line; only a session that ignores the
+  # request is torn down.
+  SOFT_CTX="${WAYFINDER_SESSION_MAX_TOKENS:-${SESSION_MAX_TOKENS:-150000}}"
+  MAX_CTX=$(( SOFT_CTX + ${WAYFINDER_HANDOFF_ALLOWANCE:-30000} ))
+  CAPPED=""; SIGNALLED=""
   context_tokens() {
     python3 - "$1" 2>/dev/null <<'PY'
 import json,sys
@@ -292,7 +300,7 @@ for line in open(sys.argv[1]):
     if '"usage"' not in line: continue
     try: d=json.loads(line)
     except: continue
-    u=d.get('message',{}).get('usage') if d.get('type')=='assistant' else None
+    u=d.get('message',{}).get('usage') if d.get('type')=='assistant' and not d.get('parent_tool_use_id') else None
     if u: last=u.get('input_tokens',0)+u.get('cache_read_input_tokens',0)+u.get('cache_creation_input_tokens',0)
 print(last)
 PY
@@ -300,6 +308,10 @@ PY
   while kill -0 "$SESSION_PID" 2>/dev/null; do
     sleep 30
     ELAPSED=$(( $(date +%s) - S0 )); CTX="$(context_tokens "$LOG")"; CTX="${CTX:-0}"
+    echo "$CTX $SOFT_CTX" > "$CTXF"
+    if [ -z "$SIGNALLED" ] && [ "$CTX" -ge "$SOFT_CTX" ]; then
+      SIGNALLED=1; touch "$CTXF.signal"; echo "    #$T crossed the hand-off line (${CTX} tokens ≥ ${SOFT_CTX}) — asked to hand off; hard stop at ${MAX_CTX}"
+    fi
     if [ "$ELAPSED" -ge "$MAX_S" ]; then CAPPED="time cap (${MAX_S}s)"; fi
     if [ "$CTX" -ge "$MAX_CTX" ]; then CAPPED="context cap (${CTX} tokens ≥ ${MAX_CTX})"; fi
     if [ -n "$CAPPED" ]; then

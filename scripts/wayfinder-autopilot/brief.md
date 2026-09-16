@@ -246,6 +246,14 @@ confirm once) until the bar above is met, and record the after-counts.
 - Findings with a real decision behind them become a Wayfinder ticket named
   on the close, with the score they cost. A finding without a decision is
   fixed, never parked.
+- **The hand-off line is 150K tokens of context.** When you cross it, a
+  hook message after your next tool call says HAND-OFF NOW. Obey it at the
+  nearest safe point: finish the edit in hand, write the hand-off file,
+  commit, post `Autopilot: continue —`, end the turn. The tokens you spend
+  on those steps do not count against the line — the driver only stops a
+  session that ignores the message, 30K later. Do not race the line: if a
+  step you are about to start is big (a capture round, the spec critic),
+  and you are within 20K of it, hand off before the step, not during it.
 - **A session is one context (the driver caps it at 150K tokens and 3h30);
   a ticket is not.** The whole ticket ships — every screen, state and check
   it names — over as many sessions as it takes. Never narrow the scope,
