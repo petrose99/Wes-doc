@@ -3,8 +3,10 @@
 import { prisma } from "@/lib/db"
 import { canDecideStage, findCurrentStage, toWorkflowStageInputs, type WorkflowStageInput } from "@/lib/approvals/engine"
 import { computeApprovalEligibility, stageHasEligibleApprover, type ApprovalEligibility } from "@/lib/approvals/row-eligibility"
-import { listOpenGatesForDocuments, type OpenGateSummary } from "@/lib/gates/list"
+import { listOpenGatesForDocument, listOpenGatesForDocuments, type OpenGateSummary } from "@/lib/gates/list"
+import { DUPLICATE_GATE_TYPE } from "@/lib/gates/duplicate"
 import { MATCH_VARIANCE_GATE_TYPE } from "@/lib/gates/match-variance"
+import { resolveSupplier } from "@/lib/suppliers/alias"
 import type { WorkspaceRole } from "@/models/workspaces"
 
 /** #236 (Wayfinder map #177): the Approvals destination's two queues — Invoices (every submitted
@@ -37,6 +39,9 @@ export type ApprovalInvoiceRow = {
    * filters on this, and the Approve/Reject footer disables itself when it's false. */
   canDecide: boolean
   eligibility: ApprovalEligibility
+  /** #257: the stage an approval moves it to, for the Approve sheet's count-bearing description
+   * ("2 of 3 · Owner sign-off. Approving moves it to Finance sign-off"); null on the last stage. */
+  nextStageName: string | null
 }
 
 export type PoMismatchRow = {
@@ -188,6 +193,7 @@ export async function listApprovalInvoiceRows(workspaceId: string, actor: Approv
       waitingSince: task.updatedAt,
       canDecide,
       eligibility,
+      nextStageName: task.stages.find((candidate) => candidate.stageIndex > task.currentStageIndex)?.name ?? null,
     }
   })
 }
@@ -243,4 +249,105 @@ export async function countReadyToApprove(workspaceId: string, actor: ApprovalAc
     if (canDecide && eligibility.status === "ready") count += 1
   }
   return count
+}
+
+/** #257 S6/S7: what the Detail sheet's Approval tab shows beyond the decisions themselves — who
+ * started the run and when, whose turn it is now, the supplier's standing facts and the near
+ * duplicate the duplicate check named. Loaded with the document (`getQueueDetailAction`), never
+ * a second round trip; every part is null-safe so a workflow-less document or an unknown supplier
+ * renders the tab with the parts it has. */
+export type ApprovalDetailFacts = {
+  approval: {
+    startedBy: { name: string; avatar: string | null } | null
+    startedAt: string
+    stages: Array<{ stageIndex: number; name: string }>
+    currentStageIndex: number
+    /** `canDecideStage` for the signed-in actor: "Waiting on you" vs "Waiting on ‹name›". */
+    waitingOnYou: boolean
+    /** Named approvers of the current stage, when the stage names any; else the role in words. */
+    waitingOn: string
+  } | null
+  supplier: { name: string; documentCount: number; lastSeenAt: string | null; terms: string | null } | null
+  nearDuplicate: { documentId: string; invoiceNumber: string | null; state: string } | null
+  /** PO Mismatches: the open match-variance gate's figures, for the read-only variance summary. */
+  mismatch: { invoiceTotal: number; poTotal: number; variance: number; threshold: number; percent: number; currencyCode: string | null; alreadyInvoiced: number | null } | null
+}
+
+function userLabel(user: { name: string | null; email: string } | null | undefined): string | null {
+  return user ? user.name || user.email : null
+}
+
+function termsLabel(supplier: { paymentTermsDays: number | null; earlyPaymentDiscountPercent: unknown; earlyPaymentDiscountDays: number | null }): string | null {
+  if (supplier.paymentTermsDays === null) return null
+  const discount = supplier.earlyPaymentDiscountPercent === null || supplier.earlyPaymentDiscountPercent === undefined ? null : Number(supplier.earlyPaymentDiscountPercent)
+  if (discount && supplier.earlyPaymentDiscountDays !== null) return `${discount}/${supplier.earlyPaymentDiscountDays} net ${supplier.paymentTermsDays}`
+  return `Net ${supplier.paymentTermsDays}`
+}
+
+export async function getApprovalDetailFacts(workspaceId: string, documentId: string, actor: ApprovalActor): Promise<ApprovalDetailFacts> {
+  const [task, document, gates] = await Promise.all([
+    prisma.reviewTask.findFirst({
+      where: { workspaceId, documentId, workflowId: { not: null }, currentStageIndex: { not: null }, status: { in: ["open", "in_review"] } },
+      orderBy: { createdAt: "desc" },
+      select: { createdAt: true, createdById: true, currentStageIndex: true, workflow: { select: { stages: { orderBy: { stageIndex: "asc" } } } } },
+    }),
+    prisma.document.findFirst({ where: { id: documentId, workspaceId }, select: { reviewedData: true } }),
+    listOpenGatesForDocument(workspaceId, documentId),
+  ])
+
+  let approval: ApprovalDetailFacts["approval"] = null
+  if (task?.workflow && task.currentStageIndex !== null) {
+    const stages = toWorkflowStageInputs(task.workflow.stages)
+    const current = findCurrentStage(stages, task.currentStageIndex)
+    const approverIds = current?.approverIds ?? []
+    const [starter, approvers] = await Promise.all([
+      task.createdById ? prisma.user.findUnique({ where: { id: task.createdById }, select: { name: true, email: true, avatar: true } }) : null,
+      approverIds.length ? prisma.user.findMany({ where: { id: { in: approverIds } }, select: { name: true, email: true } }) : [],
+    ])
+    const waitingOnYou = current ? canDecideStage({ stage: current, actorRole: engineRole(actor.role), actorId: actor.userId }) : false
+    const named = approvers.map((user) => userLabel(user)).filter((name): name is string => !!name)
+    const waitingOn = named.length ? named.join(", ") : current?.requireOwner ? "an owner" : "any member"
+    const starterName = userLabel(starter)
+    approval = {
+      startedBy: starterName ? { name: starterName, avatar: starter?.avatar ?? null } : null,
+      startedAt: task.createdAt.toISOString(),
+      stages: stages.map((stage) => ({ stageIndex: stage.stageIndex, name: stage.name })),
+      currentStageIndex: task.currentStageIndex,
+      waitingOnYou,
+      waitingOn,
+    }
+  }
+
+  const values = (document?.reviewedData ?? {}) as Record<string, unknown>
+  const supplierName = asString(values.vendor) ?? asString(values.merchant)
+  const resolved = supplierName ? await resolveSupplier(workspaceId, supplierName) : null
+  const supplierRow = resolved?.supplierId
+    ? await prisma.supplier.findUnique({ where: { id: resolved.supplierId }, select: { canonicalName: true, documentCount: true, lastSeenAt: true, paymentTermsDays: true, earlyPaymentDiscountPercent: true, earlyPaymentDiscountDays: true } })
+    : null
+  const supplier: ApprovalDetailFacts["supplier"] = supplierRow
+    ? { name: supplierRow.canonicalName, documentCount: supplierRow.documentCount, lastSeenAt: supplierRow.lastSeenAt?.toISOString() ?? null, terms: termsLabel(supplierRow) }
+    : null
+
+  const duplicate = gates.find((gate) => gate.gateType === DUPLICATE_GATE_TYPE)
+  const matchedId = asString(duplicate?.payload?.matchedDocumentId)
+  const matched = matchedId ? await prisma.document.findFirst({ where: { id: matchedId, workspaceId }, select: { id: true, status: true, reviewedData: true } }) : null
+  const nearDuplicate: ApprovalDetailFacts["nearDuplicate"] = matched
+    ? { documentId: matched.id, invoiceNumber: asString(((matched.reviewedData ?? {}) as Record<string, unknown>).invoice_number), state: matched.status.replaceAll("_", " ") }
+    : null
+
+  const variance = gates.find((gate) => gate.gateType === MATCH_VARIANCE_GATE_TYPE)
+  const payload = (variance?.payload ?? {}) as Record<string, unknown>
+  const mismatch: ApprovalDetailFacts["mismatch"] = variance
+    ? {
+      invoiceTotal: asNumber(payload.invoiceTotal) ?? 0,
+      poTotal: asNumber(payload.anchorTotal) ?? 0,
+      variance: asNumber(payload.variance) ?? 0,
+      threshold: asNumber(payload.threshold) ?? 0,
+      percent: asNumber(payload.percent) ?? 0,
+      currencyCode: asString(values.currency_code),
+      alreadyInvoiced: asNumber(payload.alreadyInvoiced) ?? asNumber(payload.invoicedToDate),
+    }
+    : null
+
+  return { approval, supplier, nearDuplicate, mismatch }
 }

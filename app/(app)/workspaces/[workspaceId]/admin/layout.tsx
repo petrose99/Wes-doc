@@ -44,9 +44,8 @@ export default async function AdminLayout({ children, params }: { children: Reac
     <AdminLeaveGuard />
     <AdminNav groups={groups} />
     <div className="min-w-0 flex-1">
-      {/* evaluate H6 (#252): below md the nav that names the company is hidden, so the company is
-          said once here, on every Admin page — Priya must never configure the wrong client. */}
-      <p className="px-5 pt-5 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500 md:hidden">{context.workspace.name}</p>
+      {/* #257 S4: below md the company name is said once, by the shell's phone header (the
+          switcher) on every route — #252's caption here repeated it 60px under the same name. */}
       {children}
     </div>
   </div>
