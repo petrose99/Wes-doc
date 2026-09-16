@@ -3,16 +3,17 @@
 import { useSignOut } from "@/components/shell/sign-out-button"
 import { openKeyboardShortcutsDialog } from "@/components/shell/keyboard-shortcuts"
 import { openHowItWorksDialog } from "@/components/shell/how-it-works"
+import { openApprovalEmailsDialog } from "@/components/shell/approval-emails"
 import { useKeyboardShortcutsEnabled } from "@/lib/shell/keyboard-shortcuts"
 import { accountPaths } from "@/lib/admin/paths"
-import { ChevronsUpDown, CircleHelp, Keyboard, LogOut, ShieldCheck } from "lucide-react"
+import { ChevronsUpDown, CircleHelp, Keyboard, LogOut, Mail, ShieldCheck } from "lucide-react"
 import Link from "next/link"
 import { useEffect, useRef, useState } from "react"
 
 /** The rail's account chip and its menu. #231 Q10 (#252): account-level items live here, not in
  * a company's Admin — Security (MFA, sessions) and the two help surfaces — beside the everyday
  * sign-out. "Sign out everywhere" stays on Security, where its weight belongs. */
-export function AccountMenu({ name, email, collapsed = false, workspaceId }: { name: string; email: string; collapsed?: boolean; workspaceId?: string }) {
+export function AccountMenu({ name, email, collapsed = false, workspaceId, approvalEmails = true }: { name: string; email: string; collapsed?: boolean; workspaceId?: string; /** #271: the saved "Approval emails" value, for the row's Off suffix. */ approvalEmails?: boolean }) {
   const [open, setOpen] = useState(false)
   const wrapper = useRef<HTMLDivElement>(null)
   const trigger = useRef<HTMLButtonElement>(null)
@@ -48,7 +49,7 @@ export function AccountMenu({ name, email, collapsed = false, workspaceId }: { n
   const itemClass = "flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100 focus-visible:bg-slate-100 focus-visible:outline-none disabled:opacity-50"
 
   return <div ref={wrapper} className="relative">
-    <button ref={trigger} type="button" className="flex w-full items-center gap-2 border border-transparent rounded-lg px-2 py-2 text-left transition-[background-color,border-color,box-shadow] duration-150 hover:border-[#dbe3ea] hover:bg-white hover:shadow-[0_1px_3px_rgba(15,23,42,0.06)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" onClick={() => setOpen((value) => !value)} aria-haspopup="menu" aria-expanded={open} aria-label={collapsed ? "Account menu" : undefined}>
+    <button ref={trigger} id="account-menu-trigger" type="button" className="flex w-full items-center gap-2 border border-transparent rounded-lg px-2 py-2 text-left transition-[background-color,border-color,box-shadow] duration-150 hover:border-[#dbe3ea] hover:bg-white hover:shadow-[0_1px_3px_rgba(15,23,42,0.06)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" onClick={() => setOpen((value) => !value)} aria-haspopup="menu" aria-expanded={open} aria-label={collapsed ? "Account menu" : undefined}>
       <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[9px] bg-emerald-700 text-xs font-bold text-white">{initial}</span>
       {!collapsed && <>
         <span className="min-w-0 flex-1">
@@ -75,6 +76,12 @@ export function AccountMenu({ name, email, collapsed = false, workspaceId }: { n
           onClick={() => { close(); openKeyboardShortcutsDialog() }}>
           <Keyboard className="h-4 w-4" aria-hidden /><span className="flex-1">Keyboard shortcuts</span>
           {!shortcutsEnabled && <span className="text-xs text-slate-500">Off</span>}
+        </button>
+        {/* #271 spec §4: the Approval-emails switch lives in a dialog (host in Sidebar); the row shows the saved state. */}
+        <button type="button" role="menuitem" className={itemClass} aria-label={approvalEmails ? "Approval emails" : "Approval emails, off"}
+          onClick={() => { close(); openApprovalEmailsDialog() }}>
+          <Mail className="h-4 w-4" aria-hidden /><span className="flex-1">Approval emails</span>
+          {!approvalEmails && <span className="text-xs text-slate-500">Off</span>}
         </button>
         <div className="my-1 border-t border-hairline" aria-hidden />
       </>}

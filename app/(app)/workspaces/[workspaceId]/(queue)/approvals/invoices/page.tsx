@@ -9,11 +9,13 @@ import { requireWorkspaceRole, type WorkspaceRole } from "@/models/workspaces"
 import { createSavedViewAction, deleteSavedViewAction, duplicateSavedViewAction, renameSavedViewAction, saveFiltersToViewAction, shareSavedViewAction } from "@/app/(app)/workspaces/[workspaceId]/(chrome)/saved-views-actions"
 import { ApprovalInvoiceQueue } from "@/components/queue/approval-invoice-queue"
 import { SavedViewPicker } from "@/components/typed-destinations/saved-view-picker"
+import { auditEventData, getRequestAuditContext } from "@/lib/audit"
+import { prisma } from "@/lib/db"
 import { notFound } from "next/navigation"
 
 export const dynamic = "force-dynamic"
 
-export type ApprovalsInvoicesSearchParams = { status?: string; approver?: string; sort?: string; view?: string }
+export type ApprovalsInvoicesSearchParams = { status?: string; approver?: string; sort?: string; view?: string; doc?: string; via?: string }
 
 /** #236: Approvals › Invoices — every submitted Approval (CONTEXT.md's "Approval"), the default
  * view of the Approvals destination. `approver` defaults to "me" (CONTEXT.md's "Ready to
@@ -47,6 +49,17 @@ export async function ApprovalsInvoicesQueuePage({ params, searchParams, selecte
   const onlyNotEligible = status === "not_eligible"
   const poMismatchCount = filterPoMismatchRows(poMismatchRows, searchParamsOf(query)).length
 
+  // #271: an Approval notice links here with `?doc=<id>&via=notice`. The row opens as if the
+  // `[documentId]` route had been hit (a missing row falls through to queueArrival's notice); the
+  // arrival is audited once (`notice.opened`) so the notice's reach is on the document's trail;
+  // `via` is never echoed into a link the page emits.
+  const docParam = typeof query.doc === "string" && allRows.some((row) => row.documentId === query.doc) ? query.doc : null
+  const initialSelectedId = selectedDocumentId ?? docParam
+  if (query.via === "notice") {
+    const context = await getRequestAuditContext()
+    await prisma.documentAuditEvent.create({ data: auditEventData({ workspaceId, documentId: docParam, actorId: user.id, type: "notice.opened" }, context) }).catch(() => undefined)
+  }
+
   const currentViewFilters: Record<string, string> = { ...(approver === "anyone" ? { approver: "anyone" } : {}), ...(onlyNotEligible ? { status: "not_eligible" } : {}) }
 
   const arrival = await queueArrival(workspaceId, { searchParams: query as Record<string, string | string[] | undefined>, queuePath: "approvals/invoices", selectedId: selectedDocumentId, rowIds: allRows.map((row) => row.documentId), decidedText: "This invoice was already decided — it's no longer in Ready to Approve." })
@@ -57,7 +70,7 @@ export async function ApprovalsInvoicesQueuePage({ params, searchParams, selecte
     rows={allRows}
     poMismatchCount={poMismatchCount}
     workspaceDocumentCount={workspaceDocumentCount}
-    initialSelectedId={selectedDocumentId}
+    initialSelectedId={initialSelectedId}
     views={<SavedViewPicker views={savedViews} selectedViewId={selectedViewId ?? null} currentFilters={currentViewFilters}
       currentUserId={user.id} currentUserRole={membership.role as WorkspaceRole}
       createAction={createSavedViewAction.bind(null, workspaceId, "approvals-invoices", basePath)}

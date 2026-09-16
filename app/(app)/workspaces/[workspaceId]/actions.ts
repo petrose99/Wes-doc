@@ -1047,6 +1047,31 @@ export async function deleteWorksheetAction(workspaceId: string, fileId: string,
   } catch (error) { return { success: false, error: errorMessage(error, "Could not delete the worksheet") } }
 }
 
+/** #271 — the per-person "Approval emails" switch (spec §4). A `User` column, not a workspace
+ * setting: the same person is one Approver across every company they belong to. Saves on
+ * change (a single boolean with immediate feedback — the one autosave outside Admin's save
+ * bar); the account page is revalidated so the phone panel and the menu suffix read the new
+ * value on their next render. */
+export async function setApprovalNoticeEmailsAction(workspaceId: string, enabled: boolean): Promise<ActionState<{ enabled: boolean }>> {
+  const user = await getCurrentUser()
+  if (typeof enabled !== "boolean") return { success: false, error: "Invalid value" }
+  try {
+    const updated = await prisma.user.update({ where: { id: user.id }, data: { approvalNoticeEmails: enabled }, select: { approvalNoticeEmails: true } })
+    revalidatePath(`/workspaces/${workspaceId}/account`)
+    revalidatePath(`/workspaces/${workspaceId}`, "layout")
+    return { success: true, data: { enabled: updated.approvalNoticeEmails } }
+  } catch (error) {
+    return { success: false, error: errorMessage(error) }
+  }
+}
+
+/** The dialog reads the saved value when it opens (pre-flight B2) rather than trusting a prop
+ * rendered before a stop link may have flipped it in another tab. */
+export async function getApprovalNoticeEmailsAction(): Promise<ActionState<{ enabled: boolean }>> {
+  const user = await getCurrentUser()
+  return { success: true, data: { enabled: user.approvalNoticeEmails } }
+}
+
 /* Workspace lifecycle actions (create, rename, delete, members, invitations) live in the
  * sibling workspace-actions.ts — every "use server" export is a public RPC endpoint, and the
  * destructive workspace surface is worth keeping in one small reviewable file. */

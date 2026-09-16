@@ -7,6 +7,7 @@ import { adminPaths } from "@/lib/admin/paths"
 import { FIELD_TABLE_TYPES, isFieldTableType, type FieldTableType } from "@/lib/configuration/field-table"
 import { DOC_TYPE_SPECS } from "@/lib/doc-types"
 import { fieldTableStamp, getFieldTable } from "@/models/field-configs"
+import { isEmailConfigured } from "@/lib/email"
 
 export const dynamic = "force-dynamic"
 
@@ -43,6 +44,8 @@ export default async function ConfigurationFieldsPage({ params, searchParams }: 
       types={FIELD_TABLE_TYPES.map((value) => ({ value, label: DOC_TYPE_SPECS[value].label, shortLabel: SHORT_LABELS[value] }))} />}
   >
     {!context.owner && <ReadOnlyBand owners={context.owners} />}
+    {/* #271 spec §4: the one place an admin learns the Approval notice cannot send. Visible text, not a tooltip. */}
+    {!isEmailConfigured() && <ReadOnlyBand owners={[]}>Approval emails are off for this workspace: no sending address is configured. Approvers still see Approvals in DocuBite.</ReadOnlyBand>}
     <div id={panelId} role="tabpanel" aria-label={`${typeLabel} fields`}>
       <FieldTableEditor key={docType} workspaceId={workspaceId} docType={docType} typeLabel={typeLabel} rows={table.rows} stamp={stamp} readOnly={!context.owner} />
     </div>

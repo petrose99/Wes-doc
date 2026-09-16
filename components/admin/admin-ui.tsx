@@ -34,11 +34,13 @@ export function AdminPage({ title, intro, aside, children, phoneNote = true }: {
 /** #231 Q19: a member opening an owner-only page sees the page, cannot change it, and is told
  * who can — never `notFound()`. Names are read from the membership list so the recovery is a
  * person, not a role. */
-export function ReadOnlyBand({ owners }: { owners: string[] }) {
+export function ReadOnlyBand({ owners, children }: { owners: string[]; /** #271: an alternative sentence in the same band (Admin's "email is not configured" line). */ children?: ReactNode }) {
   const named = owners.filter(Boolean)
   return <p role="status" className="mb-8 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] leading-relaxed text-amber-900">
-    Only an owner can change this.{" "}
-    {named.length ? <>Ask an owner: <span className="font-medium">{named.join(", ")}</span>.</> : "Ask an owner."}
+    {children ?? <>
+      Only an owner can change this.{" "}
+      {named.length ? <>Ask an owner: <span className="font-medium">{named.join(", ")}</span>.</> : "Ask an owner."}
+    </>}
   </p>
 }
 

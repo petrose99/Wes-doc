@@ -12,3 +12,16 @@ export function postSignInDestination(
   const needsChallenge = assurance?.nextLevel === "aal2" && assurance.nextLevel !== assurance.currentLevel
   return needsChallenge ? `/mfa/challenge?next=${encodeURIComponent(redirectTo)}` : redirectTo
 }
+
+/** Validates a `?next=` return path (#271: the Approval notice's deep link survives sign-in).
+ * Accepts only a same-origin relative path: starts with a single `/`, not `//` or `/\` (browsers
+ * normalise `\` to `/`, so `/\evil.com` is protocol-relative in disguise), and not `/login`
+ * itself (no loop). Anything else returns null and the caller uses its default destination. */
+export function safeNextPath(value: string | string[] | null | undefined): string | null {
+  const raw = Array.isArray(value) ? value[0] : value
+  if (!raw || raw.length > 2048) return null
+  if (!/^\/(?![/\\])/.test(raw)) return null
+  if (/^\/login(?:[/?#]|$)/.test(raw)) return null
+  if (/[\r\n]/.test(raw)) return null
+  return raw
+}

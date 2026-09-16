@@ -7,6 +7,8 @@ import { resolveAutoStartWorkflowId } from "@/models/approval-defaults"
 import { isPaymentConfirmationRequired } from "@/lib/doc-types"
 import { auditEventData, getRequestAuditContext } from "@/lib/audit"
 import { prisma } from "@/lib/db"
+import { kickApprovalNoticeDrain } from "@/lib/notices/kick"
+import { notifySentBack } from "@/models/approval-notices"
 import { cache } from "react"
 
 export const REVIEW_TASK_STATUSES = ["open", "in_review", "approved", "rejected"] as const
@@ -110,7 +112,8 @@ export async function createReviewTask(input: {
         workspaceId: input.workspaceId, documentId: input.documentId, reason: input.reason ?? "manual",
         detail: input.detail ?? null, priority: input.priority ?? 0, dueAt: input.dueAt ?? null,
         assigneeId: input.assigneeId ?? null, createdById: input.createdById,
-        ...(workflowId ? { workflowId, currentStageIndex: 0, status: "in_review" } : {}),
+        // stageReachedAt is the Approval notice's clock (#271): set whenever a stage is entered.
+        ...(workflowId ? { workflowId, currentStageIndex: 0, status: "in_review", stageReachedAt: new Date() } : {}),
       },
     }),
     prisma.documentAuditEvent.create({ data: auditEventData({ workspaceId: input.workspaceId, documentId: input.documentId, actorId: input.createdById, type: "review_task_created" }, context) }),
@@ -118,6 +121,7 @@ export async function createReviewTask(input: {
       ? [prisma.documentAuditEvent.create({ data: auditEventData({ workspaceId: input.workspaceId, documentId: input.documentId, actorId: null, type: "review_task_workflow_auto_started", detail: { workflowId: autoStartedWorkflowId } }, context) })]
       : []),
   ])
+  if (workflowId) void kickApprovalNoticeDrain()
   return task
 }
 
@@ -236,9 +240,10 @@ export async function decideReviewTaskStage(input: { workspaceId: string; taskId
   const note = input.note?.trim() || null
   const context = await getRequestAuditContext()
   const [updated] = await prisma.$transaction([
-    prisma.reviewTask.update({ where: { id: task.id }, data: { status: nextStatus, currentStageIndex: nextStageIndex, resolvedAt, ...(note && !task.detail ? { detail: note } : {}) } }),
+    prisma.reviewTask.update({ where: { id: task.id }, data: { status: nextStatus, currentStageIndex: nextStageIndex, resolvedAt, ...(result.outcome === "advance" ? { stageReachedAt: new Date() } : {}), ...(note && !task.detail ? { detail: note } : {}) } }),
     prisma.documentAuditEvent.create({ data: auditEventData({ workspaceId: input.workspaceId, documentId: task.documentId, actorId: input.actorId, type: "review_task_stage_decided", detail: { stageIndex: currentStage.stageIndex, stageName: currentStage.name, decision: input.decision, outcome: result.outcome, ...(note ? { note } : {}) } }, context) }),
   ])
+  if (result.outcome === "advance") void kickApprovalNoticeDrain()
   return updated
 }
 
@@ -253,7 +258,7 @@ export async function decideReviewTaskStage(input: { workspaceId: string; taskId
 export async function sendReviewTaskBackForReview(input: { workspaceId: string; taskId: string; actorId: string; reason: string }) {
   const task = await prisma.reviewTask.findFirst({
     where: { id: input.taskId, workspaceId: input.workspaceId },
-    select: { id: true, documentId: true, workflowId: true, status: true, currentStageIndex: true },
+    select: { id: true, documentId: true, workflowId: true, status: true, currentStageIndex: true, createdById: true },
   })
   if (!task) throw new Error("review_task_not_found")
   if (!task.workflowId || task.currentStageIndex === null) throw new Error("review_task_has_no_workflow")
@@ -262,9 +267,11 @@ export async function sendReviewTaskBackForReview(input: { workspaceId: string; 
   if (!reason) throw new Error("reason_required")
   const context = await getRequestAuditContext()
   const [updated] = await prisma.$transaction([
-    prisma.reviewTask.update({ where: { id: task.id }, data: { status: "open", workflowId: null, currentStageIndex: null, resolvedAt: null } }),
+    prisma.reviewTask.update({ where: { id: task.id }, data: { status: "open", workflowId: null, currentStageIndex: null, stageReachedAt: null, resolvedAt: null } }),
     prisma.documentAuditEvent.create({ data: auditEventData({ workspaceId: input.workspaceId, documentId: task.documentId, actorId: input.actorId, type: "review_task_sent_back", detail: { reason } }, context) }),
   ])
+  // The starter hears about it directly (one mail per human act, no coalescing — spec §1.9).
+  void notifySentBack({ workspaceId: input.workspaceId, documentId: task.documentId, taskId: task.id, createdById: task.createdById, actorId: input.actorId, reason })
   return updated
 }
 

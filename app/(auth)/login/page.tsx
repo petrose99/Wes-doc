@@ -1,4 +1,5 @@
 import { LoginForm } from "@/components/auth/login-form"
+import { safeNextPath } from "@/lib/auth-post-sign-in"
 import { isGoogleAuthEnabled } from "@/lib/config"
 import { parseInviteToken } from "@/lib/invite-token"
 import { getInvitationEmailForToken } from "@/models/workspaces"
@@ -6,8 +7,10 @@ import type { Metadata } from "next"
 
 export const metadata: Metadata = { title: "Sign in" }
 
-export default async function LoginPage({ searchParams }: { searchParams: Promise<{ invite?: string | string[] }> }) {
-  const { invite } = await searchParams
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ invite?: string | string[]; next?: string | string[] }> }) {
+  const { invite, next } = await searchParams
+  // #271: a validated return path (proxy.ts sets it when it bounces a signed-out deep link).
+  const nextPath = safeNextPath(next)
   // Shape-validated server-side before it is ever used — see lib/invite-token.ts for why this
   // is the thing standing between `?invite=` and an open redirect.
   const token = parseInviteToken(Array.isArray(invite) ? invite[0] : invite)
@@ -22,7 +25,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
 
     <LoginForm
       defaultEmail={invitedEmail || undefined}
-      redirectTo={token ? `/invite/${token}` : "/workspaces"}
+      redirectTo={token ? `/invite/${token}` : nextPath ?? "/workspaces"}
       googleEnabled={isGoogleAuthEnabled}
       signupHref={`/signup${inviteQuery}`}
     />

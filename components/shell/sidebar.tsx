@@ -1,6 +1,7 @@
 "use client"
 
 import { AccountMenu } from "@/components/shell/account-menu"
+import { ApprovalEmailsDialog } from "@/components/shell/approval-emails"
 import { KeyboardShortcuts, SHORTCUT_DESTINATIONS } from "@/components/shell/keyboard-shortcuts"
 import { HowItWorksDialog } from "@/components/shell/how-it-works"
 
@@ -53,7 +54,7 @@ const ICONS: Record<string, typeof Files> = {
 export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, accountingEnabled = false, pipelineReviewCount = 0, reviewTaskCount = 0, financePushableCount = 0, openExceptionsCount = 0, batchesPendingApprovalCount = 0, approvalsReadyCount = 0 }: {
   workspaceId: string
   workspaces: SwitchableWorkspace[]
-  user: { name: string; email: string }
+  user: { name: string; email: string; approvalEmails?: boolean }
   /** Every module key currently enabled for this workspace (getWorkspaceCapabilities(...).enabled),
    * used to build the nav entries each module registers via ModuleDefinition.navItems. */
   enabledModuleKeys: string[]
@@ -273,10 +274,11 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
     </nav>
 
     <div className="mt-auto pt-3">
-      <AccountMenu name={user.name} email={user.email} collapsed={compact} workspaceId={workspaceId} />
+      <AccountMenu name={user.name} email={user.email} collapsed={compact} workspaceId={workspaceId} approvalEmails={user.approvalEmails ?? true} />
     </div>
   </div>
   <KeyboardShortcuts destinations={SHORTCUT_DESTINATIONS(workspaceId, adminPaths(workspaceId).configuration)} />
   <HowItWorksDialog />
+  <ApprovalEmailsDialog workspaceId={workspaceId} initial={user.approvalEmails ?? true} />
   </aside>
 }

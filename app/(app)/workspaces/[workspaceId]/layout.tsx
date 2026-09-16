@@ -79,7 +79,7 @@ export default async function WorkspaceLayout({ children, params }: { children: 
     <Sidebar
       workspaceId={workspaceId}
       workspaces={switchable}
-      user={{ name: user.name, email: user.email }}
+      user={{ name: user.name, email: user.email, approvalEmails: user.approvalNoticeEmails }}
       enabledModuleKeys={[...capabilities.enabled]}
       accountingEnabled={config.integrations.bigcapital.enabled}
       pipelineReviewCount={pipelineCounts.review}

@@ -308,3 +308,28 @@ export async function sendSentBackNotice(input: {
     console.warn(`[approval-notices] sent-back email failed for ${user.email}:`, error instanceof Error ? error.message : error)
   }
 }
+
+/** Convenience for `sendReviewTaskBackForReview`: loads the facts `sendSentBackNotice` needs
+ * (workspace name, actor name, the document's reviewed supplier/number/amount) so the review-task
+ * model only hands over ids. Never throws — a failed notice must not fail the send-back. */
+export async function notifySentBack(input: { workspaceId: string; documentId: string; taskId: string; createdById: string | null; actorId: string; reason: string }): Promise<void> {
+  try {
+    if (!isEmailConfigured()) return
+    if (!input.createdById || input.createdById === input.actorId) return
+    const [workspace, actor, document] = await Promise.all([
+      prisma.workspace.findUnique({ where: { id: input.workspaceId }, select: { name: true } }),
+      prisma.user.findUnique({ where: { id: input.actorId }, select: { name: true, email: true } }),
+      prisma.document.findUnique({ where: { id: input.documentId }, select: { reviewedData: true } }),
+    ])
+    if (!workspace) return
+    const values = (document?.reviewedData ?? {}) as Record<string, unknown>
+    await sendSentBackNotice({
+      workspaceId: input.workspaceId, workspaceName: workspace.name, taskId: input.taskId, documentId: input.documentId,
+      createdById: input.createdById, actorId: input.actorId, actorName: actor?.name?.trim() || actor?.email || "Someone", reason: input.reason,
+      supplier: asString(values.vendor) ?? asString(values.merchant), invoiceNumber: asString(values.invoice_number),
+      amount: asNumber(values.total) ?? asNumber(values.amount), currency: asString(values.currency_code),
+    })
+  } catch (error) {
+    console.warn("[approval-notices] sent-back notice failed:", error instanceof Error ? error.message : error)
+  }
+}

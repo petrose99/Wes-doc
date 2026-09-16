@@ -4,6 +4,7 @@
 import { auditEventData, getRequestAuditContext } from "@/lib/audit"
 import { createReviewTask } from "@/models/review-tasks"
 import { prisma } from "@/lib/db"
+import { kickApprovalNoticeDrain } from "@/lib/notices/kick"
 import { cache } from "react"
 
 export type WorkflowStageDraft = {
@@ -125,8 +126,9 @@ export async function startWorkflowOnReviewTask(input: { workspaceId: string; ta
   if (task.status !== "open") throw new Error("review_task_not_open")
   const context = await getRequestAuditContext()
   const [updated] = await prisma.$transaction([
-    prisma.reviewTask.update({ where: { id: task.id }, data: { workflowId: workflow.id, currentStageIndex: 0, status: "in_review" } }),
+    prisma.reviewTask.update({ where: { id: task.id }, data: { workflowId: workflow.id, currentStageIndex: 0, status: "in_review", stageReachedAt: new Date() } }),
     prisma.documentAuditEvent.create({ data: auditEventData({ workspaceId: input.workspaceId, documentId: task.documentId, actorId: input.actorId, type: "review_task_workflow_started", detail: { workflowId: workflow.id } }, context) }),
   ])
+  void kickApprovalNoticeDrain()
   return updated
 }
