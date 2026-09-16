@@ -97,6 +97,10 @@ _Avoid_: Reopen, cancel (that withdraws a run before any stage is decided)
 **Not eligible**:
 An Approval that is visible to its Approver but cannot be decided yet because a hard check failed or an escalation is open on the invoice. Never hidden, never overridable from Approvals; the reason is shown on the row.
 
+**Approval notice**:
+The one email an Approver gets when Approvals reach a stage they can decide: every eligible Approval that reached them since their last notice, never more than one an hour, none when nothing is new, and nothing about their own actions. It names the supplier and amount and opens the row (or Ready to Approve, when there are several); it never decides anything. A still-undecided Approval is nudged at most twice more. The person who started a run gets the same kind of notice only when it is sent back for review. Each person can switch it off in one click.
+_Avoid_: Reminder (as the user-facing name), digest, alert, push, notification (as a badge count)
+
 **Bill Pay**:
 The queue of approved, unpaid invoices from which payment batches are created. An invoice reaches it only once its processing state is Approved; one that cannot be paid yet (no supplier bank details) stays visible with the reason.
 _Avoid_: Payables, payment run (the queue), pay list

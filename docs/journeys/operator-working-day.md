@@ -51,7 +51,7 @@ Decided (Q4): **the Checks tab owns resolution on whichever queue the operator i
 
 ### 4. Hand to the Approver
 
-Reviewer starts an Approval from the Invoices bulk bar (#227). The Approver's lane begins **by habit**: nothing notifies anyone; the rail badge on Ready to Approve is the only signal and the phone has no rail (Seam #246, blocked by #236). On the desktop the Approver works Ready to Approve with the same pane, read-only fields, sticky Reject · Approve, Send back for review with a reason. Not eligible rows stay visible with the reason.
+Reviewer starts an Approval from the Invoices bulk bar (#227). The Approver's lane begins with an **Approval notice** (#246): one email per person when eligible Approvals reach their stage, coalesced to at most one an hour, deep-linked to the row, with the rail and phone-tab badges as the in-app signal; the old 48h reminder becomes its capped nudge. Today, until #271 ships, it still begins by habit: nothing fires on Start and the 48h reminder goes to assignee-or-owners. On the desktop the Approver works Ready to Approve with the same pane, read-only fields, sticky Reject · Approve, Send back for review with a reason. Not eligible rows stay visible with the reason.
 
 **Phone is the Approver's lane only** (Q7, #189, #232): open → Ready to Approve → Approval Context → decide → back to the list. Everything else on the phone is read-only. Today the tab bar is Invoices · Exceptions · Finance-or-Archive · Settings, three queues have no phone entry, and the pane opens full-screen with working Approve/Reject.
 
