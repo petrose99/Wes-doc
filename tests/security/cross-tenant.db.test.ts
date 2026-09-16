@@ -23,6 +23,11 @@ let appPrisma: PrismaClient | null = null
 
 const INFRA_TABLES = new Set([
   "workspaces", "users", "workspace_members", "workspace_invitations",
+  // #254 (ADR 0002): organizations/organization_members have no workspace_id column at all — an
+  // Organization groups Workspaces, it isn't scoped by one. workspace_invitation_grants is
+  // invitation-adjacent, same reasoning as workspace_invitations above (readable before a
+  // workspace's membership is decided).
+  "organizations", "organization_members", "workspace_invitation_grants",
 ])
 
 async function withAppWorkspace<T>(workspaceId: string, fn: (tx: import("@/prisma/client").Prisma.TransactionClient) => Promise<T>): Promise<T> {

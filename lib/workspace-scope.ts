@@ -17,7 +17,12 @@
  * Workspace itself (the scoping root — filtering it by workspaceId is meaningless); WorkspaceMember
  * and WorkspaceInvitation (membership is how workspace access is *decided*, so it must be readable
  * before a workspace is known); AdminAuditEvent (system-level); and the
- * child models reached only through a scoped parent (DocumentTemplateVersion, DocumentFileShare). */
+ * child models reached only through a scoped parent (DocumentTemplateVersion, DocumentFileShare).
+ * #254 (ADR 0002): also NOT listed — Organization and OrganizationMember (no workspaceId column;
+ * organization membership is Admin-scoped and never itself grants entity access, so every org-wide
+ * read is written as unscoped() + an explicit workspaceId IN (WorkspaceMember ids) list, never
+ * derived from OrganizationMember — see models/organizations.ts) and WorkspaceInvitationGrant
+ * (invitation-adjacent, same reasoning as WorkspaceInvitation above). */
 // #255: also NOT listed, deliberately: ProductEvent (workspaceId is nullable — analytics events
 // fire before a workspace exists, e.g. signup funnel steps — and its retention sweep in
 // lib/analytics.ts deliberately spans every workspace).

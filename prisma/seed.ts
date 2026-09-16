@@ -12,8 +12,10 @@
  */
 import { createAdminClient } from "@/lib/supabase/server"
 import { createWorkspaceForUser } from "@/models/workspaces"
+import { createOrganization, addCompanyToOrganization } from "@/models/organizations"
 import { drainProvisionJobs } from "@/models/bigcapital"
 import { prisma } from "@/lib/db"
+import { DEV_BYPASS_USER } from "@/lib/supabase/dev-bypass"
 
 type DemoAccount = { email: string; name: string; role: string; password: string }
 
@@ -59,6 +61,29 @@ async function seedAccount(account: DemoAccount) {
   return { email: account.email, password: account.password, role: account.role }
 }
 
+/** #254/#287: DEV_AUTH_BYPASS always resolves to this fixed identity (lib/supabase/dev-bypass.ts),
+ * whose personal workspace is normally provisioned lazily on first request. That leaves it in
+ * exactly one workspace, which can't exercise a switcher, Companies, Users or the Dashboard
+ * rollups — all of which only render past ≥2 memberships. Seed it a second, org-grouped
+ * workspace up front so #285/#286/#287 have something to point Playwright at without a manual
+ * "add a company" click first. Idempotent: skips once the user already has ≥2 memberships. */
+async function seedDevBypassOrganization() {
+  const user = await prisma.user.upsert({
+    where: { email: DEV_BYPASS_USER.email },
+    create: { id: DEV_BYPASS_USER.id, email: DEV_BYPASS_USER.email, name: DEV_BYPASS_USER.name, role: "user", emailVerified: true },
+    update: {},
+  })
+
+  const memberships = await prisma.workspaceMember.findMany({ where: { userId: user.id }, orderBy: { createdAt: "asc" } })
+  if (memberships.length === 0) await createWorkspaceForUser(user)
+  if (memberships.length >= 2) return
+
+  const organization = await prisma.organization.findFirst({ where: { name: "Acme Advisory", members: { some: { userId: user.id } } } })
+    ?? (await createOrganization("Acme Advisory", user.id))
+  const existingCompany = await prisma.workspace.findFirst({ where: { organizationId: organization.id, members: { some: { userId: user.id } } } })
+  if (!existingCompany) await addCompanyToOrganization(organization.id, user.id, { name: "Riverside Bakery Co.", country: "US", baseCurrency: "USD" })
+}
+
 async function main() {
   // These are known credentials with an admin account among them. Seeding them into a real
   // deployment would hand anyone who reads this file an admin login.
@@ -68,6 +93,7 @@ async function main() {
 
   const seeded = []
   for (const account of ACCOUNTS) seeded.push(await seedAccount(account))
+  await seedDevBypassOrganization()
 
   console.log("\nSeeded accounts:\n")
   for (const row of seeded) console.log(`  ${row.email.padEnd(30)} ${row.password.padEnd(24)} ${row.role}`)

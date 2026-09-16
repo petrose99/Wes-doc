@@ -347,7 +347,12 @@ export async function deleteWorkspace(input: { workspaceId: string; actorId: str
 
 /** Returns the workspace name alongside the token so the caller can compose the invitation
  * email without a second query for something it just read. There is no seat limit anymore. */
-export async function createWorkspaceInvitation(input: { workspaceId: string; ownerId: string; email: string; role?: WorkspaceRole }) {
+/** `additionalGrants`: #254/#286 — extra (workspaceId, role) pairs beyond the primary workspace,
+ * so one invitation can add a user to several companies in an organization at once. The caller
+ * (Users' invite form, #286) is responsible for checking the inviter has "owner" on each extra
+ * workspace too; this function only enforces it for the primary one, matching every existing
+ * single-company caller unchanged. */
+export async function createWorkspaceInvitation(input: { workspaceId: string; ownerId: string; email: string; role?: WorkspaceRole; additionalGrants?: { workspaceId: string; role?: WorkspaceRole }[] }) {
   await requireWorkspaceRole(input.workspaceId, input.ownerId, ["owner"])
   const workspace = await prisma.workspace.findUniqueOrThrow({ where: { id: input.workspaceId } })
   const email = input.email.trim().toLowerCase()
@@ -356,7 +361,18 @@ export async function createWorkspaceInvitation(input: { workspaceId: string; ow
   if (await prisma.workspaceMember.findFirst({ where: { workspaceId: input.workspaceId, user: { email } } })) throw new Error("member_already_exists")
   const token = randomBytes(32).toString("base64url")
   await prisma.workspaceInvitation.deleteMany({ where: { workspaceId: input.workspaceId, email, acceptedAt: null } })
-  const invitation = await prisma.workspaceInvitation.create({ data: { workspaceId: input.workspaceId, sentById: input.ownerId, email, role: parseRole(input.role || "member"), tokenHash: invitationHash(token), expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) } })
+  const additionalGrants = (input.additionalGrants ?? []).filter((grant) => grant.workspaceId !== input.workspaceId)
+  const invitation = await prisma.workspaceInvitation.create({
+    data: {
+      workspaceId: input.workspaceId,
+      sentById: input.ownerId,
+      email,
+      role: parseRole(input.role || "member"),
+      tokenHash: invitationHash(token),
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      additionalGrants: additionalGrants.length ? { create: additionalGrants.map((grant) => ({ workspaceId: grant.workspaceId, role: parseRole(grant.role || "member") })) } : undefined,
+    },
+  })
   await recordDocumentAudit({ workspaceId: input.workspaceId, actorId: input.ownerId, type: "invitation_created", detail: { email, role: invitation.role } })
   return { token, invitation, workspaceName: workspace.name }
 }
@@ -401,7 +417,7 @@ export async function getInvitationEmailForToken(token: string) {
 }
 
 export async function acceptWorkspaceInvitation(token: string, user: Pick<User, "id" | "email">) {
-  const invitation = await prisma.workspaceInvitation.findUnique({ where: { tokenHash: invitationHash(token) } })
+  const invitation = await prisma.workspaceInvitation.findUnique({ where: { tokenHash: invitationHash(token) }, include: { additionalGrants: true } })
   if (!invitation) throw new Error("invitation_invalid")
   if (invitation.email !== user.email.toLowerCase()) throw new Error("invitation_email_mismatch")
   // Idempotent for the person who already used it: a back button, a second tab, or a re-opened
@@ -421,6 +437,26 @@ export async function acceptWorkspaceInvitation(token: string, user: Pick<User, 
   const context = await getRequestAuditContext()
   const audit = reviewerAuditEventRows({ workspaceId: invitation.workspaceId, actorId: user.id, targetUserId: user.id, prevReviewers, delta, reason: "invitation_accepted" }, context)
 
+  // #254/#286: additionalGrants add the same user to further companies in one acceptance. Each
+  // gets its own upsert + reviewer/mode accounting, exactly like the primary workspace above —
+  // an org-wide invite is N per-workspace grants, never a shortcut around WorkspaceMember.
+  const extraGrants: { workspaceId: string; role: string }[] = []
+  for (const grant of invitation.additionalGrants ?? []) {
+    const grantExisting = await prisma.workspaceMember.findUnique({ where: { workspaceId_userId: { workspaceId: grant.workspaceId, userId: user.id } } })
+    const grantDelta = reviewerDelta(grantExisting?.role ?? null, grant.role) as -1 | 0 | 1
+    const grantPrevReviewers = grantDelta === 0 ? 0 : await countReviewers(grant.workspaceId)
+    extraGrants.push({ workspaceId: grant.workspaceId, role: grant.role })
+    const grantAudit = reviewerAuditEventRows({ workspaceId: grant.workspaceId, actorId: user.id, targetUserId: user.id, prevReviewers: grantPrevReviewers, delta: grantDelta, reason: "invitation_accepted" }, context)
+    await prisma.$transaction([
+      prisma.workspaceMember.upsert({ where: { workspaceId_userId: { workspaceId: grant.workspaceId, userId: user.id } }, update: { role: grant.role }, create: { workspaceId: grant.workspaceId, userId: user.id, role: grant.role } }),
+      prisma.documentAuditEvent.create({
+        data: auditEventData({ workspaceId: grant.workspaceId, actorId: user.id, type: "invitation_accepted", detail: { role: grant.role } }, context),
+      }),
+      ...grantAudit.rows.map((data) => prisma.documentAuditEvent.create({ data })),
+    ])
+    await afterModeFlip(grant.workspaceId, grantAudit.before, grantAudit.after)
+  }
+
   await prisma.$transaction([
     prisma.workspaceMember.upsert({ where: { workspaceId_userId: { workspaceId: invitation.workspaceId, userId: user.id } }, update: { role: invitation.role }, create: { workspaceId: invitation.workspaceId, userId: user.id, role: invitation.role } }),
     prisma.workspaceInvitation.update({ where: { id: invitation.id }, data: { acceptedAt: new Date() } }),
@@ -432,9 +468,11 @@ export async function acceptWorkspaceInvitation(token: string, user: Pick<User, 
   await afterModeFlip(invitation.workspaceId, audit.before, audit.after)
   const fullUser = await prisma.user.findUnique({ where: { id: user.id }, select: { id: true, name: true, email: true } })
   if (fullUser) {
-    provisionMemberAccount(invitation.workspaceId, { id: fullUser.id, name: fullUser.name ?? "", email: fullUser.email }).catch((err) => {
-      console.error("[bigcapital-members] provision after invite accept failed:", err instanceof Error ? err.message : err)
-    })
+    for (const workspaceId of [invitation.workspaceId, ...extraGrants.map((g) => g.workspaceId)]) {
+      provisionMemberAccount(workspaceId, { id: fullUser.id, name: fullUser.name ?? "", email: fullUser.email }).catch((err) => {
+        console.error("[bigcapital-members] provision after invite accept failed:", err instanceof Error ? err.message : err)
+      })
+    }
   }
   return invitation.workspaceId
 }
