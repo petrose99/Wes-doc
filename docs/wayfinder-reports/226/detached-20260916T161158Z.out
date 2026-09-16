@@ -19,3 +19,20 @@
     #258 crossed the hand-off line (152444 tokens ≥ 150000) — asked to hand off; hard stop at 180000
     #258 context at exit: 152577 tokens, 25 min
     cleaned up session pid 1435601 (pgid ?); free: 5752 MB
+    scoreboard: 50 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #258: phase measure done → close next in 1537s
+=== [5/50] #258 — Build the one status vocabulary: StatePills from processingState(), the pane status line, stepper words, Approval tab from the audit log  [sonnet · low · phase: close]
+    #258 crossed the hand-off line (153657 tokens ≥ 150000) — asked to hand off; hard stop at 180000
+    #258 context at exit: 172416 tokens, 21 min
+    cleaned up session pid 1470747 (pgid ?); free: 5759 MB
+    scoreboard: 51 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #258: continued (progressed), session 1/3 without progress allowed, hand-off 124 lines (limit 120) in 1267s
+=== [6/50] #258 — Build the one status vocabulary: StatePills from processingState(), the pane status line, stepper words, Approval tab from the audit log  [opus[1m] · low · phase: close]
+    #258 context at exit: 112198 tokens, 17 min
+    cleaned up session pid 1499483 (pgid ?); free: 5960 MB
+    scoreboard: 52 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #258: resolved in 1025s
+=== [7/50] #261 — Build the phone Queue screen: card rows and the Filters sheet on all five queues  [opus[1m] · low · phase: spec]
+    #261 crossed the hand-off line (163472 tokens ≥ 150000) — asked to hand off; hard stop at 180000
+    #261 context at exit: 168635 tokens, 9 min
+    cleaned up session pid 1521115 (pgid ?); free: 6304 MB
