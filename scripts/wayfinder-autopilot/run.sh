@@ -151,9 +151,12 @@ progress_mark() {   # a fingerprint of "did this session move the work": HEAD + 
 # model; a ticket left "Autopilot: partial —" is retried on MODEL_STRONG.
 # Phased builds. A rendered-surface build ("Build …" task ticket) runs as
 # three sessions, each a fresh context that starts from the hand-off file:
-#   spec  → intent + impeccable pre-build, pre-flight A–E, spec critic; no dev server
-#   build → the surface from the tables, contract checks, WIP commit; no capture
-#   close → capture, critique/evaluate/include, fix batch, confirm, tests, close
+#   spec    → intent + impeccable pre-build, pre-flight A–E, spec critic; no dev server
+#   build   → the surface from the tables, contract checks, WIP commit; no capture
+#   measure → servers, one capture round, the three readers, scores on the hand-off; no fixes
+#   close   → fix batch, confirm round, tests, build, primer, report, close
+# (#257's close phase did not fit one budget: five sessions, the readers never
+# re-run after the fixes. Measuring and closing are now separate sessions.)
 # The cost of a session is quadratic in its length (every turn re-reads the
 # context), so three short sessions cost a fraction of one long one — #252
 # ran 747 turns/221M tokens in one session; its continuation from a hand-off
@@ -165,12 +168,13 @@ PHASED_TITLE_RE="${PHASED_TITLE_RE:-^Build }"
 # the driver read "spec" again and re-ran a finished phase (#259, 11:55). The
 # driver therefore keeps its own high-water mark in <ticket>.phase and takes
 # the later of the two.
-phase_rank() { case "$1" in spec) echo 1;; build) echo 2;; close) echo 3;; *) echo 0;; esac; }
+phase_rank() { case "$1" in spec) echo 1;; build) echo 2;; measure) echo 3;; close) echo 4;; *) echo 0;; esac; }
 phase_of() {   # $1 ticket → "" (single session) | spec | build | close
   local labels; labels="$(gh api "repos/$REPO/issues/$1" --jq '[.labels[].name]|join(",")')"
   [[ "$labels" == *wayfinder:task* ]] && [[ "$(title "$1")" =~ $PHASED_TITLE_RE ]] || { echo ""; return; }
   local h="$OUT/$1.handoff.md" m=spec f=spec
-  if [ -f "$h" ] && grep -q '^milestone: build-done' "$h"; then m=close
+  if [ -f "$h" ] && grep -q '^milestone: measured' "$h"; then m=close
+  elif [ -f "$h" ] && grep -q '^milestone: build-done' "$h"; then m=measure
   elif [ -f "$h" ] && grep -q '^milestone: spec-done' "$h"; then m=build; fi
   [ -f "$OUT/$1.phase" ] && f="$(cat "$OUT/$1.phase")"
   if [ "$(phase_rank "$m")" -ge "$(phase_rank "$f")" ]; then echo "$m"; else echo "$f"; fi
@@ -264,13 +268,16 @@ while [ "$n" -lt "$MAX" ]; do
   case "$PHASE" in
     spec)  CONT="$CONT
 
-**This session's phase: SPEC** (1 of 3). Do the pre-build only — the \`intent\` and \`impeccable\` pre-build pass, \`preflight.md\` parts A–E filled, the spec critic run and its gate met. Write the spec and the filled pre-flight to the ticket's scratch folder. No dev server, no browser, no product code. End by writing the hand-off file with the line \`milestone: spec-done\`, committing (\`wip(autopilot): #$T spec\`), and stopping. The build is the next session's, in a fresh context." ;;
+**This session's phase: SPEC** (1 of 4). Do the pre-build only — the \`intent\` and \`impeccable\` pre-build pass, \`preflight.md\` parts A–E filled, the spec critic run and its gate met. Write the spec and the filled pre-flight to the ticket's scratch folder. No dev server, no browser, no product code. End by writing the hand-off file with the line \`milestone: spec-done\`, committing (\`wip(autopilot): #$T spec\`), and stopping. The build is the next session's, in a fresh context." ;;
     build) CONT="$CONT
 
-**This session's phase: BUILD** (2 of 3). Read the hand-off, the spec and the filled pre-flight; build the whole surface from the tables, every state; run the Part B contract checks and the affected tests; run \`tsc --noEmit\` once at the end of the phase. No capture, no critique, no evaluate — measuring is the next session's, in a fresh context. End by writing the hand-off with what is built and where, the line \`milestone: build-done\`, committing (\`wip(autopilot): #$T build\`), and stopping." ;;
+**This session's phase: BUILD** (2 of 4). Read the hand-off, the spec and the filled pre-flight; build the whole surface from the tables, every state; run the Part B contract checks and the affected tests; run \`tsc --noEmit\` once at the end of the phase. No capture, no critique, no evaluate — measuring is the next session's, in a fresh context. End by writing the hand-off with what is built and where, the line \`milestone: build-done\`, committing (\`wip(autopilot): #$T build\`), and stopping." ;;
+    measure) CONT="$CONT
+
+**This session's phase: MEASURE** (3 of 4). Read the hand-off. Seed and servers up in one call; one capture round as a state list on \`scripts/wayfinder-autopilot/capture-round.mjs\` (every state at both widths, detector JSON, keyboard probes); contact sheets; then the three readers — critique, evaluate, include — as fresh \`sonnet\` agents on that set. No product fixes in this phase. End by writing the scores (every heuristic, health, P0–P3, include verdict) and the triage of real detector findings into the hand-off with the line \`milestone: measured\`, committing (\`wip(autopilot): #$T measured\`), and stopping. The fix batch is the next session's, in a fresh context." ;;
     close) CONT="$CONT
 
-**This session's phase: CLOSE** (3 of 3). Read the hand-off. Seed, dev server, one capture round; critique, evaluate and include on that set; the fix batch; the confirming round; then once each: affected tests → full suite → \`tsc --noEmit\` → \`eslint\` → \`next build\` (dev server stopped first). Report, lessons with their \`check:\`, close at the bar. If the bar is not reached, update the hand-off, post \`Autopilot: continue —\`, commit, stop." ;;
+**This session's phase: CLOSE** (4 of 4). Read the hand-off: the scores and triage are on it, the capture round script exists — do not re-measure first. The fix batch (every P1, every heuristic under 3, every real detector finding); the confirming round with the same round script and the readers re-run on it; then once each: affected tests → full suite → \`tsc --noEmit\` → \`eslint\` → \`next build\` (dev server stopped first). Report, lessons with their \`check:\`, close at the bar. If the bar is not reached, update the hand-off with the new scores, post \`Autopilot: continue —\`, commit, stop." ;;
   esac
   { cat "$BRIEF"; printf '\n\n## Paths for this run\n\n- Generic lessons (every project): `%s`\n- Project lessons (this repo): `%s`\n- Report: `%s/%s.md`\n- Hand-off file (keep it current at every milestone): `%s/%s.handoff.md`\n- Scratch folder for captures and the filled preflight: `%s/scratch-%s/`\n\n%s\n' "$GENERIC_LESSONS" "$PROJECT_LESSONS" "$OUT" "$T" "$OUT" "$T" "$LOGS" "$T" "$CONT"; } > "$RUN_BRIEF"
   # Memory: the whole session (claude + dev server + headless browser + node

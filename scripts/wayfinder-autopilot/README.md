@@ -34,7 +34,9 @@ scripts/wayfinder-autopilot/stop.sh <map>                     # stop cleanly: ru
 Watch: `tail -f docs/wayfinder-reports/<map>/detached.out`.
 Stop: `kill <driver pid>` (current ticket finishes, nothing new starts).
 
-Capture rounds: `capture-round.mjs` is the shared runner for the close phase (fresh context per state, detector injection, residue filter, keyboard probes, per-state error isolation, `detector.json` + `keyboard.json`); a ticket's round script is a state list on top of it. The context-guard hook also nags once per session when the hand-off passes `WAYFINDER_HANDOFF_MAX_LINES` (120), and the run-log row records the length.
+Phased builds: a "Build …" task ticket runs as four fresh sessions — spec → build → measure → close — read off `milestone:` lines in the hand-off (`spec-done`, `build-done`, `measured`); the driver keeps a high-water mark in `<ticket>.phase` so a phase never moves backwards.
+
+Capture rounds: `capture-round.mjs` is the shared runner for the measure and close phases (fresh context per state, detector injection, residue filter, keyboard probes, per-state error isolation, `detector.json` + `keyboard.json`); a ticket's round script is a state list on top of it. The context-guard hook also nags once per session when the hand-off passes `WAYFINDER_HANDOFF_MAX_LINES` (120), and the run-log row records the length.
 
 Hard phases: once a phase has `HARD_AFTER` run-log rows without completing (default 2) every further session on it runs on `MODEL_HARD` at `EFFORT_HARD` (per-project `config.sh`), skipping the cheap first pass; when the phase advances the count restarts and routing reverts to the normal ladder. The driver reads these once at start — restart it at a session boundary to apply a change.
 

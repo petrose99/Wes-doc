@@ -120,28 +120,30 @@ run in the foreground (`run_in_background: false`) and read on return. Code
 is written by this session. Never end a turn "waiting"; if you cannot
 continue, commit WIP, post the partial hand-off and end.
 
-**Build tickets run in three phases, each a fresh session.** The driver
+**Build tickets run in four phases, each a fresh session.** The driver
 reads the phase off the hand-off file's `milestone:` line and tells you
 which one this session is, at the end of this brief: **spec** (pre-build,
 pre-flight, critic; no dev server) → **build** (the surface from the
-tables; no capture) → **close** (capture, scoring, fix batch, checks, close).
-Do only your phase. A phase ends by writing the hand-off with its exit line
-(`milestone: spec-done` / `milestone: build-done`), committing, and
+tables; no capture) → **measure** (servers, one round, the three readers,
+scores on the hand-off; no fixes) → **close** (fix batch, confirm round,
+checks, report, close). Do only your phase. A phase ends by writing the
+hand-off with its exit line (`milestone: spec-done` / `milestone:
+build-done` / `milestone: measured`), committing, and
 stopping — the next phase starts fresh from that file, which is why the
 hand-off must carry every pointer the next session needs (spec path,
 pre-flight path, what is built, what is verified). Do not "just start" the
 next phase because there is context left: the next session's fresh context
 is the saving.
 
-**The close phase measures before it fixes, with shared tooling.** The
+**Measure and close use shared tooling, and measure never fixes.** The
 capture round is a short state list on top of
 `scripts/wayfinder-autopilot/capture-round.mjs` (fresh context per state,
 detector injection, residue filter, keyboard probes, per-state error
 isolation, `detector.json` + `keyboard.json`) — never a Playwright harness
-written from scratch (#257 spent four sessions on one). Order inside the
-phase: servers up in one call → one round → the three readers → scores into
-the hand-off **immediately** (a session cut after that still hands the
-numbers on) → the fix batch → the confirm round → checks → report. The
+written from scratch (#257 spent four sessions on one). Measure: servers
+up in one call → one round → the three readers → scores and triage into
+the hand-off → `milestone: measured`. Close: the fix batch → the confirm
+round with the same round script and the readers re-run → checks → report. The
 hand-off stays under ~80 lines of pointers throughout; the hook refuses to
 let it grow past 120 without a rewrite.
 
