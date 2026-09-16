@@ -10,7 +10,7 @@ code**; attach the filled file to the report.
 
 ---
 
-## Part A — Excellence targets (optional: only when a ticket is marked to go beyond the floor)
+## Part A — Two excellence targets (H1 and H5 by default; they fall out of Part B)
 
 The critic's 4 is *"every action confirms" · "escape everywhere" · "fully
 consistent" · "errors nearly impossible" · "everything discoverable"*. A 4 does
@@ -32,9 +32,12 @@ built to a solid 3 (no primary gap).
 | H9 Recovery | 4 / 3 | e.g. every error at its source, names the problem and the fix, keeps the input | |
 | H10 Help | 4 / 3 | e.g. the rule taught where it bites (empty state, dialog description, first-run); `?` reachable | |
 
-Skip this part on a normal ticket; the floor is every heuristic ≥ 3 with zero
-P1s, and Parts B–E deliver that. Fill it only when the ticket says "beyond the
-floor"; then gate at ≥ 36 predicted.
+Fill two rows, not ten: H1 (every mutation updates every view in the same tick
+— B2) and H5 (every ⚠ action confirmed with its consequence, inputs
+constrained — B1). Both are 4s by construction when Part B is honoured, so they
+cost nothing extra. The other eight are built to a solid 3. Gate: predicted
+≥ 32 with none under 3. More 4-targets only when the ticket says "beyond the
+bar".
 
 Heuristics the mode makes `n/a` (H7/H10 on Persuade surfaces) are stated, not
 skipped silently. On Operate surfaces all ten apply.
@@ -125,8 +128,8 @@ argument. Record both columns here:
 | H | critique: self / critic / reconciled | evaluate worst-issue: self / critic / reconciled | Spec change made |
 |---|---|---|---|
 
-Gate after reconciliation: **zero P0/P1 predicted, no heuristic under 3,
-verdict Clean.** (Beyond-the-floor tickets: also critique ≥ 36.)
+Gate after reconciliation: **zero P0/P1 predicted, no heuristic under 3, two
+4s (≥ 32), verdict Clean, evaluate ≈ ≥ 85.**
 
 ---
 

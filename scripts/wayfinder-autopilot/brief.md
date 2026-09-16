@@ -46,22 +46,25 @@ you, with one rule: **take the recommended answer.**
 - Execution tickets: commit your work on the current branch with a
   conventional commit message referencing the ticket. Never push.
 
-## The bar: no rework, not perfection
+## The bar: solid, no rework, not perfection
 
-The owner's bar for closing a rendered-surface ticket is the **no-rework
-floor** — the level below which someone has to come back and fix it later:
+The owner's bar for closing a rendered-surface ticket:
 
-- `evaluate`: **zero P0/P1**, health ≥ 80, anti-pattern verdict Clean.
-- `critique`: **≥ 30/40 with no heuristic under 3**.
+- `evaluate`: **zero P0/P1**, health **≥ 85**, anti-pattern verdict Clean.
+- `critique`: **≥ 32/40, no heuristic under 3** — i.e. two 4s. Take them
+  where the contracts already pay for them: H1 (view freshness on every
+  mutation, B2) and H5 (confirm-with-consequence on every ⚠ action, B1) are
+  4s by construction if Part B is honoured. Don't chase a third.
 - In-page detector cleared to the named app-wide residue at 1440 and 390.
 - `include`: keyboard flow verified live at both widths.
 
-Points above that are not bought with extra passes. **One fix batch, then
-ship**: first measurement → one batch fixing every P1 and every heuristic
-under 3 → confirming measurement → close if at the floor. If the confirm is
-still under the floor with no P1s, close and record the gap. If a P1 remains,
-leave the ticket `Autopilot: partial —` as a hand-off (the driver retries on
-the stronger model); that is the only case that earns a third pass.
+**One fix batch, then ship — a second only if the first removed a P1** (fixing
+a P1 changes enough that the confirm can't stand in for it). Sequence: first
+measurement → batch fixing every P1 and every heuristic under 3 → confirming
+measurement → close at the bar. Confirm under the bar with no P1s: close and
+record the gap. A P1 still open after the allowed batches: leave the ticket
+`Autopilot: partial —` as a hand-off (the driver retries on the stronger
+model). Never a batch to turn a 3 into a 4.
 
 **The skills are there so the first pass is right.** Before the first line of
 code on an execution ticket, the pre-build pass is mandatory and is done
@@ -84,8 +87,9 @@ properly, not skimmed:
    the pre-flight (step 3) cites it.
 3. **Pre-flight — `preflight.md` next to this brief, filled completely,
    before code.** It has seven parts and each exists because a real first
-   pass lost points there: **A** *optional* — excellence targets are
-   for a ticket the owner has marked to go beyond the floor, not the default; **B** six contracts that are grep-checkable
+   pass lost points there: **A** two excellence targets only — H1 and H5 by
+   default, earned through the Part B contracts, not extra work; more only if
+   the ticket says "beyond the bar"; **B** six contracts that are grep-checkable
    (action reachability + reversal, view freshness after every mutation, one
    term per concept, shell-primitive reuse, focus/keys/failure path per
    interactive surface, time-axis edges); **C** coverage by component type;
@@ -97,7 +101,7 @@ properly, not skimmed:
    thing the spec still permits and its severity, walk each core task with
    the four questions (try · notice · associate · see progress), sweep the
    anti-patterns. **Gate after D: predicted zero P0/P1, no heuristic
-   under 3, Clean.** Under the gate you change the spec, never the code later.
+   under 3, two 4s, Clean.** Under the gate you change the spec, never the code later.
    The filled tables are then the build checklist, row by row.
 4. Build the whole surface from the tables, all states included, with the
    detector hook fixing findings as they appear. **Before the first
