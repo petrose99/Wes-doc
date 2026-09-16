@@ -21,6 +21,11 @@ import { cancelDocument, deleteWorkspaceDocuments, DocumentCancellationBlockedEr
 import { listDocumentAuditEvents, listDocumentStageDecisions } from "@/models/audit-events"
 import { getActiveWorkflowStageState } from "@/models/review-tasks"
 import { overrideGate } from "@/lib/gates/actions"
+import { MATCH_VARIANCE_GATE_TYPE } from "@/lib/gates/match-variance"
+import { canOverrideMismatch, setMismatchApprovers } from "@/models/mismatch-approvers"
+import { AUTO_START_ESTIMATE_DAYS, estimateAutoStarts, setDefaultApprovalFlow } from "@/models/approval-defaults"
+import { getOrCreateAutomationConfig, updateAutomationConfig } from "@/models/automation-config"
+import { adminPaths } from "@/lib/admin/paths"
 import { listOpenGatesForDocument, overrideEligibility } from "@/lib/gates/list"
 import { addDomainPackToFile, createFile, createFolder, deleteFileIfEmpty, deleteFiles, deleteFolder, duplicateFile, getFileTemplates, getWorkspaceFile, listFileShares, moveToFolder, removeFileShare, renameFile, renameFolder, setLinkAccess, touchFile, upsertFileShare } from "@/models/files"
 import { getCurrentUser } from "@/lib/auth"
@@ -267,6 +272,16 @@ export async function overrideGateAction(workspaceId: string, gateId: string, fo
   if (!gate || gate.workspaceId !== workspaceId) return { success: false, error: "Gate not found" }
   const eligibility = overrideEligibility(gate.severity)
   if (!eligibility.overridable) return { success: false, error: eligibility.reason }
+  // #253: a PO mismatch is overridden by whoever Admin › PO Mismatch Flows › Who approves a
+  // mismatch names. An empty list there is the in-force default ("the current stage's approver"),
+  // which is exactly the any-member rule this path already applied — so an unconfigured workspace
+  // is unaffected. The refusal names the people who can, rather than only saying no.
+  if (gate.gateType === MATCH_VARIANCE_GATE_TYPE) {
+    const verdict = await canOverrideMismatch({ workspaceId, actorId: user.id })
+    if (!verdict.allowed) {
+      return { success: false, error: `Only ${verdict.approverNames.join(", ")} can override a PO mismatch in this workspace. Ask one of them, or change who approves a mismatch in Admin › PO Mismatch Flows.` }
+    }
+  }
   const reason = String(formData.get("reason") ?? "").trim()
   if (!reason) return { success: false, error: "A reason is required to override this gate." }
   await overrideGate({ gateId, actorId: user.id, reason })
@@ -556,6 +571,10 @@ export async function setWorkspaceAiAction(workspaceId: string, enabled: boolean
 /** #206: the acceptable overage (percent of ordered quantity) before the PO/invoice line-
  * consumption check flags a description group. 0-100 is the sane range for a percentage read
  * as "how far over is still fine" — anything beyond that isn't a tolerance any more. */
+/** @deprecated #253 — superseded by setPoMismatchPolicyAction, which saves both tolerances and the
+ * approver list under Admin › PO Mismatch Flows' one save bar. Left in place rather than deleted:
+ * removing a shipped server action is an owner's call, not a build's (recorded as an orphan on the
+ * close comment for sign-off). No surface calls this any more. */
 export async function setPoQuantityToleranceAction(workspaceId: string, percent: number): Promise<ActionState<null>> {
   const user = await getCurrentUser()
   if (!(await requireMember(workspaceId, user.id, ["owner"]))) return { success: false, error: NO_ACCESS }
@@ -565,6 +584,84 @@ export async function setPoQuantityToleranceAction(workspaceId: string, percent:
     revalidatePath(paths(workspaceId).workspace)
     return { success: true, data: null }
   } catch { return { success: false, error: "Could not change the tolerance setting" } }
+}
+
+/** #253: Admin › PO Mismatch Flows saves as one form — both tolerances and the approver list under
+ * one Save. Three writes rather than one because they land in three places (Workspace, the
+ * automation config, Workspace again); they are ordered so the two tolerances commit before the
+ * approver list, and any failure returns a refusal with nothing half-applied that the owner cannot
+ * see, since the page re-reads on success.
+ *
+ * `matchVariancePercent` arrives 0–100 from the field and is stored 0–1, which is what
+ * WorkspaceAutomationConfig.matchTolerance.percent has always held (#228 Q12) — the gate and the
+ * View PO row (#250) read that number unchanged. The existing `floor` is preserved: it is a
+ * separate decision that this form does not surface, and dropping it would silently widen the
+ * gate. */
+export async function setPoMismatchPolicyAction(workspaceId: string, input: {
+  quantityPercent: number
+  matchVariancePercent: number
+  approverIds: string[]
+}): Promise<ActionState<null>> {
+  const user = await getCurrentUser()
+  if (!(await requireMember(workspaceId, user.id, ["owner"]))) return { success: false, error: NO_ACCESS }
+  if (!Number.isFinite(input.quantityPercent) || input.quantityPercent < 0 || input.quantityPercent > 100) {
+    return { success: false, error: "Enter a quantity tolerance between 0 and 100." }
+  }
+  if (!Number.isFinite(input.matchVariancePercent) || input.matchVariancePercent < 0 || input.matchVariancePercent > 100) {
+    return { success: false, error: "Enter a match variance between 0 and 100." }
+  }
+  try {
+    const config = await getOrCreateAutomationConfig(workspaceId)
+    const existingTolerance = (config.matchTolerance ?? null) as { percent?: number; floor?: { amount: number; currency?: string } } | null
+    await prisma.workspace.update({ where: { id: workspaceId }, data: { poQuantityTolerancePercent: input.quantityPercent } })
+    await updateAutomationConfig({
+      workspaceId,
+      actorId: user.id,
+      patch: {
+        matchTolerance: {
+          percent: input.matchVariancePercent / 100,
+          floor: existingTolerance?.floor ?? { amount: 0 },
+        },
+      },
+    })
+    await setMismatchApprovers({ workspaceId, userIds: input.approverIds, actorId: user.id })
+    revalidatePath(adminPaths(workspaceId).poMismatchFlows)
+    return { success: true, data: null }
+  } catch (error) {
+    if (error instanceof Error && error.message === "mismatch_approver_not_a_member") {
+      return { success: false, error: "One of the people you named is no longer a member of this workspace." }
+    }
+    return { success: false, error: "Could not save the mismatch policy" }
+  }
+}
+
+/** #253: the Default flow selector on Admin › Approval Flows. `workflowId: null` clears it, which
+ * puts the workspace back to approvals starting by hand from the Invoices bulk bar. */
+export async function setDefaultApprovalFlowAction(workspaceId: string, workflowId: string | null): Promise<ActionState<null>> {
+  const user = await getCurrentUser()
+  if (!(await requireMember(workspaceId, user.id, ["owner"]))) return { success: false, error: NO_ACCESS }
+  try {
+    await setDefaultApprovalFlow({ workspaceId, workflowId, actorId: user.id })
+    revalidatePath(adminPaths(workspaceId).approvalFlows)
+    return { success: true, data: null }
+  } catch (error) {
+    if (error instanceof Error && error.message === "approval_workflow_not_found") {
+      return { success: false, error: "That workflow no longer exists. Reload the page to see the current list." }
+    }
+    return { success: false, error: "Could not change the default flow" }
+  }
+}
+
+/** #253: the 30-day estimate behind the confirm. Its own action rather than page data because it
+ * is only needed at the moment someone opens the confirm — counting it on every page render would
+ * put a 5,000-row scan behind a screen nobody is changing. */
+export async function estimateAutoStartsAction(workspaceId: string): Promise<ActionState<{ count: number; days: number }>> {
+  const user = await getCurrentUser()
+  if (!(await requireMember(workspaceId, user.id, ["owner"]))) return { success: false, error: NO_ACCESS }
+  try {
+    const count = await estimateAutoStarts(workspaceId)
+    return { success: true, data: { count, days: AUTO_START_ESTIMATE_DAYS } }
+  } catch { return { success: false, error: "Could not count the last 30 days" } }
 }
 
 /** F15: turning hipaaMode on immediately forces every file's linkAccess back to "none" — the

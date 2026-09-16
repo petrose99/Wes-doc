@@ -3,6 +3,7 @@
 // app/(app)/workspaces/[workspaceId]/review-actions.ts and do the auth.
 import { track } from "@/lib/analytics"
 import { canDecideStage, decideStage, findCurrentStage, toWorkflowStageInputs } from "@/lib/approvals/engine"
+import { resolveAutoStartWorkflowId } from "@/models/approval-defaults"
 import { isPaymentConfirmationRequired } from "@/lib/doc-types"
 import { auditEventData, getRequestAuditContext } from "@/lib/audit"
 import { prisma } from "@/lib/db"
@@ -90,6 +91,18 @@ export async function createReviewTask(input: {
 }) {
   const document = await prisma.document.findFirst({ where: { id: input.documentId, workspaceId: input.workspaceId }, select: { id: true } })
   if (!document) throw new Error("document_not_found")
+
+  // #253: the auto-start. A caller that named a workflow keeps it — an explicit choice always
+  // beats the workspace default. Otherwise the workspace's default flow starts the task on its
+  // own, unless it is inactive or the document carries an open hard gate. `autoStarted` is kept
+  // separate from `workflowId` so the audit event can say which of the two happened; a reader of
+  // the document history must be able to tell "someone started this" from "the default did".
+  const explicitWorkflowId = input.workflowId ?? null
+  const autoStartedWorkflowId = explicitWorkflowId
+    ? null
+    : await resolveAutoStartWorkflowId(input.workspaceId, input.documentId)
+  const workflowId = explicitWorkflowId ?? autoStartedWorkflowId
+
   const context = await getRequestAuditContext()
   const [task] = await prisma.$transaction([
     prisma.reviewTask.create({
@@ -97,10 +110,13 @@ export async function createReviewTask(input: {
         workspaceId: input.workspaceId, documentId: input.documentId, reason: input.reason ?? "manual",
         detail: input.detail ?? null, priority: input.priority ?? 0, dueAt: input.dueAt ?? null,
         assigneeId: input.assigneeId ?? null, createdById: input.createdById,
-        ...(input.workflowId ? { workflowId: input.workflowId, currentStageIndex: 0, status: "in_review" } : {}),
+        ...(workflowId ? { workflowId, currentStageIndex: 0, status: "in_review" } : {}),
       },
     }),
     prisma.documentAuditEvent.create({ data: auditEventData({ workspaceId: input.workspaceId, documentId: input.documentId, actorId: input.createdById, type: "review_task_created" }, context) }),
+    ...(autoStartedWorkflowId
+      ? [prisma.documentAuditEvent.create({ data: auditEventData({ workspaceId: input.workspaceId, documentId: input.documentId, actorId: null, type: "review_task_workflow_auto_started", detail: { workflowId: autoStartedWorkflowId } }, context) })]
+      : []),
   ])
   return task
 }

@@ -149,6 +149,16 @@ model Workspace {
   /// DocumentCheckResult's amount-level tolerance (lib/checks/types.ts's amountTolerance) —
   /// this one governs quantity, not currency amount.
   poQuantityTolerancePercent Float       @default(5) @map("po_quantity_tolerance_percent")
+  /// #253: the workspace's default approval flow. Null (the default) means approvals never start
+  /// on their own — someone starts one by hand. When set, a ReviewTask reaching In review with no
+  /// blocking hard gate is created against this workflow at stage 0. Forward-only: setting a
+  /// default never retro-attaches a workflow to an already in-flight task. ON DELETE SET NULL so
+  /// deleting the flow turns auto-start off rather than cascading into the workspace row.
+  defaultApprovalWorkflowId String?      @map("default_approval_workflow_id") @db.Uuid
+  /// #253 (#227 decision 4): the people who may override a blocked `match-variance` gate. Empty
+  /// (the default) is a real policy, not an unconfigured hole — it means "the current stage's
+  /// approver", i.e. the pre-existing any-member rule that overrideGateAction already applied.
+  poMismatchApproverIds     String[]     @default([]) @map("po_mismatch_approver_ids") @db.Uuid
   createdAt       DateTime               @default(now()) @map("created_at")
   updatedAt       DateTime               @updatedAt @map("updated_at")
   members         WorkspaceMember[]
@@ -195,6 +205,7 @@ model Workspace {
   bankMatches BankMatch[]
   statementLines StatementLine[]
   approvalWorkflows ApprovalWorkflow[]
+  defaultApprovalWorkflow ApprovalWorkflow? @relation("WorkspaceDefaultApprovalWorkflow", fields: [defaultApprovalWorkflowId], references: [id], onDelete: SetNull)
   approvalWorkflowStages ApprovalWorkflowStage[]
   expenseClaims ExpenseClaim[]
   expenseClaimItems ExpenseClaimItem[]
@@ -1641,6 +1652,10 @@ model ApprovalWorkflow {
   stages      ApprovalWorkflowStage[]
   reviewTasks ReviewTask[]
   expenseClaims ExpenseClaim[]
+  /// #253: back-relation for Workspace.defaultApprovalWorkflowId. A list only because Prisma
+  /// requires one on the other side of an optional FK; in practice at most one workspace points
+  /// at a given workflow, since the FK lives on the workspace that owns it.
+  defaultForWorkspaces Workspace[] @relation("WorkspaceDefaultApprovalWorkflow")
 
   @@index([workspaceId, active])
   @@map("approval_workflows")

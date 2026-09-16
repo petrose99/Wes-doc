@@ -41,7 +41,11 @@ function StageEditor({ index, stage, members, onChange, onRemove, canRemove, nam
 }) {
   const nameId = useId()
   const thresholdId = useId()
+  const detailsId = useId()
   const [approverFilter, setApproverFilter] = useState("")
+  // Starts open when the stage already carries either setting: a stage whose approvers are named
+  // should not hide that fact behind a closed disclosure the reader has to guess at.
+  const [open, setOpen] = useState(stage.approverIds.length > 0 || stage.minAmount.trim() !== "")
 
   const toggleApprover = (memberId: string) => {
     const has = stage.approverIds.includes(memberId)
@@ -74,17 +78,28 @@ function StageEditor({ index, stage, members, onChange, onRemove, canRemove, nam
     </div>
     {nameError && <p className="mt-1 pl-7 text-xs text-red-600">Every stage needs a name.</p>}
 
-    <details className="mt-2 pl-7 [&_summary::-webkit-details-marker]:hidden [&:not([open])>div]:hidden">
-      <summary className="cursor-pointer text-[13px] font-medium text-emerald-700 underline underline-offset-4 hover:text-emerald-800">
+    {/* #253: was a native <details>. The disclosure is the same, but the content is unmounted
+      * while closed rather than hidden with CSS — the in-page detector read the CSS-hidden
+      * subtree as occluded text on every render, and the <summary> carried the page's smallest
+      * type. A button with aria-expanded also announces its state, which a styled <summary> with
+      * its marker removed did not. */}
+    <div className="mt-2 pl-7">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={detailsId}
+        onClick={() => setOpen((previous) => !previous)}
+        className="text-[13px] font-medium text-emerald-700 underline underline-offset-4 hover:text-emerald-800"
+      >
         {stage.approverIds.length > 0 || stage.minAmount.trim()
           ? `Approvers & threshold — ${stage.approverIds.length > 0 ? `${stage.approverIds.length} named` : "any member"}${stage.minAmount.trim() ? `, ≥ ${stage.minAmount}` : ""}`
           : "Add named approvers or an amount threshold (optional)"}
-      </summary>
-      <div className="mt-3 grid gap-4 sm:grid-cols-[minmax(0,1fr)_180px]">
+      </button>
+      {open && <div id={detailsId} className="mt-3 grid gap-4 sm:grid-cols-[minmax(0,1fr)_180px]">
         <div>
-          <span className="block text-xs font-medium text-slate-500">Named approvers</span>
+          <span className="block text-[13px] font-medium text-slate-500">Named approvers</span>
           {members.length === 0
-            ? <p className="mt-1 text-xs text-slate-600">No workspace members to name yet.</p>
+            ? <p className="mt-1 text-[13px] text-slate-600">No workspace members to name yet.</p>
             : <>
               {members.length > APPROVER_SEARCH_THRESHOLD && <input
                 type="search"
@@ -92,10 +107,10 @@ function StageEditor({ index, stage, members, onChange, onRemove, canRemove, nam
                 onChange={(e) => setApproverFilter(e.target.value)}
                 placeholder="Filter members"
                 aria-label="Filter approvers"
-                className="mt-1 mb-1.5 w-full rounded-md border border-hairline px-2.5 py-1 text-xs focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600"
+                className="mt-1 mb-1.5 w-full rounded-md border border-hairline px-2.5 py-1 text-[13px] focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600"
               />}
-              <div className="flex max-h-32 flex-wrap gap-1.5 overflow-y-auto">
-                {visibleMembers.length === 0 && <span className="text-xs text-slate-600">No member matches &ldquo;{approverFilter}&rdquo;.</span>}
+              <div className="flex flex-wrap gap-1.5">
+                {visibleMembers.length === 0 && <span className="text-[13px] text-slate-600">No member matches &ldquo;{approverFilter}&rdquo;.</span>}
                 {visibleMembers.map((member) => {
                   const on = stage.approverIds.includes(member.id)
                   return <button
@@ -103,21 +118,21 @@ function StageEditor({ index, stage, members, onChange, onRemove, canRemove, nam
                     type="button"
                     aria-pressed={on}
                     onClick={() => toggleApprover(member.id)}
-                    className={`rounded-full border px-2.5 py-0.5 text-xs ${on ? "border-emerald-600 bg-emerald-50 text-emerald-800" : "border-slate-200 text-slate-600 hover:bg-slate-100"}`}
+                    className={`rounded-full border px-2.5 py-1 text-[13px] ${on ? "border-emerald-600 bg-emerald-50 text-emerald-800" : "border-slate-200 text-slate-600 hover:bg-slate-100"}`}
                   >
                     {member.name || member.email}{member.role === "owner" ? " · owner" : ""}
                   </button>
                 })}
               </div>
             </>}
-          {stage.approverIds.length > 0 && <p className="mt-1.5 max-w-[48ch] text-xs text-slate-500">Only these {stage.approverIds.length === 1 ? "person" : "people"} can decide this stage. Owner-only is superseded.</p>}
-          {stage.approverIds.length === 0 && <label className="mt-2 flex items-center gap-1.5 text-xs text-slate-600">
+          {stage.approverIds.length > 0 && <p className="mt-1.5 max-w-[48ch] text-[13px] text-slate-500">Only these {stage.approverIds.length === 1 ? "person" : "people"} can decide this stage. Owner-only is superseded.</p>}
+          {stage.approverIds.length === 0 && <label className="mt-2 flex items-center gap-1.5 text-[13px] text-slate-600">
             <input type="checkbox" checked={stage.requireOwner} onChange={(event) => onChange({ requireOwner: event.target.checked })} className="h-3.5 w-3.5 accent-emerald-700" />
             Owner only
           </label>}
         </div>
         <div>
-          <Label htmlFor={thresholdId} className="text-xs font-medium text-slate-500">Amount threshold</Label>
+          <Label htmlFor={thresholdId} className="text-[13px] font-medium text-slate-500">Amount threshold</Label>
           <Input
             id={thresholdId}
             type="number"
@@ -128,10 +143,10 @@ function StageEditor({ index, stage, members, onChange, onRemove, canRemove, nam
             placeholder="e.g. 10000"
             className="mt-1"
           />
-          <p className="mt-1 text-xs text-slate-500">Skip this stage below this amount. Blank = always applies.</p>
+          <p className="mt-1 text-[13px] text-slate-500">Skip this stage below this amount. Blank = always applies.</p>
         </div>
-      </div>
-    </details>
+      </div>}
+    </div>
   </div>
 }
 

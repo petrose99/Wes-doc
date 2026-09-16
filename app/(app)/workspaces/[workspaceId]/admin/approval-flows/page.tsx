@@ -2,6 +2,8 @@ import { AdminPage, ModuleOff, ReadOnlyBand } from "@/components/admin/admin-ui"
 import { Empty, Panel, Pill } from "@/components/automation/automation-ui"
 import { ApprovalWorkflowForm, type ApprovalFormMember } from "@/components/workspace/approval-workflow-form"
 import { ApprovalWorkflowRowControls } from "@/components/workspace/approval-workflow-row"
+import { DefaultApprovalFlow, type DefaultFlowOption } from "@/components/workspace/default-approval-flow"
+import { getDefaultApprovalFlow } from "@/models/approval-defaults"
 import { getAdminContext } from "@/lib/admin/context"
 import { adminPaths } from "@/lib/admin/paths"
 import { decimalToNumber } from "@/lib/money"
@@ -43,8 +45,20 @@ export default async function ApprovalFlowsPage({ params }: { params: Promise<{ 
     }
   }
 
-  return <AdminPage title="Approval Flows" intro="Route an invoice through named stages before it counts as approved, with named approvers or an amount threshold per stage. Approvals start by hand from the Invoices bulk bar.">
+  const defaultFlow = await getDefaultApprovalFlow(workspaceId)
+  const flowOptions: DefaultFlowOption[] = workflows.map((workflow) => ({
+    id: workflow.id,
+    name: workflow.name,
+    active: workflow.active,
+    stageCount: workflow.stages.length,
+  }))
+
+  return <AdminPage title="Approval Flows" intro="Route an invoice through named stages before it counts as approved, with named approvers or an amount threshold per stage. One flow can start on its own; the rest start by hand from the Invoices bulk bar.">
     {!owner && <ReadOnlyBand owners={context.owners} />}
+
+    <Panel title="Default flow" note="The one flow that starts on its own. Off until you choose one.">
+      <DefaultApprovalFlow workspaceId={workspaceId} options={flowOptions} currentId={defaultFlow?.id ?? null} readOnly={!owner} />
+    </Panel>
 
     <Panel title="Workflows" note={`${workflows.length} workflow${workflows.length === 1 ? "" : "s"} in this workspace.`}>
       {!workflows.length
@@ -53,7 +67,13 @@ export default async function ApprovalFlowsPage({ params }: { params: Promise<{ 
             {workflows.map((workflow) => (
               <div key={workflow.id} className="py-4 first:pt-0">
                 <div className="flex items-center justify-between gap-3">
-                  <span className="text-sm font-semibold text-slate-900">{workflow.name}</span>
+                  <span className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-semibold text-slate-900">{workflow.name}</span>
+                    {/* The default is marked where the flows are listed, not only in the selector
+                      * above: a reader scrolling the list must be able to see which one starts on
+                      * its own without scrolling back up (critique H6). */}
+                    {defaultFlow?.id === workflow.id && <Pill state={workflow.active ? "auto" : "waiting"}>{workflow.active ? "Default" : "Default, but inactive"}</Pill>}
+                  </span>
                   {owner
                     ? <ApprovalWorkflowRowControls workspaceId={workspaceId} workflowId={workflow.id} workflowName={workflow.name} active={workflow.active} />
                     : <Pill state={workflow.active ? "auto" : "idle"}>{workflow.active ? "Active" : "Inactive"}</Pill>}

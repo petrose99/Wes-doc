@@ -1,8 +1,9 @@
 import { AdminPage, ModuleOff, ReadOnlyBand } from "@/components/admin/admin-ui"
 import { Empty, Ledger, LedgerRow, Panel } from "@/components/automation/automation-ui"
-import { PoQuantityTolerance } from "@/components/workspace/po-quantity-tolerance"
+import { PoMismatchPolicy, type MismatchApproverOption } from "@/components/workspace/po-mismatch-policy"
 import { getAdminContext } from "@/lib/admin/context"
 import { adminPaths } from "@/lib/admin/paths"
+import { getOrCreateAutomationConfig } from "@/models/automation-config"
 import { summarizeMatching } from "@/models/matching-metrics"
 
 export const dynamic = "force-dynamic"
@@ -32,6 +33,20 @@ export default async function PoMismatchFlowsPage({ params }: { params: Promise<
   }
   const summary = await summarizeMatching(workspaceId)
 
+  // #253: the match-variance percent is stored 0–1 (WorkspaceAutomationConfig.matchTolerance,
+  // #228 Q12) and shown 0–100. Reading it through the same config row the gate reads means the
+  // number on this page and the number the View PO row honours can never drift (#250 lesson).
+  const automationConfig = await getOrCreateAutomationConfig(workspaceId)
+  const storedTolerance = (automationConfig.matchTolerance ?? null) as { percent?: number } | null
+  const matchVariancePercent = Math.round((storedTolerance?.percent ?? 0.02) * 1000) / 10
+  const approverIds = (context.workspace.poMismatchApproverIds ?? []) as string[]
+  const approverOptions: MismatchApproverOption[] = context.members.map((member) => ({
+    id: member.userId,
+    name: member.user.name ?? "",
+    email: member.user.email ?? "",
+    role: member.role === "owner" ? "owner" : "member",
+  }))
+
   const maxBucket = Math.max(1, ...summary.confidenceBuckets.map((b) => b.count))
   const reconciledPct = summary.bankAccepted > 0 ? Math.round((summary.bankReconciled / summary.bankAccepted) * 100) : 0
   const resolved = summary.byStatus.resolved ?? 0
@@ -41,9 +56,13 @@ export default async function PoMismatchFlowsPage({ params }: { params: Promise<
   return <AdminPage title="PO Mismatch Flows" intro="How far an invoice may differ from its purchase order before the row shows a mismatch, and the record of every match the pipeline has proposed.">
     {!context.owner && <ReadOnlyBand owners={context.owners} />}
 
-    <Panel title="Tolerances" note="A line inside the tolerance shows = on the invoice row; outside it shows ≠ and the Total carries the match-variance gate.">
-      <PoQuantityTolerance workspaceId={workspaceId} percent={context.workspace.poQuantityTolerancePercent} readOnly={!context.owner} />
-    </Panel>
+    <PoMismatchPolicy
+      workspaceId={workspaceId}
+      quantityPercent={context.workspace.poQuantityTolerancePercent}
+      matchVariancePercent={matchVariancePercent}
+      members={approverOptions}
+      approverIds={approverIds}
+      readOnly={!context.owner} />
 
     <Panel title="Match history" note="Documents the pipeline tied to each other, and how far the bank lines it accepted have gone toward reconciled.">
     {summary.total === 0 && summary.bankTotal === 0
