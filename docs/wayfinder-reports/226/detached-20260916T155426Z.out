@@ -1,0 +1,4 @@
+=== [1/50] #258 — Build the one status vocabulary: StatePills from processingState(), the pane status line, stepper words, Approval tab from the audit log  [opus[1m] · low · phase: spec]
+    #258 crossed the hand-off line (151519 tokens ≥ 150000) — asked to hand off; hard stop at 180000
+    #258 context at exit: 165864 tokens, 12 min
+    cleaned up session pid 1384120 (pgid ?); free: 6149 MB

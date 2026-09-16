@@ -109,10 +109,12 @@ cleanup_session() {
   for p in $(pgrep -u "$(id -u)" -f 'next dev|next-server|chrome|chromium|playwright|impeccable (live|serve)|detect\.js' 2>/dev/null); do
     [ "$p" = "$$" ] && continue
     # ps etimes = seconds since start; only kill things younger than the session
+    case "$(readlink "/proc/$p/cwd" 2>/dev/null)/" in "$ROOT/"*) ;; *) continue ;; esac   # not ours (owner's viewing server in a worktree)
     if [ "$(ps -o etimes= -p "$p" 2>/dev/null | tr -d ' ')" -le "$(( $(date +%s) - since ))" ] 2>/dev/null; then kill -TERM "$p" 2>/dev/null || true; fi
   done
   sleep 3
   for p in $(pgrep -u "$(id -u)" -f 'next dev|next-server|chrome|chromium|playwright|impeccable (live|serve)|detect\.js' 2>/dev/null); do
+    case "$(readlink "/proc/$p/cwd" 2>/dev/null)/" in "$ROOT/"*) ;; *) continue ;; esac
     if [ "$(ps -o etimes= -p "$p" 2>/dev/null | tr -d ' ')" -le "$(( $(date +%s) - since ))" ] 2>/dev/null; then kill -KILL "$p" 2>/dev/null || true; fi
   done
   sync; echo "    cleaned up session pid $pid (pgid ${pgid:-?}); free: $(free -m | awk '/Mem:/{print $7" MB"}')"
