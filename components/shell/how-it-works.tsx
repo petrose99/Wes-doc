@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { Dialog } from "@/components/ui/dialog"
+import { openKeyboardShortcutsDialog } from "@/components/shell/keyboard-shortcuts"
 
 const OPEN_EVENT = "docubite:open-how-it-works"
 
@@ -39,7 +40,8 @@ export function HowItWorksDialog() {
     window.addEventListener(OPEN_EVENT, onOpen)
     return () => window.removeEventListener(OPEN_EVENT, onOpen)
   }, [])
-  return <Dialog open={open} onClose={() => setOpen(false)} title="How DocuBite works" width="max-w-md">
+  const close = () => setOpen(false)
+  return <Dialog open={open} onClose={close} title="How DocuBite works" width="max-w-md">
     <div className="max-h-[70vh] overflow-y-auto px-5 py-4">
       {/* The sequence is the information, so the numerals are earned (craft-floor). */}
       <ol className="mt-1 space-y-3 text-sm text-slate-700">
@@ -48,7 +50,10 @@ export function HowItWorksDialog() {
           <span><strong className="font-semibold text-slate-900">{step.name}</strong> — {step.sentence}</span>
         </li>)}
       </ol>
-      <p className="mt-4 border-t border-hairline pt-3 text-[13px] text-slate-500">Keyboard shortcuts are under the account menu, or press ?</p>
+      <p className="mt-4 border-t border-hairline pt-3 text-[13px] text-slate-500">
+        <button type="button" className="font-medium text-emerald-700 hover:underline"
+          onClick={() => { close(); openKeyboardShortcutsDialog() }}>Keyboard shortcuts</button> are under the account menu, or press ?
+      </p>
     </div>
   </Dialog>
 }

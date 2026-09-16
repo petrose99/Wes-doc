@@ -68,3 +68,13 @@
 === [13/50] #264 — Build the three-way empty queue on Invoices: first-use guidance, done, filtered — and How DocuBite works on the account menu  [opus · low · phase: build · hard (2 sessions on this phase)]
     #264 context at exit: 147884 tokens, 23 min
     cleaned up session pid 1785743 (pgid ?); free: 6303 MB
+    scoreboard: 71 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #264: phase build done → measure next in 1386s
+=== [14/50] #264 — Build the three-way empty queue on Invoices: first-use guidance, done, filtered — and How DocuBite works on the account menu  [sonnet · low · phase: measure]
+    #264 context at exit: 64734 tokens, 2 min
+    cleaned up session pid 1816827 (pgid ?); free: 6306 MB
+    scoreboard: 72 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #264: continued (no progress), session 1/3 without progress allowed, hand-off not updated in 154s
+=== [15/50] #264 — Build the three-way empty queue on Invoices: first-use guidance, done, filtered — and How DocuBite works on the account menu  [opus[1m] · low · phase: measure]
+    #264 context at exit: 81324 tokens, 7 min
+    cleaned up session pid 1820183 (pgid ?); free: 6315 MB
