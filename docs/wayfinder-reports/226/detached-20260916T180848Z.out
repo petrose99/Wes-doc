@@ -17,3 +17,9 @@
 === [4/50] #262 — Build the keyboard shortcut set: roving rows, g-sequences between queues, f / ? and the Keyboard shortcuts dialog  [opus[1m] · low · phase: spec]
     #262 context at exit: 148555 tokens, 8 min
     cleaned up session pid 1645617 (pgid ?); free: 6309 MB
+    scoreboard: 62 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #262: phase spec done → build next in 484s
+=== [5/50] #262 — Build the keyboard shortcut set: roving rows, g-sequences between queues, f / ? and the Keyboard shortcuts dialog  [sonnet · low · phase: build]
+    #262 crossed the hand-off line (152360 tokens ≥ 150000) — asked to hand off; hard stop at 180000
+    #262 context at exit: 160455 tokens, 9 min
+    cleaned up session pid 1654970 (pgid ?); free: 6303 MB
