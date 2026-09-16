@@ -12,8 +12,8 @@ import { listApprovalWorkflows } from "@/models/approval-workflows"
 export const dynamic = "force-dynamic"
 
 /** #231 Q12 (#252): Admin › Approval Flows — the workflow list and editor, on the Admin shell.
- * The Default flow selector and its consequence sentence are #253's; until then the fact in
- * force is stated under the title: approvals start by hand from the Invoices bulk bar.
+ * #253 adds the Default flow selector and its consequence sentence at the top. One term on the
+ * page: "flow" (the section is Approval Flows) — the model and engine still say "workflow".
  *
  * Beyond the historic name + owner-only per stage, each stage now accepts:
  *  - a list of named approvers (empty = any member per role gate, non-empty = only these people)
@@ -25,7 +25,7 @@ export default async function ApprovalFlowsPage({ params }: { params: Promise<{ 
   const context = await getAdminContext(workspaceId)
   const { owner, membership, members } = context
   if (!context.capabilities.has("approval-workflows")) {
-    return <AdminPage title="Approval Flows"><ModuleOff what="Approval workflows" href={adminPaths(workspaceId).whatsOn} /></AdminPage>
+    return <AdminPage title="Approval Flows"><ModuleOff what="Approval flows" href={adminPaths(workspaceId).whatsOn} /></AdminPage>
   }
 
   const workflows = await listApprovalWorkflows(workspaceId)
@@ -60,9 +60,9 @@ export default async function ApprovalFlowsPage({ params }: { params: Promise<{ 
       <DefaultApprovalFlow workspaceId={workspaceId} options={flowOptions} currentId={defaultFlow?.id ?? null} readOnly={!owner} />
     </Panel>
 
-    <Panel title="Workflows" note={`${workflows.length} workflow${workflows.length === 1 ? "" : "s"} in this workspace.`}>
+    <Panel title="Flows" note={`${workflows.length} flow${workflows.length === 1 ? "" : "s"} in this workspace.`}>
       {!workflows.length
-        ? <Empty title="No workflows yet">Until one exists, an approval started from the Invoices bulk bar is a single decision by an owner.</Empty>
+        ? <Empty title="No flows yet">Until one exists, an approval started from the Invoices bulk bar is a single decision by an owner.</Empty>
         : <div className="divide-y divide-hairline-soft">
             {workflows.map((workflow) => (
               <div key={workflow.id} className="py-4 first:pt-0">
@@ -102,7 +102,7 @@ export default async function ApprovalFlowsPage({ params }: { params: Promise<{ 
     </Panel>
 
     {owner && (
-      <Panel title="Add a workflow" note="Name it, list the stages in order, and pick who decides each one.">
+      <Panel title="Add a flow" note="Name it, list the stages in order, and pick who decides each one.">
         <ApprovalWorkflowForm workspaceId={workspaceId} members={memberOptions} />
       </Panel>
     )}

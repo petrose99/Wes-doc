@@ -23,7 +23,7 @@ import { getActiveWorkflowStageState } from "@/models/review-tasks"
 import { overrideGate } from "@/lib/gates/actions"
 import { MATCH_VARIANCE_GATE_TYPE } from "@/lib/gates/match-variance"
 import { canOverrideMismatch, setMismatchApprovers } from "@/models/mismatch-approvers"
-import { AUTO_START_ESTIMATE_DAYS, estimateAutoStarts, setDefaultApprovalFlow } from "@/models/approval-defaults"
+import { AUTO_START_ESTIMATE_DAYS, STALE_FLOW_ERROR, estimateAutoStarts, setDefaultApprovalFlow } from "@/models/approval-defaults"
 import { getOrCreateAutomationConfig, updateAutomationConfig } from "@/models/automation-config"
 import { adminPaths } from "@/lib/admin/paths"
 import { listOpenGatesForDocument, overrideEligibility } from "@/lib/gates/list"
@@ -629,9 +629,9 @@ export async function setPoMismatchPolicyAction(workspaceId: string, input: {
     return { success: true, data: null }
   } catch (error) {
     if (error instanceof Error && error.message === "mismatch_approver_not_a_member") {
-      return { success: false, error: "One of the people you named is no longer a member of this workspace." }
+      return { success: false, error: "one of the people you named is no longer a member of this workspace" }
     }
-    return { success: false, error: "Could not save the mismatch policy" }
+    return { success: false, error: "could not save the mismatch policy" }
   }
 }
 
@@ -646,9 +646,9 @@ export async function setDefaultApprovalFlowAction(workspaceId: string, workflow
     return { success: true, data: null }
   } catch (error) {
     if (error instanceof Error && error.message === "approval_workflow_not_found") {
-      return { success: false, error: "That workflow no longer exists. Reload the page to see the current list." }
+      return { success: false, error: STALE_FLOW_ERROR }
     }
-    return { success: false, error: "Could not change the default flow" }
+    return { success: false, error: "could not change the default flow" }
   }
 }
 

@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useRouter } from "next/navigation"
-import { toast } from "sonner"
 
 export type ApprovalFormMember = { id: string; name: string; email: string; role: "owner" | "member" }
 
@@ -30,7 +29,7 @@ const APPROVER_SEARCH_THRESHOLD = 5
  * workspace that only cares about role-gating never has to look at either. Matches the rest of
  * the Automation section's rule-not-card language — a border-t and a label, not a bordered box
  * inside a bordered box. */
-function StageEditor({ index, stage, members, onChange, onRemove, canRemove, nameError }: {
+function StageEditor({ index, stage, members, onChange, onRemove, canRemove, nameError, thresholdError }: {
   index: number
   stage: StageRow
   members: ApprovalFormMember[]
@@ -38,6 +37,7 @@ function StageEditor({ index, stage, members, onChange, onRemove, canRemove, nam
   onRemove: () => void
   canRemove: boolean
   nameError: boolean
+  thresholdError: boolean
 }) {
   const nameId = useId()
   const thresholdId = useId()
@@ -101,13 +101,13 @@ function StageEditor({ index, stage, members, onChange, onRemove, canRemove, nam
           {members.length === 0
             ? <p className="mt-1 text-[13px] text-slate-600">No workspace members to name yet.</p>
             : <>
-              {members.length > APPROVER_SEARCH_THRESHOLD && <input
+              {members.length > APPROVER_SEARCH_THRESHOLD && <Input
                 type="search"
                 value={approverFilter}
                 onChange={(e) => setApproverFilter(e.target.value)}
                 placeholder="Filter members"
                 aria-label="Filter approvers"
-                className="mt-1 mb-1.5 w-full rounded-md border border-hairline px-2.5 py-1 text-[13px] focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600"
+                className="mt-1 mb-1.5 max-w-xs"
               />}
               <div className="flex flex-wrap gap-1.5">
                 {visibleMembers.length === 0 && <span className="text-[13px] text-slate-600">No member matches &ldquo;{approverFilter}&rdquo;.</span>}
@@ -142,8 +142,11 @@ function StageEditor({ index, stage, members, onChange, onRemove, canRemove, nam
             onChange={(event) => onChange({ minAmount: event.target.value })}
             placeholder="e.g. 10000"
             className="mt-1"
+            aria-invalid={thresholdError || undefined}
           />
-          <p className="mt-1 text-[13px] text-slate-500">Skip this stage below this amount. Blank = always applies.</p>
+          {thresholdError
+            ? <p className="mt-1 text-xs text-red-600">The threshold must be 0 or more.</p>
+            : <p className="mt-1 text-[13px] text-slate-500">Skip this stage below this amount. Blank = always applies.</p>}
         </div>
       </div>}
     </div>
@@ -164,17 +167,20 @@ export function ApprovalWorkflowForm({ workspaceId, members }: { workspaceId: st
   const [name, setName] = useState("")
   const [stages, setStages] = useState<StageRow[]>([emptyStage(), emptyStage()])
   const [showErrors, setShowErrors] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [created, setCreated] = useState<string | null>(null)
 
   const updateStage = (index: number, patch: Partial<StageRow>) => setStages((previous) => previous.map((stage, i) => (i === index ? { ...stage, ...patch } : stage)))
   const removeStage = (index: number) => setStages((previous) => previous.filter((_, i) => i !== index))
   const addStage = () => setStages((previous) => [...previous, emptyStage()])
 
   const blankStageIndexes = new Set(stages.map((s, i) => (s.name.trim() ? -1 : i)).filter((i) => i >= 0))
-  const formInvalid = !name.trim() || blankStageIndexes.size > 0
+  const badThresholdIndexes = new Set(stages.map((s, i) => (s.minAmount.trim() === "" || (Number.isFinite(Number(s.minAmount)) && Number(s.minAmount) >= 0) ? -1 : i)).filter((i) => i >= 0))
+  const formInvalid = !name.trim() || blankStageIndexes.size > 0 || badThresholdIndexes.size > 0
 
   const submit = async () => {
     if (formInvalid) { setShowErrors(true); return }
-    setPending(true)
+    setPending(true); setError(null); setCreated(null)
     try {
       const formData = new FormData()
       formData.set("name", name)
@@ -186,22 +192,22 @@ export function ApprovalWorkflowForm({ workspaceId, members }: { workspaceId: st
         if (stage.minAmount.trim()) formData.set(`stageMinAmount_${index}`, stage.minAmount.trim())
       })
       const result = await createApprovalWorkflowAction(workspaceId, formData)
-      if (!result.success) { toast.error(result.error || "Could not create the workflow"); return }
-      toast.success("Workflow created")
+      if (!result.success) { setError(`Couldn't create the flow — ${result.error || "the server didn't say why"}. What you typed is still here.`); return }
+      setCreated(name.trim())
       setName("")
       setStages([emptyStage(), emptyStage()])
       setShowErrors(false)
       router.refresh()
     } catch {
-      toast.error("Could not reach the server")
+      setError("Couldn't reach the server. What you typed is still here.")
     } finally { setPending(false) }
   }
 
   return <div>
     <div>
-      <Label htmlFor={nameId} className="text-[13px]">Workflow name</Label>
+      <Label htmlFor={nameId} className="text-[13px]">Flow name</Label>
       <Input id={nameId} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Two-step finance approval" className="mt-1.5" aria-invalid={(showErrors && !name.trim()) || undefined} />
-      {showErrors && !name.trim() && <p className="mt-1 text-xs text-red-600">Name the workflow.</p>}
+      {showErrors && !name.trim() && <p className="mt-1 text-xs text-red-600">Name the flow.</p>}
     </div>
 
     <div className="mt-5">
@@ -217,6 +223,7 @@ export function ApprovalWorkflowForm({ workspaceId, members }: { workspaceId: st
             onRemove={() => removeStage(index)}
             canRemove={stages.length > 1}
             nameError={showErrors && blankStageIndexes.has(index)}
+            thresholdError={showErrors && badThresholdIndexes.has(index)}
           />
         ))}
       </div>
@@ -225,8 +232,13 @@ export function ApprovalWorkflowForm({ workspaceId, members }: { workspaceId: st
       </button>
     </div>
 
-    <div className="mt-6 border-t border-hairline pt-5">
-      <Button onClick={() => void submit()} disabled={pending}>{pending ? "Creating…" : "Create workflow"}</Button>
+    <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-hairline pt-5">
+      <Button onClick={() => void submit()} disabled={pending}>{pending ? "Creating…" : "Create flow"}</Button>
+      {/* The refusal sits beside the action with the form intact, where AdminSaveBar puts its own —
+        * not a toast that vanishes before it is read. */}
+      {error && <span role="alert" className="text-xs text-red-700">{error}</span>}
+      {/* Success is said where the reader is, and the flow itself appears in the list above. */}
+      {created && !error && <span role="status" className="text-xs font-medium text-emerald-800">&ldquo;{created}&rdquo; is in the list above.</span>}
     </div>
   </div>
 }

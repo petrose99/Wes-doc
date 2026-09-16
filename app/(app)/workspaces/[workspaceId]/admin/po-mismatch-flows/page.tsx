@@ -39,7 +39,10 @@ export default async function PoMismatchFlowsPage({ params }: { params: Promise<
   const automationConfig = await getOrCreateAutomationConfig(workspaceId)
   const storedTolerance = (automationConfig.matchTolerance ?? null) as { percent?: number } | null
   const matchVariancePercent = Math.round((storedTolerance?.percent ?? 0.02) * 1000) / 10
-  const approverIds = (context.workspace.poMismatchApproverIds ?? []) as string[]
+  // Pruned to current members, the same way canOverrideMismatch reads it: a person who has left
+  // no longer counts on the gate, so the page must not list them as in force either.
+  const memberIds = new Set(context.members.map((member) => member.userId))
+  const approverIds = ((context.workspace.poMismatchApproverIds ?? []) as string[]).filter((id) => memberIds.has(id))
   const approverOptions: MismatchApproverOption[] = context.members.map((member) => ({
     id: member.userId,
     name: member.user.name ?? "",
@@ -53,7 +56,7 @@ export default async function PoMismatchFlowsPage({ params }: { params: Promise<
   const pending = summary.byStatus.pending ?? 0
   const byType = Object.entries(summary.byType)
 
-  return <AdminPage title="PO Mismatch Flows" intro="How far an invoice may differ from its purchase order before the row shows a mismatch, and the record of every match the pipeline has proposed.">
+  return <AdminPage title="PO Mismatch Flows" intro="How far an invoice may differ from its purchase order before the row shows a mismatch, who may let a mismatched invoice through, and the record of every match the pipeline has proposed.">
     {!context.owner && <ReadOnlyBand owners={context.owners} />}
 
     <PoMismatchPolicy

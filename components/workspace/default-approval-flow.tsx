@@ -4,8 +4,9 @@ import { estimateAutoStartsAction, setDefaultApprovalFlowAction } from "@/app/(a
 import { AdminSaveBar } from "@/components/admin/admin-save-bar"
 import { Consequence } from "@/components/admin/admin-ui"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
+import { STALE_FLOW_ERROR } from "@/models/approval-defaults"
 import { useRouter } from "next/navigation"
-import { useCallback, useId, useState } from "react"
+import { useCallback, useEffect, useId, useState } from "react"
 
 export type DefaultFlowOption = { id: string; name: string; active: boolean; stageCount: number }
 
@@ -32,9 +33,23 @@ export function DefaultApprovalFlow({ workspaceId, options, currentId, readOnly 
   const [saved, setSaved] = useState<string>(currentId ?? NONE)
   const [choice, setChoice] = useState<string>(currentId ?? NONE)
   const [pending, setPending] = useState(false)
+  const [counting, setCounting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [stale, setStale] = useState(false)
   const [savedAt, setSavedAt] = useState<number | null>(null)
   const [confirm, setConfirm] = useState<{ name: string; estimate: number | null } | null>(null)
+
+  // The server is the truth for what is in force: when the row actions below change it (the
+  // default flow deleted → SetNull, or another session chose one) and the page refreshes, the
+  // selector and its sentence follow, rather than keeping a value the server no longer holds.
+  // An unsaved choice survives the resync; a choice that merely mirrored the old saved value moves
+  // with it.
+  useEffect(() => {
+    const next = currentId ?? NONE
+    setChoice((previous) => (previous === saved ? next : previous))
+    setSaved(next)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- resync on the server value only
+  }, [currentId])
 
   const dirty = choice !== saved
   const clearSaved = useCallback(() => setSavedAt(null), [])
@@ -42,16 +57,21 @@ export function DefaultApprovalFlow({ workspaceId, options, currentId, readOnly 
   const savedOption = options.find((option) => option.id === saved) ?? null
 
   const commit = async (next: string) => {
-    setPending(true); setError(null)
+    setPending(true); setError(null); setStale(false)
     try {
       const result = await setDefaultApprovalFlowAction(workspaceId, next === NONE ? null : next)
       if (!result.success) {
+        // The dialog closes on a refusal so the sentence in the bar is in front of the reader,
+        // not behind a modal that looks as if Confirm did nothing.
+        setConfirm(null)
+        setStale(result.error === STALE_FLOW_ERROR)
         setError(`Couldn't save — ${result.error || "the server didn't say why"}. Your change is still here.`)
         return
       }
       setSaved(next); setSavedAt(Date.now()); setConfirm(null)
       router.refresh()
     } catch {
+      setConfirm(null)
       setError("Couldn't reach the server. Your change is still here.")
     } finally { setPending(false) }
   }
@@ -60,27 +80,27 @@ export function DefaultApprovalFlow({ workspaceId, options, currentId, readOnly 
     // Clearing the default needs no confirm — it returns the workspace to starting approvals by hand.
     if (choice === NONE) { await commit(NONE); return }
     if (!chosen) return
-    setPending(true); setError(null)
+    setCounting(true); setError(null)
     const result = await estimateAutoStartsAction(workspaceId)
-    setPending(false)
+    setCounting(false)
     // An estimate that cannot be counted must not block the decision: the dialog still opens and
     // says the number is unavailable, rather than trapping the owner behind a failed count.
     setConfirm({ name: chosen.name, estimate: result.success ? (result.data?.count ?? null) : null })
   }
 
-  const discard = () => { setChoice(saved); setError(null) }
+  const discard = () => { setChoice(saved); setError(null); setStale(false) }
 
   if (!options.length) {
     return <div>
       <Consequence>
-        There are no workflows to make the default yet. Add one below, then come back here to have it
+        There are no flows to make the default yet. Add one below, then come back here to have it
         start on its own. Until then, approvals start by hand from the Invoices bulk bar.
       </Consequence>
     </div>
   }
 
   return <div>
-    <fieldset disabled={readOnly || pending}>
+    <fieldset disabled={readOnly || pending || counting}>
       <legend className="sr-only">Default approval flow</legend>
       <div className="divide-y divide-hairline-soft">
         <Row
@@ -107,16 +127,21 @@ export function DefaultApprovalFlow({ workspaceId, options, currentId, readOnly 
 
     <div className="mt-4">
       <Consequence>
-        {saved === NONE
+        {saved === NONE || !savedOption
           ? "No flow starts on its own. Approvals start by hand from the Invoices bulk bar."
-          : savedOption && !savedOption.active
-            ? <><span className="font-medium text-amber-800">&ldquo;{savedOption.name}&rdquo; is the default but is inactive, so nothing starts on its own.</span> Make it active in the list below, or choose another flow.</>
-            : <>&ldquo;{savedOption?.name}&rdquo; starts on its own when an invoice reaches In review with no blocking check. Invoices already being reviewed are left as they are.</>}
+          : !savedOption.active
+            ? <>
+                <span className="font-medium text-amber-800">&ldquo;{savedOption.name}&rdquo; is the default but is inactive, so nothing starts on its own.</span>{" "}
+                {readOnly ? "An owner can make it active or choose another flow." : "Make it active in the list below, or choose another flow."}
+              </>
+            : <>&ldquo;{savedOption.name}&rdquo; starts on its own when an invoice reaches In review with no blocking check. Invoices already being reviewed are left as they are.</>}
       </Consequence>
     </div>
 
     <AdminSaveBar
-      dirty={dirty} pending={pending} error={error} savedAt={savedAt} disabled={readOnly}
+      dirty={dirty} pending={pending || counting} pendingLabel={counting ? "Counting…" : undefined}
+      error={error} savedAt={savedAt} disabled={readOnly} shortcut={confirm === null}
+      errorAction={stale ? { label: "Reload", onClick: () => { setError(null); setStale(false); router.refresh() } } : undefined}
       onSave={() => void save()} onDiscard={discard} onSavedShown={clearSaved} />
 
     <ConfirmDialog

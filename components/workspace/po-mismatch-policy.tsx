@@ -132,24 +132,25 @@ export function PoMismatchPolicy({ workspaceId, quantityPercent, matchVariancePe
       </div>
       <div className="mt-4">
         <Consequence>
-          A line inside both tolerances shows = on the invoice row and needs nobody. Outside either
-          one it shows ≠, and the invoice waits on the person named below.
+          A line inside both tolerances shows = on the invoice row and needs nobody. Over the quantity
+          tolerance, the consumption check holds the invoice for its stage&rsquo;s approver. Over the
+          match variance, the invoice waits for an override by whoever is named below.
         </Consequence>
       </div>
     </Panel>
 
     <Panel title="Who approves a mismatch" note="The people who may override a blocked PO mismatch and let the invoice through.">
       {members.length === 0
-        ? <p className="text-sm text-slate-600">There are no other members in this workspace to name yet.</p>
+        ? <p className="text-sm text-slate-600">Nobody to name yet. Invite people under Admin &rsaquo; Users first.</p>
         : <>
-            {members.length > APPROVER_SEARCH_THRESHOLD && <input
+            {members.length > APPROVER_SEARCH_THRESHOLD && <Input
               type="search"
               value={filter}
               onChange={(event) => setFilter(event.target.value)}
               placeholder="Filter members"
               aria-label="Filter people who can approve a mismatch"
               disabled={pending || readOnly}
-              className="mb-3 w-full max-w-xs rounded-md border border-hairline px-2.5 py-1.5 text-[13px] focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600 disabled:opacity-60"
+              className="mb-3 max-w-xs"
             />}
             <div className="flex flex-wrap gap-2">
               {visibleMembers.length === 0 && <span className="text-[13px] text-slate-600">No member matches &ldquo;{filter}&rdquo;.</span>}

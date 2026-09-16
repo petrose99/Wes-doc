@@ -16,9 +16,12 @@ import { setUnsaved } from "@/lib/client/unsaved-changes"
  * disabled and says why. Below `md` the bar sits above the phone tab bar. */
 const SAVED_FOR_MS = 4000
 
-export function AdminSaveBar({ dirty, pending, error, savedAt, blocker, onSave, onDiscard, onSavedShown, errorAction, disabled = false }: {
+export function AdminSaveBar({ dirty, pending, pendingLabel, error, savedAt, blocker, onSave, onDiscard, onSavedShown, errorAction, disabled = false, shortcut = true }: {
   dirty: boolean
   pending: boolean
+  /** What the Save button says while `pending` — "Saving…" unless the wait is something else
+   * (#253's Default flow counts an estimate before it saves: "Counting…"). */
+  pendingLabel?: string
   error: string | null
   /** A timestamp of the last successful save in this session, for the "Saved" line. */
   savedAt: number | null
@@ -31,6 +34,8 @@ export function AdminSaveBar({ dirty, pending, error, savedAt, blocker, onSave, 
   errorAction?: { label: string; onClick: () => void }
   /** Read-only viewers never see the bar. */
   disabled?: boolean
+  /** Off while a dialog owns the keyboard, so ⌘S cannot re-run Save under an open confirm. */
+  shortcut?: boolean
 }) {
   const key = useId()
   useEffect(() => {
@@ -39,7 +44,7 @@ export function AdminSaveBar({ dirty, pending, error, savedAt, blocker, onSave, 
   }, [key, dirty, disabled])
 
   useEffect(() => {
-    if (disabled) return
+    if (disabled || !shortcut) return
     const onKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
         event.preventDefault()
@@ -48,7 +53,7 @@ export function AdminSaveBar({ dirty, pending, error, savedAt, blocker, onSave, 
     }
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
-  }, [disabled, dirty, pending, blocker, onSave])
+  }, [disabled, shortcut, dirty, pending, blocker, onSave])
 
   useEffect(() => {
     if (savedAt === null || dirty || !onSavedShown) return
@@ -61,7 +66,7 @@ export function AdminSaveBar({ dirty, pending, error, savedAt, blocker, onSave, 
 
   return <div className={`sticky bottom-[72px] z-20 -mx-5 border-t border-hairline bg-white/95 px-5 backdrop-blur-sm transition-[opacity,transform] duration-150 ease-out md:bottom-0 md:-mx-8 md:px-8 ${visible ? "mt-10 translate-y-0 opacity-100" : "pointer-events-none mt-0! h-0 translate-y-2 overflow-hidden border-t-0 opacity-0"}`} aria-hidden={visible ? undefined : true}>
     <div className="flex min-h-[56px] flex-wrap items-center gap-x-4 gap-y-2 py-2.5">
-      <Button type="button" onClick={onSave} disabled={pending || !dirty || !!blocker} title="⌘S / Ctrl+S">{pending ? "Saving…" : "Save changes"}</Button>
+      <Button type="button" onClick={onSave} disabled={pending || !dirty || !!blocker} title="⌘S / Ctrl+S">{pending ? (pendingLabel ?? "Saving…") : "Save changes"}</Button>
       <Button type="button" variant="ghost" onClick={onDiscard} disabled={pending || !dirty}>Discard</Button>
       <span aria-live="polite" className="inline-flex items-center">
         {dirty && !pending && !error && <span className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-700">

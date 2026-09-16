@@ -9,6 +9,10 @@ import { cache } from "react"
  * is comparing the same span. */
 export const AUTO_START_ESTIMATE_DAYS = 30
 
+/** The refusal a save gets when the chosen flow was deleted between page load and Save. Exported so
+ * the selector can recognise it and offer Reload as the one control beside the sentence. */
+export const STALE_FLOW_ERROR = "that flow no longer exists"
+
 export type DefaultApprovalFlow = {
   id: string
   name: string
