@@ -118,3 +118,8 @@
     #268 crossed the hand-off line (152350 tokens ≥ 150000) — asked to hand off; hard stop at 180000
     #268 context at exit: 156259 tokens, 27 min
     cleaned up session pid 1889632 (pgid ?); free: 6302 MB
+    scoreboard: 80 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #268: phase build done → measure next in 1627s
+=== [23/50] #268 — Build the Origin link: one strip and a from= URL for every cross-surface hop  [sonnet · low · phase: measure]
+    #268 context at exit: 122662 tokens, 12 min
+    cleaned up session pid 1924365 (pgid ?); free: 6306 MB
