@@ -136,7 +136,12 @@ The single right-hand pane on a Queue screen that shows the selected row's extra
 _Avoid_: Approval Context (Vic's separate phone screen — DocuBite has one pane), detail sheet, document header (the pane header is the only header)
 
 **Origin context**:
-The workspace, list, filters, position, and workflow state from which a user opened a detail or action surface. Returning from that surface restores the origin context whenever it still exists.
+The workspace, list, filters, position, and workflow state from which a user opened a detail or action surface — in DocuBite, the origin surface's address as it stood, including the selected row. It exists only for a **hop**: an in-app link that opens a row on a *different* surface (an Invoices row to its Exception, an Archive result to its typed queue, a failed ledger push to its document, the Detail pane to its full-width page). Opening a row's Detail pane on the same queue, and choosing a queue from the rail, are not hops and carry nothing. Origin context lives exactly as long as the navigation that carries it: using the Origin link, the browser's Back, or any rail link ends it; nothing is remembered for the session. Returning restores the origin whenever it still exists; when the row no longer matches the origin's filters, the queue says so and offers to show the row instead of silently dropping it.
+_Avoid_: breadcrumb, recent, last-visited, remembered filters (a saved View is the durable way to keep filters)
+
+**Origin link**:
+The one visible way back from a hop: a single strip above the arrival surface's header that names the origin surface and the row or search it will restore (*← Back to Invoices · Acme Corp · INV-1042*). It renders only while an Origin context exists, agrees with the browser's Back, and is the only control that crosses surfaces — the Detail pane's × and Escape close the pane on the current queue and never leave it.
+_Avoid_: Back button (ambiguous with the browser's), Return, Open document in a new tab as the only way to the row
 
 **Keyboard shortcut**:
 A key or two-key sequence that moves the operator around the app — to a queue, to the filters, to the shortcuts dialog — and never edits, decides or deletes anything. Shortcuts are on by default, listed in one Keyboard shortcuts dialog reached from `?` and the account menu, ignored while the operator is typing in a field or inside a dialog or menu, and can be turned off per person in one switch. Moving between rows with the arrow keys, opening a row with Enter and closing the Detail pane with Escape are not shortcuts: they work whenever the queue or pane has focus and stay on when shortcuts are off. Shortcuts exist on desktop widths only.
