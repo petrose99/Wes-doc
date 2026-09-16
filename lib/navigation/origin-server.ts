@@ -40,7 +40,12 @@ export async function describeOrigin(workspaceId: string, from: string | null): 
   if (!docId) return { href: from, label }
 
   try {
-    const doc = await prisma.document.findFirst({ where: { id: docId, workspaceId }, select: { filename: true, reviewedData: true, rawExtraction: true } })
+    const select = { filename: true, reviewedData: true, rawExtraction: true } as const
+    // Exceptions rows are addressed by their check id (`/exceptions/<checkId>`), every other queue
+    // by the document id — resolve the check to its document for the row segment.
+    const doc = label === "Exceptions" && !params.get("doc")
+      ? (await prisma.documentCheckResult.findFirst({ where: { id: docId, workspaceId }, select: { document: { select } } }))?.document ?? null
+      : await prisma.document.findFirst({ where: { id: docId, workspaceId }, select })
     if (!doc) return { href: from, label }
     return { href: from, label, row: rowFromDocument(doc) }
   } catch {
@@ -74,6 +79,16 @@ export async function describeMissingRow(
   }
 }
 
+/** Case-1 notice for a row the server filtered out: named from the document, Show it drops the query. */
+async function describeFilteredRow(workspaceId: string, docId: string, showHref: string): Promise<{ text: string; showHref: string; name: string } | null> {
+  try {
+    const doc = await prisma.document.findFirst({ where: { id: docId, workspaceId }, select: { filename: true, reviewedData: true, rawExtraction: true } })
+    if (!doc) return null
+    const row = rowFromDocument(doc)
+    return { text: `${[row.title, row.suffix].filter(Boolean).join(" · ")} no longer matches these filters.`, showHref, name: [row.title, row.suffix].filter(Boolean).join(" ") }
+  } catch { return null }
+}
+
 type SearchParamsRecord = Record<string, string | string[] | undefined>
 
 function first(value: string | string[] | undefined): string | null {
@@ -89,7 +104,7 @@ export type QueueArrival = { origin: Origin | null; initialMissing: { text: stri
  * result goes straight to `QueueScreen`'s `origin` / `initialMissing` props. */
 export async function queueArrival(
   workspaceId: string,
-  opts: { searchParams: SearchParamsRecord; queuePath: string; selectedId: string | null; rowIds: Iterable<string>; decidedText?: string; missingText?: string },
+  opts: { searchParams: SearchParamsRecord; queuePath: string; selectedId: string | null; rowIds: Iterable<string>; unfilteredRowIds?: Iterable<string | { id: string; documentId: string }>; decidedText?: string; missingText?: string },
 ): Promise<QueueArrival> {
   const workspaceBase = `/workspaces/${workspaceId}`
   const queueLabel = originLabel(`${workspaceBase}/${opts.queuePath}`) ?? opts.queuePath
@@ -104,6 +119,15 @@ export async function queueArrival(
   const docId = opts.selectedId ?? first(opts.searchParams.doc)
   const ids = new Set(opts.rowIds)
   const missing = docId && !ids.has(docId) ? docId : null
+  // Spec §2.5 case 1 on a queue that filters on the server (Invoices' aging, Exceptions' status,
+  // Purchase Orders' consumed): the row exists but this query hides it — same wording and Show-it
+  // target as the client-derived variant in QueueScreen, so a filtered row is never called "moved".
+  const unfiltered = new Map<string, string>()
+  for (const row of opts.unfilteredRowIds ?? []) typeof row === "string" ? unfiltered.set(row, row) : unfiltered.set(row.id, row.documentId)
+  if (missing && unfiltered.has(missing)) {
+    const filtered = await describeFilteredRow(workspaceId, unfiltered.get(missing)!, `${workspaceBase}/${opts.queuePath}/${missing}`)
+    return { origin, initialMissing: filtered ?? undefined }
+  }
   const notice = missing && opts.missingText ? { text: opts.missingText } : await describeMissingRow(workspaceId, { docId: missing, goneId: first(opts.searchParams.gone), queueLabel, here, workspaceBase })
   const initialMissing = notice && opts.decidedText && notice.showHref ? { text: opts.decidedText, showHref: notice.showHref, name: notice.name } : notice ?? undefined
   return { origin, initialMissing }

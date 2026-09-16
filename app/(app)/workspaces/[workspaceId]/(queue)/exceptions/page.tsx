@@ -24,7 +24,7 @@ export async function ExceptionsQueuePage({ params, searchParams, selectedId = n
   const [all, workspaceDocumentCount] = await Promise.all([listOpenExceptions(workspaceId), countWorkspaceDocuments(workspaceId)])
   const exceptions = status === "open" || status === "in_review" ? all.filter((row) => row.escalationStatus === status) : all
 
-  const arrival = await queueArrival(workspaceId, { searchParams: query as Record<string, string | string[] | undefined>, queuePath: "exceptions", selectedId: selectedId, rowIds: all.map((exception) => exception.id), missingText: "That exception is no longer open." })
+  const arrival = await queueArrival(workspaceId, { searchParams: query as Record<string, string | string[] | undefined>, queuePath: "exceptions", selectedId: selectedId, rowIds: exceptions.map((exception) => exception.id), unfilteredRowIds: all.map((exception) => ({ id: exception.id, documentId: exception.documentId })), missingText: "That exception is no longer open." })
   return <ExceptionQueue
     arrival={arrival}
     workspaceId={workspaceId}

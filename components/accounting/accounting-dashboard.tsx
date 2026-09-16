@@ -439,7 +439,7 @@ function ReadyToPushList({ workspaceId, connectionId, documents, notPushableCoun
                     )}
                   </td>
                   <td className="px-5 py-3 text-right">
-                    <div className="inline-flex items-center gap-3">
+                    <div className="inline-flex items-center gap-3 whitespace-nowrap">
                       <Link href={hopHref} className="text-xs font-medium text-slate-600 underline-offset-2 hover:text-slate-900 hover:underline">
                         Open on {queueLabel}
                       </Link>

@@ -75,7 +75,7 @@ export async function DocumentQueuePage({ params, searchParams, docType, title, 
   const segment = docType === "purchase_order" ? "purchase-orders" : "bank-statements"
 
   const fieldTable = isFieldTableType(docType) ? await getSavedFieldTable(workspaceId, docType) : null
-  const arrival = await queueArrival(workspaceId, { searchParams: query as Record<string, string | string[] | undefined>, queuePath: segment, selectedId: selectedDocumentId, rowIds: allRows.map((row) => row.id) })
+  const arrival = await queueArrival(workspaceId, { searchParams: query as Record<string, string | string[] | undefined>, queuePath: segment, selectedId: selectedDocumentId, rowIds: rows.map((row) => row.id), unfilteredRowIds: allRows.map((row) => row.id) })
   return <DocumentQueue
     arrival={arrival}
     fieldTable={fieldTable}
