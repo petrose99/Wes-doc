@@ -76,18 +76,27 @@ properly, not skimmed:
    in particular trips on (shell, tokens, seed data, dev-server recipe).
    Each lesson that applies to this surface becomes a line in the spec now;
    the pre-flight (step 3) cites it.
-3. **Pre-flight against the scorecards.** Before building, walk the ten
-   `critique` heuristics and the `evaluate` heuristics against the spec and
-   write one line each: what in the spec earns a 4 / a 0-issue. A heuristic
-   with no answer is a hole in the spec — fix the spec, not the code later.
+3. **Pre-flight against the scorecards — as a coverage matrix, not a
+   narrative.** Copy `preflight.md` (next to this brief) into your scratch
+   folder and fill it completely: the inventory (screens, components, every
+   action, every state, every copy surface, every hop), then the 50-row
+   matrix — for each check, which inventory items it applies to and which
+   spec element covers *each* of them, or `GAP`. A 4 needs *every*; one
+   uncovered primary item is a 2. Predict the critique per heuristic and the
+   evaluate score from the task walkthroughs. **Gates: predicted critique
+   ≥ 36 and predicted evaluate ≥ 92 before code.** Below the gate you fix
+   the spec, never the code later. The filled matrix is then your build
+   checklist, row by row. Attach it to the report.
 4. Build the whole surface to that spec, all states included, with the
    detector hook fixing findings as they appear.
 
-**Then score the new UI — and the first score is a KPI.** The report records
-the first-pass `critique` and `evaluate` numbers separately from the close
-numbers. A first pass under 30/40 or 80/100 means the pre-build pass was
-skipped or shallow; say which step was weak and what it missed, so the next
-ticket's pre-build learns from it. Then work the remaining findings in
+**Then score the new UI — and the gap between predicted and measured is the
+KPI.** The report shows predicted vs first-pass vs close, per heuristic, for
+both scorecards. Every heuristic where measured < predicted is a lesson in the
+precise form `preflight.md` §4 gives (which check was marked covered, by
+what, and what the critic found instead). A first pass under 30/40 or 80/100
+with a prediction above the gate means the matrix was filled dishonestly;
+say where. Then work the remaining findings in
 batches (build fully, inspect once at both widths, fix everything shown,
 confirm once) until the bar above is met, and record the after-counts.
 
