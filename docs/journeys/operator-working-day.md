@@ -29,7 +29,7 @@ Documents arrive by email forward (`/api/inbound-email`, off unless `inboundEmai
 
 ### 1. Open the workspace → Invoices
 
-`/workspaces/<id>` lands on the Invoices queue (#237/#238). What needs me is read from the rail badges and the queue's own counts. Two numbers share the name "Invoices": the badge counts `pipelineCounts.review`, the header counts the filtered rows (already #233). The tour still points at a target the rail no longer renders (#241).
+`/workspaces/<id>` lands on the Invoices queue (#237/#238). What needs me is read from the rail badges and the queue's own counts. Two numbers share the name "Invoices": the badge counts `pipelineCounts.review`, the header counts the filtered rows (already #233). The tour still points at a target the rail no longer renders (#241). The old Dashboard's ranked next-best-action (review > awaiting placement > failed) ranked the same destinations the rail now orders — Invoices first, Exceptions last (§2) — so the rail carries it; no ranked element returns to the queue (#242).
 
 ### 2. Work the queue: Invoices → Purchase Orders → Receipts → Bank Statements → Exceptions
 

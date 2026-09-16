@@ -9,7 +9,7 @@ The Invoices queue. Opening a workspace lands the user on their work, not on a s
 _Avoid_: Dashboard, landing page, overview, next best action
 
 **Unplugged surface**:
-A feature the product no longer shows or routes to, kept only so it can be brought back deliberately. Worksheets, Expenses and Dictation are unplugged. An unplugged surface has no navigation entry, no row or bulk action, no badge, and its addresses do not open.
+A feature the product no longer shows or routes to, kept only so it can be brought back deliberately. Worksheets, Expenses, Dictation and the old Dashboard are unplugged. An unplugged surface has no navigation entry, no row or bulk action, no badge, and its addresses do not open; it is never measured or polished, only deleted once the owner signs the removal.
 _Avoid_: Hidden, deprecated, legacy
 
 **Core workflow destinations**:
