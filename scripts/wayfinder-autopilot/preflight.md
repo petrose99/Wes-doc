@@ -121,25 +121,70 @@ number or the gap that costs it. It reads text only — cheap. Reconcile: every
 heuristic where the critic's number is below yours is a spec change, not an
 argument. Record both columns here:
 
-| H | Self-predicted | Spec-critic | Reconciled | Spec change made |
-|---|---|---|---|---|
+| H | critique: self / critic / reconciled | evaluate worst-issue: self / critic / reconciled | Spec change made |
+|---|---|---|---|
 
-Gate after reconciliation: **critique ≥ 36, evaluate ≥ 92**.
-
----
-
-## Part E — Task walkthroughs and anti-patterns (what `evaluate` does)
-
-For 3–5 core tasks, step by step: *knows what to do? · sees how? · understands
-the feedback?* Every "no" / "only by guessing" → Part C `GAP` or a Part B row.
-
-| Task | Step | Knows | Sees | Understands | Gap |
-|---|---|---|---|---|---|
-
-Anti-pattern sweep (pre-selection, hidden cost, guilt copy, buried exit, forced
-continuity, asymmetric friction): each hit is a P0/P1 — remove in the spec.
+Gate after reconciliation: **critique ≥ 36; evaluate heuristic sum ≤ 5, zero
+P0/P1, verdict Clean** (≈ ≥ 92).
 
 ---
+
+## Part E — Predict `evaluate` (worst-issue scoring, walkthroughs, anti-patterns)
+
+`evaluate` is not `critique` with a different scale. It **hunts issues**: each
+heuristic gets the severity of the *worst* issue found — 0 none · 1 cosmetic ·
+2 minor · 3 major · 4 catastrophic — so one dead path is a 3 on H3 however good
+the rest of H3 is. Its health score composes the heuristic sum, task success
+from cognitive walkthroughs, and the anti-pattern verdict. Observed: sum 18 with
+four P1s → 68; sum 8 → 85. **≥ 90 needs: heuristic sum ≤ 5, zero P0/P1, every
+walkthrough step pass (≤ 2 hesitations, no failure), verdict Clean.**
+
+### E1 · Worst-issue prediction per heuristic
+For each heuristic, name the single worst thing the spec still permits and its
+severity. Use this mapping — it is how the critic has actually scored these:
+
+| Class (from Part B) | Severity |
+|---|---|
+| Action promised but unreachable; irreversible destructive act with no reversal | 3 (P1) |
+| View stale after a mutation until refresh | 3 (P1) |
+| Focus does not enter a dialog; Esc does not close; keyboard trap | 3 (P1) |
+| Link/download lands on a raw error page; input lost on error | 3 (P1) |
+| Time-axis edge changes the outcome silently (wrong amount, wrong state) | 3–4 (P1/P0) |
+| Two terms for one concept in one view; inconsistent casing in one column | 2 (P2) |
+| Bespoke primitive beside the shell's for the same job | 2 (P2) |
+| Empty KPI, repeating column, label only in `title` | 1–2 |
+
+| H | Worst issue the spec still permits | Severity | Fix in spec (→ Part B row) |
+|---|---|---|---|
+| H1 | | | |
+| H2 | | | |
+| H3 | | | |
+| H4 | | | |
+| H5 | | | |
+| H6 | | | |
+| H7 | | | |
+| H8 | | | |
+| H9 | | | |
+| H10 | | | |
+
+Predicted heuristic sum: __ · predicted P0: 0 · P1: 0 · P2: __
+
+### E2 · Cognitive walkthroughs — the four questions, per step
+For 3–5 core tasks (the operator's real jobs on this surface, from the journey
+map), every step gets the four questions `evaluate` asks. One "no" = hesitation,
+two = failure. A failure anywhere is a spec change now.
+
+| Task | Step | Will they try? (motivation) | Will they notice the control? (visibility) | Will they associate it with the effect? (understanding) | Will they see progress? (feedback) | Rating |
+|---|---|---|---|---|---|---|
+
+Estimated task success (state it as an estimate): completion __% · steps __ ·
+likely error points __.
+
+### E3 · Anti-pattern sweep
+Pre-selection · hidden cost or consequence · guilt or pressure copy · buried exit
+· forced continuity · asymmetric friction (easy in, hard out) · misleading
+label. Each hit is P0/P1 by definition — remove it in the spec. Verdict
+predicted: Clean.
 
 ## Part F — Build from the tables, then verify the contracts before measuring
 
@@ -152,8 +197,11 @@ is the untouched first pass.
 
 ## Part G — Predicted vs measured (the KPI and the lessons)
 
-| H | Reconciled prediction | First pass | Close | Gap explanation |
-|---|---|---|---|---|
+| H | critique: predicted / first pass / close | evaluate worst-issue: predicted / first pass / close | Gap explanation |
+|---|---|---|---|
+
+Also record: evaluate health predicted / first pass / close · P1 count
+predicted / found · walkthrough failures predicted / found · verdict.
 
 Every heuristic where first pass < prediction is a lesson, in this exact form:
 *(ticket, Hn) predicted 4, got 2 — Part _ row "…" was marked covered by "…";

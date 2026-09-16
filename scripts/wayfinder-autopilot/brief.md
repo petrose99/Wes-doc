@@ -86,9 +86,12 @@ properly, not skimmed:
    interactive surface, time-axis edges); **C** coverage by component type;
    **D** an independent spec critic — a fresh-context `Agent` scores the spec
    with the rubric as if it were built, and every heuristic it puts below
-   your prediction is a spec change; **E** task walkthroughs and the
-   anti-pattern sweep. **Gates after D: predicted critique ≥ 36, evaluate
-   ≥ 92.** Under the gate you change the spec, never the code later.
+   your prediction is a spec change; **E** an explicit `evaluate`
+   prediction — it scores the *worst* issue per heuristic, so name the worst
+   thing the spec still permits and its severity, walk each core task with
+   the four questions (try · notice · associate · see progress), sweep the
+   anti-patterns. **Gates after D: predicted critique ≥ 36; evaluate
+   heuristic sum ≤ 5 with zero P0/P1 and a Clean verdict.** Under the gate you change the spec, never the code later.
    The filled tables are then the build checklist, row by row.
 4. Build the whole surface from the tables, all states included, with the
    detector hook fixing findings as they appear. **Before the first
