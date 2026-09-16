@@ -64,6 +64,15 @@ export function KeyboardShortcuts({ destinations }: { destinations: ShortcutDest
   // resolves both rather than leaving either stranded (spec B6).
   useEffect(() => { clearPending(); setOpen(false) }, [pathname, clearPending])
 
+  // Admin has no queue list to consume PENDING_FOCUS_KEY="rows" (only queue-screen.tsx and
+  // search-client.tsx do), so `g d` lands here instead: a "main" flag this effect claims itself
+  // once the route change that follows router.push has actually landed.
+  useEffect(() => {
+    if (window.sessionStorage.getItem(PENDING_FOCUS_KEY) !== "main") return
+    window.sessionStorage.removeItem(PENDING_FOCUS_KEY)
+    document.getElementById("main")?.focus()
+  }, [pathname])
+
   useEffect(() => {
     const onOpen = () => setOpen(true)
     window.addEventListener(OPEN_EVENT, onOpen)
@@ -85,9 +94,12 @@ export function KeyboardShortcuts({ destinations }: { destinations: ShortcutDest
         const destination = destinations.find((entry) => entry.key === event.key)
         if (!destination) return
         event.preventDefault()
-        window.sessionStorage.setItem(PENDING_FOCUS_KEY, "rows")
-        if (pathname === destination.href) window.dispatchEvent(new Event("docubite:focus-rows"))
-        else router.push(destination.href)
+        const focusFlag = destination.label === "Admin" ? "main" : "rows"
+        window.sessionStorage.setItem(PENDING_FOCUS_KEY, focusFlag)
+        if (pathname === destination.href) {
+          if (focusFlag === "main") { window.sessionStorage.removeItem(PENDING_FOCUS_KEY); document.getElementById("main")?.focus() }
+          else window.dispatchEvent(new Event("docubite:focus-rows"))
+        } else router.push(destination.href)
         return
       }
 

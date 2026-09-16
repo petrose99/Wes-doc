@@ -1,6 +1,6 @@
 # Area primer — Queue shell (the six queues, desktop table + phone cards)
 
-Read this before touching `components/queue/queue-screen.tsx` or any `*-queue.tsx`. Facts only; the history is on #225, #257, #258, #261.
+Read this before touching `components/queue/queue-screen.tsx` or any `*-queue.tsx`. Facts only; the history is on #225, #257, #258, #261, #262.
 
 ## Routes
 `app/(app)/workspaces/[workspaceId]/(queue)/{invoices,purchase-orders,receipts,bank-statements,exceptions,approvals/invoices,approvals/po-mismatches}/page.tsx` — each is a server page that loads rows and renders one `*Queue` client component; `loading.tsx` beside each renders `QueueLoading` (`components/queue/queue-loading.tsx`). Detail pane: `?doc=<id>` on ≥`lg`, a pushState sheet below (see `detail-pane.md`).
@@ -29,3 +29,12 @@ App-wide five on every state (workspace-avatar palette ×2, Inter overused-font,
 - Every mutation refreshes row + pane (`onMutated`); every ⚠ action confirms with its consequence.
 - One term per concept: "Filters", "Sort and filter", "Clear filters", "Views"; state words from the label map only.
 - Keyboard: skip link → shell/tab bar → Views → Filters/Sort → chips → rows; h1 focusable only programmatically; every control ≥44 px `<md` (`h-11`).
+
+## Keyboard shortcuts (#262)
+- `components/shell/keyboard-shortcuts.tsx`: `KeyboardShortcuts` (one `document` keydown listener, mounted once in `Sidebar`, `md`+ gated via `matchMedia`) + `KeyboardShortcutsDialog` (opened by `?` or `openKeyboardShortcutsDialog()` from the account menu). `g <letter>` jumps rail destinations (`SHORTCUT_DESTINATIONS`); `/` → `/search` (empty `q` no longer redirects, see below); `f` focuses `#queue-facets button`; `]`/`[` cycle `button[aria-label^="Does not match the PO"]` inside `#${DETAIL_PANE_ID}`.
+- Pending-focus handoff after a route change: `sessionStorage["docubite.pendingFocus"]` = `"rows"` (consumed by `queue-screen.tsx`) | `"search"` (consumed by `search-client.tsx`) | `"main"` (consumed by `KeyboardShortcuts` itself, on `pathname` change — Admin has no row list, so `g d` focuses `#main` this way instead of `"rows"`).
+- `lib/shell/keyboard-shortcuts.ts`: the on/off store (`localStorage`, `useSyncExternalStore`), `?` always reachable even when off.
+- `components/ui/switch.tsx`: the shared `role="switch"` track/thumb primitive, used by the shortcuts dialog's toggle. **Not yet wired** into the Override-mode menu item (`queue-screen.tsx` ~line 437) or `module-row.tsx`'s pill toggle — both still use bespoke `role="switch"` markup; a real B4 gap, left open pending a design pass (visual change to a menu row, not pure execution).
+- `components/ui/dialog.tsx`: on close, focus returns to the opener, or to `#main` if the opener capture was `body` (never leaves focus stranded on `body` — a browse-mode/AT `?` press has no real opener).
+- `"/workspaces/[workspaceId]/search/page.tsx"`: no longer redirects to the workspace root when `q` is empty (only `ask=1` with no `q` does) — the `/` shortcut needs to land on an empty, focused search page.
+- Dev-server gotcha: a **cold** `next dev` compiles each route on first hit (took 50s+ for the very first request in this session); a keyboard probe that navigates through routes never hit yet will show false no-ops. Warm every route with a `curl` first, or run the capture round twice and trust the second pass.

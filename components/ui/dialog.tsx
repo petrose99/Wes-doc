@@ -83,7 +83,14 @@ export function Dialog({ open, title, description, width = "max-w-md", onClose, 
       document.body.style.overflow = previousOverflow
       // Return focus to the element that opened the dialog — only if it is still in the document
       // (a decision replaces the Approve/Reject bar with the result strip, which takes focus itself).
-      if (openerRef.current instanceof HTMLElement && openerRef.current.isConnected) openerRef.current.focus()
+      // `body` is never a meaningful opener (it means the dialog opened with nothing focused, e.g.
+      // a browse-mode AT press) — land on the main landmark instead of dropping focus back to the
+      // document root.
+      const opener = openerRef.current
+      if (opener instanceof HTMLElement && opener.isConnected) {
+        if (opener === document.body) document.getElementById("main")?.focus()
+        else opener.focus()
+      }
     }
   }, [open, initialFocus])
 

@@ -23,3 +23,9 @@
     #262 crossed the hand-off line (152360 tokens ≥ 150000) — asked to hand off; hard stop at 180000
     #262 context at exit: 160455 tokens, 9 min
     cleaned up session pid 1654970 (pgid ?); free: 6303 MB
+    scoreboard: 63 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #262: phase build done → measure next in 574s
+=== [6/50] #262 — Build the keyboard shortcut set: roving rows, g-sequences between queues, f / ? and the Keyboard shortcuts dialog  [sonnet · low · phase: measure]
+    #262 crossed the hand-off line (151046 tokens ≥ 150000) — asked to hand off; hard stop at 180000
+    #262 context at exit: 175281 tokens, 28 min
+    cleaned up session pid 1666272 (pgid ?); free: 6311 MB
