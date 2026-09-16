@@ -36,3 +36,29 @@
     #261 crossed the hand-off line (163472 tokens ≥ 150000) — asked to hand off; hard stop at 180000
     #261 context at exit: 168635 tokens, 9 min
     cleaned up session pid 1521115 (pgid ?); free: 6304 MB
+    scoreboard: 53 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #261: phase spec done → build next in 544s
+=== [8/50] #261 — Build the phone Queue screen: card rows and the Filters sheet on all five queues  [sonnet · low · phase: build]
+    #261 crossed the hand-off line (153901 tokens ≥ 150000) — asked to hand off; hard stop at 180000
+    #261 context at exit: 171050 tokens, 3 min
+    cleaned up session pid 1532202 (pgid ?); free: 6332 MB
+    scoreboard: 54 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #261: continued (progressed), session 1/3 without progress allowed in 214s
+=== [9/50] #261 — Build the phone Queue screen: card rows and the Filters sheet on all five queues  [opus[1m] · low · phase: build]
+    #261 crossed the hand-off line (159050 tokens ≥ 150000) — asked to hand off; hard stop at 180000
+    #261 context at exit: 163987 tokens, 2 min
+    cleaned up session pid 1536648 (pgid ?); free: 6333 MB
+    scoreboard: 55 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #261: continued (progressed), session 1/3 without progress allowed in 154s
+=== [10/50] #261 — Build the phone Queue screen: card rows and the Filters sheet on all five queues  [opus · low · phase: build · hard (2 sessions on this phase)]
+    #261 crossed the hand-off line (153621 tokens ≥ 150000) — asked to hand off; hard stop at 180000
+    #261 context at exit: 160462 tokens, 7 min
+    cleaned up session pid 1540095 (pgid ?); free: 6340 MB
+    scoreboard: 56 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #261: continued (progressed), session 1/3 without progress allowed in 454s
+=== [11/50] #261 — Build the phone Queue screen: card rows and the Filters sheet on all five queues  [opus · low · phase: build · hard (3 sessions on this phase)]
+    #261 context at exit: 72175 tokens, 4 min
+    cleaned up session pid 1549800 (pgid ?); free: 6352 MB
+    scoreboard: 57 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #261: phase build done → measure next in 244s
+=== [12/50] #261 — Build the phone Queue screen: card rows and the Filters sheet on all five queues  [sonnet · low · phase: measure]
