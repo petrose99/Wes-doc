@@ -69,7 +69,7 @@ export function InlineAdjustmentCard(props: InlineAdjustmentCardProps) {
           <AlertTriangle className="h-3.5 w-3.5" aria-hidden />
           {props.pendingTitle}
         </div>
-        <p className="mt-1">{props.pendingDetail}</p>
+        <p className="mt-1 max-w-[58ch]">{props.pendingDetail}</p>
       </div>
     )
   }

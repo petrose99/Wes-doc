@@ -2346,9 +2346,14 @@ model DocumentMatch {
   matchType      String    @map("match_type")
   confidence     Float
   discrepancies  Json      @default("[]")
+  /// pending (the matcher's guess) | confirmed | rejected — see lib/matching/po-link.ts for what
+  /// each means to the invoice.
   status         String    @default("pending")
   resolvedAt     DateTime? @map("resolved_at")
   resolvedById   String?   @map("resolved_by_id") @db.Uuid
+  /// #228 Q10: a manual Line match, `{ "<invoiceRow>": <poLineIndex> | null }`, that
+  /// po_line_consumption honours over its description-similarity guess. Null until set by hand.
+  lineAssignments Json?    @map("line_assignments")
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
   workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)

@@ -61,6 +61,9 @@ const BILLING_MESSAGES: Record<string, string> = {
   expense_claim_not_submitted: "This claim isn't awaiting a decision.",
   expense_claim_has_workflow: "This claim is on a workflow — decide its current stage instead.",
   expense_claim_has_no_workflow: "This claim has no workflow attached.",
+  // #250: Match manually.
+  po_match_not_found: "That purchase order link no longer exists. Reload the row and try again.",
+  purchase_order_not_found: "That purchase order no longer exists.",
 }
 
 export const errorMessage = (error: unknown, fallback: string) => {

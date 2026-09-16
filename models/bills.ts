@@ -4,6 +4,8 @@ import { prisma } from "@/lib/db"
 import { agingBucket, inferDueDate, type AgingBucket } from "@/lib/bills/due-date"
 import { getDocumentPaymentStatuses } from "@/models/ledger-payments"
 import { normalizeSupplierName } from "@/lib/suppliers/normalize"
+import type { PoLinkKind } from "@/lib/matching/po-link"
+import { summarizeInvoicePoLinks, type InvoicePoSummary } from "@/models/po-matching"
 
 /** WP-AP2: AP aging / bills cockpit. One row per Document whose template maps to "invoice" — the
  * shape an AP controller expects on day one: supplier, total, due-date (extracted OR inferred
@@ -63,6 +65,20 @@ export type BillRow = {
    * a `DocumentCheckResult` with `status: "escalated"` and `escalationStatus` null/open/in_review.
    * Folds into the row's Needs attention processing state; see `lib/documents/processing-state.ts`. */
   escalated: boolean
+  /** #228 Q5/Q6/Q11 (#250): the invoice's Purchase Order link for the Purchase Orders column —
+   * the compared PO's number carrying the number of red glyphs the pane will show, or a dashed
+   * suggestion the matcher made that compares nothing until confirmed, or "PO removed". */
+  po: BillPoLink
+}
+
+export type BillPoLink = {
+  kind: PoLinkKind | null
+  poNumber: string | null
+  poDocumentId: string | null
+  mismatchCount: number
+  confidence: number | null
+  suggestionCount: number
+  removed: boolean
 }
 
 export type BillsSummary = Record<AgingBucket | "unknown", { count: number; total: number }>
@@ -95,6 +111,13 @@ export function summarizePaidBills(bills: BillRow[], asOf = new Date()): PaidSum
   return summary
 }
 
+function toBillPoLink(summary: InvoicePoSummary | undefined): BillPoLink {
+  if (!summary) return { kind: null, poNumber: null, poDocumentId: null, mismatchCount: 0, confidence: null, suggestionCount: 0, removed: false }
+  if (summary.link) return { kind: summary.link.kind, poNumber: summary.link.poNumber, poDocumentId: summary.link.poDocumentId, mismatchCount: summary.mismatchCount, confidence: summary.link.confidence, suggestionCount: 0, removed: false }
+  const first = summary.suggestions[0]
+  return { kind: first ? "suggested" : null, poNumber: first?.poNumber ?? null, poDocumentId: first?.poDocumentId ?? null, mismatchCount: 0, confidence: first?.confidence ?? null, suggestionCount: summary.suggestions.length, removed: summary.removed }
+}
+
 /** Loads bills for a workspace. Bounded (up to `limit`, default 500) — a cockpit view is not the
  * place to render every historical invoice a workspace has ever seen. */
 export async function listWorkspaceBills(input: {
@@ -112,6 +135,9 @@ export async function listWorkspaceBills(input: {
   approvalFilter?: BillRow["approvalStatus"]
   /** #201's "Touchless" system saved view: rows that went out with no human review. */
   onlyTouchless?: boolean
+  /** #228 Q6: the Purchase Orders facet — Matched (a compared PO, clean), No PO (nothing
+   * compared: none, suggested only, or removed), Mismatch (a compared PO with red glyphs). */
+  poFilter?: "matched" | "none" | "mismatch"
 }): Promise<{ bills: BillRow[]; summary: BillsSummary }> {
   const asOf = input.asOf ?? new Date()
   const limit = input.limit ?? 500
@@ -161,6 +187,7 @@ export async function listWorkspaceBills(input: {
       select: { documentId: true },
     }),
   ])
+  const poSummaries = await summarizeInvoicePoLinks(input.workspaceId, documentIds)
   const touchlessDocIds = new Set(touchlessEvents.map((e) => e.documentId))
   const escalatedDocIds = new Set(openEscalations.map((e) => e.documentId))
 
@@ -233,6 +260,7 @@ export async function listWorkspaceBills(input: {
       fieldConfidence: (doc.confidence as Record<string, unknown> | null)?.fieldConfidence as Record<string, number> ?? {},
       touchless: touchlessDocIds.has(doc.id),
       escalated: escalatedDocIds.has(doc.id),
+      po: toBillPoLink(poSummaries.get(doc.id)),
     })
   }
 
@@ -245,6 +273,9 @@ export async function listWorkspaceBills(input: {
     if (input.statusFilter === "paid" && !(bill.paymentStatus && ["paid", "reconciled"].includes(bill.paymentStatus.toLowerCase()))) return false
     if (input.approvalFilter && bill.approvalStatus !== input.approvalFilter) return false
     if (input.onlyTouchless && !bill.touchless) return false
+    if (input.poFilter === "matched" && !(bill.po.kind && bill.po.kind !== "suggested" && bill.po.mismatchCount === 0)) return false
+    if (input.poFilter === "mismatch" && !(bill.po.kind && bill.po.kind !== "suggested" && bill.po.mismatchCount > 0)) return false
+    if (input.poFilter === "none" && bill.po.kind && bill.po.kind !== "suggested") return false
     return true
   })
 

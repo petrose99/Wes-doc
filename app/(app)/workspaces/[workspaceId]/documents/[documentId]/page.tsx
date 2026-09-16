@@ -5,6 +5,10 @@ import { FxConversionBadge } from "@/components/documents/fx-conversion-badge"
 import { MatchPanel } from "@/components/bank-match/match-panel"
 import { DocumentMatchesPanel } from "@/components/matching/document-matches-panel"
 import { listDocumentMatchesForDocument } from "@/models/document-matches-query"
+import { PoConsumptionPanel } from "@/components/matching/po-consumption-panel"
+import type { LineItemsPoProps } from "@/components/pipeline/document-detail/line-items-section"
+import { resolveDocType } from "@/lib/doc-types"
+import { summarizeInvoicePoLinks, summarizePoConsumption, type PoConsumption } from "@/models/po-matching"
 import { getCurrentUser } from "@/lib/auth"
 import { parseTemplateFields } from "@/lib/document-templates"
 import type { BlocksSidecar, DocumentProvenance } from "@/lib/provenance"
@@ -141,6 +145,25 @@ export async function DocumentDetailPage({ params, searchParams, embedded = fals
   // WP-AP1: DocumentMatch rows involving this document (as source OR target). Read-only for now;
   // resolveDocumentMatches runs during extraction (models/document-matches.ts).
   const documentMatches = await listDocumentMatchesForDocument(workspaceId, documentId)
+
+  // #228 / #250: an invoice's Purchase Order link — View PO row, Purchase Orders chip, Match
+  // manually — and a PO's consumption (Ordered / Invoiced / Remaining, Matched invoices).
+  const docType = resolveDocType(document)
+  let po: LineItemsPoProps | null = null
+  let poConsumption: PoConsumption | null = null
+  if (docType === "invoice") {
+    const summary = (await summarizeInvoicePoLinks(workspaceId, [documentId])).get(documentId) ?? null
+    const poDocument = summary?.link ? await prisma.document.findFirst({ where: { id: summary.link.poDocumentId, workspaceId }, select: { reviewedData: true, rawExtraction: true } }) : null
+    const poData = (poDocument?.reviewedData ?? poDocument?.rawExtraction ?? {}) as Record<string, unknown>
+    const poLineOptions = Array.isArray(poData.line_items) ? (poData.line_items as unknown[]).map((raw, index) => {
+      const row = (raw ?? {}) as Record<string, unknown>
+      const description = typeof row.description === "string" && row.description.trim() ? row.description.trim() : `PO line ${index + 1}`
+      return { index, label: `${index + 1} · ${description}` }
+    }) : []
+    po = { workspaceId, documentId, summary, currency: typeof data.currency_code === "string" ? data.currency_code.toUpperCase() : typeof data.currency === "string" ? data.currency.toUpperCase() : null, poLineOptions }
+  } else if (docType === "purchase_order") {
+    poConsumption = (await summarizePoConsumption(workspaceId, [documentId])).get(documentId) ?? null
+  }
 
   // A content-search result (Files browser, AP-aging chart, pipeline list) links here with an
   // ad-hoc page/bbox — a hit that matched full-text search rather than a named field, so there is
@@ -286,7 +309,10 @@ export async function DocumentDetailPage({ params, searchParams, embedded = fals
         matchedDocument: { id: match.matchedDocument.id, filename: match.matchedDocument.filename, paymentStatus: match.matchedDocument.paymentStatus },
       }))}
     /> : null}
-    documentMatches={documentMatches.length ? <DocumentMatchesPanel workspaceId={workspaceId} matches={documentMatches} /> : null}
+    documentMatches={poConsumption
+      ? <PoConsumptionPanel workspaceId={workspaceId} consumption={poConsumption} origin={`/workspaces/${workspaceId}/purchase-orders/${documentId}`} />
+      : documentMatches.length && docType !== "invoice" ? <DocumentMatchesPanel workspaceId={workspaceId} matches={documentMatches} /> : null}
+    po={po}
     stageIndicator={stageIndicator}
     institutions={institutions}
     institutionId={document.institutionId}

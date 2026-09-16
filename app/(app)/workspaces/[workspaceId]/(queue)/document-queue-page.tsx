@@ -5,6 +5,7 @@ import { listWorkspaceDocuments, summarizeDocumentForReview } from "@/models/doc
 import { listWorkspaceInstitutions } from "@/models/institutions"
 import { requireWorkspaceRole } from "@/models/workspaces"
 import { DocumentQueue, type DocumentQueueRow } from "@/components/queue/document-queue"
+import { summarizePoConsumption, type PoConsumption } from "@/models/po-matching"
 import type { ItemizedRecord } from "@/components/typed-destinations/bulk-approve-receipt"
 
 const STATUSES = new Set(["queued", "needs_review", "ready_for_review", "reviewed", "failed"])
@@ -12,9 +13,9 @@ const STATUSES = new Set(["queued", "needs_review", "ready_for_review", "reviewe
 /** #225: Purchase Orders and Bank Statements on the Queue screen. Both still read the generic
  * document list (no dedicated row model yet — see the map's "Not yet specified"), mapped to the
  * serializable row the client queue renders. */
-export async function DocumentQueuePage({ params, searchParams, docType, title, noun, itemType, supplierLabel, stat, emptyBody, selectedDocumentId = null }: {
+export async function DocumentQueuePage({ params, searchParams, docType, title, noun, itemType, supplierLabel, stat, emptyBody, selectedDocumentId = null, purchaseOrders = false }: {
   params: Promise<{ workspaceId: string }>
-  searchParams: Promise<{ status?: string; sort?: string }>
+  searchParams: Promise<{ status?: string; sort?: string; consumed?: string }>
   docType: DocType
   title: string
   noun: string
@@ -23,9 +24,10 @@ export async function DocumentQueuePage({ params, searchParams, docType, title, 
   stat?: ReactNode
   emptyBody: string
   selectedDocumentId?: string | null
+  purchaseOrders?: boolean
 }) {
   const { workspaceId } = await params
-  const { status } = await searchParams
+  const { status, consumed } = await searchParams
   const user = await getCurrentUser()
   const membership = await requireWorkspaceRole(workspaceId, user.id)
   const isBank = docType === "bank_statement"
@@ -34,7 +36,10 @@ export async function DocumentQueuePage({ params, searchParams, docType, title, 
     isBank ? listWorkspaceInstitutions(workspaceId) : Promise.resolve([]),
   ])
   const institutionName = new Map(institutions.map((institution) => [institution.id, institution.name]))
-  const rows: DocumentQueueRow[] = documents.map((document) => {
+  // #228 Q8: the Purchase Orders queue reads consumption per PO — Invoiced (amount and %) and
+  // Open / Fully invoiced are derived from the compared invoices, never set by hand.
+  const consumption = docType === "purchase_order" ? await summarizePoConsumption(workspaceId, documents.map((document) => document.id)) : new Map<string, PoConsumption>()
+  const allRows: DocumentQueueRow[] = documents.map((document) => {
     const review = summarizeDocumentForReview(document, membership.workspace.baseCurrency)
     const reviewed = (document.reviewedData as Record<string, unknown> | null) ?? {}
     // A statement has no supplier: its account holder names the row, and its closing balance is
@@ -50,8 +55,13 @@ export async function DocumentQueuePage({ params, searchParams, docType, title, 
       total: review.total ?? (isBank && closing !== null ? new Intl.NumberFormat("en", { style: "currency", currency: membership.workspace.baseCurrency ?? "USD", maximumFractionDigits: 0 }).format(closing) : null),
       category: review.category,
       institution: isBank && document.institutionId ? institutionName.get(document.institutionId) ?? null : null,
+      ...(docType === "purchase_order" ? (() => {
+        const po = consumption.get(document.id)
+        return { po: { poNumber: typeof reviewed.po_number === "string" ? reviewed.po_number : null, invoicedAmount: po?.invoicedAmount ?? 0, invoicedPercent: po?.invoicedPercent ?? null, currencyCode: po?.currencyCode ?? null, fullyInvoiced: po?.fullyInvoiced ?? false, invoiceCount: po?.invoices.length ?? 0, mismatchCount: po?.invoices.reduce((sum, invoice) => sum + invoice.mismatchCount, 0) ?? 0, overLines: po?.lines.filter((line) => line.ordered !== null && line.invoiced > line.ordered).length ?? 0 } }
+      })() : {}),
     }
   })
+  const rows = purchaseOrders && (consumed === "open" || consumed === "full") ? allRows.filter((row) => (consumed === "full") === !!row.po?.fullyInvoiced) : allRows
   const segment = docType === "purchase_order" ? "purchase-orders" : "bank-statements"
 
   return <DocumentQueue
@@ -65,5 +75,6 @@ export async function DocumentQueuePage({ params, searchParams, docType, title, 
     stat={stat}
     initialSelectedId={selectedDocumentId}
     emptyBody={emptyBody}
-    showInstitution={isBank} />
+    showInstitution={isBank}
+    purchaseOrders={purchaseOrders} />
 }

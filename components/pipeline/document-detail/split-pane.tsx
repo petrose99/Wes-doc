@@ -4,7 +4,7 @@ import { AutomationRuleForm } from "@/components/workspace/automation-rule-form"
 import { CreateReviewTaskButton } from "@/components/documents/create-review-task-button"
 import { DeleteDocumentButton } from "@/components/documents/delete-document-button"
 import { FieldRow } from "@/components/pipeline/document-detail/field-row"
-import { LineItemsSection } from "@/components/pipeline/document-detail/line-items-section"
+import { LineItemsSection, type LineItemsPoProps } from "@/components/pipeline/document-detail/line-items-section"
 import { checkAppliesToField, type FieldCheck } from "@/components/pipeline/document-detail/check-types"
 import { parseLiveCheckValues, rebuildLiveChecks } from "@/components/pipeline/document-detail/live-checks"
 import { StageIndicator, type StageStep } from "@/components/pipeline/document-detail/stage-indicator"
@@ -45,7 +45,7 @@ export function SplitPane({
   workspaceId, source, fields, data, fieldConfidence, provenanceFields, provenanceItems, initialTarget, conflictingLabels, missingRequiredFields,
   saveReview, documentType: initialDocumentType, note: initialNote, auditEvents, prevHref, nextHref, position, stage, afterActionHref,
   header, canPush, pushCard, canCreateRule, defaultSupplier, matchKind, bankMatches, documentMatches, paymentStatus, rationales, checks, fxBadge, stageIndicator,
-  institutions, institutionId, institutionName, embedded = false, history,
+  institutions, institutionId, institutionName, embedded = false, history, po = null,
 }: {
   workspaceId: string
   source: SourceDocument
@@ -96,6 +96,9 @@ export function SplitPane({
   /** #225: the Approval / Audit / Checks tabs' data, loaded with the document so they sit in the
    * same tab strip as Details and Note. Only supplied in embedded mode. */
   history?: DocumentHistory | null
+  /** #228 / #250: the invoice's Purchase Order link for the line-items section's View PO row and
+   * Match manually. Null for every non-invoice document. */
+  po?: LineItemsPoProps | null
 }) {
   const router = useRouter()
   const [tab, setTab] = useState<Tab>("details")
@@ -388,6 +391,7 @@ export function SplitPane({
               workspaceId={workspaceId}
               documentId={header.documentId}
               setTarget={setTarget}
+              po={po}
             />
 
             {fxBadge && <div className="pt-2">{fxBadge}</div>}
@@ -431,7 +435,7 @@ export function SplitPane({
 
 /** A4: the inner form that owns the field-nav state. Split out of SplitPane so the hook can
  * derive its ordering directly from formFields without SplitPane touching field-nav internals. */
-function FieldNavForm({ saveReview, docType, formFields, data, fieldConfidence, provenanceFields, provenanceItems, summaryFields, rationales, checks, workspaceId, documentId, setTarget }: {
+function FieldNavForm({ saveReview, docType, formFields, data, fieldConfidence, provenanceFields, provenanceItems, summaryFields, rationales, checks, workspaceId, documentId, setTarget, po }: {
   saveReview: (formData: FormData) => void | Promise<void>
   docType: string | null
   formFields: DocumentFieldDefinition[]
@@ -445,6 +449,7 @@ function FieldNavForm({ saveReview, docType, formFields, data, fieldConfidence, 
   workspaceId: string
   documentId: string
   setTarget: (target: ProvenanceTarget) => void
+  po: LineItemsPoProps | null
 }) {
   const navItems = formFields.map((field) => ({ key: field.key, confidence: fieldConfidence[field.key] ?? null, type: field.type }))
   const nav = useFieldNav(navItems)
@@ -475,7 +480,7 @@ function FieldNavForm({ saveReview, docType, formFields, data, fieldConfidence, 
     </div>}
     {formFields.map((field) => field.type === "array"
       ? <LineItemsSection key={field.key} field={field} value={data[field.key]} fieldKey={field.key} summaryFields={summaryFields} fieldValues={data} provenanceFields={provenanceFields} provenanceItems={provenanceItems[field.key] ?? []} onFocusSource={setTarget}
-          checks={liveChecks.filter((check) => check.fields.some((f) => f === field.key || f.startsWith(`${field.key}[`)))} onEscalate={onEscalate} />
+          checks={liveChecks.filter((check) => check.fields.some((f) => f === field.key || f.startsWith(`${field.key}[`)))} onEscalate={onEscalate} po={field.key === "line_items" ? po : null} />
       : <FieldRow key={field.key} field={field} value={data[field.key]} confidence={fieldConfidence[field.key] ?? null} ref={provenanceFields[field.key] ?? null} onFocusSource={setTarget} rationale={rationales?.[field.key] ?? null}
           checks={liveChecks.filter((check) => checkAppliesToField(check, field.key))} onEscalate={onEscalate}
           registerNav={nav.registerField} isCurrent={nav.currentKey === field.key} isCompleted={nav.completedKeys.has(field.key)} />)}

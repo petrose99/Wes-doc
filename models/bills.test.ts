@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 vi.mock("@/lib/db", () => ({ prisma: {} }))
 vi.mock("@/models/ledger-payments", () => ({ getDocumentPaymentStatuses: vi.fn().mockResolvedValue(new Map()) }))
+// #250: the Purchase Orders column reads one summary per invoice; none linked here.
+vi.mock("@/models/po-matching", () => ({ summarizeInvoicePoLinks: vi.fn().mockResolvedValue(new Map()) }))
 
 const { listWorkspaceBills } = await import("@/models/bills")
 const { prisma } = await import("@/lib/db")

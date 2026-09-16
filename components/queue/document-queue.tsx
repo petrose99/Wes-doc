@@ -6,7 +6,7 @@ import { AlertTriangle, CheckCircle2, ExternalLink, Loader2, Search } from "luci
 import { QueueScreen, type QueueColumn, type SortOption } from "@/components/queue/queue-screen"
 import { PaneMenuItem } from "@/components/queue/detail-pane"
 import { DocumentBulkActions, DocumentPaneActions } from "@/components/queue/document-actions"
-import { formatDate, TitleCell } from "@/components/queue/row-cells"
+import { formatDate, formatMoney, TitleCell } from "@/components/queue/row-cells"
 import type { Facet } from "@/components/queue/facet-filters"
 import type { ItemizedRecord } from "@/components/typed-destinations/bulk-approve-receipt"
 import { bulkExportDocumentsAction } from "@/app/(app)/workspaces/[workspaceId]/pipeline-actions"
@@ -27,9 +27,12 @@ export type DocumentQueueRow = {
   category: string
   /** Bank statements only: the asserted institution (#217). */
   institution?: string | null
+  /** Purchase orders only (#228 Q8): the PO number and its consumption by compared invoices. */
+  po?: { poNumber: string | null; invoicedAmount: number; invoicedPercent: number | null; currencyCode: string | null; fullyInvoiced: boolean; invoiceCount: number; mismatchCount: number; overLines: number }
 }
 
-export const DOCUMENT_FACETS: Facet[] = [
+
+const DOCUMENT_FACETS_BASE = (): Facet[] => [
   {
     param: "status", label: "Status",
     sections: [
@@ -37,6 +40,13 @@ export const DOCUMENT_FACETS: Facet[] = [
       { label: "Closed", options: [{ value: "reviewed", label: "Reviewed" }, { value: "failed", label: "Failed" }] },
     ],
   },
+]
+
+export const DOCUMENT_FACETS: Facet[] = DOCUMENT_FACETS_BASE()
+/** #228 Q6 on the PO side: Open / Fully invoiced is a facet here too. */
+export const PURCHASE_ORDER_FACETS: Facet[] = [
+  ...DOCUMENT_FACETS_BASE(),
+  { param: "consumed", label: "Consumption", options: [{ value: "open", label: "Open" }, { value: "full", label: "Fully invoiced" }] },
 ]
 
 const SORTS: SortOption<DocumentQueueRow>[] = [
@@ -61,7 +71,7 @@ function StatusPill({ status }: { status: string }) {
   return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}>{STATUS_LABEL[status] ?? status.replaceAll("_", " ")}</span>
 }
 
-export function DocumentQueue({ workspaceId, basePath, title, noun, itemType, rows, supplierLabel = "Supplier", views, stat, initialSelectedId, emptyBody, showInstitution = false }: {
+export function DocumentQueue({ workspaceId, basePath, title, noun, itemType, rows, supplierLabel = "Supplier", views, stat, initialSelectedId, emptyBody, showInstitution = false, purchaseOrders = false }: {
   workspaceId: string
   basePath: string
   title: string
@@ -75,6 +85,8 @@ export function DocumentQueue({ workspaceId, basePath, title, noun, itemType, ro
   initialSelectedId?: string | null
   emptyBody: string
   showInstitution?: boolean
+  /** #228 Q8: the Purchase Orders column set. */
+  purchaseOrders?: boolean
 }) {
   const [needsAttention, setNeedsAttention] = useState<Set<string>>(new Set())
   const byId = new Map(rows.map((row) => [row.id, row]))
@@ -89,9 +101,26 @@ export function DocumentQueue({ workspaceId, basePath, title, noun, itemType, ro
       render: (row) => <TitleCell title={row.supplier ?? (showInstitution ? row.institution ?? null : null)} subtitle={row.filename} missingLabel={`Unknown ${supplierLabel.toLowerCase()}`} />,
     },
     ...(showInstitution ? [{ key: "institution", label: "Institution", className: "whitespace-nowrap text-slate-700", render: (row: DocumentQueueRow) => <>{row.institution ?? "—"}</> }] : []),
-    { key: "amount", label: "Amount", narrow: true, className: "whitespace-nowrap text-right tabular-nums text-slate-900", render: (row) => <>{row.total ?? "—"}</> },
-    { key: "received", label: "Received", narrow: true, className: "whitespace-nowrap tabular-nums text-slate-700", render: (row) => <>{formatDate(row.receivedAt)}</> },
-    { key: "category", label: "Category", className: "text-slate-700", render: (row) => <>{row.category}</> },
+    // #228 Q8: Supplier · PO # · Amount · Invoiced (amount and %) · Open / Fully invoiced ·
+    // Received. No Buyer. "Received" here is the goods-receipt fact DocuBite lacks, so it reads "—"
+    // rather than borrowing the upload date; the upload date keeps its own column on the others.
+    ...(purchaseOrders ? [
+      { key: "po_number", label: "PO #", narrow: true, className: "whitespace-nowrap tabular-nums text-slate-700", render: (row: DocumentQueueRow) => <>{row.po?.poNumber ?? "—"}</> },
+      { key: "amount", label: "Amount", narrow: true, className: "whitespace-nowrap text-right tabular-nums text-slate-900", render: (row: DocumentQueueRow) => <>{row.total ?? "—"}</> },
+      { key: "invoiced", label: "Invoiced", className: "whitespace-nowrap text-right tabular-nums", render: (row: DocumentQueueRow) => row.po && row.po.invoiceCount > 0
+        ? <span className={row.po.mismatchCount ? "text-red-700" : "text-slate-800"} title={row.po.mismatchCount ? `${row.po.mismatchCount} cell${row.po.mismatchCount === 1 ? "" : "s"} on the matched invoices do not match` : undefined}>
+          {formatMoney(row.po.invoicedAmount, row.po.currencyCode)}{row.po.invoicedPercent !== null && <span className="ml-1 text-xs text-slate-500">{row.po.invoicedPercent} %</span>}
+        </span>
+        : <span className="text-slate-500">—</span> },
+      // Three states, not two: Open · Fully invoiced · Open with a line over — so "Open" never sits
+      // beside a red 115 % as if the two contradicted each other.
+      { key: "consumption", label: "Consumption", narrow: true, render: (row: DocumentQueueRow) => <span className={`inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${row.po?.fullyInvoiced ? "bg-slate-100 text-slate-700" : row.po?.overLines ? "bg-red-50 text-red-800" : "bg-emerald-50 text-emerald-800"}`}>{row.po?.fullyInvoiced ? "Fully invoiced" : row.po?.overLines ? `Open · ${row.po.overLines} line${row.po.overLines === 1 ? "" : "s"} over` : "Open"}</span> },
+      { key: "goods_received", label: "Received", className: "whitespace-nowrap text-slate-500", render: () => <span title="Goods receipt is not recorded in DocuBite">—</span> },
+    ] : [
+      { key: "amount", label: "Amount", narrow: true, className: "whitespace-nowrap text-right tabular-nums text-slate-900", render: (row: DocumentQueueRow) => <>{row.total ?? "—"}</> },
+      { key: "received", label: "Received", narrow: true, className: "whitespace-nowrap tabular-nums text-slate-700", render: (row: DocumentQueueRow) => <>{formatDate(row.receivedAt)}</> },
+      { key: "category", label: "Category", className: "text-slate-700", render: (row: DocumentQueueRow) => <>{row.category}</> },
+    ]),
     {
       key: "state", label: "State",
       render: (row) => <span className="flex flex-wrap items-center gap-1.5">
@@ -114,12 +143,12 @@ export function DocumentQueue({ workspaceId, basePath, title, noun, itemType, ro
     rows={rows}
     rowId={(row) => row.id}
     rowTitle={(row) => row.supplier ?? row.institution ?? row.filename}
-    rowSubtitle={(row) => row.supplier || row.institution ? row.filename : null}
+    rowSubtitle={(row) => purchaseOrders && row.po ? [row.po.poNumber, row.po.invoiceCount ? `${row.po.invoiceCount} invoice${row.po.invoiceCount === 1 ? "" : "s"}` : null, row.po.fullyInvoiced ? "Fully invoiced" : null].filter(Boolean).join(" · ") || row.filename : row.supplier || row.institution ? row.filename : null}
     leading={(row) => <StateGlyph status={row.status} />}
     columns={columns}
     selectable
     sortOptions={SORTS}
-    facets={DOCUMENT_FACETS}
+    facets={purchaseOrders ? PURCHASE_ORDER_FACETS : DOCUMENT_FACETS}
     views={views}
     stat={stat}
     onExportAll={exportAll}

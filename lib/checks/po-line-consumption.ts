@@ -1,72 +1,64 @@
-import { tokenSetRatio } from "@/lib/suppliers/normalize"
 import type { CheckResult } from "@/lib/checks/types"
+import { computeLineMatches, quantitySentence, unitPriceSentence, type LineMatch, type LineMatchInput } from "@/lib/matching/line-match"
 
-/** #206 (map #177's ticket 15): per-line-consumption of a PO against every invoice matched to it.
- * Per-line pairing (invoice line N ↔ PO line N) is explicitly out of scope — a second matching
- * engine. Instead, each invoice line is assigned to its best-matching PO line by description
- * similarity (no item code/SKU exists in this schema), quantities from every matched invoice are
- * summed per PO line, and the group is flagged only once cumulative consumption exceeds the
- * ordered quantity by more than the workspace's tolerance. A description with no PO-line match
- * above MATCH_THRESHOLD is not judged — an unmatched item is a matching problem, not a
- * consumption one, and inventing a comparison would teach the reviewer to distrust the check. */
+/** #206 (map #177's ticket 15), reshaped by #228 / #250: per-line consumption of a PO against
+ * every invoice matched to it, plus a unit-price comparison per line. Per-line pairing is still
+ * not a second matching engine — each invoice line is assigned to its best-matching PO line by
+ * description similarity (or by hand, `lineAssignments`), quantities from every matched invoice
+ * are summed per PO line, and a line is flagged only once cumulative consumption exceeds the
+ * ordered quantity by more than the workspace's tolerance, or its unit price sits outside the
+ * match-variance percent. A description with no PO-line match above the threshold is not judged
+ * — an unmatched item is a matching problem, not a consumption one, and inventing a comparison
+ * would teach the reviewer to distrust the check.
+ *
+ * The result always carries the full `LineMatch[]` in `detail.lines` (#228 Q4's structured
+ * breakdown), and it is emitted as a `pass` when a PO is compared and nothing fails — the View
+ * PO row needs the `=` cells as much as the `≠` ones. A document with no compared PO gets no
+ * result at all. */
 
-const MATCH_THRESHOLD = 0.6
-
-export type PoLineConsumptionInput = {
-  poLineItems: Array<{ description: string | null; quantity: number | null }>
-  /** Every line item from every invoice matched to this PO, including the invoice under review —
-   * tagged with the source document so the message can name where the overage came from. */
-  invoiceLineItems: Array<{ documentId: string; rowIndex: number; description: string | null; quantity: number | null }>
-  /** Acceptable overage over the ordered quantity, as a percentage (5 = 5% over is still fine). */
-  tolerancePercent: number
-  /** The document under review — only its own line items are addressed in `fields`, so a
-   * mismatch surfaced while reviewing one invoice never points the reviewer at another
-   * document's cells. */
-  currentDocumentId: string
+export type PoLineConsumptionInput = LineMatchInput & {
+  poDocumentId: string
+  poNumber: string | null
 }
 
-function bestPoLineIndex(description: string | null, poDescriptions: Array<string | null>): number | null {
-  let bestIndex: number | null = null
-  let bestScore = MATCH_THRESHOLD
-  poDescriptions.forEach((candidate, index) => {
-    const score = tokenSetRatio(description, candidate)
-    if (score > bestScore) { bestScore = score; bestIndex = index }
-  })
-  return bestIndex
+export type PoLineConsumptionDetail = {
+  poDocumentId: string
+  poNumber: string | null
+  quantityTolerancePercent: number
+  priceTolerancePercent: number
+  lines: LineMatch[]
 }
 
 export function checkPoLineConsumption(input: PoLineConsumptionInput): CheckResult | null {
-  const poDescriptions = input.poLineItems.map((item) => item.description)
-  const consumedByLine = new Map<number, number>()
-  const contributingRowsByLine = new Map<number, number[]>()
+  if (!input.poLineItems.length) return null
+  const lines = computeLineMatches(input)
+  const issues: string[] = []
+  const fields: string[] = []
 
-  for (const item of input.invoiceLineItems) {
-    if (item.quantity === null) continue
-    const lineIndex = bestPoLineIndex(item.description, poDescriptions)
-    if (lineIndex === null) continue
-    consumedByLine.set(lineIndex, (consumedByLine.get(lineIndex) ?? 0) + item.quantity)
-    if (item.documentId === input.currentDocumentId) {
-      const rows = contributingRowsByLine.get(lineIndex) ?? []
-      rows.push(item.rowIndex)
-      contributingRowsByLine.set(lineIndex, rows)
+  for (const line of lines) {
+    const name = line.description.po ?? (line.poLineIndex !== null ? `PO line ${line.poLineIndex + 1}` : `line ${line.rowIndex + 1}`)
+    if (line.quantity.status === "mismatch") {
+      issues.push(`"${name}": ${quantitySentence(line)}`)
+      fields.push(`line_items[${line.rowIndex}].quantity`)
+    }
+    if (line.unitPrice.status === "mismatch") {
+      issues.push(`"${name}": ${unitPriceSentence(line)}`)
+      fields.push(`line_items[${line.rowIndex}].unit_price`)
     }
   }
 
-  const issues: string[] = []
-  const fields = new Set<string>()
-
-  input.poLineItems.forEach((poLine, index) => {
-    if (poLine.quantity === null) return
-    const consumed = consumedByLine.get(index)
-    if (consumed === undefined) return
-    const allowance = poLine.quantity * (1 + input.tolerancePercent / 100)
-    if (consumed <= allowance) return
-    const rows = contributingRowsByLine.get(index)
-    if (!rows?.length) return // this invoice's own lines didn't push it over — not this document's problem to flag
-    issues.push(`"${poLine.description ?? `PO line ${index + 1}`}": ordered ${poLine.quantity}, invoiced ${consumed} across matched invoices (tolerance ${input.tolerancePercent}%)`)
-    for (const row of rows) fields.add(`line_items[${row}].quantity`)
-  })
-
-  if (!issues.length) return null
-  return { checkCode: "po_line_consumption", status: "fail", message: issues.join("; "), fields: [...fields] }
+  const detail: PoLineConsumptionDetail = {
+    poDocumentId: input.poDocumentId, poNumber: input.poNumber,
+    quantityTolerancePercent: input.quantityTolerancePercent, priceTolerancePercent: input.priceTolerancePercent,
+    lines,
+  }
+  const compared = lines.filter((line) => line.status !== "not_matched").length
+  if (!issues.length) {
+    return {
+      checkCode: "po_line_consumption", status: "pass",
+      message: compared ? `${compared} of ${lines.length} line${lines.length === 1 ? "" : "s"} matched to ${input.poNumber ?? "the PO"} within tolerance.` : `No line on this invoice could be matched to a line on ${input.poNumber ?? "the PO"}.`,
+      fields: [], detail: detail as unknown as Record<string, unknown>,
+    }
+  }
+  return { checkCode: "po_line_consumption", status: "fail", message: issues.join(" "), fields, detail: detail as unknown as Record<string, unknown> }
 }

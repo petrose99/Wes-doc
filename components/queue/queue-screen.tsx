@@ -8,6 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { DetailPane, DETAIL_PANE_ID } from "@/components/queue/detail-pane"
 import { FacetFilters, type Facet } from "@/components/queue/facet-filters"
 import { OverrideModeProvider, useOverrideMode } from "@/components/queue/override-mode-context"
+import { confirmLeave } from "@/lib/client/unsaved-changes"
 
 export type QueueColumn<T> = {
   key: string
@@ -112,11 +113,14 @@ function QueueScreenInner<T>({
     window.history.replaceState(window.history.state, "", `${id ? `${basePath}/${id}` : basePath}${qs}`)
   }, [basePath])
 
-  const open = useCallback((id: string) => { setOpenId(id); syncUrl(id) }, [syncUrl])
+  // Opening another row or closing the pane unmounts whatever is in it; unsaved work there
+  // (Match manually's pending line matches, #250) gets one chance to say so.
+  const open = useCallback((id: string) => { if (!confirmLeave()) return; setOpenId(id); syncUrl(id) }, [syncUrl])
   // Closing returns focus to the row that was open — recorded as state and applied in an effect
   // once the pane has unmounted, so `close` itself stays free of DOM refs.
   const [focusReturn, setFocusReturn] = useState<string | null>(null)
   const close = useCallback(() => {
+    if (!confirmLeave()) return
     setFocusReturn(openId)
     setOpenId(null)
     syncUrl(null)
@@ -234,7 +238,7 @@ function QueueScreenInner<T>({
     </div>}
 
     <div className="flex min-h-0 flex-1 md:overflow-hidden">
-      <div className={`min-w-0 flex-1 md:overflow-auto ${openId ? "lg:border-r lg:border-slate-200" : ""}`}>
+      <div className={`min-w-0 flex-1 md:overflow-auto ${openId ? "lg:shadow-[inset_-1px_0_0_0_rgb(226_232_240)]" : ""}`}>
         {sortedRows.length === 0
           ? <div className="mx-auto max-w-md px-6 py-16 text-center">
             <p className="text-sm font-medium text-slate-800">{filtered ? empty.filteredTitle ?? "Nothing matches these filters." : empty.title}</p>

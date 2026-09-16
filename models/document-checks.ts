@@ -6,6 +6,8 @@ import { recordSystemAudit } from "@/lib/audit"
 import { checkInvoiceArithmetic } from "@/lib/checks/arithmetic"
 import { checkLineItemArithmetic } from "@/lib/checks/line-item-arithmetic"
 import { checkPoLineConsumption, type PoLineConsumptionInput } from "@/lib/checks/po-line-consumption"
+import { parseLineAssignments } from "@/lib/matching/line-match"
+import { isComparedLink, poLinkKind, rankPoLinks, REJECTED_MATCH_STATUS } from "@/lib/matching/po-link"
 import { deriveStatementLayout, evaluateStatementDrift, type StatementLayout } from "@/lib/checks/statement-layout-drift"
 import { checkAmountAnomaly } from "@/lib/checks/amount-anomaly"
 import { checkBankDetails } from "@/lib/checks/bank-details"
@@ -260,27 +262,56 @@ async function checkStatementDriftAgainstInstitution(workspaceId: string, instit
  * check only makes sense once matching has run. */
 async function checkPoLineConsumptionAgainstMatchedPo(workspaceId: string, documentId: string, lineItemsKey: string, currentValues: Record<string, unknown>): Promise<CheckResult | null> {
   try {
-    const match = await prisma.documentMatch.findFirst({ where: { workspaceId, matchType: "po_to_invoice", targetId: documentId }, select: { sourceId: true } })
+    // #228 Q11: only a *compared* link counts — confirmed by hand, or the matcher's guess when
+    // the invoice cites the same PO number. A suggestion compares nothing; a rejected link is gone.
+    const candidates = await prisma.documentMatch.findMany({
+      where: { workspaceId, matchType: "po_to_invoice", targetId: documentId, status: { not: REJECTED_MATCH_STATUS } },
+      select: { id: true, sourceId: true, status: true, confidence: true, lineAssignments: true, source: { select: { reviewedData: true, rawExtraction: true } } },
+    })
+    const invoicePoNumber = asString(currentValues.po_number) ?? asString(currentValues.purchase_order_number)
+    const ranked = rankPoLinks(candidates.map((row) => {
+      const poValues = (row.source.reviewedData ?? row.source.rawExtraction ?? {}) as Record<string, unknown>
+      const poNumber = asString(poValues.po_number)
+      return { row, poValues, poNumber, confidence: row.confidence, kind: poLinkKind({ status: row.status, invoicePoNumber, poNumber }) }
+    })).filter((link) => isComparedLink(link.kind))
+    const match = ranked[0]
     if (!match) return null
-    const po = await prisma.document.findFirst({ where: { id: match.sourceId, workspaceId }, select: { reviewedData: true, rawExtraction: true } })
-    const poValues = (po?.reviewedData ?? po?.rawExtraction ?? {}) as Record<string, unknown>
-    const poLineItems = parseLineItemsForConsumption(poValues[lineItemsKey])
+    const poLineItems = parseLineItemsForConsumption(match.poValues[lineItemsKey])
     if (!poLineItems.length) return null
 
-    const siblingMatches = await prisma.documentMatch.findMany({ where: { workspaceId, matchType: "po_to_invoice", sourceId: match.sourceId, targetId: { not: documentId } }, select: { targetId: true } })
-    const siblings = siblingMatches.length ? await prisma.document.findMany({ where: { workspaceId, id: { in: siblingMatches.map((s) => s.targetId) } }, select: { id: true, reviewedData: true } }) : []
+    // Only siblings that are themselves *compared* against this PO consume its lines — a merely
+    // suggested link on another invoice must not push this one over the allowance.
+    const siblingMatches = await prisma.documentMatch.findMany({ where: { workspaceId, matchType: "po_to_invoice", sourceId: match.row.sourceId, targetId: { not: documentId }, status: { not: REJECTED_MATCH_STATUS } }, select: { targetId: true, status: true } })
+    const siblingStatus = new Map(siblingMatches.map((s) => [s.targetId, s.status]))
+    const siblings = siblingMatches.length ? await prisma.document.findMany({ where: { workspaceId, id: { in: siblingMatches.map((s) => s.targetId) } }, select: { id: true, filename: true, reviewedData: true } }) : []
 
     const invoiceLineItems: PoLineConsumptionInput["invoiceLineItems"] = parseLineItemsForConsumption(currentValues[lineItemsKey]).map((item, rowIndex) => ({ documentId, rowIndex, ...item }))
+    const siblingLabels: Record<string, string> = {}
     for (const sibling of siblings) {
       const values = (sibling.reviewedData ?? {}) as Record<string, unknown>
+      const siblingKind = poLinkKind({ status: siblingStatus.get(sibling.id) ?? "pending", invoicePoNumber: asString(values.po_number) ?? asString(values.purchase_order_number), poNumber: match.poNumber })
+      if (!isComparedLink(siblingKind)) continue
+      siblingLabels[sibling.id] = asString(values.invoice_number) ?? sibling.filename
       invoiceLineItems.push(...parseLineItemsForConsumption(values[lineItemsKey]).map((item, rowIndex) => ({ documentId: sibling.id, rowIndex, ...item })))
     }
 
-    const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId }, select: { poQuantityTolerancePercent: true } })
+    const [workspace, config] = await Promise.all([
+      prisma.workspace.findUnique({ where: { id: workspaceId }, select: { poQuantityTolerancePercent: true } }),
+      prisma.workspaceAutomationConfig.findUnique({ where: { workspaceId }, select: { matchTolerance: true } }),
+    ])
+    // #228 Q12: the unit-price allowance is the workspace match-variance percent (stored as a
+    // fraction, 0.02 = 2 %).
+    const tolerance = config?.matchTolerance && typeof config.matchTolerance === "object" && !Array.isArray(config.matchTolerance) ? (config.matchTolerance as { percent?: number }) : null
+    const priceTolerancePercent = Math.round(((typeof tolerance?.percent === "number" ? tolerance.percent : 0.02) * 100) * 100) / 100
     return checkPoLineConsumption({
+      poDocumentId: match.row.sourceId,
+      poNumber: match.poNumber,
       poLineItems,
       invoiceLineItems,
-      tolerancePercent: workspace?.poQuantityTolerancePercent ?? 5,
+      quantityTolerancePercent: workspace?.poQuantityTolerancePercent ?? 5,
+      priceTolerancePercent,
+      lineAssignments: parseLineAssignments(match.row.lineAssignments),
+      siblingLabels,
       currentDocumentId: documentId,
     })
   } catch (error) {
@@ -289,11 +320,11 @@ async function checkPoLineConsumptionAgainstMatchedPo(workspaceId: string, docum
   }
 }
 
-function parseLineItemsForConsumption(value: unknown): Array<{ description: string | null; quantity: number | null }> {
+function parseLineItemsForConsumption(value: unknown): Array<{ description: string | null; quantity: number | null; unitPrice: number | null }> {
   if (!Array.isArray(value)) return []
   return value.map((item) => {
     const row = item as Record<string, unknown> | null
-    return { description: asString(row?.description), quantity: asNumber(row?.quantity) }
+    return { description: asString(row?.description), quantity: asNumber(row?.quantity), unitPrice: asNumber(row?.unit_price) }
   })
 }
 

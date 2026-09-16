@@ -13,7 +13,7 @@ import type { AgingBucket } from "@/lib/bills/due-date"
 
 export const dynamic = "force-dynamic"
 
-export type InvoiceSearchParams = { blocked?: string; unpaid?: string; status?: string; approval?: string; touchless?: string; aging?: string; view?: string; sort?: string }
+export type InvoiceSearchParams = { blocked?: string; unpaid?: string; status?: string; approval?: string; touchless?: string; aging?: string; po?: string; view?: string; sort?: string }
 
 /** #225: Invoices on the Queue screen. Filters stay plain URL params (shareable, refreshable,
  * saveable as a view); the aging chip group filters here after the fetch since `agingBucket` is
@@ -24,7 +24,7 @@ export async function InvoicesQueuePage({ params, searchParams, selectedDocument
   selectedDocumentId?: string | null
 }) {
   const { workspaceId } = await params
-  const { blocked, unpaid, status, approval, touchless, aging, view: selectedViewId } = await searchParams
+  const { blocked, unpaid, status, approval, touchless, aging, po, view: selectedViewId } = await searchParams
   const user = await getCurrentUser()
   const membership = await requireWorkspaceRole(workspaceId, user.id)
   const isOwner = membership.role === "owner"
@@ -36,9 +36,10 @@ export async function InvoicesQueuePage({ params, searchParams, selectedDocument
   const approvalFilter: BillRow["approvalStatus"] | undefined =
     approval === "not_started" || approval === "in_progress" || approval === "approved" || approval === "rejected" || approval === "cancelled" ? approval : undefined
   const agingFilter = new Set((aging ?? "").split(",").filter((value): value is AgingBucket | "none" => ["current", "1-30", "31-60", "61-90", "90+", "none"].includes(value)))
+  const poFilter = po === "matched" || po === "none" || po === "mismatch" ? po : undefined
   const basePath = `/workspaces/${workspaceId}/invoices`
   const [{ bills: allBills }, minConfidencePercent, savedViews, touchlessTrend] = await Promise.all([
-    listWorkspaceBills({ workspaceId, onlyBlocked, onlyUnpaid, statusFilter, approvalFilter, onlyTouchless }),
+    listWorkspaceBills({ workspaceId, onlyBlocked, onlyUnpaid, statusFilter, approvalFilter, onlyTouchless, poFilter }),
     getMinConfidencePercent(workspaceId),
     listSavedViews({ workspaceId, viewKey: "invoices", userId: user.id }),
     getTouchlessRateTrend(workspaceId),
@@ -48,6 +49,7 @@ export async function InvoicesQueuePage({ params, searchParams, selectedDocument
     ...(onlyBlocked ? { blocked: "1" } : {}), ...(onlyUnpaid ? { unpaid: "1" } : {}),
     ...(onlyTouchless ? { touchless: "1" } : {}), ...(statusFilter ? { status: statusFilter } : {}),
     ...(approvalFilter ? { approval: approvalFilter } : {}), ...(agingFilter.size ? { aging: [...agingFilter].join(",") } : {}),
+    ...(poFilter ? { po: poFilter } : {}),
   }
   // Only bills with a total AND an unblocked status are candidates for a payment run. #220: a
   // cancelled invoice is excluded too. "synced" (pushed but unconfirmed) stays eligible.

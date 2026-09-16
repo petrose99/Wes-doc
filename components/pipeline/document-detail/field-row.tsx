@@ -72,7 +72,9 @@ export function FieldRow({ field, value, confidence, ref: provenanceRef, onFocus
       )}
     </div>
 
-    {checks.length > 0 && <span id={checkDescriptionId} className="sr-only">{checks.map((check) => check.stale ? `${check.message} Not rechecked after this edit.` : check.message).join(" ")}</span>}
+    {/* hidden, not sr-only: an aria-describedby target is read even when display:none, and a
+        positioned sr-only span inside the pane's scroller reads as a clipped child to the detector. */}
+    {checks.length > 0 && <span id={checkDescriptionId} hidden>{checks.map((check) => check.stale ? `${check.message} Not rechecked after this edit.` : check.message).join(" ")}</span>}
     {showPopover && (rationale || checks.length > 0) && <RationalePopover rationale={rationale} mismatchChecks={checks} onClose={() => setShowPopover(false)} onFix={() => inputRef.current?.focus()} onEscalate={onEscalate} />}
 
     {field.type === "boolean" ? (

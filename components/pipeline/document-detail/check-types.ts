@@ -34,6 +34,8 @@ export function checkLabel(checkCode: string): string {
     vat_number_format: "VAT format",
     vendor_onboarding: "Supplier review",
     statement_layout_drift: "Statement layout",
+    po_line_consumption: "PO line match",
+    three_way_match_discrepancy: "PO match",
   }
   return labels[checkCode] ?? "Check"
 }

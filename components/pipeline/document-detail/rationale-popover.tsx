@@ -13,7 +13,10 @@ export const SOURCE_BADGE: Record<FieldSource, { label: string; className: strin
   extraction: { label: "Extracted", className: "bg-slate-50 text-slate-600 border-slate-200", icon: Info },
 }
 
-export function CheckGlyph({ checks, onOpen }: { checks: FieldCheck[]; onOpen: () => void }) {
+export function CheckGlyph({ checks: allChecks, onOpen }: { checks: FieldCheck[]; onOpen: () => void }) {
+  // A passing check (#250's po_line_consumption emits one so the View PO row has its `=` cells)
+  // is not a glyph on the plain table — the fail-only glyph stays fail-only.
+  const checks = allChecks.filter((check) => check.status !== "pass" || check.escalated)
   if (!checks.length) return null
   const allEscalated = checks.every((check) => check.escalated)
   const hasFail = checks.some((check) => check.status === "fail")

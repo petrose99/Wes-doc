@@ -10,6 +10,7 @@ import { QueueScreen, type QueueColumn, type SortOption } from "@/components/que
 import { PaneMenuItem } from "@/components/queue/detail-pane"
 import { DocumentBulkActions, DocumentPaneActions } from "@/components/queue/document-actions"
 import { formatDate, formatMoney, StatePills, TitleCell } from "@/components/queue/row-cells"
+import { PoChip, useOriginHere } from "@/components/documents/po-compare"
 import { ReasonDialog } from "@/components/list-screen/reason-dialog-button"
 import type { Facet } from "@/components/queue/facet-filters"
 import { ConfidenceField, ProcessingStateGlyph } from "@/components/typed-destinations/row-signals"
@@ -49,10 +50,21 @@ export const INVOICE_FACETS: Facet[] = [
       { value: "61-90", label: "61–90 days" }, { value: "90+", label: "90+ days" }, { value: "none", label: "No due date" },
     ],
   },
+  // #228 Q6: the Purchase Orders facet. Matched = a compared PO with nothing red; No PO = nothing
+  // compared (none, a suggestion only, or a rejected link); Mismatch = a compared PO with `≠`s.
+  { param: "po", label: "PO", options: [{ value: "matched", label: "Matched" }, { value: "none", label: "No PO" }, { value: "mismatch", label: "Mismatch" }] },
   { param: "blocked", label: "Needs attention", kind: "toggle", options: [{ value: "1", label: "Needs attention only" }] },
   { param: "unpaid", label: "Unpaid", kind: "toggle", options: [{ value: "1", label: "Unpaid only" }] },
   { param: "touchless", label: "Touchless", kind: "toggle", options: [{ value: "1", label: "Touchless only" }] },
 ]
+
+function poSubtitle(bill: BillRow): string | null {
+  const po = bill.po
+  if (po.removed) return "PO removed"
+  if (!po.kind) return null
+  if (po.kind === "suggested") return po.suggestionCount > 1 ? `${po.suggestionCount} likely POs` : `Likely ${po.poNumber ?? "PO"}`
+  return `${po.poNumber ?? "PO"}${po.mismatchCount ? ` · ${po.mismatchCount} mismatch${po.mismatchCount === 1 ? "" : "es"}` : ""}`
+}
 
 const SORTS: SortOption<BillRow>[] = [
   { key: "newest", label: "Newest first", compare: () => 0 },
@@ -73,6 +85,7 @@ export function InvoiceQueue({ workspaceId, basePath, bills, payableDocumentIds,
   initialSelectedId?: string | null
 }) {
   const router = useRouter()
+  const origin = useOriginHere()
   const [needsAttention, setNeedsAttention] = useState<Set<string>>(new Set())
   const [cancelling, setCancelling] = useState<BillRow | null>(null)
   const minConfidence = minConfidenceFromPercent(minConfidencePercent)
@@ -104,6 +117,14 @@ export function InvoiceQueue({ workspaceId, basePath, bills, payableDocumentIds,
       </>,
     },
     { key: "aging", label: "Aging", className: "whitespace-nowrap", render: (bill) => <DueDateCountdownBadge dueDate={bill.dueDate} /> },
+    {
+      // #228 Q5/Q6/Q11: the matched PO as a chip carrying the number of `≠` glyphs the pane will
+      // show; dashed for a suggestion that compares nothing; "PO removed" after a rejection.
+      key: "po", label: "Purchase Orders", narrow: true, className: "whitespace-nowrap",
+      render: (bill) => <PoChip poNumber={bill.po.poNumber} kind={bill.po.kind} mismatchCount={bill.po.mismatchCount} confidence={bill.po.confidence ?? undefined}
+        suggestionCount={bill.po.suggestionCount} removed={bill.po.removed} origin={origin}
+        href={bill.po.kind && bill.po.kind !== "suggested" && bill.po.poDocumentId ? `/workspaces/${workspaceId}/purchase-orders/${bill.po.poDocumentId}` : undefined} />,
+    },
     {
       key: "state", label: "State",
       render: (bill) => <StatePills minConfidencePercent={minConfidencePercent}
@@ -137,7 +158,9 @@ export function InvoiceQueue({ workspaceId, basePath, bills, payableDocumentIds,
       rows={bills}
       rowId={(bill) => bill.documentId}
       rowTitle={(bill) => bill.supplier ?? "Unknown supplier"}
-      rowSubtitle={(bill) => [bill.invoiceNumber, bill.total !== null ? formatMoney(bill.total, bill.currencyCode) : null].filter(Boolean).join(" · ") || bill.filename}
+      // #228 Q6: the PO folds into the card's second line below `md` (and the row's name), so a
+      // phone reviewer hears the red count without the column.
+      rowSubtitle={(bill) => [bill.invoiceNumber, bill.total !== null ? formatMoney(bill.total, bill.currencyCode) : null, poSubtitle(bill)].filter(Boolean).join(" · ") || bill.filename}
       // #223: the leading edge is the five-state processing glyph, not the aging bucket (aging lives
       // in the countdown badge's own text since #208).
       leading={(bill) => <ProcessingStateGlyph
