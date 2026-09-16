@@ -46,16 +46,22 @@ you, with one rule: **take the recommended answer.**
 - Execution tickets: commit your work on the current branch with a
   conventional commit message referencing the ticket. Never push.
 
-## The bar is high, and the first build must already be near it
+## The bar: no rework, not perfection
 
-The owner's bar for closing a rendered-surface ticket (stricter than
-`CLAUDE.md`'s floor):
+The owner's bar for closing a rendered-surface ticket is the **no-rework
+floor** — the level below which someone has to come back and fix it later:
 
-- `critique` **≥ 34/40**, no heuristic under 3.
-- `evaluate` **≥ 90/100**, no heuristic above 1, anti-pattern verdict Clean.
-- Every real in-page detector finding cleared at 1440 and 390 (list and
-  pane-open); only the documented app-wide residue may remain, named.
+- `evaluate`: **zero P0/P1**, health ≥ 80, anti-pattern verdict Clean.
+- `critique`: **≥ 30/40 with no heuristic under 3**.
+- In-page detector cleared to the named app-wide residue at 1440 and 390.
 - `include`: keyboard flow verified live at both widths.
+
+Points above that are not bought with extra passes. **One fix batch, then
+ship**: first measurement → one batch fixing every P1 and every heuristic
+under 3 → confirming measurement → close if at the floor. If the confirm is
+still under the floor with no P1s, close and record the gap. If a P1 remains,
+leave the ticket `Autopilot: partial —` as a hand-off (the driver retries on
+the stronger model); that is the only case that earns a third pass.
 
 **The skills are there so the first pass is right.** Before the first line of
 code on an execution ticket, the pre-build pass is mandatory and is done
@@ -78,20 +84,20 @@ properly, not skimmed:
    the pre-flight (step 3) cites it.
 3. **Pre-flight — `preflight.md` next to this brief, filled completely,
    before code.** It has seven parts and each exists because a real first
-   pass lost points there: **A** excellence targets (pick ≥ 6 heuristics to
-   build to the critic's 4 and write what 4 looks like on this surface — ten
-   3s is 30 and the bar is 34); **B** six contracts that are grep-checkable
+   pass lost points there: **A** *optional* — excellence targets are
+   for a ticket the owner has marked to go beyond the floor, not the default; **B** six contracts that are grep-checkable
    (action reachability + reversal, view freshness after every mutation, one
    term per concept, shell-primitive reuse, focus/keys/failure path per
    interactive surface, time-axis edges); **C** coverage by component type;
-   **D** an independent spec critic — a fresh-context `Agent` **run with
-   `model: "opus"`** scores the spec with both rubrics as if it were built,
-   and every heuristic it puts below your prediction is a spec change; **E** an explicit `evaluate`
+   **D** an independent spec critic — a fresh-context `Agent` scores the spec
+   with both rubrics as if it were built; its job is the *structure* (P1s,
+   contracts, primitives), not the 4s. Run it with `model: "opus"` when the
+   ticket touches money, approval, schema or auth; otherwise the default; **E** an explicit `evaluate`
    prediction — it scores the *worst* issue per heuristic, so name the worst
    thing the spec still permits and its severity, walk each core task with
    the four questions (try · notice · associate · see progress), sweep the
-   anti-patterns. **Gates after D: predicted critique ≥ 36; evaluate
-   heuristic sum ≤ 5 with zero P0/P1 and a Clean verdict.** Under the gate you change the spec, never the code later.
+   anti-patterns. **Gate after D: predicted zero P0/P1, no heuristic
+   under 3, Clean.** Under the gate you change the spec, never the code later.
    The filled tables are then the build checklist, row by row.
 4. Build the whole surface from the tables, all states included, with the
    detector hook fixing findings as they appear. **Before the first
@@ -129,9 +135,8 @@ holds it). Every session loads the whole map; a long one taxes all of them.
 KPI.** The report shows reconciled prediction vs first pass vs close, per
 heuristic, for both scorecards (`preflight.md` Part G). Every heuristic where
 measured < predicted is a lesson in the precise form Part G gives (which check was marked covered, by
-what, and what the critic found instead). A first pass under 30/40 or 80/100
-with a prediction above the gate means the matrix was filled dishonestly;
-say where. Then work the remaining findings in
+what, and what the critic found instead). A P1 found that the pre-flight
+predicted away means a Part B row was filled optimistically; say which. Then work the remaining findings in
 batches (build fully, inspect once at both widths, fix everything shown,
 confirm once) until the bar above is met, and record the after-counts.
 
