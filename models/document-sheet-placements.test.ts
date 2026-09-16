@@ -37,9 +37,9 @@ describe("createPlacements", () => {
 describe("listPlacedDocumentIds", () => {
   it("returns distinct document ids", async () => {
     mockFindMany.mockResolvedValue([{ documentId: "d1" }, { documentId: "d2" }])
-    const result = await listPlacedDocumentIds("f1")
+    const result = await listPlacedDocumentIds("ws1", "f1")
     expect(result).toEqual(["d1", "d2"])
-    expect(mockFindMany).toHaveBeenCalledWith(expect.objectContaining({ where: { fileId: "f1" }, distinct: ["documentId"] }))
+    expect(mockFindMany).toHaveBeenCalledWith(expect.objectContaining({ where: { workspaceId: "ws1", fileId: "f1" }, distinct: ["documentId"] }))
   })
 })
 

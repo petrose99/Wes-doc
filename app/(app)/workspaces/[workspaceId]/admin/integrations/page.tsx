@@ -45,7 +45,7 @@ export default async function IntegrationsPage({ params, searchParams }: { param
 
   const activeConnection = connections.find((c) => c.status === "active")
   const [mappings, entities, facets] = activeConnection
-    ? await Promise.all([listCategoryAccountMappings(activeConnection.id), listAccountingEntities(workspaceId, "account"), listLibraryFacets(workspaceId)])
+    ? await Promise.all([listCategoryAccountMappings(workspaceId, activeConnection.id), listAccountingEntities(workspaceId, "account"), listLibraryFacets(workspaceId)])
     : [[], [], null]
   const accountOptions = resolveAccountOptions(entities.map((e) => ({ code: e.externalId ?? e.code, name: e.name })))
   const categories = facets ? facets.categories.map((c) => c.value) : []

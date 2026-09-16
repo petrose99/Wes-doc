@@ -339,7 +339,7 @@ export async function runHealthChecks(workspaceId: string): Promise<void> {
     const toResolve = stillOpen.filter((row) => !seenFingerprints.has(row.fingerprint)).map((row) => row.id)
     if (toResolve.length) {
       await prisma.healthCheckResult.updateMany({
-        where: { id: { in: toResolve } },
+        where: { workspaceId, id: { in: toResolve } },
         data: { status: "resolved", resolvedAt: now, resolvedAction: "auto_cleared" },
       })
     }

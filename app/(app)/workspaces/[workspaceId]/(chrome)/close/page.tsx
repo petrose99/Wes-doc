@@ -112,7 +112,7 @@ export default async function ClosePage({ params, searchParams }: {
   }
 
   const items: ItemRow[] = await prisma.closeItem.findMany({
-    where: { closeId: selected.id },
+    where: { workspaceId, closeId: selected.id },
     select: {
       id: true, kind: true, title: true, state: true, reSignRequired: true,
       computedValue: true, computedAt: true, signedAt: true,

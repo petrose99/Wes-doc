@@ -18,6 +18,9 @@
  * and WorkspaceInvitation (membership is how workspace access is *decided*, so it must be readable
  * before a workspace is known); AdminAuditEvent (system-level); and the
  * child models reached only through a scoped parent (DocumentTemplateVersion, DocumentFileShare). */
+// #255: also NOT listed, deliberately: ProductEvent (workspaceId is nullable — analytics events
+// fire before a workspace exists, e.g. signup funnel steps — and its retention sweep in
+// lib/analytics.ts deliberately spans every workspace).
 export const WORKSPACE_SCOPED_MODELS = new Set([
   "Document",
   "DocumentFile",
@@ -84,6 +87,42 @@ export const WORKSPACE_SCOPED_MODELS = new Set([
   "WorkspaceBudget",
   // #252: Admin › Configuration › Fields overlay.
   "WorkspaceFieldConfig",
+  // #255: scope-guard sweep — the remaining workspaceId-carrying models, guarded rather than
+  // documented-out. IntegrationProvisionJob's global claim (models/bigcapital.ts's
+  // claimNextProvisionJob) already wraps in unscoped(), the same WebhookDelivery/IntegrationPush
+  // precedent above.
+  "FieldSuggestion",
+  "DocumentSheetPlacement",
+  "AuditEvent",
+  "Gate",
+  "WarnCheck",
+  "BigcapitalAccount",
+  "BigcapitalMemberAccount",
+  "IntegrationProvisionJob",
+  "HealthCheckResult",
+  "HealthScore",
+  "HealthScoreConfig",
+  "CodingCorrection",
+  "CategoryAccountMapping",
+  "CategoryNature",
+  "UserListPreference",
+  "SavedView",
+  "PaymentRun",
+  "PaymentRunItem",
+  "Supplier",
+  "SupplierAlias",
+  "InboundEmailIntake",
+  "BankMatchMemory",
+  // GoldenDocument/ReviewerActivity carry workspaceId but have no call sites anywhere in the app
+  // yet (schema + migration only, from #golden-tasks) — guarded pre-emptively so the first real
+  // caller is correct by construction instead of finding this file later.
+  "GoldenDocument",
+  "ReviewerActivity",
+  "SupplierMergeEvent",
+  "SupplierMatchLabel",
+  "Close",
+  "CloseItem",
+  "Institution",
 ])
 
 /** Operations that read or mutate an existing row set through a `where`, and so must be scoped.

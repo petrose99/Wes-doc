@@ -38,10 +38,10 @@ export async function createPlacements(
   return data.map((d) => d.id)
 }
 
-export async function listPlacedDocumentIds(fileId: string): Promise<string[]> {
+export async function listPlacedDocumentIds(workspaceId: string, fileId: string): Promise<string[]> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- types available after db:generate
   const rows: { documentId: string }[] = await (prisma as any).documentSheetPlacement.findMany({
-    where: { fileId },
+    where: { workspaceId, fileId },
     select: { documentId: true },
     distinct: ["documentId"],
   })

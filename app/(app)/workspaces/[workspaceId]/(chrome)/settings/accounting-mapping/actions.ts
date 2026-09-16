@@ -42,7 +42,7 @@ export async function deleteMappingAction(
   const g = await guard(workspaceId)
   if ("error" in g) return { success: false, error: g.error }
 
-  await deleteCategoryAccountMapping(connectionId, mappingId)
+  await deleteCategoryAccountMapping(workspaceId, connectionId, mappingId)
   revalidatePath(`/workspaces/${workspaceId}/settings/accounting-mapping`)
   return { success: true }
 }

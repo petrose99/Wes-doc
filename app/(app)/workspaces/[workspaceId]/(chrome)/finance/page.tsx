@@ -34,7 +34,7 @@ export default async function FinancePage({ params, searchParams }: { params: Pr
   // a default expense account chosen. No point loading the ready list otherwise — nothing could push.
   const pushable = connection?.status === "active" && !!connection.defaultExpenseAccountId
   const [readyToPush, inferredMap, explicitMappings] = pushable
-    ? await Promise.all([listReadyToPushDocuments(workspaceId, connection.id), getCategoryAccountMap(workspaceId, connection.id), listCategoryAccountMappings(connection.id)])
+    ? await Promise.all([listReadyToPushDocuments(workspaceId, connection.id), getCategoryAccountMap(workspaceId, connection.id), listCategoryAccountMappings(workspaceId, connection.id)])
     : [[], {}, []]
   const categoryAccountMap = { ...inferredMap }
   for (const m of explicitMappings) { categoryAccountMap[m.category] = m.accountExternalId }

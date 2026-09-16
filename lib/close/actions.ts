@@ -339,7 +339,7 @@ export async function reopenClose(
     },
   })
   await client.closeItem.updateMany({
-    where: { closeId: close.id },
+    where: { workspaceId: close.workspaceId, closeId: close.id },
     data: { reSignRequired: true },
   })
 

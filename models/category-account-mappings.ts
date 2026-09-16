@@ -7,9 +7,9 @@ export type CategoryAccountMappingRow = {
   accountExternalId: string
 }
 
-export async function listCategoryAccountMappings(connectionId: string): Promise<CategoryAccountMappingRow[]> {
+export async function listCategoryAccountMappings(workspaceId: string, connectionId: string): Promise<CategoryAccountMappingRow[]> {
   return prisma.categoryAccountMapping.findMany({
-    where: { connectionId },
+    where: { workspaceId, connectionId },
     select: { id: true, category: true, kind: true, accountExternalId: true },
     orderBy: { category: "asc" },
   })
@@ -30,8 +30,8 @@ export async function upsertCategoryAccountMapping(
   })
 }
 
-export async function deleteCategoryAccountMapping(connectionId: string, mappingId: string): Promise<void> {
-  await prisma.categoryAccountMapping.deleteMany({ where: { id: mappingId, connectionId } })
+export async function deleteCategoryAccountMapping(workspaceId: string, connectionId: string, mappingId: string): Promise<void> {
+  await prisma.categoryAccountMapping.deleteMany({ where: { workspaceId, id: mappingId, connectionId } })
 }
 
 export function resolveCategoryAccount(

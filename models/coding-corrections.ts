@@ -24,7 +24,7 @@ export async function recordCodingCorrection(input: {
       select: { id: true },
     })
     const excess = rows.slice(MAX_CORRECTIONS_PER_KEY)
-    if (excess.length) await prisma.codingCorrection.deleteMany({ where: { id: { in: excess.map((row) => row.id) } } })
+    if (excess.length) await prisma.codingCorrection.deleteMany({ where: { workspaceId: input.workspaceId, id: { in: excess.map((row) => row.id) } } })
   } catch (error) {
     console.error("[coding-corrections] failed to record correction:", error instanceof Error ? error.message : error)
   }
