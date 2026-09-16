@@ -29,3 +29,13 @@ export function activeFilterCount(params: URLSearchParams, facets: FilterableFac
   const sortActive = sortKey !== null && sortKey !== "" && sortKey !== sort.defaultKey
   return facetCount + (sortActive ? 1 : 0)
 }
+
+/** #261: the one "Clear filters" — every facet param and the sort param go, everything else
+ * (`view`, a deep-link `from=`) stays. Shared by the header chips' Clear, the Filter sheet's
+ * Clear and the filtered-empty state's default action, so the three can never disagree (B4). */
+export function clearFilterParams(params: URLSearchParams, facets: FilterableFacet[], sortParam: string): URLSearchParams {
+  const next = new URLSearchParams(params.toString())
+  next.delete(sortParam)
+  for (const facet of facets) next.delete(facet.param)
+  return next
+}

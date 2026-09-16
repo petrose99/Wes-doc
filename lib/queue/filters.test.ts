@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { activeFilterCount, facetOptionValues, facetSelectedValues } from "@/lib/queue/filters"
+import { activeFilterCount, clearFilterParams, facetOptionValues, facetSelectedValues } from "@/lib/queue/filters"
 
 const STATUS = { param: "status", options: [{ value: "not_eligible" }] }
 const APPROVER = { param: "approver", options: [{ value: "anyone" }] }
