@@ -213,6 +213,8 @@
  * flash-of-hidden-content for no-JS or pre-hydration paints. */
 @keyframes db-in { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: none; } }
 @keyframes db-pop { from { opacity: 0; transform: scale(.94); } to { opacity: 1; transform: none; } }
+/* #257: the phone lane's full-screen Detail sheet slides in from the right (200ms); motion-safe only. */
+@keyframes db-sheet-in { from { transform: translateX(100%); } to { transform: none; } }
 @keyframes db-sweep { 0% { transform: translateY(-40%); opacity: 0; } 10% { opacity: 1; } 70% { transform: translateY(300%); opacity: 1; } 100% { transform: translateY(300%); opacity: 0; } }
 @keyframes db-pulse { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
 /* Fills a bar from its left edge. Like db-in and db-pop, it ends at the element's resting

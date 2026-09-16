@@ -5,6 +5,7 @@ import { ArrowLeft, ChevronDown, ChevronUp, MoreHorizontal, X } from "lucide-rea
 import Link from "next/link"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { DocumentMenuDeleteItem, DocumentMenuTopItems, OpenInNewTabMenuItem, PaneDocumentContext, PaneDocumentProvider } from "@/components/queue/document-actions-menu"
+import { usePhoneLane } from "@/lib/client/use-phone-lane"
 
 export const DETAIL_PANE_ID = "queue-detail-pane"
 
@@ -27,8 +28,10 @@ const iconButton = "inline-flex h-9 w-9 shrink-0 items-center justify-center rou
  * Document actions (Archive · Flag · Delete…) are not props: the embedded `SplitPane` registers
  * the loaded document through `PaneDocumentContext` and the frame's ⋯ renders them from that, so
  * there is exactly one implementation of each action for every queue. */
-export function PaneFrame({ mode, name, status, position, onClose, onPrev, onNext, fullHref, backHref, menu, actions, onMutated, archivedToast, headingRef, contentKey, children }: {
+export function PaneFrame({ mode, name, status, position, onClose, onPrev, onNext, fullHref, backHref, backLabel = "Back to queue", menu, actions, onMutated, archivedToast, headingRef, contentKey, children }: {
   mode: "pane" | "full"
+  /** The Back control's accessible name — "Back to Ready to Approve" on the phone lane (#257). */
+  backLabel?: string
   name: PaneName
   /** Line 2 of the header — the row's state pills and ledger mark. Comes from the row, not the
    * loaded content, so it never skeletons. Omit for surfaces with no status (Payment Batches). */
@@ -59,22 +62,46 @@ export function PaneFrame({ mode, name, status, position, onClose, onPrev, onNex
   const titleId = `${DETAIL_PANE_ID}-title`
   const [menuOpen, setMenuOpen] = useState(false)
   useEffect(() => { setMenuOpen(false) }, [contentKey])
+  // #257 spec 3.5 / B5: below `lg` the pane is a full-screen sheet over the list — a real modal
+  // dialog to assistive tech, with everything behind it (the list, the tab bar, the rail) made
+  // `inert` so Tab and a screen reader's virtual cursor cannot wander under it. Portals mounted
+  // later (Reject/Approve sheets, toasts) are siblings added after this ran, so they stay live.
+  const phone = usePhoneLane()
+  const modal = isPane && phone
+  const sectionRef = useRef<HTMLElement>(null)
+  useEffect(() => {
+    if (!modal || !sectionRef.current) return
+    const made: Element[] = []
+    let node: Element | null = sectionRef.current
+    while (node && node !== document.body) {
+      const parent: Element | null = node.parentElement
+      if (!parent) break
+      for (const sibling of Array.from(parent.children)) {
+        if (sibling === node || sibling.hasAttribute("inert")) continue
+        sibling.setAttribute("inert", "")
+        made.push(sibling)
+      }
+      node = parent
+    }
+    return () => { for (const el of made) el.removeAttribute("inert") }
+  }, [modal])
 
   return <PaneDocumentProvider onMutated={onMutated} archivedToast={archivedToast}>
-    <section id={DETAIL_PANE_ID} aria-labelledby={titleId}
+    <section id={DETAIL_PANE_ID} aria-labelledby={titleId} ref={sectionRef}
+      role={modal ? "dialog" : undefined} aria-modal={modal ? "true" : undefined}
       className={isPane
-        ? "fixed inset-0 z-50 flex min-h-0 flex-col bg-white lg:static lg:z-auto lg:h-auto lg:min-h-0 lg:w-[60%] lg:shrink-0 lg:overflow-hidden"
+        ? "fixed inset-0 z-50 flex min-h-0 flex-col bg-white max-lg:motion-safe:animate-[db-sheet-in_200ms_ease-out] lg:static lg:z-auto lg:h-auto lg:min-h-0 lg:w-[60%] lg:shrink-0 lg:overflow-hidden"
         : "flex h-screen min-h-0 flex-col bg-white"}>
       <header className="border-b border-slate-200 px-3 py-1.5 pt-[calc(0.375rem+env(safe-area-inset-top,0px))] lg:pt-1.5">
         <div className="flex h-9 items-center gap-1">
           {isPane
-            ? <button type="button" onClick={onClose} aria-label="Back to queue" className={`${iconButton} lg:hidden`}><ArrowLeft className="h-5 w-5" aria-hidden /></button>
+            ? <button type="button" onClick={onClose} aria-label={backLabel} title={backLabel} className={`${iconButton} lg:hidden`}><ArrowLeft className="h-5 w-5" aria-hidden /></button>
             : <Link href={backHref ?? "#"} aria-label="Back to queue" title="Back to queue" className={iconButton}><ArrowLeft className="h-5 w-5" aria-hidden /></Link>}
           <h2 id={titleId} ref={headingRef} tabIndex={-1} className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-900 outline-none" title={[name.title, name.suffix].filter(Boolean).join("  ")}>
             {name.title}
             {name.suffix && <span className="font-normal text-slate-500">{"  "}{name.suffix}</span>}
           </h2>
-          {isPane && position && <span className="hidden shrink-0 px-1 text-xs tabular-nums text-slate-500 sm:inline" aria-live="polite">{position.index} of {position.total}</span>}
+          {isPane && position && <span className="shrink-0 px-1 text-xs tabular-nums text-slate-500" aria-live="polite">{position.index} of {position.total}</span>}
           {isPane && <div className="flex shrink-0 items-center" role="group" aria-label="Move selection">
             <button type="button" onClick={onPrev ?? undefined} disabled={!onPrev} aria-label="Previous row" title="Previous row (↑)" className={iconButton}><ChevronUp className="h-4 w-4" aria-hidden /></button>
             <button type="button" onClick={onNext ?? undefined} disabled={!onNext} aria-label="Next row" title="Next row (↓)" className={iconButton}><ChevronDown className="h-4 w-4" aria-hidden /></button>
@@ -91,7 +118,7 @@ export function PaneFrame({ mode, name, status, position, onClose, onPrev, onNex
           flex-wrapped row of desktop-sized buttons — reusing this same slot rather than a second
           footer (B4). `[&>*]:h-12 [&>*]:flex-1` below lg sizes whatever buttons the surface hands
           in without every caller re-styling its own. */}
-      {actions && <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 px-3 py-2 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] shadow-[0_-6px_16px_-12px_rgba(15,23,42,0.35)] max-lg:grid max-lg:grid-cols-2 max-lg:gap-3 max-lg:pt-3 max-lg:[&>*]:h-12 max-lg:[&>*]:w-full max-lg:[&>*]:justify-center lg:pb-2">
+      {actions && <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 px-3 py-2 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] shadow-[0_-6px_16px_-12px_rgba(15,23,42,0.35)] max-lg:grid max-lg:grid-cols-2 max-lg:gap-3 max-lg:pt-3 max-lg:[&>button]:h-12 max-lg:[&>button]:w-full max-lg:[&>button]:justify-center max-lg:[&>:not(button)]:col-span-2 lg:pb-2">
         {actions}
       </footer>}
     </section>
@@ -150,12 +177,13 @@ function PaneMenu({ open, onOpenChange, fullHref, menu, onDeleted }: {
 /** The Queue screen's Detail pane (#225; CONTEXT.md "Detail pane"): `PaneFrame` in pane mode
  * around the load / missing / error lifecycle of whatever `loadDetail` returns (the embedded
  * split pane, via `getQueueDetailAction`). */
-export function DetailPane({ documentId, name, status, position, onClose, onPrev, onNext, loadDetail, actions, menu, fullHref, onMutated, archivedToast, reloadKey }: {
+export function DetailPane({ documentId, name, status, position, onClose, backLabel, onPrev, onNext, loadDetail, actions, menu, fullHref, onMutated, archivedToast, reloadKey }: {
   documentId: string
   name: PaneName
   status?: ReactNode
   position: { index: number; total: number }
   onClose: () => void
+  backLabel?: string
   onPrev: (() => void) | null
   onNext: (() => void) | null
   loadDetail: (documentId: string) => Promise<ReactNode | null>
@@ -193,7 +221,7 @@ export function DetailPane({ documentId, name, status, position, onClose, onPrev
   // root. Close returns focus to the row (handled by the queue).
   useEffect(() => { headingRef.current?.focus({ preventScroll: true }) }, [documentId])
 
-  return <PaneFrame mode="pane" name={name} status={status} position={position} onClose={onClose} onPrev={onPrev} onNext={onNext}
+  return <PaneFrame mode="pane" name={name} status={status} position={position} onClose={onClose} backLabel={backLabel} onPrev={onPrev} onNext={onNext}
     fullHref={fullHref} menu={menu} actions={actions} onMutated={onMutated} archivedToast={archivedToast} headingRef={headingRef} contentKey={documentId}>
     {state === "loading" && <div className="absolute inset-0 z-10 flex flex-col bg-white" aria-busy="true" aria-label="Loading document">
       {/* The stepper band and the source strip, as bars, so the chrome doesn't jump when the content lands. */}

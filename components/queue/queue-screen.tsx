@@ -7,8 +7,10 @@ import { toast } from "sonner"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { DetailPane, DETAIL_PANE_ID, type PaneName } from "@/components/queue/detail-pane"
 import { FacetFilters, type Facet } from "@/components/queue/facet-filters"
+import { FilterButton, FilterSheet } from "@/components/queue/filter-sheet"
 import { OverrideModeProvider, useOverrideMode } from "@/components/queue/override-mode-context"
 import { confirmLeave } from "@/lib/client/unsaved-changes"
+import { isPhoneLane } from "@/lib/client/use-phone-lane"
 import { orderColumnsByFieldTable, widthClassFor, type FieldTable } from "@/lib/configuration/field-table"
 
 export type QueueColumn<T> = {
@@ -27,7 +29,16 @@ export type QueueColumn<T> = {
 export type SortOption<T> = { key: string; label: string; compare: (a: T, b: T) => number }
 
 export type BulkContext = { selectedIds: string[]; clear: () => void }
-export type PaneHelpers = { close: () => void; refresh: () => void }
+/** `next` (#257 spec 3.5 "After a decision"): opens the row after the open one, wrapping to the
+ * first; null when no other row is left — the result strip's *Next to approve* reads it. */
+export type PaneHelpers = { close: () => void; refresh: () => void; next: (() => void) | null }
+
+/** Tailwind needs the literal class strings in source — a `${below}:hidden` template would never
+ * be generated — so the two breakpoints the card mode supports each carry their own set. */
+const BELOW = {
+  md: { hideBelow: "hidden md:contents", hideBelowInline: "hidden md:inline-flex", hideAbove: "md:hidden", showBelowOnly: "md:hidden", table: "hidden md:table", titleAbove: "hidden md:inline" },
+  lg: { hideBelow: "hidden lg:contents", hideBelowInline: "hidden lg:inline-flex", hideAbove: "lg:hidden", showBelowOnly: "lg:hidden", table: "hidden lg:table", titleAbove: "hidden lg:inline" },
+} as const
 
 /** The Queue screen (#225; CONTEXT.md "Queue screen"): the shared composition every typed
  * destination renders on. Two header layers — row 1 is title · Views · Sort · summary filter
@@ -83,7 +94,9 @@ export type QueueScreenProps<T> = {
   onExportAll?: () => Promise<void>
   /** The bulk action bar's contents — the surface's own buttons and dialogs. */
   bulkActions?: (context: BulkContext) => ReactNode
-  empty: { title: string; body: string; filteredTitle?: string; filteredBody?: string }
+  /** `action` renders under the body of the *unfiltered* empty state — Approvals' "N waiting on
+   * other approvers" link (#257 spec 3.6). `filteredAction` under the filtered one (Clear filters). */
+  empty: { title: string; body: string; filteredTitle?: string; filteredBody?: string; action?: ReactNode; filteredAction?: ReactNode }
   loadDetail: (documentId: string) => Promise<ReactNode | null>
   paneActions?: (row: T, helpers: PaneHelpers) => ReactNode
   paneMenu?: (row: T, helpers: PaneHelpers) => ReactNode
@@ -97,8 +110,20 @@ export type QueueScreenProps<T> = {
    * (B4). The table still renders at and above the breakpoint. */
   cards?: {
     below: "md" | "lg"
+    /** The h1 below the breakpoint ("Ready to Approve"); desktop keeps `title`. */
+    title?: string
     render: (row: T, state: { isOpen: boolean; open: () => void }) => ReactNode
   }
+  /** #257 spec 3.4: the queue's own facet predicate, applied to `rows` before the sort — so the
+   * Filter sheet's "Show n rows" counts from the same array the list renders and the empty
+   * state can say how many rows the filters hid. Pages that pass it hand over *all* rows. */
+  filterRows?: (rows: T[], params: URLSearchParams) => T[]
+  /** #257 spec 3.5: a row the surface just decided, kept in the list while its pane is open so
+   * the result strip shows there instead of #249's close-with-toast. Dropped on close. */
+  pinned?: T | null
+  /** #257 spec 3.6: a deep link to a row this view no longer holds (already decided) — the line
+   * to show above the list, since the model cannot load a decided row into the pane. */
+  initialMissingNotice?: string
   /** #257 S2: content-only rendering for a queue deep-linked to below its card breakpoint before
    * its own cards ship (#261) — no bulk bar, no row actions, no pane decision bar; the table stays,
    * with a line above it naming it read-only on a phone. */
@@ -110,6 +135,7 @@ const INTERACTIVE = "a, button, input, select, textarea, label, [role=button], [
 function QueueScreenInner<T>({
   title, basePath, rows, rowId, detailIdFor, rowName, paneStatus, fullHref, archivedToast, leading, columns: rawColumns, fieldTable = null, selectable = false, sortOptions = [], facets = [],
   views, stat, band, menu, onExportAll, bulkActions, empty, loadDetail, paneActions, paneMenu, initialSelectedId = null, sortParam = "sort", cards, phoneReadOnly = false,
+  filterRows, pinned = null, initialMissingNotice,
 }: QueueScreenProps<T>) {
   const router = useRouter()
   const pathname = usePathname()
@@ -119,21 +145,32 @@ function QueueScreenInner<T>({
   const [openId, setOpenId] = useState<string | null>(initialSelectedId)
   const [reloadKey, setReloadKey] = useState(0)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [filterOpen, setFilterOpen] = useState(false)
   const [exporting, setExporting] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
   const triggerRefs = useRef<Map<string, HTMLButtonElement>>(new Map())
+  const below = cards ? BELOW[cards.below] : null
+
+  // A deep link to a row the view no longer holds (decided since the link was made): say so once,
+  // above the list, rather than opening a pane on nothing. Read at mount only.
+  const [missingNotice] = useState<string | null>(() =>
+    initialSelectedId && initialMissingNotice && !rows.some((row) => rowId(row) === initialSelectedId) ? initialMissingNotice : null)
 
   const sortKey = searchParams.get(sortParam)
   const activeSort = sortOptions.find((option) => option.key === sortKey) ?? sortOptions[0] ?? null
+  const visibleRows = useMemo(() => (filterRows ? filterRows(rows, searchParams) : rows), [rows, filterRows, searchParams])
   const sortedRows = useMemo(() => {
-    if (!activeSort) return rows
-    return [...rows].sort(activeSort.compare)
-  }, [rows, activeSort])
+    const base = activeSort ? [...visibleRows].sort(activeSort.compare) : visibleRows
+    // The decided row stays in the list, at its place or the end, while its pane is open.
+    if (pinned && openId === rowId(pinned) && !base.some((row) => rowId(row) === openId)) return [...base, pinned]
+    return base
+  }, [visibleRows, activeSort, pinned, openId, rowId])
 
   const ids = useMemo(() => sortedRows.map(rowId), [sortedRows, rowId])
   const openIndex = openId ? ids.indexOf(openId) : -1
   const openRow = openIndex >= 0 ? sortedRows[openIndex] : null
   const filtered = facets.some((facet) => searchParams.get(facet.param))
+  const hiddenByFilters = rows.length - visibleRows.length
 
   // Reflect the open row in the URL so a refresh, a share, or Back lands on the same state — the
   // `${basePath}/${id}` route renders this same queue with `initialSelectedId` set. replaceState
@@ -141,7 +178,6 @@ function QueueScreenInner<T>({
   // #257: below `lg` the Detail pane is a full-screen sheet, so opening one is a navigation, not
   // a refinement — it gets its own history entry (Back/the phone gesture must close it). At `lg`+
   // the pane sits beside the table, so arrowing through rows still replaces in place.
-  const isPhoneLane = useCallback(() => typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches, [])
   const syncUrl = useCallback((id: string | null, push: boolean) => {
     if (typeof window === "undefined") return
     const qs = window.location.search
@@ -157,7 +193,7 @@ function QueueScreenInner<T>({
     const push = isPhoneLane() && openId === null
     setOpenId(id)
     syncUrl(id, push)
-  }, [syncUrl, isPhoneLane, openId])
+  }, [syncUrl, openId])
   // Closing returns focus to the row that was open — recorded as state and applied in an effect
   // once the pane has unmounted, so `close` itself stays free of DOM refs.
   const [focusReturn, setFocusReturn] = useState<string | null>(null)
@@ -174,7 +210,7 @@ function QueueScreenInner<T>({
     const onPopState = () => { if (openId !== null && isPhoneLane()) close(true) }
     window.addEventListener("popstate", onPopState)
     return () => window.removeEventListener("popstate", onPopState)
-  }, [openId, isPhoneLane, close])
+  }, [openId, close])
   useEffect(() => {
     if (openId === null && focusReturn) triggerRefs.current.get(focusReturn)?.focus()
   }, [openId, focusReturn])
@@ -236,7 +272,14 @@ function QueueScreenInner<T>({
   }), [rawColumns, fieldTable])
   const visibleColumns = openId ? columns.filter((column) => column.narrow) : columns
   const refresh = useCallback(() => { setReloadKey((k) => k + 1); router.refresh() }, [router])
-  const helpers = useMemo<PaneHelpers>(() => ({ close, refresh }), [close, refresh])
+  // The row after the open one, wrapping; the open (possibly pinned, already decided) row itself
+  // is never the answer.
+  const next = useMemo<(() => void) | null>(() => {
+    if (openIndex < 0) return null
+    const after = [...ids.slice(openIndex + 1), ...ids.slice(0, openIndex)].find((id) => id !== openId)
+    return after ? () => open(after) : null
+  }, [ids, openIndex, openId, open])
+  const helpers = useMemo<PaneHelpers>(() => ({ close, refresh, next }), [close, refresh, next])
 
   const setSort = (key: string) => {
     const next = new URLSearchParams(searchParams.toString())
@@ -256,22 +299,24 @@ function QueueScreenInner<T>({
   // pane grow past the viewport and push its action bar out of reach). Below `md` the queue
   // flows with the page and the pane is a fixed sheet, so no bound is needed.
   return <div ref={rootRef} className="flex min-h-0 flex-1 flex-col md:h-dvh md:flex-none md:overflow-hidden">
-    {band}
+    {/* Bill Pay's metric band sits above row 1; a card-mode queue's band (Approvals' segments) sits
+        under the title so the phone reads title → segments → Filter → list (#257 spec 3.3). */}
+    {!cards && band}
     {/* Row 1: title · Views · Sort · filters · stat · menu */}
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-slate-200 px-4 py-2">
       <h1 className="flex items-baseline gap-2 text-lg font-semibold tracking-tight text-slate-900">
-        {title}
-        <span className="text-sm font-normal tabular-nums text-slate-500" aria-label={`${rows.length} rows`}>{rows.length}</span>
+        {below && cards?.title ? <><span className={below.hideAbove}>{cards.title}</span><span className={below.titleAbove}>{title}</span></> : title}
+        <span className="text-sm font-normal tabular-nums text-slate-500" aria-live="polite" aria-label={`${sortedRows.length} rows`}>{sortedRows.length}</span>
       </h1>
-      <span className={cards ? `${cards.below}:contents hidden` : "contents"}>{views}</span>
-      {sortOptions.length > 1 && <label className={`${cards ? `hidden ${cards.below}:inline-flex` : "inline-flex"} h-8 items-center gap-1 rounded-md border border-slate-300 bg-white pl-2 pr-1 text-xs font-medium text-slate-700 focus-within:ring-2 focus-within:ring-emerald-600 focus-within:ring-offset-1">
+      <span className={below ? below.hideBelow : "contents"}>{views}</span>
+      {sortOptions.length > 1 && <label className={`${below ? below.hideBelowInline : "inline-flex"} h-8 items-center gap-1 rounded-md border border-slate-300 bg-white pl-2 pr-1 text-xs font-medium text-slate-700 focus-within:ring-2 focus-within:ring-emerald-600 focus-within:ring-offset-1`}>
         <ArrowUpDown className="h-3.5 w-3.5 text-slate-500" aria-hidden />
         <span className="sr-only">Sort by</span>
         <select value={activeSort?.key} onChange={(event) => setSort(event.target.value)} className="h-full cursor-pointer appearance-none bg-transparent pr-1 text-xs font-medium text-slate-700 focus:outline-none">
           {sortOptions.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}
         </select>
       </label>}
-      {facets.length > 0 && <span className={cards ? `hidden ${cards.below}:contents` : "contents"}><FacetFilters facets={facets} /></span>}
+      {facets.length > 0 && <span className={below ? below.hideBelow : "contents"}><FacetFilters facets={facets} /></span>}
       <div className="ml-auto flex items-center gap-2">
         {stat}
         <Popover open={menuOpen} onOpenChange={setMenuOpen}>
@@ -300,6 +345,15 @@ function QueueScreenInner<T>({
       </div>
     </div>
 
+    {cards && band}
+    {/* #257 spec 3.4: below the card breakpoint the sort select and facet chips give way to one
+        Filter button and its sheet — the same params, one place to change them. */}
+    {below && (facets.length > 0 || sortOptions.length > 1) && <div className={`${below.showBelowOnly} flex items-center gap-2 border-b border-slate-200 px-4 py-2`}>
+      <FilterButton facets={facets} sortParam={sortParam} defaultSortKey={sortOptions[0]?.key ?? null} onClick={() => setFilterOpen(true)} />
+      <FilterSheet open={filterOpen} onClose={() => setFilterOpen(false)} facets={facets} sortOptions={sortOptions} sortParam={sortParam} rows={rows} filterRows={filterRows} />
+    </div>}
+    {missingNotice && <p role="status" className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-[13px] text-slate-700">{missingNotice}</p>}
+
     {/* Override Mode banner — only while the mode is on (#203's permanent strip is gone). */}
     {overrideMode.active && <div role="status" className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200 bg-amber-50 px-4 py-1.5 text-xs font-medium text-amber-900">
       <span className="inline-flex items-center gap-1.5"><ShieldCheck className="h-3.5 w-3.5" aria-hidden />Override Mode is on. Open a row&apos;s Checks tab to override a soft check with a reason.</span>
@@ -315,14 +369,17 @@ function QueueScreenInner<T>({
 
     <div className="flex min-h-0 flex-1 md:overflow-hidden">
       <div className={`min-w-0 flex-1 md:overflow-auto ${openId ? "lg:shadow-[inset_-1px_0_0_0_rgb(226_232_240)]" : ""}`}>
-        {phoneReadOnly && <p className={`px-4 py-2 text-[13px] text-slate-600 ${cards ? `${cards.below}:hidden` : "lg:hidden"}`}>Full view on desktop — this list is read-only on a phone.</p>}
+        {phoneReadOnly && <p className={`px-4 py-2 text-[13px] text-slate-600 ${below ? below.hideAbove : "lg:hidden"}`}>Full view on desktop — this list is read-only on a phone.</p>}
         {sortedRows.length === 0
           ? <div className="mx-auto max-w-md px-6 py-16 text-center">
             <p className="text-sm font-medium text-slate-800">{filtered ? empty.filteredTitle ?? "Nothing matches these filters." : empty.title}</p>
-            <p className="mt-1 text-sm text-slate-600">{filtered ? empty.filteredBody ?? "Clear a filter to widen the queue." : empty.body}</p>
+            <p className="mt-1 text-sm text-slate-600">{filtered
+              ? empty.filteredBody ?? (hiddenByFilters > 0 ? `${hiddenByFilters} ${hiddenByFilters === 1 ? "row is" : "rows are"} hidden by the filters.` : "Clear a filter to widen the queue.")
+              : empty.body}</p>
+            {(filtered ? empty.filteredAction : empty.action) && <div className="mt-3 text-sm">{filtered ? empty.filteredAction : empty.action}</div>}
           </div>
           : <>
-          {cards && <ul aria-label={title} aria-busy={false} className={`${cards.below}:hidden`}>
+          {below && cards && <ul aria-label={cards.title ?? title} className={below.hideAbove}>
             {sortedRows.map((row) => {
               const id = rowId(row)
               const isOpen = id === openId
@@ -331,7 +388,7 @@ function QueueScreenInner<T>({
               </li>
             })}
           </ul>}
-          <table className={`w-full text-sm ${cards ? `hidden ${cards.below}:table` : ""} ${openId ? "" : "min-w-[720px]"}`}>
+          <table className={`w-full text-sm ${below ? below.table : ""} ${openId ? "" : "min-w-[720px]"}`}>
             <thead className="sticky top-0 z-10 bg-white shadow-[inset_0_-1px_0_0_theme(colors.slate.200)]">
               <tr className="text-left text-xs font-medium uppercase tracking-wide text-slate-600">
                 {selectable && <th scope="col" className="w-10 px-3 py-2">
@@ -383,6 +440,7 @@ function QueueScreenInner<T>({
         onMutated={(kind) => { if (kind === "removed") { close(); router.refresh() } else refresh() }}
         position={{ index: openIndex + 1, total: sortedRows.length }}
         onClose={close}
+        backLabel={`Back to ${cards?.title ?? title}`}
         onPrev={openIndex > 0 ? () => step(-1) : null}
         onNext={openIndex < sortedRows.length - 1 ? () => step(1) : null}
         loadDetail={loadDetail}
