@@ -2,14 +2,14 @@
 
 import { AutomationRuleForm } from "@/components/workspace/automation-rule-form"
 import { CreateReviewTaskButton } from "@/components/documents/create-review-task-button"
-import { DeleteDocumentButton } from "@/components/documents/delete-document-button"
 import { FieldRow } from "@/components/pipeline/document-detail/field-row"
 import { LineItemsSection, type LineItemsPoProps } from "@/components/pipeline/document-detail/line-items-section"
 import { checkAppliesToField, type FieldCheck } from "@/components/pipeline/document-detail/check-types"
 import { parseLiveCheckValues, rebuildLiveChecks } from "@/components/pipeline/document-detail/live-checks"
 import { StageIndicator, type StageStep } from "@/components/pipeline/document-detail/stage-indicator"
 import { useFieldNav } from "@/components/pipeline/document-detail/use-field-nav"
-import { archiveDocumentsAction, flagDocumentsAction, moveDocumentsToStageAction, updateDocumentNoteAction } from "@/app/(app)/workspaces/[workspaceId]/pipeline-actions"
+import { updateDocumentNoteAction } from "@/app/(app)/workspaces/[workspaceId]/pipeline-actions"
+import { useRegisterDocumentActions } from "@/components/queue/document-actions-menu"
 import { escalateCheckAction, setDocumentTypeAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
 import { InstitutionAssert } from "@/components/pipeline/document-detail/institution-assert"
 import { StatementDriftBanner } from "@/components/pipeline/document-detail/statement-drift-banner"
@@ -17,7 +17,6 @@ import { ApprovalStepChain, AuditLog, ChecksTab, type DocumentHistory } from "@/
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { SourceViewer, type ProvenanceTarget, type SourceDocument } from "@/components/viewer/source-preview"
 import type { DocumentFieldDefinition } from "@/lib/document-templates"
-import type { PipelineStage } from "@/lib/documents/stages"
 import type { Ref } from "@/lib/provenance"
 import type { FieldRationale } from "@/lib/rationale"
 import { Archive, ArrowDown, ArrowLeft, ArrowUp, Building2, CheckCircle2, ChevronLeft, ChevronRight, Flag, Loader2, Maximize2, Minimize2, PanelLeftClose, PanelLeftOpen } from "lucide-react"
@@ -28,6 +27,7 @@ import { toast } from "sonner"
 
 type Tab = "details" | "note" | "activity" | "approval" | "checks"
 type PanelLayout = "split" | "source-only" | "details-only"
+const LAYOUT_KEY = "pane-layout"
 
 /** Shared label map for the four document-type states. Extracted so the chip in the top bar, the
  * inline "Type:" line, and the future stage indicator all read the same names — a mismatch here
@@ -44,7 +44,7 @@ export function SplitPane({
   workspaceId, source, fields, data, fieldConfidence, provenanceFields, provenanceItems, initialTarget, conflictingLabels, missingRequiredFields,
   saveReview, documentType: initialDocumentType, note: initialNote, auditEvents, prevHref, nextHref, position, stage, afterActionHref, backHref,
   header, canPush, pushCard, canCreateRule, defaultSupplier, matchKind, bankMatches, documentMatches, paymentStatus, rationales, checks, fxBadge, stageIndicator,
-  institutions, institutionId, institutionName, embedded = false, history, po = null, initialTab,
+  institutions, institutionId, institutionName, history, po = null, initialTab,
 }: {
   workspaceId: string
   source: SourceDocument
@@ -90,13 +90,9 @@ export function SplitPane({
   institutions?: Array<{ id: string; name: string }>
   institutionId?: string | null
   institutionName?: string | null
-  /** #225: rendered inside a Queue screen's Detail pane rather than as a standalone route. The
-   * pane owns the frame (title, close, ↑/↓, the sticky Approve/Reject bar), so embedded mode
-   * drops the Back link, prev/next, the standalone Approve button and the `h-screen` root, and
-   * stacks source over fields below `lg` where the pane is a full-screen sheet. */
-  embedded?: boolean
   /** #225: the Approval / Audit / Checks tabs' data, loaded with the document so they sit in the
-   * same tab strip as Details and Note. Only supplied in embedded mode. */
+   * same tab strip as Details and Note. Supplied by the queue's loader; the standalone route
+   * shows the Activity tab instead. */
   history?: DocumentHistory | null
   /** #228 / #250: the invoice's Purchase Order link for the line-items section's View PO row and
    * Match manually. Null for every non-invoice document. */
@@ -110,11 +106,36 @@ export function SplitPane({
   const [target, setTarget] = useState<ProvenanceTarget | null>(initialTarget)
   const [note, setNote] = useState(initialNote)
   const [savingNote, setSavingNote] = useState(false)
-  const [flagged, setFlagged] = useState(header.flagged)
   const [docType, setDocType] = useState<"expense" | "sale" | "bank_statement" | "other" | null>(initialDocumentType)
   const [savingDocType, setSavingDocType] = useState(false)
-  const [busyAction, setBusyAction] = useState<"flag" | "archive" | "ready" | null>(null)
+  // The layout choice persists for the session so moving ↑/↓ through a queue keeps the panels
+  // where the operator put them; read after mount so server and first client render agree.
   const [layout, setLayout] = useState<PanelLayout>("split")
+  useEffect(() => {
+    const saved = window.sessionStorage.getItem(LAYOUT_KEY)
+    if (saved === "split" || saved === "source-only" || saved === "details-only") setLayout(saved)
+  }, [])
+  const selectLayout = (value: PanelLayout) => { setLayout(value); window.sessionStorage.setItem(LAYOUT_KEY, value) }
+  const onLayoutKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    const order: PanelLayout[] = ["split", "details-only", "source-only"]
+    const index = order.indexOf(layout)
+    const next = event.key === "ArrowRight" || event.key === "ArrowDown" ? order[(index + 1) % order.length]
+      : event.key === "ArrowLeft" || event.key === "ArrowUp" ? order[(index + order.length - 1) % order.length]
+      : null
+    if (!next) return
+    event.preventDefault()
+    selectLayout(next)
+    ;(event.currentTarget.querySelector(`[role="radio"][aria-checked="true"]`) as HTMLElement | null)?.focus()
+    window.requestAnimationFrame(() => (event.currentTarget?.querySelector(`[role="radio"][aria-checked="true"]`) as HTMLElement | null)?.focus())
+  }
+  const fileHref = `/api/documents/${source.documentId}/source`
+
+  // Hand the frame around us the document, so its ⋯ carries Archive · Flag · Delete… (#259). The
+  // standalone route wraps this component in its own frame, so the same registration serves both.
+  useRegisterDocumentActions({
+    workspaceId, documentId: header.documentId, fileId: header.fileId, filename: header.filename,
+    flagged: header.flagged, archived: header.archived, cancelled: header.cancelled, cancelledReason: header.cancelledReason, reviewLink: header.reviewLink,
+  })
 
   const selectDocType = async (type: "expense" | "sale" | "bank_statement" | "other") => {
     setSavingDocType(true)
@@ -150,65 +171,6 @@ export function SplitPane({
     }
   }
 
-  const toggleFlag = async () => {
-    setBusyAction("flag")
-    const next = !flagged
-    try {
-      const result = await flagDocumentsAction(workspaceId, [header.documentId], next)
-      if (!result.success) { toast.error(result.error || "Could not update the flag"); return }
-      setFlagged(next)
-    } catch {
-      toast.error("Could not reach the server")
-    } finally {
-      setBusyAction(null)
-    }
-  }
-
-  const archive = async () => {
-    setBusyAction("archive")
-    try {
-      const result = await archiveDocumentsAction(workspaceId, [header.documentId], true)
-      if (!result.success) { toast.error(result.error || "Could not archive this document"); return }
-      toast.success("Archived")
-      if (!embedded) router.push(afterActionHref)
-      router.refresh()
-    } catch {
-      toast.error("Could not reach the server")
-    } finally {
-      setBusyAction(null)
-    }
-  }
-
-  const moveToReady = async () => {
-    setBusyAction("ready")
-    try {
-      const result = await moveDocumentsToStageAction(workspaceId, [header.documentId], "approved")
-      if (!result.success) { toast.error(result.error || "Could not approve this document"); return }
-      // Validation can hold the document back (missing required fields / no document type) — say
-      // so instead of announcing an approval the Review tab immediately contradicts.
-      if ((result.data?.heldBack ?? 0) > 0) {
-        toast.warning("Not approved yet — fill in the missing required fields (and pick a document type) first.")
-        router.refresh()
-        return
-      }
-      toast.success("Approved")
-      router.push(afterActionHref)
-      router.refresh()
-    } catch {
-      toast.error("Could not reach the server")
-    } finally {
-      setBusyAction(null)
-    }
-  }
-
-  const cycleLayout = () => {
-    setLayout((prev) => {
-      if (prev === "split") return "details-only"
-      if (prev === "details-only") return "source-only"
-      return "split"
-    })
-  }
-
   const tabButton = (value: Tab, label: string, count?: number) => <button type="button" key={value} role="tab" aria-selected={tab === value}
     className={`flex items-center gap-1.5 whitespace-nowrap rounded-t-md border-b-2 px-3 py-2.5 text-sm font-medium transition-colors ${tab === value ? "border-emerald-700 text-emerald-800" : "border-transparent text-slate-600 hover:text-slate-900"}`}
     onClick={() => setTab(value)}>
@@ -216,90 +178,17 @@ export function SplitPane({
     {!!count && <span className="rounded-full bg-amber-100 px-1.5 py-px text-xs font-semibold tabular-nums text-amber-800">{count}</span>}
   </button>
 
-  const toolbarBtn = "inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 shadow-sm hover:bg-slate-50 hover:text-slate-800 disabled:pointer-events-none disabled:opacity-40 transition-colors"
+  const layoutOption = (value: PanelLayout, label: string) => <button type="button" key={value} role="radio" aria-checked={layout === value} tabIndex={layout === value ? 0 : -1}
+    onClick={() => selectLayout(value)}
+    className={`h-7 rounded-[5px] px-2.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 ${layout === value ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"}`}>
+    {label}
+  </button>
 
-  const statusColor = header.status === "reviewed" ? "bg-emerald-100 text-emerald-800 border-emerald-200"
-    : header.status === "needs_review" || header.status === "ready_for_review" ? "bg-amber-100 text-amber-800 border-amber-200"
-    : "bg-slate-100 text-slate-700 border-slate-200"
-
-  const showSource = layout === "split" || layout === "source-only"
-  const showDetails = layout === "split" || layout === "details-only"
-  // #236: "extracted fields are read-only while a stage is pending" (decision #6) — derived from
-  // the same `history.pendingStages` the Approval tab already renders, so it applies wherever a
-  // workflow is mid-run (Invoices' own Detail pane included, not just Approvals'), with no new
-  // prop for a caller to remember to pass.
-  const fieldsReadOnly = embedded && !!history && history.pendingStages.length > 0
-
-  return <div className={`flex flex-col overflow-hidden ${embedded ? "h-full min-h-0 bg-white" : "h-screen bg-slate-50"}`}>
-    {/* Top bar */}
-    <div className={`flex items-center gap-2 border-b border-slate-200 px-4 py-2 ${embedded ? "overflow-x-auto sm:flex-wrap" : "flex-wrap"}`}>
-      {embedded && <span className="min-w-0 flex-1 sm:hidden" aria-hidden />}
-      {!embedded && <>
-        <Link href={backHref} className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-800">
-          <ArrowLeft className="h-4 w-4" />Back
-        </Link>
-        <div className="mx-2 h-5 w-px bg-slate-200" />
-      </>}
-
-      {embedded
-        ? <span className="hidden min-w-0 flex-1 truncate text-sm text-slate-600 sm:inline" title={header.filename}>{header.filename}</span>
-        : <h1 className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-800" title={header.filename}>{header.filename}</h1>}
-
-      <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${statusColor}`}>
-        {header.status.replaceAll("_", " ")}
-      </span>
-
-      {docType && <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium ${docType === "expense" ? "border-red-200 bg-red-50 text-red-700" : docType === "sale" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : docType === "bank_statement" ? "border-blue-200 bg-blue-50 text-blue-700" : "border-slate-200 bg-slate-50 text-slate-700"}`}>
-        {docType === "expense" ? <ArrowUp className="h-3 w-3" /> : docType === "sale" ? <ArrowDown className="h-3 w-3" /> : docType === "bank_statement" ? <Building2 className="h-3 w-3" /> : null}
-        {DOC_TYPE_LABELS[docType]}
-      </span>}
-
-      {/* #220: "synced" means the push succeeded but the ledger hasn't confirmed a payment status
-          yet — distinct from (and must not fall into) the "Unpaid" bucket below, which is a
-          confirmed negative answer, not an absence of one. */}
-      {paymentStatus && <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${paymentStatus === "paid" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : paymentStatus === "partial" ? "border-amber-200 bg-amber-50 text-amber-700" : paymentStatus === "synced" ? "border-slate-200 bg-slate-50 text-slate-700" : "border-red-200 bg-red-50 text-red-700"}`}>
-        {paymentStatus === "paid" ? "Paid" : paymentStatus === "partial" ? "Partially paid" : paymentStatus === "synced" ? "Synced" : "Unpaid"}
-      </span>}
-
-      <div className="mx-2 h-5 w-px bg-slate-200" />
-
-      <button type="button" title={flagged ? "Remove flag" : "Flag for attention"} aria-label={flagged ? "Remove flag" : "Flag for attention"} aria-pressed={flagged} disabled={busyAction === "flag"} onClick={() => void toggleFlag()}
-        className={`rounded-lg p-1.5 transition-colors ${flagged ? "bg-indigo-50 text-indigo-600" : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"}`}>
-        <Flag className={`h-4 w-4 ${flagged ? "fill-indigo-400" : ""}`} />
-      </button>
-
-      {/* Keyed off the document's own status, not the ?stage= the reader arrived from — a doc
-          opened from search (no stage param) still needs its Approve button. Hidden once the
-          document is reviewed: it's already approved, re-approving is a no-op. */}
-      {!embedded && header.status !== "reviewed" && header.status !== "queued" && header.status !== "failed" && stage !== "archive" && <button type="button" disabled={busyAction === "ready"} onClick={() => void moveToReady()} className={toolbarBtn}>
-        {busyAction === "ready" ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}Approve
-      </button>}
-      {stage !== "archive" && <button type="button" disabled={busyAction === "archive"} onClick={() => void archive()} className={toolbarBtn}>
-        {busyAction === "archive" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Archive className="h-4 w-4" />}Archive
-      </button>}
-
-      {header.reviewLink && <Link className="text-xs text-emerald-600 underline" href={header.reviewLink.href}>{header.reviewLink.label}</Link>}
-
-      <DeleteDocumentButton workspaceId={workspaceId} fileId={header.fileId} documentId={header.documentId} filename={header.filename} />
-
-      <div className="mx-2 h-5 w-px bg-slate-200" />
-
-      {/* Layout toggle */}
-      <button type="button" onClick={cycleLayout} title={layout === "split" ? "Expand details" : layout === "details-only" ? "Show source only" : "Split view"} aria-label={layout === "split" ? "Expand details" : layout === "details-only" ? "Show source only" : "Split view"} className="hidden rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 lg:inline-flex">
-        {layout === "split" ? <Maximize2 className="h-4 w-4" /> : layout === "details-only" ? <PanelLeftOpen className="h-4 w-4" /> : <Minimize2 className="h-4 w-4" />}
-      </button>
-
-      {!embedded && <>
-        {position && <span className="text-xs tabular-nums text-slate-500">{position.index}/{position.total}</span>}
-        <Link href={prevHref ?? "#"} aria-disabled={!prevHref} aria-label="Previous document" className={`rounded-lg p-1 ${prevHref ? "text-slate-500 hover:bg-slate-100 hover:text-slate-700" : "pointer-events-none text-slate-300"}`}><ChevronLeft className="h-4 w-4" /></Link>
-        <Link href={nextHref ?? "#"} aria-disabled={!nextHref} aria-label="Next document" className={`rounded-lg p-1 ${nextHref ? "text-slate-500 hover:bg-slate-100 hover:text-slate-700" : "pointer-events-none text-slate-300"}`}><ChevronRight className="h-4 w-4" /></Link>
-      </>}
-    </div>
-
-    {/* Five-step lifecycle: Extracted → Checks → Approval → Sync → Pay. See stage-indicator.tsx. */}
-    {stageIndicator && stageIndicator.length > 0 && <div className="border-b border-slate-200">
-      <StageIndicator steps={stageIndicator} />
-    </div>}
+  return <div className="flex h-full min-h-0 flex-col overflow-hidden bg-white">
+    {/* The one band under the pane header: Extracted → Checks → Approval → Sync → Pay. The frame
+        around this component owns the name, the Status line and the ⋯ (#259); the document
+        introduces itself once, up there, never again down here. */}
+    {stageIndicator && stageIndicator.length > 0 && <StageIndicator steps={stageIndicator} />}
 
     {/* #217: the drift banner (or its calm "first statement" reading) always renders first among
         this pane's banners/notices, above the generic missing-fields one below. */}
@@ -316,27 +205,35 @@ export function SplitPane({
       {conflictingLabels.length > 0 && <p>Pages disagreed on: <strong>{conflictingLabels.join(", ")}</strong> — please confirm against the source.</p>}
     </div>}
 
-    {/* Main content area. Embedded below `lg` (the pane is a full-screen sheet there) the source
-        stacks above the fields at a fixed height so both stay reachable without a second sheet. */}
-    <div className={`flex min-h-0 flex-1 overflow-hidden ${embedded ? "flex-col lg:flex-row" : ""}`}>
-      {/* Source panel */}
-      {showSource && <div className={`flex min-h-0 flex-col overflow-hidden border-slate-200 transition-[flex-basis] duration-200 ${embedded ? "h-[38vh] shrink-0 border-b lg:h-auto lg:shrink lg:border-b-0 lg:border-r" : "border-r bg-white"} ${layout === "source-only" ? "flex-1" : "lg:basis-[52%]"}`}>
-        {layout !== "split" && <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2">
-          <span className="text-xs font-medium uppercase tracking-wider text-slate-400">Source document</span>
-          <button type="button" onClick={() => setLayout("split")} className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600" title="Split view">
-            <PanelLeftClose className="h-4 w-4" />
-          </button>
-        </div>}
-        <SourceViewer source={source} target={target} />
-      </div>}
+    {/* Main content area. Below `lg` (the pane is a full-screen sheet there) the source stacks
+        above the fields at a fixed height so both stay reachable without a second sheet. */}
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
+      {/* Source panel. The strip at its top is where the file lives now — filename, Open file, and
+          the layout control — and it stays rendered in Details layout (the panel collapses to the
+          strip) so the way back to Split is always in view. */}
+      <div className={`flex min-h-0 flex-col overflow-hidden border-slate-200 motion-safe:transition-[flex-basis] motion-safe:duration-200 ${layout === "details-only" ? "shrink-0 border-b lg:basis-auto lg:border-b-0 lg:border-r" : "h-[38vh] shrink-0 border-b lg:h-auto lg:shrink lg:border-b-0 lg:border-r"} ${layout === "source-only" ? "flex-1" : layout === "split" ? "lg:basis-[52%]" : ""}`}>
+        <div className="flex h-9 shrink-0 items-center gap-2 border-b border-slate-100 px-3 text-[13px]">
+          <span className="min-w-0 flex-1 truncate font-medium text-slate-700" title={header.filename}>{header.filename}</span>
+          <a href={fileHref} target="_blank" rel="noopener noreferrer" title="Open the source file in a new tab"
+            className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600">
+            <ExternalLink className="h-3.5 w-3.5" aria-hidden />Open file
+          </a>
+          <div role="radiogroup" aria-label="Pane layout" onKeyDown={onLayoutKeyDown} className="hidden shrink-0 items-center gap-0.5 rounded-md bg-slate-100 p-0.5 lg:flex">
+            {layoutOption("split", "Split")}
+            {layoutOption("details-only", "Details")}
+            {layoutOption("source-only", "Source")}
+          </div>
+        </div>
+        {layout !== "details-only" && <SourceViewer source={source} target={target} />}
+      </div>
 
       {/* Details panel */}
-      {showDetails && <div className={`flex min-h-0 flex-col overflow-hidden transition-[flex-basis] duration-200 ${embedded ? "" : "bg-white"} ${layout === "details-only" ? "flex-1" : embedded ? "min-h-0 flex-1 lg:flex-none lg:basis-[48%]" : "basis-[48%]"}`}>
+      {layout !== "source-only" && <div className={`flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden motion-safe:transition-[flex-basis] motion-safe:duration-200 ${layout === "split" ? "lg:flex-none lg:basis-[48%]" : ""}`}>
         <div className="flex items-center shadow-[inset_0_-1px_0_0_theme(colors.slate.100)]">
           <div className="flex gap-0.5 overflow-x-auto px-3 pt-1" role="tablist" aria-label="Document detail">
             {tabButton("details", "Details")}
             {tabButton("note", "Note")}
-            {embedded && history
+            {history
               ? <>
                 {tabButton("approval", "Approval")}
                 {tabButton("activity", "Audit")}
@@ -344,9 +241,6 @@ export function SplitPane({
               </>
               : tabButton("activity", "Activity")}
           </div>
-          {layout !== "split" && <button type="button" onClick={() => setLayout("split")} className="ml-auto mr-3 rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600" title="Split view">
-            <PanelLeftOpen className="h-4 w-4" />
-          </button>}
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto">

@@ -61,12 +61,14 @@ export function useRegisterDocumentActions(doc: RegisteredDocument | null) {
 
 /** Item 1b, 2, 3 of the ⋯ menu — everything above the surface's own items. Nothing renders while
  * no document is registered (loading / missing / error content, S1–S3). */
-export function DocumentMenuTopItems() {
+/** `closeMenu`: the frame closes its ⋯ once a busy item has resolved (success or failure), so focus
+ * returns to the trigger and the toast is the only thing that moves (S10). */
+export function DocumentMenuTopItems({ closeMenu }: { closeMenu?: () => void }) {
   const ctx = useContext(PaneDocumentContext)
   const doc = ctx?.doc
   const [busy, setBusy] = useState<"archive" | "flag" | null>(null)
   if (!doc) return null
-  const cancelledHint = doc.cancelled ? "Cancelled invoices are already closed." : undefined
+  const cancelledHint = doc.cancelled ? "Cancelled documents are already closed." : undefined
 
   const toggleArchive = async () => {
     setBusy("archive")
@@ -80,6 +82,7 @@ export function DocumentMenuTopItems() {
       toast.error("Could not reach the server — nothing changed")
     } finally {
       setBusy(null)
+      closeMenu?.()
     }
   }
 
@@ -95,19 +98,16 @@ export function DocumentMenuTopItems() {
       toast.error("Could not reach the server — nothing changed")
     } finally {
       setBusy(null)
+      closeMenu?.()
     }
   }
 
   return <>
-    {doc.reviewLink && <PaneMenuItem onClick={undefined}>
-      {/* An `<a>` so it behaves like a link (open in new tab, copy link), not a button pretending
-          to be one — the same reasoning that keeps Open file and Open in a new tab real links. */}
-      <a href={doc.reviewLink.href} className="flex w-full items-center" data-menu-close>{doc.reviewLink.label === "In review" ? "Open review task — in review" : "Open review task"}</a>
-    </PaneMenuItem>}
-    <PaneMenuItem disabled={doc.cancelled || busy === "archive"} hint={cancelledHint} keepOpen={busy === "archive"} onClick={() => void toggleArchive()}>
+    {doc.reviewLink && <PaneMenuItem href={doc.reviewLink.href}>Open review task</PaneMenuItem>}
+    <PaneMenuItem disabled={doc.cancelled} busy={busy === "archive"} hint={cancelledHint} onClick={() => void toggleArchive()}>
       {busy === "archive" ? <span className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" aria-hidden />Archiving…</span> : doc.archived ? "Unarchive" : "Archive"}
     </PaneMenuItem>
-    <PaneMenuItem disabled={doc.cancelled || busy === "flag"} hint={cancelledHint} keepOpen={busy === "flag"} onClick={() => void toggleFlag()}>
+    <PaneMenuItem disabled={doc.cancelled} busy={busy === "flag"} hint={cancelledHint} onClick={() => void toggleFlag()}>
       {busy === "flag" ? <span className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" aria-hidden />Flagging…</span> : <span className="inline-flex items-center gap-2"><Flag className="h-4 w-4" aria-hidden />{doc.flagged ? "Remove flag" : "Flag for attention"}</span>}
     </PaneMenuItem>
   </>
@@ -120,7 +120,7 @@ export function DocumentMenuDeleteItem({ onDeleted }: { onDeleted?: () => void }
   const doc = ctx?.doc
   const [open, setOpen] = useState(false)
   if (!doc) return null
-  const cancelledHint = doc.cancelled ? "Cancelled invoices are already closed." : undefined
+  const cancelledHint = doc.cancelled ? "Cancelled documents are already closed." : undefined
 
   return <>
     <PaneMenuItem tone="red" disabled={doc.cancelled} hint={cancelledHint} onClick={() => window.requestAnimationFrame(() => setOpen(true))}>

@@ -29,8 +29,27 @@ const ICONS = {
   pay: Banknote,
 } as const
 
+/** The step the document is on: the first `current` or `blocked` step, else the last `done`. */
+function currentStep(steps: StageStep[]): { step: StageStep; index: number } | null {
+  const active = steps.findIndex((step) => step.state === "current" || step.state === "blocked")
+  if (active >= 0) return { step: steps[active], index: active }
+  for (let i = steps.length - 1; i >= 0; i--) if (steps[i].state === "done") return { step: steps[i], index: i }
+  return steps.length ? { step: steps[0], index: 0 } : null
+}
+
+/** One 36px band under the pane header (#259 §3). `lg+`: the five nodes in a row, nothing
+ * scrolls — they fit in 830px. Below `lg`: one line, the current node and "n of N", so the band
+ * never clips "Pay" at 390 the way the scrolling pill list did. Both forms render; CSS picks. */
 export function StageIndicator({ steps }: { steps: StageStep[] }) {
-  return <ol className="flex items-center gap-1.5 overflow-x-auto px-4 py-2 text-xs" aria-label="Document lifecycle">
+  const current = currentStep(steps)
+  const currentColor = current?.step.state === "blocked" ? "text-amber-800" : current?.step.state === "done" ? "text-emerald-700" : "text-indigo-700"
+  return <div className="flex h-9 items-center overflow-hidden border-b border-slate-200 px-3 text-xs">
+    {current && <p className={`flex min-w-0 items-center gap-1.5 font-medium lg:hidden ${currentColor}`}>
+      <span className="sr-only">Step {current.index + 1} of {steps.length}, </span>
+      <span className="truncate">{current.step.label}{current.step.detail && current.step.state !== "upcoming" ? ` — ${current.step.detail}` : ""}</span>
+      <span className="shrink-0 tabular-nums text-slate-500" aria-hidden="true">· {current.index + 1} of {steps.length}</span>
+    </p>}
+    <ol className="hidden items-center gap-1.5 lg:flex" aria-label="Document lifecycle">
     {steps.map((step, index) => {
       const Icon = ICONS[step.key]
       const stateClass =
@@ -52,5 +71,6 @@ export function StageIndicator({ steps }: { steps: StageStep[] }) {
         </div>
       </li>
     })}
-  </ol>
+    </ol>
+  </div>
 }
