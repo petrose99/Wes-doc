@@ -57,6 +57,9 @@ export async function preparePaymentRun(input: {
     // payableDocumentIds, but a payment file is money leaving the workspace, so this doesn't rely
     // on that alone.
     if (bill.cancelledAt) { skipped.push({ documentId: bill.documentId, reason: "cancelled" }); continue }
+    // #249: same defense in depth for the approval gate — the client already excludes anything
+    // short of Approved from payableDocumentIds.
+    if (bill.approvalStatus !== "approved") { skipped.push({ documentId: bill.documentId, reason: "not_approved" }); continue }
     if (bill.total === null || bill.total <= 0) { skipped.push({ documentId: bill.documentId, reason: "missing_amount" }); continue }
     if (!bill.supplier) { skipped.push({ documentId: bill.documentId, reason: "missing_supplier" }); continue }
     const bank = bill.supplierId ? bankBySupplier.get(bill.supplierId) : null

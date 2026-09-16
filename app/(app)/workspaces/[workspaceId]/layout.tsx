@@ -5,6 +5,7 @@ import { getCurrentUser, getSession } from "@/lib/auth"
 import config from "@/lib/config"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { createClient } from "@/lib/supabase/server"
+import { countReadyToApprove } from "@/models/approvals"
 import { countDocumentsByStage } from "@/models/documents"
 import { countOpenExceptions } from "@/models/exceptions"
 import { countOpenReviewTasks } from "@/models/review-tasks"
@@ -60,6 +61,13 @@ export default async function WorkspaceLayout({ children, params }: { children: 
   // it. Fetched after capabilities so a workspace without the review-queue module pays nothing.
   const reviewTaskCount = capabilities.has("review-queue") ? await countOpenReviewTasks(workspaceId) : 0
 
+  // #236: the Approvals rail badge — the signed-in person's own Ready-to-Approve count across
+  // both Approvals queues, never the workspace-wide total. Same capability gate as the queue
+  // routes themselves.
+  const approvalsReadyCount = capabilities.has("review-queue")
+    ? await countReadyToApprove(workspaceId, { userId: user.id, role: membership.role as "owner" | "reviewer" | "member" })
+    : 0
+
   const switchable = workspaces.map((workspace) => ({ id: workspace.id, name: workspace.name, kind: workspace.kind, role: workspace.members[0]?.role }))
 
   return <div className="flex min-h-screen bg-white text-slate-900">
@@ -77,7 +85,8 @@ export default async function WorkspaceLayout({ children, params }: { children: 
        * the sidebar itself hides the Finance badge otherwise. */
       financePushableCount={pipelineCounts.approved}
       openExceptionsCount={openExceptionsCount}
-      batchesPendingApprovalCount={batchesPendingApprovalCount} />
+      batchesPendingApprovalCount={batchesPendingApprovalCount}
+      approvalsReadyCount={approvalsReadyCount} />
     <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-[radial-gradient(1200px_480px_at_100%_-10%,rgba(4,120,87,0.05),transparent_60%),#fafbfc]">
       <MobileHeader workspaceId={workspaceId} workspaces={switchable} user={{ name: user.name, email: user.email }} />
       <div id="main" role="main" tabIndex={-1} className="flex min-h-0 flex-1 flex-col pb-[72px] md:pb-0">{children}</div>

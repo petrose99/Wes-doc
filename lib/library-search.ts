@@ -1,4 +1,5 @@
 import config from "@/lib/config"
+import { prisma } from "@/lib/db"
 import { parseSearchInput, fuseSearchResults, type SearchResultItem } from "@/lib/global-search"
 import { searchDocumentChunks, findMatchingDocuments, searchDocumentsByContent } from "@/lib/retrieval"
 import { documentIdsInLibrary, listWorkspaceDocuments, type LibraryListFilters } from "@/models/documents"
@@ -43,6 +44,19 @@ export async function runGlobalSearch(workspaceId: string, query: string, actorI
   const contentMapped = contentResults.map((c) => ({ documentId: c.documentId, filename: c.filename, page: c.page, bbox: c.bbox, snippet: c.snippet }))
 
   const items = fuseSearchResults(fieldMatches, chunkMapped, contentMapped)
+
+  // #249: global search's own result links (`SearchDocItem`/`SearchSnippetItem` in
+  // components/shell/global-search.tsx) pointed every hit at `/pipeline`, which has had no nav
+  // entry since #238. One cheap batched lookup here — none of the three retrieval paths above
+  // carry docType — resolves each hit's typed destination without threading it through
+  // lexicalSearch/vectorSearch/findDocumentsByFields.
+  if (items.length) {
+    const documentIds = [...new Set(items.map((item) => item.documentId))]
+    const rows = await prisma.document.findMany({ where: { id: { in: documentIds } }, select: { id: true, docType: true } })
+    const docTypeById = new Map(rows.map((row) => [row.id, row.docType]))
+    for (const item of items) item.docType = docTypeById.get(item.documentId) ?? null
+  }
+
   return { items, total: items.length }
 }
 

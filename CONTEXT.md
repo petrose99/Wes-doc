@@ -13,7 +13,7 @@ A feature the product no longer shows or routes to, kept only so it can be broug
 _Avoid_: Hidden, deprecated, legacy
 
 **Core workflow destinations**:
-Invoices, Purchase Orders, Receipts, Bank Statements, Exceptions, and Search: the permission-filtered peer surfaces representing typed intake, escalated work, and cross-type lookup. The booked outcome is not a surface: a document is posted from its own queue and stays there as a Posted row. The four typed intake destinations replace the former single "Documents" surface; there is no separate record of finished work — a finished document stays on its typed queue under Closed.
+Invoices, Purchase Orders, Receipts, Bank Statements, Exceptions, Approvals, and Search: the permission-filtered peer surfaces representing typed intake, escalated work, and cross-type lookup. The booked outcome is not a surface: a document is posted from its own queue and stays there as a Posted row. The four typed intake destinations replace the former single "Documents" surface; there is no separate record of finished work — a finished document stays on its typed queue under Closed.
 _Avoid_: Archive (as a destination), Library, permanent record, Attachments
 
 **Search**:

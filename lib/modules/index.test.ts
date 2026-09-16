@@ -37,7 +37,7 @@ describe("MODULES", () => {
 
 describe("findModule", () => {
   it("finds a known module by key", () => {
-    expect(findModule("review-queue")?.name).toBe("Review queue")
+    expect(findModule("review-queue")?.name).toBe("Approvals")
   })
 
   it("returns null for an unknown key or nullish input", () => {

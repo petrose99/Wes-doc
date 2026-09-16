@@ -8,7 +8,7 @@ vi.mock("@/lib/analytics", () => ({ track: vi.fn() }))
 vi.mock("@/models/document-field-values", () => ({ replaceDocumentFieldValues: vi.fn() }))
 vi.mock("@/models/field-corrections", () => ({ recordFieldCorrection: vi.fn().mockResolvedValue(undefined) }))
 
-const { createDocumentFromBuffer, deleteWorkspaceDocuments, documentDataForExport, documentHash, documentSourceFor, isSupportedDocumentBuffer, setDocumentPaymentStatus, stageWhereClause, updateDocumentField, validateDocumentInput } = await import("@/models/documents")
+const { createDocumentFromBuffer, deleteWorkspaceDocuments, documentDataForExport, documentHash, documentSourceFor, isSupportedDocumentBuffer, listReadyToPushDocuments, setDocumentPaymentStatus, stageWhereClause, updateDocumentField, validateDocumentInput } = await import("@/models/documents")
 const { prisma } = await import("@/lib/db")
 const { deleteDocumentSource } = await import("@/lib/document-storage")
 const { recordFieldCorrection } = await import("@/models/field-corrections")
@@ -303,6 +303,58 @@ describe("setDocumentPaymentStatus", () => {
     expect(db.documentAuditEvent.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ detail: { from: "unpaid", to: "paid" } }),
     }))
+  })
+})
+
+// #249: a document approved but missing a usable total used to vanish from this list with no
+// trace, so `droppedCount` needs to actually reflect it (see accounting-dashboard.tsx's hint).
+describe("listReadyToPushDocuments", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    db.document = { findMany: vi.fn().mockResolvedValue([]) }
+    db.integrationPush = { findMany: vi.fn().mockResolvedValue([]) }
+  })
+
+  it("returns an empty, undropped page when there are no approved documents", async () => {
+    const result = await listReadyToPushDocuments("w1", "conn1")
+    expect(result).toEqual({ documents: [], droppedCount: 0 })
+  })
+
+  it("lists a pushable, totalled document and carries its docType", async () => {
+    db.document.findMany.mockResolvedValue([
+      { id: "d1", filename: "a.pdf", docType: "invoice", template: { code: "invoice" }, reviewedData: { vendor: "Acme", total: 100, currency_code: "USD" }, rawExtraction: null, codingData: null },
+    ])
+    const { documents, droppedCount } = await listReadyToPushDocuments("w1", "conn1")
+    expect(documents).toEqual([{ id: "d1", filename: "a.pdf", vendorName: "Acme", total: 100, currencyCode: "USD", category: "Uncategorized", docType: "invoice" }])
+    expect(droppedCount).toBe(0)
+  })
+
+  it("counts (rather than silently swallowing) an approved document with no usable total", async () => {
+    db.document.findMany.mockResolvedValue([
+      { id: "d1", filename: "a.pdf", docType: "invoice", template: { code: "invoice" }, reviewedData: { vendor: "Acme" }, rawExtraction: null, codingData: null },
+    ])
+    const { documents, droppedCount } = await listReadyToPushDocuments("w1", "conn1")
+    expect(documents).toEqual([])
+    expect(droppedCount).toBe(1)
+  })
+
+  it("excludes a document already succeeded on this connection without counting it as dropped", async () => {
+    db.document.findMany.mockResolvedValue([
+      { id: "d1", filename: "a.pdf", docType: "invoice", template: { code: "invoice" }, reviewedData: { vendor: "Acme", total: 100 }, rawExtraction: null, codingData: null },
+    ])
+    db.integrationPush.findMany.mockResolvedValue([{ id: "p1", connectionId: "conn1", documentId: "d1", provider: "bigcapital", status: "succeeded", attempts: 1, externalBillId: null, externalRecordKind: null, errorCode: null, createdAt: new Date(), completedAt: new Date() }])
+    const { documents, droppedCount } = await listReadyToPushDocuments("w1", "conn1")
+    expect(documents).toEqual([])
+    expect(droppedCount).toBe(0)
+  })
+
+  it("excludes a non-pushable doc type without counting it as dropped", async () => {
+    db.document.findMany.mockResolvedValue([
+      { id: "d1", filename: "a.pdf", docType: "purchase_order", template: { code: "purchase_order" }, reviewedData: { total: 100 }, rawExtraction: null, codingData: null },
+    ])
+    const { documents, droppedCount } = await listReadyToPushDocuments("w1", "conn1")
+    expect(documents).toEqual([])
+    expect(droppedCount).toBe(0)
   })
 })
 

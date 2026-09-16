@@ -2,6 +2,7 @@
 
 import { globalSearchAction, type GlobalSearchResult } from "@/app/(app)/workspaces/[workspaceId]/search-actions"
 import type { SearchResultItem } from "@/lib/global-search"
+import { documentDestinationPath } from "@/lib/typed-destinations"
 import { FileText, Loader2, Search, Sparkles, X } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -196,7 +197,7 @@ export function GlobalSearch({ workspaceId }: { workspaceId: string }) {
 function SearchDocItem({ item, workspaceId, onClick }: { item: SearchResultItem; workspaceId: string; onClick: () => void }) {
   return (
     <Link
-      href={`/workspaces/${workspaceId}/pipeline?doc=${item.documentId}`}
+      href={documentDestinationPath(`/workspaces/${workspaceId}`, { id: item.documentId, docType: item.docType })}
       onClick={onClick}
       className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-slate-50"
     >
@@ -215,9 +216,14 @@ function SearchDocItem({ item, workspaceId, onClick }: { item: SearchResultItem;
 }
 
 function SearchSnippetItem({ item, workspaceId, onClick }: { item: SearchResultItem; workspaceId: string; onClick: () => void }) {
+  // #249: this used to link to `/pipeline?doc=&page=`, but PipelinePage's searchParams
+  // (stage/q/flagged only) never read either param — the page target was already dead. The typed
+  // destination at least opens the right document; jumping straight to the matched page is #225's
+  // embedded pane not accepting searchParams at all (`getQueueDetailAction` always passes `{}`),
+  // a separate gap this ticket doesn't carry a decision to close.
   return (
     <Link
-      href={`/workspaces/${workspaceId}/pipeline?doc=${item.documentId}${item.page != null ? `&page=${item.page}` : ""}`}
+      href={documentDestinationPath(`/workspaces/${workspaceId}`, { id: item.documentId, docType: item.docType })}
       onClick={onClick}
       className="block px-4 py-2.5 transition-colors hover:bg-slate-50"
     >

@@ -4,6 +4,8 @@
 
 export type SavedViewFilters = Record<string, string>
 
+export type SavedViewSeed = { name: string; filters: SavedViewFilters; scopeToCurrentUser?: boolean }
+
 export type SavedViewSummary = {
   id: string
   name: string
@@ -16,11 +18,15 @@ export type SavedViewSummary = {
 /** The seeded, non-editable views every screen ships with — "Duplicate as new view" is the only
  * way to get an editable copy of one. Keyed by the same `viewKey` vocabulary as
  * `UserListPreference.viewKey`. "Touchless" reuses the existing touchless-tier vocabulary rather
- * than inventing a second name for the autonomous-approval tier (map #177's Notes). There is no
- * personal-inbox ("assigned to me") system view yet: Invoices/Receipts rows carry no assignee
- * today, so `scopeToCurrentUser` is a real, working flag on the model with nothing yet to turn it
- * on for — left as fog rather than backed by data that doesn't exist. */
-export const SYSTEM_VIEWS_BY_VIEW_KEY: Record<string, ReadonlyArray<{ name: string; filters: SavedViewFilters }>> = {
+ * than inventing a second name for the autonomous-approval tier (map #177's Notes).
+ *
+ * #236 is the first screen to turn `scopeToCurrentUser` on for real: Approvals › Invoices' rows
+ * carry a real Approver (CONTEXT.md), so "Ready to Approve" seeds with it true and an `approver:
+ * me` filter alongside — the filter is what the query actually reads (same flat-string-map
+ * mechanics every other view's filters use); the flag is the persisted, queryable fact that this
+ * view is a personal one, for any reader that wants to tell personal and shared views apart
+ * without parsing filters. */
+export const SYSTEM_VIEWS_BY_VIEW_KEY: Record<string, ReadonlyArray<SavedViewSeed>> = {
   invoices: [
     { name: "All", filters: {} },
     { name: "Needs review", filters: { status: "unreviewed" } },
@@ -30,6 +36,10 @@ export const SYSTEM_VIEWS_BY_VIEW_KEY: Record<string, ReadonlyArray<{ name: stri
     { name: "All", filters: {} },
     { name: "Needs review", filters: { status: "unreviewed" } },
     { name: "Touchless", filters: { touchless: "1" } },
+  ],
+  "approvals-invoices": [
+    { name: "Ready to Approve", filters: { approver: "me" }, scopeToCurrentUser: true },
+    { name: "All", filters: {} },
   ],
 }
 
