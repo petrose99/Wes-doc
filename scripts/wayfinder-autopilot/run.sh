@@ -183,10 +183,19 @@ while [ "$n" -lt "$MAX" ]; do
   # appended to a per-run copy, since the CLI takes only one system-prompt file.
   RUN_BRIEF="$LOGS/brief-$T.md"
   { cat "$BRIEF"; printf '\n\n## Paths for this run\n\n- Generic lessons (every project): `%s`\n- Project lessons (this repo): `%s`\n- Report: `%s/%s.md`\n- Scratch folder for captures and the filled preflight: `%s/scratch-%s/`\n' "$GENERIC_LESSONS" "$PROJECT_LESSONS" "$OUT" "$T" "$LOGS" "$T"; } > "$RUN_BRIEF"
-  # NODE_OPTIONS caps every node process the session starts (next dev grows to
-  # ~4 GB unbounded on this repo; 3 GB is ample and keeps the box out of swap).
+  # Memory: the whole session (claude + dev server + headless browser + node
+  # workers) runs inside one cgroup scope with a hard ceiling, so the kernel
+  # reclaims/kills inside the scope instead of the box-wide earlyoom shooting
+  # the browser mid-capture. Turbopack's memory is native (Rust), so a V8 heap
+  # cap alone does not bound next dev — the cgroup does. Falls back to no scope
+  # where systemd --user is unavailable.
+  MEM_MAX="${WAYFINDER_SESSION_MEM_MAX:-5500M}"; MEM_HIGH="${WAYFINDER_SESSION_MEM_HIGH:-4500M}"
+  SCOPE=()
+  if systemd-run --user --scope -q true 2>/dev/null; then
+    SCOPE=(systemd-run --user --scope -q --unit "wayfinder-$MAP-$T-$(date +%s)" -p "MemoryMax=$MEM_MAX" -p "MemoryHigh=$MEM_HIGH" -p "MemorySwapMax=2G")
+  fi
   ( cd "$ROOT" && NODE_OPTIONS="${WAYFINDER_NODE_OPTIONS:---max-old-space-size=3072}" \
-    setsid claude -p "/wayfinder $MAP $T" \
+    setsid "${SCOPE[@]}" claude -p "/wayfinder $MAP $T" \
       --append-system-prompt-file "$RUN_BRIEF" \
       ${MODEL:+--model "$MODEL"} \
       ${EFFORT:+--effort "$EFFORT"} \
