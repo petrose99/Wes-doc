@@ -39,3 +39,18 @@ describe("activeFilterCount (#257 spec 3.3 — the 'Filter · 2' label)", () => 
     expect(activeFilterCount(new URLSearchParams("status=bogus"), [STATUS], SORT)).toBe(0)
   })
 })
+
+describe("clearFilterParams (#261 — the one Clear filters)", () => {
+  it("strips every facet param and the sort param, keeping view and from", () => {
+    const next = clearFilterParams(new URLSearchParams("status=not_eligible&approver=anyone&sort=due&view=v1&from=%2Fx"), [STATUS, APPROVER], "sort")
+    expect(next.toString()).toBe("view=v1&from=%2Fx")
+  })
+
+  it("does not mutate the input and is a no-op on a bare URL", () => {
+    const input = new URLSearchParams("status=not_eligible")
+    const next = clearFilterParams(input, [STATUS], "sort")
+    expect(input.toString()).toBe("status=not_eligible")
+    expect(next.toString()).toBe("")
+    expect(clearFilterParams(new URLSearchParams(), [STATUS], "sort").toString()).toBe("")
+  })
+})

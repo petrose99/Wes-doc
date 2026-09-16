@@ -5,7 +5,7 @@ import { useEffect, useState } from "react"
 import { Check, Filter } from "lucide-react"
 import { Dialog } from "@/components/ui/dialog"
 import type { Facet } from "@/components/queue/facet-filters"
-import { activeFilterCount, facetSelectedValues } from "@/lib/queue/filters"
+import { activeFilterCount, clearFilterParams, facetSelectedValues } from "@/lib/queue/filters"
 
 /** #257 spec 3.4: the phone lane's one filter surface — a bottom `Dialog placement="sheet"` with
  * the queue's sort as a radiogroup, one group per `Facet`, and a footer of Clear · "Show n rows".
