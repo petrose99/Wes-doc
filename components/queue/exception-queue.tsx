@@ -110,7 +110,7 @@ export function ExceptionQueue({ workspaceId, basePath, documentBasePath, except
         row.vendor ?? row.filename, formatAmount(row.amount, row.currencyCode), row.message,
         row.escalationStatus === "in_review" ? "In review" : "Open", row.docTypeLabel,
       ].filter(Boolean).join(", ") }}
-      empty={{ title: "No open exceptions.", body: "Escalate a check from a document's field rationale to send it here. Resolved exceptions drop off this list." }}
+      empty={{ firstUse: { title: "No open exceptions.", body: "Escalate a check from a document's field rationale to send it here. Resolved exceptions drop off this list." } }}
       loadDetail={(documentId) => getQueueDetailAction(workspaceId, documentId)}
       paneActions={(row, { refresh }) => <>
         <span className="w-full text-xs text-slate-600 sm:mr-auto sm:w-auto">{row.escalationStatus === "in_review" ? `In review${row.assigneeName ? ` by ${row.assigneeName}` : ""}.` : "Open. Start the review to claim it."}</span>

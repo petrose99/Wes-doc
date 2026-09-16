@@ -29,3 +29,25 @@
     #262 crossed the hand-off line (151046 tokens ≥ 150000) — asked to hand off; hard stop at 180000
     #262 context at exit: 175281 tokens, 28 min
     cleaned up session pid 1666272 (pgid ?); free: 6311 MB
+    scoreboard: 64 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #262: phase measure done → close next, hand-off 213 lines (limit 120) in 1718s
+=== [7/50] #262 — Build the keyboard shortcut set: roving rows, g-sequences between queues, f / ? and the Keyboard shortcuts dialog  [sonnet · low · phase: close]
+    #262 crossed the hand-off line (152488 tokens ≥ 150000) — asked to hand off; hard stop at 180000
+    #262 context at exit: 170209 tokens, 33 min
+    cleaned up session pid 1703759 (pgid ?); free: 6312 MB
+    scoreboard: 65 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #262: continued (progressed), session 1/3 without progress allowed in 2019s
+=== [8/50] #262 — Build the keyboard shortcut set: roving rows, g-sequences between queues, f / ? and the Keyboard shortcuts dialog  [opus[1m] · low · phase: close]
+    #262 context at exit: 82542 tokens, 3 min
+    cleaned up session pid 1748458 (pgid ?); free: 6300 MB
+    scoreboard: 66 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #262: resolved in 214s
+=== [9/50] #264 — Build the three-way empty queue on Invoices: first-use guidance, done, filtered — and How DocuBite works on the account menu  [opus[1m] · low · phase: spec]
+    #264 crossed the hand-off line (151022 tokens ≥ 150000) — asked to hand off; hard stop at 180000
+    #264 context at exit: 160270 tokens, 7 min
+    cleaned up session pid 1752962 (pgid ?); free: 6322 MB
+    scoreboard: 67 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #264: continued (progressed), session 1/3 without progress allowed in 423s
+=== [10/50] #264 — Build the three-way empty queue on Invoices: first-use guidance, done, filtered — and How DocuBite works on the account menu  [opus[1m] · low · phase: spec]
+    #264 context at exit: 107735 tokens, 7 min
+    cleaned up session pid 1761466 (pgid ?); free: 6273 MB

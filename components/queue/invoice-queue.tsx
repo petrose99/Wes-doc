@@ -2,9 +2,11 @@
 
 import { useState, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { toast } from "sonner"
 import { QueueScreen, type QueueColumn, type SortOption } from "@/components/queue/queue-screen"
 import { joinSegments } from "@/components/queue/queue-card"
+import { InboundAddressLine } from "@/components/intake/inbound-address-line"
 import type { FieldTable } from "@/lib/configuration/field-table"
 import { PaneMenuItem } from "@/components/queue/detail-pane"
 import { DocumentBulkActions, DocumentPaneActions } from "@/components/queue/document-actions"
@@ -79,7 +81,7 @@ const SORTS: SortOption<BillRow>[] = [
   { key: "supplier", label: "Supplier A–Z", compare: (a, b) => (a.supplier ?? "￿").localeCompare(b.supplier ?? "￿") },
 ]
 
-export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercent, availableWorkflows = [], views, viewsPhone, stat, initialSelectedId, fieldTable = null }: {
+export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercent, availableWorkflows = [], views, viewsPhone, stat, initialSelectedId, fieldTable = null, workspaceDocumentCount, todayOutcome, inboundAddress }: {
   workspaceId: string
   basePath: string
   bills: BillRow[]
@@ -95,6 +97,13 @@ export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercen
   initialSelectedId?: string | null
   /** #252: Admin › Configuration › Fields for invoices, when one has been saved. */
   fieldTable?: FieldTable | null
+  /** #264: has the workspace ever held a document (any type) — decides first-use vs. done. */
+  workspaceDocumentCount: number
+  /** #264: the done state's "n approved today, m posted." sentence. */
+  todayOutcome: { approvedToday: number; postedToday: number }
+  /** #264 spec §3.1: `${token}@${domain}`, or null when email intake is off or the token could
+   * not be issued (healthcare workspace) — first-use then omits the address line entirely. */
+  inboundAddress: string | null
 }) {
   const router = useRouter()
   const origin = useOriginHere()
@@ -237,7 +246,25 @@ export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercen
           PROCESSING_STATE_LABELS[billState(bill)],
         ].filter(Boolean).join(", ")
       } }}
-      empty={{ title: "No invoices yet.", body: "Invoices appear here once one is extracted from an upload or an inbound email.", filteredBody: "Clear a filter to widen the queue." }}
+      empty={{
+        // #264 spec §3.1: #266's Add-documents dialog has not shipped, so the action is the
+        // fallback link to /pipeline — TODO(#266): swap for openAddDocumentsDialog({ type: "invoice" }).
+        firstUse: {
+          title: "No invoices yet.",
+          body: "Add an invoice and DocuBite extracts it into a row here. You check it beside the source, approve it, and post it.",
+          action: <div className="flex flex-col items-center gap-3">
+            <Link href={`/workspaces/${workspaceId}/pipeline?from=invoices`}
+              className="inline-flex h-9 items-center rounded-md bg-emerald-700 px-4 font-medium text-white hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-1 max-md:h-11">Add invoices</Link>
+            {inboundAddress && <InboundAddressLine address={inboundAddress} />}
+          </div>,
+          phoneAction: inboundAddress
+            ? <InboundAddressLine address={inboundAddress} />
+            : <p className="text-sm text-slate-600">Add invoices from a computer.</p>,
+        },
+        done: { body: `${todayOutcome.approvedToday} approved today, ${todayOutcome.postedToday} posted.` },
+        filteredBody: "Clear a filter to widen the queue.",
+      }}
+      workspaceDocumentCount={workspaceDocumentCount}
       loadDetail={(documentId) => getQueueDetailAction(workspaceId, documentId, { queueTitle: "Invoices" })}
       bulkActions={({ selectedIds, clear }) => <DocumentBulkActions
         workspaceId={workspaceId} noun="invoice" selectedIds={selectedIds} clear={clear} toRecord={toRecord}

@@ -10,6 +10,8 @@ import { FacetFilters, type Facet } from "@/components/queue/facet-filters"
 import { FilterButton, FilterSheet } from "@/components/queue/filter-sheet"
 import { OverrideModeProvider, useOverrideMode } from "@/components/queue/override-mode-context"
 import { QueueCard, joinSegments } from "@/components/queue/queue-card"
+import { QueueEmpty } from "@/components/queue/queue-empty"
+import { emptyQueueState } from "@/lib/queue/empty-state"
 import { clearFilterParams } from "@/lib/queue/filters"
 import { confirmLeave } from "@/lib/client/unsaved-changes"
 import { isPhoneLane } from "@/lib/client/use-phone-lane"
@@ -106,9 +108,18 @@ export type QueueScreenProps<T> = {
   onExportAll?: () => Promise<void>
   /** The bulk action bar's contents — the surface's own buttons and dialogs. */
   bulkActions?: (context: BulkContext) => ReactNode
-  /** `action` renders under the body of the *unfiltered* empty state — Approvals' "N waiting on
-   * other approvers" link (#257 spec 3.6). `filteredAction` under the filtered one (Clear filters). */
-  empty: { title: string; body: string; filteredTitle?: string; filteredBody?: string; action?: ReactNode; filteredAction?: ReactNode }
+  /** #264 spec §4: three empty states, one prop. `firstUse` renders only while the *workspace*
+   * (not just this view) has never held a document; queues that omit it fall straight to `done`,
+   * the#257/#261 behaviour unchanged. `done.action` is Approvals' "N waiting on other approvers"
+   * link (#257 spec 3.6). `filteredAction` renders under the filtered state (Clear filters). */
+  empty: {
+    firstUse?: { title: string; body: string; action?: ReactNode; phoneAction?: ReactNode }
+    done?: { title?: string; body?: string; action?: ReactNode }
+    filteredTitle?: string; filteredBody?: string; filteredAction?: ReactNode
+  }
+  /** #264 spec §2: has this *workspace* (any type, any status) ever held a document — decides
+   * first-use vs. done. Omit it (Payments) and first-use never renders, matching pre-#264 behaviour. */
+  workspaceDocumentCount?: number
   loadDetail: (documentId: string) => Promise<ReactNode | null>
   paneActions?: (row: T, helpers: PaneHelpers) => ReactNode
   paneMenu?: (row: T, helpers: PaneHelpers) => ReactNode
@@ -158,7 +169,7 @@ const INTERACTIVE = "a, button, input, select, textarea, label, [role=button], [
 
 function QueueScreenInner<T>({
   title, basePath, rows, rowId, detailIdFor, rowName, paneStatus, fullHref, archivedToast, leading, columns: rawColumns, fieldTable = null, selectable = false, sortOptions = [], facets = [],
-  views, viewsPhone, stat, band, menu, onExportAll, bulkActions, empty, loadDetail, paneActions, paneMenu, initialSelectedId = null, sortParam = "sort", cards, phoneReadOnly = false,
+  views, viewsPhone, stat, band, menu, onExportAll, bulkActions, empty, workspaceDocumentCount = 0, loadDetail, paneActions, paneMenu, initialSelectedId = null, sortParam = "sort", cards, phoneReadOnly = false,
   filterRows, pinned = null, initialMissingNotice, onOpenChange,
 }: QueueScreenProps<T>) {
   const router = useRouter()
@@ -214,7 +225,9 @@ function QueueScreenInner<T>({
   const rovingId = openId ?? (lastFocusedRowId && ids.includes(lastFocusedRowId) ? lastFocusedRowId : ids[0]) ?? null
 
   const focusRow = useCallback((id: string | undefined | null) => {
-    if (!id) { document.getElementById("queue-title")?.focus(); return }
+    // #264 spec §8: the list is empty — focus its heading, not the queue's own h1, so the arrival
+    // lands on the thing actually explaining the screen.
+    if (!id) { (document.getElementById("queue-empty-title") ?? document.getElementById("queue-title"))?.focus(); return }
     const button = triggerRefs.current.get(id)
     button?.focus()
     button?.scrollIntoView({ block: "nearest" })
@@ -482,16 +495,11 @@ function QueueScreenInner<T>({
       <div id="queue-list" className={`min-w-0 flex-1 md:overflow-auto ${openId ? "lg:shadow-[inset_-1px_0_0_0_rgb(226_232_240)]" : ""}`}>
         {phoneReadOnly && <p className={`px-4 py-2 text-[13px] text-slate-600 ${below ? below.hideAbove : "lg:hidden"}`}>Full view on desktop — this list is read-only on a phone.</p>}
         {sortedRows.length === 0
-          ? <div className="mx-auto max-w-md px-6 py-16 text-center">
-            <p className="text-sm font-medium text-slate-800">{filtered ? empty.filteredTitle ?? "Nothing matches these filters." : empty.title}</p>
-            <p className="mt-1 text-sm text-slate-600">{filtered
-              ? empty.filteredBody ?? (hiddenByFilters > 0 ? `${hiddenByFilters} ${hiddenByFilters === 1 ? "row is" : "rows are"} hidden by the filters.` : "Clear a filter to widen the queue.")
-              : empty.body}</p>
-            {filtered
-              ? <div className="mt-3 text-sm">{empty.filteredAction ?? <button type="button" onClick={clearFilters}
-                className="inline-flex h-11 items-center rounded-md border border-slate-300 bg-white px-4 py-2 font-medium text-slate-800 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-1 md:h-8 md:px-3 md:py-1 md:text-xs">Clear filters</button>}</div>
-              : empty.action && <div className="mt-3 text-sm">{empty.action}</div>}
-          </div>
+          ? <QueueEmpty
+            state={emptyQueueState({ workspaceDocumentCount, rowCount: sortedRows.length, filtered, hasFirstUse: !!empty.firstUse }) ?? "done"}
+            firstUse={empty.firstUse} done={empty.done}
+            filteredTitle={empty.filteredTitle} filteredBody={empty.filteredBody} filteredAction={empty.filteredAction}
+            hiddenByFilters={hiddenByFilters} onClearFilters={clearFilters} />
           : <>
           {below && cards && <ul aria-label={cards.title ?? title} className={below.hideAbove}>
             {sortedRows.map((row) => {

@@ -52,7 +52,7 @@ function ClaimPill({ status }: { status: ReceiptRow["claimStatus"] }) {
   return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize ${cls}`}>{status}</span>
 }
 
-export function ReceiptQueue({ workspaceId, basePath, receipts, minConfidencePercent, views, viewsPhone, stat, initialSelectedId, fieldTable = null }: {
+export function ReceiptQueue({ workspaceId, basePath, receipts, minConfidencePercent, views, viewsPhone, stat, initialSelectedId, fieldTable = null, workspaceDocumentCount, todayOutcome }: {
   workspaceId: string
   basePath: string
   receipts: ReceiptRow[]
@@ -64,6 +64,10 @@ export function ReceiptQueue({ workspaceId, basePath, receipts, minConfidencePer
   initialSelectedId?: string | null
   /** #252: Admin › Configuration › Fields for receipts, when one has been saved. */
   fieldTable?: FieldTable | null
+  /** #264: has the workspace ever held a document (any type) — decides first-use vs. done. */
+  workspaceDocumentCount: number
+  /** #264: the done state's "n approved today, m posted." sentence. */
+  todayOutcome: { approvedToday: number; postedToday: number }
 }) {
   const [needsAttention, setNeedsAttention] = useState<Set<string>>(new Set())
   const minConfidence = minConfidenceFromPercent(minConfidencePercent)
@@ -157,7 +161,11 @@ export function ReceiptQueue({ workspaceId, basePath, receipts, minConfidencePer
       PROCESSING_STATE_LABELS[receiptState(receipt)],
       receipt.claimStatus ? `claim ${receipt.claimStatus}` : null,
     ].filter(Boolean).join(", ") }}
-    empty={{ title: "No receipts yet.", body: "Receipts appear here once one is extracted from an upload or an inbound email." }}
+    empty={{
+      firstUse: { title: "No receipts yet.", body: "Receipts appear here once one is extracted from an upload or an inbound email." },
+      done: { body: `${todayOutcome.approvedToday} approved today, ${todayOutcome.postedToday} posted.` },
+    }}
+    workspaceDocumentCount={workspaceDocumentCount}
     loadDetail={(documentId) => getQueueDetailAction(workspaceId, documentId, { queueTitle: "Receipts" })}
     bulkActions={({ selectedIds, clear }) => <DocumentBulkActions
       workspaceId={workspaceId} noun="receipt" selectedIds={selectedIds} clear={clear} toRecord={toRecord}

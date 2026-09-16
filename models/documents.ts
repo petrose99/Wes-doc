@@ -26,6 +26,7 @@ import { Document, Prisma } from "@/prisma/client"
 import crypto from "crypto"
 import path from "path"
 import { randomUUID } from "crypto"
+import { cache } from "react"
 
 const SUPPORTED_DOCUMENT_TYPES = new Set(["application/pdf", "image/jpeg", "image/png", "image/webp", "image/heic"])
 /** "dictation" is an audio recording rather than a scan; it takes the transcribe path instead of
@@ -193,6 +194,11 @@ export function stageWhereClause(stage: PipelineStage): Prisma.DocumentWhereInpu
       return { ...paidPaymentStatus }
   }
 }
+
+/** #264: "has this workspace ever held a document" — every type, every status, including
+ * cancelled and still-processing (§2's cross-type decision, #241 d.3). Used only to pick the
+ * empty-queue state, so a plain count is enough. */
+export const countWorkspaceDocuments = cache((workspaceId: string) => prisma.document.count({ where: { workspaceId } }))
 
 /** `stage`, when given, narrows to a pipeline tab (lib/documents/stages.ts) instead of a raw
  * status. It composes with (does not replace) `status`, though callers normally pass one or the

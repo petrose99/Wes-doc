@@ -72,7 +72,7 @@ function StatusPill({ status }: { status: string }) {
   return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}>{STATUS_LABEL[status] ?? status.replaceAll("_", " ")}</span>
 }
 
-export function DocumentQueue({ workspaceId, basePath, title, noun, itemType, rows, supplierLabel = "Supplier", views, viewsPhone, stat, initialSelectedId, emptyBody, showInstitution = false, purchaseOrders = false, fieldTable = null }: {
+export function DocumentQueue({ workspaceId, basePath, title, noun, itemType, rows, supplierLabel = "Supplier", views, viewsPhone, stat, initialSelectedId, emptyBody, showInstitution = false, purchaseOrders = false, fieldTable = null, workspaceDocumentCount, todayOutcome }: {
   /** #252: Admin › Configuration › Fields for this queue's type, when one has been saved. */
   fieldTable?: FieldTable | null
   workspaceId: string
@@ -92,6 +92,11 @@ export function DocumentQueue({ workspaceId, basePath, title, noun, itemType, ro
   showInstitution?: boolean
   /** #228 Q8: the Purchase Orders column set. */
   purchaseOrders?: boolean
+  /** #264: has the workspace ever held a document (any type) — decides first-use vs. done. */
+  workspaceDocumentCount: number
+  /** #264: the done state's "n approved today, m posted." sentence — Bank Statements only (a
+   * postable queue); Purchase Orders passes undefined and keeps the default done body. */
+  todayOutcome?: { approvedToday: number; postedToday: number }
 }) {
   const [needsAttention, setNeedsAttention] = useState<Set<string>>(new Set())
   const byId = new Map(rows.map((row) => [row.id, row]))
@@ -181,7 +186,11 @@ export function DocumentQueue({ workspaceId, basePath, title, noun, itemType, ro
         : [row.supplier ?? row.institution ?? row.filename, row.total ?? "No amount", `Received ${formatDate(row.receivedAt)}`, row.category, state, attention]
       ).filter(Boolean).join(", ")
     } }}
-    empty={{ title: `No ${noun}s yet.`, body: emptyBody }}
+    empty={{
+      firstUse: { title: `No ${noun}s yet.`, body: emptyBody },
+      done: todayOutcome ? { body: `${todayOutcome.approvedToday} approved today, ${todayOutcome.postedToday} posted.` } : undefined,
+    }}
+    workspaceDocumentCount={workspaceDocumentCount}
     loadDetail={(documentId) => getQueueDetailAction(workspaceId, documentId)}
     bulkActions={({ selectedIds, clear }) => <DocumentBulkActions
       workspaceId={workspaceId} noun={noun} selectedIds={selectedIds} clear={clear} toRecord={toRecord}
