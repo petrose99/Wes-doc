@@ -46,6 +46,14 @@ so the driver passes it as the `-p` prompt, which counts as a user invocation.
   exit without close: WIP committed, hand-off posted, ticket back on the
   frontier; parked only after `MAX_ATTEMPTS` consecutive sessions with no
   progress), claim release on failure.
+- `scoreboard.py` — per-session scores (from each report's `scores:` line)
+  beside cost (turns, context, images, subagents, from the stream log). The
+  driver regenerates `docs/wayfinder-reports/<map>/scoreboard.md` after every
+  session. First-pass score is the KPI; cost is turns × context.
+- `retro.sh` + `retro-brief.md` — a bounded retrospective session (cheap
+  model, no dev server, no logs, no screenshots) that reads the scoreboard
+  and the last N reports and proposes lessons/pre-flight/brief edits as a PR.
+  Run every four or five builds: `scripts/wayfinder-autopilot/retro.sh <map>`.
 - `lessons.md` — generic lessons (any product): what earlier first passes
   missed → what to put in the spec. Read whole each session, appended at
   close, capped ~80 lines by merging. The project's own

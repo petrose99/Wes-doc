@@ -1,7 +1,7 @@
 import { AdminPage, ModuleOff, ReadOnlyBand } from "@/components/admin/admin-ui"
-import { Empty, Panel, Pill } from "@/components/automation/automation-ui"
-import { ApprovalWorkflowForm, type ApprovalFormMember } from "@/components/workspace/approval-workflow-form"
-import { ApprovalWorkflowRowControls } from "@/components/workspace/approval-workflow-row"
+import { Panel } from "@/components/automation/automation-ui"
+import { ApprovalFlowsEditor, type FlowSummary } from "@/components/workspace/approval-flows-editor"
+import type { ApprovalFormMember } from "@/components/workspace/approval-workflow-form"
 import { DefaultApprovalFlow, type DefaultFlowOption } from "@/components/workspace/default-approval-flow"
 import { getDefaultApprovalFlow } from "@/models/approval-defaults"
 import { getAdminContext } from "@/lib/admin/context"
@@ -35,7 +35,6 @@ export default async function ApprovalFlowsPage({ params }: { params: Promise<{ 
     email: m.user.email ?? "",
     role: m.role === "owner" ? "owner" : "member",
   }))
-  const memberNameById = new Map(memberOptions.map((m) => [m.id, m.name || m.email]))
   const currency = membership.workspace.baseCurrency ?? "USD"
   const formatThreshold = (value: number) => {
     try {
@@ -46,6 +45,20 @@ export default async function ApprovalFlowsPage({ params }: { params: Promise<{ 
   }
 
   const defaultFlow = await getDefaultApprovalFlow(workspaceId)
+  const flowSummaries: FlowSummary[] = workflows.map((workflow) => ({
+    id: workflow.id,
+    name: workflow.name,
+    active: workflow.active,
+    stages: workflow.stages.map((stage) => ({
+      id: stage.id,
+      name: stage.name,
+      requireOwner: stage.requireOwner,
+      approverIds: (stage.approverIds ?? []) as string[],
+      minAmount: stage.minAmount === null || stage.minAmount === undefined ? null : decimalToNumber(stage.minAmount),
+    })),
+  }))
+  const thresholds: Record<string, string> = {}
+  for (const flow of flowSummaries) for (const stage of flow.stages) if (stage.minAmount !== null) thresholds[stage.id] = formatThreshold(stage.minAmount)
   const flowOptions: DefaultFlowOption[] = workflows.map((workflow) => ({
     id: workflow.id,
     name: workflow.name,
@@ -60,51 +73,12 @@ export default async function ApprovalFlowsPage({ params }: { params: Promise<{ 
       <DefaultApprovalFlow workspaceId={workspaceId} options={flowOptions} currentId={defaultFlow?.id ?? null} readOnly={!owner} />
     </Panel>
 
-    <Panel title="Flows" note={`${workflows.length} flow${workflows.length === 1 ? "" : "s"} in this workspace.`}>
-      {!workflows.length
-        ? <Empty title="No flows yet">Until one exists, an approval started from the Invoices bulk bar is a single decision by an owner.</Empty>
-        : <div className="divide-y divide-hairline-soft">
-            {workflows.map((workflow) => (
-              <div key={workflow.id} className="py-4 first:pt-0">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-semibold text-slate-900">{workflow.name}</span>
-                    {/* The default is marked where the flows are listed, not only in the selector
-                      * above: a reader scrolling the list must be able to see which one starts on
-                      * its own without scrolling back up (critique H6). */}
-                    {defaultFlow?.id === workflow.id && <Pill state={workflow.active ? "auto" : "waiting"}>{workflow.active ? "Default" : "Default, but inactive"}</Pill>}
-                  </span>
-                  {owner
-                    ? <ApprovalWorkflowRowControls workspaceId={workspaceId} workflowId={workflow.id} workflowName={workflow.name} active={workflow.active} />
-                    : <Pill state={workflow.active ? "auto" : "idle"}>{workflow.active ? "Active" : "Inactive"}</Pill>}
-                </div>
-                <ol className="mt-2.5 space-y-1.5">
-                  {workflow.stages.map((stage, index) => {
-                    const approverIds = (stage.approverIds ?? []) as string[]
-                    const threshold = stage.minAmount === null || stage.minAmount === undefined ? null : decimalToNumber(stage.minAmount)
-                    return (
-                      <li key={stage.id} className="flex flex-wrap items-center gap-1.5 text-[13px]">
-                        <span className="tabular-nums text-slate-400">{index + 1}.</span>
-                        <span className="font-medium text-slate-800">{stage.name}</span>
-                        {approverIds.length > 0
-                          ? <Pill state="auto">{approverIds.map((id) => memberNameById.get(id) ?? id.slice(0, 8)).join(", ")}</Pill>
-                          : stage.requireOwner
-                            ? <Pill state="idle">Owner only</Pill>
-                            : <Pill state="idle">Any member</Pill>}
-                        {threshold !== null && <Pill state="waiting">≥ {formatThreshold(threshold)}</Pill>}
-                      </li>
-                    )
-                  })}
-                </ol>
-              </div>
-            ))}
-          </div>}
-    </Panel>
-
-    {owner && (
-      <Panel title="Add a flow" note="Name it, list the stages in order, and pick who decides each one.">
-        <ApprovalWorkflowForm workspaceId={workspaceId} members={memberOptions} />
-      </Panel>
-    )}
+    <ApprovalFlowsEditor
+      workspaceId={workspaceId}
+      flows={flowSummaries}
+      members={memberOptions}
+      defaultFlowId={defaultFlow?.id ?? null}
+      owner={owner}
+      formatThreshold={thresholds} />
   </AdminPage>
 }

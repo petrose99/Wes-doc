@@ -4,9 +4,10 @@ import { estimateAutoStartsAction, setDefaultApprovalFlowAction } from "@/app/(a
 import { AdminSaveBar } from "@/components/admin/admin-save-bar"
 import { Consequence } from "@/components/admin/admin-ui"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
-import { STALE_FLOW_ERROR } from "@/models/approval-defaults"
+import { STALE_FLOW_ERROR } from "@/lib/approvals/default-flow"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useCallback, useEffect, useId, useState } from "react"
+import { useCallback, useEffect, useId, useRef, useState } from "react"
 
 export type DefaultFlowOption = { id: string; name: string; active: boolean; stageCount: number }
 
@@ -30,6 +31,7 @@ export function DefaultApprovalFlow({ workspaceId, options, currentId, readOnly 
 }) {
   const router = useRouter()
   const groupId = useId()
+  const saveButtonRef = useRef<HTMLButtonElement>(null)
   const [saved, setSaved] = useState<string>(currentId ?? NONE)
   const [choice, setChoice] = useState<string>(currentId ?? NONE)
   const [pending, setPending] = useState(false)
@@ -37,7 +39,7 @@ export function DefaultApprovalFlow({ workspaceId, options, currentId, readOnly 
   const [error, setError] = useState<string | null>(null)
   const [stale, setStale] = useState(false)
   const [savedAt, setSavedAt] = useState<number | null>(null)
-  const [confirm, setConfirm] = useState<{ name: string; estimate: number | null } | null>(null)
+  const [confirm, setConfirm] = useState<{ name: string; active: boolean; estimate: number | null } | null>(null)
 
   // The server is the truth for what is in force: when the row actions below change it (the
   // default flow deleted → SetNull, or another session chose one) and the page refreshes, the
@@ -63,15 +65,15 @@ export function DefaultApprovalFlow({ workspaceId, options, currentId, readOnly 
       if (!result.success) {
         // The dialog closes on a refusal so the sentence in the bar is in front of the reader,
         // not behind a modal that looks as if Confirm did nothing.
-        setConfirm(null)
+        closeConfirm()
         setStale(result.error === STALE_FLOW_ERROR)
         setError(`Couldn't save — ${result.error || "the server didn't say why"}. Your change is still here.`)
         return
       }
-      setSaved(next); setSavedAt(Date.now()); setConfirm(null)
+      setSaved(next); setSavedAt(Date.now()); closeConfirm()
       router.refresh()
     } catch {
-      setConfirm(null)
+      closeConfirm()
       setError("Couldn't reach the server. Your change is still here.")
     } finally { setPending(false) }
   }
@@ -85,10 +87,14 @@ export function DefaultApprovalFlow({ workspaceId, options, currentId, readOnly 
     setCounting(false)
     // An estimate that cannot be counted must not block the decision: the dialog still opens and
     // says the number is unavailable, rather than trapping the owner behind a failed count.
-    setConfirm({ name: chosen.name, estimate: result.success ? (result.data?.count ?? null) : null })
+    setConfirm({ name: chosen.name, active: chosen.active, estimate: result.success ? (result.data?.count ?? null) : null })
   }
 
   const discard = () => { setChoice(saved); setError(null); setStale(false) }
+  // The confirm opens from a Save that is disabled while it counts, so the dialog records no
+  // opener; focus comes back here explicitly when it closes for any reason.
+  const closeConfirm = () => { setConfirm(null); window.requestAnimationFrame(() => saveButtonRef.current?.focus()) }
+  const bulkBar = <Link href={`/workspaces/${workspaceId}/invoices`} className="font-medium text-emerald-700 underline-offset-2 hover:underline">Invoices bulk bar</Link>
 
   if (!options.length) {
     return <div>
@@ -126,9 +132,12 @@ export function DefaultApprovalFlow({ workspaceId, options, currentId, readOnly 
     </fieldset>
 
     <div className="mt-4">
+      {/* Two sentences while a change is pending — what is in force now, and what Save would make
+        * true — so the selected radio and the sentence beneath it never contradict each other. */}
       <Consequence>
+        {dirty && <span className="font-medium text-slate-900">In force now: </span>}
         {saved === NONE || !savedOption
-          ? "No flow starts on its own. Approvals start by hand from the Invoices bulk bar."
+          ? <>No flow starts on its own. Approvals start by hand from the {bulkBar}.</>
           : !savedOption.active
             ? <>
                 <span className="font-medium text-amber-800">&ldquo;{savedOption.name}&rdquo; is the default but is inactive, so nothing starts on its own.</span>{" "}
@@ -136,11 +145,19 @@ export function DefaultApprovalFlow({ workspaceId, options, currentId, readOnly 
               </>
             : <>&ldquo;{savedOption.name}&rdquo; starts on its own when an invoice reaches In review with no blocking check. Invoices already being reviewed are left as they are.</>}
       </Consequence>
+      {dirty && <Consequence>
+        <span className="font-medium text-slate-900">After you save: </span>
+        {choice === NONE || !chosen
+          ? "no flow starts on its own; approvals start by hand again."
+          : !chosen.active
+            ? <>&ldquo;{chosen.name}&rdquo; becomes the default but is inactive, so nothing starts on its own until it is activated.</>
+            : <>&ldquo;{chosen.name}&rdquo; starts on its own when an invoice reaches In review with no blocking check.</>}
+      </Consequence>}
     </div>
 
     <AdminSaveBar
       dirty={dirty} pending={pending || counting} pendingLabel={counting ? "Counting…" : undefined}
-      error={error} savedAt={savedAt} disabled={readOnly} shortcut={confirm === null}
+      error={error} savedAt={savedAt} disabled={readOnly} shortcut={confirm === null} saveButtonRef={saveButtonRef}
       errorAction={stale ? { label: "Reload", onClick: () => { setError(null); setStale(false); router.refresh() } } : undefined}
       onSave={() => void save()} onDiscard={discard} onSavedShown={clearSaved} />
 
@@ -149,7 +166,9 @@ export function DefaultApprovalFlow({ workspaceId, options, currentId, readOnly 
       busy={pending}
       title={confirm ? `Make “${confirm.name}” the default flow?` : ""}
       description={confirm
-        ? confirm.estimate === null
+        ? !confirm.active
+          ? `“${confirm.name}” is inactive, so nothing starts on its own until it is activated in the list below. Once it is active, an invoice reaching In review with no blocking check starts it on its own. Invoices already being reviewed are left as they are.`
+          : confirm.estimate === null
           ? `From now on, an invoice reaching In review with no blocking check starts “${confirm.name}” on its own. Invoices already being reviewed are left as they are. We couldn't count how many of the last 30 days' invoices this would have covered.`
           : confirm.estimate === 0
             ? `From now on, an invoice reaching In review with no blocking check starts “${confirm.name}” on its own. No invoice in the last 30 days would have started a flow automatically. Invoices already being reviewed are left as they are.`
@@ -157,7 +176,7 @@ export function DefaultApprovalFlow({ workspaceId, options, currentId, readOnly 
         : ""}
       confirmLabel={pending ? "Saving…" : "Make it the default"}
       onConfirm={() => void commit(choice)}
-      onCancel={() => setConfirm(null)} />
+      onCancel={closeConfirm} />
   </div>
 }
 

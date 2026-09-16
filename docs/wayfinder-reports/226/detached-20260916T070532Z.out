@@ -1,0 +1,5 @@
+released #252 (left claimed by pid 733035)
+=== [1/50] #252 — Build the Admin area shell and Configuration: rail Admin item, Controls folded in, field table, Suppliers, Tax, Integrations  [sonnet]
+    #252 context at exit: 79987 tokens, 3 min
+    cleaned up session pid 739584 (pgid ?); free: 5943 MB
+--- #252: partial, attempt 1/3 — will retry, no report in 184s

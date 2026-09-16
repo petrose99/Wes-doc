@@ -120,6 +120,27 @@ run in the foreground (`run_in_background: false`) and read on return. Code
 is written by this session. Never end a turn "waiting"; if you cannot
 continue, commit WIP, post the partial hand-off and end.
 
+**The bill is turns × context. Spend both on purpose.** Every turn re-reads
+the whole context; a session at 200K context pays 200K per tool call. Map
+#226's data: build sessions cost 130–220M context tokens, a grilling 7M; #252
+took 747 turns and 221M in one session, and the continuation that finished
+it from the hand-off took 262 turns and 38M. So:
+
+- **One script per step, not one command per fact.** Put a multi-step check
+  in a `.mjs`/`.py` file and run it once; read the summary, not the raw
+  output. Ten `grep`s in ten turns cost ten context re-reads.
+- **Read ranges, never whole files.** `sed -n a,bp`, a grep with `-n`, then
+  the lines you need. `cat` of a 400-line component is 4K tokens paid on every
+  later turn.
+- **Subagents only for a bounded read that returns a verdict** (spec critic,
+  independent evaluate). Never for a search a grep answers, never for the
+  build.
+- **Hand off at a milestone when context is high, deliberately.** With the
+  hand-off file current, a fresh session resumes at a sixth of the cost of
+  continuing at 150K+. After "surface built" or after the first measurement,
+  if the driver's cap is near, commit, update the hand-off, post
+  `Autopilot: continue —` and end — that is cheaper than pushing through.
+
 **One capture pass per round, shared by every skill.** A round is one Playwright
 run producing a named set — every state × 1440 and 390 as PNGs, the in-page
 detector JSON per state, and the keyboard probe results — saved in the ticket's
@@ -155,11 +176,20 @@ predicted away means a Part B row was filled optimistically; say which. Then wor
 batches (build fully, inspect once at both widths, fix everything shown,
 confirm once) until the bar above is met, and record the after-counts.
 
-- **Write the lessons back — to the right file.** At close, append one line
-  per correction the fix loop made that the pre-build should have caught
-  (heuristic, what was missed, what to do at spec time). A lesson that would
-  hold in any product goes to the **generic** file; one that only holds in
-  this codebase goes to the **project** file. Merge with an existing line
+- **Attribute every first-pass finding before writing lessons.** For each
+  finding the first critique/evaluate raised, name the lesson or contract
+  that should have caught it and its status: *none* (write one, with its
+  `check:`), *unchecked* (it existed as prose and was not applied — convert
+  it to a check), *wrong* (it was applied and still missed — rewrite it), or
+  *new class* (nothing could have caught it — say why). The table goes in the
+  report; the lessons files change only through it. This is what turns "it
+  wrote something down" into "it stopped making that mistake".
+- **Write the lessons back — to the right file, each with its `check:`.** At
+  close, append one line per correction the fix loop made that the pre-build
+  should have caught (heuristic, what was missed, what to do at spec time,
+  how a session would fail it). A lesson that would hold in any product goes
+  to the **generic** file; one that only holds in this codebase goes to the
+  **project** file. Merge with an existing line
   when it is the same lesson, and keep each file under ~80 lines — the files
   are read whole every session, so they stay short by generalising, not by
   forgetting. Commit the project file with the ticket. A session whose first
@@ -220,7 +250,11 @@ session made no code change, commit the report alone
 <new tickets with names, blocking edges, fog graduated or added>
 
 ## Scores and counts (rendered surfaces only)
-<first-pass critique and evaluate (the KPI) · close critique and evaluate · in-page detector first-pass/close at 1440 and 390 per state · include check · which pre-build step was weak if the first pass fell short>
+scores: predicted-critique=<n> first-critique=<n> close-critique=<n> first-evaluate=<n> close-evaluate=<n>
+<that line exactly, machine-read by scoreboard.py; then: in-page detector first-pass/close at 1440 and 390 per state · include check · which pre-build step was weak if the first pass fell short>
+
+## First-pass findings → lessons (rendered surfaces only)
+| Finding (heuristic, severity) | Lesson / contract that should have caught it | Status: none · unchecked · wrong · new class | Action taken |
 
 ## Needs the owner
 <anything deferred: removals, credentials, decisions you were unsure about>

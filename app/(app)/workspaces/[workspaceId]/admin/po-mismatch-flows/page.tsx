@@ -50,7 +50,6 @@ export default async function PoMismatchFlowsPage({ params }: { params: Promise<
     role: member.role === "owner" ? "owner" : "member",
   }))
 
-  const maxBucket = Math.max(1, ...summary.confidenceBuckets.map((b) => b.count))
   const reconciledPct = summary.bankAccepted > 0 ? Math.round((summary.bankReconciled / summary.bankAccepted) * 100) : 0
   const resolved = summary.byStatus.resolved ?? 0
   const pending = summary.byStatus.pending ?? 0
@@ -74,33 +73,14 @@ export default async function PoMismatchFlowsPage({ params }: { params: Promise<
           or a bank statement and the invoice it paid.
         </Empty>
       : <>
-        <section className="grid gap-x-10 gap-y-4 md:grid-cols-2 md:items-start">
-          <p className="max-w-[52ch] text-sm leading-relaxed text-slate-700">
-            <span className="font-semibold tabular-nums text-slate-900">{resolved}</span> of the {summary.total} {summary.total === 1 ? "match" : "matches"} the pipeline proposed {resolved === 1 ? "has" : "have"} been settled.{" "}
-            {pending > 0 ? `${pending} still ${pending === 1 ? "waits" : "wait"} on a decision.` : "Nothing is waiting on a decision."}
-          </p>
-          <div className="max-w-[52ch]">
-            {summary.bankAccepted === 0
-              ? <p className="text-sm text-slate-600">
-                  No bank lines have been accepted yet. Once someone accepts a suggested match, this tracks
-                  how many of them reach reconciled in the ledger.
-                </p>
-              : <>
-                  <p className="text-sm text-slate-600">
-                    Of the {summary.bankAccepted} bank {summary.bankAccepted === 1 ? "line" : "lines"} someone accepted,{" "}
-                    <span className="font-semibold text-slate-900">{summary.bankReconciled}</span>{" "}
-                    {summary.bankReconciled === 1 ? "has" : "have"} made it all the way to reconciled in the ledger.
-                  </p>
-                  <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100">
-                    <div className="h-full bg-emerald-600" style={{ width: `${reconciledPct}%` }} />
-                  </div>
-                  <p className="mt-2 text-xs tabular-nums text-slate-500">{reconciledPct}% of accepted lines reconciled</p>
-                </>}
-          </div>
-        </section>
-
         <div className="grid gap-x-12 gap-y-10 md:grid-cols-2">
+          {/* Each lead sentence sits under its own heading, so the two columns start on the same
+            * baseline at md and stack in the right order below it. */}
           <Panel level="h3" title="Document matches" note="Two- and three-way ties between purchase orders, invoices and receipts.">
+            <p className="mb-4 max-w-[52ch] text-sm leading-relaxed text-slate-700">
+              <span className="font-semibold tabular-nums text-slate-900">{resolved}</span> of the {summary.total} {summary.total === 1 ? "match" : "matches"} the pipeline proposed {resolved === 1 ? "has" : "have"} been settled.{" "}
+              {pending > 0 ? `${pending} still ${pending === 1 ? "waits" : "wait"} on a decision.` : "Nothing is waiting on a decision."}
+            </p>
             <Ledger>
               <LedgerRow label="Settled" value={resolved} state="auto" />
               <LedgerRow label="Waiting on a decision" value={pending} state={pending > 0 ? "waiting" : "idle"} />
@@ -116,6 +96,24 @@ export default async function PoMismatchFlowsPage({ params }: { params: Promise<
           </Panel>
 
           <Panel level="h3" title="Bank reconciliation" note="Statement lines matched to an invoice or receipt, and how far each got.">
+            <div className="mb-4 max-w-[52ch]">
+              {summary.bankAccepted === 0
+                ? <p className="text-sm text-slate-600">
+                    No bank lines have been accepted yet. Once someone accepts a suggested match, this tracks
+                    how many of them reach reconciled in the ledger.
+                  </p>
+                : <>
+                    <p className="text-sm text-slate-600">
+                      Of the {summary.bankAccepted} bank {summary.bankAccepted === 1 ? "line" : "lines"} someone accepted,{" "}
+                      <span className="font-semibold text-slate-900">{summary.bankReconciled}</span>{" "}
+                      {summary.bankReconciled === 1 ? "has" : "have"} made it all the way to reconciled in the ledger.
+                    </p>
+                    <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                      <div className="h-full bg-emerald-600" style={{ width: `${reconciledPct}%` }} />
+                    </div>
+                    <p className="mt-2 text-xs tabular-nums text-slate-500">{reconciledPct}% of accepted lines reconciled</p>
+                  </>}
+            </div>
             <Ledger>
               <LedgerRow label="Suggested by the pipeline" value={summary.bankTotal} state="idle" />
               <LedgerRow label="Accepted by a person" value={summary.bankAccepted} state={summary.bankAccepted > 0 ? "waiting" : "idle"} />
@@ -124,7 +122,7 @@ export default async function PoMismatchFlowsPage({ params }: { params: Promise<
           </Panel>
         </div>
 
-        <Panel level="h3" title="How confident the matches were" note="Document matches grouped by the score the pipeline gave them.">
+        <Panel level="h3" title="How confident the matches were" note="Document matches grouped by the score the pipeline gave them; each bar is that band's share of all matches.">
           {summary.total === 0
             ? <Empty title="Nothing to plot yet">
                 Confidence bands fill in as soon as the pipeline generates its first match candidates.
@@ -135,7 +133,7 @@ export default async function PoMismatchFlowsPage({ params }: { params: Promise<
                     key={b.label}
                     label={b.label}
                     value={b.count}
-                    share={b.count / maxBucket}
+                    share={summary.total > 0 ? b.count / summary.total : 0}
                     state={b.count > 0 ? "auto" : "idle"}
                   />
                 ))}

@@ -3,9 +3,15 @@
 Product-agnostic only; codebase specifics go to the project's `.claude/wayfinder-autopilot/lessons.md`. Read in full before the pre-build pass on every execution ticket. Append at
 close: one line per correction the fix loop had to make that the pre-build
 should have caught. Format: `- (#ticket, heuristic) what was missed → what to
-do at spec time`. Keep it under ~80 lines: when two lines say the same thing,
-merge them and generalise. This file is the loop's memory; a lesson that is
-not written here will be relearned at full cost.
+do at spec time · check: <grep / script / detector rule that fails when it is
+missed>`. **A line without a `check:` is an observation, not a lesson** — it
+stays in the ticket report until someone can say how a session would fail it.
+The pre-flight runs every `check:` that applies to the surface before the
+first capture. Keep it under ~80 lines: when two lines say the same thing,
+merge them and generalise; a lesson that has fired three times graduates to
+code (a shared primitive, an eslint rule, a detector ignore with a reason) and
+leaves this file. This file is the loop's memory; a lesson that is not written
+here will be relearned at full cost.
 
 ## Pre-build (what the spec must already contain)
 

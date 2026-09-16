@@ -1,24 +1,37 @@
 "use client"
 
 import { deleteApprovalWorkflowAction, setApprovalWorkflowActiveAction } from "@/app/(app)/workspaces/[workspaceId]/approval-actions"
+import { Pill } from "@/components/automation/automation-ui"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 
-export function ApprovalWorkflowRowControls({ workspaceId, workflowId, workflowName, active }: { workspaceId: string; workflowId: string; workflowName: string; active: boolean }) {
+/** #253: a flow's row actions on Admin › Approval Flows. The status is a `Pill` (a word, never a
+ * control) and each action is a named link beside it — "Deactivate", "Duplicate", "Delete" — so
+ * nothing on the row looks like a status but behaves like a switch. Row actions apply at once (they
+ * are not part of the page's save bar) and say so in place: a refusal renders on the row with
+ * nothing changed, not in a toast that leaves before it is read.
+ *
+ * Deactivating the *default* flow is the one toggle with a consequence beyond the row — nothing
+ * starts on its own until another default is chosen — so that case confirms and names it. */
+export function ApprovalWorkflowRowControls({ workspaceId, workflowId, workflowName, active, isDefault, onDuplicate }: {
+  workspaceId: string
+  workflowId: string
+  workflowName: string
+  active: boolean
+  isDefault: boolean
+  /** Pre-fills the Add a flow form from this flow, so a variant is a rename rather than a retype. */
+  onDuplicate?: () => void
+}) {
   const router = useRouter()
   const [pending, setPending] = useState(false)
-  const [confirmOpen, setConfirmOpen] = useState(false)
-  // #253: refusals are said on the row, beside the control that failed, with nothing changed —
-  // the same in-place grammar as the page's save bar, not a toast that leaves before it is read.
+  const [confirm, setConfirm] = useState<"delete" | "deactivate" | null>(null)
   const [error, setError] = useState<string | null>(null)
-  // Optimistic: the toggle used to only ever show its old state until router.refresh() finished
-  // a full round trip, so on a slow connection a click looked like it did nothing. This flips the
-  // label immediately and rolls back on failure instead.
+  // Optimistic: the pill flips at once and rolls back on failure, so a slow round trip never
+  // looks like a click that did nothing.
   const [optimisticActive, setOptimisticActive] = useState(active)
 
-  const toggle = async () => {
-    const next = !optimisticActive
+  const setActive = async (next: boolean) => {
     setOptimisticActive(next)
     setPending(true); setError(null)
     try {
@@ -32,7 +45,7 @@ export function ApprovalWorkflowRowControls({ workspaceId, workflowId, workflowN
     } catch {
       setOptimisticActive(!next)
       setError("Couldn't reach the server. Nothing changed.")
-    } finally { setPending(false) }
+    } finally { setPending(false); setConfirm(null) }
   }
 
   const remove = async () => {
@@ -43,24 +56,36 @@ export function ApprovalWorkflowRowControls({ workspaceId, workflowId, workflowN
       router.refresh()
     } catch {
       setError("Couldn't reach the server. Nothing changed.")
-    } finally { setPending(false); setConfirmOpen(false) }
+    } finally { setPending(false); setConfirm(null) }
   }
 
-  return <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1">
+  const action = "text-xs font-medium underline-offset-2 hover:underline disabled:opacity-50"
+
+  return <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
     {error && <span role="alert" className="basis-full text-right text-xs text-red-700 sm:basis-auto">{error}</span>}
-    <button type="button" disabled={pending} onClick={() => void toggle()} aria-pressed={optimisticActive}
-      className={`rounded-full px-2.5 py-0.5 text-xs font-semibold disabled:opacity-70 ${optimisticActive ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-500"}`}>
-      {optimisticActive ? "Active" : "Inactive"}
+    <Pill state={optimisticActive ? "auto" : "idle"}>{optimisticActive ? "Active" : "Inactive"}</Pill>
+    <button type="button" disabled={pending} className={`${action} text-slate-600`}
+      onClick={() => (optimisticActive && isDefault ? setConfirm("deactivate") : void setActive(!optimisticActive))}>
+      {optimisticActive ? "Deactivate" : "Activate"}
     </button>
-    <button type="button" disabled={pending} onClick={() => setConfirmOpen(true)} className="text-xs font-medium text-red-600 hover:text-red-700 disabled:opacity-50">Delete</button>
+    {onDuplicate && <button type="button" disabled={pending} onClick={onDuplicate} className={`${action} text-slate-600`}>Duplicate</button>}
+    <button type="button" disabled={pending} onClick={() => setConfirm("delete")} className={`${action} text-red-600 hover:text-red-700`}>Delete</button>
     <ConfirmDialog
-      open={confirmOpen}
+      open={confirm === "delete"}
       destructive
       busy={pending}
       title="Delete this flow?"
-      description={`Tasks already using "${workflowName}" keep their progress, but they'll no longer show it as their flow. If it is the default flow, nothing starts on its own until another is chosen. This cannot be undone.`}
+      description={`Tasks already using "${workflowName}" keep their progress, but they'll no longer show it as their flow.${isDefault ? " It is the default flow, so nothing starts on its own until another is chosen." : ""} This cannot be undone.`}
       confirmLabel={pending ? "Deleting…" : "Delete"}
       onConfirm={() => void remove()}
-      onCancel={() => setConfirmOpen(false)} />
+      onCancel={() => setConfirm(null)} />
+    <ConfirmDialog
+      open={confirm === "deactivate"}
+      busy={pending}
+      title={`Deactivate "${workflowName}"?`}
+      description="It is the default flow. While it is inactive nothing starts on its own — approvals start by hand from the Invoices bulk bar until it is active again or another default is chosen. Invoices already being reviewed are left as they are."
+      confirmLabel={pending ? "Deactivating…" : "Deactivate"}
+      onConfirm={() => void setActive(false)}
+      onCancel={() => setConfirm(null)} />
   </div>
 }

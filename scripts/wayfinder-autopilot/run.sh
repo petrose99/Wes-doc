@@ -296,6 +296,8 @@ PY
   [ -f "$OUT/$T.md" ] || OUTCOME="$OUTCOME, no report"
   printf '| %s | [#%s](https://github.com/%s/issues/%s) %s | %s (%s) | %dm%02ds | [log](logs/%s) |\n' \
     "$START" "$T" "$REPO" "$T" "$TT" "$OUTCOME" "${MODEL:-default}" $((DUR/60)) $((DUR%60)) "$(basename "$LOG")" >> "$RUNLOG"
+  # Cost beside the score, every session: turns × context is the bill.
+  python3 "$(dirname "$0")/scoreboard.py" "$MAP" "$ROOT" 2>/dev/null | sed 's/^/    /' || true
   echo "--- #$T: $OUTCOME in ${DUR}s"
 done
 echo "Run log: $RUNLOG"

@@ -1,10 +1,11 @@
 "use client"
 
-import { useId, useMemo, useState } from "react"
+import { useEffect, useId, useMemo, useRef, useState } from "react"
 import { createApprovalWorkflowAction } from "@/app/(app)/workspaces/[workspaceId]/approval-actions"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { setUnsaved } from "@/lib/client/unsaved-changes"
 import { useRouter } from "next/navigation"
 
 export type ApprovalFormMember = { id: string; name: string; email: string; role: "owner" | "member" }
@@ -20,6 +21,10 @@ type StageRow = {
 let nextKey = 0
 const emptyStage = (): StageRow => ({ key: nextKey++, name: "", requireOwner: false, approverIds: [], minAmount: "" })
 
+/** What Duplicate hands the form: the flow's name and stages, ready to rename. */
+export type ApprovalFlowDraft = { name: string; stages: { name: string; requireOwner: boolean; approverIds: string[]; minAmount: string }[] }
+const fromDraft = (draft: ApprovalFlowDraft): StageRow[] => draft.stages.map((stage) => ({ key: nextKey++, ...stage }))
+
 /** Beyond this many members, a flat row of toggle chips stops being scannable — one chip per
  * person, unbounded, is how a 12-person workspace turned "pick approvers" into a wall of buttons.
  * Past the threshold each stage gets its own filter box over the same chip list instead. */
@@ -29,12 +34,14 @@ const APPROVER_SEARCH_THRESHOLD = 5
  * workspace that only cares about role-gating never has to look at either. Matches the rest of
  * the Automation section's rule-not-card language — a border-t and a label, not a bordered box
  * inside a bordered box. */
-function StageEditor({ index, stage, members, onChange, onRemove, canRemove, nameError, thresholdError }: {
+function StageEditor({ index, count, stage, members, onChange, onRemove, onMove, canRemove, nameError, thresholdError }: {
   index: number
+  count: number
   stage: StageRow
   members: ApprovalFormMember[]
   onChange: (patch: Partial<StageRow>) => void
   onRemove: () => void
+  onMove: (direction: -1 | 1) => void
   canRemove: boolean
   nameError: boolean
   thresholdError: boolean
@@ -72,6 +79,9 @@ function StageEditor({ index, stage, members, onChange, onRemove, canRemove, nam
           className={nameError ? "border-red-400 focus-visible:ring-red-400" : undefined}
         />
       </div>
+      {/* Order is the flow: a stage that lands in the wrong place is moved, not deleted and retyped. */}
+      <button type="button" disabled={index === 0} onClick={() => onMove(-1)} aria-label={`Move stage ${index + 1} up`} className="shrink-0 text-[13px] font-medium text-slate-500 hover:text-slate-900 disabled:opacity-40">↑</button>
+      <button type="button" disabled={index === count - 1} onClick={() => onMove(1)} aria-label={`Move stage ${index + 1} down`} className="shrink-0 text-[13px] font-medium text-slate-500 hover:text-slate-900 disabled:opacity-40">↓</button>
       <button type="button" disabled={!canRemove} onClick={onRemove} className="shrink-0 text-[13px] font-medium text-slate-500 hover:text-red-700 disabled:opacity-40">
         Remove
       </button>
@@ -125,7 +135,7 @@ function StageEditor({ index, stage, members, onChange, onRemove, canRemove, nam
                 })}
               </div>
             </>}
-          {stage.approverIds.length > 0 && <p className="mt-1.5 max-w-[48ch] text-[13px] text-slate-500">Only these {stage.approverIds.length === 1 ? "person" : "people"} can decide this stage. Owner-only is superseded.</p>}
+          {stage.approverIds.length > 0 && <p className="mt-1.5 max-w-[48ch] text-[13px] text-slate-500">Only {stage.approverIds.length === 1 ? "this person" : "these people"} can decide this stage, whatever their role.</p>}
           {stage.approverIds.length === 0 && <label className="mt-2 flex items-center gap-1.5 text-[13px] text-slate-600">
             <input type="checkbox" checked={stage.requireOwner} onChange={(event) => onChange({ requireOwner: event.target.checked })} className="h-3.5 w-3.5 accent-emerald-700" />
             Owner only
@@ -160,16 +170,44 @@ function StageEditor({ index, stage, members, onChange, onRemove, canRemove, nam
  * WP-AP2: `approverIds` and `minAmount` are optional per-stage settings. Empty approver list ⇒
  * role-only gating (the historic behavior). Blank minAmount ⇒ the stage applies at every amount.
  * The engine's canDecideStage / applicableStages honor both — see lib/approvals/engine.ts. */
-export function ApprovalWorkflowForm({ workspaceId, members }: { workspaceId: string; members: ApprovalFormMember[] }) {
+export function ApprovalWorkflowForm({ workspaceId, members, draft }: {
+  workspaceId: string
+  members: ApprovalFormMember[]
+  /** Set by Duplicate on a row above; the form takes it as its new content and moves focus to the name. */
+  draft?: ApprovalFlowDraft | null
+}) {
   const router = useRouter()
   const nameId = useId()
+  const formKey = useId()
+  const nameRef = useRef<HTMLInputElement>(null)
   const [pending, setPending] = useState(false)
-  const [name, setName] = useState("")
-  const [stages, setStages] = useState<StageRow[]>([emptyStage(), emptyStage()])
+  const [name, setName] = useState(draft?.name ?? "")
+  const [stages, setStages] = useState<StageRow[]>(draft ? fromDraft(draft) : [emptyStage(), emptyStage()])
   const [showErrors, setShowErrors] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [created, setCreated] = useState<string | null>(null)
 
+  useEffect(() => {
+    if (!draft) return
+    setName(draft.name); setStages(fromDraft(draft)); setShowErrors(false); setError(null); setCreated(null)
+    nameRef.current?.focus(); nameRef.current?.select()
+  }, [draft])
+
+  // A half-built flow is unsaved work: the Admin leave guard asks before it is lost, the same as
+  // a dirty save bar elsewhere in Admin.
+  const typed = name.trim() !== "" || stages.some((stage) => stage.name.trim() !== "" || stage.approverIds.length > 0 || stage.minAmount.trim() !== "")
+  useEffect(() => {
+    setUnsaved(formKey, typed ? "You have a flow that hasn't been created yet." : null)
+    return () => setUnsaved(formKey, null)
+  }, [formKey, typed])
+
+  const moveStage = (index: number, direction: -1 | 1) => setStages((previous) => {
+    const target = index + direction
+    if (target < 0 || target >= previous.length) return previous
+    const next = [...previous]
+    ;[next[index], next[target]] = [next[target], next[index]]
+    return next
+  })
   const updateStage = (index: number, patch: Partial<StageRow>) => setStages((previous) => previous.map((stage, i) => (i === index ? { ...stage, ...patch } : stage)))
   const removeStage = (index: number) => setStages((previous) => previous.filter((_, i) => i !== index))
   const addStage = () => setStages((previous) => [...previous, emptyStage()])
@@ -206,7 +244,7 @@ export function ApprovalWorkflowForm({ workspaceId, members }: { workspaceId: st
   return <div>
     <div>
       <Label htmlFor={nameId} className="text-[13px]">Flow name</Label>
-      <Input id={nameId} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Two-step finance approval" className="mt-1.5" aria-invalid={(showErrors && !name.trim()) || undefined} />
+      <Input ref={nameRef} id={nameId} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Two-step finance approval" className="mt-1.5" aria-invalid={(showErrors && !name.trim()) || undefined} />
       {showErrors && !name.trim() && <p className="mt-1 text-xs text-red-600">Name the flow.</p>}
     </div>
 
@@ -217,10 +255,12 @@ export function ApprovalWorkflowForm({ workspaceId, members }: { workspaceId: st
           <StageEditor
             key={stage.key}
             index={index}
+            count={stages.length}
             stage={stage}
             members={members}
             onChange={(patch) => updateStage(index, patch)}
             onRemove={() => removeStage(index)}
+            onMove={(direction) => moveStage(index, direction)}
             canRemove={stages.length > 1}
             nameError={showErrors && blankStageIndexes.has(index)}
             thresholdError={showErrors && badThresholdIndexes.has(index)}

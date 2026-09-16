@@ -6,6 +6,7 @@ import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { createApprovalWorkflow, deleteApprovalWorkflow, updateApprovalWorkflow, type WorkflowStageDraft } from "@/models/approval-workflows"
 import { revalidatePath } from "next/cache"
 import { errorMessage, NO_ACCESS, paths, requireMember } from "./action-helpers"
+import { adminPaths } from "@/lib/admin/paths"
 
 /** Building and editing workflows is owner-only, same bar as automation-rules.ts's rule creation
  * — both are workspace-wide policy, not a per-document action any member should be able to change
@@ -49,6 +50,7 @@ export async function createApprovalWorkflowAction(workspaceId: string, formData
   try {
     const workflow = await createApprovalWorkflow({ workspaceId, name, stages, createdById: user.id })
     revalidatePath(paths(workspaceId).approvals)
+    revalidatePath(adminPaths(workspaceId).approvalFlows)
     return { success: true, data: { id: workflow.id } }
   } catch (error) { return { success: false, error: errorMessage(error, "Could not create the workflow") } }
 }
@@ -59,6 +61,7 @@ export async function setApprovalWorkflowActiveAction(workspaceId: string, workf
   try {
     await updateApprovalWorkflow({ workspaceId, workflowId, active })
     revalidatePath(paths(workspaceId).approvals)
+    revalidatePath(adminPaths(workspaceId).approvalFlows)
     return { success: true, data: null }
   } catch (error) { return { success: false, error: errorMessage(error, "Could not update the workflow") } }
 }
@@ -69,6 +72,7 @@ export async function deleteApprovalWorkflowAction(workspaceId: string, workflow
   try {
     await deleteApprovalWorkflow(workspaceId, workflowId)
     revalidatePath(paths(workspaceId).approvals)
+    revalidatePath(adminPaths(workspaceId).approvalFlows)
     return { success: true, data: null }
   } catch (error) { return { success: false, error: errorMessage(error, "Could not delete the workflow") } }
 }

@@ -104,9 +104,12 @@ export function PoMismatchPolicy({ workspaceId, quantityPercent, matchVariancePe
     setError(null)
   }
 
-  const namedApprovers = savedApprovers
+  const named = (ids: string[]) => ids
     .map((id) => members.find((member) => member.id === id))
     .filter((member): member is MismatchApproverOption => Boolean(member))
+  const namedApprovers = named(savedApprovers)
+  const pendingApprovers = named(approvers)
+  const approversDirty = !sameSet(approvers, savedApprovers)
 
   return <div className="space-y-10">
     <Panel title="Tolerances" note="How far an invoice may differ from its purchase order before the row shows a mismatch.">
@@ -114,27 +117,29 @@ export function PoMismatchPolicy({ workspaceId, quantityPercent, matchVariancePe
         <ToleranceRow
           id={quantityId}
           label="Quantity tolerance"
-          description="How far a purchase order's cumulative invoiced quantity may exceed what was ordered before the line shows ≠ and the consumption check holds the invoice."
+          description="How much more than the ordered quantity the invoices on a purchase order may add up to before the line shows ≠ and the invoice is held for its stage's approver."
           value={quantity}
           onChange={setQuantity}
           invalid={!quantityValid}
+          problem={quantityValid ? null : "Enter a number between 0 and 100."}
           disabled={pending || readOnly}
         />
         <ToleranceRow
           id={varianceId}
           label="Match variance"
-          description="How far an invoice's unit price and total may differ from the order before the Total carries the match-variance gate and the invoice waits for someone to override it."
+          description="How far an invoice's unit prices and total may differ from the order before the Total shows ≠ and the invoice waits for someone named below to let it through."
           value={variance}
           onChange={setVariance}
           invalid={!varianceValid}
+          problem={varianceValid ? null : "Enter a number between 0 and 100."}
           disabled={pending || readOnly}
         />
       </div>
       <div className="mt-4">
         <Consequence>
           A line inside both tolerances shows = on the invoice row and needs nobody. Over the quantity
-          tolerance, the consumption check holds the invoice for its stage&rsquo;s approver. Over the
-          match variance, the invoice waits for an override by whoever is named below.
+          tolerance, the invoice is held for its stage&rsquo;s approver. Over the match variance, it
+          waits for someone named below to let it through.
         </Consequence>
       </div>
     </Panel>
@@ -156,6 +161,9 @@ export function PoMismatchPolicy({ workspaceId, quantityPercent, matchVariancePe
               {visibleMembers.length === 0 && <span className="text-[13px] text-slate-600">No member matches &ldquo;{filter}&rdquo;.</span>}
               {visibleMembers.map((member) => {
                 const on = approvers.includes(member.id)
+                // A member reads the list; only an owner presses it. The read-only rendering is a
+                // pill, not a disabled button, so nothing looks pressable that is not.
+                if (readOnly) return <span key={member.id} className={`rounded-full border px-3 py-1 text-[13px] ${on ? "border-emerald-600 bg-emerald-50 text-emerald-800" : "border-slate-200 text-slate-500"}`}>{member.name || member.email}{member.role === "owner" ? " · owner" : ""}{on ? " ✓" : ""}</span>
                 return <button
                   key={member.id}
                   type="button"
@@ -169,12 +177,21 @@ export function PoMismatchPolicy({ workspaceId, quantityPercent, matchVariancePe
               })}
             </div>
           </>}
-      <div className="mt-4">
+      <div className="mt-4 space-y-1.5">
         <Consequence>
+          {approversDirty && <span className="font-medium text-slate-900">In force now: </span>}
           {namedApprovers.length === 0
-            ? <>Nobody is named, so a mismatch is decided by <span className="font-medium text-slate-900">the current stage&rsquo;s approver</span> — whoever the invoice&rsquo;s approval flow has it with. That is what is in force now.</>
+            ? <>Nobody is named, so a mismatch is decided by <span className="font-medium text-slate-900">the current stage&rsquo;s approver</span> — whoever the invoice&rsquo;s approval flow has it with.</>
             : <>Only <span className="font-medium text-slate-900">{namedApprovers.map((member) => member.name || member.email).join(", ")}</span> can override a PO mismatch. Anyone else who tries is told to ask {namedApprovers.length === 1 ? "them" : "one of them"}.</>}
         </Consequence>
+        {/* The chip row changes at once; the policy changes on Save. Saying both keeps a pressed chip
+          * and the sentence under it from contradicting each other. */}
+        {approversDirty && <Consequence>
+          <span className="font-medium text-slate-900">After you save: </span>
+          {pendingApprovers.length === 0
+            ? <>nobody is named, so the current stage&rsquo;s approver decides again.</>
+            : <>only {pendingApprovers.map((member) => member.name || member.email).join(", ")} can override a PO mismatch.</>}
+        </Consequence>}
       </div>
     </Panel>
 
@@ -186,27 +203,35 @@ export function PoMismatchPolicy({ workspaceId, quantityPercent, matchVariancePe
 
 /** One ruled tolerance: its name and sentence on the left, its number right-aligned. A rule, not a
  * box — the Admin ledger grammar. */
-function ToleranceRow({ id, label, description, value, onChange, invalid, disabled }: {
+function ToleranceRow({ id, label, description, value, onChange, invalid, problem, disabled }: {
   id: string
   label: string
   description: string
   value: string
   onChange: (value: string) => void
   invalid: boolean
+  /** The problem said at the field, linked by aria-describedby; the save bar repeats it as the
+   * reason Save is off. */
+  problem: string | null
   disabled: boolean
 }) {
+  const problemId = `${id}-problem`
   return <div className="flex flex-wrap items-start justify-between gap-x-8 gap-y-3 py-4 first:pt-0">
     <div className="min-w-0 max-w-[56ch]">
       <label htmlFor={id} className="block text-sm text-slate-900">{label}</label>
       <p className="mt-0.5 max-w-[52ch] text-xs leading-relaxed text-slate-500">{description}</p>
     </div>
-    <div className="flex items-center gap-2">
-      <Input
-        id={id} type="number" min={0} max={100} step={1} inputMode="numeric"
-        className="w-20 text-right tabular-nums" value={value} disabled={disabled}
-        aria-invalid={invalid || undefined}
-        onChange={(event) => onChange(event.target.value)} />
-      <span className="text-sm text-slate-600">%</span>
+    <div>
+      <div className="flex items-center gap-2">
+        <Input
+          id={id} type="number" min={0} max={100} step={1} inputMode="numeric"
+          className={`w-20 text-right tabular-nums ${invalid ? "border-red-400 focus-visible:border-red-500 focus-visible:ring-red-200" : ""}`} value={value} disabled={disabled}
+          aria-invalid={invalid || undefined}
+          aria-describedby={problem ? problemId : undefined}
+          onChange={(event) => onChange(event.target.value)} />
+        <span className="text-sm text-slate-600">%</span>
+      </div>
+      {problem && <p id={problemId} className="mt-1 text-right text-xs text-red-600">{problem}</p>}
     </div>
   </div>
 }
