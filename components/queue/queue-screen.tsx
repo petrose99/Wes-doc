@@ -160,7 +160,7 @@ export type QueueScreenProps<T> = {
    * another queue, or deleted — the line to show above the list, since the model cannot load a
    * missing row into the pane. `showHref` renders a "Show it" link when the row can still be
    * found somewhere. */
-  initialMissing?: { text: string; showHref?: string }
+  initialMissing?: { text: string; showHref?: string; name?: string }
   /** #268 spec §2.1–2.4: the cross-surface hop this queue was opened from, or null. Rendered as
    * the one Origin link, first in `#main`'s tab order, before `band`. */
   origin?: Origin | null
@@ -232,7 +232,8 @@ function QueueScreenInner<T>({
     const row = rows.find((r) => rowId(r) === initialSelectedId)
     if (!row || visibleRows.some((r) => rowId(r) === initialSelectedId)) return undefined
     const { title, suffix } = rowName(row)
-    return { text: `${[title, suffix].filter(Boolean).join(" · ")} no longer matches these filters.`, showHref: `${basePath}/${initialSelectedId}` }
+    const name = [title, suffix].filter(Boolean).join(" ")
+    return { text: `${[title, suffix].filter(Boolean).join(" · ")} no longer matches these filters.`, showHref: `${basePath}/${initialSelectedId}`, name }
   }, [initialSelectedId, rows, visibleRows, rowId, rowName, basePath])
   // The notice belongs to the row the URL addressed at arrival; opening another row clears it (spec §2.5).
   const activeNotice = openId && openId !== initialSelectedId ? undefined : (filteredNotice ?? missingNotice)
@@ -504,7 +505,7 @@ function QueueScreenInner<T>({
       </>}
     </div>}
     {activeNotice && <p role="status" className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-[13px] text-slate-700">
-      {activeNotice.text}{activeNotice.showHref && <> <Link href={activeNotice.showHref} className="font-medium text-slate-900 underline underline-offset-2">Show it</Link></>}
+      {activeNotice.text}{activeNotice.showHref && <> <Link href={activeNotice.showHref} aria-label={activeNotice.name ? `Show ${activeNotice.name}` : "Show it"} className="font-medium text-slate-900 underline underline-offset-2">Show it</Link></>}
     </p>}
 
     {/* Override Mode banner — only while the mode is on (#203's permanent strip is gone). */}

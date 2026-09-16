@@ -94,3 +94,19 @@
 === [18/50] #268 — Build the Origin link: one strip and a from= URL for every cross-surface hop  [opus[1m] · low · phase: spec]
     #268 context at exit: 134629 tokens, 7 min
     cleaned up session pid 1859643 (pgid ?); free: 6304 MB
+    scoreboard: 76 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #268: phase spec done → build next in 424s
+=== [19/50] #268 — Build the Origin link: one strip and a from= URL for every cross-surface hop  [sonnet · low · phase: build]
+    #268 crossed the hand-off line (150447 tokens ≥ 150000) — asked to hand off; hard stop at 180000
+    #268 context at exit: 156831 tokens, 4 min
+    cleaned up session pid 1867836 (pgid ?); free: 6308 MB
+    scoreboard: 77 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #268: continued (progressed), session 1/3 without progress allowed in 243s
+=== [20/50] #268 — Build the Origin link: one strip and a from= URL for every cross-surface hop  [opus[1m] · low · phase: build]
+    #268 crossed the hand-off line (152264 tokens ≥ 150000) — asked to hand off; hard stop at 180000
+    #268 context at exit: 159527 tokens, 5 min
+    cleaned up session pid 1872927 (pgid ?); free: 6314 MB
+    scoreboard: 78 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #268: continued (progressed), session 1/3 without progress allowed in 334s
+=== [21/50] #268 — Build the Origin link: one strip and a from= URL for every cross-surface hop  [opus · low · phase: build · hard (2 sessions on this phase)]
+    #268 crossed the hand-off line (156771 tokens ≥ 150000) — asked to hand off; hard stop at 180000

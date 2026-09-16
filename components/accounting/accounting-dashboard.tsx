@@ -16,6 +16,8 @@ import {
 } from "@/app/(app)/workspaces/[workspaceId]/integration-push-actions"
 import type { ReadyToPushDocument } from "@/models/documents"
 import { documentDestinationPath } from "@/lib/typed-destinations"
+import { labelForDestinationPath, withOrigin } from "@/lib/navigation/origin"
+import { useOriginHere } from "@/components/documents/po-compare"
 import { ArrowUpRight, CheckCircle2, CircleDot, FileText, Loader2, RefreshCw, ShieldAlert, Wallet } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -268,6 +270,8 @@ function ReadyToPushList({ workspaceId, connectionId, documents, notPushableCoun
   onChanged: () => void
 }) {
   const [pending, startTransition] = useTransition()
+  // #268 H-c: the failed-row hop carries this page as its origin so the queue shows a way back.
+  const here = useOriginHere()
   const [pushingId, setPushingId] = useState<string | null>(null)
   const [accounts, setAccounts] = useState<{ id: string; name: string }[] | null>(null)
   const [loadingAccounts, setLoadingAccounts] = useState(false)
@@ -390,13 +394,18 @@ function ReadyToPushList({ workspaceId, connectionId, documents, notPushableCoun
               </tr>
             </thead>
             <tbody>
-              {documents.map((doc) => (
+              {documents.map((doc) => {
+                const destination = documentDestinationPath(`/workspaces/${workspaceId}`, { id: doc.id, docType: doc.docType })
+                const queueLabel = labelForDestinationPath(destination)
+                const hopHref = withOrigin(destination, here)
+                return (
                 <tr key={doc.id} className="border-b border-slate-100 transition-colors last:border-0 hover:bg-slate-50/50">
                   <td className="px-5 py-3">
                     <p className="font-medium text-slate-800">{doc.vendorName}</p>
                     {/* #249: a failed push's reason had nowhere to send the reader to actually fix
-                     * it — link the filename to the document's typed destination. */}
-                    <Link href={documentDestinationPath(`/workspaces/${workspaceId}`, { id: doc.id, docType: doc.docType })} className="text-xs text-slate-400 underline-offset-2 hover:text-emerald-700 hover:underline">
+                     * it — link the filename to the document's typed destination. #268 H-c: the hop
+                     * carries `from=` so the queue renders Back to Finance. */}
+                    <Link href={hopHref} aria-label={`Open ${doc.filename} on ${queueLabel}`} className="text-xs text-slate-400 underline-offset-2 hover:text-emerald-700 hover:underline">
                       {doc.filename}
                     </Link>
                     {batchResults[doc.id] && <p className={`mt-1 text-xs font-medium ${batchResults[doc.id].status === "failed" ? "text-red-600" : "text-emerald-600"}`}>
@@ -430,19 +439,25 @@ function ReadyToPushList({ workspaceId, connectionId, documents, notPushableCoun
                     )}
                   </td>
                   <td className="px-5 py-3 text-right">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="border-emerald-200 text-emerald-700 hover:border-emerald-300 hover:bg-emerald-50"
-                      disabled={pending}
-                      onClick={() => setConfirmation({ kind: "one", document: doc })}
-                    >
-                      {pushingId === doc.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><ArrowUpRight className="mr-1 h-3.5 w-3.5" />{batchResults[doc.id]?.status === "failed" ? "Retry" : "Push"}</>}
-                    </Button>
+                    <div className="inline-flex items-center gap-3">
+                      <Link href={hopHref} className="text-xs font-medium text-slate-600 underline-offset-2 hover:text-slate-900 hover:underline">
+                        Open on {queueLabel}
+                      </Link>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="border-emerald-200 text-emerald-700 hover:border-emerald-300 hover:bg-emerald-50"
+                        disabled={pending}
+                        onClick={() => setConfirmation({ kind: "one", document: doc })}
+                      >
+                        {pushingId === doc.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><ArrowUpRight className="mr-1 h-3.5 w-3.5" />{batchResults[doc.id]?.status === "failed" ? "Retry" : "Push"}</>}
+                      </Button>
+                    </div>
                   </td>
                 </tr>
-              ))}
+                )
+              })}
             </tbody>
           </table>
         </div>}

@@ -5,7 +5,9 @@ import { StatusLine } from "@/components/queue/status-line"
 import { LEDGER_FACT_LABELS, PROCESSING_STATE_LABELS, processingState } from "@/lib/documents/processing-state"
 import { processingFact } from "@/lib/documents/processing-fact"
 import { getProcessingStateInput } from "@/models/processing-state"
-import { readOrigin } from "@/lib/navigation/origin"
+import { labelForDestinationPath, readOrigin, withParam, type Origin } from "@/lib/navigation/origin"
+import { describeOrigin } from "@/lib/navigation/origin-server"
+import { OriginStrip } from "@/components/queue/origin-strip"
 import type { DocumentHistory } from "@/components/queue/history-tabs"
 import { FxConversionBadge } from "@/components/documents/fx-conversion-badge"
 import { MatchPanel } from "@/components/bank-match/match-panel"
@@ -67,7 +69,7 @@ export async function DocumentDetailPage({ params, searchParams, embedded = fals
   const user = await getCurrentUser()
   const membership = await requireWorkspaceRole(workspaceId, user.id)
   const document = await getWorkspaceDocument(workspaceId, documentId)
-  if (!document) notFound()
+  if (!document) goneOrNotFound(query, workspaceId, documentId)
 
   const capabilities = await getWorkspaceCapabilities(workspaceId)
   const canPush = document.status === "reviewed" && capabilities.has("accounting-push")
@@ -206,11 +208,13 @@ export async function DocumentDetailPage({ params, searchParams, embedded = fals
   const bbox = bboxParts && bboxParts.length === 4 && bboxParts.every((n) => Number.isFinite(n) && n >= 0 && n <= 1) ? (bboxParts as [number, number, number, number]) : null
   const initialTarget = Number.isFinite(pageNumber) ? { page: pageNumber, bbox, quote: "" } : null
 
-  // Full mode's *Back to queue*: the origin surface when the link carried one (#244), else the
-  // queue this document lives on (#249: never the nav-less `/pipeline`) — the typed destination
-  // without its trailing row id, so Back lands on the list, not on the pane again.
+  // Full mode's way back is the OriginStrip above the frame (#268 spec §2.4): the origin surface
+  // when the link carried a valid `from` (#244), else this document's own queue with the row
+  // selected. `queueHref` (the list without the row) only serves *Delete*'s landing.
   const typedDestinationHref = documentDestinationPath(`/workspaces/${workspaceId}`, document)
-  const queueHref = readOrigin(query) ?? typedDestinationHref.slice(0, typedDestinationHref.lastIndexOf("/"))
+  const queueHref = typedDestinationHref.slice(0, typedDestinationHref.lastIndexOf("/"))
+  const origin: Origin = (await describeOrigin(workspaceId, readOrigin(query, workspaceId)))
+    ?? { href: typedDestinationHref, label: labelForDestinationPath(typedDestinationHref) }
 
   // Five-step lifecycle indicator. Derived server-side so the client SplitPane doesn't have to
   // pull in review-task / integration-push readers. `checks` uses readinessStatus (added by the
@@ -364,20 +368,33 @@ export async function DocumentDetailPage({ params, searchParams, embedded = fals
   const status = processing && state
     ? <StatusLine state={state} fact={processingFact({ ...processing, now: new Date() })} ledger={ledger} openCheckCodes={processing.openCheckCodes} cancelledReason={processing.cancelledReason} />
     : undefined
-  return <PaneFrame mode="full" name={name} backHref={queueHref} status={status}>{splitPane}</PaneFrame>
+  return <div className="flex h-screen min-h-0 flex-col">
+    <OriginStrip origin={origin} />
+    <PaneFrame mode="full" name={name} backHref={queueHref} status={status}>{splitPane}</PaneFrame>
+  </div>
+}
+
+/** #268 spec §3.0: a hop that lands on a deleted or foreign id never shows the framework 404.
+ * With a valid `from`, the origin page gets `gone=<id>` and renders "That document was deleted."
+ * as its row notice; without one, `not-found.tsx` beside this page renders inside the shell. */
+function goneOrNotFound(query: { from?: string }, workspaceId: string, documentId: string): never {
+  const from = readOrigin(query, workspaceId)
+  if (from) redirect(withParam(from, "gone", documentId))
+  notFound()
 }
 
 export default async function LegacyDocumentPage({ params, searchParams }: {
   params: Promise<{ workspaceId: string; documentId: string }>
-  searchParams: Promise<{ stage?: string; page?: string; bb?: string }>
+  searchParams: Promise<{ stage?: string; page?: string; bb?: string; from?: string }>
 }) {
   const { workspaceId, documentId } = await params
   const query = await searchParams
   const document = await getWorkspaceDocument(workspaceId, documentId)
-  if (!document) notFound()
+  if (!document) goneOrNotFound(query, workspaceId, documentId)
 
   const redirectQuery = new URLSearchParams()
-  for (const key of ["stage", "page", "bb"] as const) {
+  // #268 H-d: `from` rides along so the typed queue renders the Origin link for a search hop.
+  for (const key of ["stage", "page", "bb", "from"] as const) {
     if (query[key]) redirectQuery.set(key, query[key]!)
   }
   const suffix = redirectQuery.toString() ? `?${redirectQuery.toString()}` : ""

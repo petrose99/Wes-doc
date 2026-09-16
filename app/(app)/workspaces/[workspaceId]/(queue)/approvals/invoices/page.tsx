@@ -49,7 +49,7 @@ export async function ApprovalsInvoicesQueuePage({ params, searchParams, selecte
 
   const currentViewFilters: Record<string, string> = { ...(approver === "anyone" ? { approver: "anyone" } : {}), ...(onlyNotEligible ? { status: "not_eligible" } : {}) }
 
-  const arrival = await queueArrival(workspaceId, { searchParams: query as Record<string, string | string[] | undefined>, queuePath: "approvals/invoices", selectedId: selectedDocumentId, rowIds: rows.map((row) => row.documentId), decidedText: "This invoice was already decided — it's no longer in Ready to Approve." })
+  const arrival = await queueArrival(workspaceId, { searchParams: query as Record<string, string | string[] | undefined>, queuePath: "approvals/invoices", selectedId: selectedDocumentId, rowIds: allRows.map((row) => row.documentId), decidedText: "This invoice was already decided — it's no longer in Ready to Approve." })
   return <ApprovalInvoiceQueue
     arrival={arrival}
     workspaceId={workspaceId}

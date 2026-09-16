@@ -2,7 +2,6 @@
 
 import { Component, useCallback, useContext, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react"
 import { ArrowLeft, ChevronDown, ChevronUp, MoreHorizontal, X } from "lucide-react"
-import Link from "next/link"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { DeleteDocumentDialog, DocumentMenuDeleteItem, DocumentMenuTopItems, OpenInNewTabMenuItem, PaneDocumentContext, PaneDocumentProvider } from "@/components/queue/document-actions-menu"
 import { usePhoneLane } from "@/lib/client/use-phone-lane"
@@ -91,12 +90,12 @@ export function PaneFrame({ mode, name, status, position, onClose, onPrev, onNex
       role={modal ? "dialog" : undefined} aria-modal={modal ? "true" : undefined}
       className={isPane
         ? "fixed inset-0 z-50 flex min-h-0 flex-col bg-white max-lg:motion-safe:animate-[db-sheet-in_200ms_ease-out] lg:static lg:z-auto lg:h-auto lg:min-h-0 lg:w-[60%] lg:shrink-0 lg:overflow-hidden"
-        : "flex h-screen min-h-0 flex-col bg-white"}>
+        : "flex min-h-0 flex-1 flex-col bg-white"}>
       <header className="border-b border-slate-200 px-3 py-1.5 pt-[calc(0.375rem+env(safe-area-inset-top,0px))] lg:pt-1.5">
         <div className="flex h-9 items-center gap-1">
-          {isPane
-            ? <button type="button" onClick={onClose} aria-label={backLabel} title={backLabel} className={`${iconButton} lg:hidden`}><ArrowLeft className="h-5 w-5" aria-hidden /></button>
-            : <Link href={backHref ?? "#"} aria-label="Back to queue" title="Back to queue" className={iconButton}><ArrowLeft className="h-5 w-5" aria-hidden /></Link>}
+          {/* #268: full mode has no icon back link — the page's OriginStrip above the frame is the
+              one named way back (one back control per page); `backHref` only serves *Delete*. */}
+          {isPane && <button type="button" onClick={onClose} aria-label={backLabel} title={backLabel} className={`${iconButton} lg:hidden`}><ArrowLeft className="h-5 w-5" aria-hidden /></button>}
           <h2 id={titleId} ref={headingRef} tabIndex={-1} className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-900 outline-none" title={[name.title, name.suffix].filter(Boolean).join("  ")}>
             {name.title}
             {/* Below lg the header is 36px and the row's card already showed number · amount: the

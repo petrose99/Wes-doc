@@ -3,6 +3,8 @@
 import { globalSearchAction, type GlobalSearchResult } from "@/app/(app)/workspaces/[workspaceId]/search-actions"
 import { AssistantPanel } from "@/components/assistant/assistant-panel"
 import type { SearchResultItem } from "@/lib/global-search"
+import { documentDestinationPath, originLabel, withOrigin } from "@/lib/navigation/origin"
+import { useOriginHere } from "@/components/documents/po-compare"
 import { FileText, Loader2, Search, Sparkles } from "lucide-react"
 import Link from "next/link"
 import { useEffect, useRef, useState, useTransition } from "react"
@@ -99,12 +101,16 @@ export function SearchPageClient({ workspaceId, initialQuery, askMode = false }:
 }
 
 function ResultRow({ item, base }: { item: SearchResultItem; base: string }) {
-  const href = item.type === "snippet"
-    ? `${base}/pipeline?doc=${item.documentId}${item.page != null ? `&page=${item.page}` : ""}`
-    : `${base}/pipeline?doc=${item.documentId}`
+  // #268 H-d: the hop goes through the legacy document route (which forwards `page` and `from`
+  // to the typed queue) and carries this search as its origin — never the removed `/pipeline`.
+  const here = useOriginHere()
+  const target = `${base}/documents/${item.documentId}${item.type === "snippet" && item.page != null ? `?page=${item.page}` : ""}`
+  const href = withOrigin(target, here)
+  const queueLabel = item.docType ? originLabel(documentDestinationPath(base, { id: item.documentId, docType: item.docType })) : null
+  const name = queueLabel ? `Open ${item.filename} on ${queueLabel}` : `Open ${item.filename}`
 
   return (
-    <Link href={href} className="flex items-start gap-3 rounded-lg px-3 py-3 transition-colors hover:bg-slate-50">
+    <Link href={href} aria-label={name} className="flex items-start gap-3 rounded-lg px-3 py-3 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600">
       <FileText className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-2">

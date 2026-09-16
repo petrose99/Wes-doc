@@ -57,7 +57,7 @@ const ORIGIN_SEGMENTS: Record<string, true> = { "purchase-orders": true, "bank-s
 export async function describeMissingRow(
   workspaceId: string,
   opts: { docId: string | null; goneId: string | null; queueLabel: string; here: string; workspaceBase: string },
-): Promise<{ text: string; showHref?: string } | null> {
+): Promise<{ text: string; showHref?: string; name?: string } | null> {
   if (opts.goneId) return { text: "That document was deleted." }
   if (!opts.docId) return null
   try {
@@ -68,7 +68,7 @@ export async function describeMissingRow(
     if (!doc) return { text: "That document was deleted." }
     const row = rowFromDocument(doc)
     const name = row.suffix ? `${row.title} · ${row.suffix}` : row.title
-    return { text: `${name} is no longer on ${opts.queueLabel}.`, showHref: withOrigin(documentDestinationPath(opts.workspaceBase, doc), opts.here) }
+    return { text: `${name} is no longer on ${opts.queueLabel}.`, showHref: withOrigin(documentDestinationPath(opts.workspaceBase, doc), opts.here), name: [row.title, row.suffix].filter(Boolean).join(" ") }
   } catch {
     return { text: "That document was deleted." }
   }
@@ -81,7 +81,7 @@ function first(value: string | string[] | undefined): string | null {
   return v ? v : null
 }
 
-export type QueueArrival = { origin: Origin | null; initialMissing: { text: string; showHref?: string } | undefined }
+export type QueueArrival = { origin: Origin | null; initialMissing: { text: string; showHref?: string; name?: string } | undefined }
 
 /** What a queue page needs on arrival (#268): the strip's model from `from=`, and the
  * missing-row notice when the addressed row (`/<queue>/<id>`, `?doc=`) is not among the rows or
@@ -105,6 +105,6 @@ export async function queueArrival(
   const ids = new Set(opts.rowIds)
   const missing = docId && !ids.has(docId) ? docId : null
   const notice = missing && opts.missingText ? { text: opts.missingText } : await describeMissingRow(workspaceId, { docId: missing, goneId: first(opts.searchParams.gone), queueLabel, here, workspaceBase })
-  const initialMissing = notice && opts.decidedText && notice.showHref ? { text: opts.decidedText, showHref: notice.showHref } : notice ?? undefined
+  const initialMissing = notice && opts.decidedText && notice.showHref ? { text: opts.decidedText, showHref: notice.showHref, name: notice.name } : notice ?? undefined
   return { origin, initialMissing }
 }

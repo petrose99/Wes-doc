@@ -77,7 +77,7 @@ export async function InvoicesQueuePage({ params, searchParams, selectedDocument
 
   const trend = touchlessTrend.trend ? `${touchlessTrend.trend.deltaPercentagePoints > 0 ? "+" : ""}${touchlessTrend.trend.deltaPercentagePoints}pt` : null
 
-  const arrival = await queueArrival(workspaceId, { searchParams: query as Record<string, string | string[] | undefined>, queuePath: "invoices", selectedId: selectedDocumentId, rowIds: bills.map((bill) => bill.id) })
+  const arrival = await queueArrival(workspaceId, { searchParams: query as Record<string, string | string[] | undefined>, queuePath: "invoices", selectedId: selectedDocumentId, rowIds: bills.map((bill) => bill.documentId) })
   return <InvoiceQueue
     arrival={arrival}
     workspaceId={workspaceId}

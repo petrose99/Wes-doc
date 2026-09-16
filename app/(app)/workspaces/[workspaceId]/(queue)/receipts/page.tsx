@@ -53,7 +53,7 @@ export async function ReceiptsQueuePage({ params, searchParams, selectedDocument
     ...(onlyTouchless ? { touchless: "1" } : {}),
   }
 
-  const arrival = await queueArrival(workspaceId, { searchParams: query as Record<string, string | string[] | undefined>, queuePath: "receipts", selectedId: selectedDocumentId, rowIds: receipts.map((receipt) => receipt.id) })
+  const arrival = await queueArrival(workspaceId, { searchParams: query as Record<string, string | string[] | undefined>, queuePath: "receipts", selectedId: selectedDocumentId, rowIds: receipts.map((receipt) => receipt.documentId) })
   return <ReceiptQueue
     arrival={arrival}
     workspaceId={workspaceId}

@@ -78,4 +78,7 @@ First-pass scores are the KPI (the pre-build getting better); close scores are r
 | #264 | 20260916T212927 | sonnet | continued (no progress), ses | 33 | 34 | 37 | 88 | 96 | 13 | 1M | 0K | 0 | 0 | 2m34s |
 | #264 | 20260916T213209 | opus[1m] | phase measure done → close n | 33 | 34 | 37 | 88 | 96 | 67 | 4M | 1K | 14 | 3 | 7m35s |
 | #264 | 20260916T213952 | sonnet | resolved | 33 | 34 | 37 | 88 | 96 | 108 | 9M | 1K | 5 | 3 | 17m06s |
-| #268 | 20260916T215711 | opus[1m] | continued (progressed), sess | 0 | 0 | 0 | 0 | 0 | 50 | 6M | 2K | 0 | 0 | 5m03s |
+| #268 | 20260916T215711 | opus[1m] | continued (progressed), sess | 32 | · | · | · | · | 50 | 6M | 2K | 0 | 0 | 5m03s |
+| #268 | 20260916T220223 | opus[1m] | phase spec done → build next | 32 | · | · | · | · | 41 | 4M | 1K | 0 | 1 | 7m04s |
+| #268 | 20260916T220936 | sonnet | continued (progressed), sess | 32 | · | · | · | · | 81 | 10M | 1K | 0 | 0 | 4m03s |
+| #268 | 20260916T221348 | opus[1m] | continued (progressed), sess | 32 | · | · | · | · | 67 | 8M | 2K | 0 | 0 | 5m34s |
