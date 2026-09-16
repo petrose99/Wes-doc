@@ -211,9 +211,10 @@ while [ "$n" -lt "$MAX" ]; do
   # cap alone does not bound next dev — the cgroup does. Falls back to no scope
   # where systemd --user is unavailable.
   MEM_MAX="${WAYFINDER_SESSION_MEM_MAX:-5500M}"; MEM_HIGH="${WAYFINDER_SESSION_MEM_HIGH:-4500M}"
-  SCOPE=()
+  SCOPE=(); UNIT=""
   if systemd-run --user --scope -q true 2>/dev/null; then
-    SCOPE=(systemd-run --user --scope -q --unit "wayfinder-$MAP-$T-$(date +%s)" -p "MemoryMax=$MEM_MAX" -p "MemoryHigh=$MEM_HIGH" -p "MemorySwapMax=2G")
+    UNIT="wayfinder-$MAP-$T-$(date +%s).scope"
+    SCOPE=(systemd-run --user --scope -q --unit "$UNIT" -p "MemoryMax=$MEM_MAX" -p "MemoryHigh=$MEM_HIGH" -p "MemorySwapMax=2G")
   fi
   ( cd "$ROOT" && NODE_OPTIONS="${WAYFINDER_NODE_OPTIONS:---max-old-space-size=3072}" \
     setsid "${SCOPE[@]}" claude -p "/wayfinder $MAP $T" \
@@ -257,8 +258,18 @@ PY
     if [ -n "$CAPPED" ]; then
       echo "    #$T hit the $CAPPED — saving WIP and handing off"
       wip_handoff "$T" "the session hit its $CAPPED"
-      pgid="$(ps -o pgid= -p "$SESSION_PID" 2>/dev/null | tr -d ' ')"
-      if [ -n "$pgid" ]; then kill -TERM -- "-$pgid" 2>/dev/null || true; sleep 8; kill -KILL -- "-$pgid" 2>/dev/null || true; fi
+      # Stop the session, not ourselves: $SESSION_PID is the launching
+      # subshell, which shares this script's process group (a detached run
+      # is its own session leader, so -pgid was the runner itself — seen
+      # 2026-09-16, #253). The claude process is setsid'd into its own group
+      # and, where systemd is available, into its own scope: stop the scope,
+      # else the claude process's group.
+      if [ -n "$UNIT" ] && systemctl --user is-active -q "$UNIT" 2>/dev/null; then
+        systemctl --user stop "$UNIT" 2>/dev/null || true
+      else
+        cpid="$(pgrep -f "claude -p /wayfinder $MAP $T " | head -1)"; pgid="$(ps -o pgid= -p "${cpid:-0}" 2>/dev/null | tr -d ' ')"
+        if [ -n "$pgid" ] && [ "$pgid" != "$(ps -o pgid= -p $$ | tr -d ' ')" ]; then kill -TERM -- "-$pgid" 2>/dev/null || true; sleep 8; kill -KILL -- "-$pgid" 2>/dev/null || true; fi
+      fi
       break
     fi
   done
@@ -294,6 +305,7 @@ PY
     gh issue edit "$T" --repo "$REPO" --remove-assignee "$ME" >/dev/null 2>&1 || true
   fi
   [ -f "$OUT/$T.md" ] || OUTCOME="$OUTCOME, no report"
+  if [ "$(state "$T")" != "closed" ] && { [ ! -f "$OUT/$T.handoff.md" ] || [ "$(stat -c %Y "$OUT/$T.handoff.md")" -lt "$S0" ]; }; then OUTCOME="$OUTCOME, hand-off not updated"; fi
   printf '| %s | [#%s](https://github.com/%s/issues/%s) %s | %s (%s) | %dm%02ds | [log](logs/%s) |\n' \
     "$START" "$T" "$REPO" "$T" "$TT" "$OUTCOME" "${MODEL:-default}" $((DUR/60)) $((DUR%60)) "$(basename "$LOG")" >> "$RUNLOG"
   # Cost beside the score, every session: turns × context is the bill.
