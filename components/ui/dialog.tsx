@@ -14,7 +14,7 @@ import { createPortal } from "react-dom"
  * click-outside-to-close remain as before. */
 const FOCUSABLE = "a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex=\"-1\"])"
 
-export function Dialog({ open, title, description, width = "max-w-md", onClose, children, placement = "center" }: {
+export function Dialog({ open, title, description, width = "max-w-md", onClose, children, placement = "center", initialFocus }: {
   open: boolean
   title: string
   description?: string
@@ -25,6 +25,10 @@ export function Dialog({ open, title, description, width = "max-w-md", onClose, 
    * but placement (trap, Esc, return focus, scroll lock) is this same Dialog; a second component
    * would be two systems for one job (B4). At `md`+ a sheet renders centered, same as `"center"`. */
   placement?: "center" | "sheet"
+  /** #257 B5: a selector for the element that takes focus on open, when it is not the first
+   * focusable (the header's × comes first in the DOM). A reason sheet lands on its textarea, the
+   * Filter sheet on the selected sort. Falls back to the first focusable when nothing matches. */
+  initialFocus?: string
 }) {
   const contentRef = useRef<HTMLDivElement>(null)
   const openerRef = useRef<Element | null>(null)
@@ -42,7 +46,8 @@ export function Dialog({ open, title, description, width = "max-w-md", onClose, 
     const focusFirst = () => {
       const container = contentRef.current
       if (!container) return
-      const first = container.querySelector<HTMLElement>(FOCUSABLE)
+      const preferred = initialFocus ? container.querySelector<HTMLElement>(initialFocus) : null
+      const first = preferred ?? container.querySelector<HTMLElement>(FOCUSABLE)
       ;(first ?? container).focus()
     }
     const raf = window.requestAnimationFrame(focusFirst)
@@ -74,7 +79,7 @@ export function Dialog({ open, title, description, width = "max-w-md", onClose, 
       // Return focus to the element that opened the dialog (if it is still around).
       if (openerRef.current instanceof HTMLElement) openerRef.current.focus()
     }
-  }, [open, onClose])
+  }, [open, onClose, initialFocus])
 
   if (!open || typeof document === "undefined") return null
 

@@ -48,7 +48,7 @@ export function ReasonDialogButton({
 /** #225: the dialog on its own, for callers whose trigger lives somewhere the dialog cannot —
  * a Detail pane's overflow menu closes (and unmounts its items) the moment a dialog opens over
  * it, so the menu item only flips `open` and the dialog mounts beside the pane instead. */
-export function ReasonDialog({ open, onClose, action, title, description, submitLabel, placeholder, placement = "center" }: {
+export function ReasonDialog({ open, onClose, action, title, description, submitLabel, placeholder, placement = "center", disabledReason = null, pendingLabel = "Working…" }: {
   open: boolean
   onClose: () => void
   action: (formData: FormData) => Promise<{ success: boolean; error?: string }>
@@ -58,6 +58,11 @@ export function ReasonDialog({ open, onClose, action, title, description, submit
   placeholder: string
   /** #257: `"sheet"` for the phone lane's Reject/Override sheets — same Dialog, bottom-anchored. */
   placement?: "center" | "sheet"
+  /** #257 spec 3.6 (offline inside an open sheet): when set, submit is disabled and this sentence
+   * renders under it — the typed reason stays; clearing it re-enables submit in place. */
+  disabledReason?: string | null
+  /** What the submit button reads while the action runs ("Rejecting…", "Approving…"). */
+  pendingLabel?: string
 }) {
   const [reason, setReason] = useState("")
   const [error, setError] = useState<string | null>(null)
@@ -67,13 +72,13 @@ export function ReasonDialog({ open, onClose, action, title, description, submit
   const close = () => { onClose(); setError(null); setReason("") }
 
   return (
-    <Dialog open={open} placement={placement} title={title} description={description} onClose={() => { if (!pending) close() }}>
+    <Dialog open={open} placement={placement} initialFocus="textarea" title={title} description={description} onClose={() => { if (!pending) close() }}>
       {/* #251: the field is named (placeholder alone is not a name) and the refusal is announced. */}
       <form
         className="space-y-3 px-5 py-4"
         onSubmit={(event) => {
           event.preventDefault()
-          if (!reason.trim() || pending) return
+          if (!reason.trim() || pending || disabledReason) return
           const formData = new FormData()
           formData.set("reason", reason.trim())
           startTransition(async () => {
@@ -92,16 +97,17 @@ export function ReasonDialog({ open, onClose, action, title, description, submit
             required
             value={reason}
             placeholder={placeholder}
-            className="w-full resize-none rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 transition-colors placeholder:text-slate-500 focus:border-emerald-400 focus:bg-white focus:outline-none"
+            className="w-full resize-none rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-base text-slate-900 transition-colors placeholder:text-slate-500 focus:border-emerald-400 focus:bg-white focus:outline-none sm:text-sm"
             onChange={(event) => setReason(event.target.value)} />
         </label>
         {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
-        <div className="flex justify-end gap-2">
-          <button type="button" className="rounded-md px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100" disabled={pending} onClick={close}>
+        {disabledReason && <p role="status" className="text-[13px] text-slate-600">{disabledReason}</p>}
+        <div className="flex justify-end gap-2 max-md:grid max-md:grid-cols-2 max-md:[&>button]:h-12">
+          <button type="button" className="rounded-md px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100 max-md:border max-md:border-slate-300" disabled={pending} onClick={close}>
             Cancel
           </button>
-          <button type="submit" className="rounded-md bg-emerald-700 px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-800 disabled:opacity-40" disabled={pending || !reason.trim()}>
-            {pending ? "Working…" : submitLabel}
+          <button type="submit" className="rounded-md bg-emerald-700 px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-800 disabled:opacity-40" disabled={pending || !reason.trim() || !!disabledReason}>
+            {pending ? pendingLabel : submitLabel}
           </button>
         </div>
       </form>
