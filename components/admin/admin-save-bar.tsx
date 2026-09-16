@@ -59,7 +59,7 @@ export function AdminSaveBar({ dirty, pending, error, savedAt, blocker, onSave, 
   if (disabled) return null
   const visible = dirty || pending || !!error || savedAt !== null
 
-  return <div className={`sticky bottom-[72px] z-20 -mx-5 mt-10 border-t border-hairline bg-white/95 px-5 backdrop-blur-sm transition-[opacity,transform] duration-150 ease-out md:bottom-0 md:-mx-8 md:px-8 ${visible ? "translate-y-0 opacity-100" : "pointer-events-none h-0 translate-y-2 overflow-hidden opacity-0"}`} aria-hidden={visible ? undefined : true}>
+  return <div className={`sticky bottom-[72px] z-20 -mx-5 border-t border-hairline bg-white/95 px-5 backdrop-blur-sm transition-[opacity,transform] duration-150 ease-out md:bottom-0 md:-mx-8 md:px-8 ${visible ? "mt-10 translate-y-0 opacity-100" : "pointer-events-none mt-0! h-0 translate-y-2 overflow-hidden border-t-0 opacity-0"}`} aria-hidden={visible ? undefined : true}>
     <div className="flex min-h-[56px] flex-wrap items-center gap-x-4 gap-y-2 py-2.5">
       <Button type="button" onClick={onSave} disabled={pending || !dirty || !!blocker} title="⌘S / Ctrl+S">{pending ? "Saving…" : "Save changes"}</Button>
       <Button type="button" variant="ghost" onClick={onDiscard} disabled={pending || !dirty}>Discard</Button>

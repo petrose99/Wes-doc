@@ -43,6 +43,11 @@ export default async function AdminLayout({ children, params }: { children: Reac
   return <div className="flex min-h-0 flex-1 bg-white">
     <AdminLeaveGuard />
     <AdminNav groups={groups} />
-    <div className="min-w-0 flex-1">{children}</div>
+    <div className="min-w-0 flex-1">
+      {/* evaluate H6 (#252): below md the nav that names the company is hidden, so the company is
+          said once here, on every Admin page — Priya must never configure the wrong client. */}
+      <p className="px-5 pt-5 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500 md:hidden">{context.workspace.name}</p>
+      {children}
+    </div>
   </div>
 }

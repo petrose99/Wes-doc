@@ -69,6 +69,11 @@ export function FieldTableEditor({ workspaceId, docType, typeLabel, rows: initia
   }, [workspaceId, docType, stamp, rows, router])
 
   const discard = () => { setRows(initial); setError(null) }
+  // evaluate H6/H10 (#252): the padlock explained itself only to screen readers; sighted owners
+  // saw a grey tick they could not change and no reason. One visible line under the table.
+  const locked = rows.filter((row) => row.requiredLocked)
+  const lockedCount = locked.length
+  const lockedList = locked.map((row) => row.label).join(", ").replace(/, ([^,]*)$/, " and $1")
   const clearSaved = useCallback(() => setSavedAt(null), [])
 
   return <div>
@@ -81,7 +86,7 @@ export function FieldTableEditor({ workspaceId, docType, typeLabel, rows: initia
             <th scope="col" className="pb-2 pr-2 text-center text-[13px] font-medium text-slate-500 md:pr-4"><span className="md:hidden">Edit</span><span className="hidden md:inline">Editable</span></th>
             <th scope="col" className="pb-2 pr-2 text-center text-[13px] font-medium text-slate-500 md:pr-4"><span className="md:hidden">Req.</span><span className="hidden md:inline">Required</span></th>
             <th scope="col" className="pb-2 pr-2 text-[13px] font-medium text-slate-500 md:pr-4">Width</th>
-            <th scope="col" className="w-16 whitespace-nowrap pb-2 text-right text-[13px] font-medium text-slate-500 md:w-20">Order</th>
+            <th scope="col" className="w-[4.25rem] whitespace-nowrap pb-2 text-right text-[13px] font-medium text-slate-500 md:w-20"><span className="md:hidden">Move</span><span className="hidden md:inline">Order</span></th>
           </tr>
         </thead>
         <tbody className="divide-y divide-hairline-soft">
@@ -90,7 +95,7 @@ export function FieldTableEditor({ workspaceId, docType, typeLabel, rows: initia
             const requiredId = `${row.key}-required`
             const widthId = `${row.key}-width`
             return <tr key={row.key} className="h-10">
-              <td className="max-w-[7rem] py-1.5 pr-2 md:max-w-[13rem] md:pr-4">
+              <td className="max-w-[6.5rem] py-1.5 pr-2 md:max-w-[13rem] md:pr-4">
                 <div className="flex items-center gap-2">
                   <span className="truncate font-medium text-slate-900" title={row.label}>{row.label}</span>
                   {row.custom && <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-700">Custom</span>}
@@ -103,10 +108,11 @@ export function FieldTableEditor({ workspaceId, docType, typeLabel, rows: initia
                     aria-label={row.required ? `${row.label} editable — stays on while the field is required` : `${row.label} editable`} onChange={(event) => update(row.key, { editable: event.target.checked })} />
                   {row.required && !readOnly && <Lock className="h-3.5 w-3.5" aria-hidden />}
                 </span>
+                {row.required && !readOnly && <span className="sr-only">Stays on while the field is required.</span>}
               </td>
               <td className="py-1.5 pr-2 text-center md:pr-4">
                 {row.requiredLocked
-                  ? <span className="inline-flex items-center gap-1 text-slate-600">
+                  ? <span className="inline-flex items-center gap-1 text-slate-600" title="Checks read this field, so it stays required.">
                       <input id={requiredId} type="checkbox" className="h-4 w-4 accent-emerald-700" checked readOnly aria-disabled="true"
                         aria-label={`${row.label} required — checks read this field, so it stays required`} onChange={() => undefined} onKeyDown={(event) => { if (event.key === " ") event.preventDefault() }} onClick={(event) => event.preventDefault()} />
                       <Lock className="h-3.5 w-3.5" aria-hidden />
@@ -115,8 +121,8 @@ export function FieldTableEditor({ workspaceId, docType, typeLabel, rows: initia
                   : <input id={requiredId} type="checkbox" className="h-4 w-4 accent-emerald-700" checked={row.required} disabled={readOnly}
                       aria-label={`${row.label} required`} onChange={(event) => update(row.key, { required: event.target.checked })} />}
               </td>
-              <td className="py-1.5 pr-2 md:pr-4">
-                <NativeSelect id={widthId} value={row.width} disabled={readOnly} aria-label={`${row.label} column width`} className="h-8 w-[6.25rem] md:w-[7.5rem]"
+              <td className="py-1.5 pr-1.5 md:pr-4">
+                <NativeSelect id={widthId} value={row.width} disabled={readOnly} aria-label={`${row.label} column width`} className="h-8 w-[6rem] md:w-[7.5rem]"
                   onChange={(event) => update(row.key, { width: event.target.value as FieldWidth })}>
                   {FIELD_WIDTHS.map((width) => <option key={width} value={width}>{FIELD_WIDTH_LABELS[width]}</option>)}
                 </NativeSelect>
@@ -140,6 +146,10 @@ export function FieldTableEditor({ workspaceId, docType, typeLabel, rows: initia
         </tbody>
       </table>
     </div>
+    {lockedCount > 0 && <p className="mt-3 flex max-w-[60ch] items-start gap-1.5 text-xs leading-snug text-slate-500">
+      <Lock className="mt-0.5 h-3 w-3 shrink-0" aria-hidden />
+      <span>{lockedCount === 1 ? "One field is locked" : `${lockedCount} fields are locked`}: checks read {lockedList}, so {lockedCount === 1 ? "it stays" : "they stay"} required and editable.</span>
+    </p>}
     <p className="sr-only" aria-live="polite">{announce}</p>
     <AdminSaveBar dirty={dirty} pending={pending} error={error} savedAt={savedAt} onSave={() => void save()} onDiscard={discard} onSavedShown={clearSaved} disabled={readOnly}
       errorAction={error?.startsWith("Configuration changed") ? { label: "Reload", onClick: () => { discard(); router.refresh() } } : undefined} />

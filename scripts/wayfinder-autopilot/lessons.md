@@ -19,6 +19,11 @@ not written here will be relearned at full cost.
 - (docubite #250/#251/#252, all H) First passes had no heuristic at 4 — seven or eight 3s and two or three 2s, 26–28/40. Ten 3s is 30; the bar of 34 needs four 4s. → Excellence is targeted, not hoped for: `preflight.md` Part A picks ≥ 6 heuristics to build to the critic's 4 and states what 4 looks like on this surface before code.
 - (docubite #251/#252, H1 H3 H4 + P1s) Every 2 and P1 was one of six classes — stale views after a mutation, dead action paths, vocabulary drift, bespoke primitives beside shell ones, unspecified focus/failure paths, time-axis edges. → State each as a contract (`preflight.md` Part B) and grep-verify it before the first measurement.
 
+- (docubite #252, H4 consistency, P1) The Admin save bar was declared "the one save grammar" while three legacy forms on the same pages kept their own inline Save or on-change autosave; the header comment said so, the code did not. → Part B "one primitive per concept" is verified by grep, not by comment: list every mutating control on the surface (`onChange`+action, inline Save, toast.success) and each one is either the shell primitive or named as a row action in the spec.
+- (docubite #252, H6/H10 recognition) A locked control explained itself only in `sr-only` text — accessible, invisible. → Every disabled or locked control has one visible reason (footnote or inline text); `sr-only` supplements, it never carries the only explanation.
+- (docubite #252, H6 recognition) A context caption ("which company am I configuring") was passed page-by-page and landed on one page. → Context that every page of an area must show renders in the area's layout, never as a per-page prop.
+- (docubite #252, H3 control) A "leave without saving?" guard used `window.confirm` beside an app that already owns a ConfirmDialog. → Part B contract: the surface's confirms all use the shell dialog; `window.confirm`/`alert` grep must be empty (`beforeunload` is the only native prompt).
+
 ## Grilling (what a decision ticket must establish before its first round)
 
 - (docubite #248, H4 consistency) A fact word on the incumbent was derived from a different record than its name implied ("Synced" came from the push row, not the ledger sync). → Before deciding vocabulary, trace every fact word on the surface to the query that produces it; the word follows the record.

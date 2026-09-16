@@ -33,11 +33,28 @@ export function setUnsaved(key: string, reason: string | null) {
   if (had !== has) for (const listener of listeners) listener(has)
 }
 
+export function hasUnsaved(): boolean {
+  return reasons.size > 0
+}
+
+/** The first registered reason, for a guard that asks in its own dialog (AdminLeaveGuard). */
+export function unsavedReason(): string | null {
+  return reasons.size > 0 ? [...reasons.values()][0] : null
+}
+
+/** The person chose to leave anyway: forget every reason and tell subscribers. */
+export function clearUnsaved() {
+  if (reasons.size === 0) return
+  reasons.clear()
+  if (typeof window !== "undefined") window.removeEventListener("beforeunload", onBeforeUnload)
+  for (const listener of listeners) listener(false)
+}
+
 /** True when it is fine to leave: nothing unsaved, or the person chose to leave anyway. */
 export function confirmLeave(): boolean {
   if (reasons.size === 0) return true
   const reason = [...reasons.values()][0]
   const leave = window.confirm(`${reason}\n\nLeave anyway? The unsaved changes will be lost.`)
-  if (leave) reasons.clear()
+  if (leave) clearUnsaved()
   return leave
 }

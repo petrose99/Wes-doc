@@ -39,7 +39,6 @@ export default async function ConfigurationFieldsPage({ params, searchParams }: 
   return <AdminPage
     title="Fields"
     intro={<>Each row is one field on the {typeLabel} Detail pane. <strong className="font-medium text-slate-800">Editable</strong> lets a reviewer change it; <strong className="font-medium text-slate-800">Required</strong> holds the document in review until it has a value; <strong className="font-medium text-slate-800">Width</strong> sets its column in the {QUEUE_NAMES[docType]} queue. Custom fields come from this company&rsquo;s <Link href={adminPaths(workspaceId).whatsOn} className="font-medium text-emerald-700 underline-offset-2 hover:underline">document templates</Link>.</>}
-    company={context.workspace.name}
     aside={<DocTypeSwitcher basePath={adminPaths(workspaceId).fields} current={docType} panelId={panelId}
       types={FIELD_TABLE_TYPES.map((value) => ({ value, label: DOC_TYPE_SPECS[value].label, shortLabel: SHORT_LABELS[value] }))} />}
   >

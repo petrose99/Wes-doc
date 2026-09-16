@@ -1,6 +1,6 @@
 "use client"
 
-import { deleteWorkspaceAction, leaveWorkspaceAction, renameWorkspaceAction } from "@/app/(app)/workspaces/[workspaceId]/workspace-actions"
+import { deleteWorkspaceAction, leaveWorkspaceAction } from "@/app/(app)/workspaces/[workspaceId]/workspace-actions"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/admin/panel-card"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
@@ -8,11 +8,13 @@ import { Dialog } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { TriangleAlert } from "lucide-react"
-import { useRouter } from "next/navigation"
 import { useState, useTransition } from "react"
 import { toast } from "sonner"
 
-/** Both destructive paths end in a hard navigation rather than router.push: the membership this
+/** #252: the rename moved to CompanyNameForm (one save grammar); this file is the two ways out —
+ * Delete for an owner, Leave for everyone else — both behind an accessible confirmation.
+ *
+ * Both destructive paths end in a hard navigation rather than router.push: the membership this
  * whole segment is rendered behind has just gone, so the layout's redirect and (chrome)'s
  * requireWorkspaceRole throw would race a soft transition. Same reasoning as the sign-out. */
 const escapeToWorkspaceList = () => { window.location.href = "/workspaces" }
@@ -23,9 +25,7 @@ export function WorkspaceDangerZone({ workspaceId, workspaceName, workspaceKind,
   workspaceKind: string
   viewerRole: string
 }) {
-  const router = useRouter()
   const [pending, startTransition] = useTransition()
-  const [name, setName] = useState(workspaceName)
   // #231 Q8: "Company" in Admin; a personal workspace is the one thing that is not a company.
   const noun = workspaceKind === "personal" ? "workspace" : "company"
   const [deleting, setDeleting] = useState(false)
@@ -68,27 +68,6 @@ export function WorkspaceDangerZone({ workspaceId, workspaceName, workspaceKind,
   }
 
   return <div className="space-y-6">
-    <Card>
-      <CardHeader>
-        <CardTitle>{noun === "company" ? "Company name" : "Workspace name"}</CardTitle>
-        <CardDescription>Shown in the sidebar switcher and on every invitation.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form className="flex flex-wrap gap-2" onSubmit={(event) => {
-          event.preventDefault()
-          startTransition(async () => {
-            const result = await renameWorkspaceAction(workspaceId, name)
-            if (!result.success) { toast.error(result.error ? `Couldn't rename — ${result.error} Nothing changed.` : "Couldn't rename — the server didn't say why. Nothing changed."); return }
-            toast.success(noun === "company" ? "Company renamed" : "Workspace renamed")
-            router.refresh()
-          })
-        }}>
-          <Input value={name} onChange={(event) => setName(event.target.value)} className="max-w-xs" minLength={2} maxLength={80} required />
-          <Button type="submit" disabled={pending || name.trim() === workspaceName}>{pending ? "Saving…" : "Save"}</Button>
-        </form>
-      </CardContent>
-    </Card>
-
     <Card>
       <CardHeader className="border-red-200">
         <CardTitle className="flex items-center gap-2 text-red-800"><TriangleAlert className="h-4 w-4 shrink-0" aria-hidden />Delete this {noun}</CardTitle>

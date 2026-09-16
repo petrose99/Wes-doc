@@ -1,6 +1,5 @@
 import { AdminPage } from "@/components/admin/admin-ui"
 import { Panel } from "@/components/automation/automation-ui"
-import { WorkspaceDangerZone } from "@/components/workspace/danger-zone"
 import { InvitePanel } from "@/components/workspace/invite-panel"
 import { MembersTable } from "@/components/workspace/members-table"
 import { getAdminContext } from "@/lib/admin/context"
@@ -11,7 +10,7 @@ export const dynamic = "force-dynamic"
 /** #231 Q14 (#252): Admin › Users — this company's members and invitations (the org-level list
  * on the Queue-screen shell is #254's; without an organization the same address shows this
  * company's people). The "firm / SMB mode" pill is gone: the fact it stood for is one sentence
- * under the title. */
+ * under the title. The company's name and its deletion live on Companies (evaluate H8). */
 export default async function UsersPage({ params }: { params: Promise<{ workspaceId: string }> }) {
   const { workspaceId } = await params
   const context = await getAdminContext(workspaceId)
@@ -35,6 +34,5 @@ export default async function UsersPage({ params }: { params: Promise<{ workspac
       <InvitePanel workspaceId={workspaceId} invitations={invitations.map((invitation) => ({ id: invitation.id, email: invitation.email, role: invitation.role, expiresAt: invitation.expiresAt.toISOString() }))} />
     </Panel>}
 
-    <WorkspaceDangerZone workspaceId={workspaceId} workspaceName={workspace.name} workspaceKind={workspace.kind} viewerRole={membership.role} />
   </AdminPage>
 }

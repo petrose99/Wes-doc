@@ -8,19 +8,28 @@ import { Button } from "@/components/ui/button"
 import type { CategoryNatureRow, CategoryNature } from "@/models/category-natures"
 import { Plus, Trash2 } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { useState, useTransition } from "react"
+import { useId, useState, useTransition } from "react"
 import { toast } from "sonner"
 
+/** Add and Remove act on a row at once (a row list, like Suppliers). Changing a row's nature is
+ * a setting: when `onNatureChange` is given (Admin › Tax, #252) the select reports the edit to the
+ * page's form and the sticky Save bar applies it, so the page keeps one save grammar. */
 export function CategoryNatureTable({
   workspaceId,
   rows,
   isOwner,
+  natureOverrides,
+  onNatureChange,
 }: {
   workspaceId: string
   rows: CategoryNatureRow[]
   isOwner: boolean
+  /** Unsaved nature edits by row id, owned by the enclosing form. */
+  natureOverrides?: Record<string, CategoryNature>
+  onNatureChange?: (id: string, category: string, nature: CategoryNature) => void
 }) {
   const router = useRouter()
+  const ids = { category: useId(), nature: useId() }
   const [pending, startTransition] = useTransition()
   const [newCategory, setNewCategory] = useState("")
   const [newNature, setNewNature] = useState<CategoryNature>("goods")
@@ -40,6 +49,7 @@ export function CategoryNatureTable({
   }
 
   const changeNature = (id: string, category: string, nature: CategoryNature) => {
+    if (onNatureChange) { onNatureChange(id, category, nature); return }
     startTransition(async () => {
       const res = await upsertCategoryNatureAction(workspaceId, category, nature)
       if (res.success) {
@@ -79,7 +89,8 @@ export function CategoryNatureTable({
                 <td className="py-2">
                   {isOwner ? (
                     <select
-                      value={r.nature}
+                      aria-label={`${r.category} nature`}
+                      value={natureOverrides?.[r.id] ?? r.nature}
                       onChange={(e) => changeNature(r.id, r.category, e.target.value as CategoryNature)}
                       disabled={pending}
                       className="rounded-md border border-slate-300 bg-white px-2 py-1 text-sm"
@@ -100,7 +111,7 @@ export function CategoryNatureTable({
                       className="rounded p-1 text-slate-500 transition-colors hover:bg-red-50 hover:text-red-700"
                       aria-label={`Remove ${r.category}`}
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Trash2 className="h-4 w-4" aria-hidden />
                     </button>
                   </td>
                 )}
@@ -117,8 +128,9 @@ export function CategoryNatureTable({
       {isOwner && (
         <div className="flex flex-wrap items-end gap-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3">
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-600">Category</label>
+            <label htmlFor={ids.category} className="text-xs font-medium text-slate-600">Category</label>
             <input
+              id={ids.category}
               type="text"
               value={newCategory}
               onChange={(e) => setNewCategory(e.target.value)}
@@ -127,8 +139,9 @@ export function CategoryNatureTable({
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-600">Nature</label>
+            <label htmlFor={ids.nature} className="text-xs font-medium text-slate-600">Nature</label>
             <select
+              id={ids.nature}
               value={newNature}
               onChange={(e) => setNewNature(e.target.value as CategoryNature)}
               className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm"

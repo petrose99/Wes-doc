@@ -8,12 +8,9 @@ import Link from "next/link"
 /** One page: the section name as the display h1, one intro sentence, then panels at a 40px
  * rhythm. `max-w` is the same on every Admin page so the column never jumps between sections
  * (the incumbent jumped 128px between Settings and Controls). */
-export function AdminPage({ title, intro, aside, children, phoneNote = true, company }: {
+export function AdminPage({ title, intro, aside, children, phoneNote = true }: {
   title: string
   intro?: ReactNode
-  /** The company being configured — shown above the title below `md`, where the nav that
-   * carries it is hidden (Priya must never configure the wrong client). */
-  company?: string
   /** A control that belongs beside the title — the Fields page's document-type switcher. */
   aside?: ReactNode
   children: ReactNode
@@ -21,9 +18,9 @@ export function AdminPage({ title, intro, aside, children, phoneNote = true, com
   phoneNote?: boolean
 }) {
   return <div className="w-full max-w-[880px] px-5 py-6 md:px-8 md:py-8">
+    {/* The company name below md is the Admin layout's, above this frame. */}
     {phoneNote && <PhoneNote />}
     <header className="mb-8">
-      {company && <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500 md:hidden">{company}</p>}
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
         <h1 className="font-display text-[26px] leading-none font-semibold tracking-tight text-slate-900">{title}</h1>
         {aside}
