@@ -52,7 +52,7 @@ function StageEditor({ index, count, stage, members, onChange, onRemove, onMove,
   const [approverFilter, setApproverFilter] = useState("")
   // Starts open when the stage already carries either setting: a stage whose approvers are named
   // should not hide that fact behind a closed disclosure the reader has to guess at.
-  const [open, setOpen] = useState(stage.approverIds.length > 0 || stage.minAmount.trim() !== "")
+  const [open, setOpen] = useState(stage.approverIds.length > 0 || stage.minAmount.trim() !== "" || stage.requireOwner)
 
   const toggleApprover = (memberId: string) => {
     const has = stage.approverIds.includes(memberId)
@@ -99,11 +99,11 @@ function StageEditor({ index, count, stage, members, onChange, onRemove, onMove,
         aria-expanded={open}
         aria-controls={detailsId}
         onClick={() => setOpen((previous) => !previous)}
-        className="text-[13px] font-medium text-emerald-700 underline underline-offset-4 hover:text-emerald-800"
+        className="text-left text-[13px] font-medium text-emerald-700 underline underline-offset-4 hover:text-emerald-800"
       >
         {stage.approverIds.length > 0 || stage.minAmount.trim()
-          ? `Approvers & threshold — ${stage.approverIds.length > 0 ? `${stage.approverIds.length} named` : "any member"}${stage.minAmount.trim() ? `, ≥ ${stage.minAmount}` : ""}`
-          : "Add named approvers or an amount threshold (optional)"}
+          ? `Approvers & threshold — ${stage.approverIds.length > 0 ? `${stage.approverIds.length} named` : stage.requireOwner ? "owner only" : "any member"}${stage.minAmount.trim() ? `, ≥ ${stage.minAmount}` : ""}`
+          : stage.requireOwner ? "Approvers & threshold — owner only" : "Add named approvers or an amount threshold (optional)"}
       </button>
       {open && <div id={detailsId} className="mt-3 grid gap-4 sm:grid-cols-[minmax(0,1fr)_180px]">
         <div>
@@ -170,11 +170,13 @@ function StageEditor({ index, count, stage, members, onChange, onRemove, onMove,
  * WP-AP2: `approverIds` and `minAmount` are optional per-stage settings. Empty approver list ⇒
  * role-only gating (the historic behavior). Blank minAmount ⇒ the stage applies at every amount.
  * The engine's canDecideStage / applicableStages honor both — see lib/approvals/engine.ts. */
-export function ApprovalWorkflowForm({ workspaceId, members, draft }: {
+export function ApprovalWorkflowForm({ workspaceId, members, draft, onTypedChange }: {
   workspaceId: string
   members: ApprovalFormMember[]
   /** Set by Duplicate on a row above; the form takes it as its new content and moves focus to the name. */
   draft?: ApprovalFlowDraft | null
+  /** Tells the owner of `draft` whether the form holds typed work, so Duplicate asks before replacing it. */
+  onTypedChange?: (typed: boolean) => void
 }) {
   const router = useRouter()
   const nameId = useId()
@@ -198,8 +200,9 @@ export function ApprovalWorkflowForm({ workspaceId, members, draft }: {
   const typed = name.trim() !== "" || stages.some((stage) => stage.name.trim() !== "" || stage.approverIds.length > 0 || stage.minAmount.trim() !== "")
   useEffect(() => {
     setUnsaved(formKey, typed ? "You have a flow that hasn't been created yet." : null)
+    onTypedChange?.(typed)
     return () => setUnsaved(formKey, null)
-  }, [formKey, typed])
+  }, [formKey, typed, onTypedChange])
 
   const moveStage = (index: number, direction: -1 | 1) => setStages((previous) => {
     const target = index + direction
@@ -217,7 +220,13 @@ export function ApprovalWorkflowForm({ workspaceId, members, draft }: {
   const formInvalid = !name.trim() || blankStageIndexes.size > 0 || badThresholdIndexes.size > 0
 
   const submit = async () => {
-    if (formInvalid) { setShowErrors(true); return }
+    if (formInvalid) {
+      setShowErrors(true)
+      // The first problem gets focus, so a keyboard or screen-reader user lands on it rather than
+      // hunting five red lines from the button.
+      window.requestAnimationFrame(() => document.querySelector<HTMLElement>("[aria-invalid=true]")?.focus())
+      return
+    }
     setPending(true); setError(null); setCreated(null)
     try {
       const formData = new FormData()

@@ -3,7 +3,8 @@
 import { Empty, Panel, Pill } from "@/components/automation/automation-ui"
 import { ApprovalWorkflowForm, type ApprovalFlowDraft, type ApprovalFormMember } from "@/components/workspace/approval-workflow-form"
 import { ApprovalWorkflowRowControls } from "@/components/workspace/approval-workflow-row"
-import { useState } from "react"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
+import { useCallback, useState } from "react"
 
 export type FlowSummary = {
   id: string
@@ -27,15 +28,21 @@ export function ApprovalFlowsEditor({ workspaceId, flows, members, defaultFlowId
   formatThreshold: Record<string, string>
 }) {
   const [draft, setDraft] = useState<ApprovalFlowDraft | null>(null)
+  const [typed, setTyped] = useState(false)
+  const [replaceWith, setReplaceWith] = useState<ApprovalFlowDraft | null>(null)
+  const onTypedChange = useCallback((next: boolean) => setTyped(next), [])
   const memberNameById = new Map(members.map((m) => [m.id, m.name || m.email]))
 
-  const duplicate = (flow: FlowSummary) => setDraft({
+  const toDraft = (flow: FlowSummary): ApprovalFlowDraft => ({
     name: `${flow.name} (copy)`,
     stages: flow.stages.map((stage) => ({ name: stage.name, requireOwner: stage.requireOwner, approverIds: stage.approverIds, minAmount: stage.minAmount === null ? "" : String(stage.minAmount) })),
   })
+  // Duplicate replaces the whole form. If the form already holds typed work, that is a loss the
+  // owner has to choose, so it asks first; an empty form is replaced without ceremony.
+  const duplicate = (flow: FlowSummary) => (typed ? setReplaceWith(toDraft(flow)) : setDraft(toDraft(flow)))
 
   return <>
-    <Panel title="Flows" note={`${flows.length} flow${flows.length === 1 ? "" : "s"} in this workspace. A flow's stages are fixed once it exists — to change them, duplicate it, edit the copy and delete the original.`}>
+    <Panel title="Flows" note={`${flows.length} flow${flows.length === 1 ? "" : "s"} in this workspace. Activate, Deactivate and Delete apply at once; the default flow above waits for Save. A flow's stages are fixed once it exists — to change them, duplicate it, edit the copy and delete the original.`}>
       {!flows.length
         ? <Empty title="No flows yet">Until one exists, an approval started from the Invoices bulk bar is a single decision by an owner.</Empty>
         : <div className="divide-y divide-hairline-soft">
@@ -71,8 +78,15 @@ export function ApprovalFlowsEditor({ workspaceId, flows, members, defaultFlowId
 
     {owner && (
       <Panel title="Add a flow" note="Name it, list the stages in order, and pick who decides each one.">
-        <ApprovalWorkflowForm workspaceId={workspaceId} members={members} draft={draft} />
+        <ApprovalWorkflowForm workspaceId={workspaceId} members={members} draft={draft} onTypedChange={onTypedChange} />
       </Panel>
     )}
+    <ConfirmDialog
+      open={replaceWith !== null}
+      title="Replace what you've typed?"
+      description={`The Add a flow form already has something in it. Duplicating “${replaceWith?.name.replace(/ \(copy\)$/, "") ?? ""}” replaces it with that flow's stages; what you typed is not kept.`}
+      confirmLabel="Replace"
+      onConfirm={() => { setDraft(replaceWith); setReplaceWith(null) }}
+      onCancel={() => setReplaceWith(null)} />
   </>
 }

@@ -15,6 +15,9 @@ beforeEach(() => {
   // WP-AP2: default "no push exists" so the payment-status gate still fires under existing
   // tests unless a specific test overrides it to simulate a ledger sync in flight.
   db.integrationPush = { findFirst: vi.fn().mockResolvedValue(null), findMany: vi.fn().mockResolvedValue([]) }
+  // #253: no default flow unless a test sets one — the shipped behaviour (approvals start by hand).
+  db.workspace = { findUnique: vi.fn().mockResolvedValue({ defaultApprovalWorkflow: null }) }
+  db.gate = { findMany: vi.fn().mockResolvedValue([]) }
 })
 
 describe("parseReviewTaskStatus", () => {
@@ -45,6 +48,47 @@ describe("createReviewTask", () => {
       data: expect.objectContaining({ workspaceId: "w1", documentId: "d1", reason: "manual", detail: "looks off" }),
     }))
     expect(db.$transaction).toHaveBeenCalledWith(["create-task", "audit"])
+  })
+
+  // #253: the default flow auto-starts at task creation unless something says no.
+  it("auto-starts the workspace's default flow when it is active and nothing blocks the document", async () => {
+    db.document = { findFirst: vi.fn().mockResolvedValue({ id: "d1" }) }
+    db.reviewTask = { create: vi.fn().mockReturnValue("create-task") }
+    db.documentAuditEvent = { create: vi.fn().mockReturnValue("audit") }
+    db.workspace = { findUnique: vi.fn().mockResolvedValue({ defaultApprovalWorkflow: { id: "wf-default", name: "Two-step", active: true } }) }
+
+    await createReviewTask({ workspaceId: "w1", documentId: "d1", createdById: "u1" })
+
+    expect(db.reviewTask.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ workflowId: "wf-default", currentStageIndex: 0, status: "in_review" }),
+    }))
+    expect(db.documentAuditEvent.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ type: "review_task_workflow_auto_started", actorId: null }),
+    }))
+  })
+
+  it("does not auto-start an inactive default, or one the document's open hard gate blocks", async () => {
+    db.document = { findFirst: vi.fn().mockResolvedValue({ id: "d1" }) }
+    db.reviewTask = { create: vi.fn().mockReturnValue("create-task") }
+    db.documentAuditEvent = { create: vi.fn().mockReturnValue("audit") }
+    db.workspace = { findUnique: vi.fn().mockResolvedValue({ defaultApprovalWorkflow: { id: "wf-default", name: "Two-step", active: false } }) }
+    await createReviewTask({ workspaceId: "w1", documentId: "d1", createdById: "u1" })
+    expect(db.reviewTask.create.mock.calls[0][0].data.workflowId).toBeUndefined()
+
+    db.workspace = { findUnique: vi.fn().mockResolvedValue({ defaultApprovalWorkflow: { id: "wf-default", name: "Two-step", active: true } }) }
+    db.gate = { findMany: vi.fn().mockResolvedValue([{ documentId: "d1" }]) }
+    await createReviewTask({ workspaceId: "w1", documentId: "d1", createdById: "u1" })
+    expect(db.reviewTask.create.mock.calls[1][0].data.workflowId).toBeUndefined()
+  })
+
+  it("keeps an explicit workflowId over the default, with no auto-start event", async () => {
+    db.document = { findFirst: vi.fn().mockResolvedValue({ id: "d1" }) }
+    db.reviewTask = { create: vi.fn().mockReturnValue("create-task") }
+    db.documentAuditEvent = { create: vi.fn().mockReturnValue("audit") }
+    db.workspace = { findUnique: vi.fn().mockResolvedValue({ defaultApprovalWorkflow: { id: "wf-default", name: "Two-step", active: true } }) }
+    await createReviewTask({ workspaceId: "w1", documentId: "d1", createdById: "u1", workflowId: "wf-explicit" })
+    expect(db.reviewTask.create.mock.calls[0][0].data.workflowId).toBe("wf-explicit")
+    expect(db.documentAuditEvent.create).toHaveBeenCalledTimes(1)
   })
 
   it("starts at stage 0 and status in_review when a workflowId is given", async () => {

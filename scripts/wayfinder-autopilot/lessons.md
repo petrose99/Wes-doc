@@ -29,6 +29,12 @@ here will be relearned at full cost.
 - (docubite #252, H6/H10 recognition) A locked control explained itself only in `sr-only` text — accessible, invisible. → Every disabled or locked control has one visible reason (footnote or inline text); `sr-only` supplements, it never carries the only explanation.
 - (docubite #252, H6 recognition) A context caption ("which company am I configuring") was passed page-by-page and landed on one page. → Context that every page of an area must show renders in the area's layout, never as a per-page prop.
 - (docubite #252, H3 control) A "leave without saving?" guard used `window.confirm` beside an app that already owns a ConfirmDialog. → Part B contract: the surface's confirms all use the shell dialog; `window.confirm`/`alert` grep must be empty (`beforeunload` is the only native prompt).
+- (docubite #253, H3 control) A confirm opened by a Save button that was *disabled* at that moment (busy/counting) recorded no opener, so Escape dropped focus to body. → B5: for every dialog, name the element focus returns to and whether it can be disabled at open time; a form whose Save opens a confirm returns focus itself.
+- (docubite #253, H1 status) An "in force now" sentence beside a control showing the *pending* choice reads as stale the moment the control changes. → Spec two sentences per control: what is in force (saved) and what Save will make true (pending); B2 row per sentence, not per view.
+- (docubite #253, H4 consistency) A control that borrowed a status primitive's look (toggle styled as the read-only Pill) was a P2 the primitive diff could not see. → B4 also lists every control with the primitive it *looks like*; a status primitive never carries a click.
+- (docubite #253, H9 recovery) Client validation specified as "in-form blocker" landed 600px from the field, in the save bar. → B5 states *where* each validation message renders (at the field, `aria-describedby`) and what the bar merely repeats.
+- (docubite #253, H7 flexibility) A create-only list with no accelerator scored 2 when the spec named only ⌘S. → Part A/C: every list of user-made records names at least one accelerator (duplicate, reorder, filter) or states why none.
+- (docubite #253, H5 prevention) An accelerator that replaces form content (Duplicate → prefill) destroyed typed work; found only at the confirm round. → B1 row for any action that *replaces* input: guard when the target holds typed work.
 
 ## Grilling (what a decision ticket must establish before its first round)
 

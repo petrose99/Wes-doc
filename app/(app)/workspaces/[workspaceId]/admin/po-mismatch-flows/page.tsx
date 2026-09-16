@@ -122,6 +122,7 @@ export default async function PoMismatchFlowsPage({ params }: { params: Promise<
           </Panel>
         </div>
 
+        <div className="border-t border-hairline pt-10">
         <Panel level="h3" title="How confident the matches were" note="Document matches grouped by the score the pipeline gave them; each bar is that band's share of all matches.">
           {summary.total === 0
             ? <Empty title="Nothing to plot yet">
@@ -139,6 +140,7 @@ export default async function PoMismatchFlowsPage({ params }: { params: Promise<
                 ))}
               </Ledger>}
         </Panel>
+        </div>
       </>}
     </Panel>
   </AdminPage>

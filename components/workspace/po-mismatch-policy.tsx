@@ -117,29 +117,31 @@ export function PoMismatchPolicy({ workspaceId, quantityPercent, matchVariancePe
         <ToleranceRow
           id={quantityId}
           label="Quantity tolerance"
-          description="How much more than the ordered quantity the invoices on a purchase order may add up to before the line shows ≠ and the invoice is held for its stage's approver."
+          description="How much more than the ordered quantity the invoices on one purchase order may add up to."
           value={quantity}
           onChange={setQuantity}
           invalid={!quantityValid}
           problem={quantityValid ? null : "Enter a number between 0 and 100."}
           disabled={pending || readOnly}
+          readOnly={readOnly}
         />
         <ToleranceRow
           id={varianceId}
           label="Match variance"
-          description="How far an invoice's unit prices and total may differ from the order before the Total shows ≠ and the invoice waits for someone named below to let it through."
+          description="How far an invoice's unit prices and total may differ from the order's."
           value={variance}
           onChange={setVariance}
           invalid={!varianceValid}
           problem={varianceValid ? null : "Enter a number between 0 and 100."}
           disabled={pending || readOnly}
+          readOnly={readOnly}
         />
       </div>
       <div className="mt-4">
         <Consequence>
-          A line inside both tolerances shows = on the invoice row and needs nobody. Over the quantity
-          tolerance, the invoice is held for its stage&rsquo;s approver. Over the match variance, it
-          waits for someone named below to let it through.
+          Inside both tolerances a line shows = on the invoice row and needs nobody. Over the quantity
+          tolerance it shows ≠ and the invoice is held for its stage&rsquo;s approver. Over the match
+          variance it shows ≠ and the invoice waits for someone named below to let it through.
         </Consequence>
       </div>
     </Panel>
@@ -203,7 +205,7 @@ export function PoMismatchPolicy({ workspaceId, quantityPercent, matchVariancePe
 
 /** One ruled tolerance: its name and sentence on the left, its number right-aligned. A rule, not a
  * box — the Admin ledger grammar. */
-function ToleranceRow({ id, label, description, value, onChange, invalid, problem, disabled }: {
+function ToleranceRow({ id, label, description, value, onChange, invalid, problem, disabled, readOnly }: {
   id: string
   label: string
   description: string
@@ -214,21 +216,24 @@ function ToleranceRow({ id, label, description, value, onChange, invalid, proble
    * reason Save is off. */
   problem: string | null
   disabled: boolean
+  readOnly: boolean
 }) {
   const problemId = `${id}-problem`
   return <div className="flex flex-wrap items-start justify-between gap-x-8 gap-y-3 py-4 first:pt-0">
     <div className="min-w-0 max-w-[56ch]">
-      <label htmlFor={id} className="block text-sm text-slate-900">{label}</label>
+      {readOnly ? <span className="block text-sm text-slate-900">{label}</span> : <label htmlFor={id} className="block text-sm text-slate-900">{label}</label>}
       <p className="mt-0.5 max-w-[52ch] text-xs leading-relaxed text-slate-500">{description}</p>
     </div>
     <div>
       <div className="flex items-center gap-2">
-        <Input
+        {/* A member reads the number; it is shown as text at full contrast, not a greyed field. */}
+        {readOnly && <span id={id} className="w-20 text-right text-sm tabular-nums text-slate-900">{value}</span>}
+        {!readOnly && <Input
           id={id} type="number" min={0} max={100} step={1} inputMode="numeric"
           className={`w-20 text-right tabular-nums ${invalid ? "border-red-400 focus-visible:border-red-500 focus-visible:ring-red-200" : ""}`} value={value} disabled={disabled}
           aria-invalid={invalid || undefined}
           aria-describedby={problem ? problemId : undefined}
-          onChange={(event) => onChange(event.target.value)} />
+          onChange={(event) => onChange(event.target.value)} />}
         <span className="text-sm text-slate-600">%</span>
       </div>
       {problem && <p id={problemId} className="mt-1 text-right text-xs text-red-600">{problem}</p>}
