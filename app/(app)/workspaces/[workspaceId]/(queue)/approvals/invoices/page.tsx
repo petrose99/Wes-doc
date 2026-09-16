@@ -2,6 +2,7 @@ import { getCurrentUser } from "@/lib/auth"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { listApprovalInvoiceRows, listPoMismatchRows } from "@/models/approvals"
 import { listSavedViews } from "@/models/saved-views"
+import { filterPoMismatchRows, searchParamsOf } from "@/lib/approvals/filters"
 import { requireWorkspaceRole, type WorkspaceRole } from "@/models/workspaces"
 import { createSavedViewAction, deleteSavedViewAction, duplicateSavedViewAction, renameSavedViewAction, saveFiltersToViewAction, shareSavedViewAction } from "@/app/(app)/workspaces/[workspaceId]/(chrome)/saved-views-actions"
 import { ApprovalInvoiceQueue } from "@/components/queue/approval-invoice-queue"
@@ -22,7 +23,8 @@ export async function ApprovalsInvoicesQueuePage({ params, searchParams, selecte
   selectedDocumentId?: string | null
 }) {
   const { workspaceId } = await params
-  const { status, approver, view: selectedViewId } = await searchParams
+  const query = await searchParams
+  const { status, approver, view: selectedViewId } = query
   const user = await getCurrentUser()
   const membership = await requireWorkspaceRole(workspaceId, user.id)
   const capabilities = await getWorkspaceCapabilities(workspaceId)
@@ -36,21 +38,18 @@ export async function ApprovalsInvoicesQueuePage({ params, searchParams, selecte
     listSavedViews({ workspaceId, viewKey: "approvals-invoices", userId: user.id }),
   ])
 
-  const scopeToMe = approver !== "anyone"
+  // #257: the Approver/Status facets apply client-side (`lib/approvals/filters.ts`) so the
+  // Filter sheet and the empty state can count; the page hands over every row. The segment's PO
+  // Mismatches count goes through the same predicate so the two stay comparable.
   const onlyNotEligible = status === "not_eligible"
-  const rows = allRows
-    .filter((row) => !scopeToMe || row.canDecide)
-    .filter((row) => !onlyNotEligible || row.eligibility.status !== "ready")
-  // The queue picker's PO Mismatches count reflects the same Approver scope currently applied
-  // here, so the two badges stay comparable when the operator toggles Me/Anyone.
-  const poMismatchCount = poMismatchRows.filter((row) => !scopeToMe || row.canDecide).length
+  const poMismatchCount = filterPoMismatchRows(poMismatchRows, searchParamsOf(query)).length
 
   const currentViewFilters: Record<string, string> = { ...(approver === "anyone" ? { approver: "anyone" } : {}), ...(onlyNotEligible ? { status: "not_eligible" } : {}) }
 
   return <ApprovalInvoiceQueue
     workspaceId={workspaceId}
     basePath={basePath}
-    rows={rows}
+    rows={allRows}
     poMismatchCount={poMismatchCount}
     initialSelectedId={selectedDocumentId}
     views={<SavedViewPicker views={savedViews} selectedViewId={selectedViewId ?? null} currentFilters={currentViewFilters}

@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useTransition, type ReactNode } from "react"
-import { useRouter } from "next/navigation"
+import Link from "next/link"
+import { useRouter, useSearchParams } from "next/navigation"
 import { toast } from "sonner"
 import { Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -15,6 +16,9 @@ import { QueueSegments } from "@/components/queue/queue-segments"
 import { ProcessingStateGlyph } from "@/components/typed-destinations/row-signals"
 import { processingState } from "@/lib/documents/processing-state"
 import { useOnlineStatus } from "@/lib/client/use-online-status"
+import { usePhoneLane } from "@/lib/client/use-phone-lane"
+import { countWaitingOnOthers, filterApprovalInvoiceRows } from "@/lib/approvals/filters"
+import { DecisionResultStrip, NETWORK_ERROR, OFFLINE_REASON, type Decided } from "@/components/queue/decision-result"
 import { decideReviewTaskStageAction } from "@/app/(app)/workspaces/[workspaceId]/review-actions"
 import { sendApprovalBackForReviewAction } from "@/app/(app)/workspaces/[workspaceId]/(queue)/approvals/actions"
 import { getQueueDetailAction } from "@/app/(app)/workspaces/[workspaceId]/queue-actions"
@@ -26,9 +30,9 @@ export const APPROVAL_INVOICE_FACETS: Facet[] = [
 ]
 
 const SORTS: SortOption<ApprovalInvoiceRow>[] = [
-  { key: "waiting", label: "Waiting longest", compare: (a, b) => a.waitingSince.getTime() - b.waitingSince.getTime() },
+  { key: "waiting", label: "Waiting longest first", compare: (a, b) => a.waitingSince.getTime() - b.waitingSince.getTime() },
   { key: "amount", label: "Amount, high to low", compare: (a, b) => (b.total ?? -Infinity) - (a.total ?? -Infinity) },
-  { key: "due", label: "Due date", compare: (a, b) => (a.dueDate?.getTime() ?? Infinity) - (b.dueDate?.getTime() ?? Infinity) },
+  { key: "due", label: "Due soonest", compare: (a, b) => (a.dueDate?.getTime() ?? Infinity) - (b.dueDate?.getTime() ?? Infinity) },
 ]
 
 function stageLabel(stage: ApprovalInvoiceRow["stage"]): string {
@@ -55,7 +59,10 @@ function eligibilityText(row: ApprovalInvoiceRow): string {
 export function ApprovalInvoiceQueue({ workspaceId, basePath, rows, poMismatchCount, views, initialSelectedId }: {
   workspaceId: string
   basePath: string
+  /** Every row the actor may see — the Approver/Status facets apply client-side
+   * (`filterApprovalInvoiceRows`), so the Filter sheet and the empty state can count. */
   rows: ApprovalInvoiceRow[]
+  /** PO mismatches through the same facets, for the segment count. */
   poMismatchCount: number
   /** The saved-view picker (#201) — composed here, after the queue picker, matching every other
    * typed destination's `views` slot; PO Mismatches has no saved views yet, so it omits this. */
@@ -64,7 +71,11 @@ export function ApprovalInvoiceQueue({ workspaceId, basePath, rows, poMismatchCo
 }) {
   const router = useRouter()
   const online = useOnlineStatus()
+  const phone = usePhoneLane()
   const [pending, setPending] = useState<{ taskId: string; decision: "approve" | "reject" } | null>(null)
+  // #257 spec 3.5 "After a decision": the decided row stays open (pinned) with a result strip in
+  // place of the decision bar; the desktop toast stays as well. Cleared when another row opens.
+  const [decided, setDecided] = useState<Decided<ApprovalInvoiceRow> | null>(null)
   const [approving, setApproving] = useState<ApprovalInvoiceRow | null>(null)
   const [rejecting, setRejecting] = useState<ApprovalInvoiceRow | null>(null)
   const [sendingBack, setSendingBack] = useState<ApprovalInvoiceRow | null>(null)
@@ -83,27 +94,45 @@ export function ApprovalInvoiceQueue({ workspaceId, basePath, rows, poMismatchCo
   // row still refreshes right after — a stage another approver just decided (the classic race,
   // "Approved by Dana 12s ago") is only resolved by re-reading the server, not by trusting the
   // client's optimistic guess.
-  const decide = async (row: ApprovalInvoiceRow, decision: "approve" | "reject", note: string | undefined, onSettled: () => void) => {
+  // Three exits (spec 3.6): success → result strip; server refused (already decided, not your
+  // stage) → the strip carries the server's sentence and the row re-reads; network throw → the
+  // sheet stays open with the typed reason and the bar shows the error.
+  const decide = async (row: ApprovalInvoiceRow, decision: "approve" | "reject", note: string | undefined): Promise<{ success: boolean; error?: string }> => {
     setError(null)
     setPending({ taskId: row.taskId, decision })
     try {
       const result = await decideReviewTaskStageAction(workspaceId, row.taskId, decision, note)
-      if (!result.success) { setError({ taskId: row.taskId, message: result.error || "Could not record that decision" }); router.refresh(); return }
-      toast.success(decision === "approve" ? "Approved" : "Rejected")
-      onSettled()
-    } catch {
-      setError({ taskId: row.taskId, message: "Could not reach the server" })
+      if (!result.success) {
+        setDecided({ row, outcome: "refused", message: result.error || "This stage is no longer yours to decide." })
+        router.refresh()
+        return { success: true }
+      }
+      setDecided({ row, outcome: decision === "approve" ? "approved" : "rejected" })
+      if (!phone) toast.success(decision === "approve" ? "Approved" : "Rejected")
       router.refresh()
+      return { success: true }
+    } catch {
+      setError({ taskId: row.taskId, message: NETWORK_ERROR })
+      return { success: false, error: NETWORK_ERROR }
     } finally {
       setPending(null)
     }
   }
+  const waitingOnOthers = countWaitingOnOthers(rows)
+  // One clock reading per render of the list, so "overdue" is stable across cards.
+  const [renderedAt] = useState(() => Date.now())
+  const searchParams = useSearchParams()
+  const ownCount = filterApprovalInvoiceRows(rows, searchParams).length
 
   return <>
     <QueueScreen<ApprovalInvoiceRow>
       title="Invoices"
       basePath={basePath}
       rows={rows}
+      filterRows={filterApprovalInvoiceRows}
+      pinned={decided?.row ?? null}
+      onOpenChange={(id) => { if (id !== decided?.row.documentId) setDecided(null) }}
+      initialMissingNotice="This invoice was already decided — it's no longer in Ready to Approve."
       rowId={(row) => row.documentId}
       rowName={(row) => ({ title: row.supplier ?? "Unknown supplier", suffix: [row.invoiceNumber, row.total !== null ? formatMoney(row.total, row.currencyCode) : null].filter(Boolean).join(" · ") || null })}
       leading={(row) => <ProcessingStateGlyph state={processingState({ approvalStatus: "in_progress", blockedByCheck: row.eligibility.status !== "ready", escalated: false, touchless: false, status: "needs_review" })} />}
@@ -111,20 +140,27 @@ export function ApprovalInvoiceQueue({ workspaceId, basePath, rows, poMismatchCo
       sortOptions={SORTS}
       facets={APPROVAL_INVOICE_FACETS}
       band={<div className="px-4 pt-3"><QueueSegments segments={[
-        { key: "invoices", label: "Invoice approvals", count: rows.length, href: basePath },
+        { key: "invoices", label: "Invoice approvals", count: ownCount, href: basePath },
         { key: "po-mismatches", label: "PO mismatches", count: poMismatchCount, href: basePath.replace(/\/invoices$/, "/po-mismatches") },
       ]} active="invoices" /></div>}
       views={views}
-      cards={{ below: "lg", render: (row, { open }) => <ApprovalCard row={row} onOpen={open} /> }}
+      cards={{ below: "lg", title: "Ready to Approve", render: (row, { open }) => <ApprovalCard row={row} onOpen={open} now={renderedAt} /> }}
       initialSelectedId={initialSelectedId}
       empty={{
-        title: "Nothing to approve right now.",
-        body: "Ready to Approve shows every submitted Approval whose current stage you can decide. Start one from the Invoices bulk-action bar (Approval ▾ → Start).",
-        filteredTitle: "Nothing matches these filters.",
-        filteredBody: "Try Approver · Anyone to see Approvals pending on other approvers.",
+        title: "Nothing needs your approval",
+        body: "Anything you can decide will show here.",
+        action: <span className="flex flex-wrap justify-center gap-x-4 gap-y-1">
+          {waitingOnOthers > 0 && <Link href={`${basePath}?approver=anyone`} className="font-medium text-emerald-800 underline-offset-2 hover:underline">{waitingOnOthers} waiting on other approvers</Link>}
+          <Link href={`/workspaces/${workspaceId}/invoices`} className="font-medium text-emerald-800 underline-offset-2 hover:underline">Go to Invoices</Link>
+        </span>,
+        filteredTitle: "No rows match these filters",
+        filteredAction: <Link href={basePath} className="font-medium text-emerald-800 underline-offset-2 hover:underline">Clear filters</Link>,
       }}
       loadDetail={(documentId) => getQueueDetailAction(workspaceId, documentId, { initialTab: "approval" })}
-      paneActions={(row) => {
+      paneActions={(row, helpers) => {
+        if (decided && decided.row.documentId === row.documentId) {
+          return <DecisionResultStrip decided={decided} next={helpers.next} onBack={() => { setDecided(null); helpers.close() }} />
+        }
         const rowError = error?.taskId === row.taskId ? error.message : null
         const isPending = pending?.taskId === row.taskId
         // Decision #5: an ineligible row's Approve is disabled, but Reject stays available —
@@ -132,7 +168,7 @@ export function ApprovalInvoiceQueue({ workspaceId, basePath, rows, poMismatchCo
         // withdrawing the Approval itself.
         const rejectDisabled = !online || !row.canDecide || pending !== null
         const approveDisabled = rejectDisabled || row.eligibility.status !== "ready"
-        const disabledReason = !online ? "You're offline — reconnect to decide this Approval." : !row.canDecide ? "Only this stage's approver can decide it." : row.eligibility.status !== "ready" ? eligibilityText(row) : null
+        const disabledReason = !online ? OFFLINE_REASON : !row.canDecide ? "Only this stage's approver can decide it." : row.eligibility.status !== "ready" ? eligibilityText(row) : null
         return <>
           {rowError && <p role="alert" className="w-full text-xs text-red-700 sm:mr-auto sm:w-auto">{rowError}</p>}
           {!rowError && disabledReason && <span className="w-full text-xs text-slate-600 sm:mr-auto sm:w-auto">{disabledReason}</span>}
@@ -142,22 +178,21 @@ export function ApprovalInvoiceQueue({ workspaceId, basePath, rows, poMismatchCo
         </>
       }}
       paneMenu={(row) => <>
-        <PaneMenuItem tone="amber" disabled={!online || !row.canDecide} onClick={() => setSendingBack(row)}>
+        <PaneMenuItem tone="amber" disabled={!online || !row.canDecide || phone} hint={phone ? "Send back for review is a desktop action." : undefined} onClick={() => setSendingBack(row)}>
           Send back for review…
         </PaneMenuItem>
       </>} />
 
     {/* Decision #11: a plain Approve keeps an optional comment, never a required reason. */}
     <ApproveCommentDialog row={approving} onClose={() => setApproving(null)} pending={pending !== null}
-      onApprove={(comment) => { const row = approving; if (row) void decide(row, "approve", comment || undefined, () => { setApproving(null); router.refresh() }) }} />
+      disabledReason={!online ? OFFLINE_REASON : null}
+      onApprove={async (comment) => { const row = approving; if (!row) return { success: false, error: "No invoice selected" }; return decide(row, "approve", comment || undefined) }} />
 
     <ReasonDialog open={rejecting !== null} placement="sheet" onClose={() => setRejecting(null)}
+      disabledReason={!online ? OFFLINE_REASON : null} pendingLabel="Rejecting…"
       action={async (formData) => {
         if (!rejecting) return { success: false, error: "No invoice selected" }
-        const reason = String(formData.get("reason") || "").trim()
-        const result = await decideReviewTaskStageAction(workspaceId, rejecting.taskId, "reject", reason)
-        if (result.success) { toast.success("Rejected"); router.refresh() }
-        return result
+        return decide(rejecting, "reject", String(formData.get("reason") || "").trim())
       }}
       title="Reject this Approval"
       description="This ends the approval run for this invoice. The reason goes on the audit trail and to whoever started it."
@@ -165,6 +200,7 @@ export function ApprovalInvoiceQueue({ workspaceId, basePath, rows, poMismatchCo
       placeholder="Why is this being rejected?" />
 
     <ReasonDialog open={sendingBack !== null} onClose={() => setSendingBack(null)}
+      disabledReason={!online ? OFFLINE_REASON : null} pendingLabel="Sending back…"
       action={async (formData) => {
         if (!sendingBack) return { success: false, error: "No invoice selected" }
         const result = await sendApprovalBackForReviewAction(workspaceId, sendingBack.taskId, formData)
@@ -181,8 +217,9 @@ export function ApprovalInvoiceQueue({ workspaceId, basePath, rows, poMismatchCo
 /** #257 spec 3.3: the phone/tablet card row for Invoice approvals — one `<a>` per row so a
  * long-press/open-in-new-tab works and the deep-link route already exists; `onClick` prevents
  * default and drives the shared `open()` (pushState per S8). */
-function ApprovalCard({ row, onOpen }: { row: ApprovalInvoiceRow; onOpen: () => void }) {
+function ApprovalCard({ row, onOpen, now }: { row: ApprovalInvoiceRow; onOpen: () => void; now: number }) {
   const notEligible = row.eligibility.status !== "ready"
+  const overdue = row.dueDate !== null && row.dueDate.getTime() < now
   return <a href={`#${row.documentId}`} onClick={(event) => { event.preventDefault(); onOpen() }}
     className="flex min-h-16 items-start gap-3 px-4 py-3 hover:bg-slate-50 active:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-inset">
     <ProcessingStateGlyph state={processingState({ approvalStatus: "in_progress", blockedByCheck: notEligible, escalated: false, touchless: false, status: "needs_review" })} />
@@ -192,7 +229,7 @@ function ApprovalCard({ row, onOpen }: { row: ApprovalInvoiceRow; onOpen: () => 
         <span className="shrink-0 tabular-nums text-[15px] font-semibold text-slate-900">{row.total !== null ? formatMoney(row.total, row.currencyCode) : <span className="font-normal text-slate-600">No amount</span>}</span>
       </span>
       <span className="mt-0.5 block text-[13px] text-slate-600">
-        {row.invoiceNumber ?? "No invoice #"} · <span className={row.dueDate && row.dueDate.getTime() < Date.now() ? "text-red-700" : ""}>Due {formatDate(row.dueDate)}{row.dueDate && row.dueDate.getTime() < Date.now() ? " · overdue" : ""}</span>
+        {row.invoiceNumber ?? "No invoice #"} · <span className={overdue ? "text-red-700" : ""}>Due {formatDate(row.dueDate)}{overdue ? " · overdue" : ""}</span>
       </span>
       <span className="mt-0.5 block text-[13px]">
         {notEligible
@@ -206,23 +243,40 @@ function ApprovalCard({ row, onOpen }: { row: ApprovalInvoiceRow; onOpen: () => 
 /** Decision #11's optional-comment Approve. Deliberately not `ReasonDialog`: that component
  * requires non-empty text and disables submit until there's some — the whole point here is that
  * submitting with nothing typed is the common path. */
-function ApproveCommentDialog({ row, onClose, onApprove, pending }: {
+function ApproveCommentDialog({ row, onClose, onApprove, pending, disabledReason }: {
   row: ApprovalInvoiceRow | null
   onClose: () => void
-  onApprove: (comment: string) => void
+  /** Resolves like a `ReasonDialog` action: `success: false` keeps the sheet open with the
+   * typed comment and shows `error` inline (the network case). */
+  onApprove: (comment: string) => Promise<{ success: boolean; error?: string }>
   pending: boolean
+  /** Offline inside the open sheet (spec 3.6): submit disabled, sentence under it, comment kept. */
+  disabledReason?: string | null
 }) {
   const [comment, setComment] = useState("")
+  const [error, setError] = useState<string | null>(null)
   const [, startTransition] = useTransition()
-  return <Dialog open={row !== null} placement="sheet" title="Approve this stage" description={row ? `${stageLabel(row.stage)} — an optional comment is recorded on the audit trail.` : ""} onClose={() => { if (!pending) { onClose(); setComment("") } }}>
+  const close = () => { onClose(); setComment(""); setError(null) }
+  const description = row ? `${stageLabel(row.stage)}. Approving ${row.nextStageName ? `moves it to ${row.nextStageName}` : "completes the Approval"}.` : ""
+  return <Dialog open={row !== null} placement="sheet" initialFocus="textarea" title="Approve this stage" description={description} onClose={() => { if (!pending) close() }}>
     <div className="space-y-3 px-5 py-4">
-      <textarea rows={3} value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Comment (optional)"
-        className="w-full resize-none rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm transition-colors focus:border-emerald-400 focus:bg-white focus:outline-none" />
-      <div className="flex justify-end gap-2">
-        <button type="button" className="rounded-md px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100" disabled={pending} onClick={() => { onClose(); setComment("") }}>Cancel</button>
-        <button type="button" className="inline-flex items-center gap-1.5 rounded-md bg-emerald-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-40" disabled={pending}
-          onClick={() => startTransition(() => { onApprove(comment.trim()); setComment("") })}>
-          {pending && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />}Approve
+      <label className="block text-sm">
+        <span className="mb-1 block font-medium text-slate-800">Comment (optional)</span>
+        <textarea rows={3} value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Anything the next approver should know"
+          className="w-full resize-none rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-base text-slate-900 transition-colors placeholder:text-slate-500 focus:border-emerald-400 focus:bg-white focus:outline-none sm:text-sm" />
+      </label>
+      {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+      {disabledReason && <p role="status" className="text-[13px] text-slate-600">{disabledReason}</p>}
+      <div className="flex justify-end gap-2 max-md:grid max-md:grid-cols-2 max-md:[&>button]:h-12">
+        <button type="button" className="rounded-md px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100 max-md:border max-md:border-slate-300" disabled={pending} onClick={close}>Cancel</button>
+        <button type="button" className="inline-flex items-center justify-center gap-1.5 rounded-md bg-emerald-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-40" disabled={pending || !!disabledReason}
+          onClick={() => startTransition(async () => {
+            setError(null)
+            const result = await onApprove(comment.trim())
+            if (!result.success) { setError(result.error ?? "Couldn't record that."); return }
+            close()
+          })}>
+          {pending && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />}{pending ? "Approving…" : "Approve"}
         </button>
       </div>
     </div>

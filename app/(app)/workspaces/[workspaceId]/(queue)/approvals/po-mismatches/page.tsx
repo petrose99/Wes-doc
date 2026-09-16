@@ -3,6 +3,7 @@ import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { listApprovalInvoiceRows, listPoMismatchRows } from "@/models/approvals"
 import { requireWorkspaceRole, type WorkspaceRole } from "@/models/workspaces"
 import { PoMismatchQueue } from "@/components/queue/po-mismatch-queue"
+import { filterApprovalInvoiceRows, searchParamsOf } from "@/lib/approvals/filters"
 import { notFound } from "next/navigation"
 
 export const dynamic = "force-dynamic"
@@ -18,7 +19,7 @@ export async function ApprovalsPoMismatchesQueuePage({ params, searchParams, sel
   selectedDocumentId?: string | null
 }) {
   const { workspaceId } = await params
-  const { status, approver } = await searchParams
+  const query = await searchParams
   const user = await getCurrentUser()
   const membership = await requireWorkspaceRole(workspaceId, user.id)
   const capabilities = await getWorkspaceCapabilities(workspaceId)
@@ -31,14 +32,11 @@ export async function ApprovalsPoMismatchesQueuePage({ params, searchParams, sel
     listPoMismatchRows(workspaceId, actor),
   ])
 
-  const scopeToMe = approver !== "anyone"
-  const onlyNotEligible = status === "not_eligible"
-  const rows = allMismatchRows
-    .filter((row) => !scopeToMe || row.canDecide)
-    .filter((row) => !onlyNotEligible || row.eligibility.status !== "ready")
-  const invoiceCount = allInvoiceRows.filter((row) => !scopeToMe || row.canDecide).length
+  // #257: facets apply client-side (`lib/approvals/filters.ts`); the page hands over every row
+  // and the segment's Invoice approvals count goes through the same predicate.
+  const invoiceCount = filterApprovalInvoiceRows(allInvoiceRows, searchParamsOf(query)).length
 
-  return <PoMismatchQueue workspaceId={workspaceId} basePath={basePath} rows={rows} invoiceCount={invoiceCount} initialSelectedId={selectedDocumentId} />
+  return <PoMismatchQueue workspaceId={workspaceId} basePath={basePath} rows={allMismatchRows} invoiceCount={invoiceCount} initialSelectedId={selectedDocumentId} />
 }
 
 export default function ApprovalsPoMismatchesPage({ params, searchParams }: { params: Promise<{ workspaceId: string }>; searchParams: Promise<ApprovalsPoMismatchesSearchParams> }) {

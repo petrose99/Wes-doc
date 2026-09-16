@@ -124,6 +124,9 @@ export type QueueScreenProps<T> = {
   /** #257 spec 3.6: a deep link to a row this view no longer holds (already decided) — the line
    * to show above the list, since the model cannot load a decided row into the pane. */
   initialMissingNotice?: string
+  /** Fires with the open row's id whenever the pane opens on another row or closes — the surface
+   * uses it to drop a result strip (#257 spec 3.5) that belongs to the row that was decided. */
+  onOpenChange?: (id: string | null) => void
   /** #257 S2: content-only rendering for a queue deep-linked to below its card breakpoint before
    * its own cards ship (#261) — no bulk bar, no row actions, no pane decision bar; the table stays,
    * with a line above it naming it read-only on a phone. */
@@ -135,7 +138,7 @@ const INTERACTIVE = "a, button, input, select, textarea, label, [role=button], [
 function QueueScreenInner<T>({
   title, basePath, rows, rowId, detailIdFor, rowName, paneStatus, fullHref, archivedToast, leading, columns: rawColumns, fieldTable = null, selectable = false, sortOptions = [], facets = [],
   views, stat, band, menu, onExportAll, bulkActions, empty, loadDetail, paneActions, paneMenu, initialSelectedId = null, sortParam = "sort", cards, phoneReadOnly = false,
-  filterRows, pinned = null, initialMissingNotice,
+  filterRows, pinned = null, initialMissingNotice, onOpenChange,
 }: QueueScreenProps<T>) {
   const router = useRouter()
   const pathname = usePathname()
@@ -144,6 +147,13 @@ function QueueScreenInner<T>({
   const [checked, setChecked] = useState<Set<string>>(new Set())
   const [openId, setOpenId] = useState<string | null>(initialSelectedId)
   const [reloadKey, setReloadKey] = useState(0)
+  // Reported once per change of the open row, not on every render of a new callback identity.
+  const reportedOpenId = useRef<string | null | undefined>(undefined)
+  useEffect(() => {
+    if (reportedOpenId.current === openId) return
+    reportedOpenId.current = openId
+    onOpenChange?.(openId)
+  }, [openId, onOpenChange])
   const [menuOpen, setMenuOpen] = useState(false)
   const [filterOpen, setFilterOpen] = useState(false)
   const [exporting, setExporting] = useState(false)

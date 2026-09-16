@@ -1,7 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
+import Link from "next/link"
+import { useRouter, useSearchParams } from "next/navigation"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { QueueScreen, type QueueColumn, type SortOption } from "@/components/queue/queue-screen"
@@ -12,6 +13,9 @@ import { QueueSegments } from "@/components/queue/queue-segments"
 import { ProcessingStateGlyph } from "@/components/typed-destinations/row-signals"
 import { processingState } from "@/lib/documents/processing-state"
 import { useOnlineStatus } from "@/lib/client/use-online-status"
+import { usePhoneLane } from "@/lib/client/use-phone-lane"
+import { countWaitingOnOthers, filterPoMismatchRows } from "@/lib/approvals/filters"
+import { DecisionResultStrip, NETWORK_ERROR, OFFLINE_REASON, type Decided } from "@/components/queue/decision-result"
 import { overrideGateAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
 import { decideReviewTaskStageAction } from "@/app/(app)/workspaces/[workspaceId]/review-actions"
 import { getQueueDetailAction } from "@/app/(app)/workspaces/[workspaceId]/queue-actions"
@@ -24,7 +28,7 @@ export const PO_MISMATCH_FACETS: Facet[] = [
 
 const SORTS: SortOption<PoMismatchRow>[] = [
   { key: "variance", label: "Variance, high to low", compare: (a, b) => b.variance - a.variance },
-  { key: "waiting", label: "Waiting longest", compare: (a, b) => a.waitingSince.getTime() - b.waitingSince.getTime() },
+  { key: "waiting", label: "Waiting longest first", compare: (a, b) => a.waitingSince.getTime() - b.waitingSince.getTime() },
 ]
 
 function stageLabel(stage: PoMismatchRow["stage"]): string {
@@ -50,16 +54,47 @@ function variancePercent(row: PoMismatchRow): number {
 export function PoMismatchQueue({ workspaceId, basePath, rows, invoiceCount, initialSelectedId }: {
   workspaceId: string
   basePath: string
+  /** Every row the actor may see — facets apply client-side (`filterPoMismatchRows`). */
   rows: PoMismatchRow[]
+  /** Invoice approvals through the same facets, for the segment count. */
   invoiceCount: number
   initialSelectedId?: string | null
 }) {
   const router = useRouter()
   const online = useOnlineStatus()
+  const phone = usePhoneLane()
   const [pending, setPending] = useState<{ gateId: string; action: "approve" | "reject" } | null>(null)
+  // #257 spec 3.5 "After a decision": the decided row stays open with a result strip.
+  const [decided, setDecided] = useState<Decided<PoMismatchRow> | null>(null)
   const [overriding, setOverriding] = useState<PoMismatchRow | null>(null)
   const [rejecting, setRejecting] = useState<PoMismatchRow | null>(null)
   const [error, setError] = useState<{ gateId: string; message: string } | null>(null)
+
+  // One exit map for both sheets (spec 3.6): success/refused → result strip and re-read; a
+  // network throw keeps the sheet open with the typed reason and puts the error in the bar.
+  const settle = (row: PoMismatchRow, action: "approve" | "reject", run: () => Promise<{ success: boolean; error?: string }>) => async () => {
+    setError(null)
+    setPending({ gateId: row.gateId, action })
+    try {
+      const result = await run()
+      if (result.success) {
+        setDecided({ row, outcome: action === "approve" ? "approved" : "rejected" })
+        if (!phone) toast.success(action === "approve" ? "Approved — the match-variance gate was overridden" : "Rejected")
+      } else {
+        setDecided({ row, outcome: "refused", message: result.error || "This stage is no longer yours to decide." })
+      }
+      router.refresh()
+      return { success: true }
+    } catch {
+      setError({ gateId: row.gateId, message: NETWORK_ERROR })
+      return { success: false, error: NETWORK_ERROR }
+    } finally {
+      setPending(null)
+    }
+  }
+  const waitingOnOthers = countWaitingOnOthers(rows)
+  const searchParams = useSearchParams()
+  const ownCount = filterPoMismatchRows(rows, searchParams).length
 
   const columns: QueueColumn<PoMismatchRow>[] = [
     { key: "supplier", label: "Supplier", narrow: true, className: "min-w-[12rem]", render: (row) => <TitleCell title={row.supplier} missingLabel="Unknown supplier" subtitle={row.eligibility.status !== "ready" ? eligibilityText(row) : null} /> },
@@ -79,6 +114,10 @@ export function PoMismatchQueue({ workspaceId, basePath, rows, invoiceCount, ini
       title="PO Mismatches"
       basePath={basePath}
       rows={rows}
+      filterRows={filterPoMismatchRows}
+      pinned={decided?.row ?? null}
+      onOpenChange={(id) => { if (id !== decided?.row.documentId) setDecided(null) }}
+      initialMissingNotice="This invoice was already decided — it's no longer in Ready to Approve."
       rowId={(row) => row.documentId}
       rowName={(row) => ({ title: row.supplier ?? "Unknown supplier", suffix: [row.invoiceNumber, `${formatMoney(row.variance, row.currencyCode)} variance`].filter(Boolean).join(" · ") || null })}
       leading={(row) => <ProcessingStateGlyph state={processingState({ approvalStatus: "in_progress", blockedByCheck: row.eligibility.status !== "ready", escalated: false, touchless: false, status: "needs_review" })} />}
@@ -87,23 +126,30 @@ export function PoMismatchQueue({ workspaceId, basePath, rows, invoiceCount, ini
       facets={PO_MISMATCH_FACETS}
       band={<div className="px-4 pt-3"><QueueSegments segments={[
         { key: "invoices", label: "Invoice approvals", count: invoiceCount, href: basePath.replace(/\/po-mismatches$/, "/invoices") },
-        { key: "po-mismatches", label: "PO mismatches", count: rows.length, href: basePath },
+        { key: "po-mismatches", label: "PO mismatches", count: ownCount, href: basePath },
       ]} active="po-mismatches" /></div>}
-      cards={{ below: "lg", render: (row, { open }) => <MismatchCard row={row} onOpen={open} /> }}
+      cards={{ below: "lg", title: "Ready to Approve", render: (row, { open }) => <MismatchCard row={row} onOpen={open} /> }}
       initialSelectedId={initialSelectedId}
       empty={{
-        title: "No PO mismatches right now.",
-        body: "A row appears here automatically once a 2/3-way match variance gate fires on an invoice that already has an Approval in flight — there's no separate Start action.",
-        filteredTitle: "Nothing matches these filters.",
-        filteredBody: "Try Approver · Anyone to see mismatches pending on other approvers.",
+        title: "Nothing needs your approval",
+        body: "Anything you can decide will show here. A PO mismatch appears on its own once a match check fails on an invoice with an Approval in flight.",
+        action: <span className="flex flex-wrap justify-center gap-x-4 gap-y-1">
+          {waitingOnOthers > 0 && <Link href={`${basePath}?approver=anyone`} className="font-medium text-emerald-800 underline-offset-2 hover:underline">{waitingOnOthers} waiting on other approvers</Link>}
+          <Link href={`/workspaces/${workspaceId}/invoices`} className="font-medium text-emerald-800 underline-offset-2 hover:underline">Go to Invoices</Link>
+        </span>,
+        filteredTitle: "No rows match these filters",
+        filteredAction: <Link href={basePath} className="font-medium text-emerald-800 underline-offset-2 hover:underline">Clear filters</Link>,
       }}
       loadDetail={(documentId) => getQueueDetailAction(workspaceId, documentId, { initialTab: "checks" })}
-      paneActions={(row) => {
+      paneActions={(row, helpers) => {
+        if (decided && decided.row.documentId === row.documentId) {
+          return <DecisionResultStrip decided={decided} next={helpers.next} onBack={() => { setDecided(null); helpers.close() }} />
+        }
         const rowError = error?.gateId === row.gateId ? error.message : null
         const isPending = pending?.gateId === row.gateId
         const rejectDisabled = !online || !row.canDecide || pending !== null
         const approveDisabled = rejectDisabled || row.eligibility.status !== "ready"
-        const disabledReason = !online ? "You're offline — reconnect to decide this Approval." : !row.canDecide ? "Only this stage's approver can decide it." : row.eligibility.status !== "ready" ? eligibilityText(row) : null
+        const disabledReason = !online ? OFFLINE_REASON : !row.canDecide ? "Only this stage's approver can decide it." : row.eligibility.status !== "ready" ? eligibilityText(row) : null
         return <>
           {rowError && <p role="alert" className="w-full text-xs text-red-700 sm:mr-auto sm:w-auto">{rowError}</p>}
           {!rowError && disabledReason && <span className="w-full text-xs text-slate-600 sm:mr-auto sm:w-auto">{disabledReason}</span>}
@@ -115,18 +161,11 @@ export function PoMismatchQueue({ workspaceId, basePath, rows, invoiceCount, ini
 
     {/* Decision #3/#11: Approving a PO Mismatch is an override — it always needs a reason. */}
     <ReasonDialog open={overriding !== null} placement="sheet" onClose={() => setOverriding(null)}
+      disabledReason={!online ? OFFLINE_REASON : null} pendingLabel="Approving…"
       action={async (formData) => {
         if (!overriding) return { success: false, error: "No mismatch selected" }
-        setError(null)
-        setPending({ gateId: overriding.gateId, action: "approve" })
-        try {
-          const result = await overrideGateAction(workspaceId, overriding.gateId, formData)
-          if (result.success) { toast.success("Approved — the match-variance gate was overridden"); router.refresh() }
-          else { setError({ gateId: overriding.gateId, message: result.error || "Could not override this gate" }); router.refresh() }
-          return result
-        } finally {
-          setPending(null)
-        }
+        const row = overriding
+        return settle(row, "approve", () => overrideGateAction(workspaceId, row.gateId, formData))()
       }}
       title="Approve over the PO mismatch"
       description={overriding ? `This invoice is ${formatMoney(overriding.variance, overriding.currencyCode)} (${variancePercent(overriding).toFixed(1)}%) over the PO, past the ${Math.round(overriding.percent * 100)}% allowance. Approving overrides the match check and is recorded with your reason. The invoice then continues through its approval flow.` : ""}
@@ -134,22 +173,15 @@ export function PoMismatchQueue({ workspaceId, basePath, rows, invoiceCount, ini
       placeholder="Why is this variance acceptable?" />
 
     <ReasonDialog open={rejecting !== null} placement="sheet" onClose={() => setRejecting(null)}
+      disabledReason={!online ? OFFLINE_REASON : null} pendingLabel="Rejecting…"
       action={async (formData) => {
         if (!rejecting) return { success: false, error: "No mismatch selected" }
+        const row = rejecting
         const reason = String(formData.get("reason") || "").trim()
-        setError(null)
-        setPending({ gateId: rejecting.gateId, action: "reject" })
-        try {
-          const result = await decideReviewTaskStageAction(workspaceId, rejecting.taskId, "reject", reason)
-          if (result.success) { toast.success("Rejected"); router.refresh() }
-          else { setError({ gateId: rejecting.gateId, message: result.error || "Could not reject this Approval" }); router.refresh() }
-          return result
-        } finally {
-          setPending(null)
-        }
+        return settle(row, "reject", () => decideReviewTaskStageAction(workspaceId, row.taskId, "reject", reason))()
       }}
       title="Reject this Approval"
-      description="Ends the invoice's Approval run entirely, not just this mismatch. The reason is recorded on the audit trail."
+      description="This ends the approval run for this invoice, not just this mismatch. The reason goes on the audit trail and to whoever started it."
       submitLabel="Reject"
       placeholder="Why is this being rejected?" />
   </>
