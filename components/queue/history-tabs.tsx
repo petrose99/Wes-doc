@@ -8,6 +8,7 @@ import { useOverrideMode } from "@/components/queue/override-mode-context"
 import { overrideGateAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
 import { formatMoney } from "@/lib/money"
 import type { ApprovalDetailFacts } from "@/models/approvals"
+import type { ProcessingState } from "@/lib/documents/processing-state"
 
 /** The Detail pane's history data (#225): the approval step chain (#218), the flat audit log,
  * and this document's open checks (#203). Loaded server-side by `getQueueDetailAction` alongside
@@ -27,6 +28,13 @@ export type DocumentHistory = {
    * mechanism, which is deliberately not a `Gate` (a document can carry more than one simultaneous
    * escalation; `Gate` is unique per gateType). Resolved from the Exceptions queue, not here. */
   escalations: Array<{ id: string; checkCode: string; message: string; escalationStatus: "open" | "in_review" | "resolved"; escalatedAt: string }>
+  /** #258: who approved this document from the queue with no approval flow — from the
+   * `document_reviewed` audit event, counted only when `Document.status === "reviewed"`, else
+   * degraded to `Document.reviewedAt` with a null actor. Null when the document isn't reviewed. */
+  reviewed?: { at: string; actorName: string | null } | null
+  /** #258: set once the document went out touchless — the threshold the Approval tab's footer
+   * names. Null otherwise. */
+  touchless?: { thresholdPercent: number } | null
 }
 
 function initials(name: string): string {
@@ -42,6 +50,10 @@ function PersonMark({ name, avatar, tone }: { name: string; avatar?: string | nu
   }
   const fill = tone === "waiting" ? "border border-dashed border-slate-300 text-slate-500" : tone === "rejected" ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-800"
   return <span aria-hidden className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${fill} ${ring}`}>{initials(name)}</span>
+}
+
+function formatDateTime(date: Date): string {
+  return new Intl.DateTimeFormat("en", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" }).format(date)
 }
 
 function relativeTime(iso: string): string {
@@ -60,12 +72,61 @@ function relativeTime(iso: string): string {
  * decided, the stage it waits on (ringed, "Waiting on you" / "Waiting on ‹name›"), and the
  * stages not reached yet. Falls back to the decisions + pending stages alone (#218's data) when
  * the loader supplied no `facts.approval` — the standalone route, or a document with no run. */
-export function ApprovalTimeline({ decisions, pendingStages, approval }: {
+export function ApprovalTimeline({ decisions, pendingStages, approval, state, reviewed, touchless, queueTitle, cancelledReason }: {
   decisions: DocumentHistory["stageDecisions"]
   pendingStages: DocumentHistory["pendingStages"]
   approval?: ApprovalDetailFacts["approval"]
+  /** #258: the document's processing state, so the Approval tab is never the flat "No approval
+   * steps yet" on an Approved or Touchless document with no workflow — one of the four
+   * contradictory statuses the baseline critique found. */
+  state?: ProcessingState
+  reviewed?: DocumentHistory["reviewed"]
+  touchless?: DocumentHistory["touchless"]
+  /** "Invoices" / "Receipts" — only Invoices' bulk bar has *Start approval*. */
+  queueTitle?: string
+  cancelledReason?: string | null
 }) {
   if (!approval && decisions.length === 0 && pendingStages.length === 0) {
+    if (state === "cancelled") {
+      return <p className="text-sm text-slate-500">{cancelledReason ? `Cancelled · ${cancelledReason}` : "Cancelled"}</p>
+    }
+    if (state === "approved" && reviewed) {
+      const date = new Date(reviewed.at)
+      return <>
+        <ol aria-label="Approval timeline"><li className="flex gap-3">
+          <PersonMark name={reviewed.actorName ?? "DocuBite"} tone="done" />
+          <div className="min-w-0 pt-1">
+            <p className="text-sm text-slate-800">
+              {reviewed.actorName ? <><span className="font-medium">{reviewed.actorName}</span> reviewed and approved</> : "Reviewed and approved"}
+            </p>
+            <p className="text-xs text-slate-500"><time dateTime={reviewed.at}>{formatDateTime(date)}</time></p>
+          </div>
+        </li></ol>
+        <p className="mt-2 text-[13px] text-slate-500">No approval flow ran — approved from the queue.</p>
+      </>
+    }
+    if (state === "touchless" && touchless) {
+      const date = reviewed?.at ? new Date(reviewed.at) : null
+      return <>
+        <ol aria-label="Approval timeline"><li className="flex gap-3">
+          <PersonMark name="DocuBite" tone="done" />
+          <div className="min-w-0 pt-1">
+            <p className="text-sm text-slate-800">Sent automatically</p>
+            {date && <p className="text-xs text-slate-500"><time dateTime={date.toISOString()}>{formatDateTime(date)}</time></p>}
+          </div>
+        </li></ol>
+        <p className="mt-2 text-[13px] text-slate-500">All fields met the {touchless.thresholdPercent}% threshold; nobody reviewed it.</p>
+      </>
+    }
+    if (state === "in_review") {
+      return <p className="text-sm text-slate-500">
+        {queueTitle === "Invoices"
+          ? "No approval started. Start approval from the Invoices bulk bar, or approve from the pane."
+          : queueTitle === "Receipts"
+            ? "No approval started. Start approval from the Receipts bulk bar, or approve from the pane."
+            : "No approval started. Approve from the pane."}
+      </p>
+    }
     return <p className="text-sm text-slate-500">No approval steps yet. Approving this document records the first one.</p>
   }
   const decidedByStage = new Map(decisions.map((decision) => [decision.stageIndex, decision]))
@@ -118,7 +179,13 @@ export function ApprovalTimeline({ decisions, pendingStages, approval }: {
 /** #257 spec 3.5: the Approval tab — the status line, the timeline, what is known of the
  * supplier, and (PO Mismatches) the variance figures the decision is about. Everything here is
  * read-only; the decision itself is the pane's footer. */
-export function ApprovalTab({ workspaceId, history }: { workspaceId: string; history: DocumentHistory }) {
+export function ApprovalTab({ workspaceId, history, state, queueTitle, cancelledReason }: {
+  workspaceId: string
+  history: DocumentHistory
+  state?: ProcessingState
+  queueTitle?: string
+  cancelledReason?: string | null
+}) {
   const facts = history.facts ?? null
   const approval = facts?.approval ?? null
   const supplier = facts?.supplier ?? null
@@ -133,7 +200,8 @@ export function ApprovalTab({ workspaceId, history }: { workspaceId: string; his
       <span className={`font-semibold ${approval.waitingOnYou ? "text-emerald-800" : "text-slate-700"}`}>{approval.waitingOnYou ? "Waiting on you" : `Waiting on ${approval.waitingOn}`}</span>
       <span className="text-slate-500"> · {stageLabel}</span>
     </p>}
-    <ApprovalTimeline decisions={history.stageDecisions} pendingStages={history.pendingStages} approval={approval} />
+    <ApprovalTimeline decisions={history.stageDecisions} pendingStages={history.pendingStages} approval={approval}
+      state={state} reviewed={history.reviewed} touchless={history.touchless} queueTitle={queueTitle} cancelledReason={cancelledReason} />
 
     {mismatch && <section aria-labelledby="approval-variance">
       <h3 id="approval-variance" className="text-xs font-semibold uppercase tracking-wide text-slate-500">PO match</h3>

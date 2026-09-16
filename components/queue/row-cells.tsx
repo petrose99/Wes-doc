@@ -1,4 +1,5 @@
 import type { ReactNode } from "react"
+import { PROCESSING_STATE_LABELS, LEDGER_FACT_LABELS, type ProcessingState } from "@/lib/documents/processing-state"
 
 export function formatMoney(amount: number, currency?: string | null): string {
   const currencyCode = currency && /^[A-Z]{3}$/.test(currency) ? currency : "USD"
@@ -25,40 +26,35 @@ export function TitleCell({ title, subtitle, missingLabel }: { title: ReactNode;
 
 const PILL = "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
 
-/** The row's state pills, in CONTEXT.md's "Processing state" precedence: Cancelled, then Needs
- * attention (a check blocked it or a bulk approve held it back), then In review, then Touchless,
- * then Approved. Ledger facts (Synced / Paid) render after, separately, because they are not
- * processing states. */
-export function StatePills({ cancelled, cancelledReason, needsAttention, openCheckCodes, inReview, touchless, approved, ledger, minConfidencePercent, trailing }: {
-  cancelled?: boolean
-  cancelledReason?: string | null
-  needsAttention?: boolean
+const STATE_PILL_TONE: Record<ProcessingState, string> = {
+  cancelled: "bg-slate-200 text-slate-700",
+  needs_attention: "bg-amber-100 text-amber-900",
+  in_review: "bg-blue-100 text-blue-800",
+  touchless: "bg-emerald-50 text-emerald-800",
+  approved: "bg-emerald-100 text-emerald-800",
+}
+
+/** The row's state pill, one word from `PROCESSING_STATE_LABELS` — the one vocabulary #258 built
+ * so the row, the pane's Status line, the stepper and the Approval tab always agree. `state` is
+ * total (always one of the five keys), so there is no fallback branch. Ledger facts (Posted /
+ * Paid) render after, separately, because they are not processing states. */
+export function StatePills({ state, ledger, openCheckCodes, cancelledReason, trailing }: {
+  state: ProcessingState
   openCheckCodes?: string[]
-  inReview?: boolean
-  touchless?: boolean
-  approved?: boolean
-  /** A ledger fact such as "synced" or "paid". */
+  cancelledReason?: string | null
+  /** A ledger fact key such as "synced" or "paid". */
   ledger?: string | null
-  minConfidencePercent: number
   trailing?: ReactNode
 }) {
-  // Kept on the signature for the callers; the glyph owns both signals now (#223).
-  void touchless; void minConfidencePercent
-  const state = cancelled
-    ? <span className={`${PILL} bg-slate-200 text-slate-700`} title={cancelledReason ?? undefined}>Cancelled</span>
-    : needsAttention
-      ? <span className={`${PILL} bg-amber-100 text-amber-900`} title={openCheckCodes?.length ? `Open checks: ${openCheckCodes.join(", ")}` : "Held back from a bulk approve — missing required fields or a document type."}>
-        Needs attention{openCheckCodes?.length ? ` · ${openCheckCodes.length}` : ""}
-      </span>
-      : inReview
-        ? <span className={`${PILL} bg-blue-100 text-blue-800`}>In review</span>
-        // Touchless no longer renders here (#223) — the row's processing-state glyph carries it.
-        : approved
-            ? <span className={`${PILL} bg-emerald-100 text-emerald-800`}>Approved</span>
-            : <span className={`${PILL} bg-slate-100 text-slate-700`}>Unreviewed</span>
+  const openCount = state === "needs_attention" ? openCheckCodes?.length ?? 0 : 0
+  const title = state === "cancelled" ? cancelledReason ?? undefined
+    : state === "needs_attention" ? (openCheckCodes?.length ? `Open checks: ${openCheckCodes.join(", ")}` : undefined)
+    : undefined
   return <span className="flex flex-wrap items-center gap-1.5">
-    {state}
-    {ledger && <span className={`${PILL} bg-slate-100 text-slate-700 capitalize`}>{ledger}</span>}
+    <span className={`${PILL} ${STATE_PILL_TONE[state]}`} title={title}>
+      {PROCESSING_STATE_LABELS[state]}{openCount > 0 ? ` · ${openCount}` : ""}
+    </span>
+    {ledger && <span className={`${PILL} bg-slate-100 text-slate-700`}>{LEDGER_FACT_LABELS[ledger as "synced" | "paid"] ?? ledger}</span>}
     {trailing}
   </span>
 }

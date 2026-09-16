@@ -22,6 +22,10 @@ export type RegisteredDocument = {
   cancelled: boolean
   cancelledReason?: string | null
   reviewLink?: { href: string; label: string } | null
+  /** #258: who decided this document's approval, once the pane's detail load knows — upgrades
+   * the Status line's row-derived sentence (e.g. "Approved") to name the actor ("Approved by
+   * Nadia K."). Null until the detail loads, or when the state has no actor to show. */
+  decision?: { kind: "approved" | "rejected"; actorName: string | null; at: string } | null
 }
 
 type PaneDocumentContextValue = {
@@ -33,7 +37,9 @@ type PaneDocumentContextValue = {
   archivedToast: { archived: string; unarchived: string }
 }
 
-const PaneDocumentContext = createContext<PaneDocumentContextValue | null>(null)
+/** Exported so `StatusLine` (#258) can read `doc.decision` directly for the pane's actor upgrade
+ * — the one other reader of this context besides the ⋯ menu items in this file. */
+export const PaneDocumentContext = createContext<PaneDocumentContextValue | null>(null)
 
 export function PaneDocumentProvider({ onMutated, archivedToast, children }: {
   onMutated?: (kind: "changed" | "removed") => void
@@ -59,7 +65,7 @@ export function useRegisterDocumentActions(doc: RegisteredDocument | null) {
     setDoc(doc)
     return () => setDoc(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setDoc, doc?.documentId, doc?.fileId, doc?.filename, doc?.flagged, doc?.archived, doc?.cancelled, doc?.cancelledReason, doc?.reviewLink?.href, doc?.reviewLink?.label])
+  }, [setDoc, doc?.documentId, doc?.fileId, doc?.filename, doc?.flagged, doc?.archived, doc?.cancelled, doc?.cancelledReason, doc?.reviewLink?.href, doc?.reviewLink?.label, doc?.decision?.kind, doc?.decision?.actorName, doc?.decision?.at])
 }
 
 /** Item 1b, 2, 3 of the ⋯ menu — everything above the surface's own items. Nothing renders while

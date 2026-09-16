@@ -30,7 +30,8 @@ export async function ReceiptsQueuePage({ params, searchParams, selectedDocument
   const user = await getCurrentUser()
   const membership = await requireWorkspaceRole(workspaceId, user.id)
   const basePath = `/workspaces/${workspaceId}/receipts`
-  const statusFilter = status === "unreviewed" || status === "reviewed" ? status : undefined
+  // #258: the five processing-state keys. A stale "unreviewed"/"reviewed" value just doesn't match.
+  const statusFilter = status === "cancelled" || status === "needs_attention" || status === "in_review" || status === "touchless" || status === "approved" ? status : undefined
   const claimFilter = claim === "unclaimed" || claim === "claimed" ? claim : undefined
   const onlyTouchless = touchless === "1"
   const [{ receipts }, minConfidencePercent, savedViews, matchRate, fieldTable] = await Promise.all([

@@ -8,6 +8,8 @@ import type { FieldTable } from "@/lib/configuration/field-table"
 import { PaneMenuItem } from "@/components/queue/detail-pane"
 import { DocumentBulkActions, DocumentPaneActions } from "@/components/queue/document-actions"
 import { formatDate, formatMoney, StatePills, TitleCell } from "@/components/queue/row-cells"
+import { StatusLine } from "@/components/queue/status-line"
+import { processingFact } from "@/lib/documents/processing-fact"
 import { PoChip, useOriginHere } from "@/components/documents/po-compare"
 import { ReasonDialog } from "@/components/list-screen/reason-dialog-button"
 import type { Facet } from "@/components/queue/facet-filters"
@@ -29,10 +31,17 @@ import type { BillRow } from "@/models/bills"
  * Aging joins them as a chip group in place of #186's six header cards. */
 export const INVOICE_FACETS: Facet[] = [
   {
+    // #258: the one status vocabulary — the five processing states plus the ledger's own two
+    // facts, in two sections so "Status" still reads as one chip.
     param: "status", label: "Status",
     sections: [
-      { label: "Open", options: [{ value: "unreviewed", label: "Unreviewed" }, { value: "reviewed", label: "Reviewed" }, { value: "synced", label: "Synced" }] },
-      { label: "Closed", options: [{ value: "paid", label: "Paid" }] },
+      {
+        label: "Processing state", options: [
+          { value: "cancelled", label: "Cancelled" }, { value: "needs_attention", label: "Needs attention" },
+          { value: "in_review", label: "In review" }, { value: "touchless", label: "Touchless" }, { value: "approved", label: "Approved" },
+        ],
+      },
+      { label: "Ledger", options: [{ value: "synced", label: "Posted" }, { value: "paid", label: "Paid" }] },
     ],
   },
   {
@@ -98,15 +107,31 @@ export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercen
     return { id, type: "Invoice", vendor: bill?.supplier ?? null, number: bill?.invoiceNumber ?? null, amount: bill?.total ?? null, currencyCode: bill?.currencyCode ?? null, dateLabel: "Due", date: bill?.dueDate ?? null }
   }
 
-  // One State rendering for the column and the pane header's Status line (#259).
-  const statePills = (bill: BillRow) => <StatePills minConfidencePercent={minConfidencePercent}
-    cancelled={!!bill.cancelledAt} cancelledReason={bill.cancelledReason}
-    needsAttention={bill.blockedByCheck || needsAttention.has(bill.documentId) || bill.approvalStatus === "rejected"} openCheckCodes={bill.openCheckCodes}
-    inReview={bill.approvalStatus === "in_progress"} touchless={bill.touchless} approved={bill.status === "reviewed"}
-    // ADR 0001 (#251): the ledger fact is the derived paid state's own words — "Paid (recorded)"
-    // until the ledger confirms — and "synced" stays the ledger's word while unpaid.
-    ledger={bill.paidState.state !== "unpaid" ? bill.paidState.label : bill.paymentStatus}
+  // One state per row, shared by the leading glyph and the State column / pane Status line
+  // (#258): heldBack folds in here so the glyph and the pill can no longer disagree (#258 closed
+  // that split).
+  const billState = (bill: BillRow) => processingState({
+    approvalStatus: bill.approvalStatus, blockedByCheck: bill.blockedByCheck, escalated: bill.escalated,
+    touchless: bill.touchless, status: bill.status, heldBack: needsAttention.has(bill.documentId),
+  })
+  const billLedger = (bill: BillRow) => bill.paidState.state !== "unpaid" ? bill.paidState.label : bill.paymentStatus
+  // The queue column keeps the pill only (StatePills); the pane's Status line (#234) adds the
+  // fact sentence — both share the same `state` so they can't disagree.
+  const statePills = (bill: BillRow) => <StatePills state={billState(bill)}
+    openCheckCodes={bill.openCheckCodes} cancelledReason={bill.cancelledReason} ledger={billLedger(bill)}
     trailing={<ReviewSlaCountdownBadge openedAt={bill.reviewTaskOpenedAt} slaHours={DEFAULT_REVIEW_SLA_HOURS} />} />
+  const paneStatus = (bill: BillRow) => {
+    const state = billState(bill)
+    const fact = processingFact({
+      approvalStatus: bill.approvalStatus, blockedByCheck: bill.blockedByCheck, escalated: bill.escalated,
+      touchless: bill.touchless, status: bill.status, heldBack: needsAttention.has(bill.documentId),
+      cancelledReason: bill.cancelledReason, reviewTaskOpenedAt: bill.reviewTaskOpenedAt, receivedAt: bill.receivedAt,
+      openCheckCodes: bill.openCheckCodes,
+      approvedBy: bill.status === "reviewed" ? { actorName: null, at: bill.reviewedAt ?? new Date() } : null,
+    })
+    return <StatusLine state={state} fact={fact} ledger={billLedger(bill)} openCheckCodes={bill.openCheckCodes} cancelledReason={bill.cancelledReason}
+      trailing={<ReviewSlaCountdownBadge openedAt={bill.reviewTaskOpenedAt} slaHours={DEFAULT_REVIEW_SLA_HOURS} />} />
+  }
 
   const columns: QueueColumn<BillRow>[] = [
     {
@@ -169,13 +194,11 @@ export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercen
       // #228 Q6: the PO folds into the name's suffix (the card's second line below `md`), so a
       // phone reviewer hears the red count without the column.
       rowName={(bill) => ({ title: bill.supplier ?? "Unknown supplier", suffix: [bill.invoiceNumber, bill.total !== null ? formatMoney(bill.total, bill.currencyCode) : null, poSubtitle(bill)].filter(Boolean).join(" · ") || bill.filename })}
-      paneStatus={statePills}
+      paneStatus={paneStatus}
       archivedToast={{ archived: "Archived — now under Closed", unarchived: "Unarchived — back in Open" }}
       // #223: the leading edge is the five-state processing glyph, not the aging bucket (aging lives
       // in the countdown badge's own text since #208).
-      leading={(bill) => <ProcessingStateGlyph
-        state={processingState({ approvalStatus: bill.approvalStatus, blockedByCheck: bill.blockedByCheck, escalated: bill.escalated, touchless: bill.touchless, status: bill.status })}
-        minConfidencePercent={minConfidencePercent} />}
+      leading={(bill) => <ProcessingStateGlyph state={billState(bill)} minConfidencePercent={minConfidencePercent} />}
       columns={columns}
       fieldTable={fieldTable}
       selectable

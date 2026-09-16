@@ -48,3 +48,5 @@ First-pass scores are the KPI (the pre-build getting better); close scores are r
 | #257 | 20260916T144918 | opus | resolved | 32 | 34 | 35 | 73 | 95 | 133 | 13M | 3K | 5 | 3 | 22m06s |
 | #259 | 20260916T151137 | sonnet | phase measure done → close n | 34 | · | · | · | · | 150 | 12M | 1K | 8 | 3 | 16m29s |
 | #259 | 20260916T152816 | sonnet | resolved | 34 | · | · | · | · | 215 | 23M | 1K | 9 | 2 | 26m08s |
+| #258 | 20260916T155436 | opus[1m] | phase spec done → build next | 32 | · | · | · | · | 102 | 10M | 2K | 0 | 1 | 12m34s |
+| #258 | 20260916T160718 | sonnet | continued (progressed), sess | 32 | · | · | · | · | 56 | 7M | 0K | 0 | 0 | 4m34s |

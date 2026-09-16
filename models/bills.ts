@@ -9,6 +9,7 @@ import { summarizeInvoicePoLinks, type InvoicePoSummary } from "@/models/po-matc
 import { derivePaidState, type DerivedPaidState } from "@/lib/payments/paid-state"
 import { LIVE_BATCH_STATUSES, type BatchStatus } from "@/lib/payments/batch-status"
 import { decimalToNumber } from "@/lib/money"
+import { processingState, PROCESSING_STATES, type ProcessingState } from "@/lib/documents/processing-state"
 
 /** WP-AP2: AP aging / bills cockpit. One row per Document whose template maps to "invoice" — the
  * shape an AP controller expects on day one: supplier, total, due-date (extracted OR inferred
@@ -59,6 +60,9 @@ export type BillRow = {
   /** #225: the id of that same open/in_review ReviewTask, so the Detail pane's Approve / Reject
    * bar can decide it directly. Null whenever `reviewTaskOpenedAt` is null. */
   openReviewTaskId: string | null
+  /** #258: when the document arrived — the Status line's fallback for "In review · received
+   * ‹date›" on a document with no ReviewTask at all yet. */
+  receivedAt: Date | null
   /** Per-field extraction confidence (0-1), keyed the same as `reviewedData` ("vendor"/"merchant",
    * "total"/"amount", "invoice_number", "due_date"). Read from `document.confidence.fieldConfidence`
    * — #199/#219's row anatomy underlines every extracted-field cell from it; absent for a field
@@ -135,7 +139,11 @@ export async function listWorkspaceBills(input: {
    * model field for the taxonomy's Posted/Exported/Transferred values (no push/ledger status of
    * that shape exists), so "paid" stands in as the only real "closed" state. #220 adds "synced":
    * pushed successfully but not yet confirmed paid by the ledger — see BillRow.paymentStatus. */
-  statusFilter?: "unreviewed" | "reviewed" | "synced" | "paid"
+  /** #258: the five `ProcessingState` keys, filtered via `processingState(row)` (the row's own
+   * derivation), plus the ledger facts `synced`/`paid`, which stay independent of processing
+   * state. Old `"unreviewed"`/`"reviewed"` values from a stale URL are ignored (no match, no
+   * redirect — the chip just shows nothing selected). */
+  statusFilter?: ProcessingState | "synced" | "paid"
   /** #211's Invoice Approval filter-chip group. See BillRow.approvalStatus. */
   approvalFilter?: BillRow["approvalStatus"]
   /** #201's "Touchless" system saved view: rows that went out with no human review. */
@@ -157,7 +165,7 @@ export async function listWorkspaceBills(input: {
     },
     select: {
       id: true, filename: true, status: true, reviewedAt: true, reviewedData: true, confidence: true,
-      cancelledAt: true, cancelledReason: true,
+      cancelledAt: true, cancelledReason: true, receivedAt: true,
       template: { select: { code: true } },
     },
     orderBy: { receivedAt: "desc" },
@@ -283,6 +291,7 @@ export async function listWorkspaceBills(input: {
       cancelledReason: doc.cancelledReason,
       reviewTaskOpenedAt,
       openReviewTaskId: reviewTaskOpenedAt ? latestTask!.id : null,
+      receivedAt: doc.receivedAt,
       fieldConfidence: (doc.confidence as Record<string, unknown> | null)?.fieldConfidence as Record<string, number> ?? {},
       touchless: touchlessDocIds.has(doc.id),
       escalated: escalatedDocIds.has(doc.id),
@@ -293,10 +302,10 @@ export async function listWorkspaceBills(input: {
   const filtered = bills.filter((bill) => {
     if (input.onlyBlocked && !bill.blockedByCheck) return false
     if (input.onlyUnpaid && bill.paidState.state === "paid") return false
-    if (input.statusFilter === "unreviewed" && bill.status === "reviewed") return false
-    if (input.statusFilter === "reviewed" && bill.status !== "reviewed") return false
     if (input.statusFilter === "synced" && bill.paymentStatus?.toLowerCase() !== "synced") return false
     if (input.statusFilter === "paid" && bill.paidState.state !== "paid") return false
+    if (input.statusFilter && (PROCESSING_STATES as string[]).includes(input.statusFilter) &&
+      processingState({ approvalStatus: bill.approvalStatus, blockedByCheck: bill.blockedByCheck, escalated: bill.escalated, touchless: bill.touchless, status: bill.status }) !== input.statusFilter) return false
     if (input.approvalFilter && bill.approvalStatus !== input.approvalFilter) return false
     if (input.onlyTouchless && !bill.touchless) return false
     if (input.poFilter === "matched" && !(bill.po.kind && bill.po.kind !== "suggested" && bill.po.mismatchCount === 0)) return false

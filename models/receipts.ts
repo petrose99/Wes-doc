@@ -1,6 +1,7 @@
 // Deliberately NOT a "use server" module, matching models/bills.ts: server actions live upstream
 // and do the auth. This trusts the workspaceId it is handed.
 import { prisma } from "@/lib/db"
+import { processingState, PROCESSING_STATES, type ProcessingState } from "@/lib/documents/processing-state"
 
 /** #212: Receipts cockpit, the Receipts counterpart to models/bills.ts's Invoices projection. One
  * row per Document whose type resolves to "receipt" (covers both the plain "receipt" template and
@@ -42,6 +43,9 @@ export type ReceiptRow = {
    * (`lib/documents/processing-state.ts`); no filter-chip taxonomy reads this today, unlike
    * Invoices' Invoice Approval group. */
   approvalStatus: "not_started" | "in_progress" | "approved" | "rejected"
+  /** #258: when the document arrived — the Status line's fallback for "In review · received
+   * ‹date›" on a document with no ReviewTask at all yet. */
+  receivedAt: Date | null
 }
 
 /** Loads receipts for a workspace. Bounded (up to `limit`, default 500), same reasoning as
@@ -51,7 +55,9 @@ export async function listWorkspaceReceipts(input: {
   limit?: number
   /** Status filter-chip group, same taxonomy as Invoices' Status chips: "unreviewed"/"reviewed"
    * map onto doc.status directly. */
-  statusFilter?: "unreviewed" | "reviewed"
+  /** #258: the five `ProcessingState` keys, filtered via `processingState(row)`. Old
+   * `"unreviewed"`/`"reviewed"` values from a stale URL are ignored (no match, no redirect). */
+  statusFilter?: ProcessingState
   /** Claim filter-chip group: whether the receipt has been absorbed into an expense claim yet. */
   claimFilter?: "unclaimed" | "claimed"
   /** #201's "Touchless" system saved view: rows that went out with no human review. */
@@ -66,7 +72,7 @@ export async function listWorkspaceReceipts(input: {
       template: { code: { in: ["receipt", "expense_receipt"] } },
     },
     select: {
-      id: true, filename: true, status: true, reviewedAt: true, reviewedData: true, confidence: true,
+      id: true, filename: true, status: true, reviewedAt: true, reviewedData: true, confidence: true, receivedAt: true,
       template: { select: { code: true } },
     },
     orderBy: { receivedAt: "desc" },
@@ -152,12 +158,13 @@ export async function listWorkspaceReceipts(input: {
       touchless: touchlessDocIds.has(doc.id),
       escalated: escalatedDocIds.has(doc.id),
       approvalStatus,
+      receivedAt: doc.receivedAt,
     }
   })
 
   const filtered = receipts.filter((receipt) => {
-    if (input.statusFilter === "unreviewed" && receipt.status === "reviewed") return false
-    if (input.statusFilter === "reviewed" && receipt.status !== "reviewed") return false
+    if (input.statusFilter && (PROCESSING_STATES as string[]).includes(input.statusFilter) &&
+      processingState({ approvalStatus: receipt.approvalStatus, blockedByCheck: receipt.blockedByCheck, escalated: receipt.escalated, touchless: receipt.touchless, status: receipt.status }) !== input.statusFilter) return false
     if (input.claimFilter === "unclaimed" && receipt.claimId !== null) return false
     if (input.claimFilter === "claimed" && receipt.claimId === null) return false
     if (input.onlyTouchless && !receipt.touchless) return false

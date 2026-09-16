@@ -2,3 +2,10 @@
     #258 crossed the hand-off line (151519 tokens ≥ 150000) — asked to hand off; hard stop at 180000
     #258 context at exit: 165864 tokens, 12 min
     cleaned up session pid 1384120 (pgid ?); free: 6149 MB
+    scoreboard: 45 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #258: phase spec done → build next in 754s
+=== [2/50] #258 — Build the one status vocabulary: StatePills from processingState(), the pane status line, stepper words, Approval tab from the audit log  [sonnet · low · phase: build]
+    #258 crossed the hand-off line (150992 tokens ≥ 150000) — asked to hand off; hard stop at 180000
+    #258 context at exit: 163636 tokens, 4 min
+    cleaned up session pid 1399730 (pgid ?); free: 6087 MB
+    scoreboard: 46 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md

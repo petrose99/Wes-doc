@@ -7,6 +7,8 @@ import type { FieldTable } from "@/lib/configuration/field-table"
 import { PaneMenuItem } from "@/components/queue/detail-pane"
 import { DocumentBulkActions, DocumentPaneActions } from "@/components/queue/document-actions"
 import { formatDate, formatMoney, StatePills, TitleCell } from "@/components/queue/row-cells"
+import { StatusLine } from "@/components/queue/status-line"
+import { processingFact } from "@/lib/documents/processing-fact"
 import type { Facet } from "@/components/queue/facet-filters"
 import { ConfidenceField, ProcessingStateGlyph } from "@/components/typed-destinations/row-signals"
 import { processingState } from "@/lib/documents/processing-state"
@@ -21,7 +23,16 @@ import type { ReceiptRow } from "@/models/receipts"
 
 /** #212's Status and Claim taxonomy as summary chips (#225). */
 export const RECEIPT_FACETS: Facet[] = [
-  { param: "status", label: "Status", options: [{ value: "unreviewed", label: "Unreviewed" }, { value: "reviewed", label: "Reviewed" }] },
+  {
+    // #258: the five processing states — Receipts have no ledger facet (they never post/pay).
+    param: "status", label: "Status",
+    sections: [{
+      label: "Processing state", options: [
+        { value: "cancelled", label: "Cancelled" }, { value: "needs_attention", label: "Needs attention" },
+        { value: "in_review", label: "In review" }, { value: "touchless", label: "Touchless" }, { value: "approved", label: "Approved" },
+      ],
+    }],
+  },
   { param: "claim", label: "Claim", options: [{ value: "unclaimed", label: "Unclaimed" }, { value: "claimed", label: "Claimed" }] },
   { param: "touchless", label: "Touchless", kind: "toggle", options: [{ value: "1", label: "Touchless only" }] },
 ]
@@ -62,11 +73,24 @@ export function ReceiptQueue({ workspaceId, basePath, receipts, minConfidencePer
     return { id, type: "Receipt", vendor: receipt?.merchant ?? null, number: receipt?.receiptNumber ?? null, amount: receipt?.total ?? null, currencyCode: receipt?.currencyCode ?? null, dateLabel: "Date", date: receipt?.purchaseDate ?? null }
   }
 
-  // One State rendering for the column and the pane header's Status line (#259).
-  const statePills = (receipt: ReceiptRow) => <StatePills minConfidencePercent={minConfidencePercent}
-    needsAttention={receipt.blockedByCheck || needsAttention.has(receipt.documentId)} openCheckCodes={receipt.openCheckCodes}
-    inReview={!!receipt.reviewTaskOpenedAt} touchless={receipt.touchless} approved={receipt.status === "reviewed"}
+  // One state per row, shared by the leading glyph and the State column / pane Status line (#258).
+  const receiptState = (receipt: ReceiptRow) => processingState({
+    approvalStatus: receipt.approvalStatus, blockedByCheck: receipt.blockedByCheck, escalated: receipt.escalated,
+    touchless: receipt.touchless, status: receipt.status, heldBack: needsAttention.has(receipt.documentId),
+  })
+  const statePills = (receipt: ReceiptRow) => <StatePills state={receiptState(receipt)} openCheckCodes={receipt.openCheckCodes}
     trailing={<ReviewSlaCountdownBadge openedAt={receipt.reviewTaskOpenedAt} slaHours={DEFAULT_REVIEW_SLA_HOURS} />} />
+  const paneStatus = (receipt: ReceiptRow) => {
+    const state = receiptState(receipt)
+    const fact = processingFact({
+      approvalStatus: receipt.approvalStatus, blockedByCheck: receipt.blockedByCheck, escalated: receipt.escalated,
+      touchless: receipt.touchless, status: receipt.status, heldBack: needsAttention.has(receipt.documentId),
+      reviewTaskOpenedAt: receipt.reviewTaskOpenedAt, receivedAt: receipt.receivedAt, openCheckCodes: receipt.openCheckCodes,
+      approvedBy: receipt.status === "reviewed" ? { actorName: null, at: receipt.reviewedAt ?? new Date() } : null,
+    })
+    return <StatusLine state={state} fact={fact} openCheckCodes={receipt.openCheckCodes}
+      trailing={<ReviewSlaCountdownBadge openedAt={receipt.reviewTaskOpenedAt} slaHours={DEFAULT_REVIEW_SLA_HOURS} />} />
+  }
 
   const columns: QueueColumn<ReceiptRow>[] = [
     {
@@ -106,11 +130,9 @@ export function ReceiptQueue({ workspaceId, basePath, receipts, minConfidencePer
     rows={receipts}
     rowId={(receipt) => receipt.documentId}
     rowName={(receipt) => ({ title: receipt.merchant ?? "Unknown merchant", suffix: [receipt.receiptNumber, receipt.total !== null ? formatMoney(receipt.total, receipt.currencyCode) : null].filter(Boolean).join(" · ") || receipt.filename })}
-    paneStatus={statePills}
+    paneStatus={paneStatus}
     // #223: same five-state processing glyph as Invoices on the leading edge.
-    leading={(receipt) => <ProcessingStateGlyph
-      state={processingState({ approvalStatus: receipt.approvalStatus, blockedByCheck: receipt.blockedByCheck, escalated: receipt.escalated, touchless: receipt.touchless, status: receipt.status })}
-      minConfidencePercent={minConfidencePercent} />}
+    leading={(receipt) => <ProcessingStateGlyph state={receiptState(receipt)} minConfidencePercent={minConfidencePercent} />}
     columns={columns}
     fieldTable={fieldTable}
     selectable

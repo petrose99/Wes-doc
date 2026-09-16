@@ -33,7 +33,9 @@ export async function InvoicesQueuePage({ params, searchParams, selectedDocument
   const onlyBlocked = blocked === "1"
   const onlyUnpaid = unpaid === "1"
   const onlyTouchless = touchless === "1"
-  const statusFilter = status === "unreviewed" || status === "reviewed" || status === "synced" || status === "paid" ? status : undefined
+  // #258: the five processing-state keys plus the ledger's synced/paid. A stale "unreviewed"/
+  // "reviewed" value from an old URL just doesn't match — the chip shows nothing selected.
+  const statusFilter = status === "cancelled" || status === "needs_attention" || status === "in_review" || status === "touchless" || status === "approved" || status === "synced" || status === "paid" ? status : undefined
   const approvalFilter: BillRow["approvalStatus"] | undefined =
     approval === "not_started" || approval === "in_progress" || approval === "approved" || approval === "rejected" || approval === "cancelled" ? approval : undefined
   const agingFilter = new Set((aging ?? "").split(",").filter((value): value is AgingBucket | "none" => ["current", "1-30", "31-60", "61-90", "90+", "none"].includes(value)))
