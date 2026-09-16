@@ -8,9 +8,12 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { DetailPane, DETAIL_PANE_ID, type PaneName } from "@/components/queue/detail-pane"
 import { FacetFilters, type Facet } from "@/components/queue/facet-filters"
 import { FilterButton, FilterSheet } from "@/components/queue/filter-sheet"
+import Link from "next/link"
 import { OverrideModeProvider, useOverrideMode } from "@/components/queue/override-mode-context"
+import { OriginStrip } from "@/components/queue/origin-strip"
 import { QueueCard, joinSegments } from "@/components/queue/queue-card"
 import { QueueEmpty } from "@/components/queue/queue-empty"
+import { withOrigin, type Origin } from "@/lib/navigation/origin"
 import { emptyQueueState } from "@/lib/queue/empty-state"
 import { clearFilterParams } from "@/lib/queue/filters"
 import { confirmLeave } from "@/lib/client/unsaved-changes"
@@ -153,9 +156,14 @@ export type QueueScreenProps<T> = {
   /** #257 spec 3.5: a row the surface just decided, kept in the list while its pane is open so
    * the result strip shows there instead of #249's close-with-toast. Dropped on close. */
   pinned?: T | null
-  /** #257 spec 3.6: a deep link to a row this view no longer holds (already decided) — the line
-   * to show above the list, since the model cannot load a decided row into the pane. */
-  initialMissingNotice?: string
+  /** #268 spec §2.5: a deep link to a row this view no longer holds — filtered out, moved to
+   * another queue, or deleted — the line to show above the list, since the model cannot load a
+   * missing row into the pane. `showHref` renders a "Show it" link when the row can still be
+   * found somewhere. */
+  initialMissing?: { text: string; showHref?: string }
+  /** #268 spec §2.1–2.4: the cross-surface hop this queue was opened from, or null. Rendered as
+   * the one Origin link, first in `#main`'s tab order, before `band`. */
+  origin?: Origin | null
   /** Fires with the open row's id whenever the pane opens on another row or closes — the surface
    * uses it to drop a result strip (#257 spec 3.5) that belongs to the row that was decided. */
   onOpenChange?: (id: string | null) => void
@@ -170,7 +178,7 @@ const INTERACTIVE = "a, button, input, select, textarea, label, [role=button], [
 function QueueScreenInner<T>({
   title, basePath, rows, rowId, detailIdFor, rowName, paneStatus, fullHref, archivedToast, leading, columns: rawColumns, fieldTable = null, selectable = false, sortOptions = [], facets = [],
   views, viewsPhone, stat, band, menu, onExportAll, bulkActions, empty, workspaceDocumentCount = 0, loadDetail, paneActions, paneMenu, initialSelectedId = null, sortParam = "sort", cards, phoneReadOnly = false,
-  filterRows, pinned = null, initialMissingNotice, onOpenChange,
+  filterRows, pinned = null, initialMissing, onOpenChange, origin = null,
 }: QueueScreenProps<T>) {
   const router = useRouter()
   const pathname = usePathname()
@@ -192,6 +200,8 @@ function QueueScreenInner<T>({
   const rootRef = useRef<HTMLDivElement>(null)
   const triggerRefs = useRef<Map<string, HTMLButtonElement>>(new Map())
   const below = cards ? BELOW[cards.below] : null
+  const hereQuery = searchParams.toString()
+  const here = hereQuery ? `${pathname}?${hereQuery}` : pathname
 
   // #262: the roving tab stop — one row button carries tabIndex=0, everything else -1, so Tab
   // leaves the table in one hop instead of walking every row. The open row wins; failing that,
@@ -204,14 +214,27 @@ function QueueScreenInner<T>({
     return () => { delete document.body.dataset.queueList }
   }, [])
 
-  // A deep link to a row the view no longer holds (decided since the link was made): say so once,
-  // above the list, rather than opening a pane on nothing. Read at mount only.
-  const [missingNotice] = useState<string | null>(() =>
-    initialSelectedId && initialMissingNotice && !rows.some((row) => rowId(row) === initialSelectedId) ? initialMissingNotice : null)
+  // A deep link to a row the view no longer holds (decided since the link was made, or handed to
+  // us by the server as already gone): say so once, above the list, rather than opening a pane on
+  // nothing. Read at mount only. #268 spec §2.5 case 1: a row still in `rows` but filtered out of
+  // `visibleRows` is a client-derived variant of the same notice, computed below instead.
+  const [missingNotice] = useState<typeof initialMissing>(() =>
+    initialSelectedId && initialMissing && !rows.some((row) => rowId(row) === initialSelectedId) ? initialMissing : undefined)
 
   const sortKey = searchParams.get(sortParam)
   const activeSort = sortOptions.find((option) => option.key === sortKey) ?? sortOptions[0] ?? null
   const visibleRows = useMemo(() => (filterRows ? filterRows(rows, searchParams) : rows), [rows, filterRows, searchParams])
+  // #268 spec §2.5 case 1: the deep-linked row exists but the current filters hide it — named
+  // from `rows` (the row is still known), href drops every query param so the operator sees it
+  // unfiltered.
+  const filteredNotice = useMemo(() => {
+    if (!initialSelectedId) return undefined
+    const row = rows.find((r) => rowId(r) === initialSelectedId)
+    if (!row || visibleRows.some((r) => rowId(r) === initialSelectedId)) return undefined
+    const { title, suffix } = rowName(row)
+    return { text: `${[title, suffix].filter(Boolean).join(" · ")} no longer matches these filters.`, showHref: `${basePath}/${initialSelectedId}` }
+  }, [initialSelectedId, rows, visibleRows, rowId, rowName, basePath])
+  const activeNotice = filteredNotice ?? missingNotice
   const sortedRows = useMemo(() => {
     const base = activeSort ? [...visibleRows].sort(activeSort.compare) : visibleRows
     // The decided row stays in the list, at its place or the end, while its pane is open.
@@ -420,6 +443,9 @@ function QueueScreenInner<T>({
   // pane grow past the viewport and push its action bar out of reach). Below `md` the queue
   // flows with the page and the pane is a fixed sheet, so no bound is needed.
   return <div ref={rootRef} className="flex min-h-0 flex-1 flex-col md:h-dvh md:flex-none md:overflow-hidden">
+    {/* #268 spec §2.1–2.4: the cross-surface hop's way back — first focusable in `#main`, above
+        even the metric band. */}
+    <OriginStrip origin={origin} />
     {/* Bill Pay's metric band sits above row 1; a card-mode queue's band (Approvals' segments) sits
         under the title so the phone reads title → segments → Filter → list (#257 spec 3.3). */}
     {!cards && band}
@@ -476,7 +502,9 @@ function QueueScreenInner<T>({
         <FilterSheet open={filterOpen} onClose={() => setFilterOpen(false)} facets={facets} sortOptions={sortOptions} sortParam={sortParam} rows={rows} filterRows={filterRows} />
       </>}
     </div>}
-    {missingNotice && <p role="status" className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-[13px] text-slate-700">{missingNotice}</p>}
+    {activeNotice && <p role="status" className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-[13px] text-slate-700">
+      {activeNotice.text}{activeNotice.showHref && <> <Link href={activeNotice.showHref} className="font-medium text-slate-900 underline underline-offset-2">Show it</Link></>}
+    </p>}
 
     {/* Override Mode banner — only while the mode is on (#203's permanent strip is gone). */}
     {overrideMode.active && <div role="status" className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200 bg-amber-50 px-4 py-1.5 text-xs font-medium text-amber-900">
@@ -585,7 +613,7 @@ function QueueScreenInner<T>({
         documentId={(detailIdFor ?? rowId)(openRow)}
         name={rowName(openRow)}
         status={paneStatus?.(openRow)}
-        fullHref={fullHref ? fullHref(openRow) : `${basePath}/${(detailIdFor ?? rowId)(openRow)}?full=1`}
+        fullHref={withOrigin(fullHref ? fullHref(openRow) : `${basePath}/${(detailIdFor ?? rowId)(openRow)}?full=1`, here)}
         archivedToast={archivedToast}
         onMutated={(kind) => { if (kind === "removed") { close(); router.refresh() } else refresh() }}
         position={{ index: openIndex + 1, total: sortedRows.length }}

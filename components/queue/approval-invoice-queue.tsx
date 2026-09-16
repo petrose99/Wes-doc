@@ -149,7 +149,7 @@ export function ApprovalInvoiceQueue({ workspaceId, basePath, rows, poMismatchCo
       filterRows={filterApprovalInvoiceRows}
       pinned={decided?.row ?? null}
       onOpenChange={(id) => { if (id !== decided?.row.documentId) setDecided(null) }}
-      initialMissingNotice="This invoice was already decided — it's no longer in Ready to Approve."
+      initialMissing={{ text: "This invoice was already decided — it's no longer in Ready to Approve." }}
       rowId={(row) => row.documentId}
       rowName={(row) => ({ title: row.supplier ?? "Unknown supplier", suffix: [row.invoiceNumber, row.total !== null ? formatMoney(row.total, row.currencyCode) : null].filter(Boolean).join(" · ") || null })}
       leading={(row) => <ProcessingStateGlyph state={processingState({ approvalStatus: "in_progress", blockedByCheck: row.eligibility.status !== "ready", escalated: false, touchless: false, status: "needs_review" })} />}

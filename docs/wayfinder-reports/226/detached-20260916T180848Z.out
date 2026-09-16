@@ -78,3 +78,19 @@
 === [15/50] #264 — Build the three-way empty queue on Invoices: first-use guidance, done, filtered — and How DocuBite works on the account menu  [opus[1m] · low · phase: measure]
     #264 context at exit: 81324 tokens, 7 min
     cleaned up session pid 1820183 (pgid ?); free: 6315 MB
+    scoreboard: 73 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #264: phase measure done → close next in 455s
+=== [16/50] #264 — Build the three-way empty queue on Invoices: first-use guidance, done, filtered — and How DocuBite works on the account menu  [sonnet · low · phase: close]
+    #264 context at exit: 125035 tokens, 17 min
+    cleaned up session pid 1830443 (pgid ?); free: 6312 MB
+    scoreboard: 74 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #264: resolved in 1026s
+=== [17/50] #268 — Build the Origin link: one strip and a from= URL for every cross-surface hop  [opus[1m] · low · phase: spec]
+    #268 crossed the hand-off line (161727 tokens ≥ 150000) — asked to hand off; hard stop at 180000
+    #268 context at exit: 178627 tokens, 5 min
+    cleaned up session pid 1853510 (pgid ?); free: 6321 MB
+    scoreboard: 75 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #268: continued (progressed), session 1/3 without progress allowed in 303s
+=== [18/50] #268 — Build the Origin link: one strip and a from= URL for every cross-surface hop  [opus[1m] · low · phase: spec]
+    #268 context at exit: 134629 tokens, 7 min
+    cleaned up session pid 1859643 (pgid ?); free: 6304 MB

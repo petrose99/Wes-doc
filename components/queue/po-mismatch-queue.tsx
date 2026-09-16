@@ -126,7 +126,7 @@ export function PoMismatchQueue({ workspaceId, basePath, rows, invoiceCount, ini
       filterRows={filterPoMismatchRows}
       pinned={decided?.row ?? null}
       onOpenChange={(id) => { if (id !== decided?.row.documentId) setDecided(null) }}
-      initialMissingNotice="This invoice was already decided — it's no longer in Ready to Approve."
+      initialMissing={{ text: "This invoice was already decided — it's no longer in Ready to Approve." }}
       rowId={(row) => row.documentId}
       rowName={(row) => ({ title: row.supplier ?? "Unknown supplier", suffix: [row.invoiceNumber, `${formatMoney(row.variance, row.currencyCode)} variance`].filter(Boolean).join(" · ") || null })}
       leading={(row) => <ProcessingStateGlyph state={processingState({ approvalStatus: "in_progress", blockedByCheck: row.eligibility.status !== "ready", escalated: false, touchless: false, status: "needs_review" })} />}
