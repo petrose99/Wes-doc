@@ -160,13 +160,20 @@ progress_mark() {   # a fingerprint of "did this session move the work": HEAD + 
 # took 262/38M. The phase is read off the hand-off file's `milestone:` lines,
 # so the runner keeps no state and a re-run resumes where the file says.
 PHASED_TITLE_RE="${PHASED_TITLE_RE:-^Build }"
+# A phase never moves backwards. The hand-off file is rewritten by every
+# session and one build session dropped the `milestone: spec-done` line, so
+# the driver read "spec" again and re-ran a finished phase (#259, 11:55). The
+# driver therefore keeps its own high-water mark in <ticket>.phase and takes
+# the later of the two.
+phase_rank() { case "$1" in spec) echo 1;; build) echo 2;; close) echo 3;; *) echo 0;; esac; }
 phase_of() {   # $1 ticket → "" (single session) | spec | build | close
   local labels; labels="$(gh api "repos/$REPO/issues/$1" --jq '[.labels[].name]|join(",")')"
   [[ "$labels" == *wayfinder:task* ]] && [[ "$(title "$1")" =~ $PHASED_TITLE_RE ]] || { echo ""; return; }
-  local h="$OUT/$1.handoff.md"
-  if [ -f "$h" ] && grep -q '^milestone: build-done' "$h"; then echo close
-  elif [ -f "$h" ] && grep -q '^milestone: spec-done' "$h"; then echo build
-  else echo spec; fi
+  local h="$OUT/$1.handoff.md" m=spec f=spec
+  if [ -f "$h" ] && grep -q '^milestone: build-done' "$h"; then m=close
+  elif [ -f "$h" ] && grep -q '^milestone: spec-done' "$h"; then m=build; fi
+  [ -f "$OUT/$1.phase" ] && f="$(cat "$OUT/$1.phase")"
+  if [ "$(phase_rank "$m")" -ge "$(phase_rank "$f")" ]; then echo "$m"; else echo "$f"; fi
 }
 declare -A PHASE_RUNS=()   # "ticket:phase" → sessions already spent on that phase
 model_for() {   # $1 ticket, $2 attempt number (1-based), $3 phase
@@ -233,6 +240,9 @@ while [ "$n" -lt "$MAX" ]; do
   RUN_BRIEF="$LOGS/brief-$T.md"
   MARK0="$(progress_mark "$T")"
   CONT=""; [ -f "$OUT/$T.handoff.md" ] && CONT="**This is a continuation session.** A previous session worked this ticket and did not close it. Read the hand-off file first and continue from the milestone it names; do not restart, re-spec or re-measure what it records as done."
+  [ -n "$PHASE" ] && CONT="$CONT
+
+**Hand-off file rule:** when you rewrite the hand-off, keep every \`milestone:\` line already in it and add yours below. The driver reads the phase off those lines; a dropped line re-runs a finished phase."
   case "$PHASE" in
     spec)  CONT="$CONT
 
@@ -348,6 +358,7 @@ PY
     # fresh context. Keep the claim; commit anything the session left.
     ( cd "$ROOT" && git add -A -- . ':!.scratch' ':!.impeccable/live' ":!docs/wayfinder-reports/$MAP/logs" && git commit -q -m "wip(autopilot): #$T $PHASE phase done" ) 2>/dev/null || true
     ATTEMPTS[$T]=0; NEXT_T="$T"
+    echo "$(phase_of "$T")" > "$OUT/$T.phase"
     OUTCOME="phase $PHASE done → $(phase_of "$T") next"
   else
     [ -n "$PHASE" ] && NEXT_T="$T"   # a phased ticket is continued next, not re-queued behind the frontier
