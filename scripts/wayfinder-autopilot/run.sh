@@ -36,7 +36,7 @@ ALLOWED_TOOLS=(
   "Read" "Edit" "Write" "Glob" "Grep" "Skill" "Agent" "WebFetch" "WebSearch"
 )
 
-MAP="${1:?usage: run.sh <map-number> [--max N] [--ticket N] [--dry-run] [--detach] [--after-pid PID]}"; shift
+MAP="${1:?usage: run.sh <map-number> [--max N] [--ticket N] [--dry-run] [--detach] [--after-pid PID] [--model M]}"; shift
 MAX=50; ONLY=""; DRY=0; DETACH=0; AFTER_PID=""
 ARGS=("$@")
 while [ $# -gt 0 ]; do
@@ -46,6 +46,7 @@ while [ $# -gt 0 ]; do
     --dry-run) DRY=1; shift ;;
     --detach) DETACH=1; shift ;;
     --after-pid) AFTER_PID="$2"; shift 2 ;;
+    --model) export WAYFINDER_MODEL="$2"; shift 2 ;;
     *) echo "unknown arg: $1" >&2; exit 2 ;;
   esac
 done
