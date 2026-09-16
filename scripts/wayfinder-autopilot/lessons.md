@@ -28,6 +28,7 @@ not written here will be relearned at full cost.
 ## Build
 
 - (docubite #250) Three detector batches were needed because the first screenshots were only taken after the whole surface was built. → Screenshot each new component at 1440 and 390 as it lands, not only at the end; the hook catches static findings, the overlay catches layout ones.
+- (docubite #252) Detector, critique and evaluate each opened their own browser on the same build; a headless Chromium is 200–400 MB and each pass is minutes. → One capture pass per round (states × widths PNGs + detector JSON + keyboard probe) that all three skills read; re-capture only after code changes.
 - (docubite #250) Static `impeccable detect` was skipped; the in-page overlay found everything. → In-page overlay is the source of truth; run it per state (list, pane-open, dialog-open, sheet-open), not once.
 
 ## Scoring

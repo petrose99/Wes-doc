@@ -99,6 +99,14 @@ properly, not skimmed:
    extraction, primitive diff, focus probe) and fix what they show — that is
    lint, not scoring. Then take the first critique and evaluate untouched.
 
+**One capture pass per round, shared by every skill.** A round is one Playwright
+run producing a named set — every state × 1440 and 390 as PNGs, the in-page
+detector JSON per state, and the keyboard probe results — saved in the ticket's
+scratch folder. `critique`, `evaluate` and `include` all read *that set*; none
+of them opens its own browser. Re-capture only after code changes (the next fix
+batch), never because a second skill wants to look. Two rounds per fix batch
+at most: first pass, and confirm.
+
 **Then score the new UI — and the gap between predicted and measured is the
 KPI.** The report shows reconciled prediction vs first pass vs close, per
 heuristic, for both scorecards (`preflight.md` Part G). Every heuristic where
