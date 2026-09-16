@@ -276,7 +276,13 @@ while [ "$n" -lt "$MAX" ]; do
   # post a partial hand-off so the driver retries with a fresh context, tear
   # the session down.
   MAX_S="${WAYFINDER_SESSION_MAX_SECONDS:-12600}"
-  MAX_CTX="${WAYFINDER_SESSION_MAX_TOKENS:-${SESSION_MAX_TOKENS:-150000}}"   # baseline ~42K; grillings finish under this; a build hands off at a milestone and continues — every turn past here pays for context it barely uses
+  MAX_CTX="${WAYFINDER_SESSION_MAX_TOKENS:-${SESSION_MAX_TOKENS:-150000}}"
+  # The spec phase front-loads the intent and impeccable skills, the
+  # references, the map and the spec it writes — ~140K before the critic
+  # runs, in under 60 turns (#257: capped at 152K after 10 min, twice). It is
+  # short, so the quadratic cost is small; give it room. Build and close keep
+  # the default: they are the long phases.
+  [ "$PHASE" = spec ] && MAX_CTX="${WAYFINDER_SPEC_MAX_TOKENS:-${SPEC_MAX_TOKENS:-200000}}"   # baseline ~42K; grillings finish under this; a build hands off at a milestone and continues — every turn past here pays for context it barely uses
   CAPPED=""
   context_tokens() {
     python3 - "$1" 2>/dev/null <<'PY'
