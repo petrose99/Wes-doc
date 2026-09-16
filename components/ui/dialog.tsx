@@ -37,6 +37,11 @@ export function Dialog({ open, title, description, width = "max-w-md", onClose, 
   const titleId = useId()
   const descId = useId()
 
+  // `onClose` is almost always an inline lambda; reading it through a ref keeps the effect from
+  // re-running on every keystroke inside the dialog (each run bounced focus opener → content and
+  // dropped typed characters in the Reject sheet, #257 round 1).
+  const onCloseRef = useRef(onClose)
+  useEffect(() => { onCloseRef.current = onClose }, [onClose])
   useEffect(() => {
     if (!open) return
     openerRef.current = typeof document !== "undefined" ? document.activeElement : null
@@ -53,7 +58,7 @@ export function Dialog({ open, title, description, width = "max-w-md", onClose, 
     const raf = window.requestAnimationFrame(focusFirst)
 
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") { onClose(); return }
+      if (event.key === "Escape") { onCloseRef.current(); return }
       if (event.key !== "Tab") return
       const container = contentRef.current
       if (!container) return
@@ -79,7 +84,7 @@ export function Dialog({ open, title, description, width = "max-w-md", onClose, 
       // Return focus to the element that opened the dialog (if it is still around).
       if (openerRef.current instanceof HTMLElement) openerRef.current.focus()
     }
-  }, [open, onClose, initialFocus])
+  }, [open, initialFocus])
 
   if (!open || typeof document === "undefined") return null
 

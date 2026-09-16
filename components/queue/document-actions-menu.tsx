@@ -50,13 +50,16 @@ export function PaneDocumentProvider({ onMutated, archivedToast, children }: {
  * frame-level document actions beyond *Open review task*, per #234) to tell the frame around it
  * which document is loaded. Registers on mount, updates on change, clears on unmount. */
 export function useRegisterDocumentActions(doc: RegisteredDocument | null) {
-  const ctx = useContext(PaneDocumentContext)
+  // Depend on the stable `setDoc`, never on the context object: the provider builds a new value
+  // per render, and registering on it re-ran this effect (clear → set → provider re-render → …)
+  // until React cut the loop with "Maximum update depth exceeded" (#257 close).
+  const setDoc = useContext(PaneDocumentContext)?.setDoc
   useEffect(() => {
-    if (!ctx) return
-    ctx.setDoc(doc)
-    return () => ctx.setDoc(null)
+    if (!setDoc) return
+    setDoc(doc)
+    return () => setDoc(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ctx, doc?.documentId, doc?.fileId, doc?.filename, doc?.flagged, doc?.archived, doc?.cancelled, doc?.cancelledReason, doc?.reviewLink?.href, doc?.reviewLink?.label])
+  }, [setDoc, doc?.documentId, doc?.fileId, doc?.filename, doc?.flagged, doc?.archived, doc?.cancelled, doc?.cancelledReason, doc?.reviewLink?.href, doc?.reviewLink?.label])
 }
 
 /** Item 1b, 2, 3 of the ⋯ menu — everything above the surface's own items. Nothing renders while

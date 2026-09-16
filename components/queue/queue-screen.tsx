@@ -198,17 +198,25 @@ function QueueScreenInner<T>({
 
   // Opening another row or closing the pane unmounts whatever is in it; unsaved work there
   // (Match manually's pending line matches, #250) gets one chance to say so.
+  // True while the open pane owns a history entry of its own (phone lane, opened from the list —
+  // not from a deep link, which has no entry to pop).
+  const pushedRef = useRef(false)
   const open = useCallback((id: string) => {
     if (!confirmLeave()) return
     const push = isPhoneLane() && openId === null
     setOpenId(id)
     syncUrl(id, push)
+    if (push) pushedRef.current = true
   }, [syncUrl, openId])
   // Closing returns focus to the row that was open — recorded as state and applied in an effect
   // once the pane has unmounted, so `close` itself stays free of DOM refs.
   const [focusReturn, setFocusReturn] = useState<string | null>(null)
   const close = useCallback((fromPopstate = false) => {
     if (!fromPopstate && !confirmLeave()) return
+    // The pane pushed its own entry: pop it, so the phone's Back gesture and the pane's Back
+    // control leave the same history behind; the popstate handler below finishes the close.
+    if (!fromPopstate && pushedRef.current) { pushedRef.current = false; window.history.back(); return }
+    pushedRef.current = false
     setFocusReturn(openId)
     setOpenId(null)
     // A popstate-driven close already moved history back; pushing/replacing here would fight it.
@@ -222,7 +230,14 @@ function QueueScreenInner<T>({
     return () => window.removeEventListener("popstate", onPopState)
   }, [openId, close])
   useEffect(() => {
-    if (openId === null && focusReturn) triggerRefs.current.get(focusReturn)?.focus()
+    if (openId !== null || !focusReturn) return
+    // Table rows register a ref, but below the card breakpoint the table is `display: none` and
+    // the surface's own card `<a>` is what the operator left from — focus whichever is rendered.
+    const trigger = triggerRefs.current.get(focusReturn)
+    const el = trigger && trigger.offsetParent !== null
+      ? trigger
+      : rootRef.current?.querySelector<HTMLElement>(`[data-row-id="${focusReturn}"] a, [data-row-id="${focusReturn}"] button`)
+    el?.focus()
   }, [openId, focusReturn])
   const step = useCallback((delta: 1 | -1) => {
     if (openIndex < 0) return
@@ -256,7 +271,9 @@ function QueueScreenInner<T>({
     if (!openId) return
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null
-      if (target?.closest("input, textarea, select, [contenteditable=true], [role=dialog], [role=alertdialog], [role=listbox], [role=menu], [role=radiogroup]")) return
+      if (target?.closest("input, textarea, select, [contenteditable=true], [role=alertdialog], [role=listbox], [role=menu], [role=radiogroup]")) return
+      // Below `lg` the Detail pane is itself a modal dialog; only an inner `Dialog` keeps Escape.
+      if (target?.closest("[role=dialog]")?.closest("[data-inner]")) return
       // A modal is open somewhere on the page: its own Escape wins, the queue stays put (#251).
       // `[data-inner]` marks a `Dialog` (Filter/Reject/Approve/Override sheet) specifically — the
       // full-screen Detail pane sheet carries no such attribute, so Escape still closes *that*
@@ -393,7 +410,7 @@ function QueueScreenInner<T>({
             {sortedRows.map((row) => {
               const id = rowId(row)
               const isOpen = id === openId
-              return <li key={id} className="border-b border-slate-200 last:border-b-0">
+              return <li key={id} data-row-id={id} className="border-b border-slate-200 last:border-b-0">
                 {cards.render(row, { isOpen, open: () => (isOpen ? close() : open(id)) })}
               </li>
             })}
@@ -449,7 +466,7 @@ function QueueScreenInner<T>({
         archivedToast={archivedToast}
         onMutated={(kind) => { if (kind === "removed") { close(); router.refresh() } else refresh() }}
         position={{ index: openIndex + 1, total: sortedRows.length }}
-        onClose={close}
+        onClose={() => close()}
         backLabel={`Back to ${cards?.title ?? title}`}
         onPrev={openIndex > 0 ? () => step(-1) : null}
         onNext={openIndex < sortedRows.length - 1 ? () => step(1) : null}
