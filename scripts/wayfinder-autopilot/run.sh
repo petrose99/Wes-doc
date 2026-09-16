@@ -176,16 +176,20 @@ phase_of() {   # $1 ticket → "" (single session) | spec | build | close
   if [ "$(phase_rank "$m")" -ge "$(phase_rank "$f")" ]; then echo "$m"; else echo "$f"; fi
 }
 declare -A PHASE_RUNS=()   # "ticket:phase" → sessions already spent on that phase
-# Hard tickets. A ticket that has already consumed HARD_AFTER sessions (rows
-# in the run log, so the count survives a driver restart) is hard: every
-# further session runs on MODEL_HARD at EFFORT_HARD, whatever the phase or
-# attempt — no cheap first pass on a phase, no waiting for a "partial" to
-# escalate. #257's close phase spent its first session on Sonnet and made no
-# progress; a ticket on its fourth session has shown it is not cheap work.
-HARD_AFTER="${WAYFINDER_HARD_AFTER:-${HARD_AFTER:-3}}"
+# Hard phases. A phase that has already burned HARD_AFTER sessions without
+# completing is hard: every further session on it runs on MODEL_HARD at
+# EFFORT_HARD — no cheap first pass, no waiting for a "partial" to escalate.
+# The moment the phase completes (its "phase … done →" row lands in the run
+# log) or the ticket resolves, the count restarts and routing reverts to the
+# normal ladder (the exec model's first pass, the strong model on the second
+# session). Counted from run-log rows, so the count survives a driver restart.
+HARD_AFTER="${WAYFINDER_HARD_AFTER:-${HARD_AFTER:-2}}"
 MODEL_HARD="${WAYFINDER_MODEL_HARD:-${MODEL_HARD:-$MODEL_STRONG}}"
 EFFORT_HARD="${WAYFINDER_EFFORT_HARD:-${EFFORT_HARD:-$EFFORT}}"
-sessions_on() { grep -c "\[#$1\](" "$RUNLOG" 2>/dev/null || true; }
+sessions_on() {   # $1 ticket → run-log rows since the phase last advanced
+  [ -f "$RUNLOG" ] || { echo 0; return; }
+  awk -v t="[#$1](" 'index($0,t){ n++; if ($0 ~ /\| phase [a-z]+ done → [a-z]+ next/) n=0 } END{ print n+0 }' "$RUNLOG"
+}
 hard_ticket() { [ -n "$MODEL_HARD" ] && [ "${HARD_AFTER:-0}" -gt 0 ] && [ "$(sessions_on "$1")" -ge "$HARD_AFTER" ]; }
 model_for() {   # $1 ticket, $2 attempt number (1-based), $3 phase
   [ -n "${WAYFINDER_MODEL:-}" ] && { echo "$WAYFINDER_MODEL"; return; }
@@ -231,7 +235,7 @@ while [ "$n" -lt "$MAX" ]; do
   PHASE="$(phase_of "$T")"
   MODEL="$(model_for "$T" $(( ${ATTEMPTS[$T]:-0} + 1 )) "$PHASE")"
   SESSION_EFFORT="$EFFORT"; HARD=""
-  if hard_ticket "$T"; then SESSION_EFFORT="$EFFORT_HARD"; HARD=" · hard ($(sessions_on "$T") sessions so far)"; fi
+  if hard_ticket "$T"; then SESSION_EFFORT="$EFFORT_HARD"; HARD=" · hard ($(sessions_on "$T") sessions on this phase)"; fi
   echo "=== [$n/$MAX] #$T — $TT  [${MODEL:-default model}${SESSION_EFFORT:+ · $SESSION_EFFORT}${PHASE:+ · phase: $PHASE}$HARD]"
   if [ "$DRY" = 1 ]; then SKIP[$T]=1; continue; fi
 
