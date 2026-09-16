@@ -76,24 +76,30 @@ properly, not skimmed:
    in particular trips on (shell, tokens, seed data, dev-server recipe).
    Each lesson that applies to this surface becomes a line in the spec now;
    the pre-flight (step 3) cites it.
-3. **Pre-flight against the scorecards — as a coverage matrix, not a
-   narrative.** Copy `preflight.md` (next to this brief) into your scratch
-   folder and fill it completely: the inventory (screens, components, every
-   action, every state, every copy surface, every hop), then the 50-row
-   matrix — for each check, which inventory items it applies to and which
-   spec element covers *each* of them, or `GAP`. A 4 needs *every*; one
-   uncovered primary item is a 2. Predict the critique per heuristic and the
-   evaluate score from the task walkthroughs. **Gates: predicted critique
-   ≥ 36 and predicted evaluate ≥ 92 before code.** Below the gate you fix
-   the spec, never the code later. The filled matrix is then your build
-   checklist, row by row. Attach it to the report.
-4. Build the whole surface to that spec, all states included, with the
-   detector hook fixing findings as they appear.
+3. **Pre-flight — `preflight.md` next to this brief, filled completely,
+   before code.** It has seven parts and each exists because a real first
+   pass lost points there: **A** excellence targets (pick ≥ 6 heuristics to
+   build to the critic's 4 and write what 4 looks like on this surface — ten
+   3s is 30 and the bar is 34); **B** six contracts that are grep-checkable
+   (action reachability + reversal, view freshness after every mutation, one
+   term per concept, shell-primitive reuse, focus/keys/failure path per
+   interactive surface, time-axis edges); **C** coverage by component type;
+   **D** an independent spec critic — a fresh-context `Agent` scores the spec
+   with the rubric as if it were built, and every heuristic it puts below
+   your prediction is a spec change; **E** task walkthroughs and the
+   anti-pattern sweep. **Gates after D: predicted critique ≥ 36, evaluate
+   ≥ 92.** Under the gate you change the spec, never the code later.
+   The filled tables are then the build checklist, row by row.
+4. Build the whole surface from the tables, all states included, with the
+   detector hook fixing findings as they appear. **Before the first
+   measurement, run the Part B contract checks** (reachability grep, string
+   extraction, primitive diff, focus probe) and fix what they show — that is
+   lint, not scoring. Then take the first critique and evaluate untouched.
 
 **Then score the new UI — and the gap between predicted and measured is the
-KPI.** The report shows predicted vs first-pass vs close, per heuristic, for
-both scorecards. Every heuristic where measured < predicted is a lesson in the
-precise form `preflight.md` §4 gives (which check was marked covered, by
+KPI.** The report shows reconciled prediction vs first pass vs close, per
+heuristic, for both scorecards (`preflight.md` Part G). Every heuristic where
+measured < predicted is a lesson in the precise form Part G gives (which check was marked covered, by
 what, and what the critic found instead). A first pass under 30/40 or 80/100
 with a prediction above the gate means the matrix was filled dishonestly;
 say where. Then work the remaining findings in

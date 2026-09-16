@@ -16,6 +16,9 @@ not written here will be relearned at full cost.
 - (docubite #250, H4 consistency) Deep-link hops lost their origin until `from=` was added to every one. → Every navigation the surface introduces carries origin context (`from=`) by construction; list them in the spec.
 - (docubite #251, H1/H4) First evaluate was 68 with four P1s: the same pattern — states and consequences designed in the fix loop. → Do steps 1–3 of the pre-build pass fully; loading the skills is not doing them.
 
+- (docubite #250/#251/#252, all H) First passes had no heuristic at 4 — seven or eight 3s and two or three 2s, 26–28/40. Ten 3s is 30; the bar of 34 needs four 4s. → Excellence is targeted, not hoped for: `preflight.md` Part A picks ≥ 6 heuristics to build to the critic's 4 and states what 4 looks like on this surface before code.
+- (docubite #251/#252, H1 H3 H4 + P1s) Every 2 and P1 was one of six classes — stale views after a mutation, dead action paths, vocabulary drift, bespoke primitives beside shell ones, unspecified focus/failure paths, time-axis edges. → State each as a contract (`preflight.md` Part B) and grep-verify it before the first measurement.
+
 ## Grilling (what a decision ticket must establish before its first round)
 
 - (docubite #248, H4 consistency) A fact word on the incumbent was derived from a different record than its name implied ("Synced" came from the push row, not the ledger sync). → Before deciding vocabulary, trace every fact word on the surface to the query that produces it; the word follows the record.
