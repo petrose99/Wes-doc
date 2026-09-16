@@ -175,14 +175,16 @@ while [ "$n" -lt "$MAX" ]; do
   # Each session gets its own process group (setsid) so everything it spawns —
   # dev server, headless Chromium, node workers, subagents — can be torn down
   # together when the ticket is done, and the next session starts clean.
-  # The brief is generic; the session learns the two lessons paths from this line.
+  # The brief is generic; the run-specific paths (lessons files, report) are
+  # appended to a per-run copy, since the CLI takes only one system-prompt file.
+  RUN_BRIEF="$LOGS/brief-$T.md"
+  { cat "$BRIEF"; printf '\n\n## Paths for this run\n\n- Generic lessons (every project): `%s`\n- Project lessons (this repo): `%s`\n- Report: `%s/%s.md`\n- Scratch folder for captures and the filled preflight: `%s/scratch-%s/`\n' "$GENERIC_LESSONS" "$PROJECT_LESSONS" "$OUT" "$T" "$LOGS" "$T"; } > "$RUN_BRIEF"
   # NODE_OPTIONS caps every node process the session starts (next dev grows to
   # ~4 GB unbounded on this repo; 3 GB is ample and keeps the box out of swap).
   ( cd "$ROOT" && NODE_OPTIONS="${WAYFINDER_NODE_OPTIONS:---max-old-space-size=3072}" \
     setsid claude -p "/wayfinder $MAP $T" \
-      --append-system-prompt-file "$BRIEF" \
+      --append-system-prompt-file "$RUN_BRIEF" \
       ${MODEL:+--model "$MODEL"} \
-      --append-system-prompt "Lessons files for this run — generic (every project): $GENERIC_LESSONS · project-specific (this repo): $PROJECT_LESSONS. Reports go to $OUT/<ticket>.md." \
       --permission-mode acceptEdits \
       --allowedTools "${ALLOWED_TOOLS[@]}" \
       --disallowedTools AskUserQuestion \
