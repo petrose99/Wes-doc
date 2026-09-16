@@ -60,8 +60,10 @@ ME="$(gh api user --jq .login)"
 # shell (and any harness timeout); progress goes to docs/wayfinder-reports/<map>/detached.out.
 if [ "$DETACH" = 1 ]; then
   DET=(); for a in "${ARGS[@]}"; do [ "$a" = "--detach" ] || DET+=("$a"); done
-  nohup setsid "$0" "$MAP" "${DET[@]}" > "$OUT/detached.out" 2>&1 < /dev/null &
-  echo "detached as pid $! — tail -f $OUT/detached.out"; exit 0
+  DOUT="$OUT/detached-$(date -u +%Y%m%dT%H%M%SZ).out"
+  nohup setsid "$0" "$MAP" "${DET[@]}" > "$DOUT" 2>&1 < /dev/null &
+  ln -sfn "$(basename "$DOUT")" "$OUT/detached.out"
+  echo "detached as pid $! — tail -f $DOUT"; exit 0
 fi
 
 # --after-pid: wait for an earlier session (pid) to exit before starting, and
@@ -101,17 +103,17 @@ cleanup_session() {
   local pid="$1" since="$2" pgid
   pgid="$(ps -o pgid= -p "$pid" 2>/dev/null | tr -d ' ')"
   if [ -n "$pgid" ] && [ "$pgid" != "$$" ]; then
-    kill -TERM -- "-$pgid" 2>/dev/null; sleep 5; kill -KILL -- "-$pgid" 2>/dev/null
+    kill -TERM -- "-$pgid" 2>/dev/null || true; sleep 5; kill -KILL -- "-$pgid" 2>/dev/null || true
   fi
   local p
-  for p in $(pgrep -f 'next dev|next-server|chrome|chromium|playwright|impeccable (live|serve)|detect\.js' 2>/dev/null); do
+  for p in $(pgrep -u "$(id -u)" -f 'next dev|next-server|chrome|chromium|playwright|impeccable (live|serve)|detect\.js' 2>/dev/null); do
     [ "$p" = "$$" ] && continue
     # ps etimes = seconds since start; only kill things younger than the session
-    [ "$(ps -o etimes= -p "$p" 2>/dev/null | tr -d ' ')" -le "$(( $(date +%s) - since ))" ] 2>/dev/null && kill -TERM "$p" 2>/dev/null
+    if [ "$(ps -o etimes= -p "$p" 2>/dev/null | tr -d ' ')" -le "$(( $(date +%s) - since ))" ] 2>/dev/null; then kill -TERM "$p" 2>/dev/null || true; fi
   done
   sleep 3
-  for p in $(pgrep -f 'next dev|next-server|chrome|chromium|playwright|impeccable (live|serve)|detect\.js' 2>/dev/null); do
-    [ "$(ps -o etimes= -p "$p" 2>/dev/null | tr -d ' ')" -le "$(( $(date +%s) - since ))" ] 2>/dev/null && kill -KILL "$p" 2>/dev/null
+  for p in $(pgrep -u "$(id -u)" -f 'next dev|next-server|chrome|chromium|playwright|impeccable (live|serve)|detect\.js' 2>/dev/null); do
+    if [ "$(ps -o etimes= -p "$p" 2>/dev/null | tr -d ' ')" -le "$(( $(date +%s) - since ))" ] 2>/dev/null; then kill -KILL "$p" 2>/dev/null || true; fi
   done
   sync; echo "    cleaned up session pid $pid (pgid ${pgid:-?}); free: $(free -m | awk '/Mem:/{print $7" MB"}')"
 }
@@ -163,8 +165,8 @@ while [ "$n" -lt "$MAX" ]; do
   # still running from before this run (or a previous run), stop it first.
   # The VPS's memwatch alerts under 20% available RAM, and a stale next-server
   # alone can hold 4 GB.
-  for p in $(pgrep -f 'next dev|next-server|chrome|chromium|playwright' 2>/dev/null); do
-    [ "$p" = "$$" ] || kill -TERM "$p" 2>/dev/null
+  for p in $(pgrep -u "$(id -u)" -f 'next dev|next-server|chrome|chromium|playwright' 2>/dev/null); do
+    [ "$p" = "$$" ] || kill -TERM "$p" 2>/dev/null || true
   done
   sleep 2
   START=$(date -u +%Y-%m-%dT%H:%M:%SZ); S0=$(date +%s)
@@ -219,7 +221,7 @@ PY
       echo "    #$T hit the $CAPPED — saving WIP and handing off"
       ( cd "$ROOT" && git add -A && git commit -q -m "wip(autopilot): #$T session hit the $CAPPED; hand-off to the next attempt" ) 2>/dev/null || true
       gh issue comment "$T" --repo "$REPO" --body "Autopilot: partial — the session hit its $CAPPED. Work so far is committed as WIP on the branch. Next attempt: read the last commits and any report draft in docs/wayfinder-reports, measure once, close at the bar or continue the hand-off. If the remaining work is more than one session, split it: create a child task ticket for the remainder and close this one at a coherent boundary." >/dev/null 2>&1 || true
-      pgid="$(ps -o pgid= -p "$SESSION_PID" 2>/dev/null | tr -d ' ')"; [ -n "$pgid" ] && kill -TERM -- "-$pgid" 2>/dev/null
+      pgid="$(ps -o pgid= -p "$SESSION_PID" 2>/dev/null | tr -d ' ')"; [ -n "$pgid" ] && { kill -TERM -- "-$pgid" 2>/dev/null || true; }
       break
     fi
   done
