@@ -124,13 +124,17 @@ MODEL_STRONG="${WAYFINDER_MODEL_STRONG:-}"          # empty = the user's default
 MODEL_CHEAP="${WAYFINDER_MODEL_CHEAP:-}"
 [ -f "$ROOT/.claude/wayfinder-autopilot/config.sh" ] && . "$ROOT/.claude/wayfinder-autopilot/config.sh"
 MODEL_CHEAP="${MODEL_CHEAP:-$MODEL_STRONG}"
-model_for() {
+# MODEL_EXEC_FIRST (optional, per-project): execution tickets start on this
+# model; a ticket left "Autopilot: partial —" is retried on MODEL_STRONG.
+model_for() {   # $1 ticket, $2 attempt number (1-based)
   [ -n "${WAYFINDER_MODEL:-}" ] && { echo "$WAYFINDER_MODEL"; return; }
-  local labels title
+  local labels title attempt="${2:-1}"
   labels="$(gh api "repos/$REPO/issues/$1" --jq '[.labels[].name]|join(",")')"
   title="$(title "$1")"
   if [[ "$labels" == *wayfinder:research* ]] || [[ "$title" =~ [Pp]olish|[Bb]ring\ .*\ to\ the\ (autopilot\ )?bar ]]; then
     echo "$MODEL_CHEAP"
+  elif [[ "$labels" == *wayfinder:task* ]] && [ -n "${MODEL_EXEC_FIRST:-}" ] && [ "$attempt" = 1 ]; then
+    echo "$MODEL_EXEC_FIRST"
   else
     echo "$MODEL_STRONG"
   fi
@@ -150,7 +154,7 @@ while [ "$n" -lt "$MAX" ]; do
   fi
   n=$((n+1))
   TT="$(title "$T")"
-  MODEL="$(model_for "$T")"
+  MODEL="$(model_for "$T" $(( ${ATTEMPTS[$T]:-0} + 1 )))"
   echo "=== [$n/$MAX] #$T — $TT  [${MODEL:-default model}]"
   if [ "$DRY" = 1 ]; then SKIP[$T]=1; continue; fi
 

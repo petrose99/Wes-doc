@@ -84,9 +84,9 @@ properly, not skimmed:
    (action reachability + reversal, view freshness after every mutation, one
    term per concept, shell-primitive reuse, focus/keys/failure path per
    interactive surface, time-axis edges); **C** coverage by component type;
-   **D** an independent spec critic — a fresh-context `Agent` scores the spec
-   with the rubric as if it were built, and every heuristic it puts below
-   your prediction is a spec change; **E** an explicit `evaluate`
+   **D** an independent spec critic — a fresh-context `Agent` **run with
+   `model: "opus"`** scores the spec with both rubrics as if it were built,
+   and every heuristic it puts below your prediction is a spec change; **E** an explicit `evaluate`
    prediction — it scores the *worst* issue per heuristic, so name the worst
    thing the spec still permits and its severity, walk each core task with
    the four questions (try · notice · associate · see progress), sweep the
@@ -148,8 +148,10 @@ confirm once) until the bar above is met, and record the after-counts.
   on the close, with the score they cost. A finding without a decision is
   fixed, never parked.
 - If the bar cannot be reached in this session, **leave the ticket open**
-  with an `Autopilot: partial —` comment stating current scores, what is
-  fixed and what remains; commit what you have. The driver will come back.
+  with an `Autopilot: partial —` comment and commit what you have. The driver
+  retries on a stronger model, so write the comment as a hand-off: current
+  scores per heuristic, the path to the filled `preflight.md`, what is built
+  and verified, the open findings by heuristic, and what you would do next.
 - **Score the new UI, not the old one.** A grilling ticket may critique the
   incumbent as *evidence* for its recommendations (what the old surface got
   wrong), never as a number to beat — the grilling is about to change what
