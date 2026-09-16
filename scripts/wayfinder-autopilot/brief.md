@@ -156,6 +156,15 @@ confirm once) until the bar above is met, and record the after-counts.
 - Findings with a real decision behind them become a Wayfinder ticket named
   on the close, with the score they cost. A finding without a decision is
   fixed, never parked.
+- **A session is one context, and the driver caps it at 150K tokens and
+  3h30.** Plan the ticket to fit: pre-flight, build, one measurement round,
+  close. If while filling the pre-flight you can see the work is more than
+  one session (many screens, a schema change plus a surface, two queues),
+  **split it before building**: create a child `wayfinder:task` ticket for
+  the second half (blocked by this one), narrow this ticket's scope in a
+  comment, and build the first half to the bar. Reaching the cap mid-build is
+  the expensive way to split; the driver will commit your tree as WIP and
+  hand off, but the next session pays to rediscover where you were.
 - If the bar cannot be reached in this session, **leave the ticket open**
   with an `Autopilot: partial —` comment and commit what you have. The driver
   retries on a stronger model, so write the comment as a hand-off: current

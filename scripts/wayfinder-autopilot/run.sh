@@ -187,24 +187,44 @@ while [ "$n" -lt "$MAX" ]; do
       --output-format stream-json --verbose \
       > "$LOG" 2>"$LOG.stderr" ) &
   SESSION_PID=$!
-  # Hard time cap per session (default 3h30). On expiry: commit whatever the
-  # session has in the tree as WIP so nothing is lost, post a partial hand-off
-  # so the driver retries with a fresh context, then tear the session down.
+  # Two hard caps per session, enforced here because the model cannot see its
+  # own budget in -p mode: wall time (default 3h30) and context size (default
+  # 150K tokens, read from the usage block of the latest assistant turn in the
+  # stream-json log). On either: commit the tree as WIP so nothing is lost,
+  # post a partial hand-off so the driver retries with a fresh context, tear
+  # the session down.
   MAX_S="${WAYFINDER_SESSION_MAX_SECONDS:-12600}"
-  TIMED_OUT=0
+  MAX_CTX="${WAYFINDER_SESSION_MAX_TOKENS:-150000}"
+  CAPPED=""
+  context_tokens() {
+    python3 - "$1" 2>/dev/null <<'PY'
+import json,sys
+last=0
+for line in open(sys.argv[1]):
+    if '"usage"' not in line: continue
+    try: d=json.loads(line)
+    except: continue
+    u=d.get('message',{}).get('usage') if d.get('type')=='assistant' else None
+    if u: last=u.get('input_tokens',0)+u.get('cache_read_input_tokens',0)+u.get('cache_creation_input_tokens',0)
+print(last)
+PY
+  }
   while kill -0 "$SESSION_PID" 2>/dev/null; do
     sleep 30
-    if [ $(( $(date +%s) - S0 )) -ge "$MAX_S" ]; then
-      TIMED_OUT=1
-      echo "    #$T hit the ${MAX_S}s session cap — saving WIP and handing off"
-      ( cd "$ROOT" && git add -A && git commit -q -m "wip(autopilot): #$T session hit the time cap; hand-off to the next attempt" ) 2>/dev/null || true
-      gh issue comment "$T" --repo "$REPO" --body "Autopilot: partial — the session hit its time cap (${MAX_S}s). Work so far is committed as WIP on the branch. Next attempt: read the run log, the report draft if any, and the last commits; measure once; close at the bar or continue the hand-off." >/dev/null 2>&1 || true
+    ELAPSED=$(( $(date +%s) - S0 )); CTX="$(context_tokens "$LOG")"; CTX="${CTX:-0}"
+    if [ "$ELAPSED" -ge "$MAX_S" ]; then CAPPED="time cap (${MAX_S}s)"; fi
+    if [ "$CTX" -ge "$MAX_CTX" ]; then CAPPED="context cap (${CTX} tokens ≥ ${MAX_CTX})"; fi
+    if [ -n "$CAPPED" ]; then
+      echo "    #$T hit the $CAPPED — saving WIP and handing off"
+      ( cd "$ROOT" && git add -A && git commit -q -m "wip(autopilot): #$T session hit the $CAPPED; hand-off to the next attempt" ) 2>/dev/null || true
+      gh issue comment "$T" --repo "$REPO" --body "Autopilot: partial — the session hit its $CAPPED. Work so far is committed as WIP on the branch. Next attempt: read the last commits and any report draft in docs/wayfinder-reports, measure once, close at the bar or continue the hand-off. If the remaining work is more than one session, split it: create a child task ticket for the remainder and close this one at a coherent boundary." >/dev/null 2>&1 || true
       pgid="$(ps -o pgid= -p "$SESSION_PID" 2>/dev/null | tr -d ' ')"; [ -n "$pgid" ] && kill -TERM -- "-$pgid" 2>/dev/null
       break
     fi
   done
   wait "$SESSION_PID" 2>/dev/null; RC=$?
-  [ "$TIMED_OUT" = 1 ] && RC=124
+  [ -n "$CAPPED" ] && RC=124
+  echo "    #$T context at exit: $(context_tokens "$LOG") tokens, $(( ( $(date +%s) - S0 ) / 60 )) min"
   cleanup_session "$SESSION_PID" "$S0"
   set -e
   DUR=$(( $(date +%s) - S0 ))
