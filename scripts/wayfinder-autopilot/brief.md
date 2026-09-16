@@ -70,9 +70,12 @@ properly, not skimmed:
 2. `impeccable shape` then `layout`, `typeset`, `clarify` for the surface;
    read `craft-floor.md`; read the stored critique of the nearest shipped
    surface (`.impeccable/critique/`) and the resolution's Action Summary.
-   **Read `scripts/wayfinder-autopilot/lessons.md` in full** — it is what
-   every earlier first pass missed. Each lesson that applies to this surface
-   becomes a line in the spec now; the pre-flight (step 3) cites it.
+   **Read both lessons files in full** (paths are given in the system
+   prompt line after this brief): the generic one is what every earlier
+   first pass missed in any project; the project one is what this codebase
+   in particular trips on (shell, tokens, seed data, dev-server recipe).
+   Each lesson that applies to this surface becomes a line in the spec now;
+   the pre-flight (step 3) cites it.
 3. **Pre-flight against the scorecards.** Before building, walk the ten
    `critique` heuristics and the `evaluate` heuristics against the spec and
    write one line each: what in the spec earns a 4 / a 0-issue. A heuristic
@@ -88,12 +91,15 @@ ticket's pre-build learns from it. Then work the remaining findings in
 batches (build fully, inspect once at both widths, fix everything shown,
 confirm once) until the bar above is met, and record the after-counts.
 
-- **Write the lessons back.** At close, append to
-  `scripts/wayfinder-autopilot/lessons.md` one line per correction the fix
-  loop made that the pre-build should have caught (heuristic, what was
-  missed, what to do at spec time). Merge with an existing line when it is
-  the same lesson. Commit it with the ticket. A session whose first pass met
-  the bar still records what nearly slipped.
+- **Write the lessons back — to the right file.** At close, append one line
+  per correction the fix loop made that the pre-build should have caught
+  (heuristic, what was missed, what to do at spec time). A lesson that would
+  hold in any product goes to the **generic** file; one that only holds in
+  this codebase goes to the **project** file. Merge with an existing line
+  when it is the same lesson, and keep each file under ~80 lines — the files
+  are read whole every session, so they stay short by generalising, not by
+  forgetting. Commit the project file with the ticket. A session whose first
+  pass met the bar still records what nearly slipped.
 - Findings with a real decision behind them become a Wayfinder ticket named
   on the close, with the score they cost. A finding without a decision is
   fixed, never parked.
@@ -109,8 +115,8 @@ confirm once) until the bar above is met, and record the after-counts.
 
 ## Report (mandatory, every session)
 
-Before ending, write `docs/wayfinder-reports/<map>/<ticket>.md` (create the
-folder if needed) and include it in your commit if you made one; if the
+Before ending, write the report at the path the system prompt gives (create
+the folder if needed) and include it in your commit if you made one; if the
 session made no code change, commit the report alone
 (`docs(wayfinder): autopilot report for #<ticket>`). Format:
 

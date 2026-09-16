@@ -14,9 +14,17 @@
 # agent is told so; widen ALLOWED_TOOLS if a ticket legitimately needs more.
 set -euo pipefail
 
-REPO=petrose99/docubite
-ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-BRIEF="$ROOT/scripts/wayfinder-autopilot/brief.md"
+# Portable: this folder can live anywhere (a repo's scripts/, or ~/.claude/wayfinder-autopilot).
+# The project is whatever git repo you run it from; the tracker repo comes from gh.
+AP="$(cd "$(dirname "$0")" && pwd)"                       # driver, brief, generic lessons
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"  # the project being worked
+REPO="${WAYFINDER_REPO:-$(gh repo view --json nameWithOwner --jq .nameWithOwner)}"
+BRIEF="$AP/brief.md"
+GENERIC_LESSONS="$AP/lessons.md"                           # travels with the tool
+PROJECT_LESSONS="$ROOT/.claude/wayfinder-autopilot/lessons.md"   # stays with the repo
+mkdir -p "$(dirname "$PROJECT_LESSONS")"
+[ -f "$PROJECT_LESSONS" ] || printf '# Project lessons — %s\n\nWhat first passes missed *in this codebase* (its shell, tokens, components, seed data, dev-server recipe). Generic, product-agnostic lessons go to the tool'"'"'s own lessons.md instead.\n\n' "$REPO" > "$PROJECT_LESSONS"
+export WAYFINDER_GENERIC_LESSONS="$GENERIC_LESSONS" WAYFINDER_PROJECT_LESSONS="$PROJECT_LESSONS"
 ALLOWED_TOOLS=(
   "Bash(gh:*)" "Bash(git:*)" "Bash(npm:*)" "Bash(npx:*)" "Bash(pnpm:*)"
   "Bash(node:*)" "Bash(impeccable:*)" "Bash(ls:*)" "Bash(cat:*)" "Bash(grep:*)"
@@ -135,8 +143,10 @@ while [ "$n" -lt "$MAX" ]; do
   # Each session gets its own process group (setsid) so everything it spawns —
   # dev server, headless Chromium, node workers, subagents — can be torn down
   # together when the ticket is done, and the next session starts clean.
+  # The brief is generic; the session learns the two lessons paths from this line.
   ( cd "$ROOT" && setsid claude -p "/wayfinder $MAP $T" \
       --append-system-prompt-file "$BRIEF" \
+      --append-system-prompt "Lessons files for this run — generic (every project): $GENERIC_LESSONS · project-specific (this repo): $PROJECT_LESSONS. Reports go to $OUT/<ticket>.md." \
       --permission-mode acceptEdits \
       --allowedTools "${ALLOWED_TOOLS[@]}" \
       --disallowedTools AskUserQuestion \

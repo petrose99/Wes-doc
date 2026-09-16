@@ -4,6 +4,22 @@ Works a Wayfinder map unattended: one fresh Claude session per frontier
 ticket, answering grilling questions with the `➡️` recommendation, writing a
 report per ticket, tearing down each session's processes before the next.
 
+## Install once, use in any project
+
+The folder is self-contained. Copy it somewhere global and run it from
+inside whichever repo has the map:
+
+```bash
+cp -r scripts/wayfinder-autopilot ~/.claude/wayfinder-autopilot
+cd ~/some-other-project && ~/.claude/wayfinder-autopilot/run.sh <map> --detach
+```
+
+The tracker repo comes from `gh repo view` (override with `WAYFINDER_REPO=owner/name`).
+Each project gets `.claude/wayfinder-autopilot/lessons.md` for codebase-specific
+lessons; the generic lessons live next to the driver and travel with it.
+Allow the driver in that project's `.claude/settings.local.json`:
+`Bash(~/.claude/wayfinder-autopilot/run.sh:*)`.
+
 ## Run
 
 ```bash
@@ -27,6 +43,10 @@ so the driver passes it as the `-p` prompt, which counts as a user invocation.
   sub-issue order), per-session `setsid claude -p "/wayfinder <map> <ticket>"`,
   process-group teardown + stray dev-server/Chromium sweep, run log, retry of
   `Autopilot: partial —` tickets (3 attempts), claim release on failure.
+- `lessons.md` — generic lessons (any product): what earlier first passes
+  missed → what to put in the spec. Read whole each session, appended at
+  close, capped ~80 lines by merging. The project's own
+  `.claude/wayfinder-autopilot/lessons.md` holds codebase-specific ones.
 - `brief.md` — appended system prompt: standing delegation (take the
   recommended answer, never AskUserQuestion, never remove a feature without
   owner sign-off), one ticket per session, build → score → improve on
