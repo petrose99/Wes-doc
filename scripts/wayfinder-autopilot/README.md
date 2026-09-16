@@ -34,6 +34,8 @@ scripts/wayfinder-autopilot/stop.sh <map>                     # stop cleanly: ru
 Watch: `tail -f docs/wayfinder-reports/<map>/detached.out`.
 Stop: `kill <driver pid>` (current ticket finishes, nothing new starts).
 
+Hard tickets: once a ticket has `HARD_AFTER` run-log rows (default 3) every further session runs on `MODEL_HARD` at `EFFORT_HARD` (per-project `config.sh`), skipping the cheap first pass. The driver reads these once at start — restart it at a session boundary to apply a change.
+
 Needs `.claude/settings.local.json` to allow `Bash(scripts/wayfinder-autopilot/run.sh:*)`
 if Claude itself is to launch it; `/wayfinder` is `disable-model-invocation`,
 so the driver passes it as the `-p` prompt, which counts as a user invocation.
