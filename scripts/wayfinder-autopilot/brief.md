@@ -120,6 +120,33 @@ run in the foreground (`run_in_background: false`) and read on return. Code
 is written by this session. Never end a turn "waiting"; if you cannot
 continue, commit WIP, post the partial hand-off and end.
 
+**Build tickets run in three phases, each a fresh session.** The driver
+reads the phase off the hand-off file's `milestone:` line and tells you
+which one this session is, at the end of this brief: **spec** (pre-build,
+pre-flight, critic; no dev server) → **build** (the surface from the
+tables; no capture) → **close** (capture, scoring, fix batch, checks, close).
+Do only your phase. A phase ends by writing the hand-off with its exit line
+(`milestone: spec-done` / `milestone: build-done`), committing, and
+stopping — the next phase starts fresh from that file, which is why the
+hand-off must carry every pointer the next session needs (spec path,
+pre-flight path, what is built, what is verified). Do not "just start" the
+next phase because there is context left: the next session's fresh context
+is the saving.
+
+**Every turn calls a tool.** A turn that is only text re-reads the whole
+context for nothing; in #252's first attempt one turn in four was narration.
+Do not announce what you are about to do — do it. Put independent tool calls
+in the same turn. The only text-only turn is the last one, after the report
+is written and the ticket is closed or handed off.
+
+**One contact sheet per round, not one image per state.** After a capture
+round, tile the round's PNGs into one sheet with
+`node scripts/wayfinder-autopilot/contact-sheet.mjs <png-dir> --out <sheet.png>`
+(copy it beside the scratch Playwright first, as with the capture runner)
+and read that once. Open a full-size PNG only for a state the detector or
+the critic flagged, at most eight per round. #252 read 133 images; each
+one stays in context for every later turn.
+
 **The bill is turns × context. Spend both on purpose.** Every turn re-reads
 the whole context; a session at 200K context pays 200K per tool call. Map
 #226's data: build sessions cost 130–220M context tokens, a grilling 7M; #252
@@ -157,9 +184,13 @@ need for the critique's design-specificity judgement. Everything else stays on
 disk, referenced by filename. Never re-read an image you have already seen
 unless the code under it changed.
 
-**Tests: affected until the close, full once.** During build and fix batches
-run only the test files that touch what you changed (`vitest <paths>` or
-`--changed`). The full suite and `next build` run exactly once, at the close.
+**Tests, typecheck, lint: affected until the close, full once.** During
+build and fix batches run only the test files that touch what you changed
+(`vitest <paths>` or `--changed`); the detector hook and those tests are the
+per-edit checks. `tsc --noEmit` runs once at the end of the build phase and
+once at the close; `eslint`, the full suite and `next build` run exactly once,
+at the close, with the dev server stopped first (this box cannot run them
+beside it — #252 lost an hour swapping).
 
 **Keep the map an index.** When you append to *Decisions so far*, your entry is
 one line: the ticket's linked title and a gist of ≤ 25 words — the detail is

@@ -149,11 +149,38 @@ progress_mark() {   # a fingerprint of "did this session move the work": HEAD + 
 }
 # MODEL_EXEC_FIRST (optional, per-project): execution tickets start on this
 # model; a ticket left "Autopilot: partial —" is retried on MODEL_STRONG.
-model_for() {   # $1 ticket, $2 attempt number (1-based)
+# Phased builds. A rendered-surface build ("Build …" task ticket) runs as
+# three sessions, each a fresh context that starts from the hand-off file:
+#   spec  → intent + impeccable pre-build, pre-flight A–E, spec critic; no dev server
+#   build → the surface from the tables, contract checks, WIP commit; no capture
+#   close → capture, critique/evaluate/include, fix batch, confirm, tests, close
+# The cost of a session is quadratic in its length (every turn re-reads the
+# context), so three short sessions cost a fraction of one long one — #252
+# ran 747 turns/221M tokens in one session; its continuation from a hand-off
+# took 262/38M. The phase is read off the hand-off file's `milestone:` lines,
+# so the runner keeps no state and a re-run resumes where the file says.
+PHASED_TITLE_RE="${PHASED_TITLE_RE:-^Build }"
+phase_of() {   # $1 ticket → "" (single session) | spec | build | close
+  local labels; labels="$(gh api "repos/$REPO/issues/$1" --jq '[.labels[].name]|join(",")')"
+  [[ "$labels" == *wayfinder:task* ]] && [[ "$(title "$1")" =~ $PHASED_TITLE_RE ]] || { echo ""; return; }
+  local h="$OUT/$1.handoff.md"
+  if [ -f "$h" ] && grep -q '^milestone: build-done' "$h"; then echo close
+  elif [ -f "$h" ] && grep -q '^milestone: spec-done' "$h"; then echo build
+  else echo spec; fi
+}
+declare -A PHASE_RUNS=()   # "ticket:phase" → sessions already spent on that phase
+model_for() {   # $1 ticket, $2 attempt number (1-based), $3 phase
   [ -n "${WAYFINDER_MODEL:-}" ] && { echo "$WAYFINDER_MODEL"; return; }
-  local labels title attempt="${2:-1}"
+  local labels title attempt="${2:-1}" phase="${3:-}"
   labels="$(gh api "repos/$REPO/issues/$1" --jq '[.labels[].name]|join(",")')"
   title="$(title "$1")"
+  if [ -n "$phase" ]; then
+    # spec is judgement → strong. build and close are execution from the
+    # tables → the exec model for their first session; a second session on
+    # the same phase (cap, no close) → strong.
+    if [ "$phase" = spec ] || [ "${PHASE_RUNS[$1:$phase]:-0}" -ge 1 ] || [ -z "${MODEL_EXEC_FIRST:-}" ]; then echo "$MODEL_STRONG"; else echo "$MODEL_EXEC_FIRST"; fi
+    return
+  fi
   # A continuation (a hand-off file exists from an earlier session) always runs
   # on the strong model: the cheap first pass has had its turn.
   [ -f "$OUT/$1.handoff.md" ] && { echo "$MODEL_STRONG"; return; }
@@ -169,9 +196,11 @@ model_for() {   # $1 ticket, $2 attempt number (1-based)
 state()  { gh api "repos/$REPO/issues/$1" --jq .state; }
 title()  { gh api "repos/$REPO/issues/$1" --jq .title; }
 
-n=0
+n=0; NEXT_T=""
 while [ "$n" -lt "$MAX" ]; do
-  if [ -n "$ONLY" ]; then
+  if [ -n "$NEXT_T" ]; then
+    T="$NEXT_T"; NEXT_T=""
+  elif [ -n "$ONLY" ]; then
     [ "$n" -gt 0 ] && break
     T="$ONLY"
   else
@@ -180,8 +209,9 @@ while [ "$n" -lt "$MAX" ]; do
   fi
   n=$((n+1))
   TT="$(title "$T")"
-  MODEL="$(model_for "$T" $(( ${ATTEMPTS[$T]:-0} + 1 )))"
-  echo "=== [$n/$MAX] #$T — $TT  [${MODEL:-default model}${EFFORT:+ · $EFFORT}]"
+  PHASE="$(phase_of "$T")"
+  MODEL="$(model_for "$T" $(( ${ATTEMPTS[$T]:-0} + 1 )) "$PHASE")"
+  echo "=== [$n/$MAX] #$T — $TT  [${MODEL:-default model}${EFFORT:+ · $EFFORT}${PHASE:+ · phase: $PHASE}]"
   if [ "$DRY" = 1 ]; then SKIP[$T]=1; continue; fi
 
   # Start each session on a clean box: if a dev server or headless browser is
@@ -203,6 +233,17 @@ while [ "$n" -lt "$MAX" ]; do
   RUN_BRIEF="$LOGS/brief-$T.md"
   MARK0="$(progress_mark "$T")"
   CONT=""; [ -f "$OUT/$T.handoff.md" ] && CONT="**This is a continuation session.** A previous session worked this ticket and did not close it. Read the hand-off file first and continue from the milestone it names; do not restart, re-spec or re-measure what it records as done."
+  case "$PHASE" in
+    spec)  CONT="$CONT
+
+**This session's phase: SPEC** (1 of 3). Do the pre-build only — the \`intent\` and \`impeccable\` pre-build pass, \`preflight.md\` parts A–E filled, the spec critic run and its gate met. Write the spec and the filled pre-flight to the ticket's scratch folder. No dev server, no browser, no product code. End by writing the hand-off file with the line \`milestone: spec-done\`, committing (\`wip(autopilot): #$T spec\`), and stopping. The build is the next session's, in a fresh context." ;;
+    build) CONT="$CONT
+
+**This session's phase: BUILD** (2 of 3). Read the hand-off, the spec and the filled pre-flight; build the whole surface from the tables, every state; run the Part B contract checks and the affected tests; run \`tsc --noEmit\` once at the end of the phase. No capture, no critique, no evaluate — measuring is the next session's, in a fresh context. End by writing the hand-off with what is built and where, the line \`milestone: build-done\`, committing (\`wip(autopilot): #$T build\`), and stopping." ;;
+    close) CONT="$CONT
+
+**This session's phase: CLOSE** (3 of 3). Read the hand-off. Seed, dev server, one capture round; critique, evaluate and include on that set; the fix batch; the confirming round; then once each: affected tests → full suite → \`tsc --noEmit\` → \`eslint\` → \`next build\` (dev server stopped first). Report, lessons with their \`check:\`, close at the bar. If the bar is not reached, update the hand-off, post \`Autopilot: continue —\`, commit, stop." ;;
+  esac
   { cat "$BRIEF"; printf '\n\n## Paths for this run\n\n- Generic lessons (every project): `%s`\n- Project lessons (this repo): `%s`\n- Report: `%s/%s.md`\n- Hand-off file (keep it current at every milestone): `%s/%s.handoff.md`\n- Scratch folder for captures and the filled preflight: `%s/scratch-%s/`\n\n%s\n' "$GENERIC_LESSONS" "$PROJECT_LESSONS" "$OUT" "$T" "$OUT" "$T" "$LOGS" "$T" "$CONT"; } > "$RUN_BRIEF"
   # Memory: the whole session (claude + dev server + headless browser + node
   # workers) runs inside one cgroup scope with a hard ceiling, so the kernel
@@ -281,9 +322,17 @@ PY
   DUR=$(( $(date +%s) - S0 ))
 
   ATTEMPTS[$T]=$(( ${ATTEMPTS[$T]:-0} + 1 ))
+  [ -n "$PHASE" ] && PHASE_RUNS[$T:$PHASE]=$(( ${PHASE_RUNS[$T:$PHASE]:-0} + 1 ))
   if [ "$(state "$T")" = "closed" ]; then
     OUTCOME=resolved
+  elif [ -n "$PHASE" ] && [ "$(phase_of "$T")" != "$PHASE" ]; then
+    # The phase's exit milestone is on the hand-off: same ticket, next phase,
+    # fresh context. Keep the claim; commit anything the session left.
+    ( cd "$ROOT" && git add -A -- . ':!.scratch' ':!.impeccable/live' ":!docs/wayfinder-reports/$MAP/logs" && git commit -q -m "wip(autopilot): #$T $PHASE phase done" ) 2>/dev/null || true
+    ATTEMPTS[$T]=0; NEXT_T="$T"
+    OUTCOME="phase $PHASE done → $(phase_of "$T") next"
   else
+    [ -n "$PHASE" ] && NEXT_T="$T"   # a phased ticket is continued next, not re-queued behind the frontier
     # A session that moved the work (new commit or hand-off change) does not
     # count against MAX_ATTEMPTS: the ticket is continued for as long as it
     # keeps progressing. Only consecutive no-progress sessions exhaust it.
@@ -299,7 +348,7 @@ PY
     if [[ "$last" == "Autopilot: partial"* || "$last" == "Autopilot: continue"* ]] && [ "${ATTEMPTS[$T]}" -lt "$MAX_ATTEMPTS" ]; then
       OUTCOME="continued ($PROG), session ${ATTEMPTS[$T]}/$MAX_ATTEMPTS without progress allowed"
     else
-      OUTCOME="not closed (rc=$RC, $PROG) — $MAX_ATTEMPTS sessions without progress, parked"; SKIP[$T]=1
+      OUTCOME="not closed (rc=$RC, $PROG) — $MAX_ATTEMPTS sessions without progress, parked"; SKIP[$T]=1; NEXT_T=""
     fi
     # release the claim so the retry (or a human) can take it
     gh issue edit "$T" --repo "$REPO" --remove-assignee "$ME" >/dev/null 2>&1 || true
