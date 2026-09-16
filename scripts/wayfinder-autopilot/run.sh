@@ -121,6 +121,14 @@ while [ "$n" -lt "$MAX" ]; do
   echo "=== [$n/$MAX] #$T — $TT"
   if [ "$DRY" = 1 ]; then SKIP[$T]=1; continue; fi
 
+  # Start each session on a clean box: if a dev server or headless browser is
+  # still running from before this run (or a previous run), stop it first.
+  # The VPS's memwatch alerts under 20% available RAM, and a stale next-server
+  # alone can hold 4 GB.
+  for p in $(pgrep -f 'next dev|next-server|chrome|chromium|playwright' 2>/dev/null); do
+    [ "$p" = "$$" ] || kill -TERM "$p" 2>/dev/null
+  done
+  sleep 2
   START=$(date -u +%Y-%m-%dT%H:%M:%SZ); S0=$(date +%s)
   LOG="$LOGS/$(date -u +%Y%m%dT%H%M%SZ)-$T.jsonl"
   set +e
