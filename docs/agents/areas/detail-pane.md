@@ -34,6 +34,11 @@ inside each queue's standalone `[documentId]?full=1` route.
   layout-control radiogroup, tab strip (Details · Note · Approval · Audit · Checks — order per
   queue), `useRegisterDocumentActions` (calls `PaneDocumentContext.setDoc`).
   `stage-indicator.tsx` renders the status band under the header.
+- **Status vocabulary (#258)**: one word per state everywhere — `StatePill`s in rows, the pane's
+  `status-line.tsx`, the stepper words and the Approval tab (built from the audit log) all derive
+  from `processingState()`; never hand-write a status label (`row-cells`, `status-line`,
+  `history-tabs` tests pin this). The Save review button is `#save-review-submit`
+  (`components/pipeline/document-detail/split-pane.tsx`).
 - `components/queue/queue-screen.tsx`: `rowName`/`paneStatus`/`fullHref`/`onMutated` props feed the
   frame; callers migrated to this shape (invoices, payments/batches, receipts, purchase-orders,
   approvals/invoices, approvals/po-mismatches, exceptions, library).
@@ -72,3 +77,10 @@ round never actually got the dialog to render and treated the gap as "just needs
 the second round proved it was a real bug). Tab order in the header: name → ↑ → ↓ → ⋯ → Close/Back;
 at a list boundary the disabled button is skipped, so Tab #1 landing on the next enabled control is
 correct, not a defect. Esc inside the ⋯ menu returns focus to the ⋯ trigger.
+**Reload-focus contract (#258)**: `onMutated("changed")` bumps `DetailPane`'s `reloadKey`, which
+tears the content down through the loading skeleton and rebuilds it — any focused control inside is
+destroyed. `pendingReloadFocus` re-focuses `#save-review-submit` (else the pane heading) once
+`state === "ready"`; a new mutating control inside the pane needs a stable id and a line there, and
+the round's keyboard probe must assert `activeElement` is a `BUTTON`, not a `DIV`. Capture-tooling
+note: `capture-round.mjs` parks the mouse at the right edge before each snap — Playwright's default
+`(0,0)` sits on the collapsed rail and hover-expands it over the content (a false P0 on #258).
