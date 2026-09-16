@@ -7,3 +7,14 @@
 === [2/50] #259 — Build the folded Detail pane header: one header + Status line, stepper as the single second band, Archive/Flag/Delete in ⋯, source strip, ?full=1 on the same frame  [opus[1m] · low · phase: spec]
     #259 context at exit: 112562 tokens, 7 min
     cleaned up session pid 1070825 (pgid ?); free: 5923 MB
+    scoreboard: 29 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #259: phase spec done → build next in 454s
+=== [3/50] #259 — Build the folded Detail pane header: one header + Status line, stepper as the single second band, Archive/Flag/Delete in ⋯, source strip, ?full=1 on the same frame  [sonnet · low · phase: build]
+    #259 crossed the hand-off line (169711 tokens ≥ 150000) — asked to hand off; hard stop at 180000
+    #259 hit the context cap (182618 tokens ≥ 180000) — saving WIP and handing off
+    #259 context at exit: 182618 tokens, 5 min
+    cleaned up session pid 1079671 (pgid ?); free: 5405 MB
+    scoreboard: 30 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #259: phase build done → spec next in 305s
+=== [4/50] #259 — Build the folded Detail pane header: one header + Status line, stepper as the single second band, Archive/Flag/Delete in ⋯, source strip, ?full=1 on the same frame  [opus[1m] · low · phase: spec]
+    #259 crossed the hand-off line (151177 tokens ≥ 150000) — asked to hand off; hard stop at 180000
