@@ -107,6 +107,24 @@ of them opens its own browser. Re-capture only after code changes (the next fix
 batch), never because a second skill wants to look. Two rounds per fix batch
 at most: first pass, and confirm.
 
+**Look at pixels only where something is flagged.** Screenshots enter your
+context as images at ~1–1.5K tokens each; #252 read 66 of them. Per round,
+read the detector JSON first; open a PNG only for a state the detector or the
+critic flagged, or for the one representative screen per component type you
+need for the critique's design-specificity judgement. Everything else stays on
+disk, referenced by filename. Never re-read an image you have already seen
+unless the code under it changed.
+
+**Tests: affected until the close, full once.** During build and fix batches
+run only the test files that touch what you changed (`vitest <paths>` or
+`--changed`). The full suite and `next build` run exactly once, at the close.
+
+**Keep the map an index.** When you append to *Decisions so far*, your entry is
+one line: the ticket's linked title and a gist of ≤ 25 words — the detail is
+already on the ticket. If any existing entry runs past one line, compact it the
+same way while you are there (title link + gist; nothing is lost, the ticket
+holds it). Every session loads the whole map; a long one taxes all of them.
+
 **Then score the new UI — and the gap between predicted and measured is the
 KPI.** The report shows reconciled prediction vs first pass vs close, per
 heuristic, for both scorecards (`preflight.md` Part G). Every heuristic where

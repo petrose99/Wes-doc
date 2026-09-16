@@ -83,6 +83,9 @@ frontier() {
     --jq '.[] | select(.state=="open" and .assignee==null) | .number' |
   while read -r n; do
     [ -n "${SKIP[$n]:-}" ] && continue
+    # Tickets only the owner can close (sign-offs on removals) are never taken:
+    # a session would spend its start-up just to post "blocked". Left for the human.
+    if [[ "$(title "$n")" =~ ^(Owner sign-off|Sign off|Sign-off) ]]; then SKIP[$n]=1; continue; fi
     open_blockers="$(gh api graphql -f query="{ repository(owner:\"${REPO%/*}\",name:\"${REPO#*/}\") { issue(number:$n) { blockedBy(first:50){ nodes{ state } } } } }" \
       --jq '[.data.repository.issue.blockedBy.nodes[] | select(.state=="OPEN")] | length')"
     [ "$open_blockers" = "0" ] && echo "$n"
