@@ -28,6 +28,7 @@ scripts/wayfinder-autopilot/run.sh <map> --max 1              # one ticket, chec
 scripts/wayfinder-autopilot/run.sh <map> --detach             # whole frontier, survives the terminal
 scripts/wayfinder-autopilot/run.sh <map> --ticket 251         # one named ticket
 scripts/wayfinder-autopilot/run.sh <map> --detach --after-pid <pid>   # queue behind a running session
+scripts/wayfinder-autopilot/stop.sh <map>                     # stop cleanly: runner, session, WIP commit, hand-off; resume with run.sh
 ```
 
 Watch: `tail -f docs/wayfinder-reports/<map>/detached.out`.
