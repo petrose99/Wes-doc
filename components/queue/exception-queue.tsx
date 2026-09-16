@@ -3,11 +3,10 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { AlertTriangle, ChevronDown, ExternalLink, Loader2 } from "lucide-react"
+import { AlertTriangle, ChevronDown, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { QueueScreen, type QueueColumn, type SortOption } from "@/components/queue/queue-screen"
-import { PaneMenuItem } from "@/components/queue/detail-pane"
 import { formatDate, TitleCell } from "@/components/queue/row-cells"
 import { DueDateCountdownBadge } from "@/components/documents/countdown-badge"
 import { ReasonDialog } from "@/components/list-screen/reason-dialog-button"
@@ -96,8 +95,9 @@ export function ExceptionQueue({ workspaceId, basePath, documentBasePath, except
       rows={exceptions}
       rowId={(row) => row.id}
       detailIdFor={(row) => row.documentId}
-      rowTitle={(row) => row.vendor ?? row.filename}
-      rowSubtitle={(row) => row.message}
+      rowName={(row) => ({ title: row.vendor ?? row.filename, suffix: row.message })}
+      // A row here is one escalated check, so the pane's full mode is the *document's* route (#259).
+      fullHref={(row) => `${documentBasePath}/${row.documentId}?full=1`}
       leading={() => <AlertTriangle className="h-4 w-4 text-amber-700" aria-hidden />}
       columns={columns}
       sortOptions={SORTS}
@@ -122,10 +122,7 @@ export function ExceptionQueue({ workspaceId, basePath, documentBasePath, except
             </button>)}
           </PopoverContent>
         </Popover>
-      </>}
-      paneMenu={(row) => <PaneMenuItem onClick={() => window.open(`${documentBasePath}/${row.documentId}`, "_blank", "noopener")}>
-        <ExternalLink className="mr-2 h-4 w-4 text-slate-500" aria-hidden />Open document in a new tab
-      </PaneMenuItem>} />
+      </>} />
 
     <ReasonDialog open={resolving !== null} onClose={() => setResolving(null)}
       action={async (formData) => {

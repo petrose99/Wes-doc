@@ -2,7 +2,6 @@
 
 import { useState, type ReactNode } from "react"
 import { toast } from "sonner"
-import { ExternalLink } from "lucide-react"
 import { QueueScreen, type QueueColumn, type SortOption } from "@/components/queue/queue-screen"
 import type { FieldTable } from "@/lib/configuration/field-table"
 import { PaneMenuItem } from "@/components/queue/detail-pane"
@@ -63,6 +62,12 @@ export function ReceiptQueue({ workspaceId, basePath, receipts, minConfidencePer
     return { id, type: "Receipt", vendor: receipt?.merchant ?? null, number: receipt?.receiptNumber ?? null, amount: receipt?.total ?? null, currencyCode: receipt?.currencyCode ?? null, dateLabel: "Date", date: receipt?.purchaseDate ?? null }
   }
 
+  // One State rendering for the column and the pane header's Status line (#259).
+  const statePills = (receipt: ReceiptRow) => <StatePills minConfidencePercent={minConfidencePercent}
+    needsAttention={receipt.blockedByCheck || needsAttention.has(receipt.documentId)} openCheckCodes={receipt.openCheckCodes}
+    inReview={!!receipt.reviewTaskOpenedAt} touchless={receipt.touchless} approved={receipt.status === "reviewed"}
+    trailing={<ReviewSlaCountdownBadge openedAt={receipt.reviewTaskOpenedAt} slaHours={DEFAULT_REVIEW_SLA_HOURS} />} />
+
   const columns: QueueColumn<ReceiptRow>[] = [
     {
       key: "merchant", label: "Merchant", narrow: true, className: "min-w-[12rem]", fieldKey: "merchant",
@@ -83,10 +88,7 @@ export function ReceiptQueue({ workspaceId, basePath, receipts, minConfidencePer
     },
     {
       key: "state", label: "State",
-      render: (receipt) => <StatePills minConfidencePercent={minConfidencePercent}
-        needsAttention={receipt.blockedByCheck || needsAttention.has(receipt.documentId)} openCheckCodes={receipt.openCheckCodes}
-        inReview={!!receipt.reviewTaskOpenedAt} touchless={receipt.touchless} approved={receipt.status === "reviewed"}
-        trailing={<ReviewSlaCountdownBadge openedAt={receipt.reviewTaskOpenedAt} slaHours={DEFAULT_REVIEW_SLA_HOURS} />} />,
+      render: statePills,
     },
     { key: "claim", label: "Claim", render: (receipt) => <ClaimPill status={receipt.claimStatus} /> },
   ]
@@ -103,8 +105,8 @@ export function ReceiptQueue({ workspaceId, basePath, receipts, minConfidencePer
     basePath={basePath}
     rows={receipts}
     rowId={(receipt) => receipt.documentId}
-    rowTitle={(receipt) => receipt.merchant ?? "Unknown merchant"}
-    rowSubtitle={(receipt) => [receipt.receiptNumber, receipt.total !== null ? formatMoney(receipt.total, receipt.currencyCode) : null].filter(Boolean).join(" · ") || receipt.filename}
+    rowName={(receipt) => ({ title: receipt.merchant ?? "Unknown merchant", suffix: [receipt.receiptNumber, receipt.total !== null ? formatMoney(receipt.total, receipt.currencyCode) : null].filter(Boolean).join(" · ") || receipt.filename })}
+    paneStatus={statePills}
     // #223: same five-state processing glyph as Invoices on the leading edge.
     leading={(receipt) => <ProcessingStateGlyph
       state={processingState({ approvalStatus: receipt.approvalStatus, blockedByCheck: receipt.blockedByCheck, escalated: receipt.escalated, touchless: receipt.touchless, status: receipt.status })}
@@ -127,9 +129,6 @@ export function ReceiptQueue({ workspaceId, basePath, receipts, minConfidencePer
     paneActions={(receipt, { refresh }) => <DocumentPaneActions workspaceId={workspaceId} documentId={receipt.documentId} noun="receipt"
       status={receipt.status} openReviewTaskId={receipt.openReviewTaskId} onDone={refresh} />}
     paneMenu={(receipt) => <>
-      <PaneMenuItem onClick={() => window.open(`${basePath}/${receipt.documentId}?full=1`, "_blank", "noopener")}>
-        <ExternalLink className="mr-2 h-4 w-4 text-slate-500" aria-hidden />Open in a new tab
-      </PaneMenuItem>
       {!receipt.claimId && <PaneMenuItem onClick={() => { window.location.href = `${basePath}?mode=claims` }}>Create expense claim…</PaneMenuItem>}
     </>} />
 }

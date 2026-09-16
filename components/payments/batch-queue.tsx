@@ -122,8 +122,7 @@ export function PaymentBatchQueue({ workspaceId, basePath, rows: serverRows, fal
       basePath={basePath}
       rows={rows}
       rowId={(batch) => batch.id}
-      rowTitle={(batch) => batch.name}
-      rowSubtitle={(batch) => `${BATCH_VIEW_LABEL[batch.view]} · ${batch.billCount} bill${batch.billCount === 1 ? "" : "s"} · ${money(batch.total, batch.currencyCode)}`}
+      rowName={(batch) => ({ title: batch.name, suffix: `${BATCH_VIEW_LABEL[batch.view]} · ${batch.billCount} bill${batch.billCount === 1 ? "" : "s"} · ${money(batch.total, batch.currencyCode)}` })}
       columns={columns}
       sortOptions={SORTS}
       facets={BATCH_FACETS}

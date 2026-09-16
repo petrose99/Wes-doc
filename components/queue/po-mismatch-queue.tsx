@@ -3,10 +3,8 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { ExternalLink } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { QueueScreen, type QueueColumn, type SortOption } from "@/components/queue/queue-screen"
-import { PaneMenuItem } from "@/components/queue/detail-pane"
 import { formatMoney, TitleCell } from "@/components/queue/row-cells"
 import { ReasonDialog } from "@/components/list-screen/reason-dialog-button"
 import type { Facet } from "@/components/queue/facet-filters"
@@ -82,8 +80,7 @@ export function PoMismatchQueue({ workspaceId, basePath, rows, invoiceCount, ini
       basePath={basePath}
       rows={rows}
       rowId={(row) => row.documentId}
-      rowTitle={(row) => row.supplier ?? "Unknown supplier"}
-      rowSubtitle={(row) => [row.invoiceNumber, `${formatMoney(row.variance, row.currencyCode)} variance`].filter(Boolean).join(" · ") || null}
+      rowName={(row) => ({ title: row.supplier ?? "Unknown supplier", suffix: [row.invoiceNumber, `${formatMoney(row.variance, row.currencyCode)} variance`].filter(Boolean).join(" · ") || null })}
       leading={(row) => <ProcessingStateGlyph state={processingState({ approvalStatus: "in_progress", blockedByCheck: row.eligibility.status !== "ready", escalated: false, touchless: false, status: "needs_review" })} />}
       columns={columns}
       sortOptions={SORTS}
@@ -110,10 +107,7 @@ export function PoMismatchQueue({ workspaceId, basePath, rows, invoiceCount, ini
           <Button type="button" size="sm" variant="outline" disabled={rejectDisabled} onClick={() => setRejecting(row)}>Reject</Button>
           <Button type="button" size="sm" disabled={approveDisabled} onClick={() => setOverriding(row)}>Approve</Button>
         </>
-      }}
-      paneMenu={(row) => <PaneMenuItem onClick={() => window.open(`${basePath}/${row.documentId}?full=1`, "_blank", "noopener")}>
-        <ExternalLink className="mr-2 h-4 w-4 text-slate-500" aria-hidden />Open in a new tab
-      </PaneMenuItem>} />
+      }} />
 
     {/* Decision #3/#11: Approving a PO Mismatch is an override — it always needs a reason. */}
     <ReasonDialog open={overriding !== null} onClose={() => setOverriding(null)}

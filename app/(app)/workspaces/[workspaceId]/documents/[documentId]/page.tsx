@@ -1,5 +1,7 @@
 import { saveDocumentReviewAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
 import { SplitPane } from "@/components/pipeline/document-detail/split-pane"
+import { PaneFrame } from "@/components/queue/detail-pane"
+import { readOrigin } from "@/lib/navigation/origin"
 import type { DocumentHistory } from "@/components/queue/history-tabs"
 import { FxConversionBadge } from "@/components/documents/fx-conversion-badge"
 import { MatchPanel } from "@/components/bank-match/match-panel"
@@ -20,11 +22,10 @@ import { buildFieldRationales, type FieldRationale } from "@/lib/rationale"
 import { fieldsFromCheckDetail, type FieldCheck } from "@/components/pipeline/document-detail/check-types"
 import type { CheckStatus } from "@/lib/checks/types"
 import { documentBlocksKey, readDocumentBlocks } from "@/lib/document-storage"
-import { parseStageAlias, type PipelineStage } from "@/lib/documents/stages"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { listBankMatches } from "@/models/bank-matches"
 import { listDocumentAuditEvents } from "@/models/audit-events"
-import { getWorkspaceDocument, listWorkspaceDocuments } from "@/models/documents"
+import { getWorkspaceDocument } from "@/models/documents"
 import { getFewShotExamples } from "@/models/field-corrections"
 import { getOpenReviewTaskForDocument } from "@/models/review-tasks"
 import { listWorkspaceInstitutions } from "@/models/institutions"
@@ -35,8 +36,10 @@ import { documentDestinationPath } from "@/lib/typed-destinations"
 import { notFound, redirect } from "next/navigation"
 
 /** The pipeline's split-pane document detail: source viewer on the left, tabbed
- * Details/Note/History on the right, provenance-aware field-click highlighting, and prev/next
- * navigation through whatever filtered stage list the reader arrived from (?stage=).
+ * Details/Note/History on the right, provenance-aware field-click highlighting. Rendered inside a
+ * Queue screen's Detail pane (`embedded`), or standalone under `?full=1` — the pane's *Open in a
+ * new tab* — inside the same `PaneFrame` header the pane uses, so the document has one header
+ * implementation everywhere (#259). Legacy `?stage=` / `?page=` deep links land on the queue.
  *
  * Deliberately NOT under the (chrome) route group — that layout's `max-w-4xl` reading-column cap
  * is right for settings pages but leaves no room for a source viewer next to the form. Same URL
@@ -44,7 +47,7 @@ import { notFound, redirect } from "next/navigation"
  * layout, so it gets the workspace shell's full-bleed width instead. */
 export async function DocumentDetailPage({ params, searchParams, embedded = false, history = null, initialTab }: {
   params: Promise<{ workspaceId: string; documentId: string }>
-  searchParams: Promise<{ stage?: string; page?: string; bb?: string }>
+  searchParams: Promise<{ stage?: string; page?: string; bb?: string; from?: string; full?: string }>
   /** #225: rendered inside a Queue screen's Detail pane (see `getQueueDetailAction`). */
   embedded?: boolean
   history?: DocumentHistory | null
@@ -53,22 +56,20 @@ export async function DocumentDetailPage({ params, searchParams, embedded = fals
   initialTab?: "details" | "note" | "activity" | "approval" | "checks"
 }) {
   const { workspaceId, documentId } = await params
-  const { stage: stageParam, page: pageParam, bb: bbParam } = await searchParams
+  const query = await searchParams
+  const { page: pageParam, bb: bbParam } = query
   const user = await getCurrentUser()
   const membership = await requireWorkspaceRole(workspaceId, user.id)
   const document = await getWorkspaceDocument(workspaceId, documentId)
   if (!document) notFound()
 
-  const stage: PipelineStage | null = parseStageAlias(stageParam)
-
   const capabilities = await getWorkspaceCapabilities(workspaceId)
   const canPush = document.status === "reviewed" && capabilities.has("accounting-push")
     && capabilities.pushableTemplateCodes.includes(document.template?.code ?? "")
-  const [, pushes, auditEvents, neighbors, paymentStatuses] = await Promise.all([
+  const [, pushes, auditEvents, paymentStatuses] = await Promise.all([
     canPush ? listWorkspaceIntegrationConnections(workspaceId) : Promise.resolve([]),
     canPush ? listWorkspaceIntegrationPushes(workspaceId, documentId) : Promise.resolve([]),
     listDocumentAuditEvents(workspaceId, documentId),
-    stage ? listWorkspaceDocuments(workspaceId, { stage }) : Promise.resolve([]),
     canPush ? getDocumentPaymentStatuses(workspaceId, [documentId]) : Promise.resolve(new Map()),
   ])
 
@@ -188,20 +189,11 @@ export async function DocumentDetailPage({ params, searchParams, embedded = fals
   const bbox = bboxParts && bboxParts.length === 4 && bboxParts.every((n) => Number.isFinite(n) && n >= 0 && n <= 1) ? (bboxParts as [number, number, number, number]) : null
   const initialTarget = Number.isFinite(pageNumber) ? { page: pageNumber, bbox, quote: "" } : null
 
-  const neighborIndex = neighbors.findIndex((doc) => doc.id === documentId)
-  const stageQuery = stage ? `?stage=${stage}` : ""
-  const prevHref = stage && neighborIndex > 0 ? `/workspaces/${workspaceId}/documents/${neighbors[neighborIndex - 1].id}${stageQuery}` : null
-  const nextHref = stage && neighborIndex >= 0 && neighborIndex < neighbors.length - 1 ? `/workspaces/${workspaceId}/documents/${neighbors[neighborIndex + 1].id}${stageQuery}` : null
-  // #249: `/pipeline` has had no nav entry since #238 — falling back to it here and on the Back
-  // link below stranded the reader on an orphaned surface. The typed destination (#178's own
-  // redirect target below) is where every document actually lives now.
+  // Full mode's *Back to queue*: the origin surface when the link carried one (#244), else the
+  // queue this document lives on (#249: never the nav-less `/pipeline`) — the typed destination
+  // without its trailing row id, so Back lands on the list, not on the pane again.
   const typedDestinationHref = documentDestinationPath(`/workspaces/${workspaceId}`, document)
-  // Where a stage-changing action (Archive / Move to Ready) sends the reader next: the following
-  // document in the same filtered queue if there is one, otherwise back to the list — mirroring
-  // the "advance to the next item" behavior of a review queue, rather than stranding them on a
-  // document that no longer belongs on the tab they were just working through.
-  const afterActionHref = nextHref ?? typedDestinationHref
-  const position = stage && neighborIndex >= 0 ? { index: neighborIndex + 1, total: neighbors.length } : null
+  const queueHref = readOrigin(query) ?? typedDestinationHref.slice(0, typedDestinationHref.lastIndexOf("/"))
 
   // Five-step lifecycle indicator. Derived server-side so the client SplitPane doesn't have to
   // pull in review-task / integration-push readers. `checks` uses readinessStatus (added by the
@@ -267,7 +259,7 @@ export async function DocumentDetailPage({ params, searchParams, embedded = fals
     ]
   })()
 
-  return <SplitPane
+  const splitPane = <SplitPane
     workspaceId={workspaceId}
     source={{ documentId: document.id, filename: document.filename, mimeType: document.mimeType }}
     fields={fields}
@@ -282,15 +274,12 @@ export async function DocumentDetailPage({ params, searchParams, embedded = fals
     documentType={(codingData.documentType === "expense" || codingData.documentType === "sale" || codingData.documentType === "bank_statement") ? codingData.documentType : null}
     note={document.note ?? ""}
     auditEvents={auditEvents.map((event) => ({ ...event, createdAt: event.createdAt.toISOString() }))}
-    prevHref={prevHref}
-    nextHref={nextHref}
-    position={position}
-    stage={stage}
-    afterActionHref={afterActionHref}
-    backHref={typedDestinationHref}
     header={{
       filename: document.filename, documentId: document.id, fileId: document.fileId, status: document.status,
       flagged: document.flaggedAt !== null,
+      archived: document.archivedAt !== null,
+      cancelled: document.cancelledAt !== null,
+      cancelledReason: document.cancelledReason ?? null,
       // #236: /review is retired — the same open ReviewTask is now viewed from the Approvals
       // destination's Detail pane (its Approval tab reads "No approval steps yet" gracefully for
       // a workflow-less task, since most ReviewTasks aren't Approvals at all — decision #1).
@@ -334,10 +323,19 @@ export async function DocumentDetailPage({ params, searchParams, embedded = fals
     institutions={institutions}
     institutionId={document.institutionId}
     institutionName={institutionName}
-    embedded={embedded}
     history={history}
     initialTab={initialTab}
   />
+  if (embedded) return splitPane
+
+  // #259 full mode = read + secondary actions: the same header and ⋯ as the pane (minus *Open in
+  // a new tab*), no 1-of-N or ↑/↓, and no decision footer — Approve/Reject stays on the queue,
+  // where #227 put it.
+  const invoiceNumber = typeof data.invoice_number === "string" ? data.invoice_number.trim() : ""
+  const name = supplier
+    ? { title: supplier, suffix: invoiceNumber || document.filename }
+    : { title: document.filename, suffix: invoiceNumber || null }
+  return <PaneFrame mode="full" name={name} backHref={queueHref}>{splitPane}</PaneFrame>
 }
 
 export default async function LegacyDocumentPage({ params, searchParams }: {

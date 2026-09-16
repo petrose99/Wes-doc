@@ -119,8 +119,7 @@ export function BillPayQueue({ workspaceId, basePath, rows, summary, payerAccoun
       basePath={basePath}
       rows={rows}
       rowId={(row) => row.bill.documentId}
-      rowTitle={(row) => row.bill.supplier ?? "Unknown supplier"}
-      rowSubtitle={(row) => [row.bill.invoiceNumber, row.amountToPay !== null ? money(row.amountToPay, row.bill.currencyCode) : null, row.bill.dueDate ? `due ${formatPaymentDate(row.bill.dueDate)}` : null].filter(Boolean).join(" · ")}
+      rowName={(row) => ({ title: row.bill.supplier ?? "Unknown supplier", suffix: [row.bill.invoiceNumber, row.amountToPay !== null ? money(row.amountToPay, row.bill.currencyCode) : null, row.bill.dueDate ? `due ${formatPaymentDate(row.bill.dueDate)}` : null].filter(Boolean).join(" · ") })}
       columns={columns}
       selectable
       sortOptions={SORTS}

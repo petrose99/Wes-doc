@@ -19,10 +19,8 @@ import { SourceViewer, type ProvenanceTarget, type SourceDocument } from "@/comp
 import type { DocumentFieldDefinition } from "@/lib/document-templates"
 import type { Ref } from "@/lib/provenance"
 import type { FieldRationale } from "@/lib/rationale"
-import { Archive, ArrowDown, ArrowLeft, ArrowUp, Building2, CheckCircle2, ChevronLeft, ChevronRight, Flag, Loader2, Maximize2, Minimize2, PanelLeftClose, PanelLeftOpen } from "lucide-react"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { useRef, useState, type ReactNode } from "react"
+import { Building2, CheckCircle2, ExternalLink, Loader2 } from "lucide-react"
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react"
 import { toast } from "sonner"
 
 type Tab = "details" | "note" | "activity" | "approval" | "checks"
@@ -42,7 +40,7 @@ const DOC_TYPE_LABELS: Record<"expense" | "sale" | "bank_statement" | "other", s
 
 export function SplitPane({
   workspaceId, source, fields, data, fieldConfidence, provenanceFields, provenanceItems, initialTarget, conflictingLabels, missingRequiredFields,
-  saveReview, documentType: initialDocumentType, note: initialNote, auditEvents, prevHref, nextHref, position, stage, afterActionHref, backHref,
+  saveReview, documentType: initialDocumentType, note: initialNote, auditEvents,
   header, canPush, pushCard, canCreateRule, defaultSupplier, matchKind, bankMatches, documentMatches, paymentStatus, rationales, checks, fxBadge, stageIndicator,
   institutions, institutionId, institutionName, history, po = null, initialTab,
 }: {
@@ -60,15 +58,9 @@ export function SplitPane({
   documentType: "expense" | "sale" | "bank_statement" | null
   note: string
   auditEvents: Array<{ id: string; label: string; createdAt: string; actorName: string | null }>
-  prevHref: string | null
-  nextHref: string | null
-  position: { index: number; total: number } | null
-  stage: PipelineStage | "archive" | null
-  afterActionHref: string
-  /** #249: where "Back" (standalone/`!embedded` mode only) returns to — this document's typed
-   * destination (`documentDestinationPath`), not the nav-less `/pipeline` route. */
-  backHref: string
-  header: { filename: string; documentId: string; fileId: string; status: string; flagged: boolean; reviewLink: { href: string; label: string } | null }
+  /** What the frame around this pane needs to carry its ⋯ (#259): identity, flag/archive/cancel
+   * state and the open review task's link. */
+  header: { filename: string; documentId: string; fileId: string; status: string; flagged: boolean; archived: boolean; cancelled: boolean; cancelledReason: string | null; reviewLink: { href: string; label: string } | null }
   canPush: boolean
   pushCard: ReactNode
   canCreateRule: boolean
@@ -101,7 +93,6 @@ export function SplitPane({
    * to "checks". Undefined keeps the historic "details" default for every other queue. */
   initialTab?: Tab
 }) {
-  const router = useRouter()
   const [tab, setTab] = useState<Tab>(initialTab ?? "details")
   const [target, setTarget] = useState<ProvenanceTarget | null>(initialTarget)
   const [note, setNote] = useState(initialNote)
@@ -183,6 +174,12 @@ export function SplitPane({
     className={`h-7 rounded-[5px] px-2.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 ${layout === value ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"}`}>
     {label}
   </button>
+
+  // #236: "extracted fields are read-only while a stage is pending" (decision #6) — derived from
+  // the same `history.pendingStages` the Approval tab already renders, so it applies wherever a
+  // workflow is mid-run, with no new prop for a caller to remember to pass. Full mode (#259)
+  // carries no `history`, so it never locks — it has no decision bar to lock underneath.
+  const fieldsReadOnly = !!history && history.pendingStages.length > 0
 
   return <div className="flex h-full min-h-0 flex-col overflow-hidden bg-white">
     {/* The one band under the pane header: Extracted → Checks → Approval → Sync → Pay. The frame

@@ -3,7 +3,7 @@
 import { useState, useTransition, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { ExternalLink, Loader2 } from "lucide-react"
+import { Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog } from "@/components/ui/dialog"
 import { QueueScreen, type QueueColumn, type SortOption } from "@/components/queue/queue-screen"
@@ -105,8 +105,7 @@ export function ApprovalInvoiceQueue({ workspaceId, basePath, rows, poMismatchCo
       basePath={basePath}
       rows={rows}
       rowId={(row) => row.documentId}
-      rowTitle={(row) => row.supplier ?? "Unknown supplier"}
-      rowSubtitle={(row) => [row.invoiceNumber, row.total !== null ? formatMoney(row.total, row.currencyCode) : null].filter(Boolean).join(" · ") || null}
+      rowName={(row) => ({ title: row.supplier ?? "Unknown supplier", suffix: [row.invoiceNumber, row.total !== null ? formatMoney(row.total, row.currencyCode) : null].filter(Boolean).join(" · ") || null })}
       leading={(row) => <ProcessingStateGlyph state={processingState({ approvalStatus: "in_progress", blockedByCheck: row.eligibility.status !== "ready", escalated: false, touchless: false, status: "needs_review" })} />}
       columns={columns}
       sortOptions={SORTS}
@@ -141,9 +140,6 @@ export function ApprovalInvoiceQueue({ workspaceId, basePath, rows, poMismatchCo
         </>
       }}
       paneMenu={(row) => <>
-        <PaneMenuItem onClick={() => window.open(`${basePath}/${row.documentId}?full=1`, "_blank", "noopener")}>
-          <ExternalLink className="mr-2 h-4 w-4 text-slate-500" aria-hidden />Open in a new tab
-        </PaneMenuItem>
         <PaneMenuItem tone="amber" disabled={!online || !row.canDecide} onClick={() => setSendingBack(row)}>
           Send back for review…
         </PaneMenuItem>

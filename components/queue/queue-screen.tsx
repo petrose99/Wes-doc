@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { ArrowUpDown, Download, MoreHorizontal, ShieldAlert, ShieldCheck } from "lucide-react"
 import { toast } from "sonner"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { DetailPane, DETAIL_PANE_ID } from "@/components/queue/detail-pane"
+import { DetailPane, DETAIL_PANE_ID, type PaneName } from "@/components/queue/detail-pane"
 import { FacetFilters, type Facet } from "@/components/queue/facet-filters"
 import { OverrideModeProvider, useOverrideMode } from "@/components/queue/override-mode-context"
 import { confirmLeave } from "@/lib/client/unsaved-changes"
@@ -51,8 +51,16 @@ export type QueueScreenProps<T> = {
   /** The document a row's Detail pane shows. Defaults to `rowId` — Exceptions differ, since a
    * row there is one escalated check, not one document. */
   detailIdFor?: (row: T) => string
-  rowTitle: (row: T) => string
-  rowSubtitle?: (row: T) => string | null
+  /** The row's name as the Detail pane header shows it (#259): `title` is who/what, `suffix` the
+   * number · amount. The row's `aria-label` and its checkbox label are built from the same pair. */
+  rowName: (row: T) => PaneName
+  /** The pane header's Status line (#259): the row's state pills. Comes from the row, not the
+   * loaded content, so it never skeletons. Omit it (Payment Batches) and the line is gone. */
+  paneStatus?: (row: T) => ReactNode
+  /** Where the ⋯'s *Open in a new tab* goes. Defaults to `${basePath}/${detailId}?full=1`. */
+  fullHref?: (row: T) => string
+  /** Archive/Unarchive toast copy for queues with a Closed facet ("Archived — now under Closed"). */
+  archivedToast?: { archived: string; unarchived: string }
   /** The processing-state mark at the row's leading edge (CONTEXT.md "Processing state"). */
   leading?: (row: T) => ReactNode
   columns: QueueColumn<T>[]
@@ -88,7 +96,7 @@ export type QueueScreenProps<T> = {
 const INTERACTIVE = "a, button, input, select, textarea, label, [role=button], [contenteditable=true]"
 
 function QueueScreenInner<T>({
-  title, basePath, rows, rowId, detailIdFor, rowTitle, rowSubtitle, leading, columns: rawColumns, fieldTable = null, selectable = false, sortOptions = [], facets = [],
+  title, basePath, rows, rowId, detailIdFor, rowName, paneStatus, fullHref, archivedToast, leading, columns: rawColumns, fieldTable = null, selectable = false, sortOptions = [], facets = [],
   views, stat, band, menu, onExportAll, bulkActions, empty, loadDetail, paneActions, paneMenu, initialSelectedId = null, sortParam = "sort",
 }: QueueScreenProps<T>) {
   const router = useRouter()
@@ -171,7 +179,7 @@ function QueueScreenInner<T>({
     if (!openId) return
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null
-      if (target?.closest("input, textarea, select, [contenteditable=true], [role=dialog], [role=alertdialog], [role=listbox], [role=menu]")) return
+      if (target?.closest("input, textarea, select, [contenteditable=true], [role=dialog], [role=alertdialog], [role=listbox], [role=menu], [role=radiogroup]")) return
       // A modal is open somewhere on the page: its own Escape wins, the queue stays put (#251).
       if (document.querySelector("[role=dialog][aria-modal=true], [role=alertdialog][aria-modal=true]")) return
       if (event.key === "ArrowDown") { event.preventDefault(); step(1) }
@@ -300,14 +308,14 @@ function QueueScreenInner<T>({
                     if (isOpen) close(); else open(id)
                   }}>
                   {selectable && <td className="px-3 py-0">
-                    <input type="checkbox" aria-label={`Select ${rowTitle(row)}`} checked={isChecked} onChange={() => toggleChecked(id)} className="h-4 w-4 rounded border-slate-300 accent-emerald-700" />
+                    <input type="checkbox" aria-label={`Select ${rowName(row).title}`} checked={isChecked} onChange={() => toggleChecked(id)} className="h-4 w-4 rounded border-slate-300 accent-emerald-700" />
                   </td>}
                   {leading && <td className="px-1 py-0">{leading(row)}</td>}
                   {visibleColumns.map((column, columnIndex) => <td key={column.key} className={`px-3 py-0 ${column.className ?? ""} ${isOpen && columnIndex === 0 ? "relative before:absolute before:inset-y-2 before:-left-px before:w-[3px] before:rounded-full before:bg-emerald-700" : ""}`}>
                     {columnIndex === 0
                       ? <button type="button" ref={(el) => { if (el) triggerRefs.current.set(id, el); else triggerRefs.current.delete(id) }}
                         aria-expanded={isOpen} aria-controls={DETAIL_PANE_ID}
-                        aria-label={[rowTitle(row), rowSubtitle?.(row)].filter(Boolean).join(" · ")}
+                        aria-label={[rowName(row).title, rowName(row).suffix].filter(Boolean).join(" · ")}
                         onClick={() => (isOpen ? close() : open(id))}
                         className="block w-full min-w-0 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2">
                         {column.render(row)}
@@ -322,8 +330,11 @@ function QueueScreenInner<T>({
 
       {openRow && <DetailPane
         documentId={(detailIdFor ?? rowId)(openRow)}
-        title={rowTitle(openRow)}
-        subtitle={rowSubtitle?.(openRow) ?? null}
+        name={rowName(openRow)}
+        status={paneStatus?.(openRow)}
+        fullHref={fullHref ? fullHref(openRow) : `${basePath}/${(detailIdFor ?? rowId)(openRow)}?full=1`}
+        archivedToast={archivedToast}
+        onMutated={(kind) => { if (kind === "removed") { close(); router.refresh() } else refresh() }}
         position={{ index: openIndex + 1, total: sortedRows.length }}
         onClose={close}
         onPrev={openIndex > 0 ? () => step(-1) : null}

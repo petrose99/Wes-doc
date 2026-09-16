@@ -2,10 +2,9 @@
 
 import { useState, type ReactNode } from "react"
 import { toast } from "sonner"
-import { AlertTriangle, CheckCircle2, ExternalLink, Loader2, Search } from "lucide-react"
+import { AlertTriangle, CheckCircle2, Loader2, Search } from "lucide-react"
 import type { FieldTable } from "@/lib/configuration/field-table"
 import { QueueScreen, type QueueColumn, type SortOption } from "@/components/queue/queue-screen"
-import { PaneMenuItem } from "@/components/queue/detail-pane"
 import { DocumentBulkActions, DocumentPaneActions } from "@/components/queue/document-actions"
 import { formatDate, formatMoney, TitleCell } from "@/components/queue/row-cells"
 import type { Facet } from "@/components/queue/facet-filters"
@@ -145,8 +144,11 @@ export function DocumentQueue({ workspaceId, basePath, title, noun, itemType, ro
     basePath={basePath}
     rows={rows}
     rowId={(row) => row.id}
-    rowTitle={(row) => row.supplier ?? row.institution ?? row.filename}
-    rowSubtitle={(row) => purchaseOrders && row.po ? [row.po.poNumber, row.po.invoiceCount ? `${row.po.invoiceCount} invoice${row.po.invoiceCount === 1 ? "" : "s"}` : null, row.po.fullyInvoiced ? "Fully invoiced" : null].filter(Boolean).join(" · ") || row.filename : row.supplier || row.institution ? row.filename : null}
+    rowName={(row) => ({
+      title: row.supplier ?? row.institution ?? row.filename,
+      suffix: purchaseOrders && row.po ? [row.po.poNumber, row.po.invoiceCount ? `${row.po.invoiceCount} invoice${row.po.invoiceCount === 1 ? "" : "s"}` : null, row.po.fullyInvoiced ? "Fully invoiced" : null].filter(Boolean).join(" · ") || row.filename : row.supplier || row.institution ? row.filename : null,
+    })}
+    archivedToast={{ archived: "Archived — now under Closed", unarchived: "Unarchived — back in Open" }}
     leading={(row) => <StateGlyph status={row.status} />}
     columns={columns}
     fieldTable={fieldTable}
@@ -163,8 +165,5 @@ export function DocumentQueue({ workspaceId, basePath, title, noun, itemType, ro
       workspaceId={workspaceId} noun={noun} selectedIds={selectedIds} clear={clear} toRecord={toRecord}
       eligibleIds={selectedIds.filter((id) => byId.get(id)?.status !== "failed" && byId.get(id)?.status !== "queued")} exportFilename={`${noun.replaceAll(" ", "-")}s.csv`}
       onHeldBack={(heldBack, approved) => setNeedsAttention((prev) => { const next = new Set(prev); for (const id of heldBack) next.add(id); for (const id of approved) next.delete(id); return next })} />}
-    paneActions={(row, { refresh }) => <DocumentPaneActions workspaceId={workspaceId} documentId={row.id} noun={noun} status={row.status} openReviewTaskId={null} onDone={refresh} />}
-    paneMenu={(row) => <PaneMenuItem onClick={() => window.open(`${basePath}/${row.id}?full=1`, "_blank", "noopener")}>
-      <ExternalLink className="mr-2 h-4 w-4 text-slate-500" aria-hidden />Open in a new tab
-    </PaneMenuItem>} />
+    paneActions={(row, { refresh }) => <DocumentPaneActions workspaceId={workspaceId} documentId={row.id} noun={noun} status={row.status} openReviewTaskId={null} onDone={refresh} />} />
 }

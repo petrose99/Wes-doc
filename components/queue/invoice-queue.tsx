@@ -3,7 +3,6 @@
 import { useState, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { ExternalLink } from "lucide-react"
 import { QueueScreen, type QueueColumn, type SortOption } from "@/components/queue/queue-screen"
 import type { FieldTable } from "@/lib/configuration/field-table"
 import { PaneMenuItem } from "@/components/queue/detail-pane"
@@ -99,6 +98,16 @@ export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercen
     return { id, type: "Invoice", vendor: bill?.supplier ?? null, number: bill?.invoiceNumber ?? null, amount: bill?.total ?? null, currencyCode: bill?.currencyCode ?? null, dateLabel: "Due", date: bill?.dueDate ?? null }
   }
 
+  // One State rendering for the column and the pane header's Status line (#259).
+  const statePills = (bill: BillRow) => <StatePills minConfidencePercent={minConfidencePercent}
+    cancelled={!!bill.cancelledAt} cancelledReason={bill.cancelledReason}
+    needsAttention={bill.blockedByCheck || needsAttention.has(bill.documentId) || bill.approvalStatus === "rejected"} openCheckCodes={bill.openCheckCodes}
+    inReview={bill.approvalStatus === "in_progress"} touchless={bill.touchless} approved={bill.status === "reviewed"}
+    // ADR 0001 (#251): the ledger fact is the derived paid state's own words — "Paid (recorded)"
+    // until the ledger confirms — and "synced" stays the ledger's word while unpaid.
+    ledger={bill.paidState.state !== "unpaid" ? bill.paidState.label : bill.paymentStatus}
+    trailing={<ReviewSlaCountdownBadge openedAt={bill.reviewTaskOpenedAt} slaHours={DEFAULT_REVIEW_SLA_HOURS} />} />
+
   const columns: QueueColumn<BillRow>[] = [
     {
       key: "supplier", label: "Supplier", narrow: true, className: "min-w-[12rem]", fieldKey: "vendor",
@@ -131,14 +140,7 @@ export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercen
     },
     {
       key: "state", label: "State",
-      render: (bill) => <StatePills minConfidencePercent={minConfidencePercent}
-        cancelled={!!bill.cancelledAt} cancelledReason={bill.cancelledReason}
-        needsAttention={bill.blockedByCheck || needsAttention.has(bill.documentId) || bill.approvalStatus === "rejected"} openCheckCodes={bill.openCheckCodes}
-        inReview={bill.approvalStatus === "in_progress"} touchless={bill.touchless} approved={bill.status === "reviewed"}
-        // ADR 0001 (#251): the ledger fact is the derived paid state's own words — "Paid (recorded)"
-        // until the ledger confirms — and "synced" stays the ledger's word while unpaid.
-        ledger={bill.paidState.state !== "unpaid" ? bill.paidState.label : bill.paymentStatus}
-        trailing={<ReviewSlaCountdownBadge openedAt={bill.reviewTaskOpenedAt} slaHours={DEFAULT_REVIEW_SLA_HOURS} />} />,
+      render: statePills,
     },
   ]
 
@@ -164,10 +166,11 @@ export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercen
       basePath={basePath}
       rows={bills}
       rowId={(bill) => bill.documentId}
-      rowTitle={(bill) => bill.supplier ?? "Unknown supplier"}
-      // #228 Q6: the PO folds into the card's second line below `md` (and the row's name), so a
+      // #228 Q6: the PO folds into the name's suffix (the card's second line below `md`), so a
       // phone reviewer hears the red count without the column.
-      rowSubtitle={(bill) => [bill.invoiceNumber, bill.total !== null ? formatMoney(bill.total, bill.currencyCode) : null, poSubtitle(bill)].filter(Boolean).join(" · ") || bill.filename}
+      rowName={(bill) => ({ title: bill.supplier ?? "Unknown supplier", suffix: [bill.invoiceNumber, bill.total !== null ? formatMoney(bill.total, bill.currencyCode) : null, poSubtitle(bill)].filter(Boolean).join(" · ") || bill.filename })}
+      paneStatus={statePills}
+      archivedToast={{ archived: "Archived — now under Closed", unarchived: "Unarchived — back in Open" }}
       // #223: the leading edge is the five-state processing glyph, not the aging bucket (aging lives
       // in the countdown badge's own text since #208).
       leading={(bill) => <ProcessingStateGlyph
@@ -200,9 +203,6 @@ export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercen
       paneMenu={(bill) => {
         const info = cancelInfo(bill)
         return <>
-          <PaneMenuItem onClick={() => window.open(`${basePath}/${bill.documentId}?full=1`, "_blank", "noopener")}>
-            <ExternalLink className="mr-2 h-4 w-4 text-slate-500" aria-hidden />Open in a new tab
-          </PaneMenuItem>
           {info && <PaneMenuItem tone="amber" disabled={!info.canCancel} hint={info.reason ?? undefined} onClick={() => setCancelling(bill)}>Cancel invoice…</PaneMenuItem>}
         </>
       }} />
