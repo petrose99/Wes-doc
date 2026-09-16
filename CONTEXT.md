@@ -13,7 +13,7 @@ A feature the product no longer shows or routes to, kept only so it can be broug
 _Avoid_: Hidden, deprecated, legacy
 
 **Core workflow destinations**:
-Invoices, Purchase Orders, Receipts, Bank Statements, Exceptions, Finance, and Search: the permission-filtered peer surfaces representing typed intake, escalated work, booked outcome, and cross-type lookup. The four typed intake destinations replace the former single "Documents" surface; there is no separate record of finished work — a finished document stays on its typed queue under Closed.
+Invoices, Purchase Orders, Receipts, Bank Statements, Exceptions, and Search: the permission-filtered peer surfaces representing typed intake, escalated work, and cross-type lookup. The booked outcome is not a surface: a document is posted from its own queue and stays there as a Posted row. The four typed intake destinations replace the former single "Documents" surface; there is no separate record of finished work — a finished document stays on its typed queue under Closed.
 _Avoid_: Archive (as a destination), Library, permanent record, Attachments
 
 **Search**:
@@ -21,7 +21,7 @@ The one cross-type lookup: a Queue screen whose rows are every document in the w
 _Avoid_: Docu Search, Ask AI, global search (as a user-facing name), scope
 
 **Closed**:
-The section of every queue's Status facet that holds the rows nothing more will happen to: Synced, Paid, Cancelled, Archived. The default view is Open — In review, Needs attention, Approved, Touchless — so a finished document is one chip away, never elsewhere. Closed is a facet section, not a processing state.
+The section of every queue's Status facet that holds the rows nothing more will happen to: Posted, Paid, Cancelled, Archived. The default view is Open — In review, Needs attention, Approved, Touchless — so a finished document is one chip away, never elsewhere. Closed is a facet section, not a processing state.
 _Avoid_: Done, History, Processed
 
 **Archive** (verb):
@@ -109,6 +109,22 @@ An Approval that is visible to its Approver but cannot be decided yet because a 
 The one email an Approver gets when Approvals reach a stage they can decide: every eligible Approval that reached them since their last notice, never more than one an hour, none when nothing is new, and nothing about their own actions. It names the supplier and amount and opens the row (or Ready to Approve, when there are several); it never decides anything. A still-undecided Approval is nudged at most twice more. The person who started a run gets the same kind of notice only when it is sent back for review. Each person can switch it off in one click.
 _Avoid_: Reminder (as the user-facing name), digest, alert, push, notification (as a badge count)
 
+**Post** (verb):
+Sending an approved document's reviewed data to the ledger as a bill, expense or bank transaction, from the queue the document is on — the bulk bar's Post, or Post to ledger for the open row. Only Invoices, Receipts and Bank Statements can be posted; a row is eligible once it is Approved, its category is confirmed, its currency is resolved, and it is not cancelled or already posted. Posting is a Server-confirmed action with a Partial outcome per row. Nothing un-posts: the ledger owns what it holds.
+_Avoid_: push, sync, send to the ledger, export (that is the CSV)
+
+**Posted**:
+The Ledger mark that a document's post reached the ledger, with the date it did. It is read from the post itself, never from the ledger's later payment sync, and it moves the row into Closed. A posted document that the ledger later confirms paid reads Paid instead.
+_Avoid_: Synced, Pushed, Transferred
+
+**Ledger mark**:
+The one mark beside a row's processing state that says where the document stands with the ledger: Posting… (the post is queued and retrying), Posted, Post failed (the post was refused for a reason the row can fix — the row then also reads Needs attention with that reason as an open check), or Paid. A ledger problem that is not the row's — the ledger is disconnected or has no default account — never marks rows; it is said once, above the queue, while posts are waiting.
+_Avoid_: ledger status, sync status, integration state
+
+**Finance**:
+The ledger connection's own page: whether the workspace is connected, when it last synced, its default account, and the way into the ledger. It holds no rows and no work — posting happens on the queues, paying in Bill Pay — and its contents belong to Admin › Integrations once that exists.
+_Avoid_: Accounting (the surface), the ledger (that is what Finance opens), push list
+
 **Bill Pay**:
 The queue of approved, unpaid invoices from which payment batches are created. An invoice reaches it only once its processing state is Approved; one that cannot be paid yet (no supplier bank details) stays visible with the reason. A row held by a pending or approved payment batch reads *Scheduled* — still on the queue, not batchable again until the batch is rejected or paid. Amount to pay defaults to the discounted total inside an open discount window, else what is still due; an operator may set a smaller amount (a partial payment) per row.
 _Avoid_: Payables, payment run (the queue), pay list
@@ -182,18 +198,18 @@ The user-facing progress and outcome for a workflow operation, shown inline wher
 A batch result in which individual items may succeed, need review, be skipped, be canceled, or fail. Partial outcomes remain visible per item rather than being collapsed into one batch-level success or failure.
 
 **Server-confirmed action**:
-An action whose durable or external effect is not treated as complete until the server confirms it, including approvals, ledger pushes, and other financial writes. Local optimistic feedback may precede confirmation only for reversible, low-risk changes.
+An action whose durable or external effect is not treated as complete until the server confirms it, including approvals, posts to the ledger, and other financial writes. Local optimistic feedback may precede confirmation only for reversible, low-risk changes.
 
 **Touchless**:
-A document whose extracted fields all met the workspace's confidence threshold and was pushed to the ledger without a human review step. Shown on a record as a fact once it has happened, not as a prediction or a pending state.
+A document whose extracted fields all met the workspace's confidence threshold and was posted to the ledger without a human review step. Shown on a record as a fact once it has happened, not as a prediction or a pending state.
 _Avoid_: Auto-approved, zero-touch
 
 **Processing state**:
-Where a queue row stands in the intake → review → approval path, shown as one mark at the row's leading edge. Exactly one of, in precedence order: Cancelled, Needs attention (a check blocked it, an escalation is open, or an approval was rejected), In review, Touchless, Approved. Ledger facts such as Synced or Paid are not processing states and are shown separately. Due-date urgency is not a processing state either. These five words are the only words the app uses for where a document stands — the row, the Detail pane's status line, the stepper and the Approval tab all say the same one, derived the same way. A document nobody has opened yet is In review.
+Where a queue row stands in the intake → review → approval path, shown as one mark at the row's leading edge. Exactly one of, in precedence order: Cancelled, Needs attention (a check blocked it, an escalation is open, or an approval was rejected), In review, Touchless, Approved. Ledger facts such as Posted or Paid are not processing states and are shown separately, as the Ledger mark. Due-date urgency is not a processing state either. These five words are the only words the app uses for where a document stands — the row, the Detail pane's status line, the stepper and the Approval tab all say the same one, derived the same way. A document nobody has opened yet is In review.
 _Avoid_: Status (the column of pills is broader), aging (that is the due-date signal), Unreviewed / Reviewed / Signed off / Awaiting approval (synonyms the surfaces used to invent), the stored status values (queued, needs review, ready for review, reviewed — persistence words, never shown)
 
 **Status line**:
-The one line at the top of the Detail pane that states the row's processing state and the fact behind it — who decided, when, or what is holding it: "Approved by Nadia K. · 12 Sep 2026", "In review · opened 3 days ago", "Needs attention · 2 open checks", "Touchless · sent automatically", "Cancelled · duplicate". Ledger facts follow as their own mark. It replaces the pane's separate status pill; the Approval tab holds the full trail behind it.
+The one line at the top of the Detail pane that states the row's processing state and the fact behind it — who decided, when, or what is holding it: "Approved by Nadia K. · 12 Sep 2026", "In review · opened 3 days ago", "Needs attention · 2 open checks", "Touchless · sent automatically", "Cancelled · duplicate". Ledger facts follow as their own mark ("Posted 12 Sep · Open in ledger"). It replaces the pane's separate status pill; the Approval tab holds the full trail behind it.
 _Avoid_: pane pill, status badge
 
 **Confidence threshold**:

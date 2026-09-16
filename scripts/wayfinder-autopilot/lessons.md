@@ -16,6 +16,12 @@ not written here will be relearned at full cost.
 - (docubite #250, H4 consistency) Deep-link hops lost their origin until `from=` was added to every one. → Every navigation the surface introduces carries origin context (`from=`) by construction; list them in the spec.
 - (docubite #251, H1/H4) First evaluate was 68 with four P1s: the same pattern — states and consequences designed in the fix loop. → Do steps 1–3 of the pre-build pass fully; loading the skills is not doing them.
 
+## Grilling (what a decision ticket must establish before its first round)
+
+- (docubite #248, H4 consistency) A fact word on the incumbent was derived from a different record than its name implied ("Synced" came from the push row, not the ledger sync). → Before deciding vocabulary, trace every fact word on the surface to the query that produces it; the word follows the record.
+- (docubite #248, H9 recovery) A surface deleted earlier left its feeders alive: a task type still created that nothing rendered, a component unmounted but present. → When a ticket replaces or shrinks a surface, grep for every producer of the rows it showed and every importer of its components; orphans go on the sign-off ticket by name.
+- (docubite #248, H5 error prevention) Row-level and system-level failures were one bucket on the incumbent (a connection outage would have marked every row). → Split failure classes in the spec: what the row can fix marks the row; what only an admin can fix is said once, above the list, while work waits.
+
 ## Build
 
 - (docubite #250) Three detector batches were needed because the first screenshots were only taken after the whole surface was built. → Screenshot each new component at 1440 and 390 as it lands, not only at the end; the hook catches static findings, the overlay catches layout ones.
