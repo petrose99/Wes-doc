@@ -1,6 +1,8 @@
 import { getCurrentUser } from "@/lib/auth"
 import { listWorkspaceBills, type BillRow } from "@/models/bills"
 import { getMinConfidencePercent } from "@/models/automation-config"
+import { listApprovalWorkflows } from "@/models/approval-workflows"
+import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { requireWorkspaceRole, type WorkspaceRole } from "@/models/workspaces"
 import { listSavedViews } from "@/models/saved-views"
 import { getSavedFieldTable } from "@/models/field-configs"
@@ -37,13 +39,18 @@ export async function InvoicesQueuePage({ params, searchParams, selectedDocument
   const agingFilter = new Set((aging ?? "").split(",").filter((value): value is AgingBucket | "none" => ["current", "1-30", "31-60", "61-90", "90+", "none"].includes(value)))
   const poFilter = po === "matched" || po === "none" || po === "mismatch" ? po : undefined
   const basePath = `/workspaces/${workspaceId}/invoices`
-  const [{ bills: allBills }, minConfidencePercent, savedViews, touchlessTrend, fieldTable] = await Promise.all([
+  const capabilities = await getWorkspaceCapabilities(workspaceId)
+  const workflowsEnabled = capabilities.has("approval-workflows")
+  const [{ bills: allBills }, minConfidencePercent, savedViews, touchlessTrend, fieldTable, approvalWorkflows] = await Promise.all([
     listWorkspaceBills({ workspaceId, onlyBlocked, onlyUnpaid, statusFilter, approvalFilter, onlyTouchless, poFilter }),
     getMinConfidencePercent(workspaceId),
     listSavedViews({ workspaceId, viewKey: "invoices", userId: user.id }),
     getTouchlessRateTrend(workspaceId),
     // #252: Admin › Configuration › Fields, when an owner has saved one for invoices.
     getSavedFieldTable(workspaceId, "invoice"),
+    // #236: "Start Approval" on the bulk-action bar needs the workspace's active workflows to
+    // offer a choice from — empty when the module is off, which hides the Approval ▾ control.
+    workflowsEnabled ? listApprovalWorkflows(workspaceId, { activeOnly: true }) : Promise.resolve([]),
   ])
   const bills = agingFilter.size === 0 ? allBills : allBills.filter((bill) => agingFilter.has(bill.agingBucket ?? "none"))
   const currentViewFilters: Record<string, string> = {
@@ -52,6 +59,7 @@ export async function InvoicesQueuePage({ params, searchParams, selectedDocument
     ...(approvalFilter ? { approval: approvalFilter } : {}), ...(agingFilter.size ? { aging: [...agingFilter].join(",") } : {}),
     ...(poFilter ? { po: poFilter } : {}),
   }
+
   const trend = touchlessTrend.trend ? `${touchlessTrend.trend.deltaPercentagePoints > 0 ? "+" : ""}${touchlessTrend.trend.deltaPercentagePoints}pt` : null
 
   return <InvoiceQueue
@@ -60,6 +68,7 @@ export async function InvoicesQueuePage({ params, searchParams, selectedDocument
     bills={bills}
     minConfidencePercent={minConfidencePercent}
     fieldTable={fieldTable}
+    availableWorkflows={approvalWorkflows.map((workflow) => ({ id: workflow.id, name: workflow.name, stageCount: workflow.stages.length }))}
     initialSelectedId={selectedDocumentId}
     stat={<QueueStat label="Touchless" value={`${Math.round(touchlessTrend.touchlessRate * 100)}%`}
       detail={`${touchlessTrend.totalPushedTouchless} of ${touchlessTrend.totalExtracted} sent without review, last 30 days${trend ? `, ${trend} vs. prior 30` : ""}`}

@@ -14,14 +14,13 @@ import { escalateCheckAction, setDocumentTypeAction } from "@/app/(app)/workspac
 import { InstitutionAssert } from "@/components/pipeline/document-detail/institution-assert"
 import { StatementDriftBanner } from "@/components/pipeline/document-detail/statement-drift-banner"
 import { ApprovalStepChain, AuditLog, ChecksTab, type DocumentHistory } from "@/components/queue/history-tabs"
-import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { SourceViewer, type ProvenanceTarget, type SourceDocument } from "@/components/viewer/source-preview"
 import type { DocumentFieldDefinition } from "@/lib/document-templates"
 import type { PipelineStage } from "@/lib/documents/stages"
 import type { Ref } from "@/lib/provenance"
 import type { FieldRationale } from "@/lib/rationale"
-import { Archive, ArrowDown, ArrowLeft, ArrowUp, Building2, CheckCircle2, ChevronLeft, ChevronRight, Eye, EyeOff, Flag, Loader2, Maximize2, Minimize2, PanelLeftClose, PanelLeftOpen } from "lucide-react"
+import { Archive, ArrowDown, ArrowLeft, ArrowUp, Building2, CheckCircle2, ChevronLeft, ChevronRight, Flag, Loader2, Maximize2, Minimize2, PanelLeftClose, PanelLeftOpen } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useRef, useState, type ReactNode } from "react"
@@ -43,9 +42,9 @@ const DOC_TYPE_LABELS: Record<"expense" | "sale" | "bank_statement" | "other", s
 
 export function SplitPane({
   workspaceId, source, fields, data, fieldConfidence, provenanceFields, provenanceItems, initialTarget, conflictingLabels, missingRequiredFields,
-  saveReview, documentType: initialDocumentType, note: initialNote, auditEvents, prevHref, nextHref, position, stage, afterActionHref,
+  saveReview, documentType: initialDocumentType, note: initialNote, auditEvents, prevHref, nextHref, position, stage, afterActionHref, backHref,
   header, canPush, pushCard, canCreateRule, defaultSupplier, matchKind, bankMatches, documentMatches, paymentStatus, rationales, checks, fxBadge, stageIndicator,
-  institutions, institutionId, institutionName, embedded = false, history, po = null,
+  institutions, institutionId, institutionName, embedded = false, history, po = null, initialTab,
 }: {
   workspaceId: string
   source: SourceDocument
@@ -66,6 +65,9 @@ export function SplitPane({
   position: { index: number; total: number } | null
   stage: PipelineStage | "archive" | null
   afterActionHref: string
+  /** #249: where "Back" (standalone/`!embedded` mode only) returns to — this document's typed
+   * destination (`documentDestinationPath`), not the nav-less `/pipeline` route. */
+  backHref: string
   header: { filename: string; documentId: string; fileId: string; status: string; flagged: boolean; reviewLink: { href: string; label: string } | null }
   canPush: boolean
   pushCard: ReactNode
@@ -99,9 +101,12 @@ export function SplitPane({
   /** #228 / #250: the invoice's Purchase Order link for the line-items section's View PO row and
    * Match manually. Null for every non-invoice document. */
   po?: LineItemsPoProps | null
+  /** #236: which tab this pane opens on — Approvals opens straight to "approval", PO Mismatches
+   * to "checks". Undefined keeps the historic "details" default for every other queue. */
+  initialTab?: Tab
 }) {
   const router = useRouter()
-  const [tab, setTab] = useState<Tab>("details")
+  const [tab, setTab] = useState<Tab>(initialTab ?? "details")
   const [target, setTarget] = useState<ProvenanceTarget | null>(initialTarget)
   const [note, setNote] = useState(initialNote)
   const [savingNote, setSavingNote] = useState(false)
@@ -219,13 +224,18 @@ export function SplitPane({
 
   const showSource = layout === "split" || layout === "source-only"
   const showDetails = layout === "split" || layout === "details-only"
+  // #236: "extracted fields are read-only while a stage is pending" (decision #6) — derived from
+  // the same `history.pendingStages` the Approval tab already renders, so it applies wherever a
+  // workflow is mid-run (Invoices' own Detail pane included, not just Approvals'), with no new
+  // prop for a caller to remember to pass.
+  const fieldsReadOnly = embedded && !!history && history.pendingStages.length > 0
 
   return <div className={`flex flex-col overflow-hidden ${embedded ? "h-full min-h-0 bg-white" : "h-screen bg-slate-50"}`}>
     {/* Top bar */}
     <div className={`flex items-center gap-2 border-b border-slate-200 px-4 py-2 ${embedded ? "overflow-x-auto sm:flex-wrap" : "flex-wrap"}`}>
       {embedded && <span className="min-w-0 flex-1 sm:hidden" aria-hidden />}
       {!embedded && <>
-        <Link href={stage ? `/workspaces/${workspaceId}/pipeline?stage=${stage}` : `/workspaces/${workspaceId}/pipeline`} className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-800">
+        <Link href={backHref} className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-800">
           <ArrowLeft className="h-4 w-4" />Back
         </Link>
         <div className="mx-2 h-5 w-px bg-slate-200" />
@@ -374,25 +384,33 @@ export function SplitPane({
               institutionName={institutionName ?? null}
             />}
 
+            {/* Decision #6: a stage is still pending on this invoice's Approval, so its extracted
+                fields are locked rather than editable underneath a decision in flight. */}
+            {fieldsReadOnly && <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              Fields are locked while an approval decision is pending on this invoice.
+            </p>}
+
             {/* Review form — A4.1 field navigation: land on the lowest-confidence field first,
                 Enter = confirm-and-advance. Non-array fields are what the nav visits; the array
                 editor has its own confidence signal and its own keyboard flow. */}
-            <FieldNavForm
-              saveReview={saveReview}
-              docType={docType}
-              formFields={formFields}
-              data={data}
-              fieldConfidence={fieldConfidence}
-              provenanceFields={provenanceFields}
-              provenanceItems={provenanceItems}
-              summaryFields={summaryFields}
-              rationales={rationales ?? null}
-              checks={checks ?? []}
-              workspaceId={workspaceId}
-              documentId={header.documentId}
-              setTarget={setTarget}
-              po={po}
-            />
+            <fieldset disabled={fieldsReadOnly} className="min-w-0">
+              <FieldNavForm
+                saveReview={saveReview}
+                docType={docType}
+                formFields={formFields}
+                data={data}
+                fieldConfidence={fieldConfidence}
+                provenanceFields={provenanceFields}
+                provenanceItems={provenanceItems}
+                summaryFields={summaryFields}
+                rationales={rationales ?? null}
+                checks={checks ?? []}
+                workspaceId={workspaceId}
+                documentId={header.documentId}
+                setTarget={setTarget}
+                po={po}
+              />
+            </fieldset>
 
             {fxBadge && <div className="pt-2">{fxBadge}</div>}
             {canPush && <div className="pt-2">{pushCard}</div>}
@@ -425,7 +443,7 @@ export function SplitPane({
           </div>}
 
           {tab === "checks" && history && <div className={`mx-auto p-6 ${layout === "details-only" ? "max-w-2xl" : ""}`}>
-            <ChecksTab workspaceId={workspaceId} gates={history.gates} />
+            <ChecksTab workspaceId={workspaceId} gates={history.gates} escalations={history.escalations} />
           </div>}
         </div>
       </div>}

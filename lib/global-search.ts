@@ -75,6 +75,10 @@ export type SearchResultItem = {
   bbox?: [number, number, number, number] | null
   snippet?: string | null
   score: number
+  /** #249: which typed destination this result opens on. Filled in by `runGlobalSearch` after
+   * fusing — the fusers here only see filename/values/snippet, not the document row. Null while
+   * unresolved (never actually rendered that way; the caller always fills it before returning). */
+  docType?: string | null
 }
 
 export function fuseSearchResults(

@@ -359,14 +359,28 @@ export type ReadyToPushDocument = {
   total: number
   currencyCode: string | null
   category: string
+  /** #249: lets a caller link the row to its typed destination instead of the nav-less
+   * `/pipeline` (see `lib/typed-destinations.ts`'s `documentDestinationPath`). */
+  docType: string | null
+}
+
+export type ReadyToPushResult = {
+  documents: ReadyToPushDocument[]
+  /** #249: how many otherwise-eligible approved documents were silently excluded for having no
+   * usable total — previously dropped with no trace, so a reader comparing this list against an
+   * "Approved" count shown elsewhere (the pipeline stage tally) saw fewer rows here with no
+   * explanation. Counted separately from the isPushableDocument/already-succeeded exclusions,
+   * which are expected and don't need surfacing. */
+  droppedCount: number
 }
 
 /** Documents on the "Ready" pipeline stage whose type is pushable to accounting and that don't
  * already have a succeeded push to `connectionId` — the Accounting page's "Ready to push" batch
  * list. A document with no usable total (normalizeBillFromDocument would refuse it, same check the
- * single-document push action already applies) is silently excluded: it can't be pushed either
- * way, so it doesn't belong on a "ready to push" list. */
-export async function listReadyToPushDocuments(workspaceId: string, connectionId: string): Promise<ReadyToPushDocument[]> {
+ * single-document push action already applies) is excluded: it can't be pushed either way, so it
+ * doesn't belong on a "ready to push" list — but the caller can still tell the reader how many
+ * were held back and why, via `droppedCount`. */
+export async function listReadyToPushDocuments(workspaceId: string, connectionId: string): Promise<ReadyToPushResult> {
   const [documents, pushes] = await Promise.all([
     listWorkspaceDocuments(workspaceId, { stage: "approved" }),
     listWorkspaceIntegrationPushes(workspaceId),
@@ -375,6 +389,7 @@ export async function listReadyToPushDocuments(workspaceId: string, connectionId
     pushes.filter((push) => push.connectionId === connectionId && push.status === "succeeded").map((push) => push.documentId)
   )
   const results: ReadyToPushDocument[] = []
+  let droppedCount = 0
   for (const doc of documents) {
     if (!isPushableDocument(doc) || succeededDocumentIds.has(doc.id)) continue
     const templateCode = doc.template?.code ?? null
@@ -383,12 +398,13 @@ export async function listReadyToPushDocuments(workspaceId: string, connectionId
       const bill = normalizeBillFromDocument({ documentId: doc.id, filename: doc.filename, templateCode, reviewedData })
       const coding = (doc.codingData as Record<string, unknown> | null) ?? {}
       const category = asScalarString(coding.account) ?? asScalarString(reviewedData.category) ?? "Uncategorized"
-      results.push({ id: doc.id, filename: doc.filename, vendorName: bill.vendorName, total: bill.total, currencyCode: bill.currencyCode, category })
+      results.push({ id: doc.id, filename: doc.filename, vendorName: bill.vendorName, total: bill.total, currencyCode: bill.currencyCode, category, docType: doc.docType ?? null })
     } catch {
       // no usable total — not push-ready
+      droppedCount += 1
     }
   }
-  return results
+  return { documents: results, droppedCount }
 }
 
 /** Which of the given documents currently have a queued/processing DocumentProcessingJob — what

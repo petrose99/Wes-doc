@@ -1,84 +1,10 @@
-import { ReviewInbox } from "@/components/workspace/review-inbox"
-import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
-import { listReviewTasks, parseReviewTaskStatus, type ReviewTaskStatus } from "@/models/review-tasks"
-import { summarizeDocumentForReview } from "@/models/documents"
-import { getWorkspaceMembers, getWorkspaceMode, requireWorkspaceRole } from "@/models/workspaces"
-import { getCurrentUser } from "@/lib/auth"
-import { notFound } from "next/navigation"
-import Link from "next/link"
+import { permanentRedirect } from "next/navigation"
 
 export const dynamic = "force-dynamic"
 
-const STATUS_TABS: { value: ReviewTaskStatus | "all"; label: string }[] = [
-  { value: "open", label: "Open" },
-  { value: "in_review", label: "In review" },
-  { value: "approved", label: "Approved" },
-  { value: "rejected", label: "Rejected" },
-  { value: "all", label: "All" },
-]
-
-/** The accounting review queue — a keyboard-driven split view (components/workspace/review-inbox.tsx):
- * a list on the left, the selected document's preview/fields/controls on the right. Status tabs
- * persist through the URL so a bookmark or a back button lands on the same view. */
-export default async function ReviewQueuePage({ params, searchParams }: {
-  params: Promise<{ workspaceId: string }>
-  searchParams: Promise<{ status?: string }>
-}) {
+/** #236 decision #1: /review is retired — Approvals › Invoices is its replacement, a 308 so any
+ * bookmark, link or search-engine index pointing at the old URL is corrected in place. */
+export default async function ReviewQueueRedirectPage({ params }: { params: Promise<{ workspaceId: string }> }) {
   const { workspaceId } = await params
-  const { status: statusParam } = await searchParams
-  const user = await getCurrentUser()
-  const membership = await requireWorkspaceRole(workspaceId, user.id)
-  const capabilities = await getWorkspaceCapabilities(workspaceId)
-  if (!capabilities.has("review-queue")) notFound()
-
-  const status = statusParam && statusParam !== "all" ? parseReviewTaskStatus(statusParam) ?? undefined : undefined
-  const [tasks, members, workspaceMode] = await Promise.all([
-    listReviewTasks(workspaceId, status ? { status } : {}),
-    getWorkspaceMembers(workspaceId),
-    getWorkspaceMode(workspaceId),
-  ])
-
-  return <main className="mx-auto w-full max-w-6xl space-y-6 p-6">
-    <header className="flex flex-wrap items-end justify-between gap-3">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Documents — Review queue</h1>
-        <p className="mt-1 text-sm text-slate-500">Documents that need a person to look at them before they&apos;re trusted. Part of the Review stage of your document lifecycle.</p>
-      </div>
-      <Link href={`/workspaces/${workspaceId}/pipeline?stage=review`} className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900">
-        ← Back to Documents
-      </Link>
-    </header>
-
-    <nav className="flex gap-1 border-b">
-      {STATUS_TABS.map((tab) => {
-        const active = (statusParam ?? "open") === tab.value
-        return <Link key={tab.value} href={tab.value === "open" ? `/workspaces/${workspaceId}/review` : `/workspaces/${workspaceId}/review?status=${tab.value}`}
-          className={`border-b-2 px-3 py-2 text-sm font-medium ${active ? "border-emerald-700 text-emerald-800" : "border-transparent text-slate-500 hover:text-slate-800"}`}>
-          {tab.label}
-        </Link>
-      })}
-    </nav>
-
-    <ReviewInbox
-      workspaceId={workspaceId}
-      workspaceMode={workspaceMode}
-      currentStatus={statusParam ?? "open"}
-      members={members.map((member) => ({ id: member.userId, name: member.user.name }))}
-      tasks={tasks.map((task) => {
-        const confidence = (task.document.confidence as Record<string, number> | null) ?? null
-        const scores = confidence ? Object.values(confidence) : []
-        return {
-          id: task.id, status: task.status, reason: task.reason, priority: task.priority,
-          dueAt: task.dueAt?.toISOString() ?? null,
-          document: {
-            id: task.document.id, filename: task.document.filename, templateName: task.document.template?.name ?? null,
-            minConfidence: scores.length ? Math.min(...scores) : null,
-            appliedRuleName: task.document.appliedRule?.name ?? null,
-            checks: task.document.checkResults.map((check) => ({ code: check.checkCode, status: check.status as "warn" | "fail", message: check.message })),
-            review: summarizeDocumentForReview(task.document, membership.workspace.baseCurrency),
-          },
-          assignee: task.assignee ? { id: task.assignee.id, name: task.assignee.name } : null,
-        }
-      })} />
-  </main>
+  permanentRedirect(`/workspaces/${workspaceId}/approvals/invoices`)
 }

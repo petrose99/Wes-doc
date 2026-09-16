@@ -9,6 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { QueueScreen, type QueueColumn, type SortOption } from "@/components/queue/queue-screen"
 import { PaneMenuItem } from "@/components/queue/detail-pane"
 import { formatDate, TitleCell } from "@/components/queue/row-cells"
+import { DueDateCountdownBadge } from "@/components/documents/countdown-badge"
 import { ReasonDialog } from "@/components/list-screen/reason-dialog-button"
 import type { Facet } from "@/components/queue/facet-filters"
 import { getQueueDetailAction } from "@/app/(app)/workspaces/[workspaceId]/queue-actions"
@@ -62,7 +63,9 @@ export function ExceptionQueue({ workspaceId, basePath, documentBasePath, except
       render: (row) => <TitleCell title={row.vendor ?? row.filename} subtitle={row.docTypeLabel} />,
     },
     { key: "check", label: "Check", className: "min-w-[14rem] text-slate-700", render: (row) => <>{row.message}</> },
+    { key: "invoiceNumber", label: "Invoice #", className: "whitespace-nowrap text-slate-700", render: (row) => <>{row.invoiceNumber ?? <span className="text-slate-400">—</span>}</> },
     { key: "amount", label: "Amount", narrow: true, className: "whitespace-nowrap text-right tabular-nums text-slate-900", render: (row) => <>{formatAmount(row.amount, row.currencyCode)}</> },
+    { key: "due", label: "Due", className: "whitespace-nowrap", render: (row) => <DueDateCountdownBadge dueDate={row.dueDate} /> },
     {
       key: "status", label: "Status", narrow: true,
       render: (row) => <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${row.escalationStatus === "in_review" ? "bg-blue-100 text-blue-800" : "bg-amber-100 text-amber-900"}`}>

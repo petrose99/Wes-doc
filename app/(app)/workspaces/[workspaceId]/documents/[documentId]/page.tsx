@@ -42,12 +42,15 @@ import { notFound, redirect } from "next/navigation"
  * is right for settings pages but leaves no room for a source viewer next to the form. Same URL
  * as before ((chrome) is a route group, so this move doesn't change the path), just outside that
  * layout, so it gets the workspace shell's full-bleed width instead. */
-export async function DocumentDetailPage({ params, searchParams, embedded = false, history = null }: {
+export async function DocumentDetailPage({ params, searchParams, embedded = false, history = null, initialTab }: {
   params: Promise<{ workspaceId: string; documentId: string }>
   searchParams: Promise<{ stage?: string; page?: string; bb?: string }>
   /** #225: rendered inside a Queue screen's Detail pane (see `getQueueDetailAction`). */
   embedded?: boolean
   history?: DocumentHistory | null
+  /** #236: which tab the embedded pane opens on — Approvals opens straight to "approval",
+   * PO Mismatches to "checks". Undefined keeps every other queue's existing "details" default. */
+  initialTab?: "details" | "note" | "activity" | "approval" | "checks"
 }) {
   const { workspaceId, documentId } = await params
   const { stage: stageParam, page: pageParam, bb: bbParam } = await searchParams
@@ -189,11 +192,15 @@ export async function DocumentDetailPage({ params, searchParams, embedded = fals
   const stageQuery = stage ? `?stage=${stage}` : ""
   const prevHref = stage && neighborIndex > 0 ? `/workspaces/${workspaceId}/documents/${neighbors[neighborIndex - 1].id}${stageQuery}` : null
   const nextHref = stage && neighborIndex >= 0 && neighborIndex < neighbors.length - 1 ? `/workspaces/${workspaceId}/documents/${neighbors[neighborIndex + 1].id}${stageQuery}` : null
+  // #249: `/pipeline` has had no nav entry since #238 — falling back to it here and on the Back
+  // link below stranded the reader on an orphaned surface. The typed destination (#178's own
+  // redirect target below) is where every document actually lives now.
+  const typedDestinationHref = documentDestinationPath(`/workspaces/${workspaceId}`, document)
   // Where a stage-changing action (Archive / Move to Ready) sends the reader next: the following
   // document in the same filtered queue if there is one, otherwise back to the list — mirroring
   // the "advance to the next item" behavior of a review queue, rather than stranding them on a
   // document that no longer belongs on the tab they were just working through.
-  const afterActionHref = nextHref ?? (stage ? `/workspaces/${workspaceId}/pipeline?stage=${stage}` : `/workspaces/${workspaceId}/pipeline`)
+  const afterActionHref = nextHref ?? typedDestinationHref
   const position = stage && neighborIndex >= 0 ? { index: neighborIndex + 1, total: neighbors.length } : null
 
   // Five-step lifecycle indicator. Derived server-side so the client SplitPane doesn't have to
@@ -280,10 +287,14 @@ export async function DocumentDetailPage({ params, searchParams, embedded = fals
     position={position}
     stage={stage}
     afterActionHref={afterActionHref}
+    backHref={typedDestinationHref}
     header={{
       filename: document.filename, documentId: document.id, fileId: document.fileId, status: document.status,
       flagged: document.flaggedAt !== null,
-      reviewLink: reviewQueueEnabled && openReviewTask ? { href: `/workspaces/${workspaceId}/review/${openReviewTask.id}`, label: openReviewTask.status === "in_review" ? "In review" : "Open — view review task" } : null,
+      // #236: /review is retired — the same open ReviewTask is now viewed from the Approvals
+      // destination's Detail pane (its Approval tab reads "No approval steps yet" gracefully for
+      // a workflow-less task, since most ReviewTasks aren't Approvals at all — decision #1).
+      reviewLink: reviewQueueEnabled && openReviewTask ? { href: `/workspaces/${workspaceId}/approvals/invoices/${documentId}`, label: openReviewTask.status === "in_review" ? "In review" : "Open — view review task" } : null,
     }}
     canPush={canPush}
     paymentStatus={paymentStatuses.get(documentId)?.paymentStatus ?? null}
@@ -325,6 +336,7 @@ export async function DocumentDetailPage({ params, searchParams, embedded = fals
     institutionName={institutionName}
     embedded={embedded}
     history={history}
+    initialTab={initialTab}
   />
 }
 

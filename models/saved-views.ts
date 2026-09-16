@@ -63,7 +63,7 @@ async function ensureSystemViewsSeeded(workspaceId: string, viewKey: string) {
       viewKey,
       name: seed.name,
       isSystem: true,
-      scopeToCurrentUser: false,
+      scopeToCurrentUser: seed.scopeToCurrentUser ?? false,
       columns: [] as unknown as Prisma.InputJsonValue,
       filters: seed.filters as unknown as Prisma.InputJsonValue,
       sort: Prisma.JsonNull,

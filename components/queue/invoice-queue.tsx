@@ -12,6 +12,7 @@ import { formatDate, formatMoney, StatePills, TitleCell } from "@/components/que
 import { PoChip, useOriginHere } from "@/components/documents/po-compare"
 import { ReasonDialog } from "@/components/list-screen/reason-dialog-button"
 import type { Facet } from "@/components/queue/facet-filters"
+import { ApprovalBulkAction, type ApprovalWorkflowOption } from "@/components/typed-destinations/approval-bulk-action"
 import { ConfidenceField, ProcessingStateGlyph } from "@/components/typed-destinations/row-signals"
 import { processingState } from "@/lib/documents/processing-state"
 import { type ItemizedRecord } from "@/components/typed-destinations/bulk-approve-receipt"
@@ -72,11 +73,15 @@ const SORTS: SortOption<BillRow>[] = [
   { key: "supplier", label: "Supplier A–Z", compare: (a, b) => (a.supplier ?? "￿").localeCompare(b.supplier ?? "￿") },
 ]
 
-export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercent, views, stat, initialSelectedId, fieldTable = null }: {
+export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercent, availableWorkflows = [], views, stat, initialSelectedId, fieldTable = null }: {
   workspaceId: string
   basePath: string
   bills: BillRow[]
   minConfidencePercent: number
+  /** #236: active ApprovalWorkflows this workspace can Start on a selection — empty when the
+   * approval-workflows module is off, or none are configured yet, in which case the Approval ▾
+   * bulk control doesn't render at all. */
+  availableWorkflows?: ApprovalWorkflowOption[]
   views?: ReactNode
   stat?: ReactNode
   initialSelectedId?: string | null
@@ -184,7 +189,12 @@ export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercen
         eligibleIds={selectedIds.filter((id) => !billsById.get(id)?.blockedByCheck)} exportFilename="invoices.csv"
         onHeldBack={(heldBack, approved) => setNeedsAttention((prev) => { const next = new Set(prev); for (const id of heldBack) next.add(id); for (const id of approved) next.delete(id); return next })}
         // #229 Q9 (#251): "Prepare payment run" has left this bar — paying happens on Bill Pay.
-        approvedNext={{ label: "Approved invoices are ready in Bill Pay", href: `/workspaces/${workspaceId}/payments/bill-pay` }} />}
+        approvedNext={{ label: "Approved invoices are ready in Bill Pay", href: `/workspaces/${workspaceId}/payments/bill-pay` }}
+        extra={<>
+          <ApprovalBulkAction workspaceId={workspaceId} selectedIds={selectedIds} clear={clear} toRecord={toRecord} workflows={availableWorkflows}
+            startEligibleIds={selectedIds.filter((id) => { const status = billsById.get(id)?.approvalStatus; return status === "not_started" || status === "rejected" })}
+            cancelEligibleIds={selectedIds.filter((id) => billsById.get(id)?.approvalStatus === "in_progress")} />
+        </>} />}
       paneActions={(bill, { refresh }) => <DocumentPaneActions workspaceId={workspaceId} documentId={bill.documentId} noun="invoice"
         status={bill.status} openReviewTaskId={bill.openReviewTaskId} cancelled={!!bill.cancelledAt} onDone={refresh} />}
       paneMenu={(bill) => {

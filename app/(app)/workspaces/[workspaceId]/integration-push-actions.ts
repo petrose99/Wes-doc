@@ -31,7 +31,7 @@ async function pushDocumentToConnection(
   connectionId: string,
   userId: string,
   expenseAccountId?: string
-): Promise<{ status: string }> {
+): Promise<{ status: string; errorCode?: string | null }> {
   const document = await getWorkspaceDocument(workspaceId, documentId)
   if (!document) throw new Error("Document not found")
   if (document.status !== "reviewed") throw new Error("Only reviewed documents can be pushed")
@@ -94,9 +94,9 @@ async function pushDocumentToConnection(
     createdById: userId,
   })
   await attemptIntegrationPush(push.id)
-  const updated = await prisma.integrationPush.findUnique({ where: { id: push.id }, select: { status: true } })
+  const updated = await prisma.integrationPush.findUnique({ where: { id: push.id }, select: { status: true, errorCode: true } })
   if (updated?.status === "pending") await kickIntegrationPushDrain()
-  return { status: updated?.status ?? "pending" }
+  return { status: updated?.status ?? "pending", errorCode: updated?.errorCode ?? null }
 }
 
 export async function pushDocumentToAccountingAction(
@@ -137,14 +137,17 @@ export async function pushAllReadyDocumentsAction(
   if (!(await requireMember(workspaceId, user.id))) return { success: false, error: NO_ACCESS }
   if (!(await workspaceIntegrationsPlanEnabled(workspaceId))) return { success: false, error: errorMessage(new Error("integrations_plan_required"), NO_ACCESS) }
 
-  const ready = await listReadyToPushDocuments(workspaceId, connectionId)
+  const { documents: ready } = await listReadyToPushDocuments(workspaceId, connectionId)
   let pushed = 0
   let failed = 0
   const results: Array<{ documentId: string; status: "succeeded" | "queued" | "failed"; error?: string }> = []
   for (const doc of ready) {
     try {
       const result = await pushDocumentToConnection(workspaceId, doc.id, connectionId, user.id, accountOverrides?.[doc.id])
-      if (result.status === "failed") { failed += 1; results.push({ documentId: doc.id, status: "failed" }) }
+      // #249: a push that fails inside attemptIntegrationPush (rather than throwing here) used to
+      // report bare "failed" with no reason — the same object the catch block below already
+      // carries one on. `errorCode` is the field attemptIntegrationPush itself writes on failure.
+      if (result.status === "failed") { failed += 1; results.push({ documentId: doc.id, status: "failed", error: result.errorCode ?? "Could not push this document" }) }
       else { pushed += 1; results.push({ documentId: doc.id, status: result.status === "succeeded" ? "succeeded" : "queued" }) }
     } catch (error) {
       failed += 1

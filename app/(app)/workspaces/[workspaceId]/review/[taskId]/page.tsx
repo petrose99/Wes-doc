@@ -1,110 +1,18 @@
-import { AutomationRuleForm } from "@/components/workspace/automation-rule-form"
-import { DocumentPreview } from "@/components/documents/document-preview"
-import { ReviewTaskDetail } from "@/components/workspace/review-task-detail"
-import { canDecideStage, findCurrentStage } from "@/lib/approvals/engine"
 import { getCurrentUser } from "@/lib/auth"
-import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
-import { parseTemplateFields } from "@/lib/document-templates"
-import { prisma } from "@/lib/db"
-import { listApprovalWorkflows } from "@/models/approval-workflows"
 import { getReviewTask } from "@/models/review-tasks"
-import { getWorkspaceMembers, requireWorkspaceRole } from "@/models/workspaces"
-import { notFound } from "next/navigation"
+import { requireWorkspaceRole } from "@/models/workspaces"
+import { notFound, permanentRedirect } from "next/navigation"
 
 export const dynamic = "force-dynamic"
 
-/** The task detail beside the existing document view (WP10): the source file on one side, the
- * extracted fields and the review controls on the other — reusing /api/documents/[id]/source,
- * the same authorised-through-the-file route the sheet's own preview and the shared-file grid
- * already serve source bytes through, rather than a new one. */
-export default async function ReviewTaskDetailPage({ params }: { params: Promise<{ workspaceId: string; taskId: string }> }) {
+/** #236 decision #1: /review/[taskId] is retired — the same document's Approval now lives at
+ * /approvals/invoices/[documentId] (a task id was never meaningful to a bookmark; the document is
+ * what a person actually recognizes). 308, matching the parent route's own retirement. */
+export default async function ReviewTaskRedirectPage({ params }: { params: Promise<{ workspaceId: string; taskId: string }> }) {
   const { workspaceId, taskId } = await params
   const user = await getCurrentUser()
-  const membership = await requireWorkspaceRole(workspaceId, user.id)
-  const capabilities = await getWorkspaceCapabilities(workspaceId)
-  if (!capabilities.has("review-queue")) notFound()
-
+  await requireWorkspaceRole(workspaceId, user.id)
   const task = await getReviewTask(workspaceId, taskId)
   if (!task) notFound()
-
-  const fields = parseTemplateFields(task.document.fieldSnapshot)
-  const values = (task.document.reviewedData ?? task.document.rawExtraction ?? {}) as Record<string, unknown>
-  const members = await getWorkspaceMembers(workspaceId)
-  const checkResults = await prisma.documentCheckResult.findMany({ where: { workspaceId, documentId: task.document.id }, orderBy: { checkCode: "asc" } })
-  const supplierValue = values.vendor ?? values.merchant
-  const supplier = typeof supplierValue === "string" ? supplierValue.trim() : ""
-  const canCreateRule = capabilities.has("supplier-rules") && membership.role === "owner" && supplier.length > 0
-
-  const workflowsEnabled = capabilities.has("approval-workflows")
-  const availableWorkflows = workflowsEnabled && task.status === "open" && !task.workflowId
-    ? (await listApprovalWorkflows(workspaceId, { activeOnly: true })).map((wf) => ({ id: wf.id, name: wf.name, stageCount: wf.stages.length }))
-    : []
-  const workflow = task.workflow && task.currentStageIndex !== null ? (() => {
-    const stages = task.workflow!.stages.map((stage) => ({ stageIndex: stage.stageIndex, name: stage.name, requireOwner: stage.requireOwner, approverIds: stage.approverIds ?? [], minAmount: stage.minAmount !== null && stage.minAmount !== undefined ? Number(stage.minAmount) : null }))
-    const currentStage = findCurrentStage(stages, task.currentStageIndex!)
-    return { id: task.workflow!.id, name: task.workflow!.name, currentStageIndex: task.currentStageIndex!, stages, canDecideCurrentStage: currentStage ? canDecideStage({ stage: currentStage, actorRole: membership.role === "owner" ? "owner" : "member", actorId: user.id }) : false }
-  })() : null
-
-  return <main className="mx-auto grid w-full max-w-6xl gap-6 p-6 lg:grid-cols-[1.2fr_0.8fr]">
-    <div className="space-y-4">
-      <header>
-        <h1 className="text-2xl font-bold text-slate-900">{task.document.filename}</h1>
-        <p className="mt-1 text-sm text-slate-500">{task.detail || "No additional detail was given when this task was created."}</p>
-      </header>
-
-      {task.document.storageKey
-        ? <DocumentPreview src={`/api/documents/${task.document.id}/source`} filename={task.document.filename} mimeType={task.document.mimeType} className="h-[70vh] rounded border" />
-        : <p className="rounded border border-dashed p-6 text-center text-sm text-slate-400">Source not available</p>}
-    </div>
-
-    <div className="space-y-4">
-      <ReviewTaskDetail
-        workspaceId={workspaceId}
-        taskId={task.id}
-        status={task.status}
-        assigneeId={task.assigneeId}
-        members={members.map((member) => ({ id: member.userId, name: member.user.name }))}
-        workflow={workflow}
-        availableWorkflows={availableWorkflows} />
-
-      {checkResults.length > 0 && <div className="rounded border p-4">
-        <h2 className="text-sm font-bold text-slate-900">Deterministic checks</h2>
-        <ul className="mt-2 space-y-2 text-sm">
-          {checkResults.map((check) => (
-            <li key={check.id} className="flex items-start gap-2">
-              {/* amber kept intentionally: this is a three-way fail/warn/pass severity legend (red/amber/emerald), not a standalone accent */}
-              <span className={`mt-0.5 shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold capitalize ${check.status === "fail" ? "bg-red-100 text-red-700" : check.status === "warn" ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}>{check.status}</span>
-              <span className="text-slate-600">{check.message}</span>
-            </li>
-          ))}
-        </ul>
-      </div>}
-
-      <div className="rounded border p-4">
-        <h2 className="text-sm font-bold text-slate-900">Extracted fields</h2>
-        <dl className="mt-2 space-y-1.5 text-sm">
-          {fields.filter((field) => field.type !== "array").map((field) => (
-            <div key={field.key} className="flex justify-between gap-3">
-              <dt className="text-slate-500">{field.label}</dt>
-              <dd className="text-right font-medium text-slate-900">{formatValue(values[field.key])}</dd>
-            </div>
-          ))}
-        </dl>
-      </div>
-
-      {canCreateRule && <details className="rounded border p-4">
-        <summary className="cursor-pointer text-sm font-bold text-slate-900">Create a rule from this document</summary>
-        <p className="mt-1 text-xs text-slate-500">Matches this supplier automatically on future documents.</p>
-        <div className="mt-3">
-          <AutomationRuleForm workspaceId={workspaceId} defaultSupplier={supplier} />
-        </div>
-      </details>}
-    </div>
-  </main>
-}
-
-function formatValue(value: unknown): string {
-  if (value === null || value === undefined || value === "") return "—"
-  if (typeof value === "object") return JSON.stringify(value)
-  return String(value)
+  permanentRedirect(`/workspaces/${workspaceId}/approvals/invoices/${task.documentId}`)
 }
