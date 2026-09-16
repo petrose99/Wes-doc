@@ -47,7 +47,15 @@ The typed destination for a bill received from a supplier. Absorbs the former Do
 The typed destination for a purchase order, paired with Invoices for matching and cumulative line-item comparison against what has already been invoiced against it.
 
 **Receipt**:
-The typed destination for a receipt. Absorbs expense-claim creation and approval as an action on selected rows rather than as its own destination.
+The typed destination for a receipt. Absorbs expense-claim creation as an action on selected rows rather than as its own destination: Add to claim on the bulk bar (and the pane's overflow for one row) opens a dialog in place, and the claim itself is read and submitted from the receipt's Approval tab. A receipt's own processing state is about its review; whether it sits in a claim is a separate fact, shown in the Claim column.
+
+**Expense claim**:
+A bundle of expense receipts one person paid for personally, submitted for approval as one amount frozen at submission. A draft belongs to its Claimant, who can add and remove receipts or delete it; once submitted it is an Approval — a row on the Approvals destination's Expense claims view, decided by the Approver of its stage (any owner where no flow applies) — and can be withdrawn back to draft only while no stage has been decided. Approving a claim records that its Claimant is owed the amount; it does not change any receipt's processing state. A rejected claim stays as a record and releases its receipts to be claimed again. A receipt can be in a claim only if it is an expense receipt, is not Needs attention, and is not already in an open or approved claim.
+_Avoid_: Expense report, expenses (as a destination), reimbursement request
+
+**Claimant**:
+The person an Expense claim reimburses: the member who assembled and submitted it. Distinct from the Approver who decides it.
+_Avoid_: Submitter, employee
 
 **Bank Statement**:
 The typed destination for a bank statement. The reviewer asserts the issuing institution; the first statement for that institution becomes its saved layout, and later uploads are checked against it for drift.
@@ -79,7 +87,7 @@ A named, reusable filter/sort/column configuration on a list screen. System view
 A single unit of pending work surfaced in a Next-action queue — a document awaiting review or a match awaiting confirmation. An approval awaiting a decision is an Approval, not a work item; it is worked by an Approver, not an assignee.
 
 **Approval**:
-A run started on an invoice by a person, moving through the stages of an approval flow until it is approved, rejected, or sent back for review. An invoice nobody has started an approval on is under review, not awaiting approval.
+A run started on an invoice by a person — or an Expense claim once submitted — moving through the stages of an approval flow until it is approved, rejected, or sent back for review. An invoice nobody has started an approval on is under review, not awaiting approval.
 _Avoid_: Review task (the storage record), sign-off (as the umbrella term)
 
 **Approver**:
@@ -87,7 +95,7 @@ The person who can decide the current stage of an Approval — a stage's named a
 _Avoid_: Reviewer (that is who prepares the row), assignee
 
 **Ready to Approve**:
-The personal system view on the Approvals destination: every Approval whose current stage the signed-in person can decide, including rows that are not yet eligible, shown with the reason. The badge on the rail counts this view and nothing else.
+The personal system view on the Approvals destination: every Approval whose current stage the signed-in person can decide — invoices, PO mismatches and submitted Expense claims alike — including rows that are not yet eligible, shown with the reason. The badge on the rail counts this view and nothing else.
 _Avoid_: Pending approvals (that is the workspace-wide count), inbox
 
 **Send back for review**:
