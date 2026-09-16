@@ -5,3 +5,4 @@ One page per surface family, written by the build that shipped it and refreshed 
 | Area | Covers |
 |---|---|
 | [admin](admin.md) | Admin › Configuration, Approval Flows, PO Mismatch Flows, Users, Companies, Suppliers, Integrations; Account |
+| [approvals](approvals.md) | Approvals queue (Invoice approvals · PO mismatches), the `QueueScreen` phone lane (cards, Filter sheet, detail sheet, decision sheets, result strip), phone tab bar |

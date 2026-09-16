@@ -21,7 +21,7 @@ function task(overrides: Record<string, unknown> = {}) {
     workflow: { stages: [STAGE] },
     document: {
       id: "doc-1", filename: "invoice.pdf", reviewedData: { vendor: "Acme", invoice_number: "INV-1", total: 1000, currency_code: "USD" },
-      cancelledAt: null, template: { code: "invoice" },
+      cancelledAt: null, template: { code: "invoice" }, paymentStatus: "paid",
     },
     ...overrides,
   }
@@ -34,6 +34,7 @@ beforeEach(() => {
   db.gate = { findMany: vi.fn().mockResolvedValue([]) }
   db.documentCheckResult = { findMany: vi.fn().mockResolvedValue([]) }
   db.workspaceMember = { findMany: vi.fn().mockResolvedValue([OWNER, MEMBER]) }
+  db.integrationPush = { findMany: vi.fn().mockResolvedValue([]) }
 })
 
 describe("listApprovalInvoiceRows", () => {
@@ -61,6 +62,19 @@ describe("listApprovalInvoiceRows", () => {
     db.documentCheckResult.findMany.mockResolvedValue([{ documentId: "doc-1" }])
     const rows = await listApprovalInvoiceRows("w1", OWNER)
     expect(rows[0].eligibility).toEqual({ status: "not_eligible", reason: "An exception is open on this invoice." })
+  })
+
+  it("reads not_eligible with the server's sentence when payment is unconfirmed on an invoice", async () => {
+    db.reviewTask.findMany.mockResolvedValue([task({ document: { ...task().document, paymentStatus: null } })])
+    const rows = await listApprovalInvoiceRows("w1", OWNER)
+    expect(rows[0].eligibility).toEqual({ status: "not_eligible", reason: "Confirm whether this has been paid before approving it." })
+  })
+
+  it("stays ready when a ledger push is pending for the unpaid invoice", async () => {
+    db.reviewTask.findMany.mockResolvedValue([task({ document: { ...task().document, paymentStatus: null } })])
+    db.integrationPush.findMany.mockResolvedValue([{ documentId: "doc-1" }])
+    const rows = await listApprovalInvoiceRows("w1", OWNER)
+    expect(rows[0].eligibility.status).toBe("ready")
   })
 
   it("reads no_approver when the stage names approvers who are no longer members", async () => {

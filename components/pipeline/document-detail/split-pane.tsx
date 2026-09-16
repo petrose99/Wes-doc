@@ -20,7 +20,7 @@ import { SourceViewer, type ProvenanceTarget, type SourceDocument } from "@/comp
 import type { DocumentFieldDefinition } from "@/lib/document-templates"
 import type { Ref } from "@/lib/provenance"
 import type { FieldRationale } from "@/lib/rationale"
-import { Building2, CheckCircle2, ChevronDown, ChevronUp, ExternalLink, Loader2 } from "lucide-react"
+import { CheckCircle2, ChevronDown, ChevronUp, ExternalLink, Loader2 } from "lucide-react"
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react"
 import { toast } from "sonner"
 
@@ -44,7 +44,7 @@ const DOC_TYPE_LABELS: Record<"expense" | "sale" | "bank_statement" | "other", s
 export function SplitPane({
   workspaceId, source, fields, data, fieldConfidence, provenanceFields, provenanceItems, initialTarget, conflictingLabels, missingRequiredFields,
   saveReview, documentType: initialDocumentType, note: initialNote, auditEvents,
-  header, canPush, pushCard, canCreateRule, defaultSupplier, matchKind, bankMatches, documentMatches, paymentStatus, rationales, checks, fxBadge, stageIndicator,
+  header, canPush, pushCard, canCreateRule, defaultSupplier, matchKind, bankMatches, documentMatches, rationales, checks, fxBadge, stageIndicator,
   institutions, institutionId, institutionName, history, po = null, initialTab,
 }: {
   workspaceId: string

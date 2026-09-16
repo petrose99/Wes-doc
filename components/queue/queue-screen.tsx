@@ -200,13 +200,13 @@ function QueueScreenInner<T>({
   // (Match manually's pending line matches, #250) gets one chance to say so.
   // True while the open pane owns a history entry of its own (phone lane, opened from the list —
   // not from a deep link, which has no entry to pop).
-  const pushedRef = useRef(false)
+  const [pushed, setPushed] = useState(false)
   const open = useCallback((id: string) => {
     if (!confirmLeave()) return
     const push = isPhoneLane() && openId === null
     setOpenId(id)
     syncUrl(id, push)
-    if (push) pushedRef.current = true
+    if (push) setPushed(true)
   }, [syncUrl, openId])
   // Closing returns focus to the row that was open — recorded as state and applied in an effect
   // once the pane has unmounted, so `close` itself stays free of DOM refs.
@@ -215,13 +215,13 @@ function QueueScreenInner<T>({
     if (!fromPopstate && !confirmLeave()) return
     // The pane pushed its own entry: pop it, so the phone's Back gesture and the pane's Back
     // control leave the same history behind; the popstate handler below finishes the close.
-    if (!fromPopstate && pushedRef.current) { pushedRef.current = false; window.history.back(); return }
-    pushedRef.current = false
+    if (!fromPopstate && pushed) { setPushed(false); window.history.back(); return }
+    setPushed(false)
     setFocusReturn(openId)
     setOpenId(null)
     // A popstate-driven close already moved history back; pushing/replacing here would fight it.
     if (!fromPopstate) syncUrl(null, false)
-  }, [openId, syncUrl])
+  }, [openId, pushed, syncUrl])
   // Back, the browser's own gesture, or the pane's Back control (`history.back()`) all arrive as
   // popstate — close the pane to match, without touching history a second time.
   useEffect(() => {

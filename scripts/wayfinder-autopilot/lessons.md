@@ -35,6 +35,9 @@ here will be relearned at full cost.
 - (docubite #253, H9 recovery) Client validation specified as "in-form blocker" landed 600px from the field, in the save bar. → B5 states *where* each validation message renders (at the field, `aria-describedby`) and what the bar merely repeats.
 - (docubite #253, H7 flexibility) A create-only list with no accelerator scored 2 when the spec named only ⌘S. → Part A/C: every list of user-made records names at least one accelerator (duplicate, reorder, filter) or states why none.
 - (docubite #253, H5 prevention) An accelerator that replaces form content (Duplicate → prefill) destroyed typed work; found only at the confirm round. → B1 row for any action that *replaces* input: guard when the target holds typed work.
+- (docubite #257, H1/H5, P1) Approve was enabled on rows the server then refused (a payment-status precondition lived only in the server action). → B1 lists every `assert*`/throw in the server action behind a ⚠ button and maps each to a disabled-with-reason state on the row, same sentence both sides. · check: each precondition name in the action's asserts appears in the row-eligibility function; a miss is a P1.
+- (docubite #257, include P1) Card links and tab buttons built their accessible name from adjacent text nodes with no separators ("Needs attentionAcme Corp$5,175"). → Any composite `<a>`/`<button>` gets an explicit `aria-label` with commas; a count badge inside a tab is folded into the name ("Checks, 1 open"). · check: keyboard probe prints each focus target's name; a name with no space between two capitalised words or a digit glued to a word fails.
+- (docubite #257, H8 craft) Phone h1 (18px) sat one step above 16px body, and a 40px tab row had no vertical padding — the `typeset`/`layout` pass only looked at desktop. → The spec's type scale and control padding are stated per breakpoint. · check: in-page detector `flat-type-hierarchy` / `cramped-padding` at 390 on the list state before the first measurement.
 
 ## Grilling (what a decision ticket must establish before its first round)
 
@@ -47,6 +50,7 @@ here will be relearned at full cost.
 - (docubite #250) Three detector batches were needed because the first screenshots were only taken after the whole surface was built. → Screenshot each new component at 1440 and 390 as it lands, not only at the end; the hook catches static findings, the overlay catches layout ones.
 - (docubite #252) Detector, critique and evaluate each opened their own browser on the same build; a headless Chromium is 200–400 MB and each pass is minutes. → One capture pass per round (states × widths PNGs + detector JSON + keyboard probe) that all three skills read; re-capture only after code changes.
 - (docubite #250) Static `impeccable detect` was skipped; the in-page overlay found everything. → In-page overlay is the source of truth; run it per state (list, pane-open, dialog-open, sheet-open), not once.
+- (docubite #257, B5 focus) Three focus faults found only by the live probe: a dialog effect keyed on `onClose` re-ran per keystroke and dropped typed text; a context *object* in effect deps looped on every open; a result strip that *replaces* its trigger left focus on body. → Effects key on stable setters/refs, never on callbacks or context objects; when a control disappears on success, the replacement takes focus (`tabIndex=-1` + focus on mount). · check: keyboard probe after each decision prints `document.activeElement`; `body` fails; `eslint react-hooks` on touched files per batch, not once at close.
 
 ## Scoring
 

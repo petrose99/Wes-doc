@@ -113,6 +113,9 @@ export function FilterSheet<T>({ open, onClose, facets, sortOptions, sortParam, 
         className="inline-flex h-12 items-center justify-center rounded-md bg-emerald-700 text-sm font-semibold tabular-nums text-white hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-1">
         Show {count} {count === 1 ? "row" : "rows"}
       </button>
+      {/* The count changes under the operator's fingers as facets are toggled; say so once per change
+        * without moving focus off the radio. */}
+      <p aria-live="polite" className="sr-only">{count} {count === 1 ? "row" : "rows"} match</p>
     </div>
   </Dialog>
 }
@@ -129,7 +132,7 @@ export function FilterButton({ facets, sortParam, defaultSortKey, onClick }: {
   const count = activeFilterCount(searchParams, facets, { param: sortParam, defaultKey: defaultSortKey })
   const active = count > 0
   return <button type="button" onClick={onClick} aria-haspopup="dialog"
-    className={`inline-flex h-10 items-center gap-2 rounded-md border bg-white px-3 text-sm font-medium tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-1 ${active ? "border-emerald-600 text-emerald-800" : "border-slate-300 text-slate-700 hover:bg-slate-50"}`}>
+    className={`inline-flex h-11 items-center gap-2 rounded-md border bg-white px-3 text-sm font-medium tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-1 ${active ? "border-emerald-600 text-emerald-800" : "border-slate-300 text-slate-700 hover:bg-slate-50"}`}>
     <Filter className="h-4 w-4" aria-hidden />
     {active ? `Filter · ${count}` : "Filter"}
     {active && <span className="sr-only">{`, ${count} active`}</span>}
