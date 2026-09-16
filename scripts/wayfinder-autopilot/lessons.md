@@ -51,3 +51,11 @@ here will be relearned at full cost.
 ## Scoring
 
 - (any) Some detector findings are app-wide residue (shell chrome, dev overlay, brand font) and show on every surface. → Name the residue once in the project lessons file; report it as residue; never spend a batch on it inside a feature ticket.
+
+## Process (the loop itself, not the surface)
+
+- (docubite #257, close phase) Four close sessions went into writing a per-ticket Playwright capture harness; round 1 aborted at state 11 on one bad selector. → The round is a state list on `capture-round.mjs`; the runner isolates every state. · check: `grep -L capture-round docs/wayfinder-reports/*/logs/scratch-*/pw/round.mjs` lists a round script that must be rewritten.
+- (docubite #257, hand-off) The hand-off grew to 500+ lines / 13K tokens and was re-read whole at the top of twelve sessions; first-turn context was 47K before any work. → Pointers only, under ~80 lines; history lives in the scratch folder. · check: `wc -l docs/wayfinder-reports/*/*.handoff.md` shows a file over 120 (the context-guard hook nags at that line).
+- (docubite #257, close phase) Two sessions captured and fixed without re-running the readers, so the score never moved on paper and no session knew whether the bar was met. → Readers run once per round, first thing after the captures, and their numbers go into the hand-off before the first fix. · check: a close-phase hand-off without a `critique`/`health` line after a round exists.
+- (docubite #257, sessions) A Sonnet first session on a phase that had already consumed three sessions spent 29 calls standing up servers and made no progress. → A phase past two sessions runs on the hard model (driver `HARD_AFTER`) and environment bring-up is one command. · check: run-log shows a "no progress" row on a phase with ≥ 2 earlier rows.
+

@@ -402,6 +402,7 @@ PY
   fi
   [ -f "$OUT/$T.md" ] || OUTCOME="$OUTCOME, no report"
   if [ "$(state "$T")" != "closed" ] && { [ ! -f "$OUT/$T.handoff.md" ] || [ "$(stat -c %Y "$OUT/$T.handoff.md")" -lt "$S0" ]; }; then OUTCOME="$OUTCOME, hand-off not updated"; fi
+  HL=$(wc -l < "$OUT/$T.handoff.md" 2>/dev/null || echo 0); [ "${HL:-0}" -gt "${WAYFINDER_HANDOFF_MAX_LINES:-120}" ] && OUTCOME="$OUTCOME, hand-off $HL lines (limit ${WAYFINDER_HANDOFF_MAX_LINES:-120})"
   printf '| %s | [#%s](https://github.com/%s/issues/%s) %s | %s (%s) | %dm%02ds | [log](logs/%s) |\n' \
     "$START" "$T" "$REPO" "$T" "$TT" "$OUTCOME" "${MODEL:-default}" $((DUR/60)) $((DUR%60)) "$(basename "$LOG")" >> "$RUNLOG"
   # Cost beside the score, every session: turns × context is the bill.

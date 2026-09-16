@@ -133,6 +133,18 @@ pre-flight path, what is built, what is verified). Do not "just start" the
 next phase because there is context left: the next session's fresh context
 is the saving.
 
+**The close phase measures before it fixes, with shared tooling.** The
+capture round is a short state list on top of
+`scripts/wayfinder-autopilot/capture-round.mjs` (fresh context per state,
+detector injection, residue filter, keyboard probes, per-state error
+isolation, `detector.json` + `keyboard.json`) — never a Playwright harness
+written from scratch (#257 spent four sessions on one). Order inside the
+phase: servers up in one call → one round → the three readers → scores into
+the hand-off **immediately** (a session cut after that still hands the
+numbers on) → the fix batch → the confirm round → checks → report. The
+hand-off stays under ~80 lines of pointers throughout; the hook refuses to
+let it grow past 120 without a rewrite.
+
 **Read the area primer first; write it back at close.** `docs/agents/areas/`
 holds one page per surface family (Admin, queue shell, Detail pane,
 Payments, Approvals, phone). At the start of the spec and build phases,

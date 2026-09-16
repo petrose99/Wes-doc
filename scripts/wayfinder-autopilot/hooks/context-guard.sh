@@ -7,6 +7,20 @@
 # the tokens spent writing the hand-off never count against the line.
 [ -n "${WAYFINDER_CTX_FILE:-}" ] || exit 0
 sig="$WAYFINDER_CTX_FILE.signal"
+# Hand-off size guard, once per session: the brief says ~80 lines of pointers,
+# and #257's grew to 500+ (13K tokens read at the start of every one of its
+# twelve sessions). Past HANDOFF_MAX_LINES the session is told to rewrite it
+# as pointers into the scratch folder before anything else.
+hf="${WAYFINDER_HANDOFF_FILE:-}"; hmax="${WAYFINDER_HANDOFF_MAX_LINES:-120}"
+if [ -n "$hf" ] && [ -f "$hf" ] && [ ! -f "$WAYFINDER_CTX_FILE.handoff-nagged" ]; then
+  hl=$(wc -l < "$hf")
+  if [ "$hl" -gt "$hmax" ]; then
+    touch "$WAYFINDER_CTX_FILE.handoff-nagged"
+    python3 -c 'import json,sys; print(json.dumps({"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":sys.argv[1]}}))' \
+      "HAND-OFF TOO LONG: $hf is $hl lines; the rule is under ~80 (hard limit $hmax). Every session re-reads it whole. Before continuing, rewrite it as pointers: milestone lines, the exact next step, and paths to the spec, pre-flight, captures, scores and triage files in the scratch folder — move narrative and per-session history into those files, do not carry it here."
+    exit 0
+  fi
+fi
 [ -f "$sig" ] || exit 0
 h="${WAYFINDER_HANDOFF_FILE:-the ticket hand-off file}"
 # hand-off already written after the signal: the session is on its way out; stay quiet
