@@ -154,6 +154,9 @@ model_for() {   # $1 ticket, $2 attempt number (1-based)
   local labels title attempt="${2:-1}"
   labels="$(gh api "repos/$REPO/issues/$1" --jq '[.labels[].name]|join(",")')"
   title="$(title "$1")"
+  # A continuation (a hand-off file exists from an earlier session) always runs
+  # on the strong model: the cheap first pass has had its turn.
+  [ -f "$OUT/$1.handoff.md" ] && { echo "$MODEL_STRONG"; return; }
   if [[ "$labels" == *wayfinder:research* ]] || [[ "$title" =~ [Pp]olish|[Bb]ring\ .*\ to\ the\ (autopilot\ )?bar ]]; then
     echo "$MODEL_CHEAP"
   elif [[ "$labels" == *wayfinder:task* ]] && [ -n "${MODEL_EXEC_FIRST:-}" ] && [ "$attempt" = 1 ]; then
