@@ -126,3 +126,13 @@ User invokes with a map (URL or number). A ticket is **optional**: without one, 
 5. Add newly-surfaced tickets (create-then-wire); graduate any fog the answer has made specifiable, clearing each graduated patch from **Not yet specified** so it lives only as its new ticket. If the answer reveals that a ticket (this one or another) sits beyond the destination, **rule it out of scope** rather than resolving it on the route. If the decision invalidates other parts of the map, update or delete those tickets.
 
 The user may run unblocked tickets in parallel, so expect other sessions to be editing the tracker concurrently.
+
+### Continue a ticket across sessions
+
+A ticket that outgrows one session is **continued**, never abandoned, narrowed or silently split. One session is one context; the ticket's scope is whatever it says, and it closes only when all of it is done to the bar.
+
+- **Keep a hand-off file current** at `docs/wayfinder-reports/<map>/<ticket>.handoff.md` from the first milestone on, and commit it with the work as WIP. It is written for a reader with no memory of this session: the milestones done (spec · pre-flight · data/model · surface · first measurement · fix batch · confirm), what is built and verified, where the artefacts are (spec, filled pre-flight, captures, scores), the open findings, and the exact next step. Update it at every milestone, not at the end — a session can be cut at any moment, and a current file is what makes that harmless.
+- **Ending short:** post `Autopilot: continue — <where it stands>` on the ticket, leave it open, commit the tree. The driver puts it back on the frontier.
+- **Starting a continuation:** read the hand-off file before anything else, then the last commits. Resume at the milestone it names. Do not re-spec, rebuild or re-measure what it records as done; do re-run the checks the bar requires at close.
+- **Splitting** is a scoping act, not a budget one: only at a boundary the map would recognise as its own ticket, with the child carrying the whole remainder and blocked on this one. Never to make this session's close look complete.
+- **Never delegate the build to a background agent and end the turn waiting.** A driven session exits the moment a turn ends without a tool call, and everything it spawned dies with it. Subagents are for bounded reads that return in one foreground call.

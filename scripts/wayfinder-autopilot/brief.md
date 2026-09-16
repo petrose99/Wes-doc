@@ -62,9 +62,9 @@ The owner's bar for closing a rendered-surface ticket:
 a P1 changes enough that the confirm can't stand in for it). Sequence: first
 measurement → batch fixing every P1 and every heuristic under 3 → confirming
 measurement → close at the bar. Confirm under the bar with no P1s: close and
-record the gap. A P1 still open after the allowed batches: leave the ticket
-`Autopilot: partial —` as a hand-off (the driver retries on the stronger
-model). Never a batch to turn a 3 into a 4.
+record the gap. A P1 still open after the allowed batches: update the
+hand-off file, leave the ticket open with an `Autopilot: continue —` comment,
+and the next session continues it. Never a batch to turn a 3 into a 4.
 
 **The skills are there so the first pass is right.** Before the first line of
 code on an execution ticket, the pre-build pass is mandatory and is done
@@ -108,6 +108,17 @@ properly, not skimmed:
    measurement, run the Part B contract checks** (reachability grep, string
    extraction, primitive diff, focus probe) and fix what they show — that is
    lint, not scoring. Then take the first critique and evaluate untouched.
+
+**You do the build in this session. Never hand it to a background agent.**
+A headless `claude -p` session ends the moment you finish a turn without a
+tool call, and everything it spawned dies with it. #253 was lost this way:
+the session started a background build `Agent`, ended its turn with "waiting
+for it to finish", and the process exited with the ticket open, no report and
+no commit. `Agent` is for bounded, fresh-context *reads* that return in one
+call — the spec critic (Part D), the independent `evaluate`, a scoped search —
+run in the foreground (`run_in_background: false`) and read on return. Code
+is written by this session. Never end a turn "waiting"; if you cannot
+continue, commit WIP, post the partial hand-off and end.
 
 **One capture pass per round, shared by every skill.** A round is one Playwright
 run producing a named set — every state × 1440 and 390 as PNGs, the in-page
@@ -156,20 +167,25 @@ confirm once) until the bar above is met, and record the after-counts.
 - Findings with a real decision behind them become a Wayfinder ticket named
   on the close, with the score they cost. A finding without a decision is
   fixed, never parked.
-- **A session is one context, and the driver caps it at 150K tokens and
-  3h30.** Plan the ticket to fit: pre-flight, build, one measurement round,
-  close. If while filling the pre-flight you can see the work is more than
-  one session (many screens, a schema change plus a surface, two queues),
-  **split it before building**: create a child `wayfinder:task` ticket for
-  the second half (blocked by this one), narrow this ticket's scope in a
-  comment, and build the first half to the bar. Reaching the cap mid-build is
-  the expensive way to split; the driver will commit your tree as WIP and
-  hand off, but the next session pays to rediscover where you were.
+- **A session is one context (the driver caps it at 250K tokens and 3h30);
+  a ticket is not.** The whole ticket ships — every screen, state and check
+  it names — over as many sessions as it takes. Never narrow the scope,
+  defer part of it, or split it to fit a session; split only at a real
+  scope boundary the map would recognise (a second surface, a schema effort),
+  and then the child ticket carries the whole remainder, not "later". The
+  continuation protocol from the `wayfinder` skill applies: **keep the
+  hand-off file current at every milestone** (spec written · pre-flight
+  filled · schema/models done · surface built · first measurement · fix
+  batch · confirm), commit WIP with it (`wip(autopilot): #<ticket>
+  <milestone>`), so a hard cap loses nothing and the next session resumes
+  at the milestone, not at the start. If this is a continuation session,
+  read the hand-off file first and do not redo what it records as done.
 - If the bar cannot be reached in this session, **leave the ticket open**
-  with an `Autopilot: partial —` comment and commit what you have. The driver
-  retries on a stronger model, so write the comment as a hand-off: current
-  scores per heuristic, the path to the filled `preflight.md`, what is built
-  and verified, the open findings by heuristic, and what you would do next.
+  with an `Autopilot: continue —` comment, the hand-off file updated and the
+  tree committed. Write the hand-off for a reader with no memory of this
+  session: milestones done, what is built and verified, current scores per
+  heuristic, the path to the filled `preflight.md`, open findings by
+  heuristic, and the exact next step.
 - **Score the new UI, not the old one.** A grilling ticket may critique the
   incumbent as *evidence* for its recommendations (what the old surface got
   wrong), never as a number to beat — the grilling is about to change what

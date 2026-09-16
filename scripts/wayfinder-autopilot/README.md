@@ -41,8 +41,11 @@ so the driver passes it as the `-p` prompt, which counts as a user invocation.
 
 - `run.sh` — driver: frontier query (open, unassigned, all blockers closed, in
   sub-issue order), per-session `setsid claude -p "/wayfinder <map> <ticket>"`,
-  process-group teardown + stray dev-server/Chromium sweep, run log, retry of
-  `Autopilot: partial —` tickets (3 attempts), claim release on failure.
+  process-group teardown + stray dev-server/Chromium sweep, run log,
+  continuation of tickets left open (`Autopilot: continue —`, a cap, or an
+  exit without close: WIP committed, hand-off posted, ticket back on the
+  frontier; parked only after `MAX_ATTEMPTS` consecutive sessions with no
+  progress), claim release on failure.
 - `lessons.md` — generic lessons (any product): what earlier first passes
   missed → what to put in the spec. Read whole each session, appended at
   close, capped ~80 lines by merging. The project's own
@@ -60,5 +63,5 @@ so the driver passes it as the `-p` prompt, which counts as a user invocation.
 
 - `ALLOWED_TOOLS` in `run.sh`: sessions run in `acceptEdits` with this
   allowlist; a denied command shows up in the report as "denied". Widen here.
-- `MAX_ATTEMPTS` in `run.sh`: retries for partial execution tickets.
+- `MAX_ATTEMPTS` in `run.sh`: consecutive no-progress sessions on one ticket before it is parked; a session that commits or updates the hand-off file resets it.
 - Typical times on map #226: grilling tickets 6–16 min; execution tickets longer.

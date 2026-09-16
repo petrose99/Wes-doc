@@ -80,7 +80,7 @@ fi
 # Frontier = open, unassigned child tickets whose blockers are all closed, in
 # sub-issue order. Tickets that failed earlier this run are skipped.
 declare -A SKIP=() ATTEMPTS=()
-MAX_ATTEMPTS=3   # a ticket left open as "Autopilot: partial —" is retried this many times
+MAX_ATTEMPTS=3   # consecutive sessions on one ticket with no progress before it is parked; progress resets it
 frontier() {
   gh api "repos/$REPO/issues/$MAP/sub_issues" --paginate \
     --jq '.[] | select(.state=="open" and .assignee==null) | .number' |
@@ -131,6 +131,22 @@ MODEL_CHEAP="${MODEL_CHEAP:-$MODEL_STRONG}"
 # --effort so the autopilot never inherits whatever the user's own /model
 # choice wrote into ~/.claude/settings.json. Empty = inherit.
 EFFORT="${WAYFINDER_EFFORT:-${EFFORT:-}}"
+# Continuation. A ticket is never dropped because one session could not
+# finish it: when a session hits a cap, or exits with the ticket open and no
+# hand-off (a plain exit while "waiting" on a subagent, a decline), the tree
+# is committed as WIP and a hand-off comment is posted, and the ticket comes
+# straight back onto the frontier for the next session to continue from the
+# hand-off file (docs/wayfinder-reports/<map>/<ticket>.handoff.md — the
+# wayfinder skill keeps it current at every milestone). MAX_ATTEMPTS bounds
+# only *consecutive sessions that made no progress* (no new commit, no
+# hand-off change); a session that moved the work resets the count.
+wip_handoff() {   # $1 ticket, $2 reason
+  ( cd "$ROOT" && git add -A -- . ':!.scratch' ':!.impeccable/live' ":!docs/wayfinder-reports/$MAP/logs" && git commit -q -m "wip(autopilot): #$1 $2; continued in the next session" ) 2>/dev/null || true
+  gh issue comment "$1" --repo "$REPO" --body "Autopilot: continue — $2. Work so far is committed as WIP on the branch. Next session: read \`docs/wayfinder-reports/$MAP/$1.handoff.md\` and the last commits, continue from the milestone it names, do the build in this session (no background build agent — a session that ends its turn waiting on one exits and takes it down), keep the hand-off file current, and close at the bar. If the previous session left a question for the owner, answer it under the standing delegation and continue. Do not narrow the ticket to fit a session: the whole scope ships, over as many sessions as it takes." >/dev/null 2>&1 || true
+}
+progress_mark() {   # a fingerprint of "did this session move the work": HEAD + hand-off file
+  ( cd "$ROOT" && git rev-parse HEAD 2>/dev/null; git hash-object "$OUT/$1.handoff.md" 2>/dev/null ) | tr '\n' ' '
+}
 # MODEL_EXEC_FIRST (optional, per-project): execution tickets start on this
 # model; a ticket left "Autopilot: partial —" is retried on MODEL_STRONG.
 model_for() {   # $1 ticket, $2 attempt number (1-based)
@@ -182,7 +198,9 @@ while [ "$n" -lt "$MAX" ]; do
   # The brief is generic; the run-specific paths (lessons files, report) are
   # appended to a per-run copy, since the CLI takes only one system-prompt file.
   RUN_BRIEF="$LOGS/brief-$T.md"
-  { cat "$BRIEF"; printf '\n\n## Paths for this run\n\n- Generic lessons (every project): `%s`\n- Project lessons (this repo): `%s`\n- Report: `%s/%s.md`\n- Scratch folder for captures and the filled preflight: `%s/scratch-%s/`\n' "$GENERIC_LESSONS" "$PROJECT_LESSONS" "$OUT" "$T" "$LOGS" "$T"; } > "$RUN_BRIEF"
+  MARK0="$(progress_mark "$T")"
+  CONT=""; [ -f "$OUT/$T.handoff.md" ] && CONT="**This is a continuation session.** A previous session worked this ticket and did not close it. Read the hand-off file first and continue from the milestone it names; do not restart, re-spec or re-measure what it records as done."
+  { cat "$BRIEF"; printf '\n\n## Paths for this run\n\n- Generic lessons (every project): `%s`\n- Project lessons (this repo): `%s`\n- Report: `%s/%s.md`\n- Hand-off file (keep it current at every milestone): `%s/%s.handoff.md`\n- Scratch folder for captures and the filled preflight: `%s/scratch-%s/`\n\n%s\n' "$GENERIC_LESSONS" "$PROJECT_LESSONS" "$OUT" "$T" "$OUT" "$T" "$LOGS" "$T" "$CONT"; } > "$RUN_BRIEF"
   # Memory: the whole session (claude + dev server + headless browser + node
   # workers) runs inside one cgroup scope with a hard ceiling, so the kernel
   # reclaims/kills inside the scope instead of the box-wide earlyoom shooting
@@ -235,8 +253,7 @@ PY
     if [ "$CTX" -ge "$MAX_CTX" ]; then CAPPED="context cap (${CTX} tokens ≥ ${MAX_CTX})"; fi
     if [ -n "$CAPPED" ]; then
       echo "    #$T hit the $CAPPED — saving WIP and handing off"
-      ( cd "$ROOT" && git add -A -- . ':!.scratch' ':!.impeccable/live' ":!docs/wayfinder-reports/$MAP/logs" && git commit -q -m "wip(autopilot): #$T session hit the $CAPPED; hand-off to the next attempt" ) 2>/dev/null || true
-      gh issue comment "$T" --repo "$REPO" --body "Autopilot: partial — the session hit its $CAPPED. Work so far is committed as WIP on the branch. Next attempt: read the last commits and any report draft in docs/wayfinder-reports, measure once, close at the bar or continue the hand-off. If the remaining work is more than one session, split it: create a child task ticket for the remainder and close this one at a coherent boundary." >/dev/null 2>&1 || true
+      wip_handoff "$T" "the session hit its $CAPPED"
       pgid="$(ps -o pgid= -p "$SESSION_PID" 2>/dev/null | tr -d ' ')"
       if [ -n "$pgid" ]; then kill -TERM -- "-$pgid" 2>/dev/null || true; sleep 8; kill -KILL -- "-$pgid" 2>/dev/null || true; fi
       break
@@ -253,11 +270,22 @@ PY
   if [ "$(state "$T")" = "closed" ]; then
     OUTCOME=resolved
   else
+    # A session that moved the work (new commit or hand-off change) does not
+    # count against MAX_ATTEMPTS: the ticket is continued for as long as it
+    # keeps progressing. Only consecutive no-progress sessions exhaust it.
+    if [ "$(progress_mark "$T")" != "$MARK0" ]; then ATTEMPTS[$T]=1; PROG="progressed"; else PROG="no progress"; fi
     last="$(gh api "repos/$REPO/issues/$T/comments" --jq 'last.body // ""' | head -c 40)"
-    if [[ "$last" == "Autopilot: partial"* ]] && [ "${ATTEMPTS[$T]}" -lt "$MAX_ATTEMPTS" ]; then
-      OUTCOME="partial, attempt ${ATTEMPTS[$T]}/$MAX_ATTEMPTS — will retry"
+    if [[ "$last" != "Autopilot: partial"* && "$last" != "Autopilot: continue"* ]] && [ "${ATTEMPTS[$T]}" -lt "$MAX_ATTEMPTS" ]; then
+      # Ended on its own with the ticket open and no hand-off: keep the work,
+      # post the hand-off ourselves, continue next session.
+      echo "    #$T exited (rc=$RC) without closing or handing off — saving WIP, will continue"
+      wip_handoff "$T" "the session exited (rc=$RC) without closing or handing off"
+      last="Autopilot: continue"
+    fi
+    if [[ "$last" == "Autopilot: partial"* || "$last" == "Autopilot: continue"* ]] && [ "${ATTEMPTS[$T]}" -lt "$MAX_ATTEMPTS" ]; then
+      OUTCOME="continued ($PROG), session ${ATTEMPTS[$T]}/$MAX_ATTEMPTS without progress allowed"
     else
-      OUTCOME="not closed (rc=$RC)"; SKIP[$T]=1
+      OUTCOME="not closed (rc=$RC, $PROG) — $MAX_ATTEMPTS sessions without progress, parked"; SKIP[$T]=1
     fi
     # release the claim so the retry (or a human) can take it
     gh issue edit "$T" --repo "$REPO" --remove-assignee "$ME" >/dev/null 2>&1 || true
