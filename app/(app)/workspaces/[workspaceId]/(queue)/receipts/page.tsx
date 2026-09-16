@@ -3,6 +3,7 @@ import { listWorkspaceReceipts } from "@/models/receipts"
 import { getMinConfidencePercent } from "@/models/automation-config"
 import { requireWorkspaceRole, type WorkspaceRole } from "@/models/workspaces"
 import { listSavedViews } from "@/models/saved-views"
+import { getSavedFieldTable } from "@/models/field-configs"
 import { createSavedViewAction, deleteSavedViewAction, duplicateSavedViewAction, renameSavedViewAction, saveFiltersToViewAction, shareSavedViewAction } from "@/app/(app)/workspaces/[workspaceId]/(chrome)/saved-views-actions"
 import { ExpenseClaimsPage } from "@/app/(app)/workspaces/[workspaceId]/(chrome)/expenses/page"
 import { ReceiptQueue } from "@/components/queue/receipt-queue"
@@ -32,11 +33,12 @@ export async function ReceiptsQueuePage({ params, searchParams, selectedDocument
   const statusFilter = status === "unreviewed" || status === "reviewed" ? status : undefined
   const claimFilter = claim === "unclaimed" || claim === "claimed" ? claim : undefined
   const onlyTouchless = touchless === "1"
-  const [{ receipts }, minConfidencePercent, savedViews, matchRate] = await Promise.all([
+  const [{ receipts }, minConfidencePercent, savedViews, matchRate, fieldTable] = await Promise.all([
     listWorkspaceReceipts({ workspaceId, statusFilter, claimFilter, onlyTouchless }),
     getMinConfidencePercent(workspaceId),
     listSavedViews({ workspaceId, viewKey: "receipts", userId: user.id }),
     getDocumentMatchRateStats(workspaceId, "receipt", ["invoice_to_receipt", "po_to_receipt"]),
+    getSavedFieldTable(workspaceId, "receipt"),
   ])
   const currentViewFilters: Record<string, string> = {
     ...(statusFilter ? { status: statusFilter } : {}), ...(claimFilter ? { claim: claimFilter } : {}),
@@ -48,6 +50,7 @@ export async function ReceiptsQueuePage({ params, searchParams, selectedDocument
     basePath={basePath}
     receipts={receipts}
     minConfidencePercent={minConfidencePercent}
+    fieldTable={fieldTable}
     initialSelectedId={selectedDocumentId}
     stat={<QueueStat label="Matched" value={`${Math.round(matchRate.matchRate * 100)}%`} detail={`${matchRate.matched} of ${matchRate.total} receipts reconciled, last 30 days`} />}
     views={<SavedViewPicker views={savedViews} selectedViewId={selectedViewId ?? null} currentFilters={currentViewFilters}

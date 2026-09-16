@@ -105,7 +105,7 @@ export function GlobalSearch({ workspaceId }: { workspaceId: string }) {
         role="dialog"
         aria-modal="true"
         aria-label="Search documents"
-        className="flex max-h-[60vh] w-full max-w-xl flex-col rounded-2xl border border-[#e6ebf1] bg-white shadow-2xl"
+        className="flex max-h-[60vh] w-full max-w-xl flex-col rounded-2xl border border-hairline bg-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-3 border-b px-4 py-3 focus-within:bg-emerald-50/40">

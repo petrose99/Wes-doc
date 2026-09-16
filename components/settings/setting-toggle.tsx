@@ -22,19 +22,24 @@ export function SettingToggle({ id, label, explanation, checked, onChange, disab
   disabled?: boolean
   variant?: "block" | "inline"
 }) {
+  // #231 Q22 (#252): the inline variant's explanation is visible too — a sentence under the
+  // label in the same 12px the block variant uses — never only in `title`, which a keyboard or
+  // touch user never sees.
   if (variant === "inline") {
     return (
-      <label htmlFor={id} className="flex items-center gap-2 pb-2.5 text-[13px] text-slate-700" title={explanation}>
+      <label htmlFor={id} className="flex items-start gap-2 pb-2.5 text-[13px] text-slate-700">
         <input
           id={id}
           type="checkbox"
           checked={checked}
           disabled={disabled}
           onChange={(e) => onChange(e.target.checked)}
-          className="h-4 w-4 accent-emerald-700"
+          className="mt-0.5 h-4 w-4 accent-emerald-700"
         />
-        <span>{label}</span>
-        <span className="sr-only"> — {explanation}</span>
+        <span>
+          <span className="block">{label}</span>
+          <span className="block text-xs text-slate-500">{explanation}</span>
+        </span>
       </label>
     )
   }

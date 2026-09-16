@@ -11,6 +11,8 @@ import { resolveDocType } from "@/lib/doc-types"
 import { summarizeInvoicePoLinks, summarizePoConsumption, type PoConsumption } from "@/models/po-matching"
 import { getCurrentUser } from "@/lib/auth"
 import { parseTemplateFields } from "@/lib/document-templates"
+import { applyFieldTable, isFieldTableType } from "@/lib/configuration/field-table"
+import { getSavedFieldTable } from "@/models/field-configs"
 import type { BlocksSidecar, DocumentProvenance } from "@/lib/provenance"
 import { repairMissingBboxes } from "@/lib/provenance"
 import { prisma } from "@/lib/db"
@@ -67,7 +69,11 @@ export async function DocumentDetailPage({ params, searchParams, embedded = fals
     canPush ? getDocumentPaymentStatuses(workspaceId, [documentId]) : Promise.resolve(new Map()),
   ])
 
-  const fields = parseTemplateFields(document.fieldSnapshot)
+  // #252: Admin › Configuration › Fields overlays Required and not-editable on the template's
+  // own definitions. Only read when the workspace has saved a table for this type.
+  const configuredType = resolveDocType(document)
+  const fieldTable = isFieldTableType(configuredType) ? await getSavedFieldTable(workspaceId, configuredType) : null
+  const fields = applyFieldTable(parseTemplateFields(document.fieldSnapshot), fieldTable)
   const confidence = document.confidence as { missingRequiredFields?: string[]; fieldConfidence?: Record<string, number>; conflictingFields?: string[] } | null
   const fieldConfidence = confidence?.fieldConfidence || {}
   const conflictingLabels = (confidence?.conflictingFields || []).map((key) => fields.find((field) => field.key === key)?.label || key)

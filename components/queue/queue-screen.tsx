@@ -9,6 +9,7 @@ import { DetailPane, DETAIL_PANE_ID } from "@/components/queue/detail-pane"
 import { FacetFilters, type Facet } from "@/components/queue/facet-filters"
 import { OverrideModeProvider, useOverrideMode } from "@/components/queue/override-mode-context"
 import { confirmLeave } from "@/lib/client/unsaved-changes"
+import { orderColumnsByFieldTable, widthClassFor, type FieldTable } from "@/lib/configuration/field-table"
 
 export type QueueColumn<T> = {
   key: string
@@ -17,6 +18,9 @@ export type QueueColumn<T> = {
   narrow?: boolean
   /** Cell classes — alignment, tabular numerals, width hints. */
   className?: string
+  /** #252: the document field this column shows, so Admin › Configuration › Fields can order,
+   * size or hide it in the system views. Columns without one (state, aging, PO) keep their place. */
+  fieldKey?: string
   render: (row: T) => ReactNode
 }
 
@@ -52,6 +56,9 @@ export type QueueScreenProps<T> = {
   /** The processing-state mark at the row's leading edge (CONTEXT.md "Processing state"). */
   leading?: (row: T) => ReactNode
   columns: QueueColumn<T>[]
+  /** #252: the workspace's saved field table for this queue's type, or null when none is saved.
+   * Orders the field columns, drops Hidden ones and applies the width. */
+  fieldTable?: FieldTable | null
   /** Renders the bulk-selection checkbox column. Off for surfaces with no bulk actions. */
   selectable?: boolean
   sortOptions?: SortOption<T>[]
@@ -81,7 +88,7 @@ export type QueueScreenProps<T> = {
 const INTERACTIVE = "a, button, input, select, textarea, label, [role=button], [contenteditable=true]"
 
 function QueueScreenInner<T>({
-  title, basePath, rows, rowId, detailIdFor, rowTitle, rowSubtitle, leading, columns, selectable = false, sortOptions = [], facets = [],
+  title, basePath, rows, rowId, detailIdFor, rowTitle, rowSubtitle, leading, columns: rawColumns, fieldTable = null, selectable = false, sortOptions = [], facets = [],
   views, stat, band, menu, onExportAll, bulkActions, empty, loadDetail, paneActions, paneMenu, initialSelectedId = null, sortParam = "sort",
 }: QueueScreenProps<T>) {
   const router = useRouter()
@@ -165,6 +172,10 @@ function QueueScreenInner<T>({
   const toggleAll = () => setChecked(allChecked ? new Set() : new Set(ids))
   const clearChecked = () => setChecked(new Set())
 
+  const columns = useMemo(() => orderColumnsByFieldTable(rawColumns, fieldTable).map((column) => {
+    const width = widthClassFor(fieldTable, column.fieldKey)
+    return width ? { ...column, className: `${column.className ?? ""} ${width}` } : column
+  }), [rawColumns, fieldTable])
   const visibleColumns = openId ? columns.filter((column) => column.narrow) : columns
   const refresh = useCallback(() => { setReloadKey((k) => k + 1); router.refresh() }, [router])
   const helpers = useMemo<PaneHelpers>(() => ({ close, refresh }), [close, refresh])

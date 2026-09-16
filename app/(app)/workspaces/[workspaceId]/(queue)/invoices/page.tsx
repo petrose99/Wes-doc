@@ -3,6 +3,7 @@ import { listWorkspaceBills, type BillRow } from "@/models/bills"
 import { getMinConfidencePercent } from "@/models/automation-config"
 import { requireWorkspaceRole, type WorkspaceRole } from "@/models/workspaces"
 import { listSavedViews } from "@/models/saved-views"
+import { getSavedFieldTable } from "@/models/field-configs"
 import { createSavedViewAction, deleteSavedViewAction, duplicateSavedViewAction, renameSavedViewAction, saveFiltersToViewAction, shareSavedViewAction } from "@/app/(app)/workspaces/[workspaceId]/(chrome)/saved-views-actions"
 import { InvoiceQueue } from "@/components/queue/invoice-queue"
 import { QueueStat } from "@/components/queue/queue-stat"
@@ -36,11 +37,13 @@ export async function InvoicesQueuePage({ params, searchParams, selectedDocument
   const agingFilter = new Set((aging ?? "").split(",").filter((value): value is AgingBucket | "none" => ["current", "1-30", "31-60", "61-90", "90+", "none"].includes(value)))
   const poFilter = po === "matched" || po === "none" || po === "mismatch" ? po : undefined
   const basePath = `/workspaces/${workspaceId}/invoices`
-  const [{ bills: allBills }, minConfidencePercent, savedViews, touchlessTrend] = await Promise.all([
+  const [{ bills: allBills }, minConfidencePercent, savedViews, touchlessTrend, fieldTable] = await Promise.all([
     listWorkspaceBills({ workspaceId, onlyBlocked, onlyUnpaid, statusFilter, approvalFilter, onlyTouchless, poFilter }),
     getMinConfidencePercent(workspaceId),
     listSavedViews({ workspaceId, viewKey: "invoices", userId: user.id }),
     getTouchlessRateTrend(workspaceId),
+    // #252: Admin › Configuration › Fields, when an owner has saved one for invoices.
+    getSavedFieldTable(workspaceId, "invoice"),
   ])
   const bills = agingFilter.size === 0 ? allBills : allBills.filter((bill) => agingFilter.has(bill.agingBucket ?? "none"))
   const currentViewFilters: Record<string, string> = {
@@ -56,6 +59,7 @@ export async function InvoicesQueuePage({ params, searchParams, selectedDocument
     basePath={basePath}
     bills={bills}
     minConfidencePercent={minConfidencePercent}
+    fieldTable={fieldTable}
     initialSelectedId={selectedDocumentId}
     stat={<QueueStat label="Touchless" value={`${Math.round(touchlessTrend.touchlessRate * 100)}%`}
       detail={`${touchlessTrend.totalPushedTouchless} of ${touchlessTrend.totalExtracted} sent without review, last 30 days${trend ? `, ${trend} vs. prior 30` : ""}`}

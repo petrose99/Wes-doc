@@ -5,6 +5,8 @@ import { listWorkspaceDocuments, summarizeDocumentForReview } from "@/models/doc
 import { listWorkspaceInstitutions } from "@/models/institutions"
 import { requireWorkspaceRole } from "@/models/workspaces"
 import { DocumentQueue, type DocumentQueueRow } from "@/components/queue/document-queue"
+import { getSavedFieldTable } from "@/models/field-configs"
+import { isFieldTableType } from "@/lib/configuration/field-table"
 import { summarizePoConsumption, type PoConsumption } from "@/models/po-matching"
 import type { ItemizedRecord } from "@/components/typed-destinations/bulk-approve-receipt"
 
@@ -64,7 +66,9 @@ export async function DocumentQueuePage({ params, searchParams, docType, title, 
   const rows = purchaseOrders && (consumed === "open" || consumed === "full") ? allRows.filter((row) => (consumed === "full") === !!row.po?.fullyInvoiced) : allRows
   const segment = docType === "purchase_order" ? "purchase-orders" : "bank-statements"
 
+  const fieldTable = isFieldTableType(docType) ? await getSavedFieldTable(workspaceId, docType) : null
   return <DocumentQueue
+    fieldTable={fieldTable}
     workspaceId={workspaceId}
     basePath={`/workspaces/${workspaceId}/${segment}`}
     title={title}

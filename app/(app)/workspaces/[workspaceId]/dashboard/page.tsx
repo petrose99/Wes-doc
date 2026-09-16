@@ -135,7 +135,7 @@ export default async function WorkspaceDashboardPage({ params }: {
       </div>
     </header>
 
-    <div className="rounded-2xl border border-[#e6ebf1] bg-white p-[18px] shadow-panel sm:p-5">
+    <div className="rounded-2xl border border-hairline bg-white p-[18px] shadow-panel sm:p-5">
       {nextAction ? <>
         <div className="flex flex-wrap items-center gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600"><nextAction.icon className="h-[19px] w-[19px]" /></span>
@@ -150,7 +150,7 @@ export default async function WorkspaceDashboardPage({ params }: {
         {secondaryQueueItems.length > 0 && <ul className="mt-3.5 flex flex-wrap gap-2 border-t border-[#eef2f6] pt-3.5">
           {secondaryQueueItems.map((item) => (
             <li key={item.key}>
-              <Link href={item.href} className="inline-flex items-center gap-1.5 rounded-full border border-[#e6ebf1] bg-white px-3 py-1.5 text-[12.5px] font-medium text-slate-600 hover:border-[#c7d2fe] hover:bg-slate-50 hover:text-indigo-700">
+              <Link href={item.href} className="inline-flex items-center gap-1.5 rounded-full border border-hairline bg-white px-3 py-1.5 text-[12.5px] font-medium text-slate-600 hover:border-[#c7d2fe] hover:bg-slate-50 hover:text-indigo-700">
                 <item.icon className="h-3.5 w-3.5" />{item.message}
               </Link>
             </li>
@@ -175,14 +175,14 @@ export default async function WorkspaceDashboardPage({ params }: {
           <div className="text-[25px] font-extrabold tracking-tight text-slate-900 sm:text-[27px]">{stat.value}</div>
           <div className="mt-0.5 text-[12.5px] text-slate-500 sm:text-[13px]">{stat.label}</div>
         </>
-        const className = `rounded-2xl border border-[#e6ebf1] bg-white p-[15px_16px] shadow-panel transition-[border-color,box-shadow,transform] duration-150 sm:p-[18px] ${stat.hoverClass}`
+        const className = `rounded-2xl border border-hairline bg-white p-[15px_16px] shadow-panel transition-[border-color,box-shadow,transform] duration-150 sm:p-[18px] ${stat.hoverClass}`
         return stat.href
           ? <Link key={stat.label} href={stat.href} className={className}>{inner}</Link>
           : <div key={stat.label} className={className}>{inner}</div>
       })}
     </div>
 
-    <div className="rounded-2xl border border-[#e6ebf1] bg-white p-[18px] shadow-panel lg:p-5">
+    <div className="rounded-2xl border border-hairline bg-white p-[18px] shadow-panel lg:p-5">
       <div className="mb-3.5 flex items-center gap-2">
         <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600"><SearchCheck className="h-[17px] w-[17px]" /></span>
         <h2 className="text-[15px] font-bold text-slate-900">Needs your review</h2>
@@ -217,11 +217,11 @@ export default async function WorkspaceDashboardPage({ params }: {
         openReviewTasks={analytics.headline.openReviewTasks}
         formatMoney={formatMoney}
       />
-      <div className="rounded-2xl border border-[#e6ebf1] bg-white p-5 shadow-panel">
+      <div className="rounded-2xl border border-hairline bg-white p-5 shadow-panel">
         <h2 className="mb-4 text-[15px] font-bold text-slate-900">Spend by category</h2>
         <SpendByCategoryChart workspaceId={workspaceId} rows={analytics.spend} formatMoney={formatMoney} />
       </div>
-      <div className="rounded-2xl border border-[#e6ebf1] bg-white p-5 shadow-panel">
+      <div className="rounded-2xl border border-hairline bg-white p-5 shadow-panel">
         <VendorSpendChart rows={analytics.vendorSpend} formatMoney={formatMoney} />
       </div>
     </>}

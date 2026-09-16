@@ -82,6 +82,8 @@ export const WORKSPACE_SCOPED_MODELS = new Set([
   "ReviewRoutingRule",
   "DocumentMatch",
   "WorkspaceBudget",
+  // #252: Admin › Configuration › Fields overlay.
+  "WorkspaceFieldConfig",
 ])
 
 /** Operations that read or mutate an existing row set through a `where`, and so must be scoped.

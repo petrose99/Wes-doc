@@ -1,9 +1,8 @@
 import type { ReactNode } from "react"
 import Link from "next/link"
 
-import { AutomationTabs, type AutomationTab } from "@/components/automation/automation-tabs"
 
-/** Shared furniture for the four Automation tabs.
+/** Shared furniture for Admin (#252; was the four Controls tabs).
  *
  * The section is read as a ledger rather than a dashboard: one figure per screen earns display
  * size, everything else is a ruled row with its number right-aligned in tabular figures. That is
@@ -27,30 +26,6 @@ const STATE_FILL: Record<AutomationState, string> = {
   waiting: "bg-amber-500",
   blocked: "bg-red-500",
   idle: "bg-slate-300",
-}
-
-/** Page shell. Every tab shares one header, so the four screens stop re-announcing "Automation"
- * and the space goes to the tab's own hero instead. `status` is the one live sentence a person
- * wants before anything else: what the workspace is currently allowed to do on its own. */
-export function AutomationFrame({ workspaceId, active, reviewCount, reviewEnabled, status, showSettings = true, children }: {
-  workspaceId: string
-  active: AutomationTab
-  reviewCount: number
-  reviewEnabled: boolean
-  status: ReactNode
-  /** Settings is an owner-only page (404s for anyone else) — pass false for a non-owner viewer
-   * so the tab link doesn't render a door that slams. */
-  showSettings?: boolean
-  children: ReactNode
-}) {
-  return <main className="mx-auto w-full max-w-5xl px-4 py-8 md:px-6">
-    <header className="mb-5">
-      <h1 className="font-display text-[26px] leading-none font-semibold tracking-tight text-slate-900">Controls</h1>
-      <p className="mt-2 max-w-[68ch] text-sm leading-relaxed text-slate-600">{status}</p>
-    </header>
-    <AutomationTabs workspaceId={workspaceId} active={active} reviewCount={reviewCount} reviewEnabled={reviewEnabled} showSettings={showSettings} />
-    <div className="mt-8 space-y-10">{children}</div>
-  </main>
 }
 
 /** The one number a screen is opened for. Display face, oversized, with its own caption — nothing
@@ -118,11 +93,12 @@ export function Funnel({ total, stages }: {
 
 /** A titled region. A rule and a heading — deliberately not a card, so several on one screen still
  * read as one page. */
-export function Panel({ title, note, children }: { title: string; note?: ReactNode; children: ReactNode }) {
+export function Panel({ title, note, children, level = "h2" }: { title: string; note?: ReactNode; children: ReactNode; /** h3 for a panel nested inside another panel, so heading levels do not skip. */ level?: "h2" | "h3" }) {
+  const Heading = level
   return <section>
-    <div className="border-b border-[#e6ebf1] pb-2.5">
-      <h2 className="text-[15px] font-semibold text-slate-900">{title}</h2>
-      {note && <p className="mt-1 max-w-[72ch] text-[13px] leading-relaxed text-slate-500">{note}</p>}
+    <div className="border-b border-hairline pb-2.5">
+      <Heading className="text-[15px] font-semibold text-slate-900">{title}</Heading>
+      {note && <p className="mt-1 max-w-[62ch] text-[13px] leading-relaxed text-slate-500">{note}</p>}
     </div>
     <div className="pt-4">{children}</div>
   </section>
@@ -131,7 +107,7 @@ export function Panel({ title, note, children }: { title: string; note?: ReactNo
 /** Ruled rows: a label on the left, its figure right-aligned in tabular numerals, an optional
  * proportion bar underneath. This is the ledger line the whole section is built from. */
 export function Ledger({ children }: { children: ReactNode }) {
-  return <div className="divide-y divide-[#f1f5f9]">{children}</div>
+  return <div className="divide-y divide-hairline-soft">{children}</div>
 }
 
 export function LedgerRow({ label, value, note, share, state = "idle", href }: {
@@ -180,9 +156,9 @@ export function Sheet({ head, children, minWidth = 560 }: { head: ReactNode; chi
   return <div className="overflow-x-auto">
     <table className="w-full text-sm" style={{ minWidth }}>
       <thead>
-        <tr className="border-b border-[#e6ebf1] text-left align-bottom">{head}</tr>
+        <tr className="border-b border-hairline text-left align-bottom">{head}</tr>
       </thead>
-      <tbody className="divide-y divide-[#f1f5f9]">{children}</tbody>
+      <tbody className="divide-y divide-hairline-soft">{children}</tbody>
     </table>
   </div>
 }
@@ -193,7 +169,7 @@ export function Th({ children, align = "left" }: { children: ReactNode; align?: 
 
 /** An empty state is an instruction, not an apology: it says what fills this screen. */
 export function Empty({ title, children }: { title: string; children: ReactNode }) {
-  return <div className="rounded-md border border-dashed border-[#dbe3ec] px-6 py-10 text-center">
+  return <div className="rounded-md border border-dashed border-hairline-dashed px-6 py-10 text-center">
     <p className="text-sm font-semibold text-slate-900">{title}</p>
     <p className="mx-auto mt-1.5 max-w-[52ch] text-sm leading-relaxed text-slate-500">{children}</p>
   </div>

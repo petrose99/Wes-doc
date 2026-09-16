@@ -8,6 +8,14 @@
  * survives the section being several levels down inside server-action-returned content. */
 
 const reasons = new Map<string, string>()
+const listeners = new Set<(dirty: boolean) => void>()
+
+/** Subscribe to "is anything unsaved" changing — the Admin leave guard uses it to hold a
+ * history entry while a form is dirty so the Back button asks too. */
+export function subscribeUnsaved(listener: (dirty: boolean) => void): () => void {
+  listeners.add(listener)
+  return () => { listeners.delete(listener) }
+}
 
 function onBeforeUnload(event: BeforeUnloadEvent) {
   if (reasons.size === 0) return
@@ -22,6 +30,7 @@ export function setUnsaved(key: string, reason: string | null) {
   const has = reasons.size > 0
   if (!had && has) window.addEventListener("beforeunload", onBeforeUnload)
   if (had && !has) window.removeEventListener("beforeunload", onBeforeUnload)
+  if (had !== has) for (const listener of listeners) listener(has)
 }
 
 /** True when it is fine to leave: nothing unsaved, or the person chose to leave anyway. */

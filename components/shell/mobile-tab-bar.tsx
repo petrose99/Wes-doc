@@ -1,13 +1,14 @@
 "use client"
 
-import { AlertTriangle, Landmark, Library, ListChecks, Settings } from "lucide-react"
+import { AlertTriangle, Landmark, Library, ListChecks, UserRound } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
-/** Mobile bottom tab bar. Four slots, the interim shape decided on #237 until #232 gives the
- * phone its two-card home: Invoices (the workspace home — CONTEXT.md), Exceptions, Finance (when
- * the ledger integration is enabled) or Archive as the fallback third slot, then Settings. The
- * last slot is named for where it goes; the old "More" promised a menu that never existed.
+/** Mobile bottom tab bar. Four slots, the interim shape decided on #237 until #257 builds
+ * #232's Approvals · Invoices · Exceptions · Account: Invoices (the workspace home —
+ * CONTEXT.md), Exceptions, Finance (when the ledger integration is enabled) or Archive as the
+ * fallback third slot, then Account (#231 Q18, #252: Admin is a desktop area, so the phone's
+ * fourth tab is the person — security, switching company, sign out).
  *
  * Hidden on /sheet and /documents/ — those surfaces get their full viewport on a phone; users
  * navigate back through the surface's own header. */
@@ -30,14 +31,14 @@ export function MobileTabBar({ workspaceId, pipelineReviewCount = 0, openExcepti
     { href: `${base}/invoices`, label: "Invoices", icon: ListChecks, badge: pipelineReviewCount > 0 ? pipelineReviewCount : undefined },
     { href: `${base}/exceptions`, label: "Exceptions", icon: AlertTriangle, badge: openExceptionsCount > 0 ? openExceptionsCount : undefined },
     thirdSlot,
-    { href: `${base}/settings/workspace`, label: "Settings", icon: Settings, badge: undefined as number | undefined },
+    { href: `${base}/account`, label: "Account", icon: UserRound, badge: undefined as number | undefined },
   ]
 
   return <nav aria-label="Primary workspace navigation" className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 items-center border-t border-[#eef2f6] bg-[rgba(255,255,255,0.94)] px-2 pb-5 pt-2 backdrop-blur-[10px] md:hidden">
     {tabs.map((tab) => {
       const active = pathname === tab.href
         || pathname.startsWith(`${tab.href}/`)
-        || (tab.label === "Settings" && pathname.startsWith(`${base}/settings`))
+        || (tab.label === "Account" && (pathname.startsWith(`${base}/settings`) || pathname.startsWith(`${base}/admin`)))
         || (tab.label === "Invoices" && (pathname.startsWith(`${base}/pipeline`) || pathname.startsWith(`${base}/documents`) || pathname.startsWith(`${base}/review`) || pathname.startsWith(`${base}/bills`)))
         || (tab.label === "Finance" && pathname.startsWith(`${base}/accounting`))
       // Same cap as the rail badge: three digits of "99+" reads; four digits of a real count does not.

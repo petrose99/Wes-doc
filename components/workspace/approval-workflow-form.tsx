@@ -54,7 +54,7 @@ function StageEditor({ index, stage, members, onChange, onRemove, canRemove, nam
     return members.filter((m) => (m.name || m.email).toLowerCase().includes(needle))
   }, [members, approverFilter])
 
-  return <div className="border-t border-[#e6ebf1] py-4 first:border-t-0 first:pt-0">
+  return <div className="border-t border-hairline py-4 first:border-t-0 first:pt-0">
     <div className="flex items-center gap-2.5">
       <span className="w-5 shrink-0 text-right text-xs tabular-nums text-slate-400">{index + 1}.</span>
       <div className="flex-1">
@@ -74,7 +74,7 @@ function StageEditor({ index, stage, members, onChange, onRemove, canRemove, nam
     </div>
     {nameError && <p className="mt-1 pl-7 text-xs text-red-600">Every stage needs a name.</p>}
 
-    <details className="mt-2 pl-7 [&_summary::-webkit-details-marker]:hidden">
+    <details className="mt-2 pl-7 [&_summary::-webkit-details-marker]:hidden [&:not([open])>div]:hidden">
       <summary className="cursor-pointer text-[13px] font-medium text-emerald-700 underline underline-offset-4 hover:text-emerald-800">
         {stage.approverIds.length > 0 || stage.minAmount.trim()
           ? `Approvers & threshold — ${stage.approverIds.length > 0 ? `${stage.approverIds.length} named` : "any member"}${stage.minAmount.trim() ? `, ≥ ${stage.minAmount}` : ""}`
@@ -84,7 +84,7 @@ function StageEditor({ index, stage, members, onChange, onRemove, canRemove, nam
         <div>
           <span className="block text-xs font-medium text-slate-500">Named approvers</span>
           {members.length === 0
-            ? <p className="mt-1 text-xs text-slate-400">No workspace members to name yet.</p>
+            ? <p className="mt-1 text-xs text-slate-600">No workspace members to name yet.</p>
             : <>
               {members.length > APPROVER_SEARCH_THRESHOLD && <input
                 type="search"
@@ -92,10 +92,10 @@ function StageEditor({ index, stage, members, onChange, onRemove, canRemove, nam
                 onChange={(e) => setApproverFilter(e.target.value)}
                 placeholder="Filter members"
                 aria-label="Filter approvers"
-                className="mt-1 mb-1.5 w-full rounded-md border border-[#e6ebf1] px-2.5 py-1 text-xs focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600"
+                className="mt-1 mb-1.5 w-full rounded-md border border-hairline px-2.5 py-1 text-xs focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600"
               />}
               <div className="flex max-h-32 flex-wrap gap-1.5 overflow-y-auto">
-                {visibleMembers.length === 0 && <span className="text-xs text-slate-400">No member matches &ldquo;{approverFilter}&rdquo;.</span>}
+                {visibleMembers.length === 0 && <span className="text-xs text-slate-600">No member matches &ldquo;{approverFilter}&rdquo;.</span>}
                 {visibleMembers.map((member) => {
                   const on = stage.approverIds.includes(member.id)
                   return <button
@@ -110,7 +110,7 @@ function StageEditor({ index, stage, members, onChange, onRemove, canRemove, nam
                 })}
               </div>
             </>}
-          {stage.approverIds.length > 0 && <p className="mt-1.5 text-[11px] text-slate-500">Only these {stage.approverIds.length === 1 ? "person" : "people"} can decide this stage. Owner-only is superseded.</p>}
+          {stage.approverIds.length > 0 && <p className="mt-1.5 max-w-[48ch] text-xs text-slate-500">Only these {stage.approverIds.length === 1 ? "person" : "people"} can decide this stage. Owner-only is superseded.</p>}
           {stage.approverIds.length === 0 && <label className="mt-2 flex items-center gap-1.5 text-xs text-slate-600">
             <input type="checkbox" checked={stage.requireOwner} onChange={(event) => onChange({ requireOwner: event.target.checked })} className="h-3.5 w-3.5 accent-emerald-700" />
             Owner only
@@ -128,7 +128,7 @@ function StageEditor({ index, stage, members, onChange, onRemove, canRemove, nam
             placeholder="e.g. 10000"
             className="mt-1"
           />
-          <p className="mt-1 text-[11px] text-slate-500">Skip this stage below this amount. Blank = always applies.</p>
+          <p className="mt-1 text-xs text-slate-500">Skip this stage below this amount. Blank = always applies.</p>
         </div>
       </div>
     </details>
@@ -210,7 +210,7 @@ export function ApprovalWorkflowForm({ workspaceId, members }: { workspaceId: st
       </button>
     </div>
 
-    <div className="mt-6 border-t border-[#e6ebf1] pt-5">
+    <div className="mt-6 border-t border-hairline pt-5">
       <Button onClick={() => void submit()} disabled={pending}>{pending ? "Creating…" : "Create workflow"}</Button>
     </div>
   </div>

@@ -53,7 +53,7 @@ export function PaymentBatchDetail({ workspaceId, detail, currentUserId, isOwner
       {fileProblems.length > 0 && batch.view !== "paid" && batch.view !== "rejected" && <div role="alert" className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-800">
         <p className="flex items-center gap-1.5 font-medium"><AlertTriangle className="h-3.5 w-3.5" aria-hidden />The payment file can&apos;t be written as it stands ({fileProblems.length} problem{fileProblems.length === 1 ? "" : "s"}):</p>
         <ul className="mt-1 list-disc pl-5">{fileProblems.map((problem) => <li key={problem}>{problem}</li>)}</ul>
-        <p className="mt-1">Fix the supplier&apos;s bank details under <Link href={withOrigin(`/workspaces/${workspaceId}/settings/payments`, origin)} className="underline">Settings › Payments</Link>, then download again.</p>
+        <p className="mt-1">Fix the supplier&apos;s bank details under <Link href={withOrigin(`/workspaces/${workspaceId}/admin/suppliers`, origin)} className="underline">Admin › Suppliers</Link>, then download again.</p>
       </div>}
     </div>
 

@@ -1,12 +1,11 @@
 "use client"
 
-import { useEffect, useId, useState } from "react"
+import { useId, useState } from "react"
 import { useRouter } from "next/navigation"
-import { toast } from "sonner"
 
 import { estimateTouchlessImpactAction, updateAutomationConfigAction } from "@/app/(app)/workspaces/[workspaceId]/automation/settings/actions"
+import { AdminSaveBar } from "@/components/admin/admin-save-bar"
 import { Panel } from "@/components/automation/automation-ui"
-import { Button } from "@/components/ui/button"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -55,26 +54,28 @@ type SnapshotInput = {
 }
 const snapshot = (v: SnapshotInput) => JSON.stringify(v)
 
-function AmountBandRow({ band, onChange, onRemove }: {
+function AmountBandRow({ band, onChange, onRemove, readOnly = false }: {
   band: { min: number; max: number | null; minConfidence: number; requireVerifiedSupplier?: boolean }
   onChange: (patch: Partial<typeof band>) => void
   onRemove: () => void
+  readOnly?: boolean
 }) {
   const minId = useId()
   const maxId = useId()
   const confId = useId()
   const trustedId = useId()
   const invertedRange = band.max !== null && band.max < band.min
-  return <div className="rounded-md border border-[#e6ebf1] p-4">
+  return <div className="rounded-md border border-hairline p-4">
     <div className="grid grid-cols-1 items-end gap-3 sm:grid-cols-[1fr_1fr_1fr_auto_auto]">
       <div>
         <Label htmlFor={minId} className="text-xs text-slate-500">From</Label>
-        <Input id={minId} type="number" min={0} step="0.01" value={band.min} onChange={(e) => onChange({ min: Number(e.target.value) })} className="mt-1 tabular-nums" />
+        <Input id={minId} type="number" min={0} step="0.01" value={band.min} disabled={readOnly} onChange={(e) => onChange({ min: Number(e.target.value) })} className="mt-1 tabular-nums" />
       </div>
       <div>
         <Label htmlFor={maxId} className="text-xs text-slate-500">Up to</Label>
         <Input
           id={maxId}
+          disabled={readOnly}
           type="number"
           min={0}
           step="0.01"
@@ -105,19 +106,24 @@ function AmountBandRow({ band, onChange, onRemove }: {
         label="Trusted suppliers only"
         explanation="Only a supplier you've already verified qualifies for this band's lower confidence bar."
         checked={band.requireVerifiedSupplier ?? false}
+        disabled={readOnly}
         onChange={(checked) => onChange({ requireVerifiedSupplier: checked || undefined })}
       />
-      <button type="button" onClick={onRemove} className="pb-2.5 text-[13px] font-medium text-red-700 hover:underline">
+      {!readOnly && <button type="button" onClick={onRemove} className="pb-2.5 text-[13px] font-medium text-red-700 hover:underline">
         Remove
-      </button>
+      </button>}
     </div>
     {invertedRange && <p className="mt-2 text-xs text-red-600">&ldquo;Up to&rdquo; must be at least &ldquo;From&rdquo;.</p>}
   </div>
 }
 
-export function AutomationConfigForm({ workspaceId, initial }: { workspaceId: string; initial: AutomationConfigInitial }) {
+/** `readOnly` (#231 Q19): a member sees the form with every control disabled and no save bar —
+ * the page above it names an owner to ask. */
+export function AutomationConfigForm({ workspaceId, initial, readOnly = false }: { workspaceId: string; initial: AutomationConfigInitial; readOnly?: boolean }) {
   const router = useRouter()
   const [pending, setPending] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [savedAt, setSavedAt] = useState<number | null>(null)
   const [level, setLevel] = useState<Level>(initial.level)
   const [minConfidence, setMinConfidence] = useState(initial.minConfidence)
   const [qaSampleRate, setQaSampleRate] = useState(initial.qaSampleRate)
@@ -142,12 +148,11 @@ export function AutomationConfigForm({ workspaceId, initial }: { workspaceId: st
   const currentSnapshot = snapshot({ level, minConfidence, qaSampleRate, requirePolicyPass, blockOnWarnChecks, policyText, amountBands })
   const dirty = currentSnapshot !== savedSnapshot
 
-  useEffect(() => {
-    if (!dirty) return
-    const handler = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = "" }
-    window.addEventListener("beforeunload", handler)
-    return () => window.removeEventListener("beforeunload", handler)
-  }, [dirty])
+  const discard = () => {
+    setLevel(initial.level); setMinConfidence(initial.minConfidence); setQaSampleRate(initial.qaSampleRate)
+    setRequirePolicyPass(initial.requirePolicyPass); setBlockOnWarnChecks(initial.blockOnWarnChecks)
+    setPolicyText(initial.policyText ?? ""); setAmountBands(initial.amountBands); setSaveError(null)
+  }
 
   const addBand = () => setAmountBands([...amountBands, { min: 0, max: null, minConfidence: 0.85 }])
   const removeBand = (i: number) => setAmountBands(amountBands.filter((_, idx) => idx !== i))
@@ -158,6 +163,7 @@ export function AutomationConfigForm({ workspaceId, initial }: { workspaceId: st
 
   const persist = async () => {
     setPending(true)
+    setSaveError(null)
     try {
       const result = await updateAutomationConfigAction({
         workspaceId,
@@ -172,10 +178,10 @@ export function AutomationConfigForm({ workspaceId, initial }: { workspaceId: st
         },
       })
       if ("error" in result) {
-        toast.error(result.error)
+        setSaveError(`Couldn't save — ${result.error} Your changes are still here.`)
       } else {
-        toast.success("Controls settings saved")
         setSavedSnapshot(currentSnapshot)
+        setSavedAt(Date.now())
         router.refresh()
       }
     } finally {
@@ -184,10 +190,7 @@ export function AutomationConfigForm({ workspaceId, initial }: { workspaceId: st
   }
 
   const submit = async () => {
-    if (bandsInvalid) {
-      toast.error("Fix the confidence-by-amount bands before saving — \"Up to\" must be at least \"From\".")
-      return
-    }
+    if (bandsInvalid) return
     if (level === "touchless" && initial.level !== "touchless") {
       setTouchlessConfirm({ open: true, loading: true, estimate: null })
       const result = await estimateTouchlessImpactAction({ workspaceId, minConfidence })
@@ -208,7 +211,7 @@ export function AutomationConfigForm({ workspaceId, initial }: { workspaceId: st
   return <div className="space-y-10">
     <fieldset>
       <legend className="sr-only">Autonomy level</legend>
-      <div className="grid gap-px overflow-hidden rounded-md border border-[#e6ebf1] bg-[#e6ebf1] sm:grid-cols-3">
+      <div className="grid gap-px overflow-hidden rounded-md border border-hairline bg-hairline sm:grid-cols-3">
         {LEVELS.map((option, index) => {
           const selected = level === option.value
           const reached = index <= reachedIndex
@@ -216,7 +219,7 @@ export function AutomationConfigForm({ workspaceId, initial }: { workspaceId: st
           return (
             <label
               key={option.value}
-              className={`group relative cursor-pointer p-4 transition-colors focus-within:outline focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-emerald-600 ${selected ? "bg-emerald-50" : "bg-white hover:bg-slate-50"}`}
+              className={`group relative ${readOnly ? "" : "cursor-pointer"} p-4 transition-colors focus-within:outline focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-emerald-600 ${selected ? "bg-emerald-50" : "bg-white hover:bg-slate-50"}`}
             >
               {/* The rung marker: filled up to the level in force, so the ladder reads left to right. */}
               <span className={`mb-3 block h-1 rounded-full ${reached ? "bg-emerald-600" : "bg-slate-200"}`} aria-hidden />
@@ -226,6 +229,7 @@ export function AutomationConfigForm({ workspaceId, initial }: { workspaceId: st
                   name="level"
                   value={option.value}
                   checked={selected}
+                  disabled={readOnly}
                   onChange={() => setLevel(option.value)}
                   aria-label={option.name}
                   aria-describedby={blurbId}
@@ -243,7 +247,7 @@ export function AutomationConfigForm({ workspaceId, initial }: { workspaceId: st
 
     <div className={touchless ? "space-y-10" : "space-y-10 opacity-55"}>
       {!touchless && (
-        <p className="rounded-md border border-dashed border-[#dbe3ec] px-4 py-3 text-[13px] text-slate-600">
+        <p className="max-w-[60ch] rounded-md border border-dashed border-hairline-dashed px-4 py-3 text-[13px] leading-relaxed text-slate-600">
           These control what counts as confident enough to publish, so they only take effect at Touchless.
           You can set them up now and switch the level when you are ready.
         </p>
@@ -260,6 +264,7 @@ export function AutomationConfigForm({ workspaceId, initial }: { workspaceId: st
               max={1}
               step={0.01}
               value={minConfidence}
+              disabled={readOnly}
               onChange={(e) => setMinConfidence(Number(e.target.value))}
               onBlur={(e) => setMinConfidence(clamp01(Number(e.target.value)))}
               className="mt-1.5 tabular-nums"
@@ -275,46 +280,55 @@ export function AutomationConfigForm({ workspaceId, initial }: { workspaceId: st
               max={1}
               step={0.01}
               value={qaSampleRate}
+              disabled={readOnly}
               onChange={(e) => setQaSampleRate(Number(e.target.value))}
               onBlur={(e) => setQaSampleRate(clamp01(Number(e.target.value)))}
               className="mt-1.5 tabular-nums"
             />
-            <p className="mt-1.5 text-xs text-slate-500">
-              How much of the published work is spot-checked anyway. 0.05 sends one in twenty to a reviewer without holding it up.
+            <p className="mt-1.5 max-w-[48ch] text-xs text-slate-500">
+              How much of the published work is spot-checked anyway.{" "}
+              {qaSampleRate > 0 && qaSampleRate <= 1 ? `${qaSampleRate.toFixed(2)} sends about one in ${Math.max(1, Math.round(1 / qaSampleRate))} to a reviewer without holding it up.` : "0 spot-checks nothing."}
             </p>
           </div>
         </div>
       </Panel>
 
       <Panel title="What blocks a publish" note="Conditions that send a document to review no matter how confident the coding is.">
-        <div className="divide-y divide-[#f1f5f9]">
+        <div className="divide-y divide-hairline-soft">
           <SettingToggle
             id="requirePolicyPass"
             label="The policy check has to pass"
             explanation="A document the policy rejects, or that the check could not evaluate, goes to a person."
             checked={requirePolicyPass}
             onChange={setRequirePolicyPass}
+            disabled={readOnly}
           />
+          <div className="py-3">
+            <Label htmlFor="policyText" className="text-sm text-slate-900">The policy, in plain language</Label>
+            <Textarea
+              id="policyText"
+              rows={3}
+              value={policyText}
+              disabled={readOnly}
+              onChange={(e) => setPolicyText(e.target.value)}
+              placeholder="Expenses over R 10 000 need a receipt attached."
+              className="mt-1.5"
+            />
+            <p className="mt-1.5 max-w-[60ch] text-xs text-slate-500">Checked against every document before it publishes. Leave it empty and no policy check runs.</p>
+          </div>
           <SettingToggle
             id="blockOnWarnChecks"
             label="Any warning stops it, not just a failure"
             explanation="Stricter: arithmetic and duplicate warnings hold the document back too."
             checked={blockOnWarnChecks}
             onChange={setBlockOnWarnChecks}
+            disabled={readOnly}
           />
+          <p className="max-w-[60ch] pt-3 text-[13px] leading-relaxed text-slate-600">
+            A required field with no value also holds a document in review. Which fields are required is set under{" "}
+            <a href={`/workspaces/${workspaceId}/admin/configuration`} className="font-medium text-emerald-700 underline-offset-2 hover:underline">Fields</a>.
+          </p>
         </div>
-      </Panel>
-
-      <Panel title="Policy" note="Written in plain language and checked against every document before it publishes.">
-        <Label htmlFor="policyText" className="sr-only">Policy</Label>
-        <Textarea
-          id="policyText"
-          rows={4}
-          value={policyText}
-          onChange={(e) => setPolicyText(e.target.value)}
-          placeholder="Expenses over $1,000 need a receipt attached."
-        />
-        <p className="mt-1.5 text-xs text-slate-500">Leave this empty and no policy check runs.</p>
       </Panel>
 
       <Panel
@@ -322,31 +336,26 @@ export function AutomationConfigForm({ workspaceId, initial }: { workspaceId: st
         note="A small invoice from a supplier you trust can clear a lower bar than a large one. Bands are read top to bottom and the first match wins."
       >
         {amountBands.length === 0
-          ? <div className="rounded-md border border-dashed border-[#dbe3ec] px-4 py-6 text-center">
+          ? <div className="rounded-md border border-dashed border-hairline-dashed px-4 py-6 text-center">
               <p className="text-sm text-slate-600">Every document is held to the workspace minimum above.</p>
-              <button type="button" onClick={addBand} className="mt-2 text-sm font-medium text-emerald-700 underline underline-offset-4 hover:text-emerald-800">
+              {!readOnly && <button type="button" onClick={addBand} className="mt-2 text-sm font-medium text-emerald-700 underline underline-offset-4 hover:text-emerald-800">
                 Add a band
-              </button>
+              </button>}
             </div>
           : <div className="space-y-3">
               {amountBands.map((band, i) => (
-                <AmountBandRow key={i} band={band} onChange={(patch) => updateBand(i, patch)} onRemove={() => removeBand(i)} />
+                <AmountBandRow key={i} band={band} onChange={(patch) => updateBand(i, patch)} onRemove={() => removeBand(i)} readOnly={readOnly} />
               ))}
-              <button type="button" onClick={addBand} className="text-sm font-medium text-emerald-700 underline underline-offset-4 hover:text-emerald-800">
+              {!readOnly && <button type="button" onClick={addBand} className="text-sm font-medium text-emerald-700 underline underline-offset-4 hover:text-emerald-800">
                 Add a band
-              </button>
+              </button>}
             </div>}
       </Panel>
     </div>
 
-    <div className="flex items-center gap-3 border-t border-[#e6ebf1] pt-5">
-      <Button onClick={() => void submit()} disabled={pending || bandsInvalid}>{pending ? "Saving" : "Save changes"}</Button>
-      {dirty && !pending && <span className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-700">
-        <span className="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden="true" />
-        Unsaved changes
-      </span>}
-      {bandsInvalid && <p className="text-xs text-red-600">Fix the confidence-by-amount bands above before saving.</p>}
-    </div>
+    <AdminSaveBar dirty={dirty} pending={pending} error={saveError} savedAt={savedAt} disabled={readOnly} onSavedShown={() => setSavedAt(null)}
+      blocker={bandsInvalid ? "Fix the confidence-by-amount bands above before saving." : null}
+      onSave={() => void submit()} onDiscard={discard} />
 
     <ConfirmDialog
       open={touchlessConfirm.open}
@@ -357,14 +366,14 @@ export function AutomationConfigForm({ workspaceId, initial }: { workspaceId: st
       onConfirm={() => void confirmTouchless()}
       onCancel={() => setTouchlessConfirm({ open: false, loading: false, estimate: null })}
     >
-      <div className="rounded-md border border-[#e6ebf1] bg-slate-50 px-3 py-2.5 text-[13px] text-slate-700">
+      <div className="rounded-md border border-hairline bg-slate-50 px-3 py-2.5 text-[13px] text-slate-700">
         {touchlessConfirm.loading
           ? "Estimating from the last 30 days…"
           : touchlessConfirm.estimate
             ? touchlessConfirm.estimate.totalRecent === 0
               ? "No documents in the last 30 days to estimate from — this workspace's own history will start filling in as new ones arrive."
               : <>
-                Of the last 30 days' <strong className="tabular-nums">{touchlessConfirm.estimate.totalRecent}</strong> documents,{" "}
+                Of the last 30 days&rsquo; <strong className="tabular-nums">{touchlessConfirm.estimate.totalRecent}</strong> documents,{" "}
                 about <strong className="tabular-nums">{touchlessConfirm.estimate.eligible}</strong> would have cleared this bar on extraction confidence alone.
                 <span className="mt-1 block text-[11px] text-slate-500">An estimate — checks, policy, and supplier cold-start can still hold a document back even past this line.</span>
               </>

@@ -45,11 +45,6 @@ export default async function ApprovalFlowsPage({ params }: { params: Promise<{ 
 
   return <AdminPage title="Approval Flows" intro="Route an invoice through named stages before it counts as approved, with named approvers or an amount threshold per stage. Approvals start by hand from the Invoices bulk bar.">
     {!owner && <ReadOnlyBand owners={context.owners} />}
-    {owner && (
-      <Panel title="Add a workflow" note="Name it, list the stages in order, and pick who decides each one.">
-        <ApprovalWorkflowForm workspaceId={workspaceId} members={memberOptions} />
-      </Panel>
-    )}
 
     <Panel title="Workflows" note={`${workflows.length} workflow${workflows.length === 1 ? "" : "s"} in this workspace.`}>
       {!workflows.length
@@ -85,5 +80,11 @@ export default async function ApprovalFlowsPage({ params }: { params: Promise<{ 
             ))}
           </div>}
     </Panel>
+
+    {owner && (
+      <Panel title="Add a workflow" note="Name it, list the stages in order, and pick who decides each one.">
+        <ApprovalWorkflowForm workspaceId={workspaceId} members={memberOptions} />
+      </Panel>
+    )}
   </AdminPage>
 }

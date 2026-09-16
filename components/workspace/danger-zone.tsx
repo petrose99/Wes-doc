@@ -2,7 +2,7 @@
 
 import { deleteWorkspaceAction, leaveWorkspaceAction, renameWorkspaceAction } from "@/app/(app)/workspaces/[workspaceId]/workspace-actions"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/admin/panel-card"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { Dialog } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -26,6 +26,8 @@ export function WorkspaceDangerZone({ workspaceId, workspaceName, workspaceKind,
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [name, setName] = useState(workspaceName)
+  // #231 Q8: "Company" in Admin; a personal workspace is the one thing that is not a company.
+  const noun = workspaceKind === "personal" ? "workspace" : "company"
   const [deleting, setDeleting] = useState(false)
   const [confirmName, setConfirmName] = useState("")
   const [leaving, setLeaving] = useState(false)
@@ -42,20 +44,20 @@ export function WorkspaceDangerZone({ workspaceId, workspaceName, workspaceKind,
       setConfirmingLastReviewer(true)
       return
     }
-    if (!result.success) { toast.error(result.error || "Could not leave the workspace"); return }
+    if (!result.success) { toast.error(result.error ? `Couldn't leave — ${result.error} Nothing changed.` : "Couldn't leave — the server didn't say why. Nothing changed."); return }
     escapeToWorkspaceList()
   })
 
   if (!owner) {
     return <Card>
       <CardHeader>
-        <CardTitle>Leave workspace</CardTitle>
+        <CardTitle>Leave this {noun}</CardTitle>
         <CardDescription>You lose access to every file in {workspaceName}. An owner would have to invite you back.</CardDescription>
       </CardHeader>
       <CardContent>
-        <Button type="button" variant="destructive" disabled={pending || workspaceKind === "personal"} onClick={() => setLeaving(true)}>Leave workspace</Button>
-        {workspaceKind === "personal" && <p className="mt-2 text-sm text-muted-foreground">A personal workspace cannot be left.</p>}
-        <ConfirmDialog open={leaving} destructive busy={pending} title="Leave this workspace?" description="You lose access to its files immediately." confirmLabel="Leave"
+        <Button type="button" variant="destructive" disabled={pending || workspaceKind === "personal"} onClick={() => setLeaving(true)}>Leave this {noun}</Button>
+        {workspaceKind === "personal" && <p className="mt-2 text-sm text-slate-600">A personal workspace cannot be left.</p>}
+        <ConfirmDialog open={leaving} destructive busy={pending} title={`Leave this ${noun}?`} description="You lose access to its files immediately." confirmLabel="Leave"
           onCancel={() => setLeaving(false)}
           onConfirm={() => leave()} />
         <ConfirmDialog open={confirmingLastReviewer} destructive busy={pending} title="You are the last reviewer" description="Leaving drops this workspace to SMB mode. This cannot be undone from here." confirmLabel="Leave anyway"
@@ -68,7 +70,7 @@ export function WorkspaceDangerZone({ workspaceId, workspaceName, workspaceKind,
   return <div className="space-y-6">
     <Card>
       <CardHeader>
-        <CardTitle>Workspace name</CardTitle>
+        <CardTitle>{noun === "company" ? "Company name" : "Workspace name"}</CardTitle>
         <CardDescription>Shown in the sidebar switcher and on every invitation.</CardDescription>
       </CardHeader>
       <CardContent>
@@ -76,8 +78,8 @@ export function WorkspaceDangerZone({ workspaceId, workspaceName, workspaceKind,
           event.preventDefault()
           startTransition(async () => {
             const result = await renameWorkspaceAction(workspaceId, name)
-            if (!result.success) { toast.error(result.error || "Could not rename the workspace"); return }
-            toast.success("Workspace renamed")
+            if (!result.success) { toast.error(result.error ? `Couldn't rename — ${result.error} Nothing changed.` : "Couldn't rename — the server didn't say why. Nothing changed."); return }
+            toast.success(noun === "company" ? "Company renamed" : "Workspace renamed")
             router.refresh()
           })
         }}>
@@ -87,27 +89,24 @@ export function WorkspaceDangerZone({ workspaceId, workspaceName, workspaceKind,
       </CardContent>
     </Card>
 
-    <Card className="border-destructive/30">
-      <CardHeader className="flex-row items-start gap-3 space-y-0 rounded-t-xl border-b border-destructive/20 bg-destructive/5">
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive"><TriangleAlert className="h-4 w-4" /></span>
-        <span className="space-y-1">
-          <CardTitle className="text-destructive">Delete workspace</CardTitle>
-          <CardDescription>Permanently deletes every file, document, uploaded source and extraction sheet in {workspaceName}. This cannot be undone.</CardDescription>
-        </span>
+    <Card>
+      <CardHeader className="border-red-200">
+        <CardTitle className="flex items-center gap-2 text-red-800"><TriangleAlert className="h-4 w-4 shrink-0" aria-hidden />Delete this {noun}</CardTitle>
+        <CardDescription>Permanently deletes every file, document, uploaded source and extraction sheet in {workspaceName}. This cannot be undone.</CardDescription>
       </CardHeader>
-      <CardContent className="pt-6">
-        <Button type="button" variant="destructive" disabled={pending} onClick={() => { setConfirmName(""); setDeleting(true) }}>Delete this workspace</Button>
+      <CardContent>
+        <Button type="button" variant="destructive" disabled={pending} onClick={() => { setConfirmName(""); setDeleting(true) }}>Delete this {noun}</Button>
       </CardContent>
     </Card>
 
     {/* ConfirmDialog cannot collect text, and this is the one confirmation worth making the
         user type out — so it uses the plain Dialog with its own confirm field. */}
-    <Dialog open={deleting} title="Delete this workspace?" description={`Type “${workspaceName}” to confirm. Every document and uploaded file is deleted permanently.`} onClose={() => setDeleting(false)}>
+    <Dialog open={deleting} title={`Delete this ${noun}?`} description={`Type “${workspaceName}” to confirm. Every document and uploaded file is deleted permanently.`} onClose={() => setDeleting(false)}>
       <form className="space-y-3 px-5 py-4" onSubmit={(event) => {
         event.preventDefault()
         startTransition(async () => {
           const result = await deleteWorkspaceAction(workspaceId)
-          if (!result.success) { toast.error(result.error || "Could not delete the workspace"); return }
+          if (!result.success) { toast.error(result.error ? `Couldn't delete — ${result.error} Nothing changed.` : "Couldn't delete — the server didn't say why. Nothing changed."); return }
           escapeToWorkspaceList()
         })
       }}>

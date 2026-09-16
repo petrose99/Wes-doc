@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react"
 import { toast } from "sonner"
 import { AlertTriangle, CheckCircle2, ExternalLink, Loader2, Search } from "lucide-react"
+import type { FieldTable } from "@/lib/configuration/field-table"
 import { QueueScreen, type QueueColumn, type SortOption } from "@/components/queue/queue-screen"
 import { PaneMenuItem } from "@/components/queue/detail-pane"
 import { DocumentBulkActions, DocumentPaneActions } from "@/components/queue/document-actions"
@@ -71,7 +72,9 @@ function StatusPill({ status }: { status: string }) {
   return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}>{STATUS_LABEL[status] ?? status.replaceAll("_", " ")}</span>
 }
 
-export function DocumentQueue({ workspaceId, basePath, title, noun, itemType, rows, supplierLabel = "Supplier", views, stat, initialSelectedId, emptyBody, showInstitution = false, purchaseOrders = false }: {
+export function DocumentQueue({ workspaceId, basePath, title, noun, itemType, rows, supplierLabel = "Supplier", views, stat, initialSelectedId, emptyBody, showInstitution = false, purchaseOrders = false, fieldTable = null }: {
+  /** #252: Admin › Configuration › Fields for this queue's type, when one has been saved. */
+  fieldTable?: FieldTable | null
   workspaceId: string
   basePath: string
   title: string
@@ -97,7 +100,7 @@ export function DocumentQueue({ workspaceId, basePath, title, noun, itemType, ro
 
   const columns: QueueColumn<DocumentQueueRow>[] = [
     {
-      key: "supplier", label: supplierLabel, narrow: true, className: "min-w-[12rem]",
+      key: "supplier", label: supplierLabel, narrow: true, className: "min-w-[12rem]", fieldKey: purchaseOrders ? "supplier" : "bank_name",
       render: (row) => <TitleCell title={row.supplier ?? (showInstitution ? row.institution ?? null : null)} subtitle={row.filename} missingLabel={`Unknown ${supplierLabel.toLowerCase()}`} />,
     },
     ...(showInstitution ? [{ key: "institution", label: "Institution", className: "whitespace-nowrap text-slate-700", render: (row: DocumentQueueRow) => <>{row.institution ?? "—"}</> }] : []),
@@ -105,8 +108,8 @@ export function DocumentQueue({ workspaceId, basePath, title, noun, itemType, ro
     // Received. No Buyer. "Received" here is the goods-receipt fact DocuBite lacks, so it reads "—"
     // rather than borrowing the upload date; the upload date keeps its own column on the others.
     ...(purchaseOrders ? [
-      { key: "po_number", label: "PO #", narrow: true, className: "whitespace-nowrap tabular-nums text-slate-700", render: (row: DocumentQueueRow) => <>{row.po?.poNumber ?? "—"}</> },
-      { key: "amount", label: "Amount", narrow: true, className: "whitespace-nowrap text-right tabular-nums text-slate-900", render: (row: DocumentQueueRow) => <>{row.total ?? "—"}</> },
+      { key: "po_number", label: "PO #", narrow: true, className: "whitespace-nowrap tabular-nums text-slate-700", fieldKey: "po_number", render: (row: DocumentQueueRow) => <>{row.po?.poNumber ?? "—"}</> },
+      { key: "amount", label: "Amount", narrow: true, className: "whitespace-nowrap text-right tabular-nums text-slate-900", fieldKey: "total", render: (row: DocumentQueueRow) => <>{row.total ?? "—"}</> },
       { key: "invoiced", label: "Invoiced", className: "whitespace-nowrap text-right tabular-nums", render: (row: DocumentQueueRow) => row.po && row.po.invoiceCount > 0
         ? <span className={row.po.mismatchCount ? "text-red-700" : "text-slate-800"} title={row.po.mismatchCount ? `${row.po.mismatchCount} cell${row.po.mismatchCount === 1 ? "" : "s"} on the matched invoices do not match` : undefined}>
           {formatMoney(row.po.invoicedAmount, row.po.currencyCode)}{row.po.invoicedPercent !== null && <span className="ml-1 text-xs text-slate-500">{row.po.invoicedPercent} %</span>}
@@ -146,6 +149,7 @@ export function DocumentQueue({ workspaceId, basePath, title, noun, itemType, ro
     rowSubtitle={(row) => purchaseOrders && row.po ? [row.po.poNumber, row.po.invoiceCount ? `${row.po.invoiceCount} invoice${row.po.invoiceCount === 1 ? "" : "s"}` : null, row.po.fullyInvoiced ? "Fully invoiced" : null].filter(Boolean).join(" · ") || row.filename : row.supplier || row.institution ? row.filename : null}
     leading={(row) => <StateGlyph status={row.status} />}
     columns={columns}
+    fieldTable={fieldTable}
     selectable
     sortOptions={SORTS}
     facets={purchaseOrders ? PURCHASE_ORDER_FACETS : DOCUMENT_FACETS}

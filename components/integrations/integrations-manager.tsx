@@ -1,7 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/admin/panel-card"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -75,11 +75,11 @@ function AccountingConnectionCard({ workspaceId, connection, isOwner, onChanged 
   }
 
   return (
-    <li className="rounded border px-3 py-2">
+    <li className="rounded-md border border-hairline px-3 py-2">
       <div className="flex items-center justify-between gap-3">
         <span className="min-w-0">
           <span className="font-medium">{PROVIDER_LABELS[connection.provider] ?? connection.provider}</span>{" "}
-          <span className="text-xs text-muted-foreground">{connection.tenantName || connection.externalTenantId}</span>
+          <span className="text-xs text-slate-600">{connection.tenantName || connection.externalTenantId}</span>
           {connection.status === "needs_reauth" && <span className="ml-2 text-xs text-red-600">needs reconnect</span>}
         </span>
         {isOwner && connection.status === "active" && (
@@ -100,13 +100,13 @@ function AccountingConnectionCard({ workspaceId, connection, isOwner, onChanged 
         )}
       </div>
       {isOwner && connection.status === "active" && (
-        <p className="mt-1 text-xs text-muted-foreground">
+        <p className="mt-1 text-xs text-slate-600">
           {connection.lastSyncedAt ? `Accounts last synced ${connection.lastSyncedAt.toLocaleString()}` : "Accounts not yet synced"}
         </p>
       )}
       {isOwner && connection.status === "active" && (
         <div className="mt-2 flex items-center gap-2 text-xs">
-          <Label htmlFor={`account-${connection.id}`} className="shrink-0 text-muted-foreground">Default expense account</Label>
+          <Label htmlFor={`account-${connection.id}`} className="shrink-0 text-slate-600">Default expense account</Label>
           {accounts === null ? (
             <Button type="button" size="sm" variant="outline" disabled={loadingAccounts} onClick={loadAccounts}>
               {connection.defaultExpenseAccountName || (loadingAccounts ? "Loading…" : "Choose account")}
@@ -206,7 +206,7 @@ export function IntegrationsManager({
   const anyProviderConfigured = accountingProviders.quickbooks || accountingProviders.xero
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-10">
       {/* Accounting connectors (P2) — omitted entirely if neither provider is configured on this deployment. */}
       {anyProviderConfigured && (
         <Card>
@@ -232,7 +232,7 @@ export function IntegrationsManager({
                     )
                   }
                   return (
-                    <li key={provider} className="flex items-center justify-between rounded border px-3 py-2">
+                    <li key={provider} className="flex items-center justify-between rounded-md border border-hairline px-3 py-2">
                       <span className="font-medium">{PROVIDER_LABELS[provider]}</span>
                       {isOwner ? (
                         <a
@@ -242,7 +242,7 @@ export function IntegrationsManager({
                           Connect
                         </a>
                       ) : (
-                        <span className="text-xs text-muted-foreground">Not connected</span>
+                        <span className="text-xs text-slate-600">Not connected</span>
                       )}
                     </li>
                   )
@@ -277,14 +277,14 @@ export function IntegrationsManager({
           )}
           <ul className="space-y-1 text-sm">
             {apiKeys.map((key) => (
-              <li key={key.id} className="flex items-center justify-between gap-3 rounded border px-3 py-2">
+              <li key={key.id} className="flex items-center justify-between gap-3 rounded-md border border-hairline px-3 py-2">
                 <span className="min-w-0">
                   <span className="font-medium">{key.name}</span>{" "}
-                  <code className="font-mono text-xs text-muted-foreground">{key.keyPrefix}…</code>
+                  <code className="font-mono text-xs text-slate-600">{key.keyPrefix}…</code>
                   {key.revokedAt && <span className="ml-2 text-xs text-red-600">revoked</span>}
                 </span>
                 <span className="flex items-center gap-3">
-                  <span className="text-xs text-muted-foreground">{key.lastUsedAt ? `used ${new Date(key.lastUsedAt).toLocaleDateString()}` : "never used"}</span>
+                  <span className="text-xs text-slate-600">{key.lastUsedAt ? `used ${new Date(key.lastUsedAt).toLocaleDateString()}` : "never used"}</span>
                   {isOwner && !key.revokedAt && (
                     <Button type="button" size="sm" variant="ghost" disabled={pending}
                       onClick={() => setRevokeKey(key)}>
@@ -294,7 +294,7 @@ export function IntegrationsManager({
                 </span>
               </li>
             ))}
-            {!apiKeys.length && <li className="text-muted-foreground">No API keys yet.</li>}
+            {!apiKeys.length && <li className="text-slate-600">No API keys yet.</li>}
           </ul>
           <ConfirmDialog
             open={revokeKey !== null}
@@ -335,7 +335,7 @@ export function IntegrationsManager({
                 <Input id="endpoint-url" type="url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://hooks.example.com/docubite" required />
               </div>
               <fieldset>
-                <legend className="text-sm font-medium">Events <span className="font-normal text-muted-foreground">(none selected = all)</span></legend>
+                <legend className="text-sm font-medium">Events <span className="font-normal text-slate-600">(none selected = all)</span></legend>
                 <div className="mt-1 grid grid-cols-2 gap-1 sm:grid-cols-3">
                   {eventTypes.map((type) => (
                     <label key={type} className="flex items-center gap-2 text-xs">
@@ -350,10 +350,10 @@ export function IntegrationsManager({
           )}
           <ul className="space-y-1 text-sm">
             {endpoints.map((endpoint) => (
-              <li key={endpoint.id} className="flex items-center justify-between gap-3 rounded border px-3 py-2">
+              <li key={endpoint.id} className="flex items-center justify-between gap-3 rounded-md border border-hairline px-3 py-2">
                 <span className="min-w-0">
                   <span className="block truncate font-mono text-xs">{endpoint.url}</span>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-xs text-slate-600">
                     {endpoint.events.length ? endpoint.events.join(", ") : "all events"}
                     {endpoint.status !== "active" && <span className="ml-2 text-red-600">disabled</span>}
                   </span>
@@ -372,7 +372,7 @@ export function IntegrationsManager({
                 )}
               </li>
             ))}
-            {!endpoints.length && <li className="text-muted-foreground">No webhook endpoints yet.</li>}
+            {!endpoints.length && <li className="text-slate-600">No webhook endpoints yet.</li>}
           </ul>
           <ConfirmDialog
             open={deleteEndpoint !== null}
@@ -399,7 +399,7 @@ export function IntegrationsManager({
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b text-left text-xs text-muted-foreground">
+                <tr className="border-b text-left text-xs text-slate-600">
                   <th className="py-2 pr-3">Event</th>
                   <th className="py-2 pr-3">Status</th>
                   <th className="py-2 pr-3">Response</th>
@@ -413,10 +413,10 @@ export function IntegrationsManager({
                     <td className="py-2 pr-3 font-mono text-xs">{d.eventType}</td>
                     <td className="py-2 pr-3">
                       <span className={d.status === "delivered" ? "text-emerald-700" : d.status === "failed" ? "text-red-600" : "text-indigo-700"}>{d.status}</span>
-                      {d.attempts > 1 && <span className="text-xs text-muted-foreground"> ·{d.attempts}×</span>}
+                      {d.attempts > 1 && <span className="text-xs text-slate-600"> ·{d.attempts}×</span>}
                     </td>
-                    <td className="py-2 pr-3 text-xs text-muted-foreground">{d.responseStatus ?? d.errorCode ?? "—"}</td>
-                    <td className="py-2 pr-3 text-xs text-muted-foreground">{new Date(d.createdAt).toLocaleString()}</td>
+                    <td className="py-2 pr-3 text-xs text-slate-600">{d.responseStatus ?? d.errorCode ?? "—"}</td>
+                    <td className="py-2 pr-3 text-xs text-slate-600">{new Date(d.createdAt).toLocaleString()}</td>
                     <td className="py-2 text-right">
                       {isOwner && d.status !== "delivered" && (
                         <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={() => run(() => redeliverDeliveryAction(workspaceId, d.id))}>Redeliver</Button>
@@ -425,7 +425,7 @@ export function IntegrationsManager({
                   </tr>
                 ))}
                 {!deliveries.length && (
-                  <tr><td colSpan={5} className="py-3 text-muted-foreground">No deliveries yet.</td></tr>
+                  <tr><td colSpan={5} className="py-3 text-slate-600">No deliveries yet.</td></tr>
                 )}
               </tbody>
             </table>

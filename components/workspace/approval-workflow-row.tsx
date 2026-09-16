@@ -23,14 +23,14 @@ export function ApprovalWorkflowRowControls({ workspaceId, workflowId, workflowN
       const result = await setApprovalWorkflowActiveAction(workspaceId, workflowId, next)
       if (!result.success) {
         setOptimisticActive(!next)
-        toast.error(result.error || "Could not update the workflow")
+        toast.error(result.error ? `Couldn't update the workflow — ${result.error} Nothing changed.` : "Couldn't update the workflow — the server didn't say why. Nothing changed.")
         return
       }
       toast.success(next ? `"${workflowName}" is active` : `"${workflowName}" is inactive`)
       router.refresh()
     } catch {
       setOptimisticActive(!next)
-      toast.error("Could not reach the server")
+      toast.error("Couldn't reach the server. Nothing changed.")
     } finally { setPending(false) }
   }
 
@@ -38,11 +38,11 @@ export function ApprovalWorkflowRowControls({ workspaceId, workflowId, workflowN
     setPending(true)
     try {
       const result = await deleteApprovalWorkflowAction(workspaceId, workflowId)
-      if (!result.success) { toast.error(result.error || "Could not delete the workflow"); return }
+      if (!result.success) { toast.error(result.error ? `Couldn't delete the workflow — ${result.error} Nothing changed.` : "Couldn't delete the workflow — the server didn't say why. Nothing changed."); return }
       toast.success("Workflow deleted")
       router.refresh()
     } catch {
-      toast.error("Could not reach the server")
+      toast.error("Couldn't reach the server. Nothing changed.")
     } finally { setPending(false); setConfirmOpen(false) }
   }
 

@@ -217,6 +217,7 @@ model Workspace {
   payerAccounts      PayerAccount[]
   invoicePayments    InvoicePayment[]
   billPayPreferences BillPayPreference[]
+  fieldConfigs       WorkspaceFieldConfig[]
   suppliers          Supplier[]
   supplierAliases    SupplierAlias[]
   inboundEmailIntakes InboundEmailIntake[]
@@ -2832,4 +2833,28 @@ model Institution {
   @@unique([workspaceId, normalizedKey])
   @@index([workspaceId])
   @@map("institutions")
+}
+
+/// #231 Q11 (#252): one row of Admin › Configuration › Fields — how one field of one document
+/// type behaves on the Detail pane (editable, required) and in that type's queue system views
+/// (width, position). A field without a row takes the defaults the code already had
+/// (editable, the template's own `required`, normal width, canonical order), so this table is
+/// an overlay, never the source of the fields themselves — those stay `lib/doc-types.ts` plus
+/// each type's `DocumentTemplate` custom fields.
+model WorkspaceFieldConfig {
+  id          String   @id @default(uuid()) @db.Uuid
+  workspaceId String   @map("workspace_id") @db.Uuid
+  docType     String   @map("doc_type")
+  fieldKey    String   @map("field_key")
+  editable    Boolean  @default(true)
+  required    Boolean  @default(false)
+  /// "hidden" | "narrow" | "normal" | "wide" — the queue column's default width; hidden = not a default column.
+  width       String   @default("normal")
+  position    Int      @default(0)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, docType, fieldKey])
+  @@map("workspace_field_configs")
 }

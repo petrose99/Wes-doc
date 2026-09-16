@@ -53,7 +53,7 @@ function deriveStatus(connection: Connection, job: ProvisionJob): string {
   return job ? "error" : "not_started"
 }
 
-function ConnectionCard({ workspaceId, isOwner, connection, job, lastSyncedAt, entityCounts, onChanged }: {
+function ConnectionCard({ workspaceId, isOwner, connection, job, lastSyncedAt, entityCounts, onChanged, frame = "card" }: {
   workspaceId: string
   isOwner: boolean
   connection: Connection
@@ -61,6 +61,9 @@ function ConnectionCard({ workspaceId, isOwner, connection, job, lastSyncedAt, e
   lastSyncedAt: Date | null
   entityCounts: { accounts: number; vendors: number }
   onChanged: () => void
+  /** "panel" (#248 → #252): the same behaviour inside an Admin Panel — no Card chrome, hairline
+   * rules, the primary Open ledger at the top right. */
+  frame?: "card" | "panel"
 }) {
   const [pending, startTransition] = useTransition()
   const [accounts, setAccounts] = useState<{ id: string; name: string }[] | null>(null)
@@ -120,32 +123,22 @@ function ConnectionCard({ workspaceId, isOwner, connection, job, lastSyncedAt, e
       ? <ShieldAlert className="h-5 w-5 text-red-500" />
       : <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
 
-  return (
-    <Card className="overflow-hidden" aria-busy={pending}>
-      <div className={`h-1 ${isActive ? "bg-emerald-500" : needsRepair ? "bg-red-400" : "bg-slate-200"}`} />
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <CircleDot className="h-4 w-4 text-slate-400" />
-          Connection
-        </CardTitle>
-        <CardDescription>Every workspace gets its own isolated accounting organization, created automatically — nothing to connect by hand.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+  const body = <>
         {feedback && (
           <p role={feedback.tone} aria-live={feedback.tone === "alert" ? "assertive" : "polite"} className={`rounded-md border px-3 py-2 text-sm ${feedback.tone === "alert" ? "border-red-200 bg-red-50 text-red-700" : "border-emerald-200 bg-emerald-50 text-emerald-700"}`}>
             {feedback.message}
           </p>
         )}
-        <div className="flex items-center gap-4 rounded-lg border border-slate-100 bg-slate-50/50 px-4 py-3">
+        <div className="flex items-center gap-4 rounded-lg border border-hairline bg-slate-50/50 px-4 py-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-slate-200">
             {statusIcon}
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold text-slate-800">{connection?.tenantName || "Your organization"}</p>
-            <p className={`mt-0.5 text-xs font-medium ${isActive ? "text-emerald-600" : needsRepair ? "text-red-600" : "text-slate-400"}`}>
+            <p className={`mt-0.5 text-xs font-medium ${isActive ? "text-emerald-600" : needsRepair ? "text-red-700" : "text-slate-600"}`}>
               {STATUS_LABEL[status] ?? status}
             </p>
-            {job?.errorCode && !isActive && <p className="mt-0.5 text-xs text-slate-400">Last error: {job.errorCode.replaceAll("_", " ")}</p>}
+            {job?.errorCode && !isActive && <p className="mt-0.5 text-xs text-slate-600">Last error: {job.errorCode.replaceAll("_", " ")}</p>}
           </div>
           {isOwner && needsRepair && (
             <Button type="button" size="sm" variant="outline" disabled={pending} onClick={repair} className="shrink-0">
@@ -156,19 +149,19 @@ function ConnectionCard({ workspaceId, isOwner, connection, job, lastSyncedAt, e
 
         {isActive && connection && (
           <>
-            <div className="border-t border-slate-100 pt-4">
-              <div className="flex items-center gap-4 rounded-lg border border-slate-100 bg-slate-50/50 px-4 py-3">
+            <div className="border-t border-hairline pt-4">
+              <div className="flex items-center gap-4 rounded-lg border border-hairline bg-slate-50/50 px-4 py-3">
                 <div className="flex flex-1 items-center gap-6">
                   <div className="text-center">
                     <p className="text-lg font-bold tabular-nums text-slate-800">{entityCounts.accounts}</p>
-                    <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Accounts</p>
+                    <p className="text-[11px] font-medium uppercase tracking-wider text-slate-600">Accounts</p>
                   </div>
                   <div className="h-8 w-px bg-slate-200" />
                   <div className="text-center">
                     <p className="text-lg font-bold tabular-nums text-slate-800">{entityCounts.vendors}</p>
-                    <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Vendors</p>
+                    <p className="text-[11px] font-medium uppercase tracking-wider text-slate-600">Suppliers</p>
                   </div>
-                  <span className="ml-auto text-xs text-slate-400" suppressHydrationWarning>
+                  <span className="ml-auto text-xs text-slate-600" suppressHydrationWarning>
                     {lastSyncedAt ? `Last synced ${lastSyncedAt.toLocaleDateString()}, ${lastSyncedAt.toLocaleTimeString()}` : "Not yet synced"}
                   </span>
                 </div>
@@ -178,7 +171,7 @@ function ConnectionCard({ workspaceId, isOwner, connection, job, lastSyncedAt, e
                 </Button>
               </div>
             </div>
-            <div className="flex items-center gap-3 rounded-lg border border-slate-100 px-4 py-3">
+            <div className="flex items-center gap-3 rounded-lg border border-hairline px-4 py-3">
               <Wallet className="h-4 w-4 shrink-0 text-slate-400" />
               <Label htmlFor="default-expense-account" className="shrink-0 text-sm text-slate-600">Default expense account</Label>
               {accounts === null ? (
@@ -200,9 +193,45 @@ function ConnectionCard({ workspaceId, isOwner, connection, job, lastSyncedAt, e
             </div>
           </>
         )}
-      </CardContent>
+  </>
+  if (frame === "panel") {
+    return <div className="space-y-4" aria-busy={pending}>
+      {isActive && connection?.externalTenantId && (
+        <a href={`/api/accounting/session?workspaceId=${workspaceId}`} target="_blank" rel="noreferrer"
+          className="inline-flex items-center gap-1.5 rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2">
+          Open ledger <ArrowUpRight className="h-4 w-4" aria-hidden />
+        </a>
+      )}
+      {body}
+    </div>
+  }
+  return (
+    <Card className="overflow-hidden" aria-busy={pending}>
+      <div className={`h-1 ${isActive ? "bg-emerald-500" : needsRepair ? "bg-red-400" : "bg-slate-200"}`} />
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <CircleDot className="h-4 w-4 text-slate-400" />
+          Connection
+        </CardTitle>
+        <CardDescription>Every workspace gets its own isolated accounting organization, created automatically — nothing to connect by hand.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">{body}</CardContent>
     </Card>
   )
+}
+
+/** #248 → #252: Admin › Integrations › Ledger connection — Finance's ConnectionCard behaviour
+ * (status line, Sync now, default expense account, Open ledger) inside an Admin Panel. */
+export function LedgerConnectionPanel({ workspaceId, isOwner, connection, job, lastSyncedAt, entityCounts }: {
+  workspaceId: string
+  isOwner: boolean
+  connection: Connection
+  job: ProvisionJob
+  lastSyncedAt: Date | null
+  entityCounts: { accounts: number; vendors: number }
+}) {
+  const router = useRouter()
+  return <ConnectionCard frame="panel" workspaceId={workspaceId} isOwner={isOwner} connection={connection} job={job} lastSyncedAt={lastSyncedAt} entityCounts={entityCounts} onChanged={() => router.refresh()} />
 }
 
 /** Formats a bill total using the document's own currency when it has one, falling back to a plain

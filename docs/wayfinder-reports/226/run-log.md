@@ -1,0 +1,21 @@
+# Autopilot run log — map #226
+
+| When (UTC) | Ticket | Outcome | Duration | Log |
+|---|---|---|---|---|
+| 2026-09-15T23:06:52Z | [#229](https://github.com/petrose99/docubite/issues/229) Shape payment runs that never move money: Bill Pay queue and Payment Batches | resolved | 13m33s | [log](logs/20260915T230652Z-229.jsonl) |
+| 2026-09-15T23:20:30Z | [#231](https://github.com/petrose99/docubite/issues/231) Shape the Admin area: Configuration, Approval Flows, Mismatch Flows, Users, Companies | resolved | 15m54s | [log](logs/20260915T232030Z-231.jsonl) |
+| 2026-09-15T23:36:27Z | [#232](https://github.com/petrose99/docubite/issues/232) Shape mobile approval against the tour's app screens (home cards, Ready-to-Approve cards, Approval Context, timeline) | resolved | 7m11s | [log](logs/20260915T233627Z-232.jsonl) |
+| 2026-09-15T23:43:42Z | [#233](https://github.com/petrose99/docubite/issues/233) Decide one status vocabulary for the Detail pane (row pill · pane pill · stepper · Approval tab) | resolved | 6m17s | [log](logs/20260915T234342Z-233.jsonl) |
+| 2026-09-15T23:50:02Z | [#234](https://github.com/petrose99/docubite/issues/234) Decide the Detail pane's header stack (pane header + embedded document header + stepper) and where Delete lives | resolved | 7m01s | [log](logs/20260915T235002Z-234.jsonl) |
+| 2026-09-15T23:57:06Z | [#235](https://github.com/petrose99/docubite/issues/235) Decide the queue's below-md rendering: horizontal scroller (#187/#224) or a two-line card row + Filters (n) button | resolved | 4m53s | [log](logs/20260915T235706Z-235.jsonl) |
+| 2026-09-16T00:02:03Z | [#240](https://github.com/petrose99/docubite/issues/240) Decide keyboard accelerators across the operator app: jumping between queues and rows | resolved | 7m54s | [log](logs/20260916T000203Z-240.jsonl) |
+| 2026-09-16T00:10:00Z | [#241](https://github.com/petrose99/docubite/issues/241) Decide where first-run help lives now that the workspace home is the Invoices queue | resolved | 6m03s | [log](logs/20260916T001000Z-241.jsonl) |
+| 2026-09-16T00:16:06Z | [#242](https://github.com/petrose99/docubite/issues/242) Decide the flagged Dashboard's fate at 20/40: retire it now, or bring it to the bar — and whether its ranked next-best-action moves to the Invoices home | resolved | 5m59s | [log](logs/20260916T001606Z-242.jsonl) |
+| 2026-09-16T00:22:08Z | [#243](https://github.com/petrose99/docubite/issues/243) Decide where intake lives on the distilled app: upload from the queue, the inbound address, phone upload | resolved | 5m27s | [log](logs/20260916T002208Z-243.jsonl) |
+| 2026-09-16T00:27:38Z | [#244](https://github.com/petrose99/docubite/issues/244) Decide the way back: one Origin-context restore for Exceptions, Archive, Finance failed rows and the standalone document page | resolved | 5m52s | [log](logs/20260916T002738Z-244.jsonl) |
+| 2026-09-16T00:33:33Z | [#245](https://github.com/petrose99/docubite/issues/245) Decide Archive's fate: cross-type lookup on the queue shell, or each queue's Closed facet | resolved | 6m26s | [log](logs/20260916T003333Z-245.jsonl) |
+| 2026-09-16T00:40:02Z | [#246](https://github.com/petrose99/docubite/issues/246) Decide how the Approver learns there is work: channel and cadence | resolved | 6m44s | [log](logs/20260916T004002Z-246.jsonl) |
+| 2026-09-16T00:46:49Z | [#247](https://github.com/petrose99/docubite/issues/247) Decide the expense-claim action on Receipts as a pane action | resolved | 7m29s | [log](logs/20260916T004649Z-247.jsonl) |
+| 2026-09-16T00:54:22Z | [#250](https://github.com/petrose99/docubite/issues/250) Build PO mismatch resolution in the invoice row: View PO glyphs, breakdown, Purchase Orders column, Match manually, PO queue | resolved | 92m10s | [log](logs/20260916T005422Z-250.jsonl) |
+| 2026-09-16T02:26:35Z | [#251](https://github.com/petrose99/docubite/issues/251) Build the Payments destination: Bill Pay and Payment Batches on the queue shell, with payer accounts, terms, discounts and payment records | resolved | 83m05s | [log](logs/20260916T022635Z-251.jsonl) |
+| 2026-09-16T03:49:42Z | [#248](https://github.com/petrose99/docubite/issues/248) Decide Finance's shape once Bill Pay exists: push as a queue bulk action, Finance as the connection and ledger link | resolved | 11m34s | [log](logs/20260916T034942Z-248.jsonl) |

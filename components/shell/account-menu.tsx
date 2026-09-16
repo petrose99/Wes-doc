@@ -1,18 +1,20 @@
 "use client"
 
-import { reportAuthEvent } from "@/lib/auth-audit-client"
-import { createClient } from "@/lib/supabase/client"
-import { ChevronsUpDown, LogOut } from "lucide-react"
-import { useEffect, useRef, useState } from "react"
-import { toast } from "sonner"
+import { resetOnboardingAction } from "@/app/(app)/workspaces/[workspaceId]/onboarding-actions"
+import { useSignOut } from "@/components/shell/sign-out-button"
+import { accountPaths } from "@/lib/admin/paths"
+import { ChevronsUpDown, LogOut, RotateCcw, ShieldCheck } from "lucide-react"
+import Link from "next/link"
+import { useEffect, useRef, useState, useTransition } from "react"
 
-/** The sidebar's account chip and its sign-out control — the everyday one, scoped to this
- * session only. "Sign out everywhere" (F13, terminates every session on the account) lives on
- * /settings/security instead, since it's a rarer, more consequential action. */
-export function AccountMenu({ name, email, collapsed = false }: { name: string; email: string; collapsed?: boolean }) {
+/** The rail's account chip and its menu. #231 Q10 (#252): account-level items live here, not in
+ * a company's Admin — Security (MFA, sessions) and the welcome tour — beside the everyday
+ * sign-out. "Sign out everywhere" stays on Security, where its weight belongs. */
+export function AccountMenu({ name, email, collapsed = false, workspaceId }: { name: string; email: string; collapsed?: boolean; workspaceId?: string }) {
   const [open, setOpen] = useState(false)
-  const [busy, setBusy] = useState(false)
   const wrapper = useRef<HTMLDivElement>(null)
+  const { busy, signOut } = useSignOut()
+  const [resetting, startReset] = useTransition()
 
   useEffect(() => {
     if (!open) return
@@ -23,42 +25,36 @@ export function AccountMenu({ name, email, collapsed = false }: { name: string; 
     return () => { window.removeEventListener("mousedown", onPointerDown); window.removeEventListener("keydown", onKeyDown) }
   }, [open])
 
-  const signOut = async () => {
-    setBusy(true)
-    try {
-      // Reported before signOut(), not after: the session that attributes this event to an actor
-      // is still valid here and gone the moment signOut() resolves.
-      reportAuthEvent("auth_logout")
-      await createClient().auth.signOut()
-      // A full navigation rather than router.push: the session cookie is gone, so every
-      // cached server component for this user has to be dropped too.
-      window.location.href = "/login"
-    } catch {
-      toast.error("Could not sign out — please try again")
-      setBusy(false)
-    }
-  }
-
   const initial = (name || email).trim().charAt(0).toUpperCase() || "?"
+  const itemClass = "flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100 focus-visible:bg-slate-100 focus-visible:outline-none disabled:opacity-50"
 
   return <div ref={wrapper} className="relative">
-    <button type="button" className="flex w-full items-center gap-2 border border-transparent rounded-lg px-2 py-2 text-left transition-[background-color,border-color,box-shadow] duration-150 hover:border-[#dbe3ea] hover:bg-white hover:shadow-[0_1px_3px_rgba(15,23,42,0.06)]" onClick={() => setOpen((value) => !value)} aria-haspopup="menu" aria-expanded={open}>
+    <button type="button" className="flex w-full items-center gap-2 border border-transparent rounded-lg px-2 py-2 text-left transition-[background-color,border-color,box-shadow] duration-150 hover:border-[#dbe3ea] hover:bg-white hover:shadow-[0_1px_3px_rgba(15,23,42,0.06)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" onClick={() => setOpen((value) => !value)} aria-haspopup="menu" aria-expanded={open} aria-label={collapsed ? "Account menu" : undefined}>
       <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[9px] bg-emerald-700 text-xs font-bold text-white">{initial}</span>
       {!collapsed && <>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-medium text-slate-800">{name || email}</span>
-          {name && <span className="block truncate text-xs text-slate-400">{email}</span>}
+          {name && <span className="block truncate text-xs text-slate-500">{email}</span>}
         </span>
-        <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+        <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-slate-500" />
       </>}
     </button>
-    {open && <div role="menu" className="absolute bottom-full left-0 z-50 mb-1 w-full min-w-52 overflow-hidden rounded-md border bg-white py-1 shadow-lg">
-      <div className="border-b px-3 py-2">
+    {open && <div role="menu" aria-label="Account" className="absolute bottom-full left-0 z-50 mb-1 w-full min-w-56 overflow-hidden rounded-md border border-hairline bg-white py-1 shadow-lg">
+      <div className="border-b border-hairline px-3 py-2">
         <p className="truncate text-sm font-medium text-slate-800">{name || email}</p>
-        <p className="truncate text-xs text-slate-400">{email}</p>
+        <p className="truncate text-xs text-slate-500">{email}</p>
       </div>
-      <button type="button" role="menuitem" className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100 disabled:opacity-50" disabled={busy} onClick={() => void signOut()}>
-        <LogOut className="h-4 w-4" />{busy ? "Signing out…" : "Sign out"}
+      {workspaceId && <>
+        <Link role="menuitem" href={accountPaths(workspaceId).security} className={itemClass} onClick={() => setOpen(false)}>
+          <ShieldCheck className="h-4 w-4" aria-hidden />Security
+        </Link>
+        <button type="button" role="menuitem" className={itemClass} disabled={resetting} onClick={() => startReset(async () => { await resetOnboardingAction(workspaceId); setOpen(false) })}>
+          <RotateCcw className="h-4 w-4" aria-hidden />{resetting ? "Resetting…" : "Show welcome tour again"}
+        </button>
+        <div className="my-1 border-t border-hairline" aria-hidden />
+      </>}
+      <button type="button" role="menuitem" className={itemClass} disabled={busy} onClick={() => void signOut()}>
+        <LogOut className="h-4 w-4" aria-hidden />{busy ? "Signing out…" : "Sign out"}
       </button>
     </div>}
   </div>

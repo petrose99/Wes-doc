@@ -12,7 +12,7 @@ export function FromAccountingCard({ workspaceId }: { workspaceId: string }) {
   return <>
     <button
       onClick={() => setOpen(true)}
-      className="group flex items-center gap-3 rounded-xl border border-[#e6ebf1] bg-white px-4 py-3 text-left shadow-panel transition-[border-color,box-shadow,transform] duration-150 hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md sm:flex-col sm:items-start sm:gap-0 sm:p-5"
+      className="group flex items-center gap-3 rounded-xl border border-hairline bg-white px-4 py-3 text-left shadow-panel transition-[border-color,box-shadow,transform] duration-150 hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md sm:flex-col sm:items-start sm:gap-0 sm:p-5"
     >
       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700 sm:mb-3 sm:h-10 sm:w-10">
         <Landmark className="h-[17px] w-[17px] sm:h-5 sm:w-5" />
@@ -83,7 +83,7 @@ function AccountingReportDialog({ workspaceId, onClose }: { workspaceId: string;
   }, [workspaceId, reportType, fromDate, toDate, name, router])
 
   return <div role="presentation" className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => { if (!pending) onClose() }}>
-    <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} className="w-full max-w-md rounded-2xl border border-[#e6ebf1] bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+    <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} className="w-full max-w-md rounded-2xl border border-hairline bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
       <div className="flex items-center justify-between">
         <h2 id={titleId} className="text-lg font-bold text-slate-900">From Finance</h2>
         <button type="button" aria-label="Close From Finance" disabled={pending} onClick={onClose} className="rounded p-1 text-slate-400 hover:text-slate-600 disabled:opacity-50"><X className="h-4 w-4" /></button>

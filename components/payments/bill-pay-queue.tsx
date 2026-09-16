@@ -74,7 +74,7 @@ export function BillPayQueue({ workspaceId, basePath, rows, summary, payerAccoun
   const rowsById = useMemo(() => new Map(rows.map((row) => [row.bill.documentId, row])), [rows])
   const money = (value: number, currency: string | null) => formatPaymentMoney(value, currency, fallbackCurrency)
   const origin = useOriginHere()
-  const settingsHref = withOrigin(`/workspaces/${workspaceId}/settings/payments`, origin)
+  const settingsHref = withOrigin(`/workspaces/${workspaceId}/admin/configuration/payments`, origin)
   const [paidReceipt, setPaidReceipt] = useState<{ recorded: Array<{ documentId: string; amount: number }>; leftOut: Array<{ documentId: string; reason: string }>; rows: Map<string, BillPayRow> } | null>(null)
   // Stable identity: the pane refetches whenever `loadDetail` changes.
   const loadDetail = useCallback((documentId: string) => getQueueDetailAction(workspaceId, documentId), [workspaceId])
@@ -127,7 +127,7 @@ export function BillPayQueue({ workspaceId, basePath, rows, summary, payerAccoun
       facets={BILL_PAY_FACETS}
       band={<>
         <AgingBand summary={summary} currencyCode={fallbackCurrency} />
-        {payerAccounts.length === 0 && rows.length > 0 && <p role="status" className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">No payer account yet, so nothing here can be batched. <Link href={settingsHref} className="font-medium underline underline-offset-2">Add one under Settings › Payments</Link>.</p>}
+        {payerAccounts.length === 0 && rows.length > 0 && <p role="status" className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">No payer account yet, so nothing here can be batched. <Link href={settingsHref} className="font-medium underline underline-offset-2">Add one under Admin › Payments</Link>.</p>}
       </>}
       initialSelectedId={initialSelectedId}
       empty={{ title: "Nothing to pay.", body: "Approved invoices land here.", filteredBody: "Clear a filter to widen the queue." }}

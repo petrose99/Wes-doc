@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react"
 import { toast } from "sonner"
 import { ExternalLink } from "lucide-react"
 import { QueueScreen, type QueueColumn, type SortOption } from "@/components/queue/queue-screen"
+import type { FieldTable } from "@/lib/configuration/field-table"
 import { PaneMenuItem } from "@/components/queue/detail-pane"
 import { DocumentBulkActions, DocumentPaneActions } from "@/components/queue/document-actions"
 import { formatDate, formatMoney, StatePills, TitleCell } from "@/components/queue/row-cells"
@@ -43,7 +44,7 @@ function ClaimPill({ status }: { status: ReceiptRow["claimStatus"] }) {
   return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize ${cls}`}>{status}</span>
 }
 
-export function ReceiptQueue({ workspaceId, basePath, receipts, minConfidencePercent, views, stat, initialSelectedId }: {
+export function ReceiptQueue({ workspaceId, basePath, receipts, minConfidencePercent, views, stat, initialSelectedId, fieldTable = null }: {
   workspaceId: string
   basePath: string
   receipts: ReceiptRow[]
@@ -51,6 +52,8 @@ export function ReceiptQueue({ workspaceId, basePath, receipts, minConfidencePer
   views?: ReactNode
   stat?: ReactNode
   initialSelectedId?: string | null
+  /** #252: Admin › Configuration › Fields for receipts, when one has been saved. */
+  fieldTable?: FieldTable | null
 }) {
   const [needsAttention, setNeedsAttention] = useState<Set<string>>(new Set())
   const minConfidence = minConfidenceFromPercent(minConfidencePercent)
@@ -62,20 +65,20 @@ export function ReceiptQueue({ workspaceId, basePath, receipts, minConfidencePer
 
   const columns: QueueColumn<ReceiptRow>[] = [
     {
-      key: "merchant", label: "Merchant", narrow: true, className: "min-w-[12rem]",
+      key: "merchant", label: "Merchant", narrow: true, className: "min-w-[12rem]", fieldKey: "merchant",
       render: (receipt) => <TitleCell subtitle={receipt.filename} missingLabel="Unknown merchant"
         title={receipt.merchant ? <ConfidenceField label="Merchant" value={receipt.fieldConfidence.merchant} minConfidence={minConfidence}>{receipt.merchant}</ConfidenceField> : null} />,
     },
     {
-      key: "number", label: "Receipt #", className: "whitespace-nowrap text-slate-700",
+      key: "number", label: "Receipt #", className: "whitespace-nowrap text-slate-700", fieldKey: "receipt_number",
       render: (receipt) => <ConfidenceField label="Receipt number" value={receipt.receiptNumber ? receipt.fieldConfidence.receipt_number : undefined} minConfidence={minConfidence}>{receipt.receiptNumber ?? "—"}</ConfidenceField>,
     },
     {
-      key: "amount", label: "Amount", narrow: true, className: "whitespace-nowrap text-right tabular-nums text-slate-900",
+      key: "amount", label: "Amount", narrow: true, className: "whitespace-nowrap text-right tabular-nums text-slate-900", fieldKey: "total",
       render: (receipt) => <ConfidenceField label="Amount" value={receipt.total !== null ? receipt.fieldConfidence.total ?? receipt.fieldConfidence.amount : undefined} minConfidence={minConfidence}>{receipt.total !== null ? formatMoney(receipt.total, receipt.currencyCode) : "—"}</ConfidenceField>,
     },
     {
-      key: "date", label: "Purchase date", narrow: true, className: "whitespace-nowrap tabular-nums text-slate-700",
+      key: "date", label: "Purchase date", narrow: true, className: "whitespace-nowrap tabular-nums text-slate-700", fieldKey: "purchase_date",
       render: (receipt) => <ConfidenceField label="Purchase date" value={receipt.purchaseDate ? receipt.fieldConfidence.purchase_date : undefined} minConfidence={minConfidence}>{formatDate(receipt.purchaseDate)}</ConfidenceField>,
     },
     {
@@ -107,6 +110,7 @@ export function ReceiptQueue({ workspaceId, basePath, receipts, minConfidencePer
       state={processingState({ approvalStatus: receipt.approvalStatus, blockedByCheck: receipt.blockedByCheck, escalated: receipt.escalated, touchless: receipt.touchless, status: receipt.status })}
       minConfidencePercent={minConfidencePercent} />}
     columns={columns}
+    fieldTable={fieldTable}
     selectable
     sortOptions={SORTS}
     facets={RECEIPT_FACETS}

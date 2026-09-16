@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { ExternalLink } from "lucide-react"
 import { QueueScreen, type QueueColumn, type SortOption } from "@/components/queue/queue-screen"
+import type { FieldTable } from "@/lib/configuration/field-table"
 import { PaneMenuItem } from "@/components/queue/detail-pane"
 import { DocumentBulkActions, DocumentPaneActions } from "@/components/queue/document-actions"
 import { formatDate, formatMoney, StatePills, TitleCell } from "@/components/queue/row-cells"
@@ -71,7 +72,7 @@ const SORTS: SortOption<BillRow>[] = [
   { key: "supplier", label: "Supplier A–Z", compare: (a, b) => (a.supplier ?? "￿").localeCompare(b.supplier ?? "￿") },
 ]
 
-export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercent, views, stat, initialSelectedId }: {
+export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercent, views, stat, initialSelectedId, fieldTable = null }: {
   workspaceId: string
   basePath: string
   bills: BillRow[]
@@ -79,6 +80,8 @@ export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercen
   views?: ReactNode
   stat?: ReactNode
   initialSelectedId?: string | null
+  /** #252: Admin › Configuration › Fields for invoices, when one has been saved. */
+  fieldTable?: FieldTable | null
 }) {
   const router = useRouter()
   const origin = useOriginHere()
@@ -93,20 +96,20 @@ export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercen
 
   const columns: QueueColumn<BillRow>[] = [
     {
-      key: "supplier", label: "Supplier", narrow: true, className: "min-w-[12rem]",
+      key: "supplier", label: "Supplier", narrow: true, className: "min-w-[12rem]", fieldKey: "vendor",
       render: (bill) => <TitleCell subtitle={bill.filename} missingLabel="Unknown supplier"
         title={bill.supplier ? <ConfidenceField label="Supplier" value={bill.fieldConfidence.vendor ?? bill.fieldConfidence.merchant} minConfidence={minConfidence}>{bill.supplier}</ConfidenceField> : null} />,
     },
     {
-      key: "number", label: "Invoice #", className: "whitespace-nowrap text-slate-700",
+      key: "number", label: "Invoice #", className: "whitespace-nowrap text-slate-700", fieldKey: "invoice_number",
       render: (bill) => <ConfidenceField label="Invoice number" value={bill.invoiceNumber ? bill.fieldConfidence.invoice_number : undefined} minConfidence={minConfidence}>{bill.invoiceNumber ?? "—"}</ConfidenceField>,
     },
     {
-      key: "amount", label: "Amount", narrow: true, className: "whitespace-nowrap text-right tabular-nums text-slate-900",
+      key: "amount", label: "Amount", narrow: true, className: "whitespace-nowrap text-right tabular-nums text-slate-900", fieldKey: "total",
       render: (bill) => <ConfidenceField label="Amount" value={bill.total !== null ? bill.fieldConfidence.total ?? bill.fieldConfidence.amount : undefined} minConfidence={minConfidence}>{bill.total !== null ? formatMoney(bill.total, bill.currencyCode) : "—"}</ConfidenceField>,
     },
     {
-      key: "due", label: "Due", narrow: true, className: "whitespace-nowrap tabular-nums text-slate-700",
+      key: "due", label: "Due", narrow: true, className: "whitespace-nowrap tabular-nums text-slate-700", fieldKey: "due_date",
       render: (bill) => <>
         <ConfidenceField label="Due date" value={bill.extractedDueDate ? bill.fieldConfidence.due_date : undefined} minConfidence={minConfidence}>{formatDate(bill.dueDate)}</ConfidenceField>
         {bill.dueDate && !bill.extractedDueDate && <span className="ml-1.5 text-xs text-slate-500" title="From the supplier's payment terms, not the document">inferred</span>}
@@ -166,6 +169,7 @@ export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercen
         state={processingState({ approvalStatus: bill.approvalStatus, blockedByCheck: bill.blockedByCheck, escalated: bill.escalated, touchless: bill.touchless, status: bill.status })}
         minConfidencePercent={minConfidencePercent} />}
       columns={columns}
+      fieldTable={fieldTable}
       selectable
       sortOptions={SORTS}
       facets={INVOICE_FACETS}

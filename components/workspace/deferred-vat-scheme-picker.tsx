@@ -46,7 +46,7 @@ export function DeferredVatSchemePicker({
         toast.success("Setting saved")
         router.refresh()
       } else {
-        toast.error(res.error || "Could not save setting")
+        toast.error(res.error ? `Couldn't save — ${res.error} Nothing changed.` : "Couldn't save — the server didn't say why. Nothing changed.")
       }
     })
   }

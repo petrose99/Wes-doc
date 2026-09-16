@@ -53,9 +53,9 @@ export function ControlsSpine({ workspaceId, counts, visibleStages, level, minCo
     : LEVEL_LABELS[level]
 
   const joints: Joint[] = [
-    { before: "review", label: "Vendor rules", href: `${base}/automation/vendors` },
-    { before: "approved", label: "Approval workflows", href: `${base}/automation/approvals` },
-    { before: "synced", label: autonomyLabel, href: canOpenSettings ? `${base}/automation/settings` : null },
+    { before: "review", label: "Supplier rules", href: `${base}/admin/suppliers` },
+    { before: "approved", label: "Approval flows", href: `${base}/admin/approval-flows` },
+    { before: "synced", label: autonomyLabel, href: canOpenSettings ? `${base}/admin/configuration/autonomy` : null },
     { before: "paid", label: "Ledger confirms payment", href: null },
   ]
   const jointBefore = (stage: PipelineStage) => joints.find((j) => j.before === stage)
@@ -113,7 +113,7 @@ export function ControlsSpine({ workspaceId, counts, visibleStages, level, minCo
               {joint ? annotation(joint) : <span className="text-[11px] text-transparent" aria-hidden="true">·</span>}
             </div>
             <div style={{ gridColumn: col + 1, gridRow: 2 }} className="flex items-center px-2" aria-hidden="true">
-              <span className="h-px flex-1 bg-[#dbe3ec]" />
+              <span className="h-px flex-1 bg-hairline-dashed" />
               <ArrowRight className="h-3 w-3 shrink-0 text-slate-300" />
             </div>
           </>}
@@ -126,7 +126,7 @@ export function ControlsSpine({ workspaceId, counts, visibleStages, level, minCo
       {visibleStages.map((stage, index) => {
         const joint = jointBefore(stage)
         return <span key={stage} className="contents">
-          {index > 0 && <span className="ml-[7px] flex min-w-0 items-center gap-2.5 border-l border-[#dbe3ec] py-1.5 pl-4">
+          {index > 0 && <span className="ml-[7px] flex min-w-0 items-center gap-2.5 border-l border-hairline-dashed py-1.5 pl-4">
             {joint && <span className="min-w-0 flex-1 text-left">{annotation(joint)}</span>}
           </span>}
           {stageNode(stage)}

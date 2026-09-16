@@ -39,7 +39,7 @@ export function PayerAccountsSettings({ workspaceId, accounts, owner, baseCurren
   return <div className="space-y-4">
     {accounts.length === 0
       ? <p className="text-sm text-slate-700">No payer account yet. A payment batch needs one to say which bank portal its file belongs to.</p>
-      : <ul className="divide-y divide-slate-100 border-y border-slate-200">
+      : <ul className="divide-y divide-hairline-soft">
         {accounts.map((account) => <li key={account.id} className="px-3 py-2">
           {editing === account.id
             ? <PayerAccountForm key={account.id} account={account} baseCurrency={baseCurrency} busy={pending} onCancel={() => setEditing(null)}
@@ -102,7 +102,7 @@ export function SupplierPaymentsSettings({ workspaceId, suppliers, owner, action
   const [editing, setEditing] = useState<string | null>(null)
   const [pending, start] = useTransition()
   if (suppliers.length === 0) return <p className="text-sm text-slate-700">No suppliers yet. They appear here once an invoice names one.</p>
-  return <ul className="divide-y divide-slate-100 border-y border-slate-200">
+  return <ul className="divide-y divide-hairline-soft">
     {suppliers.map((supplier) => {
       const terms = formatTerms({ netDays: supplier.paymentTermsDays, discountPercent: supplier.earlyPaymentDiscountPercent, discountDays: supplier.earlyPaymentDiscountDays })
       return <li key={supplier.id} id={`supplier-${supplier.id}`} className="px-3 py-2 target:bg-emerald-50/60">

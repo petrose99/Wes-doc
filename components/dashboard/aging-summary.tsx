@@ -28,7 +28,7 @@ export function AgingSummary({ workspaceId, summary, formatMoney }: {
   const overdue = (["1-30", "31-60", "61-90", "90+"] as const).reduce((sum, bucket) => sum + summary[bucket].total, 0)
   const queueHref = (param?: string) => `/workspaces/${workspaceId}/invoices?unpaid=1${param ? `&aging=${param}` : ""}`
 
-  return <section aria-labelledby="aging-heading" className="rounded-2xl border border-[#e6ebf1] bg-white p-[18px] shadow-panel lg:p-5">
+  return <section aria-labelledby="aging-heading" className="rounded-2xl border border-hairline bg-white p-[18px] shadow-panel lg:p-5">
     <div className="mb-3.5 flex flex-wrap items-center gap-2">
       <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-700"><Clock3 className="h-[17px] w-[17px]" /></span>
       <h2 id="aging-heading" className="text-[15px] font-bold text-slate-900">Open invoices by age</h2>

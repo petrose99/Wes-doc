@@ -18,7 +18,7 @@ export function JurisdictionPicker({ workspaceId, options, current }: {
   current: { code: JurisdictionCode; packVersion: string | null } | null
 }) {
   const [editing, setEditing] = useState(!current)
-  const [selected, setSelected] = useState<JurisdictionCode | null>(current?.code ?? options[0]?.code ?? null)
+  const [selected, setSelected] = useState<JurisdictionCode | null>(current?.code ?? null)
   const [pending, setPending] = useState(false)
 
   const save = async () => {
@@ -26,20 +26,20 @@ export function JurisdictionPicker({ workspaceId, options, current }: {
     setPending(true)
     try {
       const result = await setJurisdictionAction(workspaceId, selected)
-      if (!result.success) { toast.error(result.error || "Could not change the jurisdiction"); return }
+      if (!result.success) { toast.error(result.error ? `Couldn't change the jurisdiction — ${result.error} Nothing changed.` : "Couldn't change the jurisdiction — the server didn't say why. Nothing changed."); return }
       toast.success(`Jurisdiction set to ${options.find((o) => o.code === selected)?.name || selected}`)
       setEditing(false)
     } catch {
-      toast.error("Could not reach the server — the setting was not changed")
+      toast.error("Couldn't reach the server. Nothing changed.")
     } finally { setPending(false) }
   }
 
   if (current && !editing) {
     const currentOption = options.find((o) => o.code === current.code)
-    return <div className="flex flex-wrap items-start justify-between gap-4 rounded border p-4">
+    return <div className="flex flex-wrap items-start justify-between gap-4">
       <div className="space-y-1 text-sm">
-        <p><span className="font-medium">Jurisdiction:</span> {currentOption?.name ?? current.code} <span className="text-muted-foreground">({current.code})</span></p>
-        {current.packVersion && <p className="text-muted-foreground">Pack version: <code className="rounded bg-slate-100 px-1.5 py-0.5">{current.packVersion}</code></p>}
+        <p><span className="font-medium">Jurisdiction:</span> {currentOption?.name ?? current.code} <span className="text-slate-600">({current.code})</span></p>
+        {current.packVersion && <p className="text-slate-600">Rule pack {current.packVersion}</p>}
       </div>
       <button
         type="button"
@@ -59,18 +59,19 @@ export function JurisdictionPicker({ workspaceId, options, current }: {
   }
 
   return <div className="space-y-3">
-    {!current && <div className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+    {!current && <div className="max-w-[60ch] rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] leading-relaxed text-amber-900">
       <p className="font-medium">Jurisdiction required</p>
-      <p>AP inbound (email-in, upload, API) is refused for this workspace until a jurisdiction is picked.</p>
+      <p>Email intake and uploads are refused until a jurisdiction is picked.</p>
     </div>}
     <div className="flex flex-wrap items-center gap-3">
       <select
         aria-label="Jurisdiction"
-        className="rounded-md border px-3 py-2 text-sm"
+        className="h-9 rounded-md border border-input bg-white px-3 text-sm"
         value={selected ?? ""}
         disabled={pending || options.length === 0}
-        onChange={(event) => setSelected(event.target.value as JurisdictionCode)}
+        onChange={(event) => setSelected((event.target.value || null) as JurisdictionCode | null)}
       >
+        <option value="">Choose a jurisdiction…</option>
         {options.map((option) => <option key={option.code} value={option.code}>{option.name} ({option.code})</option>)}
       </select>
       <button
@@ -81,10 +82,10 @@ export function JurisdictionPicker({ workspaceId, options, current }: {
       >
         Save
       </button>
-      {current && <button type="button" onClick={() => { setEditing(false); setSelected(current.code) }} className="text-sm text-muted-foreground hover:underline">
+      {current && <button type="button" onClick={() => { setEditing(false); setSelected(current.code) }} className="text-sm text-slate-600 hover:underline">
         Cancel
       </button>}
     </div>
-    {options.length === 0 && <p className="text-sm text-muted-foreground">No jurisdiction packs are registered yet. Ship a pack under <code>lib/jurisdictions/&lt;code&gt;/</code> to unlock this picker.</p>}
+    {options.length === 0 && <p className="text-sm text-slate-600">No jurisdiction packs are available on this deployment yet.</p>}
   </div>
 }

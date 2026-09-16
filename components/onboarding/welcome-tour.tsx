@@ -70,7 +70,7 @@ export function WelcomeTour({ workspaceId, tourSeen }: { workspaceId: string; to
         full-screen backdrop above with no tooltip, and therefore no Skip or Done button: every
         click in the app was swallowed with no way out but Escape, and reloading only restarted the
         tour, since markTourSeenAction runs in close(). Falls back to a centred card instead. */}
-    <div className="absolute z-[101] rounded-lg border border-[#e6ebf1] bg-white px-4 py-3 shadow-xl"
+    <div className="absolute z-[101] rounded-lg border border-hairline bg-white px-4 py-3 shadow-xl"
       style={sr
         ? { top: sr.bottom + pad + 12, left: Math.max(12, sr.left), maxWidth: 280 }
         : { top: "50%", left: "50%", transform: "translate(-50%, -50%)", maxWidth: 280 }}>

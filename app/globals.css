@@ -85,6 +85,16 @@
   }
 }
 
+/* #231 Q21 (#252): the hairline rules the Controls grammar drew with three hex values
+ * (#e6ebf1 / #f1f5f9 / #dbe3ec) are tokens now, so Admin's Panel, Ledger, Sheet and the save
+ * bar rule with one vocabulary — `border-hairline`, `divide-hairline-soft`,
+ * `border-hairline-dashed`. Values are unchanged; the names carry the roles. */
+@theme {
+  --color-hairline: #e6ebf1;
+  --color-hairline-soft: #f1f5f9;
+  --color-hairline-dashed: #dbe3ec;
+}
+
 /* next/font sets both variables on <html> (app/layout.tsx). Declared as plain CSS rather than
  * through tailwind.config.ts so the legacy @config file stays the palette-only file it is. */
 @layer utilities {

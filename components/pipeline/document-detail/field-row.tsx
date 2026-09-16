@@ -3,7 +3,7 @@
 import { LineItemsEditor } from "@/components/documents/line-items-editor"
 import { CheckGlyph, RationalePopover, SOURCE_BADGE } from "@/components/pipeline/document-detail/rationale-popover"
 import type { FieldCheck } from "@/components/pipeline/document-detail/check-types"
-import type { DocumentFieldDefinition } from "@/lib/document-templates"
+import type { ConfiguredFieldDefinition } from "@/lib/configuration/field-table"
 import type { FieldRationale } from "@/lib/rationale"
 import type { Ref } from "@/lib/provenance"
 import { Crosshair, Pencil } from "lucide-react"
@@ -12,7 +12,8 @@ import { useRef, useState } from "react"
 const LOW_CONFIDENCE = 0.6
 
 export function FieldRow({ field, value, confidence, ref: provenanceRef, onFocusSource, rationale, checks = [], onEscalate, registerNav, isCurrent, isCompleted }: {
-  field: DocumentFieldDefinition
+  /** #252: `readOnly` comes from Admin › Configuration › Fields (not editable). */
+  field: ConfiguredFieldDefinition
   value: unknown
   confidence: number | null
   ref: Ref | null
@@ -29,6 +30,8 @@ export function FieldRow({ field, value, confidence, ref: provenanceRef, onFocus
 }) {
   const lowConfidence = typeof confidence === "number" && confidence < LOW_CONFIDENCE
   const isArray = field.type === "array"
+  const readOnly = field.readOnly === true
+  const readOnlyTitle = "Not editable — set under Admin › Configuration › Fields"
   const [showPopover, setShowPopover] = useState(false)
   const inputRef = useRef<HTMLInputElement | HTMLSelectElement>(null)
   const checkDescriptionId = `${field.key}-check-description`
@@ -51,8 +54,9 @@ export function FieldRow({ field, value, confidence, ref: provenanceRef, onFocus
     className={`group relative rounded-lg transition-colors ${lowConfidence ? "bg-amber-50/80 ring-1 ring-amber-200" : ""} ${isCurrent ? "outline outline-2 outline-emerald-400" : ""} ${isCompleted ? "opacity-70" : ""}`}>
     <div className="flex items-center gap-2 px-1 pb-1">
       <label htmlFor={field.key} className="text-xs font-medium text-slate-500">
-        {field.label}{field.required && <span className="ml-0.5 text-red-400">*</span>}
+        {field.label}{field.required && <span className="ml-0.5 text-red-600" aria-hidden>*</span>}{field.required && <span className="sr-only"> (required)</span>}
       </label>
+      {readOnly && <span className="rounded bg-slate-100 px-1.5 py-px text-[10px] font-semibold text-slate-700" title={readOnlyTitle}>Read-only</span>}
       {lowConfidence && <span className="rounded-full bg-amber-100 px-1.5 py-px text-[10px] font-semibold text-amber-700">Low confidence</span>}
       <CheckGlyph checks={checks} onOpen={() => setShowPopover(true)} />
       {badge && <button type="button" onClick={() => setShowPopover(!showPopover)}
@@ -78,9 +82,9 @@ export function FieldRow({ field, value, confidence, ref: provenanceRef, onFocus
     {showPopover && (rationale || checks.length > 0) && <RationalePopover rationale={rationale} mismatchChecks={checks} onClose={() => setShowPopover(false)} onFix={() => inputRef.current?.focus()} onEscalate={onEscalate} />}
 
     {field.type === "boolean" ? (
-      <label className="flex items-center gap-2 px-1 pb-1 text-sm text-slate-700"><input ref={inputRef as React.RefObject<HTMLInputElement>} id={field.key} name={field.key} type="checkbox" aria-describedby={checks.length ? checkDescriptionId : undefined} className="h-4 w-4 rounded accent-emerald-600" value="true" defaultChecked={value === true} />Yes</label>
+      <label className="flex items-center gap-2 px-1 pb-1 text-sm text-slate-700"><input ref={inputRef as React.RefObject<HTMLInputElement>} id={field.key} name={field.key} type="checkbox" aria-describedby={checks.length ? checkDescriptionId : undefined} className="h-4 w-4 rounded accent-emerald-600" value="true" defaultChecked={value === true} disabled={readOnly} />Yes</label>
     ) : field.type === "enum" ? (
-      <select ref={inputRef as React.RefObject<HTMLSelectElement>} id={field.key} name={field.key} aria-describedby={checks.length ? checkDescriptionId : undefined} defaultValue={typeof value === "string" ? value : ""} className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 transition-colors focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100">
+      <select ref={inputRef as React.RefObject<HTMLSelectElement>} id={field.key} name={field.key} aria-describedby={checks.length ? checkDescriptionId : undefined} defaultValue={typeof value === "string" ? value : ""} disabled={readOnly} title={readOnly ? readOnlyTitle : undefined} className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 transition-colors focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100 disabled:bg-slate-50 disabled:text-slate-600">
         <option value="">Select a value</option>
         {field.options?.map((option) => <option key={option} value={option}>{option}</option>)}
       </select>
@@ -89,7 +93,8 @@ export function FieldRow({ field, value, confidence, ref: provenanceRef, onFocus
         type={field.type === "number" ? "number" : field.type === "date" ? "date" : "text"}
         step={field.type === "number" ? "any" : undefined}
         defaultValue={typeof value === "string" || typeof value === "number" ? String(value) : ""}
-        className={`h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 shadow-sm transition-colors placeholder:text-slate-300 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100 ${field.type === "number" ? "tabular-nums" : ""}`} />
+        readOnly={readOnly} aria-readonly={readOnly || undefined} title={readOnly ? readOnlyTitle : undefined}
+        className={`h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 shadow-sm transition-colors placeholder:text-slate-300 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100 read-only:bg-slate-50 read-only:text-slate-600 ${field.type === "number" ? "tabular-nums" : ""}`} />
     )}
   </div>
 }

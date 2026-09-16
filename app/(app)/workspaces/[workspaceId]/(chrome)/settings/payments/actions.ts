@@ -21,7 +21,8 @@ const MESSAGES: Record<string, string> = {
 const message = (error: unknown, fallback: string) => (error instanceof Error && MESSAGES[error.message]) || errorMessage(error, fallback)
 
 function revalidate(workspaceId: string) {
-  revalidatePath(`/workspaces/${workspaceId}/settings/payments`)
+  revalidatePath(`/workspaces/${workspaceId}/admin/configuration/payments`)
+  revalidatePath(`/workspaces/${workspaceId}/admin/suppliers`)
   revalidatePath(`/workspaces/${workspaceId}/payments/bill-pay`)
 }
 

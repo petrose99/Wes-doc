@@ -1,5 +1,5 @@
 import { AdminPage, ModuleOff, ReadOnlyBand } from "@/components/admin/admin-ui"
-import { Empty, Figure, Ledger, LedgerRow, Panel } from "@/components/automation/automation-ui"
+import { Empty, Ledger, LedgerRow, Panel } from "@/components/automation/automation-ui"
 import { PoQuantityTolerance } from "@/components/workspace/po-quantity-tolerance"
 import { getAdminContext } from "@/lib/admin/context"
 import { adminPaths } from "@/lib/admin/paths"
@@ -52,16 +52,12 @@ export default async function PoMismatchFlowsPage({ params }: { params: Promise<
           or a bank statement and the invoice it paid.
         </Empty>
       : <>
-        <section className="grid gap-8 md:grid-cols-[minmax(0,300px)_minmax(0,1fr)] md:items-center">
-          <Figure
-            value={`${resolved}`}
-            state={resolved > 0 ? "auto" : "idle"}
-            caption={<>
-              {resolved === 1 ? "match has been settled" : "matches have been settled"} out of {summary.total} the
-              pipeline proposed. {pending > 0 ? `${pending} still waiting on a decision.` : "Nothing is waiting on a decision."}
-            </>}
-          />
-          <div className="rounded-md border border-hairline p-5">
+        <section className="grid gap-x-10 gap-y-4 md:grid-cols-2 md:items-start">
+          <p className="max-w-[52ch] text-sm leading-relaxed text-slate-700">
+            <span className="font-semibold tabular-nums text-slate-900">{resolved}</span> of the {summary.total} {summary.total === 1 ? "match" : "matches"} the pipeline proposed {resolved === 1 ? "has" : "have"} been settled.{" "}
+            {pending > 0 ? `${pending} still ${pending === 1 ? "waits" : "wait"} on a decision.` : "Nothing is waiting on a decision."}
+          </p>
+          <div className="max-w-[52ch]">
             {summary.bankAccepted === 0
               ? <p className="text-sm text-slate-600">
                   No bank lines have been accepted yet. Once someone accepts a suggested match, this tracks

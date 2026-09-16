@@ -33,7 +33,7 @@ export function ImportSheetDialog({ workspaceId, folderId, onClose }: {
   }, [file, workspaceId, folderId, router])
 
   return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
-    <div className="w-full max-w-md rounded-2xl border border-[#e6ebf1] bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+    <div className="w-full max-w-md rounded-2xl border border-hairline bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-bold text-slate-900">Import spreadsheet</h2>
         <button onClick={onClose} className="rounded p-1 text-slate-400 hover:text-slate-600"><X className="h-4 w-4" /></button>

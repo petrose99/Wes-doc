@@ -145,7 +145,7 @@ export function PaymentBatchQueue({ workspaceId, basePath, rows: serverRows, fal
           return <>
             {!isOwner && <p className="mr-auto text-xs text-slate-600">An owner marks it paid once the bank has taken the file.</p>}
             {batch.fileProblems > 0
-              ? <Button asChild className="lg:h-8 lg:text-xs" variant="outline"><Link className="py-1.5" href={withOrigin(`/workspaces/${workspaceId}/settings/payments`, origin)}><Landmark className="h-3.5 w-3.5" aria-hidden />Fix bank details to download</Link></Button>
+              ? <Button asChild className="lg:h-8 lg:text-xs" variant="outline"><Link className="py-1.5" href={withOrigin(`/workspaces/${workspaceId}/admin/suppliers`, origin)}><Landmark className="h-3.5 w-3.5" aria-hidden />Fix bank details to download</Link></Button>
               : <Button asChild className="lg:h-8 lg:text-xs" variant="outline"><a className="py-1.5" href={`/api/workspaces/${workspaceId}/payment-runs/${batch.id}/download`} download onClick={() => { const onFocus = () => { window.removeEventListener("focus", onFocus); refreshAll() }; window.addEventListener("focus", onFocus); window.setTimeout(refreshAll, 2500) }}><Download className="h-3.5 w-3.5" aria-hidden />{batch.exportedAt ? "Download again" : "Download payment file"}</a></Button>}
             {isOwner && <Button type="button" className="lg:h-8 lg:text-xs" disabled={busy} onClick={() => setMarkingPaid(batch)}><CheckCircle2 className="h-3.5 w-3.5" aria-hidden />Mark batch as paid…</Button>}
           </>

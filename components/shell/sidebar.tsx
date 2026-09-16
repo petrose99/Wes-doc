@@ -8,18 +8,20 @@ import { WorkspacePulse } from "@/components/shell/workspace-pulse"
 import { MODULES } from "@/lib/modules"
 import { isUnpluggedPath } from "@/lib/unplugged"
 import { AlertTriangle, Banknote, CheckCircle2, ClipboardCheck, Files, HeartPulse, History, Landmark, Library, PanelLeftClose, PanelLeftOpen, Percent, Receipt, Settings, Wallet, Workflow, Zap } from "lucide-react"
+import { adminPaths } from "@/lib/admin/paths"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useEffect, useState } from "react"
 
 const RAIL_PIN_KEY = "docubite.rail.pinned"
-const QUEUE_SEGMENTS = ["invoices", "purchase-orders", "receipts", "bank-statements", "exceptions", "payments"]
+// #231 Q20 (#252): Admin collapses the rail exactly as a queue does — its own left nav needs the width.
+const QUEUE_SEGMENTS = ["invoices", "purchase-orders", "receipts", "bank-statements", "exceptions", "payments", "admin"]
 
 /** Maps a ModuleDefinition.navItems[].icon string (lib/modules) to the lucide component it names.
  * A string in the registry rather than the component itself keeps lib/modules free of a React/UI
  * dependency — it's read by server code (capabilities, seeds) that has no business importing icons.
- * Settings-tagged module items (Rules, Tax, Approvals) don't render here at all — they show up in
- * components/shell/settings-nav.tsx instead, and unplugged surfaces (lib/unplugged) never render. */
+ * Settings-tagged module items (Rules, Tax) don't render here at all — they live inside Admin
+ * (#252) — and unplugged surfaces (lib/unplugged) never render. */
 const ICONS: Record<string, typeof Files> = {
   inbox: ClipboardCheck,
   "heart-pulse": HeartPulse,
@@ -36,8 +38,8 @@ const ICONS: Record<string, typeof Files> = {
  * promise the label keeps. When every primary is quiet the label drops one notch and a "you're
  * caught up" line takes over, so an empty rail reads as a win rather than a vacuum.
  *
- * Four typed intake destinations sit in two peer pairs, followed by Exceptions, Controls, Finance
- * and Archive. There is no Dashboard entry: the workspace home is the Invoices queue (#238), and
+ * Four typed intake destinations sit in two peer pairs, followed by Exceptions, Payments, Finance
+ * and Archive. Controls left the spine on #231 (#252): its pages are Admin's now. There is no Dashboard entry: the workspace home is the Invoices queue (#238), and
  * the logo goes there. The entries keep identical weight and badge treatment; a hairline break
  * separates the matching pair from the receipts/reconciliation pair without adding another
  * caption to the rail.
@@ -106,15 +108,12 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
   const moduleWorkItems = MODULES
     .filter((module) => enabled.has(module.key))
     .flatMap((module) => module.navItems ?? [])
-    .filter((item) => !item.href.startsWith("settings/") && item.href !== "health" && !isUnpluggedPath(`${base}/${item.href}`))
+    .filter((item) => !item.href.startsWith("settings/") && !item.href.startsWith("admin/") && item.href !== "health" && !isUnpluggedPath(`${base}/${item.href}`))
     .map((item) => ({ href: `${base}/${item.href}`, label: item.label, icon: ICONS[item.icon] ?? Files, exact: false }))
 
-  // Controls (the touchless-automation module's nav item) is hoisted out of the module bucket
-  // into the primary spine, directly under the typed intake group: it is the levers that govern the document
-  // pipeline, so adjacency to the pipeline it controls is the information architecture.
-  const controlsItem = moduleWorkItems.find((item) => item.href === `${base}/automation`)
   // The review-queue module's "Review" item is dropped (#238): since #225 every queue is the
-  // review surface, so a second entry for the same job was a second grammar.
+  // review surface, so a second entry for the same job was a second grammar. Controls
+  // (`/automation`) is dropped too (#231 Q9, #252): its pages moved into Admin.
   const otherModuleItems = moduleWorkItems.filter((item) => item.href !== `${base}/review` && item.href !== `${base}/automation`)
 
   // Primary spine, in workflow order: the four typed intake destinations, then Exceptions
@@ -140,7 +139,6 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
   const primaryItems = [
     exceptionsItem,
     paymentsItem,
-    ...(controlsItem ? [controlsItem] : []),
     ...(accountingEnabled ? [{ href: `${base}/finance`, label: "Finance", icon: Landmark, exact: false, badge: financePushableCount > 0 ? financePushableCount : undefined }] : []),
     // "Archive" is the accountant's own word for the permanent source-document record (Dext and
     // Hubdoc both name this surface Archive). Route stays /library — same label-over-URL stance
@@ -152,10 +150,11 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
   // divider is the sectioning.
   const secondaryItems = otherModuleItems
 
+  // #231 Q9 (#252): one rail item, Admin, last — Settings and Controls fold into it.
   const bottomItems = [
-    { href: `${base}/settings/workspace`, label: "Settings", icon: Settings, exact: false },
     { href: `${base}/activity`, label: "Activity", icon: History, exact: false },
     { href: `${base}/health`, label: "Health Checks", icon: HeartPulse, exact: false },
+    { href: adminPaths(workspaceId).configuration, label: "Admin", icon: Settings, exact: false },
   ]
 
   // Sum across primary badges tells us whether the TODAY label is a promise or a reward. When the
@@ -166,7 +165,7 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
   const isActive = (item: { href: string; label: string; exact: boolean }) => item.exact
     ? pathname === item.href
     : pathname === item.href || pathname.startsWith(`${item.href}/`)
-      || (item.label === "Settings" && pathname.startsWith(`${base}/settings`))
+      || (item.label === "Admin" && (pathname.startsWith(`${base}/admin`) || pathname.startsWith(`${base}/settings`) || pathname.startsWith(`${base}/automation`)))
       // Ingestion and review are still reachable through the typed destinations. Keep the first
       // destination lit for those legacy/generic work surfaces until their queues are migrated.
       || (item.label === "Invoices" && (pathname.startsWith(`${base}/pipeline`) || pathname.startsWith(`${base}/documents`) || pathname.startsWith(`${base}/review`) || pathname.startsWith(`${base}/bills`)))
@@ -257,7 +256,7 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
     </nav>
 
     <div className="mt-auto pt-3">
-      <AccountMenu name={user.name} email={user.email} collapsed={compact} />
+      <AccountMenu name={user.name} email={user.email} collapsed={compact} workspaceId={workspaceId} />
     </div>
   </div>
   </aside>
