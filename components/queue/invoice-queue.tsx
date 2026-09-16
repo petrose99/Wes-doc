@@ -209,7 +209,7 @@ export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercen
       onExportAll={exportAll}
       initialSelectedId={initialSelectedId}
       empty={{ title: "No invoices yet.", body: "Invoices appear here once one is extracted from an upload or an inbound email.", filteredBody: "Clear a filter to widen the queue." }}
-      loadDetail={(documentId) => getQueueDetailAction(workspaceId, documentId)}
+      loadDetail={(documentId) => getQueueDetailAction(workspaceId, documentId, { queueTitle: "Invoices" })}
       bulkActions={({ selectedIds, clear }) => <DocumentBulkActions
         workspaceId={workspaceId} noun="invoice" selectedIds={selectedIds} clear={clear} toRecord={toRecord}
         eligibleIds={selectedIds.filter((id) => !billsById.get(id)?.blockedByCheck)} exportFilename="invoices.csv"

@@ -90,22 +90,24 @@ export function ApprovalTimeline({ decisions, pendingStages, approval, state, re
     if (state === "cancelled") {
       return <p className="text-sm text-slate-500">{cancelledReason ? `Cancelled · ${cancelledReason}` : "Cancelled"}</p>
     }
-    if (state === "approved" && reviewed) {
-      const date = new Date(reviewed.at)
+    if (state === "approved") {
+      // Never empty on an Approved document: the actor and time when the audit trail has them,
+      // the DocuBite mark and the word alone when it predates the trail.
+      const date = reviewed ? new Date(reviewed.at) : null
       return <>
         <ol aria-label="Approval timeline"><li className="flex gap-3">
-          <PersonMark name={reviewed.actorName ?? "DocuBite"} tone="done" />
+          <PersonMark name={reviewed?.actorName ?? "DocuBite"} tone="done" />
           <div className="min-w-0 pt-1">
             <p className="text-sm text-slate-800">
-              {reviewed.actorName ? <><span className="font-medium">{reviewed.actorName}</span> reviewed and approved</> : "Reviewed and approved"}
+              {reviewed?.actorName ? <><span className="font-medium">{reviewed.actorName}</span> reviewed and approved</> : "Reviewed and approved"}
             </p>
-            <p className="text-xs text-slate-500"><time dateTime={reviewed.at}>{formatDateTime(date)}</time></p>
+            {reviewed && date && <p className="text-xs text-slate-500"><time dateTime={reviewed.at}>{formatDateTime(date)}</time></p>}
           </div>
         </li></ol>
         <p className="mt-2 text-[13px] text-slate-500">No approval flow ran — approved from the queue.</p>
       </>
     }
-    if (state === "touchless" && touchless) {
+    if (state === "touchless") {
       const date = reviewed?.at ? new Date(reviewed.at) : null
       return <>
         <ol aria-label="Approval timeline"><li className="flex gap-3">
@@ -115,19 +117,19 @@ export function ApprovalTimeline({ decisions, pendingStages, approval, state, re
             {date && <p className="text-xs text-slate-500"><time dateTime={date.toISOString()}>{formatDateTime(date)}</time></p>}
           </div>
         </li></ol>
-        <p className="mt-2 text-[13px] text-slate-500">All fields met the {touchless.thresholdPercent}% threshold; nobody reviewed it.</p>
+        <p className="mt-2 text-[13px] text-slate-500">{touchless ? `All fields met the ${touchless.thresholdPercent}% threshold; nobody reviewed it.` : "All fields met the threshold; nobody reviewed it."}</p>
       </>
     }
     if (state === "in_review") {
       return <p className="text-sm text-slate-500">
         {queueTitle === "Invoices"
           ? "No approval started. Start approval from the Invoices bulk bar, or approve from the pane."
-          : queueTitle === "Receipts"
-            ? "No approval started. Start approval from the Receipts bulk bar, or approve from the pane."
-            : "No approval started. Approve from the pane."}
+          : "No approval started. Approve from the pane."}
       </p>
     }
-    return <p className="text-sm text-slate-500">No approval steps yet. Approving this document records the first one.</p>
+    // Needs attention with no rows, or a caller that passed no state (the Approvals queues own
+    // their own status slot): nothing has been decided yet.
+    return <p className="text-sm text-slate-500">No approval started.</p>
   }
   const decidedByStage = new Map(decisions.map((decision) => [decision.stageIndex, decision]))
   const stages = approval

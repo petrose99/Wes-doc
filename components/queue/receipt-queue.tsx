@@ -143,7 +143,7 @@ export function ReceiptQueue({ workspaceId, basePath, receipts, minConfidencePer
     onExportAll={exportAll}
     initialSelectedId={initialSelectedId}
     empty={{ title: "No receipts yet.", body: "Receipts appear here once one is extracted from an upload or an inbound email." }}
-    loadDetail={(documentId) => getQueueDetailAction(workspaceId, documentId)}
+    loadDetail={(documentId) => getQueueDetailAction(workspaceId, documentId, { queueTitle: "Receipts" })}
     bulkActions={({ selectedIds, clear }) => <DocumentBulkActions
       workspaceId={workspaceId} noun="receipt" selectedIds={selectedIds} clear={clear} toRecord={toRecord}
       eligibleIds={selectedIds.filter((id) => !byId.get(id)?.blockedByCheck)} exportFilename="receipts.csv"

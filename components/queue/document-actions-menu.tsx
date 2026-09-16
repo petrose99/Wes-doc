@@ -200,4 +200,3 @@ export function OpenInNewTabMenuItem({ href }: { href: string }) {
   </PaneMenuItem>
 }
 
-export { PaneDocumentContext }

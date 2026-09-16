@@ -12,6 +12,6 @@ export default async function DeepLinkPage({ params, searchParams }: {
 }) {
   const { workspaceId, documentId } = await params
   const query = await searchParams
-  if (query.full === "1") return DocumentDetailPage({ params, searchParams })
+  if (query.full === "1") return DocumentDetailPage({ params, searchParams, queueTitle: "Invoices" })
   return InvoicesQueuePage({ params: Promise.resolve({ workspaceId }), searchParams: Promise.resolve(query), selectedDocumentId: documentId })
 }

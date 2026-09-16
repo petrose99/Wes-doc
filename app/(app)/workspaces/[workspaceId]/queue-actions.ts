@@ -14,7 +14,7 @@ import { requireMember } from "./action-helpers"
  * client component in that JSX has to be reachable from the route's module graph for the RSC
  * bundler to list it in the client manifest. #215's `import()` inside actions.ts only worked
  * while some other compiled route happened to have pulled `SplitPane` in. */
-export async function getQueueDetailAction(workspaceId: string, documentId: string, options?: { initialTab?: "details" | "note" | "activity" | "approval" | "checks" }) {
+export async function getQueueDetailAction(workspaceId: string, documentId: string, options?: { initialTab?: "details" | "note" | "activity" | "approval" | "checks"; queueTitle?: string }) {
   const user = await getCurrentUser()
   if (!(await requireMember(workspaceId, user.id))) return null
   const history = await getSelectionAuditPanelDataAction(workspaceId, documentId)
@@ -26,5 +26,7 @@ export async function getQueueDetailAction(workspaceId: string, documentId: stri
     // #236: Approvals opens the pane straight on the Approval tab (decision #6); PO Mismatches
     // opens on Checks, where the match-variance gate's own Override control lives.
     initialTab: options?.initialTab,
+    // #258: the Approval tab's in-review guidance names this queue's bulk bar.
+    queueTitle: options?.queueTitle,
   })
 }

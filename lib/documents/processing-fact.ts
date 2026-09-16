@@ -35,6 +35,9 @@ export type ProcessingFact = {
    * checks". Empty when the bare state word is the whole sentence (Touchless has its own
    * constant; a freshly-approved row with nothing else known has none). */
   detail: string
+  /** The input this fact was computed from, so a later upgrade (the pane learning the actor)
+   * re-runs this same function with one more field rather than composing its own words. */
+  input: ProcessingFactInput
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -52,33 +55,33 @@ export function processingFact(input: ProcessingFactInput): ProcessingFact {
   const state = processingState(input)
   const now = input.now ?? new Date()
 
-  if (state === "cancelled") return { state, detail: input.cancelledReason ?? "" }
+  if (state === "cancelled") return { state, detail: input.cancelledReason ?? "", input }
 
   if (state === "needs_attention") {
-    if (input.approvalStatus === "rejected") return { state, detail: input.rejectedBy ? `rejected by ${input.rejectedBy}` : "rejected" }
-    if (input.escalated) return { state, detail: "escalation open" }
+    if (input.approvalStatus === "rejected") return { state, detail: input.rejectedBy ? `rejected by ${input.rejectedBy}` : "rejected", input }
+    if (input.escalated) return { state, detail: "escalation open", input }
     const openCount = input.openCheckCodes?.length ?? 0
-    if (openCount > 0) return { state, detail: openCount === 1 ? "1 open check" : `${openCount} open checks` }
-    if (input.heldBack) return { state, detail: "held back from a bulk approve" }
-    return { state, detail: "" }
+    if (openCount > 0) return { state, detail: openCount === 1 ? "1 open check" : `${openCount} open checks`, input }
+    if (input.heldBack) return { state, detail: "held back from a bulk approve", input }
+    return { state, detail: "", input }
   }
 
   if (state === "in_review") {
     if (input.reviewTaskOpenedAt) {
       const days = daysAgo(input.reviewTaskOpenedAt, now)
-      if (days >= 14) return { state, detail: `opened ${formatDateShort(input.reviewTaskOpenedAt)}` }
-      return { state, detail: `opened ${days === 0 ? "today" : days === 1 ? "yesterday" : `${days} days ago`}` }
+      if (days >= 14) return { state, detail: `opened ${formatDateShort(input.reviewTaskOpenedAt)}`, input }
+      return { state, detail: `opened ${days === 0 ? "today" : days === 1 ? "yesterday" : `${days} days ago`}`, input }
     }
-    if (input.receivedAt) return { state, detail: `received ${formatDateShort(input.receivedAt)}` }
-    return { state, detail: "" }
+    if (input.receivedAt) return { state, detail: `received ${formatDateShort(input.receivedAt)}`, input }
+    return { state, detail: "", input }
   }
 
-  if (state === "touchless") return { state, detail: "sent automatically" }
+  if (state === "touchless") return { state, detail: "sent automatically", input }
 
   // approved
   if (input.approvedBy) {
     const { actorName, at } = input.approvedBy
-    return { state, detail: actorName ? `by ${actorName} · ${formatDateShort(at)}` : formatDateShort(at) }
+    return { state, detail: actorName ? `by ${actorName} · ${formatDateShort(at)}` : formatDateShort(at), input }
   }
-  return { state, detail: "" }
+  return { state, detail: "", input }
 }

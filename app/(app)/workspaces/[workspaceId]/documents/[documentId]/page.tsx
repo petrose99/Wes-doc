@@ -1,6 +1,10 @@
-import { saveDocumentReviewAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
+import { getSelectionAuditPanelDataAction, saveDocumentReviewAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
 import { SplitPane } from "@/components/pipeline/document-detail/split-pane"
 import { PaneFrame } from "@/components/queue/detail-pane"
+import { StatusLine } from "@/components/queue/status-line"
+import { LEDGER_FACT_LABELS, PROCESSING_STATE_LABELS, processingState } from "@/lib/documents/processing-state"
+import { processingFact } from "@/lib/documents/processing-fact"
+import { getProcessingStateInput } from "@/models/processing-state"
 import { readOrigin } from "@/lib/navigation/origin"
 import type { DocumentHistory } from "@/components/queue/history-tabs"
 import { FxConversionBadge } from "@/components/documents/fx-conversion-badge"
@@ -45,7 +49,7 @@ import { notFound, redirect } from "next/navigation"
  * is right for settings pages but leaves no room for a source viewer next to the form. Same URL
  * as before ((chrome) is a route group, so this move doesn't change the path), just outside that
  * layout, so it gets the workspace shell's full-bleed width instead. */
-export async function DocumentDetailPage({ params, searchParams, embedded = false, history = null, initialTab }: {
+export async function DocumentDetailPage({ params, searchParams, embedded = false, history = null, initialTab, queueTitle }: {
   params: Promise<{ workspaceId: string; documentId: string }>
   searchParams: Promise<{ stage?: string; page?: string; bb?: string; from?: string; full?: string }>
   /** #225: rendered inside a Queue screen's Detail pane (see `getQueueDetailAction`). */
@@ -54,6 +58,8 @@ export async function DocumentDetailPage({ params, searchParams, embedded = fals
   /** #236: which tab the embedded pane opens on — Approvals opens straight to "approval",
    * PO Mismatches to "checks". Undefined keeps every other queue's existing "details" default. */
   initialTab?: "details" | "note" | "activity" | "approval" | "checks"
+  /** #258: "Invoices" / "Receipts" — names the queue in the Approval tab's in-review guidance. */
+  queueTitle?: string
 }) {
   const { workspaceId, documentId } = await params
   const query = await searchParams
@@ -66,12 +72,21 @@ export async function DocumentDetailPage({ params, searchParams, embedded = fals
   const capabilities = await getWorkspaceCapabilities(workspaceId)
   const canPush = document.status === "reviewed" && capabilities.has("accounting-push")
     && capabilities.pushableTemplateCodes.includes(document.template?.code ?? "")
-  const [, pushes, auditEvents, paymentStatuses] = await Promise.all([
+  const [, pushes, auditEvents, paymentStatuses, processing, fullHistory] = await Promise.all([
     canPush ? listWorkspaceIntegrationConnections(workspaceId) : Promise.resolve([]),
     canPush ? listWorkspaceIntegrationPushes(workspaceId, documentId) : Promise.resolve([]),
     listDocumentAuditEvents(workspaceId, documentId),
     canPush ? getDocumentPaymentStatuses(workspaceId, [documentId]) : Promise.resolve(new Map()),
+    // #258: the same inputs the queue row derives its state from, so the stepper's Approval node
+    // and full mode's Status line print the row's word.
+    getProcessingStateInput(workspaceId, documentId),
+    // #258: full mode loads the same history the pane does — "the same pane at full width" needs
+    // the Approval tab (and the Status line's actor) there too. The embedded pane's caller
+    // (`getQueueDetailAction`) already passes it.
+    embedded ? Promise.resolve(null) : getSelectionAuditPanelDataAction(workspaceId, documentId),
   ])
+  const documentHistory = history ?? fullHistory
+  const state = processing ? processingState(processing) : null
 
   // #252: Admin › Configuration › Fields overlays Required and not-editable on the template's
   // own definitions. Only read when the workspace has saved a table for this type.
@@ -140,7 +155,9 @@ export async function DocumentDetailPage({ params, searchParams, embedded = fals
     escalated: row.status === "escalated",
   }))
 
-  const saveReview = async (formData: FormData) => { "use server"; await saveDocumentReviewAction(workspaceId, documentId, formData) }
+  // #258: every render of this page is the queue's pane or the `?full=1` route — both stay put
+  // and refresh in place after Save review (the retired `/review` inbox was the redirect's home).
+  const saveReview = async (formData: FormData) => { "use server"; return saveDocumentReviewAction(workspaceId, documentId, formData, { stay: true }) }
   const supplierValue = data.vendor ?? data.merchant
   const supplier = typeof supplierValue === "string" ? supplierValue.trim() : ""
   const canCreateRule = capabilities.has("supplier-rules") && membership.role === "owner" && supplier.length > 0
@@ -230,26 +247,30 @@ export async function DocumentDetailPage({ params, searchParams, embedded = fals
       readinessStatus === "ready" ? "done"
       : readinessStatus === "blocked" ? "blocked"
       : "current"
-    const checksDetail = readinessStatus === "blocked" && readinessBlockers[0] ? readinessBlockers[0] : readinessStatus === "ready" ? "all clear" : undefined
+    const checksDetail = readinessStatus === "blocked" && readinessBlockers[0] ? readinessBlockers[0] : readinessStatus === "ready" ? "All clear" : undefined
     // Approval
+    // #258: the Approval node says the one word the row, the Status line and the Approval tab
+    // say — `PROCESSING_STATE_LABELS` via the same `processingState()` — never its own phrasing.
     const approvalState: import("@/components/pipeline/document-detail/stage-indicator").StageStep["state"] =
-      openReviewTask && openReviewTask.status !== "approved" ? "blocked"
+      state === "cancelled" || state === "needs_attention" ? "blocked"
+      : state === "approved" || state === "touchless" ? "done"
+      : openReviewTask && openReviewTask.status !== "approved" ? "blocked"
       : document.status === "reviewed" ? "done"
       : "current"
-    const approvalDetail = openReviewTask ? (openReviewTask.status === "in_review" ? "in review" : "awaiting approval") : (document.status === "reviewed" ? "signed off" : undefined)
+    const approvalDetail = state ? PROCESSING_STATE_LABELS[state] : undefined
     // Sync
     const syncState: import("@/components/pipeline/document-detail/stage-indicator").StageStep["state"] =
       succeededPushCount > 0 ? "done"
       : failedPushCount > 0 ? "blocked"
       : approvalState === "done" ? "current"
       : "upcoming"
-    const syncDetail = succeededPushCount > 0 ? `pushed × ${succeededPushCount}` : failedPushCount > 0 ? "push failed" : undefined
+    const syncDetail = succeededPushCount > 0 ? `${LEDGER_FACT_LABELS.synced} × ${succeededPushCount}` : failedPushCount > 0 ? "Post failed" : undefined
     // Pay
     const payState: import("@/components/pipeline/document-detail/stage-indicator").StageStep["state"] =
       confirmedPaid || ledgerPaid ? "done"
       : syncState === "done" ? "current"
       : "upcoming"
-    const payDetail = confirmedPaid ? "confirmed paid" : ledgerPaid ? "paid in ledger" : undefined
+    const payDetail = confirmedPaid ? LEDGER_FACT_LABELS.paid : ledgerPaid ? `${LEDGER_FACT_LABELS.paid} in ledger` : undefined
     return [
       { key: "extracted", label: "Extracted", state: "done" },
       { key: "checks", label: "Checks", state: checksState, detail: checksDetail },
@@ -323,8 +344,10 @@ export async function DocumentDetailPage({ params, searchParams, embedded = fals
     institutions={institutions}
     institutionId={document.institutionId}
     institutionName={institutionName}
-    history={history}
+    history={documentHistory}
     initialTab={initialTab}
+    state={state ?? undefined}
+    queueTitle={queueTitle}
   />
   if (embedded) return splitPane
 
@@ -335,7 +358,13 @@ export async function DocumentDetailPage({ params, searchParams, embedded = fals
   const name = supplier
     ? { title: supplier, suffix: invoiceNumber || document.filename }
     : { title: document.filename, suffix: invoiceNumber || null }
-  return <PaneFrame mode="full" name={name} backHref={queueHref}>{splitPane}</PaneFrame>
+  // #258: the Status line in full mode is server-rendered with the actor already known — the
+  // same `StatusLine` the pane shows, fed by the same `processingFact`.
+  const ledger = succeededPushCount > 0 ? "synced" : confirmedPaid || ledgerPaid ? "paid" : null
+  const status = processing && state
+    ? <StatusLine state={state} fact={processingFact({ ...processing, now: new Date() })} ledger={ledger} openCheckCodes={processing.openCheckCodes} cancelledReason={processing.cancelledReason} />
+    : undefined
+  return <PaneFrame mode="full" name={name} backHref={queueHref} status={status}>{splitPane}</PaneFrame>
 }
 
 export default async function LegacyDocumentPage({ params, searchParams }: {

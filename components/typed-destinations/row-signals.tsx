@@ -1,5 +1,5 @@
 import { confidenceState, type ConfidenceState } from "@/lib/documents/confidence-state"
-import type { ProcessingState } from "@/lib/documents/processing-state"
+import { PROCESSING_STATE_LABELS, type ProcessingState } from "@/lib/documents/processing-state"
 
 /** Row anatomy promoted from the `prototype/dense-operator-row` branch (#182, resolved on Wayfinder
  * map #177) into production. Shared between InvoiceTable and ReceiptTable so the status glyph,
@@ -47,14 +47,6 @@ export function ConfidenceField({ label, value, minConfidence, children }: {
   )
 }
 
-const PROCESSING_STATE_LABEL: Record<ProcessingState, string> = {
-  cancelled: "Cancelled",
-  needs_attention: "Needs attention",
-  in_review: "In review",
-  touchless: "Touchless",
-  approved: "Approved",
-}
-
 /** #222/#223 (Wayfinder map #177): the row's leading-edge processing-state mark — what replaced
  * the old aging `StatusGlyph` (aging now lives only in `DueDateCountdownBadge`'s text, per #208)
  * and the Status-cell `TouchlessPill` (Vic shows one autopilot icon, not icon-plus-pill). One
@@ -68,8 +60,8 @@ export function ProcessingStateGlyph({ state, minConfidencePercent }: {
   minConfidencePercent?: number
 }) {
   const label = state === "touchless"
-    ? `${PROCESSING_STATE_LABEL[state]} — sent automatically, all fields ≥ ${minConfidencePercent}%`
-    : PROCESSING_STATE_LABEL[state]
+    ? `${PROCESSING_STATE_LABELS[state]} — sent automatically, all fields ≥ ${minConfidencePercent}%`
+    : PROCESSING_STATE_LABELS[state]
 
   if (state === "cancelled") {
     return (

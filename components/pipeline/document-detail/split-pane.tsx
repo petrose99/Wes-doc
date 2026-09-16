@@ -9,8 +9,10 @@ import { parseLiveCheckValues, rebuildLiveChecks } from "@/components/pipeline/d
 import { StageIndicator, type StageStep } from "@/components/pipeline/document-detail/stage-indicator"
 import { useFieldNav } from "@/components/pipeline/document-detail/use-field-nav"
 import { updateDocumentNoteAction } from "@/app/(app)/workspaces/[workspaceId]/pipeline-actions"
-import { useRegisterDocumentActions } from "@/components/queue/document-actions-menu"
-import { escalateCheckAction, setDocumentTypeAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
+import { PaneDocumentContext, useRegisterDocumentActions } from "@/components/queue/document-actions-menu"
+import { escalateCheckAction, setDocumentTypeAction, type SaveReviewResult } from "@/app/(app)/workspaces/[workspaceId]/actions"
+import type { ActionState } from "@/lib/actions"
+import { useRouter } from "next/navigation"
 import { InstitutionAssert } from "@/components/pipeline/document-detail/institution-assert"
 import { StatementDriftBanner } from "@/components/pipeline/document-detail/statement-drift-banner"
 import { ApprovalTab, AuditLog, ChecksTab, type DocumentHistory } from "@/components/queue/history-tabs"
@@ -20,8 +22,9 @@ import { SourceViewer, type ProvenanceTarget, type SourceDocument } from "@/comp
 import type { DocumentFieldDefinition } from "@/lib/document-templates"
 import type { Ref } from "@/lib/provenance"
 import type { FieldRationale } from "@/lib/rationale"
+import type { ProcessingState } from "@/lib/documents/processing-state"
 import { CheckCircle2, ChevronDown, ChevronUp, ExternalLink, Loader2 } from "lucide-react"
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react"
+import { useActionState, useContext, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react"
 import { toast } from "sonner"
 
 type Tab = "details" | "note" | "activity" | "approval" | "checks"
@@ -45,7 +48,7 @@ export function SplitPane({
   workspaceId, source, fields, data, fieldConfidence, provenanceFields, provenanceItems, initialTarget, conflictingLabels, missingRequiredFields,
   saveReview, documentType: initialDocumentType, note: initialNote, auditEvents,
   header, canPush, pushCard, canCreateRule, defaultSupplier, matchKind, bankMatches, documentMatches, rationales, checks, fxBadge, stageIndicator,
-  institutions, institutionId, institutionName, history, po = null, initialTab,
+  institutions, institutionId, institutionName, history, po = null, initialTab, state, queueTitle,
 }: {
   workspaceId: string
   source: SourceDocument
@@ -57,7 +60,9 @@ export function SplitPane({
   initialTarget: ProvenanceTarget | null
   conflictingLabels: string[]
   missingRequiredFields: string[]
-  saveReview: (formData: FormData) => Promise<void>
+  /** #258: returns the save's outcome instead of redirecting, so the pane (and the `?full=1`
+   * route) can toast it and refresh in place — see `saveDocumentReviewAction`'s `stay`. */
+  saveReview: (formData: FormData) => Promise<ActionState<SaveReviewResult | null>>
   documentType: "expense" | "sale" | "bank_statement" | null
   note: string
   auditEvents: Array<{ id: string; label: string; createdAt: string; actorName: string | null }>
@@ -95,6 +100,12 @@ export function SplitPane({
   /** #236: which tab this pane opens on — Approvals opens straight to "approval", PO Mismatches
    * to "checks". Undefined keeps the historic "details" default for every other queue. */
   initialTab?: Tab
+  /** #258: the document's processing state, computed server-side by the same function the row
+   * uses (`getProcessingStateInput` → `processingState`), for the Approval tab's no-flow cases. */
+  state?: ProcessingState
+  /** #258: "Invoices" / "Receipts" — the Approval tab's in-review guidance names the queue's
+   * own bulk bar (Receipts has no Start approval there). */
+  queueTitle?: string
 }) {
   const [tab, setTab] = useState<Tab>(initialTab ?? "details")
   const [target, setTarget] = useState<ProvenanceTarget | null>(initialTarget)
@@ -130,9 +141,18 @@ export function SplitPane({
 
   // Hand the frame around us the document, so its ⋯ carries Archive · Flag · Delete… (#259). The
   // standalone route wraps this component in its own frame, so the same registration serves both.
+  // #258: the decision the Status line upgrades its sentence with — the last stage decision when
+  // a flow ran, else the queue-side `document_reviewed` (already gated on `status === "reviewed"`
+  // by the loader). Null while the history hasn't loaded, so the row-derived sentence stands.
+  const lastStageDecision = history?.stageDecisions.length ? history.stageDecisions[history.stageDecisions.length - 1] : null
+  const decision = lastStageDecision
+    ? { kind: lastStageDecision.decision === "approve" ? "approved" as const : "rejected" as const, actorName: lastStageDecision.actorName, at: lastStageDecision.decidedAt }
+    : history?.reviewed ? { kind: "approved" as const, actorName: history.reviewed.actorName, at: history.reviewed.at }
+    : null
   useRegisterDocumentActions({
     workspaceId, documentId: header.documentId, fileId: header.fileId, filename: header.filename,
     flagged: header.flagged, archived: header.archived, cancelled: header.cancelled, cancelledReason: header.cancelledReason, reviewLink: header.reviewLink,
+    decision,
   })
 
   const selectDocType = async (type: "expense" | "sale" | "bank_statement" | "other") => {
@@ -377,7 +397,7 @@ export function SplitPane({
           </div>}
 
           {tab === "approval" && history && <div {...panelProps("approval")} className={`mx-auto p-4 lg:p-6 ${layout === "details-only" ? "max-w-2xl" : ""}`}>
-            <ApprovalTab workspaceId={workspaceId} history={history} />
+            <ApprovalTab workspaceId={workspaceId} history={history} state={state} queueTitle={queueTitle} cancelledReason={header.cancelledReason} />
           </div>}
 
           {tab === "checks" && history && <div {...panelProps("checks")} className={`mx-auto p-6 ${layout === "details-only" ? "max-w-2xl" : ""}`}>
@@ -392,7 +412,7 @@ export function SplitPane({
 /** A4: the inner form that owns the field-nav state. Split out of SplitPane so the hook can
  * derive its ordering directly from formFields without SplitPane touching field-nav internals. */
 function FieldNavForm({ saveReview, docType, formFields, data, fieldConfidence, provenanceFields, provenanceItems, summaryFields, rationales, checks, workspaceId, documentId, setTarget, po }: {
-  saveReview: (formData: FormData) => void | Promise<void>
+  saveReview: (formData: FormData) => Promise<ActionState<SaveReviewResult | null>>
   docType: string | null
   formFields: DocumentFieldDefinition[]
   data: Record<string, unknown>
@@ -411,6 +431,27 @@ function FieldNavForm({ saveReview, docType, formFields, data, fieldConfidence, 
   const nav = useFieldNav(navItems)
   const formRef = useRef<HTMLFormElement>(null)
   const [liveChecks, setLiveChecks] = useState(checks)
+  // #258 (B2): Save review is the one in-pane mutation that changes the processing state. The
+  // action returns instead of redirecting; success toasts the outcome and asks the queue to
+  // refresh (`onMutated` → `QueueScreen.refresh()`), so the row pill, glyph, Status line, stepper
+  // and Approval tab re-derive together. Full mode has no queue around it and refreshes itself.
+  // Failure keeps the uncontrolled inputs as typed and leaves focus on the button.
+  const paneContext = useContext(PaneDocumentContext)
+  const router = useRouter()
+  const [saveState, saveAction, saving] = useActionState<ActionState<SaveReviewResult | null> | null, FormData>(
+    async (_previous, formData) => {
+      try { return await saveReview(formData) } catch { return { success: false, error: "Could not save — try again" } }
+    }, null)
+  useEffect(() => {
+    if (!saveState) return
+    if (!saveState.success) { toast.error(saveState.error || "Could not save — try again"); return }
+    const outcome = saveState.data
+    if (outcome?.approved) toast.success("Approved")
+    else toast.success(outcome?.missingLabel ? `Saved — still In review: ${outcome.missingLabel}` : "Saved — still In review")
+    if (paneContext?.onMutated) paneContext.onMutated("changed")
+    else router.refresh()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saveState])
   // One summary line in place of the per-field "Extracted" badges the audit had FieldRow drop:
   // says how many fields landed, and how many of those are worth a second look.
   const extractedCount = formFields.filter((field) => data[field.key] !== undefined && data[field.key] !== null && data[field.key] !== "").length
@@ -426,7 +467,7 @@ function FieldNavForm({ saveReview, docType, formFields, data, fieldConfidence, 
     if (!result.success) toast.error(result.error || "Could not escalate this check")
   }
 
-  return <form ref={formRef} action={saveReview} className="space-y-3" onKeyDown={nav.onFormKeyDown} onInput={recompute}>
+  return <form ref={formRef} action={saveAction} className="space-y-3" onKeyDown={nav.onFormKeyDown} onInput={recompute}>
     {extractedCount > 0 && <p className="text-xs text-slate-500">
       All {extractedCount} field{extractedCount === 1 ? "" : "s"} extracted{nav.totalSuspects > 0 ? ` — ${nav.totalSuspects} low-confidence` : ""}.
     </p>}
@@ -441,8 +482,8 @@ function FieldNavForm({ saveReview, docType, formFields, data, fieldConfidence, 
           checks={liveChecks.filter((check) => checkAppliesToField(check, field.key))} onEscalate={onEscalate}
           registerNav={nav.registerField} isCurrent={nav.currentKey === field.key} isCompleted={nav.completedKeys.has(field.key)} />)}
     <div className="flex items-center gap-3 border-t border-slate-100 pt-3">
-      <button type="submit" disabled={!docType} className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40" title={!docType ? "Choose Expense or Sale first" : undefined}>
-        <CheckCircle2 className="h-4 w-4" />Save review
+      <button type="submit" disabled={!docType} aria-busy={saving || undefined} className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40" title={!docType ? "Choose Expense or Sale first" : undefined}>
+        {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <CheckCircle2 className="h-4 w-4" aria-hidden />}{saving ? "Saving…" : "Save review"}
       </button>
       {!docType && <span className="text-xs text-amber-600">Choose a document type first</span>}
     </div>

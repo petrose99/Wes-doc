@@ -31,6 +31,7 @@ import { getOrCreateAutomationConfig, updateAutomationConfig } from "@/models/au
 import { adminPaths } from "@/lib/admin/paths"
 import { listOpenGatesForDocument, overrideEligibility } from "@/lib/gates/list"
 import { listOpenEscalationsForDocument } from "@/models/exceptions"
+import { getProcessingStateInput } from "@/models/processing-state"
 import { addDomainPackToFile, createFile, createFolder, deleteFileIfEmpty, deleteFiles, deleteFolder, duplicateFile, getFileTemplates, getWorkspaceFile, listFileShares, moveToFolder, removeFileShare, renameFile, renameFolder, setLinkAccess, touchFile, upsertFileShare } from "@/models/files"
 import { getCurrentUser } from "@/lib/auth"
 import { prisma } from "@/lib/db"
@@ -234,7 +235,7 @@ export async function getSelectionAuditPanelDataAction(workspaceId: string, docu
   const user = await getCurrentUser()
   const membership = await requireMember(workspaceId, user.id)
   if (!membership) return null
-  const [auditEvents, stageDecisions, gates, stageState, escalations, facts] = await Promise.all([
+  const [auditEvents, stageDecisions, gates, stageState, escalations, facts, processing] = await Promise.all([
     listDocumentAuditEvents(workspaceId, documentId),
     listDocumentStageDecisions(workspaceId, documentId),
     listOpenGatesForDocument(workspaceId, documentId),
@@ -243,6 +244,9 @@ export async function getSelectionAuditPanelDataAction(workspaceId: string, docu
     // #257 S6/S7: who the approval waits on, the supplier's record, a near duplicate, the PO
     // variance figures — for the Approval tab. Null-safe per field; never fails the whole load.
     getApprovalDetailFacts(workspaceId, documentId, { userId: user.id, role: membership.role as WorkspaceRole }).catch(() => null),
+    // #258: who approved with no flow / whether it went touchless — the Approval tab is never
+    // empty on an Approved document, and the Status line names the actor once this lands.
+    getProcessingStateInput(workspaceId, documentId).catch(() => null),
   ])
   // #218: a stage only reads as "Pending" while its task is still open/in_review (stageState is
   // null once resolved or workflow-less) and it hasn't already produced a review_task_stage_decided
@@ -254,6 +258,8 @@ export async function getSelectionAuditPanelDataAction(workspaceId: string, docu
     : []
   return {
     facts,
+    reviewed: processing?.reviewed ?? null,
+    touchless: processing?.touchlessThresholdPercent !== null && processing?.touchlessThresholdPercent !== undefined ? { thresholdPercent: processing.touchlessThresholdPercent } : null,
     auditEvents: auditEvents.map((event) => ({ id: event.id, label: event.label, createdAt: event.createdAt.toISOString(), actorName: event.actorName })),
     stageDecisions: stageDecisions.map((decision) => ({ ...decision, decidedAt: decision.decidedAt.toISOString() })),
     pendingStages: pendingStages.map((stage) => ({ stageIndex: stage.stageIndex, stageName: stage.name })),
@@ -306,11 +312,18 @@ export async function overrideGateAction(workspaceId: string, gateId: string, fo
   return { success: true, data: null }
 }
 
-export async function saveDocumentReviewAction(workspaceId: string, documentId: string, formData: FormData): Promise<ActionState<null>> {
+/** Saves the pane's field form. #258: with `stay`, returns the outcome (`approved` — the
+ * document reached "reviewed" — or the first still-missing required field's label) instead of
+ * redirecting, so the embedded pane and the `?full=1` route survive their own decision and can
+ * refresh in place; the legacy `/review` inbox keeps the redirect. */
+export type SaveReviewResult = { approved: boolean; missingLabel: string | null }
+
+export async function saveDocumentReviewAction(workspaceId: string, documentId: string, formData: FormData, options: { stay?: boolean } = {}): Promise<ActionState<SaveReviewResult | null>> {
   const user = await getCurrentUser()
   if (!(await requireMember(workspaceId, user.id))) return { success: false, error: NO_ACCESS }
   const document = await getWorkspaceDocument(workspaceId, documentId)
   if (!document) return { success: false, error: "Document not found" }
+  let outcome: SaveReviewResult | null = null
   try {
     const fields = parseTemplateFields(document.fieldSnapshot)
     const data: Record<string, unknown> = {}
@@ -343,8 +356,16 @@ export async function saveDocumentReviewAction(workspaceId: string, documentId: 
       if (field.type === "number") { data[field.key] = Number(raw); continue }
       data[field.key] = raw
     }
-    await updateDocumentReview({ workspaceId, documentId, reviewedData: data, actorId: user.id }); after(async () => { await refreshDocumentReadiness({ workspaceId, documentId }) }); revalidatePath(`${paths(workspaceId).documents}/${documentId}`); await revalidateSheet(workspaceId, document.fileId); redirect(paths(workspaceId).review)
+    const updated = await updateDocumentReview({ workspaceId, documentId, reviewedData: data, actorId: user.id })
+    after(async () => { await refreshDocumentReadiness({ workspaceId, documentId }) })
+    revalidatePath(`${paths(workspaceId).documents}/${documentId}`)
+    await revalidateSheet(workspaceId, document.fileId)
+    const missing = (updated.confidence as { missingRequiredFields?: string[] } | null)?.missingRequiredFields ?? []
+    const missingLabel = missing[0] ? fields.find((field) => field.key === missing[0])?.label ?? missing[0] : null
+    outcome = { approved: updated.status === "reviewed", missingLabel }
   } catch { return { success: false, error: "Check the field values" } }
+  if (options.stay) return { success: true, data: outcome }
+  redirect(paths(workspaceId).review)
 }
 
 /** A reviewer flags a check as "the document is wrong" rather than "the extraction misread it"
