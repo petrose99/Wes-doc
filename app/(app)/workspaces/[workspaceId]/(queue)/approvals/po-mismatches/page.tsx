@@ -1,3 +1,4 @@
+import { queueArrival } from "@/lib/navigation/origin-server"
 import { getCurrentUser } from "@/lib/auth"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { listApprovalInvoiceRows, listPoMismatchRows } from "@/models/approvals"
@@ -38,7 +39,8 @@ export async function ApprovalsPoMismatchesQueuePage({ params, searchParams, sel
   // and the segment's Invoice approvals count goes through the same predicate.
   const invoiceCount = filterApprovalInvoiceRows(allInvoiceRows, searchParamsOf(query)).length
 
-  return <PoMismatchQueue workspaceId={workspaceId} basePath={basePath} rows={allMismatchRows} invoiceCount={invoiceCount} workspaceDocumentCount={workspaceDocumentCount} initialSelectedId={selectedDocumentId} />
+  const arrival = await queueArrival(workspaceId, { searchParams: query as Record<string, string | string[] | undefined>, queuePath: "approvals/po-mismatches", selectedId: selectedDocumentId, rowIds: allMismatchRows.map((row) => row.documentId), decidedText: "This invoice was already decided — it's no longer in Ready to Approve." })
+  return <PoMismatchQueue arrival={arrival} workspaceId={workspaceId} basePath={basePath} rows={allMismatchRows} invoiceCount={invoiceCount} workspaceDocumentCount={workspaceDocumentCount} initialSelectedId={selectedDocumentId} />
 }
 
 export default function ApprovalsPoMismatchesPage({ params, searchParams }: { params: Promise<{ workspaceId: string }>; searchParams: Promise<ApprovalsPoMismatchesSearchParams> }) {

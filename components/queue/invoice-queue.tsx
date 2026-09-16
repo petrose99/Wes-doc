@@ -1,5 +1,6 @@
 "use client"
 
+import type { QueueArrival } from "@/lib/navigation/origin-server"
 import { useState, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
@@ -81,7 +82,7 @@ const SORTS: SortOption<BillRow>[] = [
   { key: "supplier", label: "Supplier A–Z", compare: (a, b) => (a.supplier ?? "￿").localeCompare(b.supplier ?? "￿") },
 ]
 
-export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercent, availableWorkflows = [], views, viewsPhone, stat, initialSelectedId, fieldTable = null, workspaceDocumentCount, todayOutcome, inboundAddress }: {
+export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercent, availableWorkflows = [], views, viewsPhone, stat, initialSelectedId, fieldTable = null, workspaceDocumentCount, todayOutcome, inboundAddress, arrival }: {
   workspaceId: string
   basePath: string
   bills: BillRow[]
@@ -104,6 +105,8 @@ export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercen
   /** #264 spec §3.1: `${token}@${domain}`, or null when email intake is off or the token could
    * not be issued (healthcare workspace) — first-use then omits the address line entirely. */
   inboundAddress: string | null
+  /** #268: the Origin strip's model + the missing-row notice, from `queueArrival` on the server. */
+  arrival?: QueueArrival
 }) {
   const router = useRouter()
   const origin = useOriginHere()
@@ -212,6 +215,8 @@ export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercen
 
   return <>
     <QueueScreen<BillRow>
+    origin={arrival?.origin ?? null}
+    initialMissing={arrival?.initialMissing}
       title="Invoices"
       basePath={basePath}
       rows={bills}

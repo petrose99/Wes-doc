@@ -1,5 +1,6 @@
 "use client"
 
+import type { QueueArrival } from "@/lib/navigation/origin-server"
 import { useState } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -51,7 +52,7 @@ function variancePercent(row: PoMismatchRow): number {
  * Override Mode already uses from the Checks tab — decision #3 asks for the primitive, not a
  * second mechanism); Reject ends the invoice's Approval, same action as the Invoices queue's own
  * Reject. */
-export function PoMismatchQueue({ workspaceId, basePath, rows, invoiceCount, initialSelectedId, workspaceDocumentCount }: {
+export function PoMismatchQueue({ workspaceId, basePath, rows, invoiceCount, initialSelectedId, workspaceDocumentCount, arrival }: {
   workspaceId: string
   basePath: string
   /** Every row the actor may see — facets apply client-side (`filterPoMismatchRows`). */
@@ -61,6 +62,8 @@ export function PoMismatchQueue({ workspaceId, basePath, rows, invoiceCount, ini
   initialSelectedId?: string | null
   /** #264 spec §2: passed through to `QueueScreen` (the state function needs it for every queue). */
   workspaceDocumentCount: number
+  /** #268: the Origin strip's model + the missing-row notice, from `queueArrival` on the server. */
+  arrival?: QueueArrival
 }) {
   const router = useRouter()
   const online = useOnlineStatus()
@@ -120,14 +123,15 @@ export function PoMismatchQueue({ workspaceId, basePath, rows, invoiceCount, ini
 
   return <>
     <QueueScreen<PoMismatchRow>
+    origin={arrival?.origin ?? null}
+    initialMissing={arrival?.initialMissing}
       title="PO Mismatches"
       basePath={basePath}
       rows={rows}
       filterRows={filterPoMismatchRows}
       pinned={decided?.row ?? null}
       onOpenChange={(id) => { if (id !== decided?.row.documentId) setDecided(null) }}
-      initialMissing={{ text: "This invoice was already decided — it's no longer in Ready to Approve." }}
-      rowId={(row) => row.documentId}
+            rowId={(row) => row.documentId}
       rowName={(row) => ({ title: row.supplier ?? "Unknown supplier", suffix: [row.invoiceNumber, `${formatMoney(row.variance, row.currencyCode)} variance`].filter(Boolean).join(" · ") || null })}
       leading={(row) => <ProcessingStateGlyph state={processingState({ approvalStatus: "in_progress", blockedByCheck: row.eligibility.status !== "ready", escalated: false, touchless: false, status: "needs_review" })} />}
       columns={columns}

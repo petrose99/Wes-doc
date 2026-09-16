@@ -1,5 +1,6 @@
 "use client"
 
+import type { QueueArrival } from "@/lib/navigation/origin-server"
 import { useState, type ReactNode } from "react"
 import { toast } from "sonner"
 import { QueueScreen, type QueueColumn, type SortOption } from "@/components/queue/queue-screen"
@@ -52,7 +53,7 @@ function ClaimPill({ status }: { status: ReceiptRow["claimStatus"] }) {
   return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize ${cls}`}>{status}</span>
 }
 
-export function ReceiptQueue({ workspaceId, basePath, receipts, minConfidencePercent, views, viewsPhone, stat, initialSelectedId, fieldTable = null, workspaceDocumentCount, todayOutcome }: {
+export function ReceiptQueue({ workspaceId, basePath, receipts, minConfidencePercent, views, viewsPhone, stat, initialSelectedId, fieldTable = null, workspaceDocumentCount, todayOutcome, arrival }: {
   workspaceId: string
   basePath: string
   receipts: ReceiptRow[]
@@ -68,6 +69,8 @@ export function ReceiptQueue({ workspaceId, basePath, receipts, minConfidencePer
   workspaceDocumentCount: number
   /** #264: the done state's "n approved today, m posted." sentence. */
   todayOutcome: { approvedToday: number; postedToday: number }
+  /** #268: the Origin strip's model + the missing-row notice, from `queueArrival` on the server. */
+  arrival?: QueueArrival
 }) {
   const [needsAttention, setNeedsAttention] = useState<Set<string>>(new Set())
   const minConfidence = minConfidenceFromPercent(minConfidencePercent)
@@ -134,6 +137,8 @@ export function ReceiptQueue({ workspaceId, basePath, receipts, minConfidencePer
   }
 
   return <QueueScreen<ReceiptRow>
+    origin={arrival?.origin ?? null}
+    initialMissing={arrival?.initialMissing}
     title="Receipts"
     basePath={basePath}
     rows={receipts}

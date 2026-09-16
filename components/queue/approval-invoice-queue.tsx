@@ -1,5 +1,6 @@
 "use client"
 
+import type { QueueArrival } from "@/lib/navigation/origin-server"
 import { useState, useTransition, type ReactNode } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -56,7 +57,7 @@ function eligibilityText(row: ApprovalInvoiceRow): string {
  * screen (#225). A row's Approve/Reject decide the invoice's *current stage*
  * (`decideReviewTaskStageAction`, already generic across every workflow surface); "Send back for
  * review" lives in the pane's header overflow, not the sticky footer, per decision #6. */
-export function ApprovalInvoiceQueue({ workspaceId, basePath, rows, poMismatchCount, views, viewsPhone, initialSelectedId, workspaceDocumentCount }: {
+export function ApprovalInvoiceQueue({ workspaceId, basePath, rows, poMismatchCount, views, viewsPhone, initialSelectedId, workspaceDocumentCount, arrival }: {
   workspaceId: string
   basePath: string
   /** Every row the actor may see — the Approver/Status facets apply client-side
@@ -72,6 +73,8 @@ export function ApprovalInvoiceQueue({ workspaceId, basePath, rows, poMismatchCo
   initialSelectedId?: string | null
   /** #264 spec §2: passed through to `QueueScreen` (the state function needs it for every queue). */
   workspaceDocumentCount: number
+  /** #268: the Origin strip's model + the missing-row notice, from `queueArrival` on the server. */
+  arrival?: QueueArrival
 }) {
   const router = useRouter()
   const online = useOnlineStatus()
@@ -143,14 +146,15 @@ export function ApprovalInvoiceQueue({ workspaceId, basePath, rows, poMismatchCo
 
   return <>
     <QueueScreen<ApprovalInvoiceRow>
+    origin={arrival?.origin ?? null}
+    initialMissing={arrival?.initialMissing}
       title="Invoices"
       basePath={basePath}
       rows={rows}
       filterRows={filterApprovalInvoiceRows}
       pinned={decided?.row ?? null}
       onOpenChange={(id) => { if (id !== decided?.row.documentId) setDecided(null) }}
-      initialMissing={{ text: "This invoice was already decided — it's no longer in Ready to Approve." }}
-      rowId={(row) => row.documentId}
+            rowId={(row) => row.documentId}
       rowName={(row) => ({ title: row.supplier ?? "Unknown supplier", suffix: [row.invoiceNumber, row.total !== null ? formatMoney(row.total, row.currencyCode) : null].filter(Boolean).join(" · ") || null })}
       leading={(row) => <ProcessingStateGlyph state={processingState({ approvalStatus: "in_progress", blockedByCheck: row.eligibility.status !== "ready", escalated: false, touchless: false, status: "needs_review" })} />}
       columns={columns}

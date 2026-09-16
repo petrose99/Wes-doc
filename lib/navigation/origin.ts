@@ -4,7 +4,6 @@
  * and carries nothing. The Origin link itself is #268's to render; this is the seam every link
  * that hops writes to. */
 
-import { prisma } from "@/lib/db"
 import { documentDestinationPath } from "@/lib/typed-destinations"
 
 const FROM_PARAM = "from"
@@ -71,6 +70,8 @@ const ORIGIN_LABELS: Record<string, string> = {
   "approvals/po-mismatches": "Approvals",
   finance: "Finance",
   search: "Search",
+  // documentDestinationPath's untyped fallback (`library/documents/<id>`); the rail calls it Archive (#245).
+  library: "Archive",
 }
 
 export function originLabel(path: string): string | null {
@@ -89,47 +90,6 @@ export type Origin = {
   label: string
   row?: { title: string; suffix?: string }
   search?: { q: string; filterCount: number }
-}
-
-/** A document's title/suffix for the strip's row segment — the same vendor/reference pair the
- * queues themselves show, read straight off the reviewed/raw extraction. */
-function rowFromDocument(doc: { filename: string; reviewedData: unknown; rawExtraction: unknown }): { title: string; suffix?: string } {
-  const data = (doc.reviewedData ?? doc.rawExtraction ?? {}) as Record<string, unknown>
-  const vendorValue = data.vendor ?? data.merchant
-  const title = typeof vendorValue === "string" && vendorValue.trim() ? vendorValue.trim() : doc.filename
-  const suffixValue = data.invoice_number ?? data.po_number ?? data.statement_period
-  const suffix = typeof suffixValue === "string" && suffixValue.trim() ? suffixValue.trim() : undefined
-  return { title, suffix }
-}
-
-/** Server-side: turns a validated `from` value into the strip's model (#268 spec §1). Pure over
- * the URL, with one optional document lookup for a `<queue>/<id>` or `?doc=<id>` origin — never a
- * client fetch. Never throws: a lookup failure just omits `row` (spec §5.12). */
-export async function describeOrigin(workspaceId: string, from: string | null): Promise<Origin | null> {
-  if (!from) return null
-  const label = originLabel(from)
-  if (!label) return null
-  const [pathPart, queryString = ""] = from.split("?")
-  const params = new URLSearchParams(queryString)
-
-  if (label === "Search") {
-    const q = params.get("q") ?? ""
-    const filterCount = [...params.keys()].filter((key) => !["q", "page", "doc", "from"].includes(key)).length
-    return { href: from, label, search: { q, filterCount } }
-  }
-
-  const segments = pathPart.split("/").filter(Boolean)
-  const trailingId = /^[a-z0-9-]{10,}$/i.test(segments[segments.length - 1] ?? "") ? segments[segments.length - 1] : null
-  const docId = trailingId ?? params.get("doc")
-  if (!docId) return { href: from, label }
-
-  try {
-    const doc = await prisma.document.findFirst({ where: { id: docId, workspaceId }, select: { filename: true, reviewedData: true, rawExtraction: true } })
-    if (!doc) return { href: from, label }
-    return { href: from, label, row: rowFromDocument(doc) }
-  } catch {
-    return { href: from, label }
-  }
 }
 
 /** Every path `documentDestinationPath` can return, mapped to the label the strip shows — used

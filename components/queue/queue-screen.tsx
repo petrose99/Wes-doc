@@ -219,7 +219,7 @@ function QueueScreenInner<T>({
   // nothing. Read at mount only. #268 spec §2.5 case 1: a row still in `rows` but filtered out of
   // `visibleRows` is a client-derived variant of the same notice, computed below instead.
   const [missingNotice] = useState<typeof initialMissing>(() =>
-    initialSelectedId && initialMissing && !rows.some((row) => rowId(row) === initialSelectedId) ? initialMissing : undefined)
+    initialMissing && (!initialSelectedId || !rows.some((row) => rowId(row) === initialSelectedId)) ? initialMissing : undefined)
 
   const sortKey = searchParams.get(sortParam)
   const activeSort = sortOptions.find((option) => option.key === sortKey) ?? sortOptions[0] ?? null
@@ -234,7 +234,8 @@ function QueueScreenInner<T>({
     const { title, suffix } = rowName(row)
     return { text: `${[title, suffix].filter(Boolean).join(" · ")} no longer matches these filters.`, showHref: `${basePath}/${initialSelectedId}` }
   }, [initialSelectedId, rows, visibleRows, rowId, rowName, basePath])
-  const activeNotice = filteredNotice ?? missingNotice
+  // The notice belongs to the row the URL addressed at arrival; opening another row clears it (spec §2.5).
+  const activeNotice = openId && openId !== initialSelectedId ? undefined : (filteredNotice ?? missingNotice)
   const sortedRows = useMemo(() => {
     const base = activeSort ? [...visibleRows].sort(activeSort.compare) : visibleRows
     // The decided row stays in the list, at its place or the end, while its pane is open.

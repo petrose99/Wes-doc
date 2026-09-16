@@ -1,9 +1,14 @@
 "use client"
 
+import type { QueueArrival } from "@/lib/navigation/origin-server"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { AlertTriangle, ChevronDown, Loader2 } from "lucide-react"
+import Link from "next/link"
+import { documentDestinationPath, originLabel, withOrigin } from "@/lib/navigation/origin"
+import { useOriginHere } from "@/components/documents/po-compare"
+import { PaneMenuItem } from "@/components/queue/detail-pane"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { QueueScreen, type QueueColumn, type SortOption } from "@/components/queue/queue-screen"
@@ -43,7 +48,7 @@ function formatAmount(amount: number | null, currencyCode: string | null): strin
  * document, so the Detail pane opens the *document* behind the row (`detailIdFor`) while the
  * sticky bar carries the row's own decision: Start review, then Resolve with a reason. No
  * checkbox column: exceptions resolve one at a time. */
-export function ExceptionQueue({ workspaceId, basePath, documentBasePath, exceptions, startReviewAction, resolveAction, initialSelectedId, workspaceDocumentCount }: {
+export function ExceptionQueue({ workspaceId, basePath, documentBasePath, exceptions, startReviewAction, resolveAction, initialSelectedId, workspaceDocumentCount, arrival }: {
   workspaceId: string
   basePath: string
   documentBasePath: string
@@ -53,8 +58,16 @@ export function ExceptionQueue({ workspaceId, basePath, documentBasePath, except
   initialSelectedId?: string | null
   /** #264 spec §2: first-use only while the workspace has never held a document. */
   workspaceDocumentCount: number
+  /** #268: the Origin strip's model + the missing-row notice, from `queueArrival` on the server. */
+  arrival?: QueueArrival
 }) {
   const router = useRouter()
+  // #268 H-a/H-b: every hop to the document's own queue carries this surface's address as `from=`.
+  const here = useOriginHere()
+  const hop = (row: ExceptionRow) => {
+    const path = documentDestinationPath(`/workspaces/${workspaceId}`, { id: row.documentId, docType: row.docType })
+    return { href: withOrigin(path, here), label: `Open on ${originLabel(path) ?? "Archive"}` }
+  }
   const [pendingId, setPendingId] = useState<string | null>(null)
   const [resolving, setResolving] = useState<{ row: ExceptionRow; resolution: (typeof RESOLUTIONS)[number] } | null>(null)
 
@@ -94,6 +107,8 @@ export function ExceptionQueue({ workspaceId, basePath, documentBasePath, except
 
   return <>
     <QueueScreen<ExceptionRow>
+    origin={arrival?.origin ?? null}
+    initialMissing={arrival?.initialMissing}
       title="Exceptions"
       basePath={basePath}
       rows={exceptions}
@@ -118,11 +133,13 @@ export function ExceptionQueue({ workspaceId, basePath, documentBasePath, except
       }}
       workspaceDocumentCount={workspaceDocumentCount}
       loadDetail={(documentId) => getQueueDetailAction(workspaceId, documentId)}
+      paneMenu={(row) => <PaneMenuItem href={hop(row).href}>{hop(row).label}</PaneMenuItem>}
       paneActions={(row, { refresh }) => <>
         <span className="w-full text-xs text-slate-600 sm:mr-auto sm:w-auto">{row.escalationStatus === "in_review" ? `In review${row.assigneeName ? ` by ${row.assigneeName}` : ""}.` : "Open. Start the review to claim it."}</span>
         {row.escalationStatus === "open" && <Button type="button" size="sm" variant="outline" disabled={pendingId === row.id} onClick={() => void startReview(row.id, refresh)}>
           {pendingId === row.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : null}{pendingId === row.id ? "Starting…" : "Start review"}
         </Button>}
+        <Button asChild size="sm" variant="outline"><Link href={hop(row).href}>{hop(row).label}</Link></Button>
         <Popover>
           <PopoverTrigger asChild>
             <Button type="button" size="sm">Resolve<ChevronDown className="h-3.5 w-3.5" aria-hidden /></Button>

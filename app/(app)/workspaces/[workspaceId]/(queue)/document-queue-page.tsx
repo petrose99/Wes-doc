@@ -1,3 +1,4 @@
+import { queueArrival } from "@/lib/navigation/origin-server"
 import type { ReactNode } from "react"
 import { getCurrentUser } from "@/lib/auth"
 import type { DocType } from "@/lib/doc-types"
@@ -32,7 +33,8 @@ export async function DocumentQueuePage({ params, searchParams, docType, title, 
   showTodayOutcome?: boolean
 }) {
   const { workspaceId } = await params
-  const { status, consumed } = await searchParams
+  const query = await searchParams
+  const { status, consumed } = query
   const user = await getCurrentUser()
   const membership = await requireWorkspaceRole(workspaceId, user.id)
   const isBank = docType === "bank_statement"
@@ -73,7 +75,9 @@ export async function DocumentQueuePage({ params, searchParams, docType, title, 
   const segment = docType === "purchase_order" ? "purchase-orders" : "bank-statements"
 
   const fieldTable = isFieldTableType(docType) ? await getSavedFieldTable(workspaceId, docType) : null
+  const arrival = await queueArrival(workspaceId, { searchParams: query as Record<string, string | string[] | undefined>, queuePath: segment, selectedId: selectedDocumentId, rowIds: allRows.map((row) => row.id) })
   return <DocumentQueue
+    arrival={arrival}
     fieldTable={fieldTable}
     workspaceId={workspaceId}
     basePath={`/workspaces/${workspaceId}/${segment}`}

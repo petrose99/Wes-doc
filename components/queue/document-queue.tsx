@@ -1,5 +1,6 @@
 "use client"
 
+import type { QueueArrival } from "@/lib/navigation/origin-server"
 import { useState, type ReactNode } from "react"
 import { toast } from "sonner"
 import { AlertTriangle, CheckCircle2, Loader2, Search } from "lucide-react"
@@ -72,7 +73,7 @@ function StatusPill({ status }: { status: string }) {
   return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}>{STATUS_LABEL[status] ?? status.replaceAll("_", " ")}</span>
 }
 
-export function DocumentQueue({ workspaceId, basePath, title, noun, itemType, rows, supplierLabel = "Supplier", views, viewsPhone, stat, initialSelectedId, emptyBody, showInstitution = false, purchaseOrders = false, fieldTable = null, workspaceDocumentCount, todayOutcome }: {
+export function DocumentQueue({ workspaceId, basePath, title, noun, itemType, rows, supplierLabel = "Supplier", views, viewsPhone, stat, initialSelectedId, emptyBody, showInstitution = false, purchaseOrders = false, fieldTable = null, workspaceDocumentCount, todayOutcome, arrival }: {
   /** #252: Admin › Configuration › Fields for this queue's type, when one has been saved. */
   fieldTable?: FieldTable | null
   workspaceId: string
@@ -97,6 +98,8 @@ export function DocumentQueue({ workspaceId, basePath, title, noun, itemType, ro
   /** #264: the done state's "n approved today, m posted." sentence — Bank Statements only (a
    * postable queue); Purchase Orders passes undefined and keeps the default done body. */
   todayOutcome?: { approvedToday: number; postedToday: number }
+  /** #268: the Origin strip's model + the missing-row notice, from `queueArrival` on the server. */
+  arrival?: QueueArrival
 }) {
   const [needsAttention, setNeedsAttention] = useState<Set<string>>(new Set())
   const byId = new Map(rows.map((row) => [row.id, row]))
@@ -156,6 +159,8 @@ export function DocumentQueue({ workspaceId, basePath, title, noun, itemType, ro
   }
 
   return <QueueScreen<DocumentQueueRow>
+    origin={arrival?.origin ?? null}
+    initialMissing={arrival?.initialMissing}
     title={title}
     basePath={basePath}
     rows={rows}

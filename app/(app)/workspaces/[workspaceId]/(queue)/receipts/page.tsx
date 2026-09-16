@@ -1,3 +1,4 @@
+import { queueArrival } from "@/lib/navigation/origin-server"
 import { getCurrentUser } from "@/lib/auth"
 import { listWorkspaceReceipts } from "@/models/receipts"
 import { getMinConfidencePercent } from "@/models/automation-config"
@@ -26,7 +27,8 @@ export async function ReceiptsQueuePage({ params, searchParams, selectedDocument
   selectedDocumentId?: string | null
 }) {
   const { workspaceId } = await params
-  const { mode, status, claim, touchless, view: selectedViewId } = await searchParams
+  const query = await searchParams
+  const { mode, status, claim, touchless, view: selectedViewId } = query
   if (mode === "claims") return <div className="mx-auto w-full max-w-4xl p-6">{await ExpenseClaimsPage({ params: Promise.resolve({ workspaceId }) })}</div>
 
   const user = await getCurrentUser()
@@ -51,7 +53,9 @@ export async function ReceiptsQueuePage({ params, searchParams, selectedDocument
     ...(onlyTouchless ? { touchless: "1" } : {}),
   }
 
+  const arrival = await queueArrival(workspaceId, { searchParams: query as Record<string, string | string[] | undefined>, queuePath: "receipts", selectedId: selectedDocumentId, rowIds: receipts.map((receipt) => receipt.id) })
   return <ReceiptQueue
+    arrival={arrival}
     workspaceId={workspaceId}
     basePath={basePath}
     receipts={receipts}

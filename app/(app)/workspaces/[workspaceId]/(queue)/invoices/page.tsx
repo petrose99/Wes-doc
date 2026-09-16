@@ -1,3 +1,4 @@
+import { queueArrival } from "@/lib/navigation/origin-server"
 import { getCurrentUser } from "@/lib/auth"
 import { listWorkspaceBills, type BillRow } from "@/models/bills"
 import { getMinConfidencePercent } from "@/models/automation-config"
@@ -30,7 +31,8 @@ export async function InvoicesQueuePage({ params, searchParams, selectedDocument
   selectedDocumentId?: string | null
 }) {
   const { workspaceId } = await params
-  const { blocked, unpaid, status, approval, touchless, aging, po, view: selectedViewId } = await searchParams
+  const query = await searchParams
+  const { blocked, unpaid, status, approval, touchless, aging, po, view: selectedViewId } = query
   const user = await getCurrentUser()
   const membership = await requireWorkspaceRole(workspaceId, user.id)
 
@@ -75,7 +77,9 @@ export async function InvoicesQueuePage({ params, searchParams, selectedDocument
 
   const trend = touchlessTrend.trend ? `${touchlessTrend.trend.deltaPercentagePoints > 0 ? "+" : ""}${touchlessTrend.trend.deltaPercentagePoints}pt` : null
 
+  const arrival = await queueArrival(workspaceId, { searchParams: query as Record<string, string | string[] | undefined>, queuePath: "invoices", selectedId: selectedDocumentId, rowIds: bills.map((bill) => bill.id) })
   return <InvoiceQueue
+    arrival={arrival}
     workspaceId={workspaceId}
     basePath={basePath}
     bills={bills}

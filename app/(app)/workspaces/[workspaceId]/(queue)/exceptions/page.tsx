@@ -1,3 +1,4 @@
+import { queueArrival } from "@/lib/navigation/origin-server"
 import { getCurrentUser } from "@/lib/auth"
 import { requireWorkspaceRole } from "@/models/workspaces"
 import { listOpenExceptions } from "@/models/exceptions"
@@ -15,14 +16,17 @@ export async function ExceptionsQueuePage({ params, searchParams, selectedId = n
   selectedId?: string | null
 }) {
   const { workspaceId } = await params
-  const { status } = await searchParams
+  const query = await searchParams
+  const { status } = query
   const user = await getCurrentUser()
   await requireWorkspaceRole(workspaceId, user.id)
 
   const [all, workspaceDocumentCount] = await Promise.all([listOpenExceptions(workspaceId), countWorkspaceDocuments(workspaceId)])
   const exceptions = status === "open" || status === "in_review" ? all.filter((row) => row.escalationStatus === status) : all
 
+  const arrival = await queueArrival(workspaceId, { searchParams: query as Record<string, string | string[] | undefined>, queuePath: "exceptions", selectedId: selectedId, rowIds: all.map((exception) => exception.id), missingText: "That exception is no longer open." })
   return <ExceptionQueue
+    arrival={arrival}
     workspaceId={workspaceId}
     basePath={`/workspaces/${workspaceId}/exceptions`}
     documentBasePath={`/workspaces/${workspaceId}/documents`}
