@@ -91,6 +91,11 @@ export async function round(opts, body) {
       const s = {
         page, ctx, width,
         async snap(suffix = "", note = "") {
+          // Playwright's default mouse position is (0,0), which sits directly on this app's
+          // collapsed left nav rail and triggers its hover-expand — every capture across every
+          // ticket showed the rail permanently expanded over content until this moved the mouse
+          // off it first (#258 close phase: misread as a real P0 occlusion).
+          await page.mouse.move(width - 5, Math.round((width < 600 ? 844 : 900) / 2))
           await page.waitForTimeout(settle)
           const label = suffix ? `${name}-${suffix}` : name
           const shot = `${OUT}/${label}-${width}.png`

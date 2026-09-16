@@ -482,7 +482,7 @@ function FieldNavForm({ saveReview, docType, formFields, data, fieldConfidence, 
           checks={liveChecks.filter((check) => checkAppliesToField(check, field.key))} onEscalate={onEscalate}
           registerNav={nav.registerField} isCurrent={nav.currentKey === field.key} isCompleted={nav.completedKeys.has(field.key)} />)}
     <div className="flex items-center gap-3 border-t border-slate-100 pt-3">
-      <button type="submit" disabled={!docType} aria-busy={saving || undefined} className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40" title={!docType ? "Choose Expense or Sale first" : undefined}>
+      <button type="submit" id="save-review-submit" disabled={!docType} aria-busy={saving || undefined} className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40" title={!docType ? "Choose Expense or Sale first" : undefined}>
         {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <CheckCircle2 className="h-4 w-4" aria-hidden />}{saving ? "Saving…" : "Save review"}
       </button>
       {!docType && <span className="text-xs text-amber-600">Choose a document type first</span>}

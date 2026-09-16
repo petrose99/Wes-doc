@@ -232,6 +232,27 @@ export function DetailPane({ documentId, name, status, position, onClose, backLa
   // root. Close returns focus to the row (handled by the queue).
   useEffect(() => { headingRef.current?.focus({ preventScroll: true }) }, [documentId])
 
+  // #258 close-phase fix: a `reloadKey` bump (Save review's `onMutated("changed")`) tears down and
+  // rebuilds `content` via the "loading" skeleton in between, so the Save review button that had
+  // focus is destroyed — the browser then drops focus onto whatever DOM node happens to sit where
+  // it was, not onto its replacement. Flag the bump here (not a document switch, which the effect
+  // above already owns) and, once the reload lands, put focus back on the new Save review button
+  // (same id, fresh instance); if this document has none (e.g. a bank statement), the heading is
+  // still a sane fallback so focus never goes fully missing.
+  const isFirstReload = useRef(true)
+  const pendingReloadFocus = useRef(false)
+  useEffect(() => {
+    if (isFirstReload.current) { isFirstReload.current = false; return }
+    pendingReloadFocus.current = true
+  }, [reloadKey])
+  useEffect(() => {
+    if (state !== "ready" || !pendingReloadFocus.current) return
+    pendingReloadFocus.current = false
+    const save = document.getElementById("save-review-submit")
+    if (save) save.focus()
+    else headingRef.current?.focus({ preventScroll: true })
+  }, [state])
+
   return <PaneFrame mode="pane" name={name} status={status} position={position} onClose={onClose} backLabel={backLabel} onPrev={onPrev} onNext={onNext}
     fullHref={fullHref} menu={menu} actions={actions} onMutated={onMutated} archivedToast={archivedToast} headingRef={headingRef} contentKey={documentId}>
     {state === "loading" && <div className="absolute inset-0 z-10 flex flex-col bg-white" aria-busy="true" aria-label="Loading document">
