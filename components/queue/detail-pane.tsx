@@ -87,7 +87,11 @@ export function PaneFrame({ mode, name, status, position, onClose, onPrev, onNex
 
       <div className="relative min-h-0 flex-1 overflow-hidden">{children}</div>
 
-      {actions && <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 px-3 py-2 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] shadow-[0_-6px_16px_-12px_rgba(15,23,42,0.35)] lg:pb-2">
+      {/* #257 S9: below `lg` the footer is the decision bar — two equal 48px halves, not a
+          flex-wrapped row of desktop-sized buttons — reusing this same slot rather than a second
+          footer (B4). `[&>*]:h-12 [&>*]:flex-1` below lg sizes whatever buttons the surface hands
+          in without every caller re-styling its own. */}
+      {actions && <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 px-3 py-2 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] shadow-[0_-6px_16px_-12px_rgba(15,23,42,0.35)] max-lg:grid max-lg:grid-cols-2 max-lg:gap-3 max-lg:pt-3 max-lg:[&>*]:h-12 max-lg:[&>*]:w-full max-lg:[&>*]:justify-center lg:pb-2">
         {actions}
       </footer>}
     </section>

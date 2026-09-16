@@ -14,13 +14,17 @@ import { createPortal } from "react-dom"
  * click-outside-to-close remain as before. */
 const FOCUSABLE = "a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex=\"-1\"])"
 
-export function Dialog({ open, title, description, width = "max-w-md", onClose, children }: {
+export function Dialog({ open, title, description, width = "max-w-md", onClose, children, placement = "center" }: {
   open: boolean
   title: string
   description?: string
   width?: string
   onClose: () => void
   children: React.ReactNode
+  /** #257: `"sheet"` bottom-anchors below `md` (Filter, Reject, Approve, Override) — everything
+   * but placement (trap, Esc, return focus, scroll lock) is this same Dialog; a second component
+   * would be two systems for one job (B4). At `md`+ a sheet renders centered, same as `"center"`. */
+  placement?: "center" | "sheet"
 }) {
   const contentRef = useRef<HTMLDivElement>(null)
   const openerRef = useRef<Element | null>(null)
@@ -74,13 +78,26 @@ export function Dialog({ open, title, description, width = "max-w-md", onClose, 
 
   if (!open || typeof document === "undefined") return null
 
+  const sheet = placement === "sheet"
+
   return createPortal(
-    <div role="presentation" className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-slate-900/50 p-6 pt-[10vh]" onClick={onClose}>
+    <div role="presentation" data-inner
+      className={sheet
+        ? "fixed inset-0 z-[100] flex items-end justify-center overflow-y-auto bg-slate-900/50 md:items-start md:p-6 md:pt-[10vh]"
+        : "fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-slate-900/50 p-6 pt-[10vh]"}
+      onClick={onClose}>
       {/* labelledby/describedby wired to the rendered heading and description, so a screen
           reader announces both — the description often carries the actual instruction ("How
           would you like to view them?"), and aria-label={title} alone drops it from the a11y
-          tree. Same fix ConfirmDialog got. */}
-      <div ref={contentRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={description ? descId : undefined} className={`w-full ${width} overflow-hidden rounded-xl bg-white shadow-2xl focus:outline-none`} onClick={(event) => event.stopPropagation()}>
+          tree. Same fix ConfirmDialog got.
+          `data-inner` on the outer wrapper lets QueueScreen's document keydown handler tell "a
+          Dialog is open" apart from the full-screen Detail pane sheet, which carries no such
+          attribute — Escape must close only the innermost Dialog, never drop a typed reason. */}
+      <div ref={contentRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={description ? descId : undefined}
+        className={sheet
+          ? `w-full ${width} overflow-hidden rounded-t-xl bg-white shadow-2xl focus:outline-none pb-[env(safe-area-inset-bottom)] md:rounded-xl md:pb-0`
+          : `w-full ${width} overflow-hidden rounded-xl bg-white shadow-2xl focus:outline-none`}
+        onClick={(event) => event.stopPropagation()}>
         <div className="flex items-start justify-between gap-3 border-b px-5 py-4">
           <div>
             <h2 id={titleId} className="text-base font-semibold text-slate-900">{title}</h2>

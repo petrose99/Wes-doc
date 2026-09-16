@@ -48,7 +48,7 @@ export function ReasonDialogButton({
 /** #225: the dialog on its own, for callers whose trigger lives somewhere the dialog cannot —
  * a Detail pane's overflow menu closes (and unmounts its items) the moment a dialog opens over
  * it, so the menu item only flips `open` and the dialog mounts beside the pane instead. */
-export function ReasonDialog({ open, onClose, action, title, description, submitLabel, placeholder }: {
+export function ReasonDialog({ open, onClose, action, title, description, submitLabel, placeholder, placement = "center" }: {
   open: boolean
   onClose: () => void
   action: (formData: FormData) => Promise<{ success: boolean; error?: string }>
@@ -56,6 +56,8 @@ export function ReasonDialog({ open, onClose, action, title, description, submit
   description: string
   submitLabel: string
   placeholder: string
+  /** #257: `"sheet"` for the phone lane's Reject/Override sheets — same Dialog, bottom-anchored. */
+  placement?: "center" | "sheet"
 }) {
   const [reason, setReason] = useState("")
   const [error, setError] = useState<string | null>(null)
@@ -65,7 +67,7 @@ export function ReasonDialog({ open, onClose, action, title, description, submit
   const close = () => { onClose(); setError(null); setReason("") }
 
   return (
-    <Dialog open={open} title={title} description={description} onClose={() => { if (!pending) close() }}>
+    <Dialog open={open} placement={placement} title={title} description={description} onClose={() => { if (!pending) close() }}>
       {/* #251: the field is named (placeholder alone is not a name) and the refusal is announced. */}
       <form
         className="space-y-3 px-5 py-4"

@@ -8,7 +8,7 @@ import { QueueScreen, type QueueColumn, type SortOption } from "@/components/que
 import { formatMoney, TitleCell } from "@/components/queue/row-cells"
 import { ReasonDialog } from "@/components/list-screen/reason-dialog-button"
 import type { Facet } from "@/components/queue/facet-filters"
-import { ApprovalsQueuePicker } from "@/components/typed-destinations/approvals-queue-picker"
+import { QueueSegments } from "@/components/queue/queue-segments"
 import { ProcessingStateGlyph } from "@/components/typed-destinations/row-signals"
 import { processingState } from "@/lib/documents/processing-state"
 import { useOnlineStatus } from "@/lib/client/use-online-status"
@@ -85,7 +85,11 @@ export function PoMismatchQueue({ workspaceId, basePath, rows, invoiceCount, ini
       columns={columns}
       sortOptions={SORTS}
       facets={PO_MISMATCH_FACETS}
-      views={<ApprovalsQueuePicker workspaceId={workspaceId} active="po-mismatches" invoiceCount={invoiceCount} poMismatchCount={rows.length} />}
+      band={<div className="px-4 pt-3"><QueueSegments segments={[
+        { key: "invoices", label: "Invoice approvals", count: invoiceCount, href: basePath.replace(/\/po-mismatches$/, "/invoices") },
+        { key: "po-mismatches", label: "PO mismatches", count: rows.length, href: basePath },
+      ]} active="po-mismatches" /></div>}
+      cards={{ below: "lg", render: (row, { open }) => <MismatchCard row={row} onOpen={open} /> }}
       initialSelectedId={initialSelectedId}
       empty={{
         title: "No PO mismatches right now.",
@@ -110,7 +114,7 @@ export function PoMismatchQueue({ workspaceId, basePath, rows, invoiceCount, ini
       }} />
 
     {/* Decision #3/#11: Approving a PO Mismatch is an override — it always needs a reason. */}
-    <ReasonDialog open={overriding !== null} onClose={() => setOverriding(null)}
+    <ReasonDialog open={overriding !== null} placement="sheet" onClose={() => setOverriding(null)}
       action={async (formData) => {
         if (!overriding) return { success: false, error: "No mismatch selected" }
         setError(null)
@@ -124,12 +128,12 @@ export function PoMismatchQueue({ workspaceId, basePath, rows, invoiceCount, ini
           setPending(null)
         }
       }}
-      title="Approve this PO mismatch"
-      description="Overrides the 2/3-way match-variance check with a reason. It's recorded on the audit trail and clears the gate — the invoice's Approval itself is unaffected."
+      title="Approve over the PO mismatch"
+      description={overriding ? `This invoice is ${formatMoney(overriding.variance, overriding.currencyCode)} (${variancePercent(overriding).toFixed(1)}%) over the PO, past the ${Math.round(overriding.percent * 100)}% allowance. Approving overrides the match check and is recorded with your reason. The invoice then continues through its approval flow.` : ""}
       submitLabel="Approve"
       placeholder="Why is this variance acceptable?" />
 
-    <ReasonDialog open={rejecting !== null} onClose={() => setRejecting(null)}
+    <ReasonDialog open={rejecting !== null} placement="sheet" onClose={() => setRejecting(null)}
       action={async (formData) => {
         if (!rejecting) return { success: false, error: "No mismatch selected" }
         const reason = String(formData.get("reason") || "").trim()
@@ -149,4 +153,25 @@ export function PoMismatchQueue({ workspaceId, basePath, rows, invoiceCount, ini
       submitLabel="Reject"
       placeholder="Why is this being rejected?" />
   </>
+}
+
+/** #257 spec 3.3: the phone/tablet card row for PO mismatches. */
+function MismatchCard({ row, onOpen }: { row: PoMismatchRow; onOpen: () => void }) {
+  const notEligible = row.eligibility.status !== "ready"
+  return <a href={`#${row.documentId}`} onClick={(event) => { event.preventDefault(); onOpen() }}
+    className="flex min-h-16 items-start gap-3 px-4 py-3 hover:bg-slate-50 active:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-inset">
+    <ProcessingStateGlyph state={processingState({ approvalStatus: "in_progress", blockedByCheck: notEligible, escalated: false, touchless: false, status: "needs_review" })} />
+    <span className="min-w-0 flex-1">
+      <span className="flex items-baseline justify-between gap-2">
+        <span className="truncate text-[15px] font-semibold text-slate-900">{row.supplier ?? "Unknown supplier"}</span>
+        <span className="shrink-0 tabular-nums text-[15px] font-semibold text-slate-900">{formatMoney(row.variance, row.currencyCode)}</span>
+      </span>
+      <span className="mt-0.5 block text-[13px] text-slate-600">{row.poNumber ?? "No PO #"} · Variance {formatMoney(row.variance, row.currencyCode)} ({variancePercent(row).toFixed(1)}%)</span>
+      <span className="mt-0.5 block text-[13px]">
+        {notEligible
+          ? <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[12px] font-medium text-amber-900">{eligibilityText(row)}</span>
+          : <span className="text-slate-700">{stageLabel(row.stage)}</span>}
+      </span>
+    </span>
+  </a>
 }

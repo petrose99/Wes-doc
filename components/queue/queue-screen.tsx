@@ -91,13 +91,25 @@ export type QueueScreenProps<T> = {
   initialSelectedId?: string | null
   /** The URL search param the sort is read from and written to. Defaults to `sort`. */
   sortParam?: string
+  /** #257 S2: a card `<ul>` rendering mode below the given breakpoint, shared by every caller
+   * that needs one instead of the horizontally-scrolling table (`below: "lg"` for Approvals,
+   * `below: "md"` for #261's other queues) — one shell primitive, not a second list component
+   * (B4). The table still renders at and above the breakpoint. */
+  cards?: {
+    below: "md" | "lg"
+    render: (row: T, state: { isOpen: boolean; open: () => void }) => ReactNode
+  }
+  /** #257 S2: content-only rendering for a queue deep-linked to below its card breakpoint before
+   * its own cards ship (#261) — no bulk bar, no row actions, no pane decision bar; the table stays,
+   * with a line above it naming it read-only on a phone. */
+  phoneReadOnly?: boolean
 }
 
 const INTERACTIVE = "a, button, input, select, textarea, label, [role=button], [contenteditable=true]"
 
 function QueueScreenInner<T>({
   title, basePath, rows, rowId, detailIdFor, rowName, paneStatus, fullHref, archivedToast, leading, columns: rawColumns, fieldTable = null, selectable = false, sortOptions = [], facets = [],
-  views, stat, band, menu, onExportAll, bulkActions, empty, loadDetail, paneActions, paneMenu, initialSelectedId = null, sortParam = "sort",
+  views, stat, band, menu, onExportAll, bulkActions, empty, loadDetail, paneActions, paneMenu, initialSelectedId = null, sortParam = "sort", cards, phoneReadOnly = false,
 }: QueueScreenProps<T>) {
   const router = useRouter()
   const pathname = usePathname()
@@ -126,24 +138,43 @@ function QueueScreenInner<T>({
   // Reflect the open row in the URL so a refresh, a share, or Back lands on the same state — the
   // `${basePath}/${id}` route renders this same queue with `initialSelectedId` set. replaceState
   // rather than push: arrowing through fifty rows must not leave fifty history entries.
-  const syncUrl = useCallback((id: string | null) => {
+  // #257: below `lg` the Detail pane is a full-screen sheet, so opening one is a navigation, not
+  // a refinement — it gets its own history entry (Back/the phone gesture must close it). At `lg`+
+  // the pane sits beside the table, so arrowing through rows still replaces in place.
+  const isPhoneLane = useCallback(() => typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches, [])
+  const syncUrl = useCallback((id: string | null, push: boolean) => {
     if (typeof window === "undefined") return
     const qs = window.location.search
-    window.history.replaceState(window.history.state, "", `${id ? `${basePath}/${id}` : basePath}${qs}`)
+    const url = `${id ? `${basePath}/${id}` : basePath}${qs}`
+    if (push) window.history.pushState(window.history.state, "", url)
+    else window.history.replaceState(window.history.state, "", url)
   }, [basePath])
 
   // Opening another row or closing the pane unmounts whatever is in it; unsaved work there
   // (Match manually's pending line matches, #250) gets one chance to say so.
-  const open = useCallback((id: string) => { if (!confirmLeave()) return; setOpenId(id); syncUrl(id) }, [syncUrl])
+  const open = useCallback((id: string) => {
+    if (!confirmLeave()) return
+    const push = isPhoneLane() && openId === null
+    setOpenId(id)
+    syncUrl(id, push)
+  }, [syncUrl, isPhoneLane, openId])
   // Closing returns focus to the row that was open — recorded as state and applied in an effect
   // once the pane has unmounted, so `close` itself stays free of DOM refs.
   const [focusReturn, setFocusReturn] = useState<string | null>(null)
-  const close = useCallback(() => {
-    if (!confirmLeave()) return
+  const close = useCallback((fromPopstate = false) => {
+    if (!fromPopstate && !confirmLeave()) return
     setFocusReturn(openId)
     setOpenId(null)
-    syncUrl(null)
+    // A popstate-driven close already moved history back; pushing/replacing here would fight it.
+    if (!fromPopstate) syncUrl(null, false)
   }, [openId, syncUrl])
+  // Back, the browser's own gesture, or the pane's Back control (`history.back()`) all arrive as
+  // popstate — close the pane to match, without touching history a second time.
+  useEffect(() => {
+    const onPopState = () => { if (openId !== null && isPhoneLane()) close(true) }
+    window.addEventListener("popstate", onPopState)
+    return () => window.removeEventListener("popstate", onPopState)
+  }, [openId, isPhoneLane, close])
   useEffect(() => {
     if (openId === null && focusReturn) triggerRefs.current.get(focusReturn)?.focus()
   }, [openId, focusReturn])
@@ -181,7 +212,10 @@ function QueueScreenInner<T>({
       const target = event.target as HTMLElement | null
       if (target?.closest("input, textarea, select, [contenteditable=true], [role=dialog], [role=alertdialog], [role=listbox], [role=menu], [role=radiogroup]")) return
       // A modal is open somewhere on the page: its own Escape wins, the queue stays put (#251).
-      if (document.querySelector("[role=dialog][aria-modal=true], [role=alertdialog][aria-modal=true]")) return
+      // `[data-inner]` marks a `Dialog` (Filter/Reject/Approve/Override sheet) specifically — the
+      // full-screen Detail pane sheet carries no such attribute, so Escape still closes *that*
+      // one when no inner Dialog sits on top of it (#257's history model).
+      if (document.querySelector("[data-inner] [role=dialog][aria-modal=true], [data-inner] [role=alertdialog][aria-modal=true]")) return
       if (event.key === "ArrowDown") { event.preventDefault(); step(1) }
       else if (event.key === "ArrowUp") { event.preventDefault(); step(-1) }
       else if (event.key === "Escape") { event.preventDefault(); close() }
@@ -229,15 +263,15 @@ function QueueScreenInner<T>({
         {title}
         <span className="text-sm font-normal tabular-nums text-slate-500" aria-label={`${rows.length} rows`}>{rows.length}</span>
       </h1>
-      {views}
-      {sortOptions.length > 1 && <label className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-300 bg-white pl-2 pr-1 text-xs font-medium text-slate-700 focus-within:ring-2 focus-within:ring-emerald-600 focus-within:ring-offset-1">
+      <span className={cards ? `${cards.below}:contents hidden` : "contents"}>{views}</span>
+      {sortOptions.length > 1 && <label className={`${cards ? `hidden ${cards.below}:inline-flex` : "inline-flex"} h-8 items-center gap-1 rounded-md border border-slate-300 bg-white pl-2 pr-1 text-xs font-medium text-slate-700 focus-within:ring-2 focus-within:ring-emerald-600 focus-within:ring-offset-1">
         <ArrowUpDown className="h-3.5 w-3.5 text-slate-500" aria-hidden />
         <span className="sr-only">Sort by</span>
         <select value={activeSort?.key} onChange={(event) => setSort(event.target.value)} className="h-full cursor-pointer appearance-none bg-transparent pr-1 text-xs font-medium text-slate-700 focus:outline-none">
           {sortOptions.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}
         </select>
       </label>}
-      {facets.length > 0 && <FacetFilters facets={facets} />}
+      {facets.length > 0 && <span className={cards ? `hidden ${cards.below}:contents` : "contents"}><FacetFilters facets={facets} /></span>}
       <div className="ml-auto flex items-center gap-2">
         {stat}
         <Popover open={menuOpen} onOpenChange={setMenuOpen}>
@@ -273,7 +307,7 @@ function QueueScreenInner<T>({
     </div>}
 
     {/* Bulk action bar: its own row above the table head once anything is checked. */}
-    {selectable && bulkActions && checkedIds.length > 0 && <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50 px-4 py-2 text-sm" role="region" aria-label="Bulk actions">
+    {!phoneReadOnly && selectable && bulkActions && checkedIds.length > 0 && <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50 px-4 py-2 text-sm" role="region" aria-label="Bulk actions">
       <span className="mr-1 font-medium tabular-nums text-slate-800">{checkedIds.length} selected</span>
       {bulkActions({ selectedIds: checkedIds, clear: clearChecked })}
       <button type="button" onClick={clearChecked} className="ml-auto text-xs font-medium text-slate-600 hover:text-slate-900">Clear selection</button>
@@ -281,12 +315,23 @@ function QueueScreenInner<T>({
 
     <div className="flex min-h-0 flex-1 md:overflow-hidden">
       <div className={`min-w-0 flex-1 md:overflow-auto ${openId ? "lg:shadow-[inset_-1px_0_0_0_rgb(226_232_240)]" : ""}`}>
+        {phoneReadOnly && <p className={`px-4 py-2 text-[13px] text-slate-600 ${cards ? `${cards.below}:hidden` : "lg:hidden"}`}>Full view on desktop — this list is read-only on a phone.</p>}
         {sortedRows.length === 0
           ? <div className="mx-auto max-w-md px-6 py-16 text-center">
             <p className="text-sm font-medium text-slate-800">{filtered ? empty.filteredTitle ?? "Nothing matches these filters." : empty.title}</p>
             <p className="mt-1 text-sm text-slate-600">{filtered ? empty.filteredBody ?? "Clear a filter to widen the queue." : empty.body}</p>
           </div>
-          : <table className={`w-full text-sm ${openId ? "" : "min-w-[720px]"}`}>
+          : <>
+          {cards && <ul aria-label={title} aria-busy={false} className={`${cards.below}:hidden`}>
+            {sortedRows.map((row) => {
+              const id = rowId(row)
+              const isOpen = id === openId
+              return <li key={id} className="border-b border-slate-200 last:border-b-0">
+                {cards.render(row, { isOpen, open: () => (isOpen ? close() : open(id)) })}
+              </li>
+            })}
+          </ul>}
+          <table className={`w-full text-sm ${cards ? `hidden ${cards.below}:table` : ""} ${openId ? "" : "min-w-[720px]"}`}>
             <thead className="sticky top-0 z-10 bg-white shadow-[inset_0_-1px_0_0_theme(colors.slate.200)]">
               <tr className="text-left text-xs font-medium uppercase tracking-wide text-slate-600">
                 {selectable && <th scope="col" className="w-10 px-3 py-2">
@@ -325,7 +370,8 @@ function QueueScreenInner<T>({
                 </tr>
               })}
             </tbody>
-          </table>}
+          </table>
+          </>}
       </div>
 
       {openRow && <DetailPane

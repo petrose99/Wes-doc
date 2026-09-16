@@ -1,46 +1,49 @@
 "use client"
 
-import { AlertTriangle, Landmark, Library, ListChecks, UserRound } from "lucide-react"
+import { AlertTriangle, ClipboardCheck, ListChecks, UserRound } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
-/** Mobile bottom tab bar. Four slots, the interim shape decided on #237 until #257 builds
- * #232's Approvals · Invoices · Exceptions · Account: Invoices (the workspace home —
- * CONTEXT.md), Exceptions, Finance (when the ledger integration is enabled) or Archive as the
- * fallback third slot, then Account (#231 Q18, #252: Admin is a desktop area, so the phone's
- * fourth tab is the person — security, switching company, sign out).
+/** Mobile bottom tab bar (#257 — #232's shape): Approvals · Invoices · Exceptions · Account.
+ * Approvals is the Approver's landing (#236, badged with their own Ready-to-Approve count, never
+ * the workspace total); Invoices is the workspace home (CONTEXT.md) and carries no badge — it is
+ * not a second waiting-on-you signal (#232 §2); Exceptions keeps the rail's badge; Account is the
+ * person (#231 Q18, #252: Admin is a desktop area) and, below `md`, also the door to every other
+ * queue via "Also in this workspace" (`account/page.tsx`) — Finance included, Payments excluded
+ * (#251 is owner-decided on desktop only).
  *
  * Hidden on /sheet and /documents/ — those surfaces get their full viewport on a phone; users
  * navigate back through the surface's own header. */
-export function MobileTabBar({ workspaceId, pipelineReviewCount = 0, openExceptionsCount = 0, accountingEnabled = false }: {
+export function MobileTabBar({ workspaceId, approvalsReadyCount = 0, openExceptionsCount = 0, approvalsEnabled = false }: {
   workspaceId: string
-  pipelineReviewCount?: number
+  /** #236's countReadyToApprove — the signed-in person's own count, shared with the rail badge. */
+  approvalsReadyCount?: number
   /** #210 / #238: countOpenExceptions — the same badge the rail's Exceptions entry carries. */
   openExceptionsCount?: number
+  /** review-queue capability gate — a workspace without it has no Approvals destination to link. */
+  approvalsEnabled?: boolean
   accountingEnabled?: boolean
 }) {
   const pathname = usePathname()
   if (pathname.endsWith("/sheet") || pathname.includes("/documents/")) return null
 
   const base = `/workspaces/${workspaceId}`
-  const thirdSlot = accountingEnabled
-    ? { href: `${base}/finance`, label: "Finance", icon: Landmark, badge: undefined as number | undefined }
-    : { href: `${base}/library`, label: "Archive", icon: Library, badge: undefined as number | undefined }
-
   const tabs = [
-    { href: `${base}/invoices`, label: "Invoices", icon: ListChecks, badge: pipelineReviewCount > 0 ? pipelineReviewCount : undefined },
+    ...(approvalsEnabled ? [{ href: `${base}/approvals/invoices`, label: "Approvals", icon: ClipboardCheck, badge: approvalsReadyCount > 0 ? approvalsReadyCount : undefined }] : []),
+    { href: `${base}/invoices`, label: "Invoices", icon: ListChecks, badge: undefined as number | undefined },
     { href: `${base}/exceptions`, label: "Exceptions", icon: AlertTriangle, badge: openExceptionsCount > 0 ? openExceptionsCount : undefined },
-    thirdSlot,
     { href: `${base}/account`, label: "Account", icon: UserRound, badge: undefined as number | undefined },
   ]
 
-  return <nav aria-label="Primary workspace navigation" className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 items-center border-t border-[#eef2f6] bg-[rgba(255,255,255,0.94)] px-2 pb-5 pt-2 backdrop-blur-[10px] md:hidden">
+  return <nav aria-label="Primary workspace navigation" className="fixed inset-x-0 bottom-0 z-40 grid items-center border-t border-[#eef2f6] bg-[rgba(255,255,255,0.94)] px-2 pb-5 pt-2 backdrop-blur-[10px] md:hidden" style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}>
     {tabs.map((tab) => {
       const active = pathname === tab.href
         || pathname.startsWith(`${tab.href}/`)
-        || (tab.label === "Account" && (pathname.startsWith(`${base}/settings`) || pathname.startsWith(`${base}/admin`)))
+        || (tab.label === "Approvals" && pathname.startsWith(`${base}/approvals`))
+        || (tab.label === "Account" && (pathname.startsWith(`${base}/settings`) || pathname.startsWith(`${base}/admin`)
+          || pathname.startsWith(`${base}/purchase-orders`) || pathname.startsWith(`${base}/receipts`) || pathname.startsWith(`${base}/bank-statements`)
+          || pathname.startsWith(`${base}/library`) || pathname.startsWith(`${base}/finance`) || pathname.startsWith(`${base}/payments`)))
         || (tab.label === "Invoices" && (pathname.startsWith(`${base}/pipeline`) || pathname.startsWith(`${base}/documents`) || pathname.startsWith(`${base}/review`) || pathname.startsWith(`${base}/bills`)))
-        || (tab.label === "Finance" && pathname.startsWith(`${base}/accounting`))
       // Same cap as the rail badge: three digits of "99+" reads; four digits of a real count does not.
       const badge = tab.badge == null ? null : tab.badge > 99 ? "99+" : String(tab.badge)
       return <Link key={tab.href} href={tab.href}

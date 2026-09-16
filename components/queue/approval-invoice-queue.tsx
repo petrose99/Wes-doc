@@ -11,7 +11,7 @@ import { PaneMenuItem } from "@/components/queue/detail-pane"
 import { formatDate, formatMoney, TitleCell } from "@/components/queue/row-cells"
 import { ReasonDialog } from "@/components/list-screen/reason-dialog-button"
 import type { Facet } from "@/components/queue/facet-filters"
-import { ApprovalsQueuePicker } from "@/components/typed-destinations/approvals-queue-picker"
+import { QueueSegments } from "@/components/queue/queue-segments"
 import { ProcessingStateGlyph } from "@/components/typed-destinations/row-signals"
 import { processingState } from "@/lib/documents/processing-state"
 import { useOnlineStatus } from "@/lib/client/use-online-status"
@@ -110,10 +110,12 @@ export function ApprovalInvoiceQueue({ workspaceId, basePath, rows, poMismatchCo
       columns={columns}
       sortOptions={SORTS}
       facets={APPROVAL_INVOICE_FACETS}
-      views={<>
-        <ApprovalsQueuePicker workspaceId={workspaceId} active="invoices" invoiceCount={rows.length} poMismatchCount={poMismatchCount} />
-        {views}
-      </>}
+      band={<div className="px-4 pt-3"><QueueSegments segments={[
+        { key: "invoices", label: "Invoice approvals", count: rows.length, href: basePath },
+        { key: "po-mismatches", label: "PO mismatches", count: poMismatchCount, href: basePath.replace(/\/invoices$/, "/po-mismatches") },
+      ]} active="invoices" /></div>}
+      views={views}
+      cards={{ below: "lg", render: (row, { open }) => <ApprovalCard row={row} onOpen={open} /> }}
       initialSelectedId={initialSelectedId}
       empty={{
         title: "Nothing to approve right now.",
@@ -149,7 +151,7 @@ export function ApprovalInvoiceQueue({ workspaceId, basePath, rows, poMismatchCo
     <ApproveCommentDialog row={approving} onClose={() => setApproving(null)} pending={pending !== null}
       onApprove={(comment) => { const row = approving; if (row) void decide(row, "approve", comment || undefined, () => { setApproving(null); router.refresh() }) }} />
 
-    <ReasonDialog open={rejecting !== null} onClose={() => setRejecting(null)}
+    <ReasonDialog open={rejecting !== null} placement="sheet" onClose={() => setRejecting(null)}
       action={async (formData) => {
         if (!rejecting) return { success: false, error: "No invoice selected" }
         const reason = String(formData.get("reason") || "").trim()
@@ -158,7 +160,7 @@ export function ApprovalInvoiceQueue({ workspaceId, basePath, rows, poMismatchCo
         return result
       }}
       title="Reject this Approval"
-      description="Ends this Approval's run. The reason is recorded on the audit trail."
+      description="This ends the approval run for this invoice. The reason goes on the audit trail and to whoever started it."
       submitLabel="Reject"
       placeholder="Why is this being rejected?" />
 
@@ -176,6 +178,31 @@ export function ApprovalInvoiceQueue({ workspaceId, basePath, rows, poMismatchCo
   </>
 }
 
+/** #257 spec 3.3: the phone/tablet card row for Invoice approvals — one `<a>` per row so a
+ * long-press/open-in-new-tab works and the deep-link route already exists; `onClick` prevents
+ * default and drives the shared `open()` (pushState per S8). */
+function ApprovalCard({ row, onOpen }: { row: ApprovalInvoiceRow; onOpen: () => void }) {
+  const notEligible = row.eligibility.status !== "ready"
+  return <a href={`#${row.documentId}`} onClick={(event) => { event.preventDefault(); onOpen() }}
+    className="flex min-h-16 items-start gap-3 px-4 py-3 hover:bg-slate-50 active:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-inset">
+    <ProcessingStateGlyph state={processingState({ approvalStatus: "in_progress", blockedByCheck: notEligible, escalated: false, touchless: false, status: "needs_review" })} />
+    <span className="min-w-0 flex-1">
+      <span className="flex items-baseline justify-between gap-2">
+        <span className="truncate text-[15px] font-semibold text-slate-900">{row.supplier ?? "Unknown supplier"}</span>
+        <span className="shrink-0 tabular-nums text-[15px] font-semibold text-slate-900">{row.total !== null ? formatMoney(row.total, row.currencyCode) : <span className="font-normal text-slate-600">No amount</span>}</span>
+      </span>
+      <span className="mt-0.5 block text-[13px] text-slate-600">
+        {row.invoiceNumber ?? "No invoice #"} · <span className={row.dueDate && row.dueDate.getTime() < Date.now() ? "text-red-700" : ""}>Due {formatDate(row.dueDate)}{row.dueDate && row.dueDate.getTime() < Date.now() ? " · overdue" : ""}</span>
+      </span>
+      <span className="mt-0.5 block text-[13px]">
+        {notEligible
+          ? <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[12px] font-medium text-amber-900">{eligibilityText(row)}</span>
+          : <span className="text-slate-700">{stageLabel(row.stage)}</span>}
+      </span>
+    </span>
+  </a>
+}
+
 /** Decision #11's optional-comment Approve. Deliberately not `ReasonDialog`: that component
  * requires non-empty text and disables submit until there's some — the whole point here is that
  * submitting with nothing typed is the common path. */
@@ -187,7 +214,7 @@ function ApproveCommentDialog({ row, onClose, onApprove, pending }: {
 }) {
   const [comment, setComment] = useState("")
   const [, startTransition] = useTransition()
-  return <Dialog open={row !== null} title="Approve this stage" description={row ? `${stageLabel(row.stage)} — an optional comment is recorded on the audit trail.` : ""} onClose={() => { if (!pending) { onClose(); setComment("") } }}>
+  return <Dialog open={row !== null} placement="sheet" title="Approve this stage" description={row ? `${stageLabel(row.stage)} — an optional comment is recorded on the audit trail.` : ""} onClose={() => { if (!pending) { onClose(); setComment("") } }}>
     <div className="space-y-3 px-5 py-4">
       <textarea rows={3} value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Comment (optional)"
         className="w-full resize-none rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm transition-colors focus:border-emerald-400 focus:bg-white focus:outline-none" />

@@ -1,3 +1,4 @@
+import { ChevronRight } from "lucide-react"
 import Link from "next/link"
 import { AdminPage } from "@/components/admin/admin-ui"
 import { Panel } from "@/components/automation/automation-ui"
@@ -5,6 +6,7 @@ import { ResetTourButton } from "@/components/onboarding/reset-tour-button"
 import { SignOutButton } from "@/components/shell/sign-out-button"
 import { accountPaths } from "@/lib/admin/paths"
 import { getCurrentUser } from "@/lib/auth"
+import config from "@/lib/config"
 import { getWorkspacesForUser } from "@/models/workspaces"
 
 export const dynamic = "force-dynamic"
@@ -37,6 +39,27 @@ export default async function AccountPage({ params }: { params: Promise<{ worksp
               : <Link href={`/workspaces/${workspace.id}/invoices`} className="inline-flex min-h-11 items-center text-sm font-medium text-emerald-700 underline-offset-2 hover:underline">Open</Link>}
           </li>
         })}
+      </ul>
+    </Panel>
+
+    {/* #257 S4 (`organize`): the phone's only path to every other queue below `md` — reachable,
+        never dead (#232). Visible at every width: harmless on desktop, where the rail already
+        lists these; not `md:hidden` because Account is one page, not two. Payments (#251) is
+        deliberately absent — that queue's decisions are owner-scoped to desktop for now. */}
+    <Panel title="Also in this workspace" note="The rest of what this workspace holds.">
+      <ul className="divide-y divide-hairline-soft">
+        {[
+          { label: "Purchase Orders", href: `/workspaces/${workspaceId}/purchase-orders` },
+          { label: "Receipts", href: `/workspaces/${workspaceId}/receipts` },
+          { label: "Bank Statements", href: `/workspaces/${workspaceId}/bank-statements` },
+          { label: "Archive", href: `/workspaces/${workspaceId}/library` },
+          ...(config.integrations.bigcapital.enabled ? [{ label: "Finance", href: `/workspaces/${workspaceId}/finance` }] : []),
+        ].map((item) => <li key={item.href}>
+          <Link href={item.href} className="flex min-h-12 items-center justify-between gap-2 py-2 text-sm font-medium text-slate-900 hover:text-emerald-700">
+            {item.label}
+            <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
+          </Link>
+        </li>)}
       </ul>
     </Panel>
 
