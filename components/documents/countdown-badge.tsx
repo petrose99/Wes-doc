@@ -30,6 +30,16 @@ export function DueDateCountdownBadge({ dueDate, asOf, expiringWithinDays = 3, f
   return <Pill urgency={result.urgency} label={result.label} />
 }
 
+/** #229 Q5 (#251): the early-payment discount countdown #188 held back for lack of data. Purple
+ * *Expires in N Days* only while a real discount window is open (`openDiscountWindow` returned
+ * one); it never renders "upcoming" blue or "overdue" red — a lapsed discount is simply gone,
+ * not an alarm (no fabricated urgency). */
+export function DiscountCountdownBadge({ daysLeft }: { daysLeft: number | null }) {
+  if (daysLeft === null || daysLeft < 0) return null
+  const label = daysLeft === 0 ? "Discount Expires Today" : `Discount Expires in ${daysLeft} ${daysLeft === 1 ? "Day" : "Days"}`
+  return <Pill urgency="expiring" label={label} />
+}
+
 /** A review-SLA countdown, timed from when a document's still-open review task was created
  * (`openedAt`) against a fixed budget (`slaHours` — see `DEFAULT_REVIEW_SLA_HOURS`). Renders
  * nothing once there's no open review task to time, so it never claims a deadline the pipeline

@@ -59,6 +59,10 @@ export type QueueScreenProps<T> = {
   views?: ReactNode
   /** One inline figure at the right end of row 1 (#186's metric; #205's band is gone). */
   stat?: ReactNode
+  /** #229 Q8 (#251): one metric band above header row 1 — Bill Pay's *Open invoices by age*.
+   * The one documented exception to #225's "no band": aging is the payer's question and lives
+   * where the payer works. Absent everywhere else. */
+  band?: ReactNode
   /** Additional overflow-menu items, rendered after Override Mode and Export. */
   menu?: ReactNode
   onExportAll?: () => Promise<void>
@@ -78,7 +82,7 @@ const INTERACTIVE = "a, button, input, select, textarea, label, [role=button], [
 
 function QueueScreenInner<T>({
   title, basePath, rows, rowId, detailIdFor, rowTitle, rowSubtitle, leading, columns, selectable = false, sortOptions = [], facets = [],
-  views, stat, menu, onExportAll, bulkActions, empty, loadDetail, paneActions, paneMenu, initialSelectedId = null, sortParam = "sort",
+  views, stat, band, menu, onExportAll, bulkActions, empty, loadDetail, paneActions, paneMenu, initialSelectedId = null, sortParam = "sort",
 }: QueueScreenProps<T>) {
   const router = useRouter()
   const pathname = usePathname()
@@ -144,7 +148,9 @@ function QueueScreenInner<T>({
     if (!openId) return
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null
-      if (target?.closest("input, textarea, select, [contenteditable=true], [role=dialog], [role=listbox], [role=menu]")) return
+      if (target?.closest("input, textarea, select, [contenteditable=true], [role=dialog], [role=alertdialog], [role=listbox], [role=menu]")) return
+      // A modal is open somewhere on the page: its own Escape wins, the queue stays put (#251).
+      if (document.querySelector("[role=dialog][aria-modal=true], [role=alertdialog][aria-modal=true]")) return
       if (event.key === "ArrowDown") { event.preventDefault(); step(1) }
       else if (event.key === "ArrowUp") { event.preventDefault(); step(-1) }
       else if (event.key === "Escape") { event.preventDefault(); close() }
@@ -181,6 +187,7 @@ function QueueScreenInner<T>({
   // pane grow past the viewport and push its action bar out of reach). Below `md` the queue
   // flows with the page and the pane is a fixed sheet, so no bound is needed.
   return <div ref={rootRef} className="flex min-h-0 flex-1 flex-col md:h-dvh md:flex-none md:overflow-hidden">
+    {band}
     {/* Row 1: title · Views · Sort · filters · stat · menu */}
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-slate-200 px-4 py-2">
       <h1 className="flex items-baseline gap-2 text-lg font-semibold tracking-tight text-slate-900">

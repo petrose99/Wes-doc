@@ -4,7 +4,6 @@ import { getMinConfidencePercent } from "@/models/automation-config"
 import { requireWorkspaceRole, type WorkspaceRole } from "@/models/workspaces"
 import { listSavedViews } from "@/models/saved-views"
 import { createSavedViewAction, deleteSavedViewAction, duplicateSavedViewAction, renameSavedViewAction, saveFiltersToViewAction, shareSavedViewAction } from "@/app/(app)/workspaces/[workspaceId]/(chrome)/saved-views-actions"
-import { preparePaymentRunAction } from "@/app/(app)/workspaces/[workspaceId]/(chrome)/bills/actions"
 import { InvoiceQueue } from "@/components/queue/invoice-queue"
 import { QueueStat } from "@/components/queue/queue-stat"
 import { SavedViewPicker } from "@/components/typed-destinations/saved-view-picker"
@@ -27,7 +26,6 @@ export async function InvoicesQueuePage({ params, searchParams, selectedDocument
   const { blocked, unpaid, status, approval, touchless, aging, po, view: selectedViewId } = await searchParams
   const user = await getCurrentUser()
   const membership = await requireWorkspaceRole(workspaceId, user.id)
-  const isOwner = membership.role === "owner"
 
   const onlyBlocked = blocked === "1"
   const onlyUnpaid = unpaid === "1"
@@ -51,18 +49,12 @@ export async function InvoicesQueuePage({ params, searchParams, selectedDocument
     ...(approvalFilter ? { approval: approvalFilter } : {}), ...(agingFilter.size ? { aging: [...agingFilter].join(",") } : {}),
     ...(poFilter ? { po: poFilter } : {}),
   }
-  // Only bills with a total AND an unblocked status are candidates for a payment run. #220: a
-  // cancelled invoice is excluded too. "synced" (pushed but unconfirmed) stays eligible.
-  const payableBills = bills.filter((b) => !b.blockedByCheck && !b.cancelledAt && b.total !== null && b.total > 0 && (!b.paymentStatus || !["paid", "reconciled"].includes(b.paymentStatus.toLowerCase())))
-  const payableDocumentIds = isOwner ? payableBills.map((bill) => bill.documentId) : []
   const trend = touchlessTrend.trend ? `${touchlessTrend.trend.deltaPercentagePoints > 0 ? "+" : ""}${touchlessTrend.trend.deltaPercentagePoints}pt` : null
 
   return <InvoiceQueue
     workspaceId={workspaceId}
     basePath={basePath}
     bills={bills}
-    payableDocumentIds={payableDocumentIds}
-    preparePaymentRunAction={preparePaymentRunAction.bind(null, workspaceId)}
     minConfidencePercent={minConfidencePercent}
     initialSelectedId={selectedDocumentId}
     stat={<QueueStat label="Touchless" value={`${Math.round(touchlessTrend.touchlessRate * 100)}%`}

@@ -1,6 +1,7 @@
 "use client"
 
 import { CheckCircle2, X } from "lucide-react"
+import Link from "next/link"
 import { Dialog } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 
@@ -83,11 +84,13 @@ export function ItemizedRecapTable({ records }: { records: ItemizedRecord[] }) {
  * groups per #185's partial-failure rule; each held-back row also carries the row-level badge
  * (`row-signals`'s cluster in `invoice-table.tsx`/`receipt-table.tsx`) for as long as this
  * session's selection state remembers it — see that badge's own note on the persistence gap. */
-export function BulkApproveReceiptModal({ open, onClose, approved, heldBack }: {
+export function BulkApproveReceiptModal({ open, onClose, approved, heldBack, next }: {
   open: boolean
   onClose: () => void
   approved: ItemizedRecord[]
   heldBack: ItemizedRecord[]
+  /** #229 Q9 (#251): the approved rows' next home, as one link on the receipt. */
+  next?: { label: string; href: string }
 }) {
   return (
     <Dialog open={open} onClose={onClose} title="Approve receipt" width="max-w-lg"
@@ -113,7 +116,8 @@ export function BulkApproveReceiptModal({ open, onClose, approved, heldBack }: {
           </section>
         )}
       </div>
-      <div className="flex justify-end border-t bg-slate-50 px-5 py-3">
+      <div className="flex flex-wrap items-center justify-end gap-2 border-t bg-slate-50 px-5 py-3">
+        {next && approved.length > 0 && <Button asChild size="sm" variant="outline"><Link className="py-1.5" href={next.href}>{next.label}</Link></Button>}
         <Button type="button" size="sm" onClick={onClose}>Done</Button>
       </div>
     </Dialog>

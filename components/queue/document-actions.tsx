@@ -17,7 +17,7 @@ import { BulkApproveReceiptModal, EligibilityStrip, ItemizedRecapTable, type Ite
  * facts. `extra` slots a surface-specific action between Export and Delete — Invoices' "Prepare
  * payment run". The "Needs attention" client state after a held-back approve is reported through
  * `onHeldBack` so the surface can badge those rows for the session. */
-export function DocumentBulkActions({ workspaceId, noun, selectedIds, clear, toRecord, eligibleIds, exportFilename, extra, onHeldBack }: {
+export function DocumentBulkActions({ workspaceId, noun, selectedIds, clear, toRecord, eligibleIds, exportFilename, extra, onHeldBack, approvedNext }: {
   workspaceId: string
   /** Singular, lower-case: "invoice", "receipt", "purchase order", "bank statement". */
   noun: string
@@ -29,6 +29,9 @@ export function DocumentBulkActions({ workspaceId, noun, selectedIds, clear, toR
   exportFilename: string
   extra?: ReactNode
   onHeldBack?: (heldBackIds: string[], approvedIds: string[]) => void
+  /** #229 Q9 (#251): where the approved rows go next, named on the receipt — Invoices says
+   * "Approved invoices are ready in Bill Pay". */
+  approvedNext?: { label: string; href: string }
 }) {
   const router = useRouter()
   const [busy, setBusy] = useState(false)
@@ -123,7 +126,7 @@ export function DocumentBulkActions({ workspaceId, noun, selectedIds, clear, toR
       </div>
     </ConfirmDialog>
 
-    <BulkApproveReceiptModal open={receipt !== null} onClose={() => setReceipt(null)} approved={receipt?.approved ?? []} heldBack={receipt?.heldBack ?? []} />
+    <BulkApproveReceiptModal open={receipt !== null} onClose={() => setReceipt(null)} approved={receipt?.approved ?? []} heldBack={receipt?.heldBack ?? []} next={approvedNext} />
   </>
 }
 

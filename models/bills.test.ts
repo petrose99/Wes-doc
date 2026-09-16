@@ -20,6 +20,9 @@ beforeEach(() => {
   db.supplier = { findMany: vi.fn().mockResolvedValue([]) }
   db.documentAuditEvent = { findMany: vi.fn().mockResolvedValue([]) }
   db.documentCheckResult = { findMany: vi.fn().mockResolvedValue([]) }
+  // ADR 0001 (#251): live Payment records and live batch membership feed the derived paid state.
+  db.invoicePayment = { findMany: vi.fn().mockResolvedValue([]) }
+  db.paymentRunItem = { findMany: vi.fn().mockResolvedValue([]) }
 })
 
 describe("listWorkspaceBills", () => {
@@ -135,6 +138,27 @@ describe("listWorkspaceBills", () => {
     )
     const res = await listWorkspaceBills({ workspaceId: "w1", statusFilter: "synced" })
     expect(res.bills.map((b) => b.documentId)).toEqual(["d1"])
+  })
+
+  it("derives the paid state ledger-first, then from payment records, then from a live batch (ADR 0001, #251)", async () => {
+    db.document.findMany.mockResolvedValue([
+      { id: "d1", filename: "a.pdf", status: "reviewed", reviewedAt: new Date(), template: { code: "invoice" }, reviewedData: { total: 100 } },
+      { id: "d2", filename: "b.pdf", status: "reviewed", reviewedAt: new Date(), template: { code: "invoice" }, reviewedData: { total: 200 } },
+      { id: "d3", filename: "c.pdf", status: "reviewed", reviewedAt: new Date(), template: { code: "invoice" }, reviewedData: { total: 300 } },
+    ])
+    vi.mocked(getDocumentPaymentStatuses).mockResolvedValue(new Map([["d1", { paymentStatus: "paid", dueAmount: 0, paidAmount: 100, syncedAt: new Date() }]]))
+    db.invoicePayment.findMany.mockResolvedValue([{ documentId: "d2", amount: 200 }])
+    db.paymentRunItem.findMany.mockResolvedValue([{ documentId: "d3", run: { status: "pending_approval" } }])
+    const res = await listWorkspaceBills({ workspaceId: "w1" })
+    const byId = new Map(res.bills.map((b) => [b.documentId, b.paidState]))
+    expect(byId.get("d1")).toMatchObject({ state: "paid", source: "ledger", label: "Paid" })
+    expect(byId.get("d2")).toMatchObject({ state: "paid", source: "recorded", label: "Paid (recorded)" })
+    expect(byId.get("d3")).toMatchObject({ state: "scheduled", label: "Scheduled" })
+    // The Unpaid toggle and the Paid chip read the derived state, not the ledger word.
+    const unpaid = await listWorkspaceBills({ workspaceId: "w1", onlyUnpaid: true })
+    expect(unpaid.bills.map((b) => b.documentId)).toEqual(["d3"])
+    const paid = await listWorkspaceBills({ workspaceId: "w1", statusFilter: "paid" })
+    expect(paid.bills.map((b) => b.documentId).sort()).toEqual(["d1", "d2"])
   })
 
   it("marks a cancelled invoice's approvalStatus as cancelled regardless of its ReviewTask history (#220)", async () => {

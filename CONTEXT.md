@@ -110,7 +110,7 @@ The one email an Approver gets when Approvals reach a stage they can decide: eve
 _Avoid_: Reminder (as the user-facing name), digest, alert, push, notification (as a badge count)
 
 **Bill Pay**:
-The queue of approved, unpaid invoices from which payment batches are created. An invoice reaches it only once its processing state is Approved; one that cannot be paid yet (no supplier bank details) stays visible with the reason.
+The queue of approved, unpaid invoices from which payment batches are created. An invoice reaches it only once its processing state is Approved; one that cannot be paid yet (no supplier bank details) stays visible with the reason. A row held by a pending or approved payment batch reads *Scheduled* — still on the queue, not batchable again until the batch is rejected or paid. Amount to pay defaults to the discounted total inside an open discount window, else what is still due; an operator may set a smaller amount (a partial payment) per row.
 _Avoid_: Payables, payment run (the queue), pay list
 
 **Payment batch**:

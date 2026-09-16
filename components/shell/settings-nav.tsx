@@ -1,7 +1,7 @@
 "use client"
 
 import { MODULES } from "@/lib/modules"
-import { Blocks, BookOpen, CheckCircle2, FileBarChart, Mail, Percent, Settings, ShieldCheck, Users, Wand2, Webhook } from "lucide-react"
+import { Banknote, Blocks, BookOpen, CheckCircle2, FileBarChart, Mail, Percent, Settings, ShieldCheck, Users, Wand2, Webhook } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
@@ -34,6 +34,8 @@ export function SettingsNav({ workspaceId, enabledModuleKeys, integrationsEnable
     { href: `${base}/workspace`, label: "Workspace", icon: Users },
     { href: `${base}/modules`, label: "Modules", icon: Blocks },
     ...moduleItems,
+    // #229 Q4 (#251): payer accounts and supplier payment terms.
+    { href: `${base}/payments`, label: "Payments", icon: Banknote },
     { href: `${base}/templates`, label: "Templates", icon: Settings },
     { href: `${base}/reports`, label: "Reports", icon: FileBarChart },
     { href: `${base}/email`, label: "Email intake", icon: Mail },

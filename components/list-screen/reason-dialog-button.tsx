@@ -61,10 +61,12 @@ export function ReasonDialog({ open, onClose, action, title, description, submit
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
 
-  const close = () => { onClose(); setError(null) }
+  // A cancelled reason never carries over to the next thing this dialog is opened for (#251).
+  const close = () => { onClose(); setError(null); setReason("") }
 
   return (
     <Dialog open={open} title={title} description={description} onClose={() => { if (!pending) close() }}>
+      {/* #251: the field is named (placeholder alone is not a name) and the refusal is announced. */}
       <form
         className="space-y-3 px-5 py-4"
         onSubmit={(event) => {
@@ -80,15 +82,18 @@ export function ReasonDialog({ open, onClose, action, title, description, submit
             setError(null)
           })
         }}>
-        <textarea
-          name="reason"
-          rows={3}
-          required
-          value={reason}
-          placeholder={placeholder}
-          className="w-full resize-none rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm transition-colors focus:border-emerald-400 focus:bg-white focus:outline-none"
-          onChange={(event) => setReason(event.target.value)} />
-        {error && <p className="text-sm text-red-700">{error}</p>}
+        <label className="block text-sm">
+          <span className="mb-1 block font-medium text-slate-800">Reason</span>
+          <textarea
+            name="reason"
+            rows={3}
+            required
+            value={reason}
+            placeholder={placeholder}
+            className="w-full resize-none rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 transition-colors placeholder:text-slate-500 focus:border-emerald-400 focus:bg-white focus:outline-none"
+            onChange={(event) => setReason(event.target.value)} />
+        </label>
+        {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
         <div className="flex justify-end gap-2">
           <button type="button" className="rounded-md px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100" disabled={pending} onClick={close}>
             Cancel

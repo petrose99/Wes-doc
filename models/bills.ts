@@ -6,6 +6,9 @@ import { getDocumentPaymentStatuses } from "@/models/ledger-payments"
 import { normalizeSupplierName } from "@/lib/suppliers/normalize"
 import type { PoLinkKind } from "@/lib/matching/po-link"
 import { summarizeInvoicePoLinks, type InvoicePoSummary } from "@/models/po-matching"
+import { derivePaidState, type DerivedPaidState } from "@/lib/payments/paid-state"
+import { LIVE_BATCH_STATUSES, type BatchStatus } from "@/lib/payments/batch-status"
+import { decimalToNumber } from "@/lib/money"
 
 /** WP-AP2: AP aging / bills cockpit. One row per Document whose template maps to "invoice" — the
  * shape an AP controller expects on day one: supplier, total, due-date (extracted OR inferred
@@ -30,6 +33,10 @@ export type BillRow = {
   /** When the ledger last confirmed this payment status — the closest thing to a "paid on" date
    * a synced push gives us (there's no separate payment-event table). Null until synced. */
   paidAt: Date | null
+  /** ADR 0001 (#251): the derived paid state — ledger first, then DocuBite's own Payment
+   * records, then Scheduled while a live Payment batch holds the invoice. `paymentStatus` above
+   * stays the ledger's raw word; this is what every pill and filter reads. */
+  paidState: DerivedPaidState
   status: string
   reviewedAt: Date | null
   blockedByCheck: boolean
@@ -93,14 +100,12 @@ export type PaidSummary = {
   last30d: { count: number; amount: number }
 }
 
-const PAID_STATUSES = new Set(["paid", "reconciled"])
-
 export function summarizePaidBills(bills: BillRow[], asOf = new Date()): PaidSummary {
   const cutoff = new Date(asOf.getTime() - 30 * 24 * 60 * 60 * 1000)
   const summary: PaidSummary = { total: { count: 0, amount: 0 }, last30d: { count: 0, amount: 0 } }
   for (const bill of bills) {
-    if (!bill.paymentStatus || !PAID_STATUSES.has(bill.paymentStatus.toLowerCase())) continue
-    const amount = bill.paidAmount ?? bill.total ?? 0
+    if (bill.paidState.state !== "paid") continue
+    const amount = bill.paidState.paidAmount || bill.paidAmount || bill.total || 0
     summary.total.count += 1
     summary.total.amount += amount
     if (bill.paidAt && bill.paidAt >= cutoff) {
@@ -161,7 +166,7 @@ export async function listWorkspaceBills(input: {
   if (!documents.length) return { bills: [], summary: emptySummary() }
 
   const documentIds = documents.map((d) => d.id)
-  const [paymentStatuses, openCheckTasks, suppliers, latestReviewTasks, touchlessEvents, openEscalations] = await Promise.all([
+  const [paymentStatuses, openCheckTasks, suppliers, latestReviewTasks, touchlessEvents, openEscalations, paymentRecords, batchItems] = await Promise.all([
     getDocumentPaymentStatuses(input.workspaceId, documentIds),
     prisma.reviewTask.findMany({
       where: { workspaceId: input.workspaceId, documentId: { in: documentIds }, reason: "check_failed", status: { in: ["open", "in_review"] } },
@@ -186,7 +191,24 @@ export async function listWorkspaceBills(input: {
       where: { workspaceId: input.workspaceId, documentId: { in: documentIds }, status: "escalated", OR: [{ escalationStatus: null }, { escalationStatus: { in: ["open", "in_review"] } }] },
       select: { documentId: true },
     }),
+    // ADR 0001 (#251): live Payment records and live batch membership feed the derived paid state.
+    prisma.invoicePayment.findMany({
+      where: { workspaceId: input.workspaceId, documentId: { in: documentIds }, removedAt: null },
+      select: { documentId: true, amount: true },
+    }),
+    prisma.paymentRunItem.findMany({
+      where: { workspaceId: input.workspaceId, documentId: { in: documentIds }, active: true, run: { status: { in: [...LIVE_BATCH_STATUSES] } } },
+      select: { documentId: true, run: { select: { status: true } } },
+    }),
   ])
+  const recordsByDoc = new Map<string, Array<{ amount: number }>>()
+  for (const record of paymentRecords) {
+    const list = recordsByDoc.get(record.documentId) ?? []
+    list.push({ amount: decimalToNumber(record.amount) ?? 0 })
+    recordsByDoc.set(record.documentId, list)
+  }
+  const batchStatusByDoc = new Map<string, BatchStatus>()
+  for (const item of batchItems) if (item.documentId) batchStatusByDoc.set(item.documentId, item.run.status as BatchStatus)
   const poSummaries = await summarizeInvoicePoLinks(input.workspaceId, documentIds)
   const touchlessDocIds = new Set(touchlessEvents.map((e) => e.documentId))
   const escalatedDocIds = new Set(openEscalations.map((e) => e.documentId))
@@ -248,6 +270,10 @@ export async function listWorkspaceBills(input: {
       paymentStatus: paymentRow?.paymentStatus ?? null,
       paidAmount: paymentRow?.paidAmount ?? null,
       paidAt: paymentRow?.syncedAt ?? null,
+      paidState: derivePaidState({
+        ledgerStatus: paymentRow?.paymentStatus ?? null, ledgerPaidAmount: paymentRow?.paidAmount ?? null, total,
+        records: recordsByDoc.get(doc.id) ?? [], batchStatus: batchStatusByDoc.get(doc.id) ?? null,
+      }),
       status: doc.status,
       reviewedAt: doc.reviewedAt,
       blockedByCheck: openChecks.length > 0,
@@ -266,11 +292,11 @@ export async function listWorkspaceBills(input: {
 
   const filtered = bills.filter((bill) => {
     if (input.onlyBlocked && !bill.blockedByCheck) return false
-    if (input.onlyUnpaid && bill.paymentStatus && ["paid", "reconciled"].includes(bill.paymentStatus.toLowerCase())) return false
+    if (input.onlyUnpaid && bill.paidState.state === "paid") return false
     if (input.statusFilter === "unreviewed" && bill.status === "reviewed") return false
     if (input.statusFilter === "reviewed" && bill.status !== "reviewed") return false
     if (input.statusFilter === "synced" && bill.paymentStatus?.toLowerCase() !== "synced") return false
-    if (input.statusFilter === "paid" && !(bill.paymentStatus && ["paid", "reconciled"].includes(bill.paymentStatus.toLowerCase()))) return false
+    if (input.statusFilter === "paid" && bill.paidState.state !== "paid") return false
     if (input.approvalFilter && bill.approvalStatus !== input.approvalFilter) return false
     if (input.onlyTouchless && !bill.touchless) return false
     if (input.poFilter === "matched" && !(bill.po.kind && bill.po.kind !== "suggested" && bill.po.mismatchCount === 0)) return false

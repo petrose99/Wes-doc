@@ -49,7 +49,14 @@ export function ConfirmDialog({ open, title, description, confirmLabel = "Confir
       // rAF so the portal content exists before focusing; if the dialog closed in the same
       // tick, contentRef is null and the optional chain makes this a no-op.
       window.requestAnimationFrame(() => {
-        contentRef.current?.querySelector<HTMLElement>("textarea, input, select")?.focus()
+        // #251: content without a field (a recap) still moves focus into the dialog — the
+        // non-destructive Confirm, else Cancel — so the alertdialog is announced and Enter works.
+        const container = contentRef.current
+        if (!container) return
+        const field = container.querySelector<HTMLElement>("textarea, input, select")
+        if (field) { field.focus(); return }
+        const buttons = Array.from(container.querySelectorAll<HTMLElement>("button:not([disabled])"))
+        ;(destructive ? buttons[0] : buttons[buttons.length - 1])?.focus()
       })
     }
     const onKey = (event: KeyboardEvent) => {
@@ -73,7 +80,7 @@ export function ConfirmDialog({ open, title, description, confirmLabel = "Confir
       document.body.style.overflow = previousOverflow
       if (openerRef.current instanceof HTMLElement) openerRef.current.focus()
     }
-  }, [open, children])
+  }, [open, children, destructive])
 
   // The dialog only ever opens after hydration, so there is nothing to mismatch on the server.
   if (!open || typeof document === "undefined") return null
@@ -92,7 +99,7 @@ export function ConfirmDialog({ open, title, description, confirmLabel = "Confir
         <div className="flex justify-end gap-2 border-t bg-slate-50 px-5 py-3">
           <Button type="button" variant="outline" size="sm" autoFocus={destructive && !children} disabled={busy} onClick={onCancel}>Cancel</Button>
           <Button type="button" variant={destructive ? "destructive" : "default"} size="sm" autoFocus={!children && !destructive} disabled={busy} onClick={onConfirm}>
-            {busy && <Loader2 className="h-4 w-4 animate-spin" />}{confirmLabel}
+            {busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}{confirmLabel}
           </Button>
         </div>
       </div>

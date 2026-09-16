@@ -1,11 +1,9 @@
 "use client"
 
-import { useRef, useState, type ReactNode } from "react"
+import { useState, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { ExternalLink } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { QueueScreen, type QueueColumn, type SortOption } from "@/components/queue/queue-screen"
 import { PaneMenuItem } from "@/components/queue/detail-pane"
 import { DocumentBulkActions, DocumentPaneActions } from "@/components/queue/document-actions"
@@ -15,7 +13,7 @@ import { ReasonDialog } from "@/components/list-screen/reason-dialog-button"
 import type { Facet } from "@/components/queue/facet-filters"
 import { ConfidenceField, ProcessingStateGlyph } from "@/components/typed-destinations/row-signals"
 import { processingState } from "@/lib/documents/processing-state"
-import { EligibilityStrip, ItemizedRecapTable, type ItemizedRecord } from "@/components/typed-destinations/bulk-approve-receipt"
+import { type ItemizedRecord } from "@/components/typed-destinations/bulk-approve-receipt"
 import { DueDateCountdownBadge, ReviewSlaCountdownBadge } from "@/components/documents/countdown-badge"
 import { DEFAULT_REVIEW_SLA_HOURS } from "@/lib/documents/countdown"
 import { minConfidenceFromPercent } from "@/lib/documents/confidence-state"
@@ -73,12 +71,10 @@ const SORTS: SortOption<BillRow>[] = [
   { key: "supplier", label: "Supplier A–Z", compare: (a, b) => (a.supplier ?? "￿").localeCompare(b.supplier ?? "￿") },
 ]
 
-export function InvoiceQueue({ workspaceId, basePath, bills, payableDocumentIds, preparePaymentRunAction, minConfidencePercent, views, stat, initialSelectedId }: {
+export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercent, views, stat, initialSelectedId }: {
   workspaceId: string
   basePath: string
   bills: BillRow[]
-  payableDocumentIds: string[]
-  preparePaymentRunAction: (formData: FormData) => Promise<void>
   minConfidencePercent: number
   views?: ReactNode
   stat?: ReactNode
@@ -131,7 +127,9 @@ export function InvoiceQueue({ workspaceId, basePath, bills, payableDocumentIds,
         cancelled={!!bill.cancelledAt} cancelledReason={bill.cancelledReason}
         needsAttention={bill.blockedByCheck || needsAttention.has(bill.documentId) || bill.approvalStatus === "rejected"} openCheckCodes={bill.openCheckCodes}
         inReview={bill.approvalStatus === "in_progress"} touchless={bill.touchless} approved={bill.status === "reviewed"}
-        ledger={bill.paymentStatus}
+        // ADR 0001 (#251): the ledger fact is the derived paid state's own words — "Paid (recorded)"
+        // until the ledger confirms — and "synced" stays the ledger's word while unpaid.
+        ledger={bill.paidState.state !== "unpaid" ? bill.paidState.label : bill.paymentStatus}
         trailing={<ReviewSlaCountdownBadge openedAt={bill.reviewTaskOpenedAt} slaHours={DEFAULT_REVIEW_SLA_HOURS} />} />,
     },
   ]
@@ -146,8 +144,9 @@ export function InvoiceQueue({ workspaceId, basePath, bills, payableDocumentIds,
   const cancelInfo = (bill: BillRow) => {
     if (bill.cancelledAt) return null
     const status = bill.paymentStatus?.toLowerCase() ?? null
+    if (bill.paidState.state === "paid" || bill.paidState.state === "partially_paid") return { canCancel: false, reason: "Already paid, so it can no longer be cancelled." }
+    if (bill.paidState.state === "scheduled") return { canCancel: false, reason: "In a payment batch. Reject the batch first." }
     if (status === "synced") return { canCancel: false, reason: "Already synced to your ledger, so it can no longer be cancelled." }
-    if (status === "paid" || status === "reconciled") return { canCancel: false, reason: "Already paid, so it can no longer be cancelled." }
     return { canCancel: true, reason: null }
   }
 
@@ -180,7 +179,8 @@ export function InvoiceQueue({ workspaceId, basePath, bills, payableDocumentIds,
         workspaceId={workspaceId} noun="invoice" selectedIds={selectedIds} clear={clear} toRecord={toRecord}
         eligibleIds={selectedIds.filter((id) => !billsById.get(id)?.blockedByCheck)} exportFilename="invoices.csv"
         onHeldBack={(heldBack, approved) => setNeedsAttention((prev) => { const next = new Set(prev); for (const id of heldBack) next.add(id); for (const id of approved) next.delete(id); return next })}
-        extra={<PaymentRunAction selectedIds={selectedIds} payableDocumentIds={payableDocumentIds} preparePaymentRunAction={preparePaymentRunAction} toRecord={toRecord} />} />}
+        // #229 Q9 (#251): "Prepare payment run" has left this bar — paying happens on Bill Pay.
+        approvedNext={{ label: "Approved invoices are ready in Bill Pay", href: `/workspaces/${workspaceId}/payments/bill-pay` }} />}
       paneActions={(bill, { refresh }) => <DocumentPaneActions workspaceId={workspaceId} documentId={bill.documentId} noun="invoice"
         status={bill.status} openReviewTaskId={bill.openReviewTaskId} cancelled={!!bill.cancelledAt} onDone={refresh} />}
       paneMenu={(bill) => {
@@ -204,36 +204,5 @@ export function InvoiceQueue({ workspaceId, basePath, bills, payableDocumentIds,
       description="This is final. There is no way to un-cancel once confirmed. The reason is recorded on the audit trail."
       submitLabel="Cancel invoice"
       placeholder="Why is this invoice being cancelled?" />
-  </>
-}
-
-/** Invoices' surface-specific bulk action: the payment-run file for the eligible selection. */
-function PaymentRunAction({ selectedIds, payableDocumentIds, preparePaymentRunAction, toRecord }: {
-  selectedIds: string[]
-  payableDocumentIds: string[]
-  preparePaymentRunAction: (formData: FormData) => Promise<void>
-  toRecord: (id: string) => ItemizedRecord
-}) {
-  const [confirming, setConfirming] = useState(false)
-  const formRef = useRef<HTMLFormElement>(null)
-  const payable = selectedIds.filter((id) => payableDocumentIds.includes(id))
-  if (payable.length === 0) return null
-  return <>
-    <form ref={formRef} action={preparePaymentRunAction} className="hidden">
-      {payable.map((id) => <input key={id} type="hidden" name="documentId" value={id} />)}
-    </form>
-    <Button type="button" size="sm" variant="outline" onClick={() => setConfirming(true)}>Prepare payment run ({payable.length})</Button>
-    <ConfirmDialog
-      open={confirming}
-      title={`Prepare a payment run for ${payable.length} invoice${payable.length === 1 ? "" : "s"}?`}
-      description="Downloads a payment file for the eligible invoices below. No money moves."
-      confirmLabel={`Prepare payment run (${payable.length})`}
-      onConfirm={() => { setConfirming(false); formRef.current?.requestSubmit() }}
-      onCancel={() => setConfirming(false)}>
-      <div className="space-y-2">
-        <EligibilityStrip eligible={payable.length} total={selectedIds.length} />
-        <ItemizedRecapTable records={payable.map(toRecord)} />
-      </div>
-    </ConfirmDialog>
   </>
 }
