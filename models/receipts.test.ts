@@ -106,4 +106,25 @@ describe("listWorkspaceReceipts", () => {
     expect(res.receipts.find((r) => r.documentId === "d1")?.approvalStatus).toBe("rejected")
     expect(res.receipts.find((r) => r.documentId === "d2")?.approvalStatus).toBe("approved")
   })
+  it("filters by processing state via the Status chip (#258) — a receipt never reaches Cancelled", async () => {
+    db.document.findMany.mockResolvedValue([
+      { id: "needs_attention", filename: "b.pdf", status: "reviewed", reviewedAt: new Date(), template: { code: "receipt" }, reviewedData: {} },
+      { id: "in_review", filename: "c.pdf", status: "needs_review", reviewedAt: null, template: { code: "receipt" }, reviewedData: {} },
+      { id: "touchless", filename: "d.pdf", status: "reviewed", reviewedAt: new Date(), template: { code: "receipt" }, reviewedData: {} },
+      { id: "approved", filename: "e.pdf", status: "reviewed", reviewedAt: new Date(), template: { code: "receipt" }, reviewedData: {} },
+    ])
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    db.reviewTask.findMany.mockImplementation((args: any) => {
+      if (args?.where?.reason === "check_failed") return Promise.resolve([{ documentId: "needs_attention", detail: "arithmetic_mismatch: totals" }])
+      return Promise.resolve([])
+    })
+    db.documentAuditEvent.findMany.mockResolvedValue([{ documentId: "touchless" }])
+    for (const state of ["needs_attention", "in_review", "touchless", "approved"] as const) {
+      const res = await listWorkspaceReceipts({ workspaceId: "w1", statusFilter: state })
+      expect(res.receipts.map((r) => r.documentId)).toEqual([state])
+    }
+    // ReceiptRow.approvalStatus has no "cancelled" (spec §1.2): the chip key is accepted and matches nothing.
+    const cancelled = await listWorkspaceReceipts({ workspaceId: "w1", statusFilter: "cancelled" })
+    expect(cancelled.receipts).toEqual([])
+  })
 })

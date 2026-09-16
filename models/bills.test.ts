@@ -196,4 +196,23 @@ describe("listWorkspaceBills", () => {
     expect(res.bills.find((b) => b.documentId === "d1")?.escalated).toBe(true)
     expect(res.bills.find((b) => b.documentId === "d2")?.escalated).toBe(false)
   })
+  it("filters by each of the five processing states via the Status chip (#258)", async () => {
+    db.document.findMany.mockResolvedValue([
+      { id: "cancelled", filename: "a.pdf", status: "reviewed", reviewedAt: new Date(), template: { code: "invoice" }, reviewedData: {}, cancelledAt: new Date(), cancelledReason: "Duplicate" },
+      { id: "needs_attention", filename: "b.pdf", status: "reviewed", reviewedAt: new Date(), template: { code: "invoice" }, reviewedData: {} },
+      { id: "in_review", filename: "c.pdf", status: "needs_review", reviewedAt: null, template: { code: "invoice" }, reviewedData: {} },
+      { id: "touchless", filename: "d.pdf", status: "reviewed", reviewedAt: new Date(), template: { code: "invoice" }, reviewedData: {} },
+      { id: "approved", filename: "e.pdf", status: "reviewed", reviewedAt: new Date(), template: { code: "invoice" }, reviewedData: {} },
+    ])
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    db.reviewTask.findMany.mockImplementation((args: any) => {
+      if (args?.where?.reason === "check_failed") return Promise.resolve([{ documentId: "needs_attention", detail: "arithmetic_mismatch: totals" }])
+      return Promise.resolve([])
+    })
+    db.documentAuditEvent.findMany.mockResolvedValue([{ documentId: "touchless" }])
+    for (const state of ["cancelled", "needs_attention", "in_review", "touchless", "approved"] as const) {
+      const res = await listWorkspaceBills({ workspaceId: "w1", statusFilter: state })
+      expect(res.bills.map((r) => r.documentId)).toEqual([state])
+    }
+  })
 })

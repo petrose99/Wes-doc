@@ -11,7 +11,7 @@ import { StatusLine } from "@/components/queue/status-line"
 import { processingFact } from "@/lib/documents/processing-fact"
 import type { Facet } from "@/components/queue/facet-filters"
 import { ConfidenceField, ProcessingStateGlyph } from "@/components/typed-destinations/row-signals"
-import { processingState } from "@/lib/documents/processing-state"
+import { PROCESSING_STATES, PROCESSING_STATE_LABELS, processingState } from "@/lib/documents/processing-state"
 import type { ItemizedRecord } from "@/components/typed-destinations/bulk-approve-receipt"
 import { ReviewSlaCountdownBadge } from "@/components/documents/countdown-badge"
 import { DEFAULT_REVIEW_SLA_HOURS } from "@/lib/documents/countdown"
@@ -27,10 +27,7 @@ export const RECEIPT_FACETS: Facet[] = [
     // #258: the five processing states — Receipts have no ledger facet (they never post/pay).
     param: "status", label: "Status",
     sections: [{
-      label: "Processing state", options: [
-        { value: "cancelled", label: "Cancelled" }, { value: "needs_attention", label: "Needs attention" },
-        { value: "in_review", label: "In review" }, { value: "touchless", label: "Touchless" }, { value: "approved", label: "Approved" },
-      ],
+      label: "Processing state", options: PROCESSING_STATES.map((value) => ({ value, label: PROCESSING_STATE_LABELS[value] })),
     }],
   },
   { param: "claim", label: "Claim", options: [{ value: "unclaimed", label: "Unclaimed" }, { value: "claimed", label: "Claimed" }] },

@@ -302,7 +302,7 @@ export async function DocumentDetailPage({ params, searchParams, embedded = fals
       cancelled: document.cancelledAt !== null,
       cancelledReason: document.cancelledReason ?? null,
       // #236: /review is retired — the same open ReviewTask is now viewed from the Approvals
-      // destination's Detail pane (its Approval tab reads "No approval steps yet" gracefully for
+      // destination's Detail pane (its Approval tab reads "No approval started." gracefully for
       // a workflow-less task, since most ReviewTasks aren't Approvals at all — decision #1).
       reviewLink: reviewQueueEnabled && openReviewTask ? { href: `/workspaces/${workspaceId}/approvals/invoices/${documentId}`, label: openReviewTask.status === "in_review" ? "In review" : "Open — view review task" } : null,
     }}

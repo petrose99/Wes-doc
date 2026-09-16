@@ -1,5 +1,36 @@
 import { describe, expect, it } from "vitest"
-import { processingState, type ProcessingStateInput } from "./processing-state"
+import {
+  LEDGER_FACT_LABELS,
+  PROCESSING_STATES,
+  PROCESSING_STATE_LABELS,
+  processingState,
+  type ProcessingStateInput,
+} from "./processing-state"
+
+describe("the one status vocabulary (#258)", () => {
+  it("has exactly the five states, in precedence order", () => {
+    expect(PROCESSING_STATES).toEqual(["cancelled", "needs_attention", "in_review", "touchless", "approved"])
+    expect(Object.keys(PROCESSING_STATE_LABELS)).toEqual(PROCESSING_STATES)
+  })
+
+  it("labels match CONTEXT.md, sentence case", () => {
+    expect(PROCESSING_STATE_LABELS).toEqual({
+      cancelled: "Cancelled",
+      needs_attention: "Needs attention",
+      in_review: "In review",
+      touchless: "Touchless",
+      approved: "Approved",
+    })
+  })
+
+  it("ledger facts read Posted / Paid — never Synced", () => {
+    expect(LEDGER_FACT_LABELS).toEqual({ synced: "Posted", paid: "Paid" })
+  })
+
+  it("heldBack folds into needs_attention like any other attention cause", () => {
+    expect(processingState({ approvalStatus: "approved", blockedByCheck: false, escalated: false, touchless: false, status: "reviewed", heldBack: true })).toBe("needs_attention")
+  })
+})
 
 function input(overrides: Partial<ProcessingStateInput> = {}): ProcessingStateInput {
   return {

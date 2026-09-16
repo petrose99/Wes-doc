@@ -128,7 +128,7 @@ export default async function AutomationReportPage({ params }: {
               stages={[
                 { label: "Extracted", value: extracted },
                 { label: "Passed every check", value: metrics.touchless.totalReady },
-                { label: "Synced untouched", value: metrics.touchless.totalPushedTouchless },
+                { label: "Posted untouched", value: metrics.touchless.totalPushedTouchless },
               ]}
             />
           </section>

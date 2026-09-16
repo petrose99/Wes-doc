@@ -14,7 +14,7 @@ import { ReasonDialog } from "@/components/list-screen/reason-dialog-button"
 import type { Facet } from "@/components/queue/facet-filters"
 import { QueueSegments } from "@/components/queue/queue-segments"
 import { ProcessingStateGlyph } from "@/components/typed-destinations/row-signals"
-import { processingState } from "@/lib/documents/processing-state"
+import { PROCESSING_STATE_LABELS, processingState } from "@/lib/documents/processing-state"
 import { useOnlineStatus } from "@/lib/client/use-online-status"
 import { usePhoneLane } from "@/lib/client/use-phone-lane"
 import { countWaitingOnOthers, filterApprovalInvoiceRows } from "@/lib/approvals/filters"
@@ -226,7 +226,7 @@ function ApprovalCard({ row, onOpen, now }: { row: ApprovalInvoiceRow; onOpen: (
     row.total !== null ? formatMoney(row.total, row.currencyCode) : "No amount",
     row.invoiceNumber ?? "No invoice #",
     `Due ${formatDate(row.dueDate)}${overdue ? ", overdue" : ""}`,
-    notEligible ? "Needs attention" : stageLabel(row.stage),
+    notEligible ? PROCESSING_STATE_LABELS.needs_attention : stageLabel(row.stage),
   ].join(", ")
   return <a href={`#${row.documentId}`} onClick={(event) => { event.preventDefault(); onOpen() }} aria-label={name}
     className="flex min-h-16 items-start gap-3 px-4 py-3 hover:bg-slate-50 active:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-inset">
