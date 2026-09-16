@@ -19,6 +19,14 @@ Invoices, Purchase Orders, Receipts, Bank Statements, Exceptions, Finance, and A
 The storage-and-extraction primitive underlying every typed destination. Every Invoice, Purchase Order, Receipt, and Bank Statement is a Document, but "Document" is no longer itself a user-facing destination — the user asserts which typed destination a Document belongs to at upload time, and that assertion is authoritative.
 _Avoid_: Using "Document" as a destination name; unclassified/pending-classification states
 
+**Intake**:
+How a Document enters a workspace: added from the typed queue it belongs to, emailed to the workspace's inbound address, or sent by API. Adding from a queue asserts that queue's type; the four typed intake destinations are the only queues that add. The phone does not add documents.
+_Avoid_: Upload (as a user-facing verb), import, pipeline
+
+**Inbound address**:
+The workspace's own email address for intake. Shown wherever the operator sets out to add a document — the Add dialog and the first-use Empty queue — and under Admin › Configuration for who may send to it. Only exists on a deployment where email intake is switched on.
+_Avoid_: Forwarding address, mailbox
+
 **Invoice**:
 The typed destination for a bill received from a supplier. Absorbs the former Documents/Bills surface; aging is a filter chip and a saved view here, and paying an approved invoice happens on Bill Pay, not on this queue.
 
