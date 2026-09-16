@@ -29,8 +29,14 @@ First-pass scores are the KPI (the pre-build getting better); close scores are r
 | #255 | 20260916T094235 | sonnet | resolved | · | · | · | · | · | 215 | 21M | 1K | 0 | 1 | 11m35s |
 | #254 | 20260916T095416 | ? | ? | · | · | · | · | · | 252 | 29M | 2K | 0 | 1 | ? |
 | #253 | 20260916T100946 | ? | ? | · | · | · | · | · | 382 | 64M | 7K | 61 | 6 | ? |
-| #257 | 20260916T111650 | opus[1m] | continued (progressed), sess | 32 | · | · | · | · | 55 | 5M | 2K | 0 | 1 | 10m05s |
-| #257 | 20260916T112704 | ? | ? | 32 | · | · | · | · | 59 | 5M | 2K | 0 | 1 | ? |
-| #259 | 20260916T113510 | opus[1m] | continued (progressed), sess | 32 | · | · | · | · | 42 | 5M | 2K | 0 | 0 | 7m04s |
-| #259 | 20260916T114222 | opus[1m] | phase spec done → build next | 32 | · | · | · | · | 56 | 4M | 2K | 0 | 1 | 7m34s |
-| #259 | 20260916T115003 | sonnet | phase build done → spec next | 32 | · | · | · | · | 73 | 9M | 0K | 0 | 0 | 5m05s |
+| #257 | 20260916T111650 | opus[1m] | continued (progressed), sess | 34 | · | · | · | · | 55 | 5M | 2K | 0 | 1 | 10m05s |
+| #257 | 20260916T112704 | ? | ? | 34 | · | · | · | · | 59 | 5M | 2K | 0 | 1 | ? |
+| #259 | 20260916T113510 | opus[1m] | continued (progressed), sess | 34 | · | · | · | · | 42 | 5M | 2K | 0 | 0 | 7m04s |
+| #259 | 20260916T114222 | opus[1m] | phase spec done → build next | 34 | · | · | · | · | 56 | 4M | 2K | 0 | 1 | 7m34s |
+| #259 | 20260916T115003 | sonnet | phase build done → spec next | 34 | · | · | · | · | 73 | 9M | 0K | 0 | 0 | 5m05s |
+| #259 | 20260916T115518 | opus[1m] | phase spec done → build next | 34 | · | · | · | · | 60 | 7M | 2K | 0 | 0 | 9m05s |
+| #259 | 20260916T120430 | ? | ? | 34 | · | · | · | · | 96 | 11M | 3K | 0 | 0 | ? |
+| #257 | 20260916T121839 | sonnet | continued (progressed), sess | 34 | · | · | · | · | 129 | 14M | 1K | 0 | 1 | 7m34s |
+| #257 | 20260916T122621 | opus[1m] | continued (progressed), sess | 34 | · | · | · | · | 64 | 8M | 1K | 0 | 0 | 6m34s |
+| #257 | 20260916T123303 | opus[1m] | continued (progressed), sess | 34 | · | · | · | · | 48 | 6M | 1K | 0 | 0 | 9m04s |
+| #257 | 20260916T124216 | opus[1m] | continued (progressed), sess | 34 | · | · | · | · | 85 | 9M | 2K | 0 | 0 | 11m04s |
