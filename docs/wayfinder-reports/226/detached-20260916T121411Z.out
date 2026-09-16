@@ -27,3 +27,21 @@ released #259 (left claimed by pid 1097085)
     #257 crossed the hand-off line (150706 tokens ≥ 150000) — asked to hand off; hard stop at 180000
     #257 context at exit: 156571 tokens, 9 min
     cleaned up session pid 1154188 (pgid ?); free: 6142 MB
+    scoreboard: 37 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #257: phase build done → close next in 545s
+=== [6/50] #257 — Build the phone approval lane: Approvals-first tab bar, Ready to Approve cards, full-screen Detail sheet with the decision bar  [sonnet · low · phase: close]
+    #257 context at exit: 133695 tokens, 11 min
+    cleaned up session pid 1165091 (pgid ?); free: 6075 MB
+    scoreboard: 38 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #257: continued (no progress), session 1/3 without progress allowed, hand-off not updated in 665s
+=== [7/50] #257 — Build the phone approval lane: Approvals-first tab bar, Ready to Approve cards, full-screen Detail sheet with the decision bar  [opus[1m] · low · phase: close]
+    #257 crossed the hand-off line (150274 tokens ≥ 150000) — asked to hand off; hard stop at 180000
+    #257 context at exit: 163633 tokens, 47 min
+    cleaned up session pid 1179006 (pgid ?); free: 5958 MB
+    scoreboard: 39 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #257: continued (progressed), session 1/3 without progress allowed in 2859s
+=== [8/50] #257 — Build the phone approval lane: Approvals-first tab bar, Ready to Approve cards, full-screen Detail sheet with the decision bar  [opus[1m] · low · phase: close]
+    #257 crossed the hand-off line (151922 tokens ≥ 150000) — asked to hand off; hard stop at 180000
+    #257 context at exit: 170692 tokens, 22 min
+    cleaned up session pid 1236060 (pgid ?); free: 5890 MB
+    scoreboard: 40 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md

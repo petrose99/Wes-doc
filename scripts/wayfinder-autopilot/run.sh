@@ -247,8 +247,11 @@ while [ "$n" -lt "$MAX" ]; do
   # still running from before this run (or a previous run), stop it first.
   # The VPS's memwatch alerts under 20% available RAM, and a stale next-server
   # alone can hold 4 GB.
+  # Only processes working inside this checkout: the owner's viewing server
+  # (a worktree copy on another port, behind a tunnel) is not ours to kill.
   for p in $(pgrep -u "$(id -u)" -f 'next dev|next-server|chrome|chromium|playwright' 2>/dev/null); do
-    [ "$p" = "$$" ] || kill -TERM "$p" 2>/dev/null || true
+    [ "$p" = "$$" ] && continue
+    case "$(readlink "/proc/$p/cwd" 2>/dev/null)/" in "$ROOT/"*) kill -TERM "$p" 2>/dev/null || true ;; esac
   done
   sleep 2
   START=$(date -u +%Y-%m-%dT%H:%M:%SZ); S0=$(date +%s)
