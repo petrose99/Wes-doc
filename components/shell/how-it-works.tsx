@@ -13,6 +13,16 @@ export function openHowItWorksDialog() {
   window.dispatchEvent(new Event(OPEN_EVENT))
 }
 
+/** Phone opener (spec §6 row 15): below md the account menu is the Account page (#252), so the
+ * same dialog opens from a panel there. Plain text button in the page's link family; it is the
+ * opener the shared `Dialog` returns focus to on Esc. */
+export function HowItWorksButton() {
+  return <button type="button" onClick={openHowItWorksDialog}
+    className="inline-flex min-h-11 items-center text-sm font-medium text-emerald-700 underline-offset-2 hover:underline">
+    Open How DocuBite works
+  </button>
+}
+
 const STEPS: { name: string; sentence: string }[] = [
   { name: "Add", sentence: "Drop invoices on the queue, add them with Add invoices, or email them to the workspace's address." },
   { name: "In review", sentence: "DocuBite extracts each one into a row. Open it to check the fields beside the source." },

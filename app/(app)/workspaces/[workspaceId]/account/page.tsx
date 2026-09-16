@@ -3,6 +3,7 @@ import Link from "next/link"
 import { AdminPage } from "@/components/admin/admin-ui"
 import { Panel } from "@/components/automation/automation-ui"
 import { ResetTourButton } from "@/components/onboarding/reset-tour-button"
+import { HowItWorksButton } from "@/components/shell/how-it-works"
 import { SignOutButton } from "@/components/shell/sign-out-button"
 import { accountPaths } from "@/lib/admin/paths"
 import { getCurrentUser } from "@/lib/auth"
@@ -12,7 +13,7 @@ import { getWorkspacesForUser } from "@/models/workspaces"
 export const dynamic = "force-dynamic"
 
 /** #231 Q18 (#252): the phone's fourth tab, Account — who you are, Security, switching
- * company, the welcome tour, sign out. Admin is a desktop area; this is what a phone needs of
+ * company, How DocuBite works (#264), sign out. Admin is a desktop area; this is what a phone needs of
  * it. Reachable on desktop too, from the account menu's Security entry. */
 export default async function AccountPage({ params }: { params: Promise<{ workspaceId: string }> }) {
   const { workspaceId } = await params
@@ -63,6 +64,11 @@ export default async function AccountPage({ params }: { params: Promise<{ worksp
       </ul>
     </Panel>
 
+    <Panel title="How DocuBite works" note="The four steps every invoice goes through, from adding it to posting it.">
+      <HowItWorksButton />
+    </Panel>
+
+    {/* This is the tour's last mount; removing it is #263's call (owner sign-off), not #264's. */}
     <Panel title="Welcome tour" note="Show the introduction to the workspace layout again.">
       <ResetTourButton workspaceId={workspaceId} />
     </Panel>

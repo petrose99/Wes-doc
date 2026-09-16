@@ -17,7 +17,7 @@ export type QueueEmptyProps = {
 export function QueueEmpty({ state, firstUse, done, filteredTitle, filteredBody, filteredAction, hiddenByFilters, onClearFilters }: QueueEmptyProps) {
   if (state === "first-use" && firstUse) {
     return <section aria-labelledby="queue-empty-title" className="mx-auto max-w-md px-6 py-16 text-center max-md:py-12">
-      <h2 id="queue-empty-title" tabIndex={-1} className="text-[15px] font-semibold text-slate-900 focus:outline-none">{firstUse.title}</h2>
+      <h2 id="queue-empty-title" tabIndex={-1} className="text-sm font-semibold text-slate-900 focus:outline-none">{firstUse.title}</h2>
       <p className="mx-auto mt-2 max-w-prose text-sm text-slate-600">{firstUse.body}</p>
       {(firstUse.action || firstUse.phoneAction) && <div className="mt-5 flex flex-col items-center gap-3">
         {firstUse.action && <div className="max-md:hidden">{firstUse.action}</div>}
