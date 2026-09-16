@@ -2,10 +2,12 @@
 
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { ReasonDialogButton } from "@/components/list-screen/reason-dialog-button"
 import { useOverrideMode } from "@/components/queue/override-mode-context"
 import { overrideGateAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
+import { formatMoney } from "@/lib/money"
+import type { ApprovalDetailFacts } from "@/models/approvals"
 
 /** The Detail pane's history data (#225): the approval step chain (#218), the flat audit log,
  * and this document's open checks (#203). Loaded server-side by `getQueueDetailAction` alongside
@@ -13,8 +15,11 @@ import { overrideGateAction } from "@/app/(app)/workspaces/[workspaceId]/actions
  * from #198's left-side panel, which this replaces. */
 export type DocumentHistory = {
   auditEvents: Array<{ id: string; label: string; createdAt: string; actorName: string | null }>
-  stageDecisions: Array<{ id: string; stageIndex: number; stageName: string; decision: "approve" | "reject"; note: string | null; actorName: string; decidedAt: string }>
+  stageDecisions: Array<{ id: string; stageIndex: number; stageName: string; decision: "approve" | "reject"; note: string | null; actorName: string; actorAvatar?: string | null; decidedAt: string }>
   pendingStages: Array<{ stageIndex: number; stageName: string }>
+  /** #257 S6/S7: who started the approval and who it waits on, the supplier's record, a near
+   * duplicate, and the PO variance figures — null where the queue's loader does not supply them. */
+  facts?: ApprovalDetailFacts | null
   /** `overridable`/`refusalReason` come from the server's own `overrideEligibility` — the client
    * never decides on its own that a check is a hard gate. */
   gates: Array<{ id: string; gateType: string; severity: "hard" | "soft"; firedAt: string; overridable: boolean; refusalReason: string | null }>
@@ -24,38 +29,142 @@ export type DocumentHistory = {
   escalations: Array<{ id: string; checkCode: string; message: string; escalationStatus: "open" | "in_review" | "resolved"; escalatedAt: string }>
 }
 
-/** #218: decided stages first (oldest first), then the not-yet-decided stages of the same active
- * task as "Pending" rows, so the chain reads as one sequence with a visible end. */
-export function ApprovalStepChain({ decisions, pendingStages }: { decisions: DocumentHistory["stageDecisions"]; pendingStages: DocumentHistory["pendingStages"] }) {
-  if (decisions.length === 0 && pendingStages.length === 0) return <p className="text-sm text-slate-500">No approval steps yet. Approving this document records the first one.</p>
-  return <ol className="space-y-3">
-    {decisions.map((decision) => {
-      const rejected = decision.decision === "reject"
-      return <li key={decision.id} className="flex gap-2.5">
-        <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold tabular-nums ${rejected ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-800"}`}>
-          {decision.stageIndex + 1}
-        </span>
-        <div className="min-w-0">
-          <p className="text-sm text-slate-800">
-            <span className="font-medium">{decision.stageName}</span>
-            {" · "}
-            <span className={rejected ? "text-red-700" : "text-emerald-800"}>{rejected ? "Rejected" : "Approved"}</span>
-            {" by "}{decision.actorName}
-            {rejected && decision.note ? `: ${decision.note}` : ""}
+function initials(name: string): string {
+  return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase() ?? "").join("") || "?"
+}
+
+/** A person on the timeline: their avatar, or initials on slate. 28px — the timeline's node. */
+function PersonMark({ name, avatar, tone }: { name: string; avatar?: string | null; tone: "done" | "current" | "rejected" | "waiting" }) {
+  const ring = tone === "current" ? "ring-2 ring-emerald-600 ring-offset-2" : tone === "rejected" ? "ring-2 ring-red-500 ring-offset-2" : ""
+  if (avatar) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={avatar} alt="" className={`h-7 w-7 shrink-0 rounded-full object-cover ${ring}`} />
+  }
+  const fill = tone === "waiting" ? "border border-dashed border-slate-300 text-slate-500" : tone === "rejected" ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-800"
+  return <span aria-hidden className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${fill} ${ring}`}>{initials(name)}</span>
+}
+
+function relativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime()
+  const minutes = Math.round(diff / 60000)
+  if (minutes < 1) return "just now"
+  if (minutes < 60) return `${minutes} min ago`
+  const hours = Math.round(minutes / 60)
+  if (hours < 24) return `${hours} h ago`
+  const days = Math.round(hours / 24)
+  if (days < 14) return `${days} d ago`
+  return new Date(iso).toLocaleDateString()
+}
+
+/** #257 S6 (spec 3.5 point 2): the approval as one line of people — who started it, each stage
+ * decided, the stage it waits on (ringed, "Waiting on you" / "Waiting on ‹name›"), and the
+ * stages not reached yet. Falls back to the decisions + pending stages alone (#218's data) when
+ * the loader supplied no `facts.approval` — the standalone route, or a document with no run. */
+export function ApprovalTimeline({ decisions, pendingStages, approval }: {
+  decisions: DocumentHistory["stageDecisions"]
+  pendingStages: DocumentHistory["pendingStages"]
+  approval?: ApprovalDetailFacts["approval"]
+}) {
+  if (!approval && decisions.length === 0 && pendingStages.length === 0) {
+    return <p className="text-sm text-slate-500">No approval steps yet. Approving this document records the first one.</p>
+  }
+  const decidedByStage = new Map(decisions.map((decision) => [decision.stageIndex, decision]))
+  const stages = approval
+    ? approval.stages
+    : [...decisions.map((d) => ({ stageIndex: d.stageIndex, name: d.stageName })), ...pendingStages.map((p) => ({ stageIndex: p.stageIndex, name: p.stageName }))]
+  const currentIndex = approval?.currentStageIndex ?? pendingStages[0]?.stageIndex ?? -1
+  const line = "absolute left-[13px] top-7 h-[calc(100%-0.25rem)] w-px"
+  return <ol aria-label="Approval timeline">
+    {approval && <li className="relative flex gap-3 pb-4">
+      <span className={`${line} bg-slate-200`} aria-hidden />
+      <PersonMark name={approval.startedBy?.name ?? "DocuBite"} avatar={approval.startedBy?.avatar} tone="done" />
+      <div className="min-w-0 pt-1">
+        <p className="text-sm text-slate-800"><span className="font-medium">{approval.startedBy?.name ?? "DocuBite"}</span> started the approval</p>
+        <p className="text-xs text-slate-500"><time dateTime={approval.startedAt}>{relativeTime(approval.startedAt)}</time></p>
+      </div>
+    </li>}
+    {stages.map((stage, position) => {
+      const decision = decidedByStage.get(stage.stageIndex)
+      const last = position === stages.length - 1
+      if (decision) {
+        const rejected = decision.decision === "reject"
+        return <li key={`stage-${stage.stageIndex}`} className="relative flex gap-3 pb-4">
+          {!last && <span className={`${line} ${rejected ? "bg-red-200" : "bg-emerald-200"}`} aria-hidden />}
+          <PersonMark name={decision.actorName} avatar={decision.actorAvatar} tone={rejected ? "rejected" : "done"} />
+          <div className="min-w-0 pt-1">
+            <p className="text-sm text-slate-800">
+              <span className="font-medium">{decision.actorName}</span> {rejected ? "rejected" : "approved"} · {stage.name}
+            </p>
+            {rejected && decision.note && <p className="mt-0.5 text-sm text-slate-700">“{decision.note}”</p>}
+            <p className="text-xs text-slate-500"><time dateTime={decision.decidedAt}>{relativeTime(decision.decidedAt)}</time></p>
+          </div>
+        </li>
+      }
+      const current = stage.stageIndex === currentIndex
+      const who = current ? (approval ? (approval.waitingOnYou ? "you" : approval.waitingOn) : "an approver") : null
+      return <li key={`stage-${stage.stageIndex}`} className="relative flex gap-3 pb-4" aria-current={current ? "step" : undefined}>
+        {!last && <span className={`${line} bg-slate-200`} aria-hidden />}
+        <PersonMark name={current && approval && !approval.waitingOnYou ? approval.waitingOn : String(stage.stageIndex + 1)} tone={current ? "current" : "waiting"} />
+        <div className="min-w-0 pt-1">
+          <p className={`text-sm ${current ? "font-medium text-slate-900" : "text-slate-500"}`}>
+            {current ? `Waiting on ${who}` : "Not reached"} · {stage.name}
           </p>
-          <p className="text-xs text-slate-500">{new Date(decision.decidedAt).toLocaleString()}</p>
         </div>
       </li>
     })}
-    {pendingStages.map((stage) => <li key={`pending-${stage.stageIndex}`} className="flex gap-2.5">
-      <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-dashed border-slate-300 text-[11px] font-semibold tabular-nums text-slate-500">
-        {stage.stageIndex + 1}
-      </span>
-      <div className="min-w-0">
-        <p className="text-sm text-slate-600"><span className="font-medium">{stage.stageName}</span> · Pending</p>
-      </div>
-    </li>)}
   </ol>
+}
+
+/** #257 spec 3.5: the Approval tab — the status line, the timeline, what is known of the
+ * supplier, and (PO Mismatches) the variance figures the decision is about. Everything here is
+ * read-only; the decision itself is the pane's footer. */
+export function ApprovalTab({ workspaceId, history }: { workspaceId: string; history: DocumentHistory }) {
+  const facts = history.facts ?? null
+  const approval = facts?.approval ?? null
+  const supplier = facts?.supplier ?? null
+  const mismatch = facts?.mismatch ?? null
+  const duplicate = facts?.nearDuplicate ?? null
+  // The way back from the duplicate is this pane, wherever it was opened — read on the client.
+  const [from, setFrom] = useState("")
+  useEffect(() => { setFrom(window.location.pathname + window.location.search) }, [])
+  const stageLabel = approval ? `${approval.currentStageIndex + 1} of ${approval.stages.length} · ${approval.stages.find((s) => s.stageIndex === approval.currentStageIndex)?.name ?? ""}` : null
+  return <div className="space-y-6">
+    {approval && <p className="text-sm text-slate-800" role="status">
+      <span className={`font-semibold ${approval.waitingOnYou ? "text-emerald-800" : "text-slate-700"}`}>{approval.waitingOnYou ? "Waiting on you" : `Waiting on ${approval.waitingOn}`}</span>
+      <span className="text-slate-500"> · {stageLabel}</span>
+    </p>}
+    <ApprovalTimeline decisions={history.stageDecisions} pendingStages={history.pendingStages} approval={approval} />
+
+    {mismatch && <section aria-labelledby="approval-variance">
+      <h3 id="approval-variance" className="text-xs font-semibold uppercase tracking-wide text-slate-500">PO match</h3>
+      <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+        <dt className="text-slate-600">Ordered</dt><dd className="text-right tabular-nums text-slate-800">{formatMoney(mismatch.poTotal, mismatch.currencyCode)}</dd>
+        {mismatch.alreadyInvoiced !== null && <><dt className="text-slate-600">Already invoiced</dt><dd className="text-right tabular-nums text-slate-800">{formatMoney(mismatch.alreadyInvoiced, mismatch.currencyCode)}</dd></>}
+        <dt className="text-slate-600">This invoice</dt><dd className="text-right tabular-nums text-slate-800">{formatMoney(mismatch.invoiceTotal, mismatch.currencyCode)}</dd>
+        <dt className="text-slate-600">Allowance</dt><dd className="text-right tabular-nums text-slate-800">{formatMoney(mismatch.threshold, mismatch.currencyCode)} ({Math.round(mismatch.percent * 100)}%)</dd>
+        <dt className="font-medium text-slate-800">Over by</dt><dd className="text-right font-semibold tabular-nums text-amber-800">{formatMoney(mismatch.variance, mismatch.currencyCode)}</dd>
+      </dl>
+      <p className="mt-2 text-xs text-slate-500 lg:hidden">Match lines on desktop — the Checks tab there compares every line against the PO.</p>
+    </section>}
+
+    <section aria-labelledby="approval-supplier">
+      <h3 id="approval-supplier" className="text-xs font-semibold uppercase tracking-wide text-slate-500">From this supplier</h3>
+      {supplier
+        ? <dl className="mt-2 space-y-1 text-sm">
+          <div className="flex justify-between gap-3"><dt className="text-slate-600">Invoices</dt><dd className="tabular-nums text-slate-800">{supplier.documentCount}</dd></div>
+          <div className="flex justify-between gap-3"><dt className="text-slate-600">Last seen</dt><dd className="text-slate-800">{supplier.lastSeenAt ? relativeTime(supplier.lastSeenAt) : "—"}</dd></div>
+          <div className="flex justify-between gap-3"><dt className="text-slate-600">Terms</dt><dd className="text-slate-800">{supplier.terms ?? "Not set"}</dd></div>
+        </dl>
+        : <p className="mt-2 text-sm text-slate-500">No supplier record yet.</p>}
+      {duplicate && <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+        Possible duplicate of{" "}
+        <Link href={`/workspaces/${workspaceId}/invoices/${duplicate.documentId}${from ? `?from=${encodeURIComponent(from)}` : ""}`} className="font-medium underline underline-offset-2 hover:text-amber-950">
+          {duplicate.invoiceNumber ? `invoice ${duplicate.invoiceNumber}` : "another invoice"}
+        </Link>
+        {" "}({duplicate.state}).
+      </p>}
+    </section>
+  </div>
 }
 
 export function AuditLog({ events }: { events: DocumentHistory["auditEvents"] }) {

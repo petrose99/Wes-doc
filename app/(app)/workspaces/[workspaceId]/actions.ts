@@ -20,6 +20,8 @@ import { expandZipBuffer } from "@/lib/zip-ingestion"
 import { cancelDocument, deleteWorkspaceDocuments, DocumentCancellationBlockedError, getDocumentsStatus, getWorkspaceDocument, markDocumentsReviewed, requeueAdaptiveExtraction, requeueDocumentExtraction, updateDocumentField, updateDocumentReview, validateDocumentInput } from "@/models/documents"
 import { listDocumentAuditEvents, listDocumentStageDecisions } from "@/models/audit-events"
 import { getActiveWorkflowStageState } from "@/models/review-tasks"
+import { getApprovalDetailFacts } from "@/models/approvals"
+import type { WorkspaceRole } from "@/models/workspaces"
 import { overrideGate } from "@/lib/gates/actions"
 import { MATCH_VARIANCE_GATE_TYPE } from "@/lib/gates/match-variance"
 import { canOverrideMismatch, setMismatchApprovers } from "@/models/mismatch-approvers"
@@ -230,13 +232,17 @@ export async function reclassifyDocumentAction(workspaceId: string, documentId: 
  * never has to re-derive the read-only-hard-gate rule itself. */
 export async function getSelectionAuditPanelDataAction(workspaceId: string, documentId: string) {
   const user = await getCurrentUser()
-  if (!(await requireMember(workspaceId, user.id))) return null
-  const [auditEvents, stageDecisions, gates, stageState, escalations] = await Promise.all([
+  const membership = await requireMember(workspaceId, user.id)
+  if (!membership) return null
+  const [auditEvents, stageDecisions, gates, stageState, escalations, facts] = await Promise.all([
     listDocumentAuditEvents(workspaceId, documentId),
     listDocumentStageDecisions(workspaceId, documentId),
     listOpenGatesForDocument(workspaceId, documentId),
     getActiveWorkflowStageState(workspaceId, documentId),
     listOpenEscalationsForDocument(workspaceId, documentId),
+    // #257 S6/S7: who the approval waits on, the supplier's record, a near duplicate, the PO
+    // variance figures — for the Approval tab. Null-safe per field; never fails the whole load.
+    getApprovalDetailFacts(workspaceId, documentId, { userId: user.id, role: membership.role as WorkspaceRole }).catch(() => null),
   ])
   // #218: a stage only reads as "Pending" while its task is still open/in_review (stageState is
   // null once resolved or workflow-less) and it hasn't already produced a review_task_stage_decided
@@ -247,6 +253,7 @@ export async function getSelectionAuditPanelDataAction(workspaceId: string, docu
     ? stageState.stages.filter((stage) => stage.stageIndex >= stageState.currentStageIndex && !decidedIndexes.has(stage.stageIndex))
     : []
   return {
+    facts,
     auditEvents: auditEvents.map((event) => ({ id: event.id, label: event.label, createdAt: event.createdAt.toISOString(), actorName: event.actorName })),
     stageDecisions: stageDecisions.map((decision) => ({ ...decision, decidedAt: decision.decidedAt.toISOString() })),
     pendingStages: pendingStages.map((stage) => ({ stageIndex: stage.stageIndex, stageName: stage.name })),

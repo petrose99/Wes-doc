@@ -13,19 +13,22 @@ import { useRegisterDocumentActions } from "@/components/queue/document-actions-
 import { escalateCheckAction, setDocumentTypeAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
 import { InstitutionAssert } from "@/components/pipeline/document-detail/institution-assert"
 import { StatementDriftBanner } from "@/components/pipeline/document-detail/statement-drift-banner"
-import { ApprovalStepChain, AuditLog, ChecksTab, type DocumentHistory } from "@/components/queue/history-tabs"
+import { ApprovalTab, AuditLog, ChecksTab, type DocumentHistory } from "@/components/queue/history-tabs"
+import { usePhoneLane } from "@/lib/client/use-phone-lane"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { SourceViewer, type ProvenanceTarget, type SourceDocument } from "@/components/viewer/source-preview"
 import type { DocumentFieldDefinition } from "@/lib/document-templates"
 import type { Ref } from "@/lib/provenance"
 import type { FieldRationale } from "@/lib/rationale"
-import { Building2, CheckCircle2, ExternalLink, Loader2 } from "lucide-react"
+import { Building2, CheckCircle2, ChevronDown, ChevronUp, ExternalLink, Loader2 } from "lucide-react"
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react"
 import { toast } from "sonner"
 
 type Tab = "details" | "note" | "activity" | "approval" | "checks"
 type PanelLayout = "split" | "source-only" | "details-only"
 const LAYOUT_KEY = "pane-layout"
+/** #257 spec 3.5: whether the phone lane's source strip is expanded; remembered for the session. */
+const SOURCE_KEY = "dp.source"
 
 /** Shared label map for the four document-type states. Extracted so the chip in the top bar, the
  * inline "Type:" line, and the future stage indicator all read the same names — a mismatch here
@@ -102,11 +105,15 @@ export function SplitPane({
   // The layout choice persists for the session so moving ↑/↓ through a queue keeps the panels
   // where the operator put them; read after mount so server and first client render agree.
   const [layout, setLayout] = useState<PanelLayout>("split")
+  const [sourceShown, setSourceShown] = useState(true)
+  const phone = usePhoneLane()
   useEffect(() => {
     const saved = window.sessionStorage.getItem(LAYOUT_KEY)
     if (saved === "split" || saved === "source-only" || saved === "details-only") setLayout(saved)
+    if (window.sessionStorage.getItem(SOURCE_KEY) === "hidden") setSourceShown(false)
   }, [])
   const selectLayout = (value: PanelLayout) => { setLayout(value); window.sessionStorage.setItem(LAYOUT_KEY, value) }
+  const toggleSource = () => setSourceShown((prev) => { window.sessionStorage.setItem(SOURCE_KEY, prev ? "hidden" : "shown"); return !prev })
   const onLayoutKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     const order: PanelLayout[] = ["split", "details-only", "source-only"]
     const index = order.indexOf(layout)
@@ -162,12 +169,34 @@ export function SplitPane({
     }
   }
 
-  const tabButton = (value: Tab, label: string, count?: number) => <button type="button" key={value} role="tab" aria-selected={tab === value}
-    className={`flex items-center gap-1.5 whitespace-nowrap rounded-t-md border-b-2 px-3 py-2.5 text-sm font-medium transition-colors ${tab === value ? "border-emerald-700 text-emerald-800" : "border-transparent text-slate-600 hover:text-slate-900"}`}
+  // A real tablist for the keyboard: the selected tab is the one tab stop, ←/→ (and Home/End)
+  // move and select, each tab names its panel. Below `lg` (#257 spec 3.5) the order puts the
+  // decision first — Approval · Details · Checks · Audit · Note — since the phone lane exists to
+  // decide; desktop keeps Details first.
+  const tabId = (value: Tab) => `${source.documentId}-tab-${value}`
+  const panelId = (value: Tab) => `${source.documentId}-panel-${value}`
+  const tabButton = (value: Tab, label: string, count?: number) => <button type="button" key={value} role="tab" id={tabId(value)} aria-controls={panelId(value)}
+    aria-selected={tab === value} tabIndex={tab === value ? 0 : -1}
+    className={`flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded-t-md border-b-2 px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-600 lg:min-h-0 ${tab === value ? "border-emerald-700 text-emerald-800" : "border-transparent text-slate-600 hover:text-slate-900"}`}
     onClick={() => setTab(value)}>
     {label}
     {!!count && <span className="rounded-full bg-amber-100 px-1.5 py-px text-xs font-semibold tabular-nums text-amber-800">{count}</span>}
   </button>
+  const panelProps = (value: Tab) => ({ id: panelId(value), role: "tabpanel", "aria-labelledby": tabId(value), tabIndex: -1 as const })
+  const onTabKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    const tabs = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]'))
+    const index = tabs.indexOf(document.activeElement as HTMLButtonElement)
+    if (index < 0) return
+    let next: number | null = null
+    if (event.key === "ArrowRight") next = (index + 1) % tabs.length
+    else if (event.key === "ArrowLeft") next = (index - 1 + tabs.length) % tabs.length
+    else if (event.key === "Home") next = 0
+    else if (event.key === "End") next = tabs.length - 1
+    if (next === null) return
+    event.preventDefault()
+    tabs[next].focus()
+    tabs[next].click()
+  }
 
   const layoutOption = (value: PanelLayout, label: string) => <button type="button" key={value} role="radio" aria-checked={layout === value} tabIndex={layout === value ? 0 : -1}
     onClick={() => selectLayout(value)}
@@ -208,40 +237,57 @@ export function SplitPane({
       {/* Source panel. The strip at its top is where the file lives now — filename, Open file, and
           the layout control — and it stays rendered in Details layout (the panel collapses to the
           strip) so the way back to Split is always in view. */}
-      <div className={`flex min-h-0 flex-col overflow-hidden border-slate-200 motion-safe:transition-[flex-basis] motion-safe:duration-200 ${layout === "details-only" ? "shrink-0 border-b lg:basis-auto lg:border-b-0 lg:border-r" : "h-[38vh] shrink-0 border-b lg:h-auto lg:shrink lg:border-b-0 lg:border-r"} ${layout === "source-only" ? "flex-1" : layout === "split" ? "lg:basis-[52%]" : ""}`}>
+      <div className={`flex min-h-0 flex-col overflow-hidden border-slate-200 motion-safe:transition-[flex-basis] motion-safe:duration-200 ${layout === "details-only" ? "shrink-0 border-b lg:basis-auto lg:border-b-0 lg:border-r" : `${sourceShown ? "h-[38vh]" : "h-auto"} shrink-0 border-b lg:h-auto lg:shrink lg:border-b-0 lg:border-r`} ${layout === "source-only" ? "flex-1" : layout === "split" ? "lg:basis-[52%]" : ""}`}>
         <div className="flex h-9 shrink-0 items-center gap-2 border-b border-slate-100 px-3 text-[13px]">
           <span className="min-w-0 flex-1 truncate font-medium text-slate-700" title={header.filename}>{header.filename}</span>
           <a href={fileHref} target="_blank" rel="noopener noreferrer" title="Open the source file in a new tab"
             className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600">
             <ExternalLink className="h-3.5 w-3.5" aria-hidden />Open file
           </a>
+          {/* #257 spec 3.5: on the phone the source is a strip the approver can expand when the
+              decision needs a look at the page — collapsed, the tabs get the height. */}
+          {layout !== "details-only" && <button type="button" onClick={toggleSource} aria-expanded={sourceShown} aria-controls={`${source.documentId}-source`}
+            className="inline-flex h-9 shrink-0 items-center gap-1 rounded-md px-2 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 lg:hidden">
+            {sourceShown ? <ChevronUp className="h-3.5 w-3.5" aria-hidden /> : <ChevronDown className="h-3.5 w-3.5" aria-hidden />}
+            {sourceShown ? "Hide source" : "Show source"}
+          </button>}
           <div role="radiogroup" aria-label="Pane layout" onKeyDown={onLayoutKeyDown} className="hidden shrink-0 items-center gap-0.5 rounded-md bg-slate-100 p-0.5 lg:flex">
             {layoutOption("split", "Split")}
             {layoutOption("details-only", "Details")}
             {layoutOption("source-only", "Source")}
           </div>
         </div>
-        {layout !== "details-only" && <SourceViewer source={source} target={target} />}
+        {layout !== "details-only" && <div id={`${source.documentId}-source`} className={sourceShown ? "contents" : "hidden lg:contents"}><SourceViewer source={source} target={target} /></div>}
       </div>
 
       {/* Details panel */}
       {layout !== "source-only" && <div className={`flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden motion-safe:transition-[flex-basis] motion-safe:duration-200 ${layout === "split" ? "lg:flex-none lg:basis-[48%]" : ""}`}>
         <div className="flex items-center shadow-[inset_0_-1px_0_0_theme(colors.slate.100)]">
-          <div className="flex gap-0.5 overflow-x-auto px-3 pt-1" role="tablist" aria-label="Document detail">
-            {tabButton("details", "Details")}
-            {tabButton("note", "Note")}
-            {history
+          <div className="flex gap-0.5 overflow-x-auto px-3 pt-1" role="tablist" aria-label="Document detail" onKeyDown={onTabKeyDown}>
+            {history && phone
               ? <>
                 {tabButton("approval", "Approval")}
-                {tabButton("activity", "Audit")}
+                {tabButton("details", "Details")}
                 {tabButton("checks", "Checks", history.gates.length)}
+                {tabButton("activity", "Audit")}
+                {tabButton("note", "Note")}
               </>
-              : tabButton("activity", "Activity")}
+              : <>
+                {tabButton("details", "Details")}
+                {tabButton("note", "Note")}
+                {history
+                  ? <>
+                    {tabButton("approval", "Approval")}
+                    {tabButton("activity", "Audit")}
+                    {tabButton("checks", "Checks", history.gates.length)}
+                  </>
+                  : tabButton("activity", "Activity")}
+              </>}
           </div>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
-          {tab === "details" && <div className={`mx-auto space-y-4 p-4 ${layout === "details-only" ? "max-w-2xl" : ""}`}>
+          {tab === "details" && <div {...panelProps("details")} className={`mx-auto space-y-4 p-4 ${layout === "details-only" ? "max-w-2xl" : ""}`}>
             {/* Document type confirmation — compact inline when confirmed, prominent when not */}
             {docType ? (
               <div className="flex items-center gap-2 text-sm">
@@ -317,7 +363,7 @@ export function SplitPane({
             {!header.reviewLink && <CreateReviewTaskButton workspaceId={workspaceId} documentId={header.documentId} />}
           </div>}
 
-          {tab === "note" && <div className={`mx-auto space-y-3 p-6 ${layout === "details-only" ? "max-w-2xl" : ""}`}>
+          {tab === "note" && <div {...panelProps("note")} className={`mx-auto space-y-3 p-6 ${layout === "details-only" ? "max-w-2xl" : ""}`}>
             <textarea className="min-h-48 w-full rounded-lg border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm transition-colors focus:border-emerald-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100" placeholder="A note only your team sees — not sent anywhere, not part of the extracted data."
               value={note} onChange={(event) => setNote(event.target.value)} />
             <button type="button" disabled={savingNote} className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-800 disabled:opacity-40" onClick={() => void saveNote()}>
@@ -325,15 +371,15 @@ export function SplitPane({
             </button>
           </div>}
 
-          {tab === "activity" && <div className={`mx-auto p-6 ${layout === "details-only" ? "max-w-2xl" : ""}`}>
+          {tab === "activity" && <div {...panelProps("activity")} className={`mx-auto p-6 ${layout === "details-only" ? "max-w-2xl" : ""}`}>
             <AuditLog events={history?.auditEvents ?? auditEvents} />
           </div>}
 
-          {tab === "approval" && history && <div className={`mx-auto p-6 ${layout === "details-only" ? "max-w-2xl" : ""}`}>
-            <ApprovalStepChain decisions={history.stageDecisions} pendingStages={history.pendingStages} />
+          {tab === "approval" && history && <div {...panelProps("approval")} className={`mx-auto p-4 lg:p-6 ${layout === "details-only" ? "max-w-2xl" : ""}`}>
+            <ApprovalTab workspaceId={workspaceId} history={history} />
           </div>}
 
-          {tab === "checks" && history && <div className={`mx-auto p-6 ${layout === "details-only" ? "max-w-2xl" : ""}`}>
+          {tab === "checks" && history && <div {...panelProps("checks")} className={`mx-auto p-6 ${layout === "details-only" ? "max-w-2xl" : ""}`}>
             <ChecksTab workspaceId={workspaceId} gates={history.gates} escalations={history.escalations} />
           </div>}
         </div>

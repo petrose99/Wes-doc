@@ -201,7 +201,7 @@ export async function listDocumentStageDecisions(workspaceId: string, documentId
   const events = await prisma.documentAuditEvent.findMany({
     where: { workspaceId, documentId, type: "review_task_stage_decided" },
     orderBy: { createdAt: "asc" },
-    select: { id: true, createdAt: true, detail: true, actor: { select: { name: true, email: true } } },
+    select: { id: true, createdAt: true, detail: true, actor: { select: { name: true, email: true, avatar: true } } },
   })
   return events.map((event) => {
     const detail = event.detail as { stageIndex: number; stageName: string; decision: "approve" | "reject"; note?: string } | null
@@ -213,6 +213,7 @@ export async function listDocumentStageDecisions(workspaceId: string, documentId
       decision: detail.decision,
       note: detail.note ?? null,
       actorName: event.actor?.name || event.actor?.email || "Unknown",
+      actorAvatar: event.actor?.avatar ?? null,
       decidedAt: event.createdAt,
     }
   }).filter((decision): decision is NonNullable<typeof decision> => decision !== null)
