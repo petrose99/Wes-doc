@@ -10,6 +10,10 @@ const nextConfig: NextConfig = {
   // different cause (the terminal tool's cwd, not Turbopack) — but Next's own docs are explicit
   // that an ambiguous root changes what gets resolved, so pinning it is worth doing regardless.
   turbopack: { root: import.meta.dirname },
+  // Dev-only: bounds Turbopack's native (Rust) memory, which a V8 heap cap cannot see. Unbounded,
+  // `next dev` on this repo grows to 4–5 GB RSS on an 8 GB box; the autopilot runs a dev server,
+  // a headless browser and a Claude session side by side. Ignored by `next build`/`next start`.
+  experimental: { turbopackMemoryLimit: 3 * 1024 * 1024 * 1024 },
   // Dev-only: lets HMR/dev-overlay requests through when the dev server is viewed via a tunnel
   // hostname rather than localhost. Comma-separated; ignored by `next start`.
   allowedDevOrigins: (process.env.DEV_ALLOWED_ORIGINS ?? "").split(",").map((s) => s.trim()).filter(Boolean),
