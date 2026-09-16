@@ -197,7 +197,7 @@ confirm once) until the bar above is met, and record the after-counts.
 - Findings with a real decision behind them become a Wayfinder ticket named
   on the close, with the score they cost. A finding without a decision is
   fixed, never parked.
-- **A session is one context (the driver caps it at 250K tokens and 3h30);
+- **A session is one context (the driver caps it at 150K tokens and 3h30);
   a ticket is not.** The whole ticket ships — every screen, state and check
   it names — over as many sessions as it takes. Never narrow the scope,
   defer part of it, or split it to fit a session; split only at a real

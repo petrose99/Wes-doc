@@ -234,7 +234,7 @@ while [ "$n" -lt "$MAX" ]; do
   # post a partial hand-off so the driver retries with a fresh context, tear
   # the session down.
   MAX_S="${WAYFINDER_SESSION_MAX_SECONDS:-12600}"
-  MAX_CTX="${WAYFINDER_SESSION_MAX_TOKENS:-${SESSION_MAX_TOKENS:-250000}}"   # baseline ~42K; grilling peaks 125–200K; builds must split
+  MAX_CTX="${WAYFINDER_SESSION_MAX_TOKENS:-${SESSION_MAX_TOKENS:-150000}}"   # baseline ~42K; grillings finish under this; a build hands off at a milestone and continues — every turn past here pays for context it barely uses
   CAPPED=""
   context_tokens() {
     python3 - "$1" 2>/dev/null <<'PY'
