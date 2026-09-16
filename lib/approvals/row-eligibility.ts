@@ -16,6 +16,8 @@ export type ApprovalEligibility =
   | { status: "no_approver" }
 
 export const NO_APPROVER_REASON = "Needs attention · no approver"
+/** Same sentence models/review-tasks.ts sends back for `payment_status_required` (B3, one term). */
+export const PAYMENT_UNCONFIRMED_REASON = "Confirm whether this has been paid before approving it."
 
 export function computeApprovalEligibility(input: {
   /** A DocumentCheckResult escalation (CONTEXT.md's "Check") is still open on this invoice. */
@@ -26,10 +28,15 @@ export function computeApprovalEligibility(input: {
   /** Whether at least one workspace member could still decide the stage, per
    * `stageHasEligibleApprover` below. */
   approverStillValid: boolean
+  /** models/review-tasks.ts's payment gate would refuse the decision: payment confirmation is
+   * required for this doc type, none is recorded, and no ledger push will fill it in. Shown as
+   * a reason instead of letting Approve fail after the tap (#257 close, evaluate H1/H5). */
+  paymentUnconfirmed?: boolean
 }): ApprovalEligibility {
   if (!input.approverStillValid) return { status: "no_approver" }
   if (input.hasBlockedHardGate) return { status: "not_eligible", reason: "A hard check failed on this invoice." }
   if (input.hasOpenException) return { status: "not_eligible", reason: "An exception is open on this invoice." }
+  if (input.paymentUnconfirmed) return { status: "not_eligible", reason: PAYMENT_UNCONFIRMED_REASON }
   return { status: "ready" }
 }
 

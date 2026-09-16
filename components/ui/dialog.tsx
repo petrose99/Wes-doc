@@ -81,8 +81,9 @@ export function Dialog({ open, title, description, width = "max-w-md", onClose, 
       window.cancelAnimationFrame(raf)
       window.removeEventListener("keydown", onKey)
       document.body.style.overflow = previousOverflow
-      // Return focus to the element that opened the dialog (if it is still around).
-      if (openerRef.current instanceof HTMLElement) openerRef.current.focus()
+      // Return focus to the element that opened the dialog — only if it is still in the document
+      // (a decision replaces the Approve/Reject bar with the result strip, which takes focus itself).
+      if (openerRef.current instanceof HTMLElement && openerRef.current.isConnected) openerRef.current.focus()
     }
   }, [open, initialFocus])
 

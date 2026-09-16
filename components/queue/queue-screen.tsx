@@ -36,8 +36,8 @@ export type PaneHelpers = { close: () => void; refresh: () => void; next: (() =>
 /** Tailwind needs the literal class strings in source — a `${below}:hidden` template would never
  * be generated — so the two breakpoints the card mode supports each carry their own set. */
 const BELOW = {
-  md: { hideBelow: "hidden md:contents", hideBelowInline: "hidden md:inline-flex", hideAbove: "md:hidden", showBelowOnly: "md:hidden", table: "hidden md:table", titleAbove: "hidden md:inline" },
-  lg: { hideBelow: "hidden lg:contents", hideBelowInline: "hidden lg:inline-flex", hideAbove: "lg:hidden", showBelowOnly: "lg:hidden", table: "hidden lg:table", titleAbove: "hidden lg:inline" },
+  md: { hideBelow: "hidden md:contents", hideBelowInline: "hidden md:inline-flex", hideAbove: "md:hidden", h1: "text-xl md:text-lg", showBelowOnly: "md:hidden", table: "hidden md:table", titleAbove: "hidden md:inline" },
+  lg: { hideBelow: "hidden lg:contents", hideBelowInline: "hidden lg:inline-flex", hideAbove: "lg:hidden", h1: "text-xl lg:text-lg", showBelowOnly: "lg:hidden", table: "hidden lg:table", titleAbove: "hidden lg:inline" },
 } as const
 
 /** The Queue screen (#225; CONTEXT.md "Queue screen"): the shared composition every typed
@@ -331,7 +331,7 @@ function QueueScreenInner<T>({
     {!cards && band}
     {/* Row 1: title · Views · Sort · filters · stat · menu */}
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-slate-200 px-4 py-2">
-      <h1 className="flex items-baseline gap-2 text-lg font-semibold tracking-tight text-slate-900">
+      <h1 className={`flex items-baseline gap-2 ${below ? below.h1 : "text-lg"} font-semibold tracking-tight text-slate-900`}>
         {below && cards?.title ? <><span className={below.hideAbove}>{cards.title}</span><span className={below.titleAbove}>{title}</span></> : title}
         <span className="text-sm font-normal tabular-nums text-slate-500" aria-live="polite" aria-label={`${sortedRows.length} rows`}>{sortedRows.length}</span>
       </h1>

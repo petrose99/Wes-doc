@@ -99,7 +99,9 @@ export function PaneFrame({ mode, name, status, position, onClose, onPrev, onNex
             : <Link href={backHref ?? "#"} aria-label="Back to queue" title="Back to queue" className={iconButton}><ArrowLeft className="h-5 w-5" aria-hidden /></Link>}
           <h2 id={titleId} ref={headingRef} tabIndex={-1} className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-900 outline-none" title={[name.title, name.suffix].filter(Boolean).join("  ")}>
             {name.title}
-            {name.suffix && <span className="font-normal text-slate-500">{"  "}{name.suffix}</span>}
+            {/* Below lg the header is 36px and the row's card already showed number · amount: the
+                suffix would only ever be truncated away, so it renders from lg up (title keeps it). */}
+            {name.suffix && <span className="hidden font-normal text-slate-500 lg:inline">{"  "}{name.suffix}</span>}
           </h2>
           {isPane && position && <span className="shrink-0 px-1 text-xs tabular-nums text-slate-500" aria-live="polite">{position.index} of {position.total}</span>}
           {isPane && <div className="flex shrink-0 items-center" role="group" aria-label="Move selection">

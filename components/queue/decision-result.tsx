@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 
 /** #257 spec 3.6/3.7: the one offline sentence and the one network-error sentence, shared by
@@ -21,11 +22,15 @@ export function DecisionResultStrip<T>({ decided, next, onBack }: {
   next: (() => void) | null
   onBack: () => void
 }) {
+  // The Approve/Reject button that had focus is gone once the strip replaces the bar; without
+  // this, focus falls to <body> and a keyboard/SR user loses their place (round-2 probe).
+  const statusRef = useRef<HTMLParagraphElement>(null)
+  useEffect(() => { statusRef.current?.focus() }, [])
   const line = decided.outcome === "approved" ? "Approved · just now"
     : decided.outcome === "rejected" ? "Rejected · just now"
     : decided.message ?? "This stage is no longer yours to decide."
   return <>
-    <p role="status" className={`w-full text-[13px] font-medium sm:mr-auto sm:w-auto ${decided.outcome === "refused" ? "text-amber-900" : "text-emerald-800"}`}>{line}</p>
+    <p ref={statusRef} tabIndex={-1} role="status" className={`w-full outline-none text-[13px] font-medium sm:mr-auto sm:w-auto ${decided.outcome === "refused" ? "text-amber-900" : "text-emerald-800"}`}>{line}</p>
     <Button type="button" size="sm" variant="outline" onClick={onBack}>Back to list</Button>
     <Button type="button" size="sm" disabled={!next} title={next ? undefined : "Nothing else waiting on you"} onClick={() => next?.()}>Next to approve</Button>
     {!next && <span className="w-full text-[13px] text-slate-600 sm:w-auto">Nothing else waiting on you</span>}

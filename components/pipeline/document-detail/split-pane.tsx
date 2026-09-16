@@ -177,6 +177,7 @@ export function SplitPane({
   const panelId = (value: Tab) => `${source.documentId}-panel-${value}`
   const tabButton = (value: Tab, label: string, count?: number) => <button type="button" key={value} role="tab" id={tabId(value)} aria-controls={panelId(value)}
     aria-selected={tab === value} tabIndex={tab === value ? 0 : -1}
+    aria-label={count ? `${label}, ${count} open` : undefined}
     className={`flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded-t-md border-b-2 px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-600 lg:min-h-0 ${tab === value ? "border-emerald-700 text-emerald-800" : "border-transparent text-slate-600 hover:text-slate-900"}`}
     onClick={() => setTab(value)}>
     {label}
@@ -238,8 +239,8 @@ export function SplitPane({
           the layout control — and it stays rendered in Details layout (the panel collapses to the
           strip) so the way back to Split is always in view. */}
       <div className={`flex min-h-0 flex-col overflow-hidden border-slate-200 motion-safe:transition-[flex-basis] motion-safe:duration-200 ${layout === "details-only" ? "shrink-0 border-b lg:basis-auto lg:border-b-0 lg:border-r" : `${sourceShown ? "h-[38vh]" : "h-auto"} shrink-0 border-b lg:h-auto lg:shrink lg:border-b-0 lg:border-r`} ${layout === "source-only" ? "flex-1" : layout === "split" ? "lg:basis-[52%]" : ""}`}>
-        <div className="flex h-9 shrink-0 items-center gap-2 border-b border-slate-100 px-3 text-[13px]">
-          <span className="min-w-0 flex-1 truncate font-medium text-slate-700" title={header.filename}>{header.filename}</span>
+        <div className="flex min-h-9 shrink-0 items-center gap-2 border-b border-slate-100 px-3 py-1 text-[13px]">
+          <span className="min-w-0 flex-1 break-all font-medium leading-snug text-slate-700">{header.filename}</span>
           <a href={fileHref} target="_blank" rel="noopener noreferrer" title="Open the source file in a new tab"
             className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600">
             <ExternalLink className="h-3.5 w-3.5" aria-hidden />Open file

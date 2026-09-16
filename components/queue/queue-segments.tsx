@@ -35,7 +35,7 @@ export function QueueSegments({ segments, active, label = "Approval queues" }: {
         ref={(el) => { if (el) refs.current.set(segment.key, el); else refs.current.delete(segment.key) }}
         role="tab" aria-selected={selected} tabIndex={selected ? 0 : -1}
         onKeyDown={(event) => onKeyDown(event, index)}
-        className={`flex h-10 flex-1 items-center justify-center rounded-md px-2 text-sm font-medium tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-1 ${selected ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-800"}`}>
+        className={`flex h-10 flex-1 items-center justify-center rounded-md px-2 py-2 text-sm font-medium tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-1 ${selected ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-800"}`}>
         {segment.label} ({segment.count})
       </Link>
     })}

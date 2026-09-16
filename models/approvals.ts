@@ -8,6 +8,7 @@ import { DUPLICATE_GATE_TYPE } from "@/lib/gates/duplicate"
 import { MATCH_VARIANCE_GATE_TYPE } from "@/lib/gates/match-variance"
 import { resolveSupplier } from "@/lib/suppliers/alias"
 import type { WorkspaceRole } from "@/models/workspaces"
+import { isPaymentConfirmationRequired } from "@/lib/doc-types"
 
 /** #236 (Wayfinder map #177): the Approvals destination's two queues — Invoices (every submitted
  * Approval) and PO Mismatches (the slice of those with an open match-variance gate) — both read
@@ -103,6 +104,8 @@ type SubmittedApprovalsContext = {
   tasks: SubmittedApprovalTask[]
   openGatesByDocument: Map<string, OpenGateSummary[]>
   openExceptionDocIds: Set<string>
+  /** Documents whose Approve the payment gate would refuse right now (see row-eligibility). */
+  paymentUnconfirmedDocIds: Set<string>
   memberIds: Set<string>
   hasOwnerMember: boolean
 }
@@ -117,7 +120,7 @@ async function loadSubmittedApprovals(workspaceId: string): Promise<SubmittedApp
     select: {
       id: true, documentId: true, currentStageIndex: true, updatedAt: true,
       workflow: { select: { stages: { orderBy: { stageIndex: "asc" } } } },
-      document: { select: { id: true, filename: true, reviewedData: true, cancelledAt: true, template: { select: { code: true } } } },
+      document: { select: { id: true, filename: true, reviewedData: true, cancelledAt: true, docType: true, paymentStatus: true, template: { select: { code: true } } } },
     },
     orderBy: { updatedAt: "asc" },
   })
@@ -133,9 +136,12 @@ async function loadSubmittedApprovals(workspaceId: string): Promise<SubmittedApp
     }))
 
   const documentIds = tasks.map((task) => task.documentId)
-  if (!documentIds.length) return { tasks: [], openGatesByDocument: new Map(), openExceptionDocIds: new Set(), memberIds: new Set(), hasOwnerMember: false }
+  if (!documentIds.length) return { tasks: [], openGatesByDocument: new Map(), openExceptionDocIds: new Set(), paymentUnconfirmedDocIds: new Set(), memberIds: new Set(), hasOwnerMember: false }
+  // Mirrors partitionByPaymentGate (models/review-tasks.ts): unconfirmed payment on a doc type
+  // that requires it, unless a ledger push is pending/succeeded and will fill it in.
+  const paymentCandidates = rows.filter((row) => documentIds.includes(row.documentId) && !row.document.paymentStatus && isPaymentConfirmationRequired(row.document)).map((row) => row.documentId)
 
-  const [openGatesByDocument, openEscalations, members] = await Promise.all([
+  const [openGatesByDocument, openEscalations, members, pushed] = await Promise.all([
     listOpenGatesForDocuments(workspaceId, documentIds),
     // Same open-escalation shape as models/exceptions.ts / models/bills.ts: a null
     // escalationStatus predates the #210 migration and counts as open.
@@ -144,11 +150,16 @@ async function loadSubmittedApprovals(workspaceId: string): Promise<SubmittedApp
       select: { documentId: true },
     }),
     prisma.workspaceMember.findMany({ where: { workspaceId }, select: { userId: true, role: true } }),
+    paymentCandidates.length
+      ? prisma.integrationPush.findMany({ where: { workspaceId, documentId: { in: paymentCandidates }, status: { in: ["pending", "succeeded"] } }, select: { documentId: true } })
+      : Promise.resolve([] as { documentId: string }[]),
   ])
+  const pushedDocIds = new Set(pushed.map((row) => row.documentId))
   return {
     tasks,
     openGatesByDocument,
     openExceptionDocIds: new Set(openEscalations.map((row) => row.documentId)),
+    paymentUnconfirmedDocIds: new Set(paymentCandidates.filter((id) => !pushedDocIds.has(id))),
     memberIds: new Set(members.map((member) => member.userId)),
     hasOwnerMember: members.some((member) => member.role === "owner"),
   }
@@ -167,6 +178,7 @@ function deriveRowFacts(task: SubmittedApprovalTask, actor: ApprovalActor, ctx: 
     hasOpenException: ctx.openExceptionDocIds.has(task.documentId),
     hasBlockedHardGate: gates.some((gate) => gate.severity === "hard"),
     approverStillValid,
+    paymentUnconfirmed: ctx.paymentUnconfirmedDocIds.has(task.documentId),
   })
   return { stage, canDecide, eligibility, gates }
 }

@@ -190,7 +190,14 @@ export function PoMismatchQueue({ workspaceId, basePath, rows, invoiceCount, ini
 /** #257 spec 3.3: the phone/tablet card row for PO mismatches. */
 function MismatchCard({ row, onOpen }: { row: PoMismatchRow; onOpen: () => void }) {
   const notEligible = row.eligibility.status !== "ready"
-  return <a href={`#${row.documentId}`} onClick={(event) => { event.preventDefault(); onOpen() }}
+  // Screen-reader name with separators: the visual spans concatenate without spaces otherwise.
+  const name = [
+    row.supplier ?? "Unknown supplier",
+    row.poNumber ?? "No PO #",
+    `Variance ${formatMoney(row.variance, row.currencyCode)} (${variancePercent(row).toFixed(1)}%)`,
+    notEligible ? eligibilityText(row) : stageLabel(row.stage),
+  ].join(", ")
+  return <a href={`#${row.documentId}`} onClick={(event) => { event.preventDefault(); onOpen() }} aria-label={name}
     className="flex min-h-16 items-start gap-3 px-4 py-3 hover:bg-slate-50 active:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-inset">
     <ProcessingStateGlyph state={processingState({ approvalStatus: "in_progress", blockedByCheck: notEligible, escalated: false, touchless: false, status: "needs_review" })} />
     <span className="min-w-0 flex-1">
@@ -201,7 +208,7 @@ function MismatchCard({ row, onOpen }: { row: PoMismatchRow; onOpen: () => void 
       <span className="mt-0.5 block text-[13px] text-slate-600">{row.poNumber ?? "No PO #"} · Variance {formatMoney(row.variance, row.currencyCode)} ({variancePercent(row).toFixed(1)}%)</span>
       <span className="mt-0.5 block text-[13px]">
         {notEligible
-          ? <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[12px] font-medium text-amber-900">{eligibilityText(row)}</span>
+          ? <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-[12px] font-medium leading-4 text-amber-900">{eligibilityText(row)}</span>
           : <span className="text-slate-700">{stageLabel(row.stage)}</span>}
       </span>
     </span>
