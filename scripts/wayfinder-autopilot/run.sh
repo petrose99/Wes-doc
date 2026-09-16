@@ -166,7 +166,10 @@ while [ "$n" -lt "$MAX" ]; do
   # dev server, headless Chromium, node workers, subagents — can be torn down
   # together when the ticket is done, and the next session starts clean.
   # The brief is generic; the session learns the two lessons paths from this line.
-  ( cd "$ROOT" && setsid claude -p "/wayfinder $MAP $T" \
+  # NODE_OPTIONS caps every node process the session starts (next dev grows to
+  # ~4 GB unbounded on this repo; 3 GB is ample and keeps the box out of swap).
+  ( cd "$ROOT" && NODE_OPTIONS="${WAYFINDER_NODE_OPTIONS:---max-old-space-size=3072}" \
+    setsid claude -p "/wayfinder $MAP $T" \
       --append-system-prompt-file "$BRIEF" \
       ${MODEL:+--model "$MODEL"} \
       --append-system-prompt "Lessons files for this run — generic (every project): $GENERIC_LESSONS · project-specific (this repo): $PROJECT_LESSONS. Reports go to $OUT/<ticket>.md." \
