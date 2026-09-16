@@ -33,8 +33,12 @@ export async function resolveOwnerRecipients(workspaceId: string): Promise<strin
 }
 
 async function sendReviewTaskReminders(now: Date) {
+  // #271: a workflow-attached task (workflowId set) is reminded by
+  // models/approval-notices.ts's sendApprovalNotices nudges instead, which reminds the *current
+  // stage's* approvers rather than the assignee/owner fallback below — excluded here so it is
+  // never reminded twice.
   const candidates = await unscoped(() => prisma.reviewTask.findMany({
-    where: { status: { in: ["open", "in_review"] } },
+    where: { status: { in: ["open", "in_review"] }, workflowId: null },
     select: {
       id: true, workspaceId: true, createdAt: true, lastReminderAt: true,
       document: { select: { filename: true } },

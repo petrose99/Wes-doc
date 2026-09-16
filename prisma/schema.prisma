@@ -35,6 +35,11 @@ model User {
   /// admin, silently revoke plan-limit exemption from every workspace they own.
   suspendedAt                       DateTime?                   @map("suspended_at")
   emailVerified                     Boolean                     @default(false) @map("is_email_verified")
+  /// #271 "Approval emails" switch: whether this user gets an Approval notice email when a stage
+  /// reaches them, is nudged, or is sent back for review. Off never suppresses the in-app signal
+  /// (the Approvals badge, #232) — only the email. Default on, since the destination this ticket
+  /// builds is "reachable by mail", not "opted into mail".
+  approvalNoticeEmails              Boolean                     @default(true) @map("approval_notice_emails")
   createdAt                         DateTime                    @default(now()) @map("created_at")
   updatedAt                         DateTime                    @updatedAt @map("updated_at")
   workspaceMemberships              WorkspaceMember[]
@@ -91,6 +96,7 @@ model User {
   lockedCloses                      Close[]                     @relation("CloseLocker")
   reopenedCloses                    Close[]                     @relation("CloseReopener")
   signedCloseItems                  CloseItem[]                 @relation("CloseItemSigner")
+  approvalNotices                   ApprovalNotice[]
 
   @@map("users")
 }
@@ -252,13 +258,18 @@ model Workspace {
 }
 
 model WorkspaceMember {
-  id          String    @id @default(uuid()) @db.Uuid
-  workspaceId String    @map("workspace_id") @db.Uuid
-  userId      String    @map("user_id") @db.Uuid
-  role        String    @default("member")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id               String    @id @default(uuid()) @db.Uuid
+  workspaceId      String    @map("workspace_id") @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  role             String    @default("member")
+  /// #271: the per-person, per-workspace hourly floor on Approval notice emails — the last time
+  /// one was sent to this member in this workspace, from any candidate task. Not stamped by a
+  /// send-back notice (models/approval-notices.ts): that is a reply to one decision, not subject
+  /// to the floor that exists to stop per-invoice fan-out to approvers.
+  noticeLastSentAt DateTime? @map("notice_last_sent_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([workspaceId, userId])
   @@index([userId])
@@ -1606,6 +1617,13 @@ model ReviewTask {
   /// Dext-parity Phase 3 WP3.4: when a reminder email was last sent for this task, so
   /// lib/reminders.ts never re-sends inside its repeat window. Null until the first one goes out.
   lastReminderAt    DateTime?         @map("last_reminder_at")
+  /// #271: when the task entered its *current* stage — set on creation at stage 0
+  /// (createReviewTask), on every stage advance (decideReviewTaskStage), and on a send-back
+  /// restart (sendReviewTaskBackForReview, which clears the workflow but a later re-start begins
+  /// a fresh stageReachedAt at stage 0 again). This is the Approval-notice sender's "pending
+  /// since" clock and the nudge-cap key — a restart of the same stage index after a send-back
+  /// must count as new again, so the key is this timestamp, never the bare stage index.
+  stageReachedAt    DateTime?         @map("stage_reached_at")
   createdAt         DateTime          @default(now()) @map("created_at")
   updatedAt         DateTime          @updatedAt @map("updated_at")
   resolvedAt        DateTime?         @map("resolved_at")
@@ -1614,12 +1632,36 @@ model ReviewTask {
   assignee          User?             @relation("ReviewTaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
   createdBy         User?             @relation("ReviewTaskCreator", fields: [createdById], references: [id], onDelete: SetNull)
   workflow          ApprovalWorkflow? @relation(fields: [workflowId], references: [id], onDelete: SetNull)
+  approvalNotices   ApprovalNotice[]
 
   @@index([workspaceId, status, createdAt])
   @@index([workspaceId, assigneeId, status])
   @@index([documentId])
   @@index([workflowId])
   @@map("review_tasks")
+}
+
+/// #271: one row per (task, person, kind) email actually sent — the Approval-notice sender's own
+/// record of what it has already told whom, independent of ReviewTask.lastReminderAt (which this
+/// replaces as the reminder clock for Approvals; the expense-claim sweep keeps using its own
+/// column, #272). `stageReachedAt` is copied from the task at send time so a restart of the same
+/// stage index (new stageReachedAt) is a fresh "reached" and a fresh nudge-cap window.
+model ApprovalNotice {
+  id             String     @id @default(uuid()) @db.Uuid
+  reviewTaskId   String     @map("review_task_id") @db.Uuid
+  userId         String     @map("user_id") @db.Uuid
+  workspaceId    String     @map("workspace_id") @db.Uuid
+  /// "reached" | "nudge" | "sent_back"
+  kind           String
+  sentAt         DateTime   @default(now()) @map("sent_at")
+  stageIndex     Int        @map("stage_index")
+  stageReachedAt DateTime   @map("stage_reached_at")
+  reviewTask     ReviewTask @relation(fields: [reviewTaskId], references: [id], onDelete: Cascade)
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([reviewTaskId, userId, stageReachedAt])
+  @@index([workspaceId])
+  @@map("approval_notices")
 }
 
 /// Data Health Phase A: one open (or since-decided) finding produced by a lib/health/checks/*

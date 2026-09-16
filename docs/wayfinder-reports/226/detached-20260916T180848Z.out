@@ -123,3 +123,23 @@
 === [23/50] #268 — Build the Origin link: one strip and a from= URL for every cross-surface hop  [sonnet · low · phase: measure]
     #268 context at exit: 122662 tokens, 12 min
     cleaned up session pid 1924365 (pgid ?); free: 6306 MB
+    scoreboard: 81 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #268: phase measure done → close next in 756s
+=== [24/50] #268 — Build the Origin link: one strip and a from= URL for every cross-surface hop  [sonnet · low · phase: close]
+    #268 context at exit: 103434 tokens, 14 min
+    cleaned up session pid 1940711 (pgid ?); free: 6303 MB
+    scoreboard: 82 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #268: resolved in 875s
+=== [25/50] #271 — Build the Approval notice: coalesced email when an Approval reaches its Approver, re-pointed reminders, per-user switch  [opus[1m] · low · phase: spec]
+    #271 crossed the hand-off line (164702 tokens ≥ 150000) — asked to hand off; hard stop at 180000
+    #271 context at exit: 172746 tokens, 4 min
+    cleaned up session pid 1959429 (pgid ?); free: 6310 MB
+    scoreboard: 83 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #271: continued (progressed), session 1/3 without progress allowed in 244s
+=== [26/50] #271 — Build the Approval notice: coalesced email when an Approval reaches its Approver, re-pointed reminders, per-user switch  [opus[1m] · low · phase: spec]
+    #271 context at exit: 139010 tokens, 9 min
+    cleaned up session pid 1964463 (pgid ?); free: 6303 MB
+    scoreboard: 84 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #271: phase spec done → build next in 544s
+=== [27/50] #271 — Build the Approval notice: coalesced email when an Approval reaches its Approver, re-pointed reminders, per-user switch  [sonnet · low · phase: build]
+    #271 crossed the hand-off line (150367 tokens ≥ 150000) — asked to hand off; hard stop at 180000

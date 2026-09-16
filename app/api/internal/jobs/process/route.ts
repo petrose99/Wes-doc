@@ -6,6 +6,7 @@ import { syncDueLedgerConnections } from "@/lib/health/sync"
 import { drainProvisionJobs } from "@/models/bigcapital"
 import { runDueHealthChecks } from "@/models/health"
 import { sendDueReminders } from "@/models/reminders"
+import { sendApprovalNotices } from "@/models/approval-notices"
 import crypto from "crypto"
 
 function authorized(request: Request) {
@@ -21,14 +22,14 @@ export async function POST(request: Request) {
     // that one queue and not also claim a document job. The cron (empty body) drains ALL THREE
     // queues, so no cron reconfiguration was needed to start delivering webhooks, and none is
     // needed now to start pushing to accounting connectors either.
-    const body = await request.json().catch(() => ({})) as { jobId?: string; drainWebhooks?: boolean; drainIntegrationPushes?: boolean }
+    const body = await request.json().catch(() => ({})) as { jobId?: string; drainWebhooks?: boolean; drainIntegrationPushes?: boolean; drainApprovalNotices?: boolean }
     // Run every independent drain concurrently rather than one after another — they touch separate
     // tables and have no ordering dependency. Provisioning is skipped entirely on a targeted
     // {jobId} dispatch (the embed-detached kick after one document's OCR/ASR step): unlike the
     // other two queues, one due provisioning attempt can genuinely block for 15+ seconds (org-build
     // polling — see models/bigcapital.ts), which would delay that document's own job for no reason
     // a single-document caller asked for. The cron's empty-body hit still drains it normally.
-    const [webhookDeliveries, integrationPushes, provisionJobs, reminders, ledgerSyncs, healthChecksRun] = await Promise.all([
+    const [webhookDeliveries, integrationPushes, provisionJobs, reminders, approvalNotices, ledgerSyncs, healthChecksRun] = await Promise.all([
       drainWebhookDeliveries(),
       drainIntegrationPushes(),
       body.jobId ? Promise.resolve(0) : drainProvisionJobs(),
@@ -36,6 +37,9 @@ export async function POST(request: Request) {
       // what actually decides whether anything sends), so this drains on every hit exactly like
       // the queues above — no separate cron wiring needed for reminders to start going out.
       sendDueReminders(),
+      // #271: cheap and self-rate-limiting the same way (the floor + nudge cap decide whether
+      // anything sends), so no separate cron wiring — drains on every hit like the queues above.
+      sendApprovalNotices(),
       // Data Health Phase B: both of these are staleness-gated (24h since last ledger sync; once
       // per calendar day for the health-check + score snapshot pass), same reasoning as
       // provisionJobs for skipping them on a targeted {jobId} dispatch — a single document's
@@ -47,7 +51,7 @@ export async function POST(request: Request) {
     let jobId: string | null = null
     if (body.jobId) { await processDocumentJob(body.jobId); jobId = body.jobId }
     else if (!body.drainWebhooks && !body.drainIntegrationPushes) jobId = await processNextQueuedDocumentJob()
-    return Response.json({ processed: Boolean(jobId), jobId, webhookDeliveries, integrationPushes, provisionJobs, reminders, ledgerSyncs, healthChecksRun })
+    return Response.json({ processed: Boolean(jobId), jobId, webhookDeliveries, integrationPushes, provisionJobs, reminders, approvalNotices, ledgerSyncs, healthChecksRun })
   } catch (error) {
     // Logged rather than swallowed: this route has no caller watching stdout except the drain
     // cron, so without this the only visibility into a failure is Vercel's function logs — and

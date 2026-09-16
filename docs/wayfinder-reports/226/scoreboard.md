@@ -78,9 +78,13 @@ First-pass scores are the KPI (the pre-build getting better); close scores are r
 | #264 | 20260916T212927 | sonnet | continued (no progress), ses | 33 | 34 | 37 | 88 | 96 | 13 | 1M | 0K | 0 | 0 | 2m34s |
 | #264 | 20260916T213209 | opus[1m] | phase measure done → close n | 33 | 34 | 37 | 88 | 96 | 67 | 4M | 1K | 14 | 3 | 7m35s |
 | #264 | 20260916T213952 | sonnet | resolved | 33 | 34 | 37 | 88 | 96 | 108 | 9M | 1K | 5 | 3 | 17m06s |
-| #268 | 20260916T215711 | opus[1m] | continued (progressed), sess | 32 | · | · | · | · | 50 | 6M | 2K | 0 | 0 | 5m03s |
-| #268 | 20260916T220223 | opus[1m] | phase spec done → build next | 32 | · | · | · | · | 41 | 4M | 1K | 0 | 1 | 7m04s |
-| #268 | 20260916T220936 | sonnet | continued (progressed), sess | 32 | · | · | · | · | 81 | 10M | 1K | 0 | 0 | 4m03s |
-| #268 | 20260916T221348 | opus[1m] | continued (progressed), sess | 32 | · | · | · | · | 67 | 8M | 2K | 0 | 0 | 5m34s |
-| #268 | 20260916T221929 | opus | continued (progressed), sess | 32 | · | · | · | · | 114 | 14M | 3K | 0 | 0 | 8m05s |
-| #268 | 20260916T222741 | opus | phase build done → measure n | 32 | · | · | · | · | 136 | 14M | 3K | 7 | 0 | 27m07s |
+| #268 | 20260916T215711 | opus[1m] | continued (progressed), sess | 32 | 32 | 32 | 91 | 91 | 50 | 6M | 2K | 0 | 0 | 5m03s |
+| #268 | 20260916T220223 | opus[1m] | phase spec done → build next | 32 | 32 | 32 | 91 | 91 | 41 | 4M | 1K | 0 | 1 | 7m04s |
+| #268 | 20260916T220936 | sonnet | continued (progressed), sess | 32 | 32 | 32 | 91 | 91 | 81 | 10M | 1K | 0 | 0 | 4m03s |
+| #268 | 20260916T221348 | opus[1m] | continued (progressed), sess | 32 | 32 | 32 | 91 | 91 | 67 | 8M | 2K | 0 | 0 | 5m34s |
+| #268 | 20260916T221929 | opus | continued (progressed), sess | 32 | 32 | 32 | 91 | 91 | 114 | 14M | 3K | 0 | 0 | 8m05s |
+| #268 | 20260916T222741 | opus | phase build done → measure n | 32 | 32 | 32 | 91 | 91 | 136 | 14M | 3K | 7 | 0 | 27m07s |
+| #268 | 20260916T225456 | sonnet | phase measure done → close n | 32 | 32 | 32 | 91 | 91 | 136 | 11M | 1K | 2 | 3 | 12m36s |
+| #268 | 20260916T230740 | sonnet | resolved | 32 | 32 | 32 | 91 | 91 | 61 | 5M | 0K | 0 | 0 | 14m35s |
+| #271 | 20260916T232228 | opus[1m] | continued (progressed), sess | 32 | · | · | · | · | 44 | 5M | 2K | 0 | 0 | 4m04s |
+| #271 | 20260916T232641 | opus[1m] | phase spec done → build next | 32 | · | · | · | · | 47 | 5M | 2K | 0 | 1 | 9m04s |
