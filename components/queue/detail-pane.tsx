@@ -4,7 +4,7 @@ import { Component, useCallback, useContext, useEffect, useId, useRef, useState,
 import { ArrowLeft, ChevronDown, ChevronUp, MoreHorizontal, X } from "lucide-react"
 import Link from "next/link"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { DocumentMenuDeleteItem, DocumentMenuTopItems, OpenInNewTabMenuItem, PaneDocumentContext, PaneDocumentProvider } from "@/components/queue/document-actions-menu"
+import { DeleteDocumentDialog, DocumentMenuDeleteItem, DocumentMenuTopItems, OpenInNewTabMenuItem, PaneDocumentContext, PaneDocumentProvider } from "@/components/queue/document-actions-menu"
 import { usePhoneLane } from "@/lib/client/use-phone-lane"
 
 export const DETAIL_PANE_ID = "queue-detail-pane"
@@ -141,6 +141,7 @@ function PaneMenu({ open, onOpenChange, fullHref, menu, onDeleted }: {
   const ctx = useContext(PaneDocumentContext)
   const hasDoc = !!ctx?.doc
   const contentRef = useRef<HTMLDivElement>(null)
+  const [deleteOpen, setDeleteOpen] = useState(false)
   if (!fullHref && !menu && !hasDoc) return null
 
   const items = () => Array.from(contentRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])
@@ -158,22 +159,30 @@ function PaneMenu({ open, onOpenChange, fullHref, menu, onDeleted }: {
     list[next].focus()
   }
 
-  return <Popover open={open} onOpenChange={onOpenChange}>
-    <PopoverTrigger asChild>
-      <button type="button" aria-label="More actions" title="More actions" aria-haspopup="menu" aria-expanded={open} className={iconButton}>
-        <MoreHorizontal className="h-4 w-4" aria-hidden />
-      </button>
-    </PopoverTrigger>
-    <PopoverContent ref={contentRef} align="end" role="menu" aria-label="More actions" className="w-64 p-1" onKeyDown={onKeyDown}
-      onOpenAutoFocus={(event) => { event.preventDefault(); items()[0]?.focus() }}
-      onClick={(event) => { if ((event.target as HTMLElement).closest("[data-menu-close]")) onOpenChange(false) }}>
-      {fullHref && <OpenInNewTabMenuItem href={fullHref} />}
-      <DocumentMenuTopItems closeMenu={() => onOpenChange(false)} />
-      {(menu || hasDoc) && (fullHref || hasDoc) && <div role="separator" className="my-1 h-px bg-slate-200" />}
-      {menu}
-      <DocumentMenuDeleteItem onDeleted={onDeleted} />
-    </PopoverContent>
-  </Popover>
+  return <>
+    <Popover open={open} onOpenChange={onOpenChange}>
+      <PopoverTrigger asChild>
+        <button type="button" aria-label="More actions" title="More actions" aria-haspopup="menu" aria-expanded={open} className={iconButton}>
+          <MoreHorizontal className="h-4 w-4" aria-hidden />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent ref={contentRef} align="end" role="menu" aria-label="More actions" className="w-64 p-1" onKeyDown={onKeyDown}
+        onOpenAutoFocus={(event) => { event.preventDefault(); items()[0]?.focus() }}
+        onClick={(event) => { if ((event.target as HTMLElement).closest("[data-menu-close]")) onOpenChange(false) }}>
+        {fullHref && <OpenInNewTabMenuItem href={fullHref} />}
+        <DocumentMenuTopItems closeMenu={() => onOpenChange(false)} />
+        {(menu || hasDoc) && (fullHref || hasDoc) && <div role="separator" className="my-1 h-px bg-slate-200" />}
+        {menu}
+        <DocumentMenuDeleteItem onRequestDelete={() => setDeleteOpen(true)} />
+      </PopoverContent>
+    </Popover>
+    {/* Lives above the popover, not inside it: PopoverContent unmounts the instant the menu
+        closes, which happens on the same click that requests this dialog (#259 close-phase fix —
+        the dialog previously never rendered because its state died with the menu). */}
+    {deleteOpen && ctx?.doc && <DeleteDocumentDialog workspaceId={ctx.doc.workspaceId} fileId={ctx.doc.fileId} documentId={ctx.doc.documentId} filename={ctx.doc.filename}
+      onOpenChange={setDeleteOpen}
+      onDeleted={() => { ctx.onMutated?.("removed"); onDeleted?.() }} />}
+  </>
 }
 
 /** The Queue screen's Detail pane (#225; CONTEXT.md "Detail pane"): `PaneFrame` in pane mode

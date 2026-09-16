@@ -116,23 +116,20 @@ export function DocumentMenuTopItems({ closeMenu }: { closeMenu?: () => void }) 
   </>
 }
 
-/** Item 5, the last (red) item — opens `DeleteDocumentDialog` once the menu itself has closed and
- * focus is back on the ⋯ trigger, so the dialog's own opener is that button (#259 §5). */
-export function DocumentMenuDeleteItem({ onDeleted }: { onDeleted?: () => void }) {
+/** Item 5, the last (red) item — asks its parent to open `DeleteDocumentDialog` once the menu
+ * itself has closed, so the dialog's own opener is the ⋯ trigger (#259 §5). The dialog itself
+ * must live above the popover's content: Radix unmounts `PopoverContent` (and everything inside
+ * it, including this item) the moment the menu closes, which happens on the same click that
+ * requests the dialog — so the dialog can't hold its own state here, or it never gets to render. */
+export function DocumentMenuDeleteItem({ onRequestDelete }: { onRequestDelete: () => void }) {
   const ctx = useContext(PaneDocumentContext)
   const doc = ctx?.doc
-  const [open, setOpen] = useState(false)
   if (!doc) return null
   const cancelledHint = doc.cancelled ? "Cancelled documents are already closed." : undefined
 
-  return <>
-    <PaneMenuItem tone="red" disabled={doc.cancelled} hint={cancelledHint} onClick={() => window.requestAnimationFrame(() => setOpen(true))}>
-      <span className="inline-flex items-center gap-2"><Trash2 className="h-4 w-4" aria-hidden />Delete…</span>
-    </PaneMenuItem>
-    {open && <DeleteDocumentDialog workspaceId={doc.workspaceId} fileId={doc.fileId} documentId={doc.documentId} filename={doc.filename}
-      onOpenChange={setOpen}
-      onDeleted={() => { ctx?.onMutated?.("removed"); onDeleted?.() }} />}
-  </>
+  return <PaneMenuItem tone="red" disabled={doc.cancelled} hint={cancelledHint} onClick={() => window.requestAnimationFrame(onRequestDelete)}>
+    <span className="inline-flex items-center gap-2"><Trash2 className="h-4 w-4" aria-hidden />Delete…</span>
+  </PaneMenuItem>
 }
 
 /** The confirm-and-delete dialog, extracted from the old standalone `DeleteDocumentButton` so the
