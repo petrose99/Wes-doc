@@ -1,1 +1,0 @@
-Resolved — see the resolution comment above. Execution: #252 (shell + Configuration) → #253 (Approval Flows + PO Mismatch Flows) and #254 (Organization, Companies, Users, Dashboard; also waits on #255, the scope-guard task). Owner sign-off on two unplugs: #256.

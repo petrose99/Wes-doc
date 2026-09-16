@@ -65,3 +65,8 @@ pgdata
 .vercel
 .impeccable/hook.cache.json
 .env.production.bak.*
+
+# autopilot session artefacts (local only)
+.impeccable/live/
+.scratch/
+docs/wayfinder-reports/*/logs/

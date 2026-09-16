@@ -213,7 +213,7 @@ while [ "$n" -lt "$MAX" ]; do
   # post a partial hand-off so the driver retries with a fresh context, tear
   # the session down.
   MAX_S="${WAYFINDER_SESSION_MAX_SECONDS:-12600}"
-  MAX_CTX="${WAYFINDER_SESSION_MAX_TOKENS:-150000}"
+  MAX_CTX="${WAYFINDER_SESSION_MAX_TOKENS:-${SESSION_MAX_TOKENS:-250000}}"   # baseline ~42K; grilling peaks 125–200K; builds must split
   CAPPED=""
   context_tokens() {
     python3 - "$1" 2>/dev/null <<'PY'
@@ -235,9 +235,10 @@ PY
     if [ "$CTX" -ge "$MAX_CTX" ]; then CAPPED="context cap (${CTX} tokens ≥ ${MAX_CTX})"; fi
     if [ -n "$CAPPED" ]; then
       echo "    #$T hit the $CAPPED — saving WIP and handing off"
-      ( cd "$ROOT" && git add -A && git commit -q -m "wip(autopilot): #$T session hit the $CAPPED; hand-off to the next attempt" ) 2>/dev/null || true
+      ( cd "$ROOT" && git add -A -- . ':!.scratch' ':!.impeccable/live' ":!docs/wayfinder-reports/$MAP/logs" && git commit -q -m "wip(autopilot): #$T session hit the $CAPPED; hand-off to the next attempt" ) 2>/dev/null || true
       gh issue comment "$T" --repo "$REPO" --body "Autopilot: partial — the session hit its $CAPPED. Work so far is committed as WIP on the branch. Next attempt: read the last commits and any report draft in docs/wayfinder-reports, measure once, close at the bar or continue the hand-off. If the remaining work is more than one session, split it: create a child task ticket for the remainder and close this one at a coherent boundary." >/dev/null 2>&1 || true
-      pgid="$(ps -o pgid= -p "$SESSION_PID" 2>/dev/null | tr -d ' ')"; [ -n "$pgid" ] && { kill -TERM -- "-$pgid" 2>/dev/null || true; }
+      pgid="$(ps -o pgid= -p "$SESSION_PID" 2>/dev/null | tr -d ' ')"
+      if [ -n "$pgid" ]; then kill -TERM -- "-$pgid" 2>/dev/null || true; sleep 8; kill -KILL -- "-$pgid" 2>/dev/null || true; fi
       break
     fi
   done
