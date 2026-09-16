@@ -46,41 +46,57 @@ you, with one rule: **take the recommended answer.**
 - Execution tickets: commit your work on the current branch with a
   conventional commit message referencing the ticket. Never push.
 
-## Low scores are work, not a record
+## The bar is high, and the first build must already be near it
 
-A ticket that changes a rendered surface **does not close on a bad score.**
-The bar from `CLAUDE.md` is the definition of done: every `critique`
-heuristic at 3/4 or better, every `evaluate` heuristic at 1 or better and the
-health score at 80 or above, every real in-page detector finding cleared at
-1440 and 390 (list and pane-open). Recording a low score beside the findings
-and closing is closing early.
+The owner's bar for closing a rendered-surface ticket (stricter than
+`CLAUDE.md`'s floor):
 
-- Work the findings in batches: build fully, inspect once (desktop + mobile
-  together), fix everything shown, confirm with one more round. Repeat the
-  batch until the bar is met. The bounded passes cap inspection rounds per
-  batch, not the number of findings you fix.
-- The only findings that may stay open are those with a real decision behind
-  them; each becomes a Wayfinder ticket named on the close, with the score it
-  costs. A finding without a decision is fixed, never parked.
-- If the bar cannot be reached in this session (context or time), **leave the
-  ticket open** with a `Autopilot: partial —` comment stating the current
-  scores, what is fixed, and what remains; commit what you have. The driver
-  will come back to it.
-- **Score the new UI, not the old one.** The map's Notes ask grilling tickets
-  to open with a critique of the incumbent: keep that as *evidence* for the
-  `➡️` recommendations (what the old surface got wrong), not as a number to
-  beat — the grilling is about to change what the surface is, so a score on
-  the old one has no baseline value. A decision ticket's report says "no
-  score; surface not built yet" and lists the incumbent findings that shaped
-  its recommendations. Skip the incumbent critique entirely when the old
-  surface is being replaced rather than refined.
-- **On an execution ticket, the order is build → score → improve.** Build the
-  surface fully to the spec first. Then take the first real measurement on
-  the new UI: `impeccable critique`, the in-page detector at 1440 and 390
-  (list and pane-open), and `evaluate`. Those numbers are the before-counts
-  for the ticket. Then work the findings in batches until the bar is met and
-  record the after-counts. The ticket closes on the new UI's scores, never
-  on the incumbent's.
+- `critique` **≥ 34/40**, no heuristic under 3.
+- `evaluate` **≥ 90/100**, no heuristic above 1, anti-pattern verdict Clean.
+- Every real in-page detector finding cleared at 1440 and 390 (list and
+  pane-open); only the documented app-wide residue may remain, named.
+- `include`: keyboard flow verified live at both widths.
+
+**The skills are there so the first pass is right.** Before the first line of
+code on an execution ticket, the pre-build pass is mandatory and is done
+properly, not skimmed:
+
+1. `intent specify` — screen-by-screen spec: behaviour, layout, copy,
+   interaction logic, every state, accessibility. `fortify` — the full state
+   inventory (empty, loading, error, partial, offline, first-run, long
+   content, zero results). `articulate` — every label, empty state, error
+   and confirmation written before it is coded. `include` — focus order,
+   names, targets, announcements planned, not retrofitted.
+2. `impeccable shape` then `layout`, `typeset`, `clarify` for the surface;
+   read `craft-floor.md`; read the stored critique of the nearest shipped
+   surface (`.impeccable/critique/`) and the resolution's Action Summary.
+3. **Pre-flight against the scorecards.** Before building, walk the ten
+   `critique` heuristics and the `evaluate` heuristics against the spec and
+   write one line each: what in the spec earns a 4 / a 0-issue. A heuristic
+   with no answer is a hole in the spec — fix the spec, not the code later.
+4. Build the whole surface to that spec, all states included, with the
+   detector hook fixing findings as they appear.
+
+**Then score the new UI — and the first score is a KPI.** The report records
+the first-pass `critique` and `evaluate` numbers separately from the close
+numbers. A first pass under 30/40 or 80/100 means the pre-build pass was
+skipped or shallow; say which step was weak and what it missed, so the next
+ticket's pre-build learns from it. Then work the remaining findings in
+batches (build fully, inspect once at both widths, fix everything shown,
+confirm once) until the bar above is met, and record the after-counts.
+
+- Findings with a real decision behind them become a Wayfinder ticket named
+  on the close, with the score they cost. A finding without a decision is
+  fixed, never parked.
+- If the bar cannot be reached in this session, **leave the ticket open**
+  with an `Autopilot: partial —` comment stating current scores, what is
+  fixed and what remains; commit what you have. The driver will come back.
+- **Score the new UI, not the old one.** A grilling ticket may critique the
+  incumbent as *evidence* for its recommendations (what the old surface got
+  wrong), never as a number to beat — the grilling is about to change what
+  the surface is. Skip it entirely when the surface is being replaced. A
+  decision ticket's report says "no score; surface not built yet". On an
+  execution ticket the only scores that count are the new UI's.
 
 ## Report (mandatory, every session)
 
@@ -109,7 +125,7 @@ session made no code change, commit the report alone
 <new tickets with names, blocking edges, fog graduated or added>
 
 ## Scores and counts (rendered surfaces only)
-<critique before/after, in-page detector before/after at 1440 and 390, evaluate score>
+<first-pass critique and evaluate (the KPI) · close critique and evaluate · in-page detector first-pass/close at 1440 and 390 per state · include check · which pre-build step was weak if the first pass fell short>
 
 ## Needs the owner
 <anything deferred: removals, credentials, decisions you were unsure about>
