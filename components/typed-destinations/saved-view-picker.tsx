@@ -22,7 +22,7 @@ type Action = (formData: FormData) => Promise<void>
  * component never talks to models/saved-views.ts directly. A thrown action error (most commonly
  * `saved_view_name_taken`, the one truly reachable in-UI failure without a live dev-server pass
  * from `impeccable` to word precisely) surfaces as a toast rather than the page error boundary. */
-export function SavedViewPicker({ views, selectedViewId, currentFilters, currentUserId, currentUserRole, createAction, duplicateAction, renameAction, saveFiltersAction, deleteAction, shareAction }: {
+export function SavedViewPicker({ views, selectedViewId, currentFilters, currentUserId, currentUserRole, createAction, duplicateAction, renameAction, saveFiltersAction, deleteAction, shareAction, variant = "popover" }: {
   views: SavedViewSummary[]
   selectedViewId: string | null
   currentFilters: SavedViewFilters
@@ -34,6 +34,10 @@ export function SavedViewPicker({ views, selectedViewId, currentFilters, current
   saveFiltersAction: Action
   deleteAction: Action
   shareAction: Action
+  /** #261: `"select"` is the phone filter row's Views control — a native `<select>` that only
+   * switches views (management is desktop, #232 §5) and renders nothing when there are no views
+   * to switch between (critic D6). */
+  variant?: "popover" | "select"
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -85,6 +89,15 @@ export function SavedViewPicker({ views, selectedViewId, currentFilters, current
       if (onError) onError(message)
       else toast.error(message)
     }
+  }
+
+  if (variant === "select") {
+    if (views.length === 0) return null
+    return <select aria-label="View" value={selected?.id ?? ""} onChange={(event) => { const view = views.find((v) => v.id === event.target.value); if (view) selectView(view) }}
+      className="h-11 max-w-[45%] rounded-md border border-slate-300 bg-white px-3 text-base font-medium text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-1">
+      <option value="" disabled={selected !== undefined && selected !== null}>Views</option>
+      {views.map((view) => <option key={view.id} value={view.id}>{view.name}</option>)}
+    </select>
   }
 
   return <>

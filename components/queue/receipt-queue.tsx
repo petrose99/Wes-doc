@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react"
 import { toast } from "sonner"
 import { QueueScreen, type QueueColumn, type SortOption } from "@/components/queue/queue-screen"
+import { joinSegments } from "@/components/queue/queue-card"
 import type { FieldTable } from "@/lib/configuration/field-table"
 import { PaneMenuItem } from "@/components/queue/detail-pane"
 import { DocumentBulkActions, DocumentPaneActions } from "@/components/queue/document-actions"
@@ -51,12 +52,14 @@ function ClaimPill({ status }: { status: ReceiptRow["claimStatus"] }) {
   return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize ${cls}`}>{status}</span>
 }
 
-export function ReceiptQueue({ workspaceId, basePath, receipts, minConfidencePercent, views, stat, initialSelectedId, fieldTable = null }: {
+export function ReceiptQueue({ workspaceId, basePath, receipts, minConfidencePercent, views, viewsPhone, stat, initialSelectedId, fieldTable = null }: {
   workspaceId: string
   basePath: string
   receipts: ReceiptRow[]
   minConfidencePercent: number
   views?: ReactNode
+  /** #261: the phone filter row's Views select. */
+  viewsPhone?: ReactNode
   stat?: ReactNode
   initialSelectedId?: string | null
   /** #252: Admin › Configuration › Fields for receipts, when one has been saved. */
@@ -91,16 +94,20 @@ export function ReceiptQueue({ workspaceId, basePath, receipts, minConfidencePer
 
   const columns: QueueColumn<ReceiptRow>[] = [
     {
-      key: "merchant", label: "Merchant", narrow: true, className: "min-w-[12rem]", fieldKey: "merchant",
+      key: "merchant", label: "Merchant", narrow: true, className: "min-w-[12rem]", fieldKey: "merchant", phone: "title",
+      phoneRender: (receipt) => receipt.merchant ?? <span className="font-normal text-slate-600">Unknown merchant</span>,
       render: (receipt) => <TitleCell subtitle={receipt.filename} missingLabel="Unknown merchant"
         title={receipt.merchant ? <ConfidenceField label="Merchant" value={receipt.fieldConfidence.merchant} minConfidence={minConfidence}>{receipt.merchant}</ConfidenceField> : null} />,
     },
     {
-      key: "number", label: "Receipt #", className: "whitespace-nowrap text-slate-700", fieldKey: "receipt_number",
+      key: "number", label: "Receipt #", className: "whitespace-nowrap text-slate-700", fieldKey: "receipt_number", priority: "low", phone: "subtitle",
+      // #261 spec §2: "Receipt # · ‹purchase date›"; a missing half is omitted.
+      phoneRender: (receipt) => joinSegments([receipt.receiptNumber, receipt.purchaseDate ? formatDate(receipt.purchaseDate) : null]),
       render: (receipt) => <ConfidenceField label="Receipt number" value={receipt.receiptNumber ? receipt.fieldConfidence.receipt_number : undefined} minConfidence={minConfidence}>{receipt.receiptNumber ?? "—"}</ConfidenceField>,
     },
     {
-      key: "amount", label: "Amount", narrow: true, className: "whitespace-nowrap text-right tabular-nums text-slate-900", fieldKey: "total",
+      key: "amount", label: "Amount", narrow: true, className: "whitespace-nowrap text-right tabular-nums text-slate-900", fieldKey: "total", phone: "trailing",
+      phoneRender: (receipt) => receipt.total !== null ? formatMoney(receipt.total, receipt.currencyCode) : <span className="font-normal text-slate-600">No amount</span>,
       render: (receipt) => <ConfidenceField label="Amount" value={receipt.total !== null ? receipt.fieldConfidence.total ?? receipt.fieldConfidence.amount : undefined} minConfidence={minConfidence}>{receipt.total !== null ? formatMoney(receipt.total, receipt.currencyCode) : "—"}</ConfidenceField>,
     },
     {
@@ -108,10 +115,11 @@ export function ReceiptQueue({ workspaceId, basePath, receipts, minConfidencePer
       render: (receipt) => <ConfidenceField label="Purchase date" value={receipt.purchaseDate ? receipt.fieldConfidence.purchase_date : undefined} minConfidence={minConfidence}>{formatDate(receipt.purchaseDate)}</ConfidenceField>,
     },
     {
-      key: "state", label: "State",
+      key: "state", label: "State", phone: "pill",
       render: statePills,
     },
-    { key: "claim", label: "Claim", render: (receipt) => <ClaimPill status={receipt.claimStatus} /> },
+    // The card shows the Claim pill only when a claim exists; "Unclaimed" stays a table-only word.
+    { key: "claim", label: "Claim", priority: "low", phone: "pill", phoneRender: (receipt) => receipt.claimStatus ? <ClaimPill status={receipt.claimStatus} /> : null, render: (receipt) => <ClaimPill status={receipt.claimStatus} /> },
   ]
 
   const exportAll = async () => {
@@ -136,9 +144,19 @@ export function ReceiptQueue({ workspaceId, basePath, receipts, minConfidencePer
     sortOptions={SORTS}
     facets={RECEIPT_FACETS}
     views={views}
+    viewsPhone={viewsPhone}
     stat={stat}
     onExportAll={exportAll}
     initialSelectedId={initialSelectedId}
+    // #261: card rows below `md`.
+    cards={{ below: "md", label: (receipt) => [
+      receipt.merchant ?? "Unknown merchant",
+      receipt.total !== null ? formatMoney(receipt.total, receipt.currencyCode) : "No amount",
+      receipt.receiptNumber,
+      receipt.purchaseDate ? formatDate(receipt.purchaseDate) : null,
+      PROCESSING_STATE_LABELS[receiptState(receipt)],
+      receipt.claimStatus ? `claim ${receipt.claimStatus}` : null,
+    ].filter(Boolean).join(", ") }}
     empty={{ title: "No receipts yet.", body: "Receipts appear here once one is extracted from an upload or an inbound email." }}
     loadDetail={(documentId) => getQueueDetailAction(workspaceId, documentId, { queueTitle: "Receipts" })}
     bulkActions={({ selectedIds, clear }) => <DocumentBulkActions

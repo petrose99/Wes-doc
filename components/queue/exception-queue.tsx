@@ -58,21 +58,23 @@ export function ExceptionQueue({ workspaceId, basePath, documentBasePath, except
 
   const columns: QueueColumn<ExceptionRow>[] = [
     {
-      key: "document", label: "Document", narrow: true, className: "min-w-[12rem]",
+      key: "document", label: "Document", narrow: true, className: "min-w-[12rem]", phone: "title",
+      phoneRender: (row) => row.vendor ?? row.filename,
       render: (row) => <TitleCell title={row.vendor ?? row.filename} subtitle={row.docTypeLabel} />,
     },
-    { key: "check", label: "Check", className: "min-w-[14rem] text-slate-700", render: (row) => <>{row.message}</> },
-    { key: "invoiceNumber", label: "Invoice #", className: "whitespace-nowrap text-slate-700", render: (row) => <>{row.invoiceNumber ?? <span className="text-slate-400">—</span>}</> },
-    { key: "amount", label: "Amount", narrow: true, className: "whitespace-nowrap text-right tabular-nums text-slate-900", render: (row) => <>{formatAmount(row.amount, row.currencyCode)}</> },
+    // #261 spec §2: the check message is the card's subtitle, two lines (`cards.subtitleClamp`).
+    { key: "check", label: "Check", className: "min-w-[14rem] text-slate-700", phone: "subtitle", render: (row) => <>{row.message}</> },
+    { key: "invoiceNumber", label: "Invoice #", className: "whitespace-nowrap text-slate-700", priority: "low", render: (row) => <>{row.invoiceNumber ?? <span className="text-slate-400">—</span>}</> },
+    { key: "amount", label: "Amount", narrow: true, className: "whitespace-nowrap text-right tabular-nums text-slate-900", phone: "trailing", render: (row) => <>{formatAmount(row.amount, row.currencyCode)}</> },
     { key: "due", label: "Due", className: "whitespace-nowrap", render: (row) => <DueDateCountdownBadge dueDate={row.dueDate} /> },
     {
-      key: "status", label: "Status", narrow: true,
+      key: "status", label: "Status", narrow: true, phone: "pill",
       render: (row) => <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${row.escalationStatus === "in_review" ? "bg-blue-100 text-blue-800" : "bg-amber-100 text-amber-900"}`}>
         {row.escalationStatus === "in_review" ? "In review" : "Open"}
       </span>,
     },
-    { key: "assignee", label: "Assignee", className: "whitespace-nowrap text-slate-700", render: (row) => <>{row.assigneeName ?? <span className="text-slate-500">Unassigned</span>}</> },
-    { key: "escalated", label: "Escalated", className: "whitespace-nowrap tabular-nums text-slate-700", render: (row) => <>{formatDate(row.escalatedAt)}</> },
+    { key: "assignee", label: "Assignee", className: "whitespace-nowrap text-slate-700", priority: "low", render: (row) => <>{row.assigneeName ?? <span className="text-slate-500">Unassigned</span>}</> },
+    { key: "escalated", label: "Escalated", className: "whitespace-nowrap tabular-nums text-slate-700", priority: "low", render: (row) => <>{formatDate(row.escalatedAt)}</> },
   ]
 
   const startReview = async (id: string, refresh: () => void) => {
@@ -103,6 +105,11 @@ export function ExceptionQueue({ workspaceId, basePath, documentBasePath, except
       sortOptions={SORTS}
       facets={EXCEPTION_FACETS}
       initialSelectedId={initialSelectedId}
+      // #261: card rows below `md`; the check message runs to two lines.
+      cards={{ below: "md", subtitleClamp: true, label: (row) => [
+        row.vendor ?? row.filename, formatAmount(row.amount, row.currencyCode), row.message,
+        row.escalationStatus === "in_review" ? "In review" : "Open", row.docTypeLabel,
+      ].filter(Boolean).join(", ") }}
       empty={{ title: "No open exceptions.", body: "Escalate a check from a document's field rationale to send it here. Resolved exceptions drop off this list." }}
       loadDetail={(documentId) => getQueueDetailAction(workspaceId, documentId)}
       paneActions={(row, { refresh }) => <>

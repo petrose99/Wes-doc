@@ -97,16 +97,23 @@ export function PoMismatchQueue({ workspaceId, basePath, rows, invoiceCount, ini
   const ownCount = filterPoMismatchRows(rows, searchParams).length
 
   const columns: QueueColumn<PoMismatchRow>[] = [
-    { key: "supplier", label: "Supplier", narrow: true, className: "min-w-[12rem]", render: (row) => <TitleCell title={row.supplier} missingLabel="Unknown supplier" subtitle={row.eligibility.status !== "ready" ? eligibilityText(row) : null} /> },
+    // #261: the columns feed the shared card's slots with the text #257's bespoke card carried.
+    { key: "supplier", label: "Supplier", narrow: true, className: "min-w-[12rem]", phone: "title", phoneRender: (row) => row.supplier ?? "Unknown supplier",
+      render: (row) => <TitleCell title={row.supplier} missingLabel="Unknown supplier" subtitle={row.eligibility.status !== "ready" ? eligibilityText(row) : null} /> },
     { key: "number", label: "Invoice #", className: "whitespace-nowrap text-slate-700", render: (row) => <>{row.invoiceNumber ?? "—"}</> },
-    { key: "po", label: "PO #", className: "whitespace-nowrap text-slate-700", render: (row) => <>{row.poNumber ?? "—"}</> },
+    { key: "po", label: "PO #", className: "whitespace-nowrap text-slate-700", phone: "subtitle",
+      phoneRender: (row) => <>{row.poNumber ?? "No PO #"} · Variance {formatMoney(row.variance, row.currencyCode)} ({variancePercent(row).toFixed(1)}%)</>,
+      render: (row) => <>{row.poNumber ?? "—"}</> },
     {
-      key: "variance", label: "Variance", className: "whitespace-nowrap text-right tabular-nums text-slate-900",
+      key: "variance", label: "Variance", className: "whitespace-nowrap text-right tabular-nums text-slate-900", phone: "trailing",
+      phoneRender: (row) => formatMoney(row.variance, row.currencyCode),
       render: (row) => <span title={`Tolerance: ${formatMoney(row.threshold, row.currencyCode)} (${Math.round(row.percent * 100)}% or ${formatMoney(row.floorAmount, row.currencyCode)}, whichever is greater)`}>
         {formatMoney(row.variance, row.currencyCode)} ({variancePercent(row).toFixed(1)}%)
       </span>,
     },
-    { key: "stage", label: "Stage", className: "whitespace-nowrap text-slate-700", render: (row) => <>{stageLabel(row.stage)}</> },
+    { key: "stage", label: "Stage", className: "whitespace-nowrap text-slate-700", phone: "pill",
+      phoneRender: (row) => row.eligibility.status !== "ready" ? <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-[12px] font-medium leading-4 text-amber-900">{eligibilityText(row)}</span> : <span className="text-[13px] text-slate-700">{stageLabel(row.stage)}</span>,
+      render: (row) => <>{stageLabel(row.stage)}</> },
   ]
 
   return <>
@@ -128,7 +135,13 @@ export function PoMismatchQueue({ workspaceId, basePath, rows, invoiceCount, ini
         { key: "invoices", label: "Invoice approvals", count: invoiceCount, href: basePath.replace(/\/po-mismatches$/, "/invoices") },
         { key: "po-mismatches", label: "PO mismatches", count: ownCount, href: basePath },
       ]} active="po-mismatches" /></div>}
-      cards={{ below: "lg", title: "Ready to Approve", render: (row, { open }) => <MismatchCard row={row} onOpen={open} /> }}
+      // #261: the shared `QueueCard` fed by the columns' phone slots; #257's comma-separated name.
+      cards={{ below: "lg", title: "Ready to Approve", label: (row) => [
+        row.supplier ?? "Unknown supplier",
+        row.poNumber ?? "No PO #",
+        `Variance ${formatMoney(row.variance, row.currencyCode)} (${variancePercent(row).toFixed(1)}%)`,
+        row.eligibility.status !== "ready" ? eligibilityText(row) : stageLabel(row.stage),
+      ].join(", ") }}
       initialSelectedId={initialSelectedId}
       empty={{
         title: "Nothing needs your approval",
@@ -138,7 +151,6 @@ export function PoMismatchQueue({ workspaceId, basePath, rows, invoiceCount, ini
           <Link href={`/workspaces/${workspaceId}/invoices`} className="font-medium text-emerald-800 underline-offset-2 hover:underline">Go to Invoices</Link>
         </span>,
         filteredTitle: "No rows match these filters",
-        filteredAction: <Link href={basePath} className="font-medium text-emerald-800 underline-offset-2 hover:underline">Clear filters</Link>,
       }}
       loadDetail={(documentId) => getQueueDetailAction(workspaceId, documentId, { initialTab: "checks" })}
       paneActions={(row, helpers) => {
@@ -185,32 +197,4 @@ export function PoMismatchQueue({ workspaceId, basePath, rows, invoiceCount, ini
       submitLabel="Reject"
       placeholder="Why is this being rejected?" />
   </>
-}
-
-/** #257 spec 3.3: the phone/tablet card row for PO mismatches. */
-function MismatchCard({ row, onOpen }: { row: PoMismatchRow; onOpen: () => void }) {
-  const notEligible = row.eligibility.status !== "ready"
-  // Screen-reader name with separators: the visual spans concatenate without spaces otherwise.
-  const name = [
-    row.supplier ?? "Unknown supplier",
-    row.poNumber ?? "No PO #",
-    `Variance ${formatMoney(row.variance, row.currencyCode)} (${variancePercent(row).toFixed(1)}%)`,
-    notEligible ? eligibilityText(row) : stageLabel(row.stage),
-  ].join(", ")
-  return <a href={`#${row.documentId}`} onClick={(event) => { event.preventDefault(); onOpen() }} aria-label={name}
-    className="flex min-h-16 items-start gap-3 px-4 py-3 hover:bg-slate-50 active:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-inset">
-    <ProcessingStateGlyph state={processingState({ approvalStatus: "in_progress", blockedByCheck: notEligible, escalated: false, touchless: false, status: "needs_review" })} />
-    <span className="min-w-0 flex-1">
-      <span className="flex items-baseline justify-between gap-2">
-        <span className="truncate text-[15px] font-semibold text-slate-900">{row.supplier ?? "Unknown supplier"}</span>
-        <span className="shrink-0 tabular-nums text-[15px] font-semibold text-slate-900">{formatMoney(row.variance, row.currencyCode)}</span>
-      </span>
-      <span className="mt-0.5 block text-[13px] text-slate-600">{row.poNumber ?? "No PO #"} · Variance {formatMoney(row.variance, row.currencyCode)} ({variancePercent(row).toFixed(1)}%)</span>
-      <span className="mt-0.5 block text-[13px]">
-        {notEligible
-          ? <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-[12px] font-medium leading-4 text-amber-900">{eligibilityText(row)}</span>
-          : <span className="text-slate-700">{stageLabel(row.stage)}</span>}
-      </span>
-    </span>
-  </a>
 }

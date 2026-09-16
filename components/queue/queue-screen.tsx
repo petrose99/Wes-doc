@@ -1,7 +1,7 @@
 "use client"
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { ArrowUpDown, Download, MoreHorizontal, ShieldAlert, ShieldCheck } from "lucide-react"
 import { toast } from "sonner"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -9,6 +9,8 @@ import { DetailPane, DETAIL_PANE_ID, type PaneName } from "@/components/queue/de
 import { FacetFilters, type Facet } from "@/components/queue/facet-filters"
 import { FilterButton, FilterSheet } from "@/components/queue/filter-sheet"
 import { OverrideModeProvider, useOverrideMode } from "@/components/queue/override-mode-context"
+import { QueueCard, joinSegments } from "@/components/queue/queue-card"
+import { clearFilterParams } from "@/lib/queue/filters"
 import { confirmLeave } from "@/lib/client/unsaved-changes"
 import { isPhoneLane } from "@/lib/client/use-phone-lane"
 import { orderColumnsByFieldTable, widthClassFor, type FieldTable } from "@/lib/configuration/field-table"
@@ -24,6 +26,16 @@ export type QueueColumn<T> = {
    * size or hide it in the system views. Columns without one (state, aging, PO) keep their place. */
   fieldKey?: string
   render: (row: T) => ReactNode
+  /** #261: which slot of the phone card this column feeds below the card breakpoint. Columns
+   * without one are table-only. `title` takes the first such column; `subtitle` and `pill`
+   * collect every column in order. */
+  phone?: "title" | "trailing" | "subtitle" | "pill"
+  /** #261: card-specific rendering when `render` carries desktop-only chrome (TitleCell's filename
+   * subtitle, a confidence field). Defaults to `render`. */
+  phoneRender?: (row: T) => ReactNode
+  /** #261: hidden between the card breakpoint and `lg` (`hidden lg:table-cell`) so the table fits
+   * a tablet without the retired horizontal scroller. */
+  priority?: "low"
 }
 
 export type SortOption<T> = { key: string; label: string; compare: (a: T, b: T) => number }
@@ -112,8 +124,17 @@ export type QueueScreenProps<T> = {
     below: "md" | "lg"
     /** The h1 below the breakpoint ("Ready to Approve"); desktop keeps `title`. */
     title?: string
-    render: (row: T, state: { isOpen: boolean; open: () => void }) => ReactNode
+    /** A bespoke card. Omit it (#261) and the screen renders `QueueCard` from the columns'
+     * `phone` slots — the default every queue takes. */
+    render?: (row: T, state: { isOpen: boolean; open: () => void }) => ReactNode
+    /** The slot card's accessible name (comma-separated). Defaults to `rowName` title, suffix. */
+    label?: (row: T) => string
+    /** Two-line subtitle on the slot card (Exceptions' check message). */
+    subtitleClamp?: boolean
   }
+  /** #261: the Views control for the phone filter row (`SavedViewPicker variant="select"`) —
+   * `views` itself is hidden below the card breakpoint. */
+  viewsPhone?: ReactNode
   /** #257 spec 3.4: the queue's own facet predicate, applied to `rows` before the sort — so the
    * Filter sheet's "Show n rows" counts from the same array the list renders and the empty
    * state can say how many rows the filters hid. Pages that pass it hand over *all* rows. */
@@ -137,7 +158,7 @@ const INTERACTIVE = "a, button, input, select, textarea, label, [role=button], [
 
 function QueueScreenInner<T>({
   title, basePath, rows, rowId, detailIdFor, rowName, paneStatus, fullHref, archivedToast, leading, columns: rawColumns, fieldTable = null, selectable = false, sortOptions = [], facets = [],
-  views, stat, band, menu, onExportAll, bulkActions, empty, loadDetail, paneActions, paneMenu, initialSelectedId = null, sortParam = "sort", cards, phoneReadOnly = false,
+  views, viewsPhone, stat, band, menu, onExportAll, bulkActions, empty, loadDetail, paneActions, paneMenu, initialSelectedId = null, sortParam = "sort", cards, phoneReadOnly = false,
   filterRows, pinned = null, initialMissingNotice, onOpenChange,
 }: QueueScreenProps<T>) {
   const router = useRouter()
@@ -315,6 +336,26 @@ function QueueScreenInner<T>({
     router.push(qs ? `${pathname}?${qs}` : pathname)
   }
 
+  // #261 spec §6: the filtered-empty state's default Clear filters. The button unmounts with the
+  // empty state, so focus is handed to the first control that still explains the list: the phone
+  // Filters button, the first header chip, else the queue title — never body (critic D3).
+  const clearFilters = () => {
+    const qs = clearFilterParams(searchParams, facets, sortParam).toString()
+    router.push(qs ? `${pathname}?${qs}` : pathname)
+    const root = rootRef.current
+    const candidates = ["#queue-filters-trigger", "#queue-facets button", "#queue-title"]
+    for (const selector of candidates) {
+      const el = root?.querySelector<HTMLElement>(selector)
+      if (el && el.offsetParent !== null) { el.focus(); return }
+    }
+  }
+  /** #261: the card slot a column feeds, rendered with `phoneRender` when the cell carries
+   * desktop-only chrome. */
+  const phoneSlot = (row: T, slot: NonNullable<QueueColumn<T>["phone"]>) =>
+    columns.filter((column) => column.phone === slot).map((column) => (column.phoneRender ?? column.render)(row)).filter((node) => node !== null && node !== undefined && node !== false && node !== "")
+  const cardLabel = (row: T) => cards?.label ? cards.label(row) : [rowName(row).title, rowName(row).suffix].filter(Boolean).join(", ")
+  const lowPriority = (column: QueueColumn<T>) => (column.priority === "low" ? "hidden lg:table-cell" : "")
+
   const exportAll = async () => {
     if (!onExportAll) return
     setExporting(true)
@@ -331,7 +372,7 @@ function QueueScreenInner<T>({
     {!cards && band}
     {/* Row 1: title · Views · Sort · filters · stat · menu */}
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-slate-200 px-4 py-2">
-      <h1 className={`flex items-baseline gap-2 ${below ? below.h1 : "text-lg"} font-semibold tracking-tight text-slate-900`}>
+      <h1 id="queue-title" tabIndex={-1} className={`flex items-baseline gap-2 ${below ? below.h1 : "text-lg"} font-semibold tracking-tight text-slate-900 focus:outline-none`}>
         {below && cards?.title ? <><span className={below.hideAbove}>{cards.title}</span><span className={below.titleAbove}>{title}</span></> : title}
         <span className="text-sm font-normal tabular-nums text-slate-500" aria-live="polite" aria-label={`${sortedRows.length} rows`}>{sortedRows.length}</span>
       </h1>
@@ -343,7 +384,7 @@ function QueueScreenInner<T>({
           {sortOptions.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}
         </select>
       </label>}
-      {facets.length > 0 && <span className={below ? below.hideBelow : "contents"}><FacetFilters facets={facets} /></span>}
+      {facets.length > 0 && <span id="queue-facets" className={below ? below.hideBelow : "contents"}><FacetFilters facets={facets} sortParam={sortParam} /></span>}
       <div className="ml-auto flex items-center gap-2">
         {stat}
         <Popover open={menuOpen} onOpenChange={setMenuOpen}>
@@ -375,16 +416,19 @@ function QueueScreenInner<T>({
     {cards && band}
     {/* #257 spec 3.4: below the card breakpoint the sort select and facet chips give way to one
         Filter button and its sheet — the same params, one place to change them. */}
-    {below && (facets.length > 0 || sortOptions.length > 1) && <div className={`${below.showBelowOnly} flex items-center gap-2 border-b border-slate-200 px-4 py-2`}>
-      <FilterButton facets={facets} sortParam={sortParam} defaultSortKey={sortOptions[0]?.key ?? null} onClick={() => setFilterOpen(true)} />
-      <FilterSheet open={filterOpen} onClose={() => setFilterOpen(false)} facets={facets} sortOptions={sortOptions} sortParam={sortParam} rows={rows} filterRows={filterRows} />
+    {below && (facets.length > 0 || sortOptions.length > 1 || viewsPhone) && <div className={`${below.showBelowOnly} flex items-center gap-2 border-b border-slate-200 px-4 py-2`}>
+      {viewsPhone}
+      {(facets.length > 0 || sortOptions.length > 1) && <>
+        <FilterButton id="queue-filters-trigger" facets={facets} sortParam={sortParam} defaultSortKey={sortOptions[0]?.key ?? null} onClick={() => setFilterOpen(true)} />
+        <FilterSheet open={filterOpen} onClose={() => setFilterOpen(false)} facets={facets} sortOptions={sortOptions} sortParam={sortParam} rows={rows} filterRows={filterRows} />
+      </>}
     </div>}
     {missingNotice && <p role="status" className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-[13px] text-slate-700">{missingNotice}</p>}
 
     {/* Override Mode banner — only while the mode is on (#203's permanent strip is gone). */}
     {overrideMode.active && <div role="status" className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200 bg-amber-50 px-4 py-1.5 text-xs font-medium text-amber-900">
       <span className="inline-flex items-center gap-1.5"><ShieldCheck className="h-3.5 w-3.5" aria-hidden />Override Mode is on. Open a row&apos;s Checks tab to override a soft check with a reason.</span>
-      <button type="button" onClick={overrideMode.toggle} className="rounded-md border border-amber-300 bg-white px-2 py-0.5 text-xs font-medium text-amber-900 hover:bg-amber-100">Turn off</button>
+      <button type="button" onClick={overrideMode.toggle} className="rounded-md border border-amber-300 bg-white px-2 py-0.5 text-xs font-medium text-amber-900 hover:bg-amber-100 max-md:h-11 max-md:px-3">Turn off</button>
     </div>}
 
     {/* Bulk action bar: its own row above the table head once anything is checked. */}
@@ -403,26 +447,37 @@ function QueueScreenInner<T>({
             <p className="mt-1 text-sm text-slate-600">{filtered
               ? empty.filteredBody ?? (hiddenByFilters > 0 ? `${hiddenByFilters} ${hiddenByFilters === 1 ? "row is" : "rows are"} hidden by the filters.` : "Clear a filter to widen the queue.")
               : empty.body}</p>
-            {(filtered ? empty.filteredAction : empty.action) && <div className="mt-3 text-sm">{filtered ? empty.filteredAction : empty.action}</div>}
+            {filtered
+              ? <div className="mt-3 text-sm">{empty.filteredAction ?? <button type="button" onClick={clearFilters}
+                className="inline-flex h-11 items-center rounded-md border border-slate-300 bg-white px-4 font-medium text-slate-800 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-1 md:h-8 md:px-3 md:text-xs">Clear filters</button>}</div>
+              : empty.action && <div className="mt-3 text-sm">{empty.action}</div>}
           </div>
           : <>
           {below && cards && <ul aria-label={cards.title ?? title} className={below.hideAbove}>
             {sortedRows.map((row) => {
               const id = rowId(row)
               const isOpen = id === openId
+              const toggle = () => (isOpen ? close() : open(id))
               return <li key={id} data-row-id={id} className="border-b border-slate-200 last:border-b-0">
-                {cards.render(row, { isOpen, open: () => (isOpen ? close() : open(id)) })}
+                {cards.render
+                  ? cards.render(row, { isOpen, open: toggle })
+                  : <QueueCard href={`${basePath}/${id}`} label={cardLabel(row)} isOpen={isOpen} onOpen={toggle} leading={leading?.(row)}
+                    title={phoneSlot(row, "title")[0] ?? rowName(row).title}
+                    trailing={phoneSlot(row, "trailing")[0]}
+                    subtitle={(() => { const s = phoneSlot(row, "subtitle"); return s.length > 0 ? joinSegments(s) : null })()}
+                    pill={(() => { const p = phoneSlot(row, "pill"); return p.length > 0 ? p.map((node, index) => <Fragment key={index}>{node}</Fragment>) : null })()}
+                    subtitleClamp={cards.subtitleClamp} />}
               </li>
             })}
           </ul>}
-          <table className={`w-full text-sm ${below ? below.table : ""} ${openId ? "" : "min-w-[720px]"}`}>
+          <table className={`w-full text-sm ${below ? below.table : ""}`}>
             <thead className="sticky top-0 z-10 bg-white shadow-[inset_0_-1px_0_0_theme(colors.slate.200)]">
               <tr className="text-left text-xs font-medium uppercase tracking-wide text-slate-600">
                 {selectable && <th scope="col" className="w-10 px-3 py-2">
                   <input type="checkbox" aria-label={`Select all ${title.toLowerCase()}`} checked={allChecked} onChange={toggleAll} className="h-4 w-4 rounded border-slate-300 accent-emerald-700" />
                 </th>}
                 {leading && <th scope="col" className="w-8 px-1 py-2"><span className="sr-only">Mark</span></th>}
-                {visibleColumns.map((column) => <th key={column.key} scope="col" className={`px-3 py-2 font-medium ${column.className ?? ""}`}>{column.label}</th>)}
+                {visibleColumns.map((column) => <th key={column.key} scope="col" className={`px-3 py-2 font-medium ${column.className ?? ""} ${lowPriority(column)}`}>{column.label}</th>)}
               </tr>
             </thead>
             <tbody>
@@ -440,7 +495,7 @@ function QueueScreenInner<T>({
                     <input type="checkbox" aria-label={`Select ${rowName(row).title}`} checked={isChecked} onChange={() => toggleChecked(id)} className="h-4 w-4 rounded border-slate-300 accent-emerald-700" />
                   </td>}
                   {leading && <td className="px-1 py-0">{leading(row)}</td>}
-                  {visibleColumns.map((column, columnIndex) => <td key={column.key} className={`px-3 py-0 ${column.className ?? ""} ${isOpen && columnIndex === 0 ? "relative before:absolute before:inset-y-2 before:-left-px before:w-[3px] before:rounded-full before:bg-emerald-700" : ""}`}>
+                  {visibleColumns.map((column, columnIndex) => <td key={column.key} className={`px-3 py-0 ${column.className ?? ""} ${lowPriority(column)} ${isOpen && columnIndex === 0 ? "relative before:absolute before:inset-y-2 before:-left-px before:w-[3px] before:rounded-full before:bg-emerald-700" : ""}`}>
                     {columnIndex === 0
                       ? <button type="button" ref={(el) => { if (el) triggerRefs.current.set(id, el); else triggerRefs.current.delete(id) }}
                         aria-expanded={isOpen} aria-controls={DETAIL_PANE_ID}

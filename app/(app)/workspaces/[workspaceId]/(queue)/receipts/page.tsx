@@ -61,6 +61,15 @@ export async function ReceiptsQueuePage({ params, searchParams, selectedDocument
       renameAction={renameSavedViewAction.bind(null, workspaceId, basePath)}
       saveFiltersAction={saveFiltersToViewAction.bind(null, workspaceId, basePath)}
       deleteAction={deleteSavedViewAction.bind(null, workspaceId, basePath)}
+      shareAction={shareSavedViewAction.bind(null, workspaceId, basePath)} />}
+    // #261: the phone filter row's Views select — the same picker, `variant="select"`.
+    viewsPhone={<SavedViewPicker variant="select" views={savedViews} selectedViewId={selectedViewId ?? null} currentFilters={currentViewFilters}
+      currentUserId={user.id} currentUserRole={membership.role as WorkspaceRole}
+      createAction={createSavedViewAction.bind(null, workspaceId, "receipts", basePath)}
+      duplicateAction={duplicateSavedViewAction.bind(null, workspaceId, "receipts", basePath)}
+      renameAction={renameSavedViewAction.bind(null, workspaceId, basePath)}
+      saveFiltersAction={saveFiltersToViewAction.bind(null, workspaceId, basePath)}
+      deleteAction={deleteSavedViewAction.bind(null, workspaceId, basePath)}
       shareAction={shareSavedViewAction.bind(null, workspaceId, basePath)} />} />
 }
 

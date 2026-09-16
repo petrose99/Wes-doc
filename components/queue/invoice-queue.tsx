@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { QueueScreen, type QueueColumn, type SortOption } from "@/components/queue/queue-screen"
+import { joinSegments } from "@/components/queue/queue-card"
 import type { FieldTable } from "@/lib/configuration/field-table"
 import { PaneMenuItem } from "@/components/queue/detail-pane"
 import { DocumentBulkActions, DocumentPaneActions } from "@/components/queue/document-actions"
@@ -78,7 +79,7 @@ const SORTS: SortOption<BillRow>[] = [
   { key: "supplier", label: "Supplier A–Z", compare: (a, b) => (a.supplier ?? "￿").localeCompare(b.supplier ?? "￿") },
 ]
 
-export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercent, availableWorkflows = [], views, stat, initialSelectedId, fieldTable = null }: {
+export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercent, availableWorkflows = [], views, viewsPhone, stat, initialSelectedId, fieldTable = null }: {
   workspaceId: string
   basePath: string
   bills: BillRow[]
@@ -88,6 +89,8 @@ export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercen
    * bulk control doesn't render at all. */
   availableWorkflows?: ApprovalWorkflowOption[]
   views?: ReactNode
+  /** #261: the phone filter row's Views select. */
+  viewsPhone?: ReactNode
   stat?: ReactNode
   initialSelectedId?: string | null
   /** #252: Admin › Configuration › Fields for invoices, when one has been saved. */
@@ -96,6 +99,8 @@ export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercen
   const router = useRouter()
   const origin = useOriginHere()
   const [needsAttention, setNeedsAttention] = useState<Set<string>>(new Set())
+  // #261: the card's "overdue" reads against one instant per mount (the same as Approvals' card).
+  const [renderedAt] = useState(() => Date.now())
   const [cancelling, setCancelling] = useState<BillRow | null>(null)
   const minConfidence = minConfidenceFromPercent(minConfidencePercent)
   const billsById = new Map(bills.map((bill) => [bill.documentId, bill]))
@@ -132,16 +137,26 @@ export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercen
 
   const columns: QueueColumn<BillRow>[] = [
     {
-      key: "supplier", label: "Supplier", narrow: true, className: "min-w-[12rem]", fieldKey: "vendor",
+      key: "supplier", label: "Supplier", narrow: true, className: "min-w-[12rem]", fieldKey: "vendor", phone: "title",
+      phoneRender: (bill) => bill.supplier ?? <span className="font-normal text-slate-600">Unknown supplier</span>,
       render: (bill) => <TitleCell subtitle={bill.filename} missingLabel="Unknown supplier"
         title={bill.supplier ? <ConfidenceField label="Supplier" value={bill.fieldConfidence.vendor ?? bill.fieldConfidence.merchant} minConfidence={minConfidence}>{bill.supplier}</ConfidenceField> : null} />,
     },
     {
-      key: "number", label: "Invoice #", className: "whitespace-nowrap text-slate-700", fieldKey: "invoice_number",
+      key: "number", label: "Invoice #", className: "whitespace-nowrap text-slate-700", fieldKey: "invoice_number", priority: "low", phone: "subtitle",
+      // #261 spec §2: the card's second line — "INV-2031 · Due 30 Sep"; a missing half is omitted.
+      phoneRender: (bill) => {
+        const overdue = bill.dueDate !== null && bill.dueDate.getTime() < renderedAt
+        return joinSegments([
+          bill.invoiceNumber,
+          bill.dueDate ? <span className={overdue ? "text-red-700" : ""}>Due {formatDate(bill.dueDate)}{overdue ? " · overdue" : ""}</span> : null,
+        ])
+      },
       render: (bill) => <ConfidenceField label="Invoice number" value={bill.invoiceNumber ? bill.fieldConfidence.invoice_number : undefined} minConfidence={minConfidence}>{bill.invoiceNumber ?? "—"}</ConfidenceField>,
     },
     {
-      key: "amount", label: "Amount", narrow: true, className: "whitespace-nowrap text-right tabular-nums text-slate-900", fieldKey: "total",
+      key: "amount", label: "Amount", narrow: true, className: "whitespace-nowrap text-right tabular-nums text-slate-900", fieldKey: "total", phone: "trailing",
+      phoneRender: (bill) => bill.total !== null ? formatMoney(bill.total, bill.currencyCode) : <span className="font-normal text-slate-600">No amount</span>,
       render: (bill) => <ConfidenceField label="Amount" value={bill.total !== null ? bill.fieldConfidence.total ?? bill.fieldConfidence.amount : undefined} minConfidence={minConfidence}>{bill.total !== null ? formatMoney(bill.total, bill.currencyCode) : "—"}</ConfidenceField>,
     },
     {
@@ -151,17 +166,17 @@ export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercen
         {bill.dueDate && !bill.extractedDueDate && <span className="ml-1.5 text-xs text-slate-500" title="From the supplier's payment terms, not the document">inferred</span>}
       </>,
     },
-    { key: "aging", label: "Aging", className: "whitespace-nowrap", render: (bill) => <DueDateCountdownBadge dueDate={bill.dueDate} /> },
+    { key: "aging", label: "Aging", className: "whitespace-nowrap", priority: "low", render: (bill) => <DueDateCountdownBadge dueDate={bill.dueDate} /> },
     {
       // #228 Q5/Q6/Q11: the matched PO as a chip carrying the number of `≠` glyphs the pane will
       // show; dashed for a suggestion that compares nothing; "PO removed" after a rejection.
-      key: "po", label: "Purchase Orders", narrow: true, className: "whitespace-nowrap",
+      key: "po", label: "Purchase Orders", narrow: true, className: "whitespace-nowrap", phone: "pill",
       render: (bill) => <PoChip poNumber={bill.po.poNumber} kind={bill.po.kind} mismatchCount={bill.po.mismatchCount} confidence={bill.po.confidence ?? undefined}
         suggestionCount={bill.po.suggestionCount} removed={bill.po.removed} origin={origin}
         href={bill.po.kind && bill.po.kind !== "suggested" && bill.po.poDocumentId ? `/workspaces/${workspaceId}/purchase-orders/${bill.po.poDocumentId}` : undefined} />,
     },
     {
-      key: "state", label: "State",
+      key: "state", label: "State", phone: "pill",
       render: statePills,
     },
   ]
@@ -202,9 +217,22 @@ export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercen
       sortOptions={SORTS}
       facets={INVOICE_FACETS}
       views={views}
+      viewsPhone={viewsPhone}
       stat={stat}
       onExportAll={exportAll}
       initialSelectedId={initialSelectedId}
+      // #261: card rows below `md`; the label is the card's accessible name, comma-separated.
+      cards={{ below: "md", label: (bill) => {
+        const overdue = bill.dueDate !== null && bill.dueDate.getTime() < renderedAt
+        return [
+          bill.supplier ?? "Unknown supplier",
+          bill.total !== null ? formatMoney(bill.total, bill.currencyCode) : "No amount",
+          bill.invoiceNumber,
+          bill.dueDate ? `Due ${formatDate(bill.dueDate)}${overdue ? ", overdue" : ""}` : null,
+          poSubtitle(bill),
+          PROCESSING_STATE_LABELS[billState(bill)],
+        ].filter(Boolean).join(", ")
+      } }}
       empty={{ title: "No invoices yet.", body: "Invoices appear here once one is extracted from an upload or an inbound email.", filteredBody: "Clear a filter to widen the queue." }}
       loadDetail={(documentId) => getQueueDetailAction(workspaceId, documentId, { queueTitle: "Invoices" })}
       bulkActions={({ selectedIds, clear }) => <DocumentBulkActions

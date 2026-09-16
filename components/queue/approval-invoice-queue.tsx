@@ -81,12 +81,26 @@ export function ApprovalInvoiceQueue({ workspaceId, basePath, rows, poMismatchCo
   const [sendingBack, setSendingBack] = useState<ApprovalInvoiceRow | null>(null)
   const [error, setError] = useState<{ taskId: string; message: string } | null>(null)
 
+  // The card's "overdue" reads against one instant per mount (#257).
+  const [renderedAt] = useState(() => Date.now())
+  // #261: the columns feed the shared card's slots (title · trailing · subtitle · pill) with the
+  // same text and logic #257's bespoke card carried — overdue in red, the eligibility pill.
   const columns: QueueColumn<ApprovalInvoiceRow>[] = [
-    { key: "supplier", label: "Supplier", narrow: true, className: "min-w-[12rem]", render: (row) => <TitleCell title={row.supplier} missingLabel="Unknown supplier" subtitle={row.eligibility.status !== "ready" ? eligibilityText(row) : null} /> },
-    { key: "number", label: "Invoice #", className: "whitespace-nowrap text-slate-700", render: (row) => <>{row.invoiceNumber ?? "—"}</> },
-    { key: "amount", label: "Amount", narrow: true, className: "whitespace-nowrap text-right tabular-nums text-slate-900", render: (row) => <>{row.total !== null ? formatMoney(row.total, row.currencyCode) : "—"}</> },
+    { key: "supplier", label: "Supplier", narrow: true, className: "min-w-[12rem]", phone: "title", phoneRender: (row) => row.supplier ?? "Unknown supplier",
+      render: (row) => <TitleCell title={row.supplier} missingLabel="Unknown supplier" subtitle={row.eligibility.status !== "ready" ? eligibilityText(row) : null} /> },
+    { key: "number", label: "Invoice #", className: "whitespace-nowrap text-slate-700", phone: "subtitle",
+      phoneRender: (row) => {
+        const overdue = row.dueDate !== null && row.dueDate.getTime() < renderedAt
+        return <>{row.invoiceNumber ?? "No invoice #"} · <span className={overdue ? "text-red-700" : ""}>Due {formatDate(row.dueDate)}{overdue ? " · overdue" : ""}</span></>
+      },
+      render: (row) => <>{row.invoiceNumber ?? "—"}</> },
+    { key: "amount", label: "Amount", narrow: true, className: "whitespace-nowrap text-right tabular-nums text-slate-900", phone: "trailing",
+      phoneRender: (row) => row.total !== null ? formatMoney(row.total, row.currencyCode) : <span className="font-normal text-slate-600">No amount</span>,
+      render: (row) => <>{row.total !== null ? formatMoney(row.total, row.currencyCode) : "—"}</> },
     { key: "due", label: "Due", narrow: true, className: "whitespace-nowrap tabular-nums text-slate-700", render: (row) => <>{formatDate(row.dueDate)}</> },
-    { key: "stage", label: "Stage", className: "whitespace-nowrap text-slate-700", render: (row) => <>{stageLabel(row.stage)}</> },
+    { key: "stage", label: "Stage", className: "whitespace-nowrap text-slate-700", phone: "pill",
+      phoneRender: (row) => row.eligibility.status !== "ready" ? <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-[12px] font-medium leading-4 text-amber-900">{eligibilityText(row)}</span> : <span className="text-[13px] text-slate-700">{stageLabel(row.stage)}</span>,
+      render: (row) => <>{stageLabel(row.stage)}</> },
     { key: "waiting", label: "Waiting since", className: "whitespace-nowrap tabular-nums text-slate-700", render: (row) => <>{waitingSinceLabel(row.waitingSince)}</> },
   ]
 
@@ -120,7 +134,6 @@ export function ApprovalInvoiceQueue({ workspaceId, basePath, rows, poMismatchCo
   }
   const waitingOnOthers = countWaitingOnOthers(rows)
   // One clock reading per render of the list, so "overdue" is stable across cards.
-  const [renderedAt] = useState(() => Date.now())
   const searchParams = useSearchParams()
   const ownCount = filterApprovalInvoiceRows(rows, searchParams).length
 
@@ -144,7 +157,18 @@ export function ApprovalInvoiceQueue({ workspaceId, basePath, rows, poMismatchCo
         { key: "po-mismatches", label: "PO mismatches", count: poMismatchCount, href: basePath.replace(/\/invoices$/, "/po-mismatches") },
       ]} active="invoices" /></div>}
       views={views}
-      cards={{ below: "lg", title: "Ready to Approve", render: (row, { open }) => <ApprovalCard row={row} onOpen={open} now={renderedAt} /> }}
+      // #261: the card is the shared `QueueCard` fed by the columns' phone slots; the label keeps
+      // #257's comma-separated name (supplier, amount, number, due[, overdue], state).
+      cards={{ below: "lg", title: "Ready to Approve", label: (row) => {
+        const overdue = row.dueDate !== null && row.dueDate.getTime() < renderedAt
+        return [
+          row.supplier ?? "Unknown supplier",
+          row.total !== null ? formatMoney(row.total, row.currencyCode) : "No amount",
+          row.invoiceNumber ?? "No invoice #",
+          `Due ${formatDate(row.dueDate)}${overdue ? ", overdue" : ""}`,
+          row.eligibility.status !== "ready" ? PROCESSING_STATE_LABELS.needs_attention : stageLabel(row.stage),
+        ].join(", ")
+      } }}
       initialSelectedId={initialSelectedId}
       empty={{
         title: "Nothing needs your approval",
@@ -154,7 +178,6 @@ export function ApprovalInvoiceQueue({ workspaceId, basePath, rows, poMismatchCo
           <Link href={`/workspaces/${workspaceId}/invoices`} className="font-medium text-emerald-800 underline-offset-2 hover:underline">Go to Invoices</Link>
         </span>,
         filteredTitle: "No rows match these filters",
-        filteredAction: <Link href={basePath} className="font-medium text-emerald-800 underline-offset-2 hover:underline">Clear filters</Link>,
       }}
       loadDetail={(documentId) => getQueueDetailAction(workspaceId, documentId, { initialTab: "approval" })}
       paneActions={(row, helpers) => {
@@ -212,40 +235,6 @@ export function ApprovalInvoiceQueue({ workspaceId, basePath, rows, poMismatchCo
       submitLabel="Send back"
       placeholder="Why is this going back for review?" />
   </>
-}
-
-/** #257 spec 3.3: the phone/tablet card row for Invoice approvals — one `<a>` per row so a
- * long-press/open-in-new-tab works and the deep-link route already exists; `onClick` prevents
- * default and drives the shared `open()` (pushState per S8). */
-function ApprovalCard({ row, onOpen, now }: { row: ApprovalInvoiceRow; onOpen: () => void; now: number }) {
-  const notEligible = row.eligibility.status !== "ready"
-  const overdue = row.dueDate !== null && row.dueDate.getTime() < now
-  // Screen-reader name with separators: the visual spans concatenate without spaces otherwise.
-  const name = [
-    row.supplier ?? "Unknown supplier",
-    row.total !== null ? formatMoney(row.total, row.currencyCode) : "No amount",
-    row.invoiceNumber ?? "No invoice #",
-    `Due ${formatDate(row.dueDate)}${overdue ? ", overdue" : ""}`,
-    notEligible ? PROCESSING_STATE_LABELS.needs_attention : stageLabel(row.stage),
-  ].join(", ")
-  return <a href={`#${row.documentId}`} onClick={(event) => { event.preventDefault(); onOpen() }} aria-label={name}
-    className="flex min-h-16 items-start gap-3 px-4 py-3 hover:bg-slate-50 active:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-inset">
-    <ProcessingStateGlyph state={processingState({ approvalStatus: "in_progress", blockedByCheck: notEligible, escalated: false, touchless: false, status: "needs_review" })} />
-    <span className="min-w-0 flex-1">
-      <span className="flex items-baseline justify-between gap-2">
-        <span className="truncate text-[15px] font-semibold text-slate-900">{row.supplier ?? "Unknown supplier"}</span>
-        <span className="shrink-0 tabular-nums text-[15px] font-semibold text-slate-900">{row.total !== null ? formatMoney(row.total, row.currencyCode) : <span className="font-normal text-slate-600">No amount</span>}</span>
-      </span>
-      <span className="mt-0.5 block text-[13px] text-slate-600">
-        {row.invoiceNumber ?? "No invoice #"} · <span className={overdue ? "text-red-700" : ""}>Due {formatDate(row.dueDate)}{overdue ? " · overdue" : ""}</span>
-      </span>
-      <span className="mt-0.5 block text-[13px]">
-        {notEligible
-          ? <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-[12px] font-medium leading-4 text-amber-900">{eligibilityText(row)}</span>
-          : <span className="text-slate-700">{stageLabel(row.stage)}</span>}
-      </span>
-    </span>
-  </a>
 }
 
 /** Decision #11's optional-comment Approve. Deliberately not `ReasonDialog`: that component

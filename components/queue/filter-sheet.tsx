@@ -48,12 +48,7 @@ export function FilterSheet<T>({ open, onClose, facets, sortOptions, sortParam, 
     if (facet.kind === "multi") setDraftFacet(facet, current.includes(value) ? current.filter((v) => v !== value) : [...current, value])
     else setDraftFacet(facet, current[0] === value ? [] : [value])
   }
-  const clear = () => setDraft((prev) => {
-    const next = new URLSearchParams(prev.toString())
-    next.delete(sortParam)
-    for (const facet of facets) next.delete(facet.param)
-    return next
-  })
+  const clear = () => setDraft((prev) => clearFilterParams(prev, facets, sortParam))
 
   const activeCount = activeFilterCount(draft, facets, { param: sortParam, defaultKey: defaultSortKey })
   const count = (filterRows ? filterRows(rows, draft) : rows).length
@@ -81,7 +76,7 @@ export function FilterSheet<T>({ open, onClose, facets, sortOptions, sortParam, 
     next.click()
   }
 
-  return <Dialog open={open} placement="sheet" title="Filter" onClose={onClose} initialFocus="[role=radio][aria-checked=true], [role=checkbox]">
+  return <Dialog open={open} placement="sheet" title="Sort and filter" onClose={onClose} initialFocus="[role=radio][aria-checked=true], [role=checkbox]">
     <div className="max-h-[60vh] overflow-y-auto py-2">
       {sortOptions.length > 1 && <div role="radiogroup" aria-labelledby="filter-sheet-sort" onKeyDown={onGroupKeyDown} className="pb-2">
         <p id="filter-sheet-sort" className="px-5 pb-1 pt-2 text-[13px] font-medium text-slate-600">Sort</p>
@@ -120,9 +115,11 @@ export function FilterSheet<T>({ open, onClose, facets, sortOptions, sortParam, 
   </Dialog>
 }
 
-/** The button that opens the sheet — "Filter", or "Filter · 2" when anything is active, tinted
- * so an applied filter is never invisible on a phone that hides the chips. */
-export function FilterButton({ facets, sortParam, defaultSortKey, onClick }: {
+/** The button that opens the sheet — "Filters", or "Filters · 2" when anything is active, tinted
+ * so an applied filter is never invisible on a phone that hides the chips (#235 d11: the label
+ * matches CONTEXT.md's "Filters"; the sheet is "Sort and filter" since it holds Sort too). */
+export function FilterButton({ id, facets, sortParam, defaultSortKey, onClick }: {
+  id?: string
   facets: Facet[]
   sortParam: string
   defaultSortKey: string | null
@@ -131,10 +128,10 @@ export function FilterButton({ facets, sortParam, defaultSortKey, onClick }: {
   const searchParams = useSearchParams()
   const count = activeFilterCount(searchParams, facets, { param: sortParam, defaultKey: defaultSortKey })
   const active = count > 0
-  return <button type="button" onClick={onClick} aria-haspopup="dialog"
+  return <button type="button" id={id} onClick={onClick} aria-haspopup="dialog"
     className={`inline-flex h-11 items-center gap-2 rounded-md border bg-white px-3 text-sm font-medium tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-1 ${active ? "border-emerald-600 text-emerald-800" : "border-slate-300 text-slate-700 hover:bg-slate-50"}`}>
     <Filter className="h-4 w-4" aria-hidden />
-    {active ? `Filter · ${count}` : "Filter"}
+    {active ? `Filters · ${count}` : "Filters"}
     {active && <span className="sr-only">{`, ${count} active`}</span>}
   </button>
 }

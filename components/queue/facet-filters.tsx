@@ -4,6 +4,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useState } from "react"
 import { Check, ChevronDown, X } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { clearFilterParams } from "@/lib/queue/filters"
 
 export type FacetOption = { value: string; label: string }
 
@@ -41,7 +42,9 @@ function summary(facet: Facet, values: string[]): string {
   return allOptions(facet).find((option) => option.value === values[0])?.label ?? values[0]
 }
 
-export function FacetFilters({ facets }: { facets: Facet[] }) {
+/** `sortParam` (#261): the chips' Clear filters shares `clearFilterParams` with the Filter sheet
+ * and the filtered-empty state, so all three clear the same set — facets and a non-default sort. */
+export function FacetFilters({ facets, sortParam = "sort" }: { facets: Facet[]; sortParam?: string }) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -73,9 +76,7 @@ export function FacetFilters({ facets }: { facets: Facet[] }) {
       return <FacetChip key={facet.param} facet={facet} values={values} onApply={(next) => apply(facet.param, next)} />
     })}
     {anyActive && <button type="button" onClick={() => {
-      const next = new URLSearchParams(searchParams.toString())
-      for (const facet of facets) next.delete(facet.param)
-      const qs = next.toString()
+      const qs = clearFilterParams(searchParams, facets, sortParam).toString()
       router.push(qs ? `${pathname}?${qs}` : pathname)
     }} className="inline-flex h-8 items-center gap-1 rounded-full px-2.5 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-1">
       <X className="h-3.5 w-3.5" aria-hidden />Clear filters
