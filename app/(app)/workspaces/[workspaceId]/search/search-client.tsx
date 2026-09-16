@@ -19,6 +19,15 @@ export function SearchPageClient({ workspaceId, initialQuery, askMode = false }:
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const nullRef = useRef(null)
 
+  // #262: arrival from the `/` shortcut — the input already autofocuses on mount, this only
+  // matters when the operator was already on this page and pressed `/` again.
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    if (window.sessionStorage.getItem("docubite.pendingFocus") !== "search") return
+    window.sessionStorage.removeItem("docubite.pendingFocus")
+    document.getElementById("search-input")?.focus()
+  }, [])
+
   useEffect(() => {
     if (!query.trim()) { setResult(null); return }
     if (timerRef.current) clearTimeout(timerRef.current)

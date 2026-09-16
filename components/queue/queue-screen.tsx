@@ -1,7 +1,7 @@
 "use client"
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react"
 import { ArrowUpDown, Download, MoreHorizontal, ShieldAlert, ShieldCheck } from "lucide-react"
 import { toast } from "sonner"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -182,6 +182,17 @@ function QueueScreenInner<T>({
   const triggerRefs = useRef<Map<string, HTMLButtonElement>>(new Map())
   const below = cards ? BELOW[cards.below] : null
 
+  // #262: the roving tab stop — one row button carries tabIndex=0, everything else -1, so Tab
+  // leaves the table in one hop instead of walking every row. The open row wins; failing that,
+  // whichever row was last focused in this mount; failing that, the first row (spec §3.1).
+  const [lastFocusedRowId, setLastFocusedRowId] = useState<string | null>(null)
+  // #262: flags the layout's "Skip to the list" link as reachable — set while this queue is
+  // mounted, cleared on unmount, read by the link via a `[data-queue-list]` CSS selector.
+  useLayoutEffect(() => {
+    document.body.dataset.queueList = "1"
+    return () => { delete document.body.dataset.queueList }
+  }, [])
+
   // A deep link to a row the view no longer holds (decided since the link was made): say so once,
   // above the list, rather than opening a pane on nothing. Read at mount only.
   const [missingNotice] = useState<string | null>(() =>
@@ -200,6 +211,35 @@ function QueueScreenInner<T>({
   const ids = useMemo(() => sortedRows.map(rowId), [sortedRows, rowId])
   const openIndex = openId ? ids.indexOf(openId) : -1
   const openRow = openIndex >= 0 ? sortedRows[openIndex] : null
+  const rovingId = openId ?? (lastFocusedRowId && ids.includes(lastFocusedRowId) ? lastFocusedRowId : ids[0]) ?? null
+
+  const focusRow = useCallback((id: string | undefined | null) => {
+    if (!id) { document.getElementById("queue-title")?.focus(); return }
+    const button = triggerRefs.current.get(id)
+    button?.focus()
+    button?.scrollIntoView({ block: "nearest" })
+  }, [])
+  const focusCheckbox = useCallback((id: string | undefined | null) => {
+    if (!id) return
+    rootRef.current?.querySelector<HTMLElement>(`tr[data-row-id="${id}"] input[type=checkbox]`)?.focus()
+  }, [])
+
+  // #262 arrival focus (spec §3.2): a `g` jump, `/`, or the "Skip to the list" link writes this
+  // flag before navigating; consumed here once the rows (or the empty state) have rendered, then
+  // removed so a later render of the same screen doesn't refire it.
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    if (window.sessionStorage.getItem("docubite.pendingFocus") !== "rows") return
+    window.sessionStorage.removeItem("docubite.pendingFocus")
+    focusRow(openId ?? ids[0] ?? null)
+  }, [ids, openId, focusRow])
+  // Same-route `g` jump (already on the destination): the host dispatches this instead of
+  // `router.push`-ing to where we already are.
+  useEffect(() => {
+    const onFocusRows = () => focusRow(openId ?? ids[0] ?? null)
+    window.addEventListener("docubite:focus-rows", onFocusRows)
+    return () => window.removeEventListener("docubite:focus-rows", onFocusRows)
+  }, [ids, openId, focusRow])
   const filtered = facets.some((facet) => searchParams.get(facet.param))
   const hiddenByFilters = rows.length - visibleRows.length
 
@@ -439,7 +479,7 @@ function QueueScreenInner<T>({
     </div>}
 
     <div className="flex min-h-0 flex-1 md:overflow-hidden">
-      <div className={`min-w-0 flex-1 md:overflow-auto ${openId ? "lg:shadow-[inset_-1px_0_0_0_rgb(226_232_240)]" : ""}`}>
+      <div id="queue-list" className={`min-w-0 flex-1 md:overflow-auto ${openId ? "lg:shadow-[inset_-1px_0_0_0_rgb(226_232_240)]" : ""}`}>
         {phoneReadOnly && <p className={`px-4 py-2 text-[13px] text-slate-600 ${below ? below.hideAbove : "lg:hidden"}`}>Full view on desktop — this list is read-only on a phone.</p>}
         {sortedRows.length === 0
           ? <div className="mx-auto max-w-md px-6 py-16 text-center">
@@ -481,26 +521,46 @@ function QueueScreenInner<T>({
               </tr>
             </thead>
             <tbody>
-              {sortedRows.map((row) => {
+              {sortedRows.map((row, index) => {
                 const id = rowId(row)
                 const isOpen = id === openId
                 const isChecked = checked.has(id)
-                return <tr key={id} aria-current={isOpen ? "true" : undefined} style={{ height: 62 }}
+                // #262 roving tabindex (spec §3.1): ↓/↑ move the tab stop while the pane is closed
+                // (the document-wide handler already moves it when a row is open, so this defers
+                // to that — no double handling); Home/End always jump to the ends; ← hands off to
+                // the row's own checkbox.
+                const onRowKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
+                  if (event.key === "ArrowDown" && openId === null) { event.preventDefault(); focusRow(ids[index + 1]) }
+                  else if (event.key === "ArrowUp" && openId === null) { event.preventDefault(); focusRow(ids[index - 1]) }
+                  else if (event.key === "Home") { event.preventDefault(); focusRow(ids[0]) }
+                  else if (event.key === "End") { event.preventDefault(); focusRow(ids[ids.length - 1]) }
+                  else if (event.key === "ArrowRight" && selectable) { event.preventDefault(); focusCheckbox(id) }
+                }
+                return <tr key={id} data-row-id={id} aria-current={isOpen ? "true" : undefined} style={{ height: 62 }}
                   className={`group cursor-pointer border-b border-slate-100 transition-colors ${isOpen ? "bg-emerald-50/60" : isChecked ? "bg-slate-50" : "hover:bg-slate-50"}`}
                   onClick={(event) => {
                     if ((event.target as HTMLElement).closest(INTERACTIVE)) return
                     if (isOpen) close(); else open(id)
                   }}>
                   {selectable && <td className="px-3 py-0">
-                    <input type="checkbox" aria-label={`Select ${rowName(row).title}`} checked={isChecked} onChange={() => toggleChecked(id)} className="h-4 w-4 rounded border-slate-300 accent-emerald-700" />
+                    <input type="checkbox" tabIndex={-1} aria-label={`Select ${rowName(row).title}`} checked={isChecked} onChange={() => toggleChecked(id)}
+                      onKeyDown={(event) => {
+                        if (event.key === "ArrowLeft" || event.key === "ArrowRight") { event.preventDefault(); focusRow(id) }
+                        else if (event.key === "ArrowDown") { event.preventDefault(); focusCheckbox(ids[index + 1]) }
+                        else if (event.key === "ArrowUp") { event.preventDefault(); focusCheckbox(ids[index - 1]) }
+                      }}
+                      className="h-4 w-4 rounded border-slate-300 accent-emerald-700" />
                   </td>}
                   {leading && <td className="px-1 py-0">{leading(row)}</td>}
                   {visibleColumns.map((column, columnIndex) => <td key={column.key} className={`px-3 py-0 ${column.className ?? ""} ${lowPriority(column)} ${isOpen && columnIndex === 0 ? "relative before:absolute before:inset-y-2 before:-left-px before:w-[3px] before:rounded-full before:bg-emerald-700" : ""}`}>
                     {columnIndex === 0
                       ? <button type="button" ref={(el) => { if (el) triggerRefs.current.set(id, el); else triggerRefs.current.delete(id) }}
+                        tabIndex={id === rovingId ? 0 : -1}
                         aria-expanded={isOpen} aria-controls={DETAIL_PANE_ID}
                         aria-label={[rowName(row).title, rowName(row).suffix].filter(Boolean).join(" · ")}
                         onClick={() => (isOpen ? close() : open(id))}
+                        onFocus={() => setLastFocusedRowId(id)}
+                        onKeyDown={onRowKeyDown}
                         className="block w-full min-w-0 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2">
                         {column.render(row)}
                       </button>

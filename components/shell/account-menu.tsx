@@ -2,8 +2,10 @@
 
 import { resetOnboardingAction } from "@/app/(app)/workspaces/[workspaceId]/onboarding-actions"
 import { useSignOut } from "@/components/shell/sign-out-button"
+import { openKeyboardShortcutsDialog } from "@/components/shell/keyboard-shortcuts"
+import { useKeyboardShortcutsEnabled } from "@/lib/shell/keyboard-shortcuts"
 import { accountPaths } from "@/lib/admin/paths"
-import { ChevronsUpDown, LogOut, RotateCcw, ShieldCheck } from "lucide-react"
+import { ChevronsUpDown, Keyboard, LogOut, RotateCcw, ShieldCheck } from "lucide-react"
 import Link from "next/link"
 import { useEffect, useRef, useState, useTransition } from "react"
 
@@ -21,6 +23,7 @@ export function AccountMenu({ name, email, collapsed = false, workspaceId }: { n
   const close = (refocus = true) => { setOpen(false); if (refocus) trigger.current?.focus() }
   const { busy, signOut } = useSignOut()
   const [resetting, startReset] = useTransition()
+  const shortcutsEnabled = useKeyboardShortcutsEnabled()
 
   useEffect(() => {
     if (!open) return
@@ -67,6 +70,11 @@ export function AccountMenu({ name, email, collapsed = false, workspaceId }: { n
         </Link>
         <button type="button" role="menuitem" className={itemClass} disabled={resetting} onClick={() => startReset(async () => { await resetOnboardingAction(workspaceId); close() })}>
           <RotateCcw className="h-4 w-4" aria-hidden />{resetting ? "Resetting…" : "Show welcome tour again"}
+        </button>
+        <button type="button" role="menuitem" className={itemClass} aria-label={shortcutsEnabled ? "Keyboard shortcuts" : "Keyboard shortcuts, off"}
+          onClick={() => { close(); openKeyboardShortcutsDialog() }}>
+          <Keyboard className="h-4 w-4" aria-hidden /><span className="flex-1">Keyboard shortcuts</span>
+          {!shortcutsEnabled && <span className="text-xs text-slate-500">Off</span>}
         </button>
         <div className="my-1 border-t border-hairline" aria-hidden />
       </>}

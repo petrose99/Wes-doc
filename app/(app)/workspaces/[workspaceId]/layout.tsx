@@ -1,6 +1,7 @@
 import { MobileHeader } from "@/components/shell/mobile-header"
 import { MobileTabBar } from "@/components/shell/mobile-tab-bar"
 import { Sidebar } from "@/components/shell/sidebar"
+import { SkipToListLink } from "@/components/shell/skip-to-list-link"
 import { getCurrentUser, getSession } from "@/lib/auth"
 import config from "@/lib/config"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
@@ -72,6 +73,9 @@ export default async function WorkspaceLayout({ children, params }: { children: 
 
   return <div className="flex min-h-screen bg-white text-slate-900">
     <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[200] focus:rounded-md focus:bg-slate-900 focus:px-3 focus:py-1.5 focus:text-sm focus:font-medium focus:text-white focus:shadow-lg">Skip to content</a>
+    {/* #262: a second skip link, only when a queue is mounted (`QueueScreen` sets the body flag) —
+        Tab, Tab, Enter reaches the first row without walking the rail. */}
+    <SkipToListLink />
     <Sidebar
       workspaceId={workspaceId}
       workspaces={switchable}

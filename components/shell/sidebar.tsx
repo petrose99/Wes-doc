@@ -1,6 +1,7 @@
 "use client"
 
 import { AccountMenu } from "@/components/shell/account-menu"
+import { KeyboardShortcuts, SHORTCUT_DESTINATIONS } from "@/components/shell/keyboard-shortcuts"
 
 import { SwitchableWorkspace, WorkspaceSwitcher } from "@/components/workspace/switcher"
 import { BiteMark } from "@/components/marketing/logo"
@@ -191,9 +192,15 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
   // stays visible in both widths — it is the promise the TODAY group makes — as a small count
   // pinned to the icon's corner while collapsed.
   const labelClass = compact ? "hidden group-hover/rail:inline group-focus-within/rail:inline" : ""
+  // #262: collapsed-rail tooltip carries the `g` jump key beside the label (H6 recognition — the
+  // dialog is the source of truth, this is a hint). Only the eight destinations the shortcut
+  // listener actually registers get one.
+  const SHORTCUT_KEY_BY_LABEL: Record<string, string> = { Invoices: "i", "Purchase Orders": "p", Receipts: "r", "Bank Statements": "b", Exceptions: "e", Approvals: "a", Payments: "y", Admin: "d" }
   const navLink = (item: { href: string; label: string; icon: typeof Files; exact: boolean; badge?: number; tourTarget?: string }) => {
     const active = isActive(item)
-    return <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined} title={compact ? item.label : undefined}
+    const shortcutKey = SHORTCUT_KEY_BY_LABEL[item.label]
+    const tooltip = compact ? (shortcutKey ? `${item.label} · g ${shortcutKey}` : item.label) : undefined
+    return <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined} title={tooltip}
       {...(item.tourTarget ? { "data-tour-target": item.tourTarget } : {})}
       className={`relative flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 ${active ? "bg-white text-emerald-800 shadow-sm ring-1 ring-emerald-700/10" : "text-slate-600 hover:bg-slate-300/40 hover:text-slate-900"}`}>
       {active && <span className="absolute left-0 top-2 bottom-2 w-[3px] rounded-full bg-emerald-700" />}
@@ -268,5 +275,6 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
       <AccountMenu name={user.name} email={user.email} collapsed={compact} workspaceId={workspaceId} />
     </div>
   </div>
+  <KeyboardShortcuts destinations={SHORTCUT_DESTINATIONS(workspaceId, adminPaths(workspaceId).configuration)} />
   </aside>
 }
