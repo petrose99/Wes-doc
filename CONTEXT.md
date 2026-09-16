@@ -13,7 +13,20 @@ A feature the product no longer shows or routes to, kept only so it can be broug
 _Avoid_: Hidden, deprecated, legacy
 
 **Core workflow destinations**:
-Invoices, Purchase Orders, Receipts, Bank Statements, Exceptions, Finance, and Archive: the permission-filtered peer surfaces representing typed intake, escalated work, booked outcome, and the permanent source record. The four typed intake destinations replace the former single "Documents" surface.
+Invoices, Purchase Orders, Receipts, Bank Statements, Exceptions, Finance, and Search: the permission-filtered peer surfaces representing typed intake, escalated work, booked outcome, and cross-type lookup. The four typed intake destinations replace the former single "Documents" surface; there is no separate record of finished work — a finished document stays on its typed queue under Closed.
+_Avoid_: Archive (as a destination), Library, permanent record, Attachments
+
+**Search**:
+The one cross-type lookup: a Queue screen whose rows are every document in the workspace that matches what was typed — any type, any processing state, archived included — with nothing listed until something is typed. Its rows open in the Detail pane in place; a typed row also offers to open on its own queue, which is a hop that carries Origin context. Documents of a type that has no queue of its own (contracts, delivery notes, payslips, tax forms, other) are found and opened here and nowhere else. Reached from the rail and, on desktop, the `/` key.
+_Avoid_: Docu Search, Ask AI, global search (as a user-facing name), scope
+
+**Closed**:
+The section of every queue's Status facet that holds the rows nothing more will happen to: Synced, Paid, Cancelled, Archived. The default view is Open — In review, Needs attention, Approved, Touchless — so a finished document is one chip away, never elsewhere. Closed is a facet section, not a processing state.
+_Avoid_: Done, History, Processed
+
+**Archive** (verb):
+Taking a document off every Open view without cancelling or deleting it, from the Detail pane's overflow menu; reversible from the same menu. An archived document is a Closed row with an Archived mark. "Archive" names only this action.
+_Avoid_: Archive as a place, Store to library
 
 **Document**:
 The storage-and-extraction primitive underlying every typed destination. Every Invoice, Purchase Order, Receipt, and Bank Statement is a Document, but "Document" is no longer itself a user-facing destination — the user asserts which typed destination a Document belongs to at upload time, and that assertion is authoritative.
@@ -136,7 +149,7 @@ The single right-hand pane on a Queue screen that shows the selected row's extra
 _Avoid_: Approval Context (Vic's separate phone screen — DocuBite has one pane), detail sheet, document header (the pane header is the only header)
 
 **Origin context**:
-The workspace, list, filters, position, and workflow state from which a user opened a detail or action surface — in DocuBite, the origin surface's address as it stood, including the selected row. It exists only for a **hop**: an in-app link that opens a row on a *different* surface (an Invoices row to its Exception, an Archive result to its typed queue, a failed ledger push to its document, the Detail pane to its full-width page). Opening a row's Detail pane on the same queue, and choosing a queue from the rail, are not hops and carry nothing. Origin context lives exactly as long as the navigation that carries it: using the Origin link, the browser's Back, or any rail link ends it; nothing is remembered for the session. Returning restores the origin whenever it still exists; when the row no longer matches the origin's filters, the queue says so and offers to show the row instead of silently dropping it.
+The workspace, list, filters, position, and workflow state from which a user opened a detail or action surface — in DocuBite, the origin surface's address as it stood, including the selected row. It exists only for a **hop**: an in-app link that opens a row on a *different* surface (an Invoices row to its Exception, a Search result to its typed queue, a failed ledger push to its document, the Detail pane to its full-width page). Opening a row's Detail pane on the same queue, and choosing a queue from the rail, are not hops and carry nothing. Origin context lives exactly as long as the navigation that carries it: using the Origin link, the browser's Back, or any rail link ends it; nothing is remembered for the session. Returning restores the origin whenever it still exists; when the row no longer matches the origin's filters, the queue says so and offers to show the row instead of silently dropping it.
 _Avoid_: breadcrumb, recent, last-visited, remembered filters (a saved View is the durable way to keep filters)
 
 **Origin link**:
