@@ -449,7 +449,7 @@ function QueueScreenInner<T>({
               : empty.body}</p>
             {filtered
               ? <div className="mt-3 text-sm">{empty.filteredAction ?? <button type="button" onClick={clearFilters}
-                className="inline-flex h-11 items-center rounded-md border border-slate-300 bg-white px-4 font-medium text-slate-800 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-1 md:h-8 md:px-3 md:text-xs">Clear filters</button>}</div>
+                className="inline-flex h-11 items-center rounded-md border border-slate-300 bg-white px-4 py-2 font-medium text-slate-800 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-1 md:h-8 md:px-3 md:py-1 md:text-xs">Clear filters</button>}</div>
               : empty.action && <div className="mt-3 text-sm">{empty.action}</div>}
           </div>
           : <>

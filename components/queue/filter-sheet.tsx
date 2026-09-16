@@ -128,10 +128,12 @@ export function FilterButton({ id, facets, sortParam, defaultSortKey, onClick }:
   const searchParams = useSearchParams()
   const count = activeFilterCount(searchParams, facets, { param: sortParam, defaultKey: defaultSortKey })
   const active = count > 0
+  // The count is spoken through `aria-label` (visible text first, so label-in-name holds) rather than
+  // an `sr-only` span: the in-page detector reads a 1px sr-only span as a 0-padding 14px text block.
   return <button type="button" id={id} onClick={onClick} aria-haspopup="dialog"
+    aria-label={active ? `Filters · ${count}, ${count} active` : undefined}
     className={`inline-flex h-11 items-center gap-2 rounded-md border bg-white px-3 text-sm font-medium tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-1 ${active ? "border-emerald-600 text-emerald-800" : "border-slate-300 text-slate-700 hover:bg-slate-50"}`}>
     <Filter className="h-4 w-4" aria-hidden />
     {active ? `Filters · ${count}` : "Filters"}
-    {active && <span className="sr-only">{`, ${count} active`}</span>}
   </button>
 }

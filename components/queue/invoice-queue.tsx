@@ -174,6 +174,10 @@ export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercen
       render: (bill) => <PoChip poNumber={bill.po.poNumber} kind={bill.po.kind} mismatchCount={bill.po.mismatchCount} confidence={bill.po.confidence ?? undefined}
         suggestionCount={bill.po.suggestionCount} removed={bill.po.removed} origin={origin}
         href={bill.po.kind && bill.po.kind !== "suggested" && bill.po.poDocumentId ? `/workspaces/${workspaceId}/purchase-orders/${bill.po.poDocumentId}` : undefined} />,
+      // #261: the card is one `<a>`; the chip's own PO link would nest an anchor (hydration error),
+      // so the phone pill is the chip without `href` — the PO link lives in the pane's Match tab.
+      phoneRender: (bill) => <PoChip poNumber={bill.po.poNumber} kind={bill.po.kind} mismatchCount={bill.po.mismatchCount} confidence={bill.po.confidence ?? undefined}
+        suggestionCount={bill.po.suggestionCount} removed={bill.po.removed} origin={origin} />,
     },
     {
       key: "state", label: "State", phone: "pill",

@@ -56,7 +56,7 @@ function eligibilityText(row: ApprovalInvoiceRow): string {
  * screen (#225). A row's Approve/Reject decide the invoice's *current stage*
  * (`decideReviewTaskStageAction`, already generic across every workflow surface); "Send back for
  * review" lives in the pane's header overflow, not the sticky footer, per decision #6. */
-export function ApprovalInvoiceQueue({ workspaceId, basePath, rows, poMismatchCount, views, initialSelectedId }: {
+export function ApprovalInvoiceQueue({ workspaceId, basePath, rows, poMismatchCount, views, viewsPhone, initialSelectedId }: {
   workspaceId: string
   basePath: string
   /** Every row the actor may see — the Approver/Status facets apply client-side
@@ -67,6 +67,8 @@ export function ApprovalInvoiceQueue({ workspaceId, basePath, rows, poMismatchCo
   /** The saved-view picker (#201) — composed here, after the queue picker, matching every other
    * typed destination's `views` slot; PO Mismatches has no saved views yet, so it omits this. */
   views?: ReactNode
+  /** #261: the same picker as `variant="select"` for the phone filter row. */
+  viewsPhone?: ReactNode
   initialSelectedId?: string | null
 }) {
   const router = useRouter()
@@ -157,6 +159,7 @@ export function ApprovalInvoiceQueue({ workspaceId, basePath, rows, poMismatchCo
         { key: "po-mismatches", label: "PO mismatches", count: poMismatchCount, href: basePath.replace(/\/invoices$/, "/po-mismatches") },
       ]} active="invoices" /></div>}
       views={views}
+      viewsPhone={viewsPhone}
       // #261: the card is the shared `QueueCard` fed by the columns' phone slots; the label keeps
       // #257's comma-separated name (supplier, amount, number, due[, overdue], state).
       cards={{ below: "lg", title: "Ready to Approve", label: (row) => {
