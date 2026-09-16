@@ -133,6 +133,24 @@ pre-flight path, what is built, what is verified). Do not "just start" the
 next phase because there is context left: the next session's fresh context
 is the saving.
 
+**Read the area primer first; write it back at close.** `docs/agents/areas/`
+holds one page per surface family (Admin, queue shell, Detail pane,
+Payments, Approvals, phone). At the start of the spec and build phases,
+read the primer for the ticket's area — components and primitives, save
+grammar, routes, seed and capture recipe, residue, conventions — instead of
+reading the codebase file by file (#252 read 178 files to learn what one
+page says). If no primer exists for the area, the close phase writes one;
+if one exists, the close phase refreshes it with what the build changed.
+Under ~80 lines, facts only, no history. Commit it with the ticket.
+
+**Models for the readers.** The spec critic (pre-flight D) runs on `opus`
+when the ticket touches money, approval, schema or auth, else `sonnet`.
+The critique, evaluate and include readers score a capture set against a
+rubric: run each as a fresh `Agent` with `model: "sonnet"`, reading the
+contact sheet and the detector JSON, never the full PNG set. Judgement
+lives in the spec phase (strong model, set by the driver); scoring and
+building do not need it.
+
 **Every turn calls a tool.** A turn that is only text re-reads the whole
 context for nothing; in #252's first attempt one turn in four was narration.
 Do not announce what you are about to do — do it. Put independent tool calls

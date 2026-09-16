@@ -54,6 +54,10 @@ so the driver passes it as the `-p` prompt, which counts as a user invocation.
   model, no dev server, no logs, no screenshots) that reads the scoreboard
   and the last N reports and proposes lessons/pre-flight/brief edits as a PR.
   Run every four or five builds: `scripts/wayfinder-autopilot/retro.sh <map>`.
+- Area primers (project, not tool): `docs/agents/areas/<area>.md`, one page
+  per surface family, read at spec/build start, written or refreshed at close.
+- `contact-sheet.mjs` — tiles a capture round into one PNG (Playwright) so a
+  reader opens one image per round instead of one per state.
 - `lessons.md` — generic lessons (any product): what earlier first passes
   missed → what to put in the spec. Read whole each session, appended at
   close, capped ~80 lines by merging. The project's own
