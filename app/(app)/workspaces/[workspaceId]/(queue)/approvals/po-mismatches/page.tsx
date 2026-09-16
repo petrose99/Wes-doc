@@ -1,6 +1,7 @@
 import { getCurrentUser } from "@/lib/auth"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { listApprovalInvoiceRows, listPoMismatchRows } from "@/models/approvals"
+import { countWorkspaceDocuments } from "@/models/documents"
 import { requireWorkspaceRole, type WorkspaceRole } from "@/models/workspaces"
 import { PoMismatchQueue } from "@/components/queue/po-mismatch-queue"
 import { filterApprovalInvoiceRows, searchParamsOf } from "@/lib/approvals/filters"
@@ -27,16 +28,17 @@ export async function ApprovalsPoMismatchesQueuePage({ params, searchParams, sel
 
   const basePath = `/workspaces/${workspaceId}/approvals/po-mismatches`
   const actor = { userId: user.id, role: membership.role as WorkspaceRole }
-  const [allInvoiceRows, allMismatchRows] = await Promise.all([
+  const [allInvoiceRows, allMismatchRows, workspaceDocumentCount] = await Promise.all([
     listApprovalInvoiceRows(workspaceId, actor),
     listPoMismatchRows(workspaceId, actor),
+    countWorkspaceDocuments(workspaceId),
   ])
 
   // #257: facets apply client-side (`lib/approvals/filters.ts`); the page hands over every row
   // and the segment's Invoice approvals count goes through the same predicate.
   const invoiceCount = filterApprovalInvoiceRows(allInvoiceRows, searchParamsOf(query)).length
 
-  return <PoMismatchQueue workspaceId={workspaceId} basePath={basePath} rows={allMismatchRows} invoiceCount={invoiceCount} initialSelectedId={selectedDocumentId} />
+  return <PoMismatchQueue workspaceId={workspaceId} basePath={basePath} rows={allMismatchRows} invoiceCount={invoiceCount} workspaceDocumentCount={workspaceDocumentCount} initialSelectedId={selectedDocumentId} />
 }
 
 export default function ApprovalsPoMismatchesPage({ params, searchParams }: { params: Promise<{ workspaceId: string }>; searchParams: Promise<ApprovalsPoMismatchesSearchParams> }) {

@@ -10,7 +10,7 @@ export function BankStatementsQueuePage({ params, searchParams, selectedDocument
 }) {
   return DocumentQueuePage({
     params, searchParams, selectedDocumentId,
-    docType: "bank_statement", title: "Bank Statements", noun: "bank statement", itemType: "Bank Statement", supplierLabel: "Account",
+    docType: "bank_statement", showTodayOutcome: true, title: "Bank Statements", noun: "bank statement", itemType: "Bank Statement", supplierLabel: "Account",
     emptyBody: "Statements appear here once one is extracted. Assert the institution on each so layout drift can be checked (#207).",
     stat: <QueueStat label="Reconciled" value="" detail="" unavailable="No bank-reconciliation matcher exists yet (#207 shipped institution and layout-drift detection only)." />,
   })

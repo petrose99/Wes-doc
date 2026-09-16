@@ -8,6 +8,7 @@ import type { PipelineStage } from "@/lib/documents/stages"
 import { ReadyBanner } from "@/components/pipeline/ready-banner"
 import { SyncedStageHeader } from "@/components/pipeline/synced-stage-header"
 import { PaidStageHeader } from "@/components/pipeline/paid-stage-header"
+import Link from "next/link"
 import type { BillsSummary, PaidSummary } from "@/models/bills"
 import type { TouchlessRateStats } from "@/lib/analytics/workspace-analytics"
 import { ListScreenShell } from "@/components/list-screen/list-screen-shell"
@@ -16,7 +17,7 @@ import { ListScreenShell } from "@/components/list-screen/list-screen-shell"
  * upload entry point, tabs, a filter bar, then the table. A server component: the data (rows,
  * counts) is fetched by the page and handed down; only the list body, its bulk actions, and the
  * upload overlay need client interactivity. */
-export function PipelineShell({ workspaceId, stage, counts, rows, contentMatches, query, flaggedOnly, documentSearchEnabled, upload, touchlessStats, billsSummary, paidSummary, baseCurrency, failedCount = 0, visibleStages }: {
+export function PipelineShell({ workspaceId, stage, counts, rows, contentMatches, query, flaggedOnly, documentSearchEnabled, upload, touchlessStats, billsSummary, paidSummary, baseCurrency, failedCount = 0, visibleStages, backToInvoices = false }: {
   workspaceId: string
   stage: PipelineStage
   counts: Record<PipelineStage, number>
@@ -25,6 +26,8 @@ export function PipelineShell({ workspaceId, stage, counts, rows, contentMatches
   /** Stages worth showing for this workspace — Synced/Paid are dropped when they can never fill
    * (no accounting integration and nothing ever synced). */
   visibleStages?: readonly PipelineStage[]
+  /** #264: arrived from the Invoices first-use state (`?from=invoices`) — render the way back under the h1. */
+  backToInvoices?: boolean
   rows: PipelineDocumentRow[]
   contentMatches: ContentMatchRow[]
   query: string
@@ -48,6 +51,7 @@ export function PipelineShell({ workspaceId, stage, counts, rows, contentMatches
           <h1 className="text-xl font-bold text-slate-900">Documents</h1>
         </div>
         <p className="text-sm text-slate-500">Inbox to paid — one list across every file, one lifecycle for every bill.</p>
+        {backToInvoices && <Link href={`/workspaces/${workspaceId}/invoices`} className="inline-flex h-9 items-center text-sm font-medium text-emerald-700 underline-offset-2 hover:underline">← Back to Invoices</Link>}
       </div>
       <div className="ml-auto">
         <FileHubUploadButton

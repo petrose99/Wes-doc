@@ -1,6 +1,7 @@
 import { getCurrentUser } from "@/lib/auth"
 import { requireWorkspaceRole } from "@/models/workspaces"
 import { listOpenExceptions } from "@/models/exceptions"
+import { countWorkspaceDocuments } from "@/models/documents"
 import { ExceptionQueue } from "@/components/queue/exception-queue"
 import { startExceptionReviewAction, resolveExceptionAction } from "./actions"
 
@@ -18,7 +19,7 @@ export async function ExceptionsQueuePage({ params, searchParams, selectedId = n
   const user = await getCurrentUser()
   await requireWorkspaceRole(workspaceId, user.id)
 
-  const all = await listOpenExceptions(workspaceId)
+  const [all, workspaceDocumentCount] = await Promise.all([listOpenExceptions(workspaceId), countWorkspaceDocuments(workspaceId)])
   const exceptions = status === "open" || status === "in_review" ? all.filter((row) => row.escalationStatus === status) : all
 
   return <ExceptionQueue
@@ -27,6 +28,7 @@ export async function ExceptionsQueuePage({ params, searchParams, selectedId = n
     documentBasePath={`/workspaces/${workspaceId}/documents`}
     exceptions={exceptions}
     initialSelectedId={selectedId}
+    workspaceDocumentCount={workspaceDocumentCount}
     startReviewAction={startExceptionReviewAction.bind(null, workspaceId)}
     resolveAction={resolveExceptionAction.bind(null, workspaceId)} />
 }

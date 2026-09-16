@@ -56,7 +56,7 @@ function eligibilityText(row: ApprovalInvoiceRow): string {
  * screen (#225). A row's Approve/Reject decide the invoice's *current stage*
  * (`decideReviewTaskStageAction`, already generic across every workflow surface); "Send back for
  * review" lives in the pane's header overflow, not the sticky footer, per decision #6. */
-export function ApprovalInvoiceQueue({ workspaceId, basePath, rows, poMismatchCount, views, viewsPhone, initialSelectedId }: {
+export function ApprovalInvoiceQueue({ workspaceId, basePath, rows, poMismatchCount, views, viewsPhone, initialSelectedId, workspaceDocumentCount }: {
   workspaceId: string
   basePath: string
   /** Every row the actor may see — the Approver/Status facets apply client-side
@@ -70,6 +70,8 @@ export function ApprovalInvoiceQueue({ workspaceId, basePath, rows, poMismatchCo
   /** #261: the same picker as `variant="select"` for the phone filter row. */
   viewsPhone?: ReactNode
   initialSelectedId?: string | null
+  /** #264 spec §2: passed through to `QueueScreen` (the state function needs it for every queue). */
+  workspaceDocumentCount: number
 }) {
   const router = useRouter()
   const online = useOnlineStatus()
@@ -174,14 +176,16 @@ export function ApprovalInvoiceQueue({ workspaceId, basePath, rows, poMismatchCo
       } }}
       initialSelectedId={initialSelectedId}
       empty={{
-        title: "Nothing needs your approval",
-        body: "Anything you can decide will show here.",
+        // #264 spec §3.3: Approvals never shows first-use copy — its rows are decisions, not
+        // documents — so its sentence and links sit under `done`.
+        done: { body: "Anything you can decide will show here.",
         action: <span className="flex flex-wrap justify-center gap-x-4 gap-y-1">
           {waitingOnOthers > 0 && <Link href={`${basePath}?approver=anyone`} className="font-medium text-emerald-800 underline-offset-2 hover:underline">{waitingOnOthers} waiting on other approvers</Link>}
           <Link href={`/workspaces/${workspaceId}/invoices`} className="font-medium text-emerald-800 underline-offset-2 hover:underline">Go to Invoices</Link>
-        </span>,
+        </span> },
         filteredTitle: "No rows match these filters",
       }}
+      workspaceDocumentCount={workspaceDocumentCount}
       loadDetail={(documentId) => getQueueDetailAction(workspaceId, documentId, { initialTab: "approval" })}
       paneActions={(row, helpers) => {
         if (decided && decided.row.documentId === row.documentId) {

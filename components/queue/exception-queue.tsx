@@ -43,7 +43,7 @@ function formatAmount(amount: number | null, currencyCode: string | null): strin
  * document, so the Detail pane opens the *document* behind the row (`detailIdFor`) while the
  * sticky bar carries the row's own decision: Start review, then Resolve with a reason. No
  * checkbox column: exceptions resolve one at a time. */
-export function ExceptionQueue({ workspaceId, basePath, documentBasePath, exceptions, startReviewAction, resolveAction, initialSelectedId }: {
+export function ExceptionQueue({ workspaceId, basePath, documentBasePath, exceptions, startReviewAction, resolveAction, initialSelectedId, workspaceDocumentCount }: {
   workspaceId: string
   basePath: string
   documentBasePath: string
@@ -51,6 +51,8 @@ export function ExceptionQueue({ workspaceId, basePath, documentBasePath, except
   startReviewAction: (checkResultId: string) => Promise<{ success: boolean; error?: string }>
   resolveAction: (checkResultId: string, resolution: ExceptionResolution, formData: FormData) => Promise<{ success: boolean; error?: string }>
   initialSelectedId?: string | null
+  /** #264 spec §2: first-use only while the workspace has never held a document. */
+  workspaceDocumentCount: number
 }) {
   const router = useRouter()
   const [pendingId, setPendingId] = useState<string | null>(null)
@@ -110,7 +112,11 @@ export function ExceptionQueue({ workspaceId, basePath, documentBasePath, except
         row.vendor ?? row.filename, formatAmount(row.amount, row.currencyCode), row.message,
         row.escalationStatus === "in_review" ? "In review" : "Open", row.docTypeLabel,
       ].filter(Boolean).join(", ") }}
-      empty={{ firstUse: { title: "No open exceptions.", body: "Escalate a check from a document's field rationale to send it here. Resolved exceptions drop off this list." } }}
+      empty={{
+        firstUse: { title: "No open exceptions.", body: "Escalate a check from a document's field rationale to send it here. Resolved exceptions drop off this list." },
+        done: { body: "Anything a check escalates will show here. Resolved exceptions drop off this list." },
+      }}
+      workspaceDocumentCount={workspaceDocumentCount}
       loadDetail={(documentId) => getQueueDetailAction(workspaceId, documentId)}
       paneActions={(row, { refresh }) => <>
         <span className="w-full text-xs text-slate-600 sm:mr-auto sm:w-auto">{row.escalationStatus === "in_review" ? `In review${row.assigneeName ? ` by ${row.assigneeName}` : ""}.` : "Open. Start the review to claim it."}</span>

@@ -1,7 +1,8 @@
 import type { ReactNode } from "react"
 import { getCurrentUser } from "@/lib/auth"
 import type { DocType } from "@/lib/doc-types"
-import { listWorkspaceDocuments, summarizeDocumentForReview } from "@/models/documents"
+import { countWorkspaceDocuments, listWorkspaceDocuments, summarizeDocumentForReview } from "@/models/documents"
+import { getTodayOutcome } from "@/models/queue-outcome"
 import { listWorkspaceInstitutions } from "@/models/institutions"
 import { requireWorkspaceRole } from "@/models/workspaces"
 import { DocumentQueue, type DocumentQueueRow } from "@/components/queue/document-queue"
@@ -15,7 +16,7 @@ const STATUSES = new Set(["queued", "needs_review", "ready_for_review", "reviewe
 /** #225: Purchase Orders and Bank Statements on the Queue screen. Both still read the generic
  * document list (no dedicated row model yet — see the map's "Not yet specified"), mapped to the
  * serializable row the client queue renders. */
-export async function DocumentQueuePage({ params, searchParams, docType, title, noun, itemType, supplierLabel, stat, emptyBody, selectedDocumentId = null, purchaseOrders = false }: {
+export async function DocumentQueuePage({ params, searchParams, docType, title, noun, itemType, supplierLabel, stat, emptyBody, selectedDocumentId = null, purchaseOrders = false, showTodayOutcome = false }: {
   params: Promise<{ workspaceId: string }>
   searchParams: Promise<{ status?: string; sort?: string; consumed?: string }>
   docType: DocType
@@ -27,15 +28,20 @@ export async function DocumentQueuePage({ params, searchParams, docType, title, 
   emptyBody: string
   selectedDocumentId?: string | null
   purchaseOrders?: boolean
+  /** #264 spec §3.3: postable queues (Bank Statements) show "n approved today, m posted." on done. */
+  showTodayOutcome?: boolean
 }) {
   const { workspaceId } = await params
   const { status, consumed } = await searchParams
   const user = await getCurrentUser()
   const membership = await requireWorkspaceRole(workspaceId, user.id)
   const isBank = docType === "bank_statement"
-  const [documents, institutions] = await Promise.all([
+  const [documents, institutions, workspaceDocumentCount, todayOutcome] = await Promise.all([
     listWorkspaceDocuments(workspaceId, { docType, status: status && STATUSES.has(status) ? status : undefined }),
     isBank ? listWorkspaceInstitutions(workspaceId) : Promise.resolve([]),
+    // #264 spec §2: first-use means the workspace has never held a document of any type.
+    countWorkspaceDocuments(workspaceId),
+    showTodayOutcome ? getTodayOutcome(workspaceId) : Promise.resolve(undefined),
   ])
   const institutionName = new Map(institutions.map((institution) => [institution.id, institution.name]))
   // #228 Q8: the Purchase Orders queue reads consumption per PO — Invoiced (amount and %) and
@@ -80,5 +86,7 @@ export async function DocumentQueuePage({ params, searchParams, docType, title, 
     initialSelectedId={selectedDocumentId}
     emptyBody={emptyBody}
     showInstitution={isBank}
-    purchaseOrders={purchaseOrders} />
+    purchaseOrders={purchaseOrders}
+    workspaceDocumentCount={workspaceDocumentCount}
+    todayOutcome={todayOutcome} />
 }

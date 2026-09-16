@@ -12,6 +12,10 @@ import { QueueStat } from "@/components/queue/queue-stat"
 import { SavedViewPicker } from "@/components/typed-destinations/saved-view-picker"
 import { getTouchlessRateTrend } from "@/lib/analytics/workspace-analytics"
 import type { AgingBucket } from "@/lib/bills/due-date"
+import config from "@/lib/config"
+import { countWorkspaceDocuments } from "@/models/documents"
+import { getTodayOutcome } from "@/models/queue-outcome"
+import { ensureInboundEmailToken } from "@/models/inbound-email"
 
 export const dynamic = "force-dynamic"
 
@@ -43,7 +47,7 @@ export async function InvoicesQueuePage({ params, searchParams, selectedDocument
   const basePath = `/workspaces/${workspaceId}/invoices`
   const capabilities = await getWorkspaceCapabilities(workspaceId)
   const workflowsEnabled = capabilities.has("approval-workflows")
-  const [{ bills: allBills }, minConfidencePercent, savedViews, touchlessTrend, fieldTable, approvalWorkflows] = await Promise.all([
+  const [{ bills: allBills }, minConfidencePercent, savedViews, touchlessTrend, fieldTable, approvalWorkflows, workspaceDocumentCount, todayOutcome, inboundToken] = await Promise.all([
     listWorkspaceBills({ workspaceId, onlyBlocked, onlyUnpaid, statusFilter, approvalFilter, onlyTouchless, poFilter }),
     getMinConfidencePercent(workspaceId),
     listSavedViews({ workspaceId, viewKey: "invoices", userId: user.id }),
@@ -53,7 +57,14 @@ export async function InvoicesQueuePage({ params, searchParams, selectedDocument
     // #236: "Start Approval" on the bulk-action bar needs the workspace's active workflows to
     // offer a choice from — empty when the module is off, which hides the Approval ▾ control.
     workflowsEnabled ? listApprovalWorkflows(workspaceId, { activeOnly: true }) : Promise.resolve([]),
+    // #264 spec §2: the three-way empty state's inputs — workspace-wide document count (any type,
+    // any status) and today's approved/posted counts; the inbound address for the first-use line
+    // (null when intake is off or the workspace has no token — healthcare).
+    countWorkspaceDocuments(workspaceId),
+    getTodayOutcome(workspaceId),
+    config.inboundEmail.enabled ? ensureInboundEmailToken(workspaceId).catch(() => null) : Promise.resolve(null),
   ])
+  const inboundAddress = config.inboundEmail.enabled && inboundToken ? `${inboundToken}@${config.inboundEmail.domain}` : null
   const bills = agingFilter.size === 0 ? allBills : allBills.filter((bill) => agingFilter.has(bill.agingBucket ?? "none"))
   const currentViewFilters: Record<string, string> = {
     ...(onlyBlocked ? { blocked: "1" } : {}), ...(onlyUnpaid ? { unpaid: "1" } : {}),
@@ -72,6 +83,9 @@ export async function InvoicesQueuePage({ params, searchParams, selectedDocument
     fieldTable={fieldTable}
     availableWorkflows={approvalWorkflows.map((workflow) => ({ id: workflow.id, name: workflow.name, stageCount: workflow.stages.length }))}
     initialSelectedId={selectedDocumentId}
+    workspaceDocumentCount={workspaceDocumentCount}
+    todayOutcome={todayOutcome}
+    inboundAddress={inboundAddress}
     stat={<QueueStat label="Touchless" value={`${Math.round(touchlessTrend.touchlessRate * 100)}%`}
       detail={`${touchlessTrend.totalPushedTouchless} of ${touchlessTrend.totalExtracted} sent without review, last 30 days${trend ? `, ${trend} vs. prior 30` : ""}`}
       trend={touchlessTrend.trend?.direction ?? null} />}

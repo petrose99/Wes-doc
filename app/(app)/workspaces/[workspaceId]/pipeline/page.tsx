@@ -36,10 +36,10 @@ function parseStage(raw: string | undefined, counts?: Record<PipelineStage, numb
  * surface — folder stays available as a filter/column, never as navigation, on the Files browser. */
 export default async function PipelinePage({ params, searchParams }: {
   params: Promise<{ workspaceId: string }>
-  searchParams: Promise<{ stage?: string; q?: string; flagged?: string }>
+  searchParams: Promise<{ stage?: string; q?: string; flagged?: string; from?: string }>
 }) {
   const { workspaceId } = await params
-  const { stage: stageParam, q, flagged } = await searchParams
+  const { stage: stageParam, q, flagged, from } = await searchParams
   const user = await getCurrentUser()
   const membership = await requireWorkspaceRole(workspaceId, user.id)
 
@@ -146,6 +146,9 @@ export default async function PipelinePage({ params, searchParams }: {
   })
 
   return <PipelineShell
+    // #264 spec §3.1: the Invoices first-use Add button lands here until #266 ships its dialog;
+    // the way back is on the page, not only in the rail.
+    backToInvoices={from === "invoices"}
     workspaceId={workspaceId}
     stage={stage}
     counts={counts}

@@ -2,6 +2,7 @@ import { getCurrentUser } from "@/lib/auth"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { listApprovalInvoiceRows, listPoMismatchRows } from "@/models/approvals"
 import { listSavedViews } from "@/models/saved-views"
+import { countWorkspaceDocuments } from "@/models/documents"
 import { filterPoMismatchRows, searchParamsOf } from "@/lib/approvals/filters"
 import { requireWorkspaceRole, type WorkspaceRole } from "@/models/workspaces"
 import { createSavedViewAction, deleteSavedViewAction, duplicateSavedViewAction, renameSavedViewAction, saveFiltersToViewAction, shareSavedViewAction } from "@/app/(app)/workspaces/[workspaceId]/(chrome)/saved-views-actions"
@@ -32,10 +33,11 @@ export async function ApprovalsInvoicesQueuePage({ params, searchParams, selecte
 
   const basePath = `/workspaces/${workspaceId}/approvals/invoices`
   const actor = { userId: user.id, role: membership.role as WorkspaceRole }
-  const [allRows, poMismatchRows, savedViews] = await Promise.all([
+  const [allRows, poMismatchRows, savedViews, workspaceDocumentCount] = await Promise.all([
     listApprovalInvoiceRows(workspaceId, actor),
     listPoMismatchRows(workspaceId, actor),
     listSavedViews({ workspaceId, viewKey: "approvals-invoices", userId: user.id }),
+    countWorkspaceDocuments(workspaceId),
   ])
 
   // #257: the Approver/Status facets apply client-side (`lib/approvals/filters.ts`) so the
@@ -51,6 +53,7 @@ export async function ApprovalsInvoicesQueuePage({ params, searchParams, selecte
     basePath={basePath}
     rows={allRows}
     poMismatchCount={poMismatchCount}
+    workspaceDocumentCount={workspaceDocumentCount}
     initialSelectedId={selectedDocumentId}
     views={<SavedViewPicker views={savedViews} selectedViewId={selectedViewId ?? null} currentFilters={currentViewFilters}
       currentUserId={user.id} currentUserRole={membership.role as WorkspaceRole}

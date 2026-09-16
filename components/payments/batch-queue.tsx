@@ -129,7 +129,7 @@ export function PaymentBatchQueue({ workspaceId, basePath, rows: serverRows, fal
       sortParam="sort"
       stat={stat}
       initialSelectedId={initialSelectedId}
-      empty={{ title: "No batches yet.", body: "Select invoices in Bill Pay to create one.", filteredBody: "Clear a filter to widen the queue." }}
+      empty={{ done: { title: "No batches yet.", body: "Select invoices in Bill Pay to create one." }, filteredBody: "Clear a filter to widen the queue." }}
       loadDetail={loadDetail}
       paneActions={(batch, helpers) => {
         paneRefresh.current = helpers.refresh

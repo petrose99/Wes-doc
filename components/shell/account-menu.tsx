@@ -1,16 +1,16 @@
 "use client"
 
-import { resetOnboardingAction } from "@/app/(app)/workspaces/[workspaceId]/onboarding-actions"
 import { useSignOut } from "@/components/shell/sign-out-button"
 import { openKeyboardShortcutsDialog } from "@/components/shell/keyboard-shortcuts"
+import { openHowItWorksDialog } from "@/components/shell/how-it-works"
 import { useKeyboardShortcutsEnabled } from "@/lib/shell/keyboard-shortcuts"
 import { accountPaths } from "@/lib/admin/paths"
-import { ChevronsUpDown, Keyboard, LogOut, RotateCcw, ShieldCheck } from "lucide-react"
+import { ChevronsUpDown, CircleHelp, Keyboard, LogOut, ShieldCheck } from "lucide-react"
 import Link from "next/link"
-import { useEffect, useRef, useState, useTransition } from "react"
+import { useEffect, useRef, useState } from "react"
 
 /** The rail's account chip and its menu. #231 Q10 (#252): account-level items live here, not in
- * a company's Admin — Security (MFA, sessions) and the welcome tour — beside the everyday
+ * a company's Admin — Security (MFA, sessions) and the two help surfaces — beside the everyday
  * sign-out. "Sign out everywhere" stays on Security, where its weight belongs. */
 export function AccountMenu({ name, email, collapsed = false, workspaceId }: { name: string; email: string; collapsed?: boolean; workspaceId?: string }) {
   const [open, setOpen] = useState(false)
@@ -22,7 +22,6 @@ export function AccountMenu({ name, email, collapsed = false, workspaceId }: { n
   // and Home/End move within it, Escape closes and hands focus back to the chip.
   const close = (refocus = true) => { setOpen(false); if (refocus) trigger.current?.focus() }
   const { busy, signOut } = useSignOut()
-  const [resetting, startReset] = useTransition()
   const shortcutsEnabled = useKeyboardShortcutsEnabled()
 
   useEffect(() => {
@@ -68,8 +67,9 @@ export function AccountMenu({ name, email, collapsed = false, workspaceId }: { n
         <Link role="menuitem" href={accountPaths(workspaceId).security} className={itemClass} onClick={() => close(false)}>
           <ShieldCheck className="h-4 w-4" aria-hidden />Security
         </Link>
-        <button type="button" role="menuitem" className={itemClass} disabled={resetting} onClick={() => startReset(async () => { await resetOnboardingAction(workspaceId); close() })}>
-          <RotateCcw className="h-4 w-4" aria-hidden />{resetting ? "Resetting…" : "Show welcome tour again"}
+        {/* #264 spec §3.5: close() first so focus is back on the chip when the dialog records its opener. */}
+        <button type="button" role="menuitem" className={itemClass} onClick={() => { close(); openHowItWorksDialog() }}>
+          <CircleHelp className="h-4 w-4" aria-hidden />How DocuBite works
         </button>
         <button type="button" role="menuitem" className={itemClass} aria-label={shortcutsEnabled ? "Keyboard shortcuts" : "Keyboard shortcuts, off"}
           onClick={() => { close(); openKeyboardShortcutsDialog() }}>

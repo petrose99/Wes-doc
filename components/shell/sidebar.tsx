@@ -2,6 +2,7 @@
 
 import { AccountMenu } from "@/components/shell/account-menu"
 import { KeyboardShortcuts, SHORTCUT_DESTINATIONS } from "@/components/shell/keyboard-shortcuts"
+import { HowItWorksDialog } from "@/components/shell/how-it-works"
 
 import { SwitchableWorkspace, WorkspaceSwitcher } from "@/components/workspace/switcher"
 import { BiteMark } from "@/components/marketing/logo"
@@ -276,5 +277,6 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
     </div>
   </div>
   <KeyboardShortcuts destinations={SHORTCUT_DESTINATIONS(workspaceId, adminPaths(workspaceId).configuration)} />
+  <HowItWorksDialog />
   </aside>
 }

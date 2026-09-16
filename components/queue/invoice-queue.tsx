@@ -250,7 +250,7 @@ export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercen
         // #264 spec §3.1: #266's Add-documents dialog has not shipped, so the action is the
         // fallback link to /pipeline — TODO(#266): swap for openAddDocumentsDialog({ type: "invoice" }).
         firstUse: {
-          title: "No invoices yet.",
+          title: "No invoices yet",
           body: "Add an invoice and DocuBite extracts it into a row here. You check it beside the source, approve it, and post it.",
           action: <div className="flex flex-col items-center gap-3">
             <Link href={`/workspaces/${workspaceId}/pipeline?from=invoices`}

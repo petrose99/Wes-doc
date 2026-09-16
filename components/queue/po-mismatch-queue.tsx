@@ -51,7 +51,7 @@ function variancePercent(row: PoMismatchRow): number {
  * Override Mode already uses from the Checks tab — decision #3 asks for the primitive, not a
  * second mechanism); Reject ends the invoice's Approval, same action as the Invoices queue's own
  * Reject. */
-export function PoMismatchQueue({ workspaceId, basePath, rows, invoiceCount, initialSelectedId }: {
+export function PoMismatchQueue({ workspaceId, basePath, rows, invoiceCount, initialSelectedId, workspaceDocumentCount }: {
   workspaceId: string
   basePath: string
   /** Every row the actor may see — facets apply client-side (`filterPoMismatchRows`). */
@@ -59,6 +59,8 @@ export function PoMismatchQueue({ workspaceId, basePath, rows, invoiceCount, ini
   /** Invoice approvals through the same facets, for the segment count. */
   invoiceCount: number
   initialSelectedId?: string | null
+  /** #264 spec §2: passed through to `QueueScreen` (the state function needs it for every queue). */
+  workspaceDocumentCount: number
 }) {
   const router = useRouter()
   const online = useOnlineStatus()
@@ -144,14 +146,16 @@ export function PoMismatchQueue({ workspaceId, basePath, rows, invoiceCount, ini
       ].join(", ") }}
       initialSelectedId={initialSelectedId}
       empty={{
-        title: "Nothing needs your approval",
-        body: "Anything you can decide will show here. A PO mismatch appears on its own once a match check fails on an invoice with an Approval in flight.",
+        // #264 spec §3.3: Approvals never shows first-use copy — its rows are decisions, not
+        // documents — so its sentence and links sit under `done`.
+        done: { body: "Anything you can decide will show here. A PO mismatch appears on its own once a match check fails on an invoice with an Approval in flight.",
         action: <span className="flex flex-wrap justify-center gap-x-4 gap-y-1">
           {waitingOnOthers > 0 && <Link href={`${basePath}?approver=anyone`} className="font-medium text-emerald-800 underline-offset-2 hover:underline">{waitingOnOthers} waiting on other approvers</Link>}
           <Link href={`/workspaces/${workspaceId}/invoices`} className="font-medium text-emerald-800 underline-offset-2 hover:underline">Go to Invoices</Link>
-        </span>,
+        </span> },
         filteredTitle: "No rows match these filters",
       }}
+      workspaceDocumentCount={workspaceDocumentCount}
       loadDetail={(documentId) => getQueueDetailAction(workspaceId, documentId, { initialTab: "checks" })}
       paneActions={(row, helpers) => {
         if (decided && decided.row.documentId === row.documentId) {

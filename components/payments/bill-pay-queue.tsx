@@ -129,7 +129,7 @@ export function BillPayQueue({ workspaceId, basePath, rows, summary, payerAccoun
         {payerAccounts.length === 0 && rows.length > 0 && <p role="status" className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">No payer account yet, so nothing here can be batched. <Link href={settingsHref} className="font-medium underline underline-offset-2">Add one under Admin › Payments</Link>.</p>}
       </>}
       initialSelectedId={initialSelectedId}
-      empty={{ title: "Nothing to pay.", body: "Approved invoices land here.", filteredBody: "Clear a filter to widen the queue." }}
+      empty={{ done: { title: "Nothing to pay.", body: "Approved invoices land here." }, filteredBody: "Clear a filter to widen the queue." }}
       loadDetail={loadDetail}
       bulkActions={({ selectedIds }) => {
         const chosen = selectedRows(selectedIds)
