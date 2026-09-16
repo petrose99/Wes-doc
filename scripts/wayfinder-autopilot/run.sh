@@ -112,6 +112,24 @@ cleanup_session() {
   sync; echo "    cleaned up session pid $pid (pgid ${pgid:-?}); free: $(free -m | awk '/Mem:/{print $7" MB"}')"
 }
 
+# Model per ticket type. Grilling and execution keep the strong model (the
+# decisions and the design bar are where quality is won); research and polish
+# passes — bounded work on already-named findings — run on the cheaper one.
+# Override for one run with WAYFINDER_MODEL=<model>.
+MODEL_STRONG="${WAYFINDER_MODEL_STRONG:-opus[1m]}"
+MODEL_CHEAP="${WAYFINDER_MODEL_CHEAP:-sonnet}"
+model_for() {
+  [ -n "${WAYFINDER_MODEL:-}" ] && { echo "$WAYFINDER_MODEL"; return; }
+  local labels title
+  labels="$(gh api "repos/$REPO/issues/$1" --jq '[.labels[].name]|join(",")')"
+  title="$(title "$1")"
+  if [[ "$labels" == *wayfinder:research* ]] || [[ "$title" =~ [Pp]olish|[Bb]ring\ .*\ to\ the\ (autopilot\ )?bar ]]; then
+    echo "$MODEL_CHEAP"
+  else
+    echo "$MODEL_STRONG"
+  fi
+}
+
 state()  { gh api "repos/$REPO/issues/$1" --jq .state; }
 title()  { gh api "repos/$REPO/issues/$1" --jq .title; }
 
@@ -126,7 +144,8 @@ while [ "$n" -lt "$MAX" ]; do
   fi
   n=$((n+1))
   TT="$(title "$T")"
-  echo "=== [$n/$MAX] #$T — $TT"
+  MODEL="$(model_for "$T")"
+  echo "=== [$n/$MAX] #$T — $TT  [$MODEL]"
   if [ "$DRY" = 1 ]; then SKIP[$T]=1; continue; fi
 
   # Start each session on a clean box: if a dev server or headless browser is
@@ -146,6 +165,7 @@ while [ "$n" -lt "$MAX" ]; do
   # The brief is generic; the session learns the two lessons paths from this line.
   ( cd "$ROOT" && setsid claude -p "/wayfinder $MAP $T" \
       --append-system-prompt-file "$BRIEF" \
+      --model "$MODEL" \
       --append-system-prompt "Lessons files for this run — generic (every project): $GENERIC_LESSONS · project-specific (this repo): $PROJECT_LESSONS. Reports go to $OUT/<ticket>.md." \
       --permission-mode acceptEdits \
       --allowedTools "${ALLOWED_TOOLS[@]}" \
@@ -173,8 +193,8 @@ while [ "$n" -lt "$MAX" ]; do
     gh issue edit "$T" --repo "$REPO" --remove-assignee "$ME" >/dev/null 2>&1 || true
   fi
   [ -f "$OUT/$T.md" ] || OUTCOME="$OUTCOME, no report"
-  printf '| %s | [#%s](https://github.com/%s/issues/%s) %s | %s | %dm%02ds | [log](logs/%s) |\n' \
-    "$START" "$T" "$REPO" "$T" "$TT" "$OUTCOME" $((DUR/60)) $((DUR%60)) "$(basename "$LOG")" >> "$RUNLOG"
+  printf '| %s | [#%s](https://github.com/%s/issues/%s) %s | %s (%s) | %dm%02ds | [log](logs/%s) |\n' \
+    "$START" "$T" "$REPO" "$T" "$TT" "$OUTCOME" "$MODEL" $((DUR/60)) $((DUR%60)) "$(basename "$LOG")" >> "$RUNLOG"
   echo "--- #$T: $OUTCOME in ${DUR}s"
 done
 echo "Run log: $RUNLOG"
