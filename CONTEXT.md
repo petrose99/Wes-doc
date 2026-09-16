@@ -126,6 +126,10 @@ _Avoid_: Approval Context (Vic's separate phone screen — DocuBite has one pane
 **Origin context**:
 The workspace, list, filters, position, and workflow state from which a user opened a detail or action surface. Returning from that surface restores the origin context whenever it still exists.
 
+**Keyboard shortcut**:
+A key or two-key sequence that moves the operator around the app — to a queue, to the filters, to the shortcuts dialog — and never edits, decides or deletes anything. Shortcuts are on by default, listed in one Keyboard shortcuts dialog reached from `?` and the account menu, ignored while the operator is typing in a field or inside a dialog or menu, and can be turned off per person in one switch. Moving between rows with the arrow keys, opening a row with Enter and closing the Detail pane with Escape are not shortcuts: they work whenever the queue or pane has focus and stay on when shortcuts are off. Shortcuts exist on desktop widths only.
+_Avoid_: Accelerator, hotkey, single-key approve (never; a decision is a click on the decision bar), power-user mode
+
 **Workflow operation**:
 An in-progress or recently completed unit of work such as extraction, sync, review assignment, worksheet placement, approval, or publish. An operation remains discoverable after navigation so the user can understand what happened and what to do next.
 
