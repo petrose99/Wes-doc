@@ -23,13 +23,40 @@ export type ProcessingStateInput = {
    * alone would default it straight to "approved" with nobody having looked at it. Treating
    * anything short of `"reviewed"` as still In review closes that gap. */
   status: string
+  /** #258: a client-side bulk approve held this row back (missing required fields or a document
+   * type) before the server round-trips. Default false — the server never sets this; it is the
+   * one input the glyph, the pill, the Status line sentence and the facet filter share so they
+   * cannot disagree (#258 closed a split where the pill folded this in but the glyph did not). */
+  heldBack?: boolean
 }
 
 export type ProcessingState = "cancelled" | "needs_attention" | "in_review" | "touchless" | "approved"
 
+/** The five states in precedence order — also `PROCESSING_STATE_LABELS`'s key order. */
+export const PROCESSING_STATES: ProcessingState[] = ["cancelled", "needs_attention", "in_review", "touchless", "approved"]
+
+/** The one vocabulary for a document's processing state (#258 Wayfinder map #226): every surface
+ * that prints a state imports this map rather than writing its own word. Sentence case; never
+ * concatenated with another word to build a different status. */
+export const PROCESSING_STATE_LABELS: Record<ProcessingState, string> = {
+  cancelled: "Cancelled",
+  needs_attention: "Needs attention",
+  in_review: "In review",
+  touchless: "Touchless",
+  approved: "Approved",
+}
+
+/** The ledger word, one place until #281 rewires its source to `IntegrationPush` and adds
+ * "Posting…" / "Post failed". "Synced" retired from every user-visible surface (#248's decision);
+ * `synced` stays the internal key. */
+export const LEDGER_FACT_LABELS: Record<"synced" | "paid", string> = {
+  synced: "Posted",
+  paid: "Paid",
+}
+
 export function processingState(input: ProcessingStateInput): ProcessingState {
   if (input.approvalStatus === "cancelled") return "cancelled"
-  if (input.blockedByCheck || input.escalated || input.approvalStatus === "rejected") return "needs_attention"
+  if (input.blockedByCheck || input.escalated || input.approvalStatus === "rejected" || input.heldBack) return "needs_attention"
   if (input.approvalStatus === "in_progress" || input.approvalStatus === "not_started" || input.status !== "reviewed") return "in_review"
   if (input.touchless) return "touchless"
   return "approved"
