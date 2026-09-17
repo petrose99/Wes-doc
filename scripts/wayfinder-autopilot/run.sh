@@ -25,6 +25,7 @@ PROJECT_LESSONS="$ROOT/.claude/wayfinder-autopilot/lessons.md"   # stays with th
 mkdir -p "$(dirname "$PROJECT_LESSONS")"
 [ -f "$PROJECT_LESSONS" ] || printf '# Project lessons — %s\n\nWhat first passes missed *in this codebase* (its shell, tokens, components, seed data, dev-server recipe). Generic, product-agnostic lessons go to the tool'"'"'s own lessons.md instead.\n\n' "$REPO" > "$PROJECT_LESSONS"
 export WAYFINDER_GENERIC_LESSONS="$GENERIC_LESSONS" WAYFINDER_PROJECT_LESSONS="$PROJECT_LESSONS"
+export TZ="${TZ:-Africa/Johannesburg}"   # the sessions stamp hand-offs and reports in local time
 ALLOWED_TOOLS=(
   "Bash(gh:*)" "Bash(git:*)" "Bash(npm:*)" "Bash(npx:*)" "Bash(pnpm:*)"
   "Bash(node:*)" "Bash(impeccable:*)" "Bash(ls:*)" "Bash(cat:*)" "Bash(grep:*)"
