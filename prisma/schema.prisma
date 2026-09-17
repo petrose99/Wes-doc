@@ -267,6 +267,12 @@ model WorkspaceMember {
   /// send-back notice (models/approval-notices.ts): that is a reply to one decision, not subject
   /// to the floor that exists to stop per-invoice fan-out to approvers.
   noticeLastSentAt DateTime? @map("notice_last_sent_at")
+  /// #286 (ADR 0003): bank details for this person on this company only — never shared between
+  /// companies, deleted with the membership. Masked to bank + last four everywhere but the edit
+  /// form; written into the payment file by #295.
+  bankName          String?   @map("bank_name")
+  bankAccountNumber String?   @map("bank_account_number")
+  bankBranchCode    String?   @map("bank_branch_code")
   createdAt        DateTime  @default(now()) @map("created_at")
   workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
