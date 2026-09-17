@@ -1,7 +1,13 @@
 import { AdminLeaveGuard } from "@/components/admin/admin-leave-guard"
 import { AdminNav, type AdminNavGroup } from "@/components/admin/admin-nav"
+import { CompanyDetail } from "@/components/admin/company-detail"
 import { getAdminContext } from "@/lib/admin/context"
 import { adminPaths } from "@/lib/admin/paths"
+
+/** #285: Companies' Detail pane arrives from a server action as JSX. The RSC bundler only lists
+ * a client component in a route's client manifest when a server component on the route's graph
+ * imports it, so this layout references the pane — same trick as `(queue)/layout.tsx`. */
+const CLIENT_MANIFEST_ANCHORS = [CompanyDetail]
 
 /** #231 Q9/Q10/Q20 (#252): the Admin area — one rail item, one left nav with Vic's two groups,
  * one reading column. Replaces Settings' tab strip and Controls' tabs (nothing removed: every
@@ -16,6 +22,7 @@ export default async function AdminLayout({ children, params }: { children: Reac
   const { workspaceId } = await params
   const context = await getAdminContext(workspaceId)
   const paths = adminPaths(workspaceId)
+  void CLIENT_MANIFEST_ANCHORS
   const hasTouchless = context.capabilities.has("touchless-automation")
   const hasTax = context.capabilities.has("jurisdiction")
 
