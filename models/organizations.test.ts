@@ -10,6 +10,9 @@ const {
   createOrganization,
   addCompanyToOrganization,
   moveWorkspaceIntoOrganization,
+  removeWorkspaceFromOrganization,
+  listOwnedUngroupedTeamWorkspaces,
+  organizationCompanyCount,
 } = await import("@/models/organizations")
 const { prisma } = await import("@/lib/db")
 
@@ -123,5 +126,60 @@ describe("moveWorkspaceIntoOrganization", () => {
     await moveWorkspaceIntoOrganization("w1", "org1", "user1")
 
     expect(db.workspace.update).toHaveBeenCalledWith({ where: { id: "w1" }, data: { organizationId: "org1" } })
+  })
+})
+
+describe("removeWorkspaceFromOrganization", () => {
+  it("refuses a caller who is not the workspace owner", async () => {
+    db.workspaceMember = { findUnique: vi.fn().mockResolvedValue({ role: "member" }) }
+    db.workspace = { update: vi.fn() }
+
+    await expect(removeWorkspaceFromOrganization("w1", "user1")).rejects.toThrow("workspace_access_denied")
+    expect(db.workspace.update).not.toHaveBeenCalled()
+  })
+
+  it("allows the owner to detach the workspace, mirroring moveWorkspaceIntoOrganization", async () => {
+    db.workspaceMember = { findUnique: vi.fn().mockResolvedValue({ role: "owner" }) }
+    db.workspace = { update: vi.fn().mockResolvedValue({ id: "w1", organizationId: null }) }
+
+    await removeWorkspaceFromOrganization("w1", "user1")
+
+    expect(db.workspace.update).toHaveBeenCalledWith({ where: { id: "w1" }, data: { organizationId: null } })
+  })
+})
+
+describe("listOwnedUngroupedTeamWorkspaces", () => {
+  it("scopes to team workspaces the caller owns with no organization", async () => {
+    db.workspaceMember = { findMany: vi.fn().mockResolvedValue([]) }
+
+    await listOwnedUngroupedTeamWorkspaces("user1")
+
+    expect(db.workspaceMember.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userId: "user1", role: "owner", workspace: { kind: "team", organizationId: null } } }),
+    )
+  })
+
+  it("sorts the eligible workspaces by name", async () => {
+    db.workspaceMember = {
+      findMany: vi.fn().mockResolvedValue([
+        { workspace: { id: "w2", name: "Zeta Co" } },
+        { workspace: { id: "w1", name: "Alpha Co" } },
+      ]),
+    }
+
+    const rows = await listOwnedUngroupedTeamWorkspaces("user1")
+
+    expect(rows.map((row) => row.id)).toEqual(["w1", "w2"])
+  })
+})
+
+describe("organizationCompanyCount", () => {
+  it("counts every workspace in the organization, not only the caller's accessible ones", async () => {
+    db.workspace = { count: vi.fn().mockResolvedValue(5) }
+
+    const count = await organizationCompanyCount("org1")
+
+    expect(count).toBe(5)
+    expect(db.workspace.count).toHaveBeenCalledWith({ where: { organizationId: "org1" } })
   })
 })

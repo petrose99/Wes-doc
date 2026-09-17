@@ -16,7 +16,7 @@ import { setUnsaved } from "@/lib/client/unsaved-changes"
  * disabled and says why. Below `md` the bar sits above the phone tab bar. */
 const SAVED_FOR_MS = 4000
 
-export function AdminSaveBar({ dirty, pending, pendingLabel, error, savedAt, blocker, onSave, onDiscard, onSavedShown, errorAction, disabled = false, shortcut = true, saveButtonRef }: {
+export function AdminSaveBar({ dirty, pending, pendingLabel, error, savedAt, blocker, onSave, onDiscard, onSavedShown, errorAction, disabled = false, shortcut = true, saveButtonRef, inPane = false, status, saveButtonId }: {
   dirty: boolean
   pending: boolean
   /** What the Save button says while `pending` — "Saving…" unless the wait is something else
@@ -39,6 +39,13 @@ export function AdminSaveBar({ dirty, pending, pendingLabel, error, savedAt, blo
   /** For a form whose Save opens a confirm: the dialog cannot record a disabled opener, so the
    * form returns focus here itself when the dialog closes. */
   saveButtonRef?: RefObject<HTMLButtonElement | null>
+  /** #286: rendered inside a Detail pane's scroll area — sticks to the pane's bottom edge instead
+   * of the page's, with the pane's own gutter. Same bar, same grammar. */
+  inPane?: boolean
+  /** #286: partial-save status beside the Saved/Unsaved word ("Saved 2 of 3 — Acme still unsaved"). */
+  status?: string | null
+  /** A stable id on the Save button so a pane remount can hand focus back to it (#258). */
+  saveButtonId?: string
 }) {
   const key = useId()
   useEffect(() => {
@@ -67,9 +74,10 @@ export function AdminSaveBar({ dirty, pending, pendingLabel, error, savedAt, blo
   if (disabled) return null
   const visible = dirty || pending || !!error || savedAt !== null
 
-  return <div className={`sticky bottom-[72px] z-20 -mx-5 border-t border-hairline bg-white/95 px-5 backdrop-blur-sm transition-[opacity,transform] duration-150 ease-out md:bottom-0 md:-mx-8 md:px-8 ${visible ? "mt-10 translate-y-0 opacity-100" : "pointer-events-none mt-0! h-0 translate-y-2 overflow-hidden border-t-0 opacity-0"}`} aria-hidden={visible ? undefined : true}>
+  const position = inPane ? "sticky bottom-0 z-20 -mx-4 border-t border-hairline bg-white/95 px-4 backdrop-blur-sm transition-[opacity,transform] duration-150 ease-out" : "sticky bottom-[72px] z-20 -mx-5 border-t border-hairline bg-white/95 px-5 backdrop-blur-sm transition-[opacity,transform] duration-150 ease-out md:bottom-0 md:-mx-8 md:px-8"
+  return <div className={`${position} ${visible ? "mt-10 translate-y-0 opacity-100" : "pointer-events-none mt-0! h-0 translate-y-2 overflow-hidden border-t-0 opacity-0"}`} aria-hidden={visible ? undefined : true}>
     <div className="flex min-h-[56px] flex-wrap items-center gap-x-4 gap-y-2 py-2.5">
-      <Button ref={saveButtonRef} type="button" onClick={onSave} disabled={pending || !dirty || !!blocker} title="⌘S / Ctrl+S">{pending ? (pendingLabel ?? "Saving…") : "Save changes"}</Button>
+      <Button ref={saveButtonRef} id={saveButtonId} type="button" onClick={onSave} disabled={pending || !dirty || !!blocker} title="⌘S / Ctrl+S">{pending ? (pendingLabel ?? "Saving…") : "Save changes"}</Button>
       <Button type="button" variant="ghost" onClick={onDiscard} disabled={pending || !dirty}>Discard</Button>
       <span aria-live="polite" className="inline-flex items-center">
         {dirty && !pending && !error && <span className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-700">
@@ -77,6 +85,7 @@ export function AdminSaveBar({ dirty, pending, pendingLabel, error, savedAt, blo
           Unsaved changes
         </span>}
         {!dirty && !pending && !error && savedAt !== null && <span className="text-xs font-medium text-emerald-800">Saved</span>}
+        {status && <span className="ml-2 text-xs text-slate-600">{status}</span>}
       </span>
       {blocker && dirty && <span className="text-xs text-red-700">{blocker}</span>}
       {error && <span role="alert" className="inline-flex flex-wrap items-center gap-x-2 text-xs text-red-700">{error}{errorAction && <button type="button" onClick={errorAction.onClick} className="font-medium underline underline-offset-2 hover:text-red-900">{errorAction.label}</button>}</span>}

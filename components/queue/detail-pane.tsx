@@ -249,7 +249,7 @@ export function DetailPane({ documentId, name, status, position, onClose, backLa
     pendingReloadFocus.current = false
     // #273: the claim card's heading, then the unclaimed sentence's button/text, after a claim
     // mutation remounts the Approval tab (spec §5.3 focus chain).
-    const target = ["save-review-submit", "claim-card-title", "claim-empty-action", "claim-empty-text"].map((id) => document.getElementById(id)).find((el): el is HTMLElement => !!el)
+    const target = ["save-review-submit", "user-pane-save", "claim-card-title", "claim-empty-action", "claim-empty-text"].map((id) => document.getElementById(id)).find((el): el is HTMLElement => !!el)
     if (target) target.focus({ preventScroll: true })
     else headingRef.current?.focus({ preventScroll: true })
   }, [state])

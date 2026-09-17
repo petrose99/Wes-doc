@@ -39,9 +39,28 @@ export const listOrganizationCompanies = cache(async (organizationId: string, us
     if (workspaceIds.length === 0) return []
     return prisma.workspace.findMany({
       where: { id: { in: workspaceIds } },
-      include: { members: { where: { userId }, select: { role: true } } },
+      include: { members: { where: { userId }, select: { role: true } }, _count: { select: { members: true } } },
       orderBy: { name: "asc" },
     })
+  }),
+)
+
+/** Companies (#285 spec §3.1): total team workspaces in the organization, regardless of the
+ * caller's access — the "‹k› more in ‹org› you're not a member of" line is this minus the
+ * caller's own accessible count, so the header figure never doubles as the org's real size. */
+export async function organizationCompanyCount(organizationId: string): Promise<number> {
+  return unscoped(() => prisma.workspace.count({ where: { organizationId } }))
+}
+
+/** "Move a company into ‹org›" (#285 spec §4.2): team workspaces `userId` owns that aren't in any
+ * organization yet — the eligible list for the Move dialog. */
+export const listOwnedUngroupedTeamWorkspaces = cache(async (userId: string) =>
+  unscoped(async () => {
+    const owned = await prisma.workspaceMember.findMany({
+      where: { userId, role: "owner", workspace: { kind: "team", organizationId: null } },
+      select: { workspace: { include: { _count: { select: { members: true } } } } },
+    })
+    return owned.map((row) => row.workspace).sort((a, b) => a.name.localeCompare(b.name))
   }),
 )
 
@@ -180,6 +199,17 @@ export async function moveWorkspaceIntoOrganization(workspaceId: string, organiz
     const membership = await prisma.workspaceMember.findUnique({ where: { workspaceId_userId: { workspaceId, userId: actorId } } })
     if (!membership || membership.role !== "owner") throw new Error("workspace_access_denied")
     return prisma.workspace.update({ where: { id: workspaceId }, data: { organizationId } })
+  })
+}
+
+/** "Remove from ‹org›" (#285 spec §4.3): detaches a team workspace, reversing
+ * moveWorkspaceIntoOrganization. Only the row's own owner may call it — mirrors the ownership
+ * check in moveWorkspaceIntoOrganization so the two are symmetric. */
+export async function removeWorkspaceFromOrganization(workspaceId: string, actorId: string) {
+  return unscoped(async () => {
+    const membership = await prisma.workspaceMember.findUnique({ where: { workspaceId_userId: { workspaceId, userId: actorId } } })
+    if (!membership || membership.role !== "owner") throw new Error("workspace_access_denied")
+    return prisma.workspace.update({ where: { id: workspaceId }, data: { organizationId: null } })
   })
 }
 

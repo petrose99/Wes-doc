@@ -13,7 +13,7 @@ import { createPortal } from "react-dom"
  * optional input (the stage-reject note) must keep that field in the tab cycle. */
 const FOCUSABLE = "a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex=\"-1\"])"
 
-export function ConfirmDialog({ open, title, description, confirmLabel = "Confirm", destructive = false, busy = false, onConfirm, onCancel, children }: {
+export function ConfirmDialog({ open, title, description, confirmLabel = "Confirm", destructive = false, busy = false, onConfirm, onCancel, children, confirmDisabled = false }: {
   open: boolean
   title: string
   description?: string
@@ -26,6 +26,9 @@ export function ConfirmDialog({ open, title, description, confirmLabel = "Confir
    * note field. Keep it to one small control; a confirm dialog that grows a form should be a
    * Dialog instead. */
   children?: React.ReactNode
+  /** #286: the action can no longer proceed (a precondition failed at submit) — Cancel only,
+   * with the reason rendered by the caller in `children`. */
+  confirmDisabled?: boolean
 }) {
   const contentRef = useRef<HTMLDivElement>(null)
   const openerRef = useRef<Element | null>(null)
@@ -101,7 +104,7 @@ export function ConfirmDialog({ open, title, description, confirmLabel = "Confir
         </div>
         <div className="flex justify-end gap-2 border-t border-hairline px-5 py-3">
           <Button type="button" variant="outline" size="sm" disabled={busy} onClick={onCancel}>Cancel</Button>
-          <Button type="button" variant={destructive ? "destructive" : "default"} size="sm" disabled={busy} onClick={onConfirm}>
+          <Button type="button" variant={destructive ? "destructive" : "default"} size="sm" disabled={busy || confirmDisabled} onClick={onConfirm}>
             {busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}{confirmLabel}
           </Button>
         </div>
