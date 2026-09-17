@@ -9,14 +9,19 @@ import { Label } from "@/components/ui/label"
 import { useState, useTransition } from "react"
 import { toast } from "sonner"
 
-/** #285 spec §5.3: the current company's card-less danger zone in the pane — the same two ways
- * out as `WorkspaceDangerZone` (Delete for an owner, Leave for everyone except the last owner),
- * refactored to sit under a company's summary instead of on its own settings page. Both keep
- * `WorkspaceDangerZone`'s hard navigation on success: the membership this pane is rendered
+/** #285 spec §5.3/§4.6: the current company's card-less danger zone in the pane — the same two
+ * ways out as `WorkspaceDangerZone` (Delete for an owner, Leave for everyone except the last
+ * owner), refactored to sit under a company's summary instead of on its own settings page. Both
+ * keep `WorkspaceDangerZone`'s hard navigation on success: the membership this pane is rendered
  * behind is gone the moment either action succeeds, so a soft transition would race the layout's
- * own redirect. Delete's server-side last-owner refusal ("delete_workspace_instead") and Leave's
- * last-owner/last-reviewer refusals are surfaced as plain server text, same as that component. */
-const escapeToWorkspaceList = () => { window.location.href = "/workspaces" }
+ * own redirect. The success toast rides the `?notice=…&name=…` query through that navigation
+ * (`components/shell/notice-toast.tsx`) rather than firing before it, since a `toast.success`
+ * called immediately before `window.location.href` never survives the full page reload. Delete's
+ * server-side last-owner refusal ("delete_workspace_instead") and Leave's last-owner/last-reviewer
+ * refusals are surfaced as plain server text, same as that component. */
+const escapeToWorkspaceList = (notice: "deleted" | "left", name: string) => {
+  window.location.href = `/workspaces?notice=${notice}&name=${encodeURIComponent(name)}`
+}
 
 export function CompanyDangerActions({ workspaceId, name, isOwner }: { workspaceId: string; name: string; isOwner: boolean }) {
   const [pending, startTransition] = useTransition()
@@ -33,8 +38,7 @@ export function CompanyDangerActions({ workspaceId, name, isOwner }: { workspace
       return
     }
     if (!result.success) { toast.error(result.error ? `Nothing was removed — ${result.error}` : "Nothing was removed — try again."); return }
-    toast.success(`You left ${name}`)
-    escapeToWorkspaceList()
+    escapeToWorkspaceList("left", name)
   })
 
   return <div className="border-t border-slate-200 px-5 py-4">
@@ -65,8 +69,7 @@ export function CompanyDangerActions({ workspaceId, name, isOwner }: { workspace
         startTransition(async () => {
           const result = await deleteWorkspaceAction(workspaceId)
           if (!result.success) { toast.error(result.error ? `Nothing was removed — ${result.error}` : "Nothing was removed — try again."); return }
-          toast.success(`${name} deleted`)
-          escapeToWorkspaceList()
+          escapeToWorkspaceList("deleted", name)
         })
       }}>
         <Label htmlFor="confirm-company-name">Company name</Label>

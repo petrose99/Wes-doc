@@ -18,12 +18,14 @@ import { redirect } from "next/navigation"
  * the local User row only happens inside getViewerUser's resolveOrProvisionUser call — reading
  * the session directly here, as under better-auth (which auto-created the row on sign-in itself),
  * would find no row yet and bounce straight back to login. */
-export default async function WorkspacesPage() {
+export default async function WorkspacesPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const user = await getViewerUser()
   if (!user) redirect(config.auth.loginUrl)
   const memberships = await getWorkspacesForUser(user.id)
-  if (!memberships.length) redirect("/workspaces/new")
-  redirect(`/workspaces/${memberships[0].id}`)
+  const { notice, name } = await searchParams
+  const noticeQuery = typeof notice === "string" && typeof name === "string" ? `?notice=${notice}&name=${encodeURIComponent(name)}` : ""
+  if (!memberships.length) redirect(`/workspaces/new${noticeQuery}`)
+  redirect(`/workspaces/${memberships[0].id}${noticeQuery}`)
 }
 
 export const dynamic = "force-dynamic"
