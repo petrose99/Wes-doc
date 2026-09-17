@@ -66,7 +66,7 @@ async function seedAccount(account: DemoAccount) {
  * exactly one workspace, which can't exercise a switcher, Companies, Users or the Dashboard
  * rollups — all of which only render past ≥2 memberships. Seed it a second, org-grouped
  * workspace up front so #285/#286/#287 have something to point Playwright at without a manual
- * "add a company" click first. Idempotent: skips once the user already has ≥2 memberships. */
+ * "add a company" click first. Idempotent: every item is looked up by name before it is created. */
 async function seedDevBypassOrganization() {
   const user = await prisma.user.upsert({
     where: { email: DEV_BYPASS_USER.email },
@@ -74,14 +74,47 @@ async function seedDevBypassOrganization() {
     update: {},
   })
 
+  // Every item below is checked by name, so re-seeding adds nothing a previous run already made.
+  // Personal workspace → Companies state (c).
   const memberships = await prisma.workspaceMember.findMany({ where: { userId: user.id }, orderBy: { createdAt: "asc" } })
   if (memberships.length === 0) await createWorkspaceForUser(user)
-  if (memberships.length >= 2) return
 
+  // #285: the Companies screen has three page states and two pane variants; each needs a row the
+  // capture round can navigate to.
+  //   (a) Acme Advisory — Riverside Bakery Co. (owner) + Harbor Lights Cafe (owner) + Northwind
+  //       Traders (member only, owned by a Prisma-only user — the non-owner pane and the hidden
+  //       "k more in ‹org›" line when the row is filtered out);
+  //   (b) Pine Street Consulting — an ungrouped team workspace the dev user owns: opening its
+  //       Companies page shows "Name your organization", and from Acme it is the Move candidate;
+  //   (c) the personal workspace above.
   const organization = await prisma.organization.findFirst({ where: { name: "Acme Advisory", members: { some: { userId: user.id } } } })
     ?? (await createOrganization("Acme Advisory", user.id))
-  const existingCompany = await prisma.workspace.findFirst({ where: { organizationId: organization.id, members: { some: { userId: user.id } } } })
-  if (!existingCompany) await addCompanyToOrganization(organization.id, user.id, { name: "Riverside Bakery Co.", country: "US", baseCurrency: "USD" })
+  const ownedCompanies: { name: string; country: string; baseCurrency: string }[] = [
+    { name: "Riverside Bakery Co.", country: "US", baseCurrency: "USD" },
+    { name: "Harbor Lights Cafe", country: "GB", baseCurrency: "GBP" },
+  ]
+  for (const company of ownedCompanies) {
+    const existing = await prisma.workspace.findFirst({ where: { organizationId: organization.id, name: company.name } })
+    if (!existing) await addCompanyToOrganization(organization.id, user.id, company)
+  }
+
+  // Northwind's owner is a Prisma-only user (no Supabase identity — nobody signs in as them), so
+  // this part runs on a sandbox without Supabase env, where the demo accounts above are skipped.
+  const northwindOwner = await prisma.user.upsert({
+    where: { email: "northwind-owner@docubite.local" },
+    create: { email: "northwind-owner@docubite.local", name: "Priya Naidoo", role: "user", emailVerified: true },
+    update: {},
+  })
+  const northwind = await prisma.workspace.findFirst({ where: { organizationId: organization.id, name: "Northwind Traders" } })
+    ?? (await addCompanyToOrganization(organization.id, northwindOwner.id, { name: "Northwind Traders", country: "ZA", baseCurrency: "ZAR" }))
+  await prisma.workspaceMember.upsert({
+    where: { workspaceId_userId: { workspaceId: northwind.id, userId: user.id } },
+    create: { workspaceId: northwind.id, userId: user.id, role: "member" },
+    update: {},
+  })
+
+  const ungrouped = await prisma.workspace.findFirst({ where: { organizationId: null, kind: "team", name: "Pine Street Consulting", members: { some: { userId: user.id, role: "owner" } } } })
+  if (!ungrouped) await createWorkspaceForUser(user, { name: "Pine Street Consulting", kind: "team", country: "US", baseCurrency: "USD" })
 }
 
 async function main() {
@@ -91,8 +124,14 @@ async function main() {
     throw new Error("Refusing to seed demo accounts in production. Set SEED_DEMO_ACCOUNTS=true if this is genuinely what you want.")
   }
 
+  // The demo accounts need the Supabase admin API; a local sandbox without it (DEV_AUTH_BYPASS
+  // only) still gets the dev-bypass organization below, which is what the UI capture rounds use.
   const seeded = []
-  for (const account of ACCOUNTS) seeded.push(await seedAccount(account))
+  if (process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    for (const account of ACCOUNTS) seeded.push(await seedAccount(account))
+  } else {
+    console.log("Supabase env not set — skipping demo accounts; seeding the dev-bypass organization only.")
+  }
   await seedDevBypassOrganization()
 
   console.log("\nSeeded accounts:\n")
@@ -104,7 +143,7 @@ async function main() {
   try {
     const processed = await drainProvisionJobs()
     if (processed > 0) console.log(`Provisioned ${processed} Bigcapital organization(s).\n`)
-  } catch (error) {
+  } catch {
     console.log("Bigcapital provisioning skipped (containers not running?).\n")
   }
 }
