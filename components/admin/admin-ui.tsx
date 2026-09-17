@@ -47,9 +47,9 @@ export function ReadOnlyBand({ owners, children }: { owners: string[]; /** #271:
 /** #231 Q18: Admin is a desktop area. A deep link on a phone still resolves under this one line;
  * the controls stay live (an owner in a pinch can still act), the save bar sits above the tab
  * bar, and the note says where the work belongs. */
-export function PhoneNote() {
-  return <p className="mb-6 rounded-md border border-hairline bg-slate-50 px-4 py-3 text-[13px] leading-relaxed text-slate-700 md:hidden">
-    Admin is a desktop area. Changes made here on a phone still save; the full tables are easier on a computer.
+export function PhoneNote({ children, until = "md" }: { children?: ReactNode; until?: "md" | "lg" }) {
+  return <p className={`mb-6 rounded-md border border-hairline bg-slate-50 px-4 py-3 text-[13px] leading-relaxed text-slate-700 ${until === "lg" ? "lg:hidden" : "md:hidden"}`}>
+    {children ?? "Admin is a desktop area. Changes made here on a phone still save; the full tables are easier on a computer."}
   </p>
 }
 

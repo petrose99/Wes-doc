@@ -118,14 +118,14 @@ export function UsersQueue({ workspaceId, data, initialSelectedId = null, initia
   // Spec §3.3 (c): the personal workspace is still a one-row list (You · Owner) whose pane opens
   // for your bank details; the header sentence replaces Invite, and there is nothing to filter.
   const bandLine = mode === "personal"
-    ? <p className="px-4 py-1.5 text-xs text-slate-500">Your personal workspace is just you. Create a team workspace on <Link href={adminPaths(workspaceId).companies} className="font-medium text-emerald-700 hover:underline">Companies</Link> to invite people.</p>
+    ? <p className="max-w-[70ch] px-4 py-1.5 text-xs text-slate-500">Your personal workspace is just you. Create a team workspace on <Link href={adminPaths(workspaceId).companies} className="font-medium text-emerald-700 hover:underline">Companies</Link> to invite people.</p>
     : mode === "org"
-    ? <p className="px-4 py-1.5 text-xs text-slate-500">
+    ? <p className="max-w-[70ch] px-4 py-1.5 text-xs text-slate-500">
         Across {new Set(rows.flatMap((row) => row.companies.map((company) => company.workspaceId))).size} companies in {organizationName}.
         {hiddenCompanyCount > 0 && ` ${hiddenCompanyCount} more ${hiddenCompanyCount === 1 ? "company" : "companies"} in ${organizationName} aren't shown — you're not a member of ${hiddenCompanyCount === 1 ? "it" : "them"}.`}
       </p>
     : mode === "team"
-      ? <p className="px-4 py-1.5 text-xs text-slate-500">
+      ? <p className="max-w-[70ch] px-4 py-1.5 text-xs text-slate-500">
           People with access to {currentCompany.name}.{" "}
           {isOwner && <>Name your organization on <Link href={adminPaths(workspaceId).companies} className="font-medium text-emerald-700 hover:underline">Companies</Link> to see people across companies.</>}
         </p>
@@ -145,7 +145,7 @@ export function UsersQueue({ workspaceId, data, initialSelectedId = null, initia
       search={mode === "personal" ? undefined : { param: "q", label: "Find by name or email" }}
       selectable={false}
       overrideMode={false}
-      primaryAction={isOwner ? <Button type="button" size="sm" onClick={() => setInviting(true)}>Invite a user</Button> : undefined}
+      primaryAction={isOwner ? <Button type="button" size="sm" className="hidden md:inline-flex" onClick={() => setInviting(true)}>Invite a user</Button> : undefined}
       band={bandLine}
       empty={{ filteredTitle: "Nothing matches these filters.", filteredAction: <Button type="button" size="sm" variant="outline" onClick={() => router.push(adminPaths(workspaceId).users)}>Clear filters</Button> }}
       onExportAll={async () => {
@@ -185,11 +185,16 @@ function InviteDialog({ open, onClose, workspaceId, currentWorkspaceId, ownedCom
   onSent: (inviteUrl: string, invitationId: string, email: string, companies: number) => void
 }) {
   const [email, setEmail] = useState("")
-  const [ticked, setTicked] = useState<Record<string, boolean>>(() => ({ [currentWorkspaceId]: true }))
+  const [ticked, setTicked] = useState<Record<string, boolean>>(() => ({ [currentWorkspaceId]: true, ...(ownedCompanies.length === 1 ? { [ownedCompanies[0].workspaceId]: true } : {}) }))
   const [roles, setRoles] = useState<Record<string, "owner" | "reviewer" | "member">>(() => ({ [currentWorkspaceId]: "member" }))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const grants = ownedCompanies.filter((company) => ticked[company.workspaceId])
+  // One owned company (every (b) team workspace, some (a) viewers): pre-ticked and locked, with the
+  // lock's visible reason — an invitation with nothing ticked would be nothing (spec §3.3 b).
+  const locked = ownedCompanies.length === 1
+  const emailRef = useRef<HTMLInputElement>(null)
+  const failWith = (message: string) => { setError(message); window.requestAnimationFrame(() => emailRef.current?.focus()) }
   const close = () => { if (busy) return; onClose(); setEmail(""); setTicked({ [currentWorkspaceId]: true }); setRoles({ [currentWorkspaceId]: "member" }); setError(null) }
   return <Dialog open={open} onClose={close} title="Invite a user" description="One invitation can open several companies. They get an email with a link that works for seven days." initialFocus="#invite-email">
     <form className="space-y-4 px-5 py-4" onSubmit={async (event) => {
@@ -199,23 +204,24 @@ function InviteDialog({ open, onClose, workspaceId, currentWorkspaceId, ownedCom
       try {
         const result = await inviteUserAction(workspaceId, { email: email.trim(), grants: grants.map((company) => ({ workspaceId: company.workspaceId, role: roles[company.workspaceId] ?? "member" })) })
         if (result.success && result.data) onSent(result.data.inviteUrl, result.data.invitationId, email.trim(), result.data.companies)
-        else setError(actionErrorText(result.error ?? "invite_failed", { email: email.trim() }))
-      } catch { setError("Couldn't send the invitation. Your entries are still here — try again.") }
+        else failWith(actionErrorText(result.error ?? "invite_failed", { email: email.trim() }))
+      } catch { failWith("Couldn't send the invitation. Your entries are still here — try again.") }
       finally { setBusy(false) }
     }}>
       <div className="space-y-1">
         <label htmlFor="invite-email" className="text-sm font-medium text-slate-800">Email</label>
-        <input id="invite-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required autoComplete="off" disabled={busy}
+        <input ref={emailRef} id="invite-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required autoComplete="off" disabled={busy}
           className="h-9 w-full rounded-md border border-slate-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600" />
       </div>
-      <fieldset className="max-h-[50vh] space-y-2 overflow-y-auto">
+      <fieldset className="max-h-[50vh] overflow-y-auto">
         <legend className="mb-1 text-sm font-medium text-slate-800">Companies and roles</legend>
+        <div className="divide-y divide-slate-100 border-y border-slate-100">
         {ownedCompanies.map((company) => {
           const isTicked = !!ticked[company.workspaceId]
           const role = roles[company.workspaceId] ?? "member"
-          return <div key={company.workspaceId} className="rounded-md border border-slate-200 p-2.5">
+          return <div key={company.workspaceId} className="py-2.5">
             <label className="flex items-center gap-2.5 text-sm">
-              <input type="checkbox" checked={isTicked} disabled={busy} onChange={(event) => setTicked((prev) => ({ ...prev, [company.workspaceId]: event.target.checked }))} className="h-4 w-4 accent-emerald-700" />
+              <input type="checkbox" checked={isTicked || locked} disabled={busy || locked} aria-describedby={locked ? "invite-locked-reason" : undefined} onChange={(event) => setTicked((prev) => ({ ...prev, [company.workspaceId]: event.target.checked }))} className="h-4 w-4 accent-emerald-700" />
               <span className="flex-1 text-slate-900">{company.name}</span>
               <NativeSelect value={role} disabled={!isTicked || busy} aria-label={`Role at ${company.name}`} className="h-8 w-[8.5rem]"
                 onChange={(event) => setRoles((prev) => ({ ...prev, [company.workspaceId]: event.target.value as "owner" | "reviewer" | "member" }))}>
@@ -224,10 +230,12 @@ function InviteDialog({ open, onClose, workspaceId, currentWorkspaceId, ownedCom
                 <option value="member">Member</option>
               </NativeSelect>
             </label>
+            {locked && <p id="invite-locked-reason" className="mt-1 pl-6 text-xs text-slate-500">The only company you own here.</p>}
             {isTicked && <div className="mt-1.5 pl-6"><Consequence>{ROLE_CONSEQUENCE[role](company.name)}</Consequence></div>}
           </div>
         })}
-        {unownedCompanies.length > 0 && <p className="text-xs text-slate-500">You can&apos;t invite to {unownedCompanies.map((c) => c.name).join(", ")} — ask their owners.</p>}
+        </div>
+        {unownedCompanies.length > 0 && <p className="mt-2 text-xs text-slate-500">You can&apos;t invite to {unownedCompanies.map((c) => c.name).join(", ")} — ask their owners.</p>}
       </fieldset>
       {grants.length === 0 && <p className="text-xs text-slate-500">Tick at least one company</p>}
       {error && <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>}

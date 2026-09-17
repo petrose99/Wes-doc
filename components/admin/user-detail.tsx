@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Dialog } from "@/components/ui/dialog"
 import { NativeSelect } from "@/components/ui/native-select"
 import { Pill } from "@/components/automation/automation-ui"
-import { Consequence } from "@/components/admin/admin-ui"
+import { Consequence, PhoneNote } from "@/components/admin/admin-ui"
 import { AdminSaveBar } from "@/components/admin/admin-save-bar"
 import { useAsyncConfirm } from "@/components/admin/user-confirm"
 import { usePhoneLane } from "@/lib/client/use-phone-lane"
@@ -103,7 +103,8 @@ function InvitedBody({ workspaceId, row, helpers, register, ownersByCompany }: U
   const [copied, setCopied] = useState(false)
   const email = row.email
   const invitationId = row.invitationId ?? ""
-  const canManage = !!row.viewerOwnsPrimary
+  const phone = usePhoneLane()
+  const canManage = !!row.viewerOwnsPrimary && !phone
   const primary = row.primaryWorkspaceName ?? row.companies[0]?.workspaceName ?? "this company"
   const primaryId = row.companies.find((c) => c.workspaceName === primary)?.workspaceId
   const grantsSentence = row.companies.map((c) => `${c.workspaceName} (${ROLE_LABELS[c.role]})`).join(" and ")
@@ -173,6 +174,7 @@ function InvitedBody({ workspaceId, row, helpers, register, ownersByCompany }: U
   }
 
   return <>
+    {phone && <PhoneNote until="lg">{PHONE_SENTENCE}</PhoneNote>}
     <dl className="divide-y divide-slate-100 border-y border-slate-100">
       <Fact term="Email">{row.email}</Fact>
       <Fact term="Companies and roles">
@@ -193,7 +195,7 @@ function InvitedBody({ workspaceId, row, helpers, register, ownersByCompany }: U
       <Button type="button" size="sm" variant="outline" className="border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800" onClick={() => { void revoke() }}>Revoke invitation</Button>
       {inviteUrl && <Button type="button" size="sm" variant="ghost" onClick={() => { void copyLink() }}>Copy link</Button>}
       <span role="status" className="text-xs text-emerald-800">{copied ? "Link copied" : ""}</span>
-    </div> : <Consequence>Ask an owner of {primary}: <span className="font-medium">{ownerNames(ownersByCompany[primaryId ?? ""])}</span> can resend or revoke it.</Consequence>}
+    </div> : phone ? null : <Consequence>Ask an owner of {primary}: <span className="font-medium">{ownerNames(ownersByCompany[primaryId ?? ""])}</span> can resend or revoke it.</Consequence>}
     {copyFallback && inviteUrl && <div className="flex flex-col gap-1">
       <label htmlFor="invite-link-fallback" className="text-xs text-slate-600">Copy this link</label>
       <input id="invite-link-fallback" readOnly value={inviteUrl} onFocus={(event) => event.currentTarget.select()} autoFocus
@@ -206,6 +208,10 @@ function InvitedBody({ workspaceId, row, helpers, register, ownersByCompany }: U
 // ── Member rows (spec §5.2, §4.2–§4.5) ──────────────────────────────────────────────────────────
 
 type Tab = "information" | "companies"
+const PHONE_SENTENCE = "Admin is a desktop area — open it on a wider screen to make changes."
+// `helpers.refresh()` remounts this body after every mutation (B2); the tab the person was on
+// survives the remount so a saved role doesn't drop them back on Information (build-gate r0 probe).
+let rememberedTab: { key: string; tab: Tab } | null = null
 type BankDraft = { bankName: string; accountNumber: string; branchCode: string }
 
 function MemberBody({ workspaceId, row, currentWorkspaceId, currentCompanyName, currentCompanyKind, ownersByCompany, ownedCompanies, helpers, register }: UserDetailProps) {
@@ -221,7 +227,8 @@ function MemberBody({ workspaceId, row, currentWorkspaceId, currentCompanyName, 
   const canEditAnyRole = !phone && companies.some((c) => c.viewerOwns)
   const eligible = useMemo(() => ownedCompanies.filter((c) => !row.companies.some((rc) => rc.workspaceId === c.workspaceId)), [ownedCompanies, row.companies])
 
-  const [tab, setTab] = useState<Tab>("information")
+  const [tab, setTabState] = useState<Tab>(() => (rememberedTab?.key === row.key ? rememberedTab.tab : "information"))
+  const setTab = useCallback((next: Tab) => { rememberedTab = { key: row.key, tab: next }; setTabState(next) }, [row.key])
   const [pendingRoles, setPendingRoles] = useState<Record<string, UserRole>>({})
   const [bankDraft, setBankDraft] = useState<BankDraft | null>(null)
   const [bankErrors, setBankErrors] = useState<Partial<Record<keyof BankDraft, string>>>({})
@@ -426,6 +433,7 @@ function MemberBody({ workspaceId, row, currentWorkspaceId, currentCompanyName, 
   const showBar = canEditAnyRole || canEditBank
 
   return <>
+    {phone && <PhoneNote until="lg">{PHONE_SENTENCE}</PhoneNote>}
     <div role="tablist" aria-label="Sections" onKeyDown={onTabKeyDown} className="flex gap-4 border-b border-slate-200">
       {tabButton("information", "Information")}
       {tabButton("companies", `Companies, ${companies.length}`, `Companies, ${companies.length}`)}
