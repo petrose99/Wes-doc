@@ -1,5 +1,7 @@
 "use server"
 
+import { getDocumentClaimFacts } from "@/models/expense-claims"
+import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import type { SuggestResult } from "@/components/extract/types"
 import { ActionState } from "@/lib/actions"
 import { redirect } from "next/navigation"
@@ -235,7 +237,7 @@ export async function getSelectionAuditPanelDataAction(workspaceId: string, docu
   const user = await getCurrentUser()
   const membership = await requireMember(workspaceId, user.id)
   if (!membership) return null
-  const [auditEvents, stageDecisions, gates, stageState, escalations, facts, processing] = await Promise.all([
+  const [auditEvents, stageDecisions, gates, stageState, escalations, facts, claimsEnabled, processing] = await Promise.all([
     listDocumentAuditEvents(workspaceId, documentId),
     listDocumentStageDecisions(workspaceId, documentId),
     listOpenGatesForDocument(workspaceId, documentId),
@@ -244,6 +246,7 @@ export async function getSelectionAuditPanelDataAction(workspaceId: string, docu
     // #257 S6/S7: who the approval waits on, the supplier's record, a near duplicate, the PO
     // variance figures — for the Approval tab. Null-safe per field; never fails the whole load.
     getApprovalDetailFacts(workspaceId, documentId, { userId: user.id, role: membership.role as WorkspaceRole }).catch(() => null),
+    getWorkspaceCapabilities(workspaceId).then((caps) => caps.has("expense-approvals")).catch(() => false),
     // #258: who approved with no flow / whether it went touchless — the Approval tab is never
     // empty on an Approved document, and the Status line names the actor once this lands.
     getProcessingStateInput(workspaceId, documentId).catch(() => null),
@@ -256,8 +259,12 @@ export async function getSelectionAuditPanelDataAction(workspaceId: string, docu
   const pendingStages = stageState
     ? stageState.stages.filter((stage) => stage.stageIndex >= stageState.currentStageIndex && !decidedIndexes.has(stage.stageIndex))
     : []
+  const claimView = claimsEnabled ? await getDocumentClaimFacts(workspaceId, documentId, { userId: user.id, role: membership.role as WorkspaceRole }).catch(() => null) : null
   return {
     facts,
+    claimsEnabled,
+    claim: claimView?.claim ?? null,
+    claimEligibility: claimView?.claimEligibility ?? null,
     reviewed: processing?.reviewed ?? null,
     touchless: processing?.touchlessThresholdPercent !== null && processing?.touchlessThresholdPercent !== undefined ? { thresholdPercent: processing.touchlessThresholdPercent } : null,
     auditEvents: auditEvents.map((event) => ({ id: event.id, label: event.label, createdAt: event.createdAt.toISOString(), actorName: event.actorName })),

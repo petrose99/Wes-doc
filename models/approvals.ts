@@ -1,5 +1,7 @@
 // Deliberately NOT a "use server" module, matching models/bills.ts and models/exceptions.ts:
 // server actions upstream do the auth and hand this the workspaceId/actor it trusts.
+import { countClaimsReadyToApprove } from "@/models/expense-claims"
+import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { prisma } from "@/lib/db"
 import { canDecideStage, findCurrentStage, toWorkflowStageInputs, type WorkflowStageInput } from "@/lib/approvals/engine"
 import { computeApprovalEligibility, stageHasEligibleApprover, type ApprovalEligibility } from "@/lib/approvals/row-eligibility"
@@ -260,6 +262,8 @@ export async function countReadyToApprove(workspaceId: string, actor: ApprovalAc
     const { canDecide, eligibility } = deriveRowFacts(task, actor, ctx)
     if (canDecide && eligibility.status === "ready") count += 1
   }
+  // #273: submitted expense claims the actor can decide sit in the same Ready to Approve count.
+  if ((await getWorkspaceCapabilities(workspaceId)).has("expense-approvals")) count += await countClaimsReadyToApprove(workspaceId, actor)
   return count
 }
 

@@ -1,5 +1,6 @@
 // Deliberately NOT a "use server" module, matching models/bills.ts: server actions live upstream
 // and do the auth. This trusts the workspaceId it is handed.
+import { claimEligibility, type ClaimEligibility } from "@/lib/claims/eligibility"
 import { prisma } from "@/lib/db"
 import { processingState, PROCESSING_STATES, type ProcessingState } from "@/lib/documents/processing-state"
 
@@ -25,6 +26,11 @@ export type ReceiptRow = {
    * "unclaimed"; nothing here changes ExpenseClaimItem's uniqueness (one claim per document). */
   claimId: string | null
   claimStatus: "draft" | "submitted" | "approved" | "rejected" | null
+  /** #273: the latest claim (by claim createdAt) this receipt sits in, for the Claim column's
+   * pill + subtitle; `claimId`/`claimStatus` stay as aliases until #274's cleanup. */
+  claim: { id: string; status: "draft" | "submitted" | "approved" | "rejected"; title: string | null; createdAt: string; claimantId: string | null; claimantName: string | null } | null
+  /** Same `claimEligibility` the server's add/submit paths run — the row mirrors every precondition. */
+  claimEligibility: ClaimEligibility
   /** When the document's most recent ReviewTask was opened, but only while it's still open/
    * in_review — null once it resolves or if there was never a ReviewTask. Same convention as
    * BillRow.reviewTaskOpenedAt; #208's Review SLA countdown badge times its clock from this. */
@@ -59,7 +65,7 @@ export async function listWorkspaceReceipts(input: {
    * `"unreviewed"`/`"reviewed"` values from a stale URL are ignored (no match, no redirect). */
   statusFilter?: ProcessingState
   /** Claim filter-chip group: whether the receipt has been absorbed into an expense claim yet. */
-  claimFilter?: "unclaimed" | "claimed"
+  claimFilter?: "unclaimed" | "draft" | "submitted" | "approved" | "rejected"
   /** #201's "Touchless" system saved view: rows that went out with no human review. */
   onlyTouchless?: boolean
 }): Promise<{ receipts: ReceiptRow[] }> {
@@ -88,7 +94,8 @@ export async function listWorkspaceReceipts(input: {
     }),
     prisma.expenseClaimItem.findMany({
       where: { workspaceId: input.workspaceId, documentId: { in: documentIds } },
-      select: { documentId: true, claim: { select: { id: true, status: true } } },
+      select: { documentId: true, claim: { select: { id: true, status: true, title: true, createdAt: true, submitterId: true, submitter: { select: { name: true, email: true } } } } },
+      orderBy: { claim: { createdAt: "desc" } },
     }),
     prisma.documentAuditEvent.findMany({
       where: { workspaceId: input.workspaceId, documentId: { in: documentIds }, type: "push.touchless_enqueued" },
@@ -117,7 +124,9 @@ export async function listWorkspaceReceipts(input: {
     list.push(code)
     openChecksByDoc.set(task.documentId, list)
   }
-  const claimByDoc = new Map(claimItems.map((item) => [item.documentId, item.claim]))
+  // Newest claim first — the first item per document wins.
+  const claimByDoc = new Map<string, (typeof claimItems)[number]["claim"]>()
+  for (const item of claimItems) if (!claimByDoc.has(item.documentId)) claimByDoc.set(item.documentId, item.claim)
 
   // First hit per document wins — the query is already newest-first.
   const latestReviewTaskByDoc = new Map<string, { id: string; status: string; createdAt: Date }>()
@@ -138,9 +147,12 @@ export async function listWorkspaceReceipts(input: {
       latestTask?.status === "in_review" ? "in_progress" :
       latestTask?.status === "open" ? "not_started" :
       "approved"
+    const state = processingState({ approvalStatus, blockedByCheck: openChecks.length > 0, escalated: escalatedDocIds.has(doc.id), touchless: touchlessDocIds.has(doc.id), status: doc.status })
     return {
       documentId: doc.id,
       filename: doc.filename,
+      claim: claim ? { id: claim.id, status: claim.status as "draft" | "submitted" | "approved" | "rejected", title: claim.title, createdAt: claim.createdAt.toISOString(), claimantId: claim.submitterId, claimantName: claim.submitter ? claim.submitter.name || claim.submitter.email : null } : null,
+      claimEligibility: claimEligibility({ templateCode: doc.template?.code ?? null, processingState: state, latestClaimStatus: (claim?.status as "draft" | "submitted" | "approved" | "rejected" | null) ?? null, currencyCode: asString(values["currency_code"]) }),
       merchant: asString(values["merchant"]),
       receiptNumber: asString(values["receipt_number"]),
       total: asNumber(values["total"]),
@@ -166,7 +178,7 @@ export async function listWorkspaceReceipts(input: {
     if (input.statusFilter && (PROCESSING_STATES as string[]).includes(input.statusFilter) &&
       processingState({ approvalStatus: receipt.approvalStatus, blockedByCheck: receipt.blockedByCheck, escalated: receipt.escalated, touchless: receipt.touchless, status: receipt.status }) !== input.statusFilter) return false
     if (input.claimFilter === "unclaimed" && receipt.claimId !== null) return false
-    if (input.claimFilter === "claimed" && receipt.claimId === null) return false
+    if (input.claimFilter && input.claimFilter !== "unclaimed" && receipt.claimStatus !== input.claimFilter) return false
     if (input.onlyTouchless && !receipt.touchless) return false
     return true
   })

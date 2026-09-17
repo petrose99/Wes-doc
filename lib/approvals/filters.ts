@@ -1,3 +1,4 @@
+import type { ExpenseClaimRow } from "@/models/expense-claims"
 import type { ApprovalInvoiceRow, PoMismatchRow } from "@/models/approvals"
 
 /** #257 spec 3.4: the Approvals facets as one pure predicate, shared by the server page (segment
@@ -35,4 +36,13 @@ export function searchParamsOf(record: Record<string, string | undefined>): URLS
   const params = new URLSearchParams()
   for (const [key, value] of Object.entries(record)) if (value !== undefined) params.set(key, value)
   return params
+}
+
+/** Expense claims (#273): only the approver scope applies — claims have no hard checks, so there is
+ * no "Not eligible" facet; `?approver=anyone` widens past the rows the actor can decide. */
+export function filterExpenseClaimRows(rows: ExpenseClaimRow[], params: URLSearchParams): ExpenseClaimRow[] {
+  return scopedToMe(params) ? rows.filter((row) => row.canDecide) : rows
+}
+export function countClaimsWaitingOnOthers(rows: ExpenseClaimRow[]): number {
+  return rows.filter((row) => !row.canDecide).length
 }

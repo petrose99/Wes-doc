@@ -79,7 +79,7 @@ export function ExpenseClaimRow({ workspaceId, claim, currentUserId, isOwner, ca
   const submitClaim = async () => {
     setPending(true)
     try {
-      const result = await submitExpenseClaimAction(workspaceId, claim.id, claim.submitter?.id ?? null, workflowChoice || null)
+      const result = await submitExpenseClaimAction(workspaceId, claim.id, claim.submitter?.id ?? null)
       if (!result.success) { toast.error(result.error || "Could not submit the claim"); return }
       toast.success("Claim submitted")
       router.refresh()

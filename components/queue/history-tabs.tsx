@@ -1,5 +1,7 @@
 "use client"
 
+import type { DocumentClaimFacts } from "@/lib/claims/facts"
+import type { ClaimEligibility } from "@/lib/claims/eligibility"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
@@ -21,6 +23,10 @@ export type DocumentHistory = {
   /** #257 S6/S7: who started the approval and who it waits on, the supplier's record, a near
    * duplicate, and the PO variance figures — null where the queue's loader does not supply them. */
   facts?: ApprovalDetailFacts | null
+  /** #273: the receipt's claim (S3 claim card) — top-level, not inside `facts`. */
+  claim?: DocumentClaimFacts | null
+  claimEligibility?: ClaimEligibility | null
+  claimsEnabled?: boolean
   /** `overridable`/`refusalReason` come from the server's own `overrideEligibility` — the client
    * never decides on its own that a check is a hard gate. */
   gates: Array<{ id: string; gateType: string; severity: "hard" | "soft"; firedAt: string; overridable: boolean; refusalReason: string | null }>
