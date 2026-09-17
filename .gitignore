@@ -73,3 +73,4 @@ docs/wayfinder-reports/*/logs/
 
 # wayfinder driver state: the phase high-water mark per ticket
 docs/wayfinder-reports/*/*.phase
+.preview/
