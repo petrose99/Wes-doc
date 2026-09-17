@@ -168,6 +168,14 @@ _Avoid_: Automation settings, workspace settings
 **Immersive surface**:
 A document-detail or worksheet page that temporarily takes over the viewport while preserving workspace identity, a clear return action, and relevant workspace status.
 
+**Document type**:
+Which kind of document a file is — Invoice, Purchase Order, Receipt, Bank Statement, or one of the secondary kinds (delivery note, contract, payslip, tax form, other). Asserted by the queue it was added to, or by classification for email intake, and never asked again on that queue. Changing it is a **Move** to another queue: the document leaves this queue and opens on the other with its extracted fields kept; secondary kinds are found in Search only. A document cannot be moved while an approval decision is pending on it, once it is Posted or Paid, or while it is a purchase order with matched invoices.
+_Avoid_: Category, kind, classification (as a user-facing word), re-type, reclassify
+
+**Direction**:
+Whether a document is money the workspace owes (Payable) or money owed to it (Receivable). A field on invoices and receipts, defaulted from the document type and confirmed when the review is saved; purchase orders are always payable; bank statements and secondary kinds have no direction.
+_Avoid_: Category, Expense/Sale (as labels), document type
+
 **Queue screen**:
 A typed destination's list view (Invoices, Purchase Orders, Receipts, Bank Statements, Exceptions). The queue fills the work area; selecting a row opens the Detail pane beside it, and the operator never leaves the screen to review, approve, or resolve a row. On a phone the same rows render as two-line cards (processing mark, name and amount, reference and due, state) in the same order, with Sort and the facets behind one Filters button and no selection; the queue never scrolls sideways at any width.
 _Avoid_: mobile table, horizontal scroller
