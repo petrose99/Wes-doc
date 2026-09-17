@@ -1,6 +1,14 @@
 # Area primer — Approvals (queue + phone lane)
 
-Shipped by #236 (Approvals landing: Invoice approvals · PO mismatches), #257 (phone approval lane below `lg`) and #271 (Approval email notice: sender, stop link, switch). Mode: Operate. Decisions live on #226, #232 (tab bar), #237 (removals), #249 (close-with-toast) — do not re-decide here. The same `QueueScreen` shell also renders Invoices, Exceptions, Payments (#251), PO rows (#250); #261 brings the card list to those.
+Shipped by #236 (Approvals landing: Invoice approvals · PO mismatches), #257 (phone approval lane below `lg`), #271 (Approval email notice: sender, stop link, switch) and #273 (expense claims: Add to claim on Receipts, the claim on the Approval tab, an Expense claims segment). Mode: Operate. Decisions live on #226, #232 (tab bar), #237 (removals), #249 (close-with-toast), #247 (expense-claim action) — do not re-decide here. The same `QueueScreen` shell also renders Invoices, Exceptions, Payments (#251), PO rows (#250); #261 brings the card list to those.
+
+## Expense claims (#273)
+- `components/queue/add-to-claim-dialog.tsx` (from Receipts bulk bar/pane): new-claim vs existing-draft radio group, mixed-currency rows disable Submit with a reason (spec §98), body inset `px-5 py-4` like every other Dialog.
+- `components/queue/claim-card.tsx` renders inside `history-tabs.tsx`'s Approval tab when the receipt belongs to a claim.
+- `models/expense-claims.ts`: `classifyClaimableDocuments` derives claim state from `reviewTask` (no `approvalStatus`/`blockedByCheck` columns on `Document`); extracted totals are **strings**, parse with `asNumber`; `ExpenseClaimItem.createMany` needs `workspaceId`; rejection reason lives in audit `detail.reason`. `countClaimsReadyToApprove` (called from `models/approvals.ts`'s `countReadyToApprove`) needs `expense-approvals` in `getWorkspaceCapabilities` — **model tests mocking `prisma` as `{}` must also mock `db.workspace.findUniqueOrThrow`, `db.workspaceModule.findMany`, `db.expenseClaim.findMany`** or `countReadyToApprove` throws.
+- Routes: `app/(app)/workspaces/[workspaceId]/(queue)/approvals/expense-claims/page.tsx` (queue) and `.../expense-claims/[claimId]/page.tsx` (shell notice, not a read-only pane — decided at #273's close, not a re-open). `receipts?mode=claims` segment; legacy `(chrome)/expenses` route now `notFound()`.
+- One creation breakpoint: `useCanCreateClaims` gates Add-to-claim at `md`. `?approver=anyone` shows all claims; default shows the caller's own.
+- Legacy `ExpenseClaimsPage`/`ExpenseClaimForm`/`ExpenseClaimRow`/`addExpenseClaimItemsAction` are unreferenced but not deleted — removal is #274 (owner sign-off).
 
 ## Approval notice (#271)
 - `models/approval-notices.ts` — sender: candidates from `models/review-tasks.ts`/`models/approval-workflows.ts` stage entry (`stageReachedAt`), coalesces same-decider mail, nudge after N days idle, "sent back" notice. `lib/notices/{stop-token,kick,fixtures,stop-urls,stop-state}.ts`; email component `components/emails/approval-notice-email.tsx`. Preview at `/dev/emails/approval-notice?case=single|plural|nudge|mixed|sent-back|long-names` (`&text=1` for plain text).
