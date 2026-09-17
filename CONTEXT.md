@@ -150,16 +150,24 @@ A DocuBite-side fact that an amount was paid against an invoice on a date, by a 
 _Avoid_: Mark as paid (the action, not the record), settlement, ledger payment (that is the ledger's own line)
 
 **Company**:
-The user-facing name for a team workspace in Admin and the switcher: one legal or financial entity with its own currency, tax jurisdiction, suppliers, ledger and members. "Workspace" remains the storage and address term. The auto-created personal workspace is shown as Personal, never as a company.
-_Avoid_: Entity (Vic's word), tenant, client (that is who the company belongs to)
+The user-facing name for a team workspace in Admin and the switcher: one legal or financial entity with its own currency, tax jurisdiction, suppliers, ledger and members. "Workspace" is the storage and address term and never appears on a screen as the thing a person belongs to: a screen says Company, Personal, or drops the noun ("here", "this company"). The auto-created personal workspace is shown as Personal, never as a company.
+_Avoid_: Entity (Vic's word), tenant, client (that is who the company belongs to), workspace (on screen), team workspace
 
 **Organization**:
-A named group of companies an accountant or finance team runs under one login. Belonging to an organization never by itself opens any of its companies; access to each company is granted separately, with its own role.
+A named group of companies an accountant or finance team runs under one login. Belonging to an organization never by itself opens any of its companies; access to each company is granted separately, with its own role. A company can only be removed from its organization from another company: the pane caption "Switch to another company to remove this one." is the one place that rule is said, and no other surface offers the action.
 _Avoid_: Firm (the derived workspace mode), account, tenant
 
+**Role**:
+A person's standing in one company — Owner, Reviewer or Member — and the only thing that decides what they can do in that company's books and Admin sections. Roles are per company; the same person may be Owner in one company and Member in another. The words Owner, Reviewer and Member belong to this ladder alone.
+_Avoid_: permission level, access level, entity role (Vic's word)
+
+**Organization admin**:
+The one organization-level standing, shown as a fact ("Organization admin") or absent ("—"), never as a ladder and never called "member". It lets a person rename the organization and see it in Admin; it opens no company by itself. The person who names the organization is its first admin.
+_Avoid_: Org admin (abbreviation), admin (bare — that is the area), organization member, organization owner
+
 **Admin**:
-The desktop-only area, reached from the bottom of the rail, that holds every setting: Organization (Dashboard, Companies, Users) and the current Company (Configuration, Approval Flows, PO Mismatch Flows, Suppliers, Integrations). Account-level settings (security, sign out) live in the account menu, not in Admin. Admin › Dashboard is the per-company triage rollup for an organization with more than one company; it is not the workspace home.
-_Avoid_: Settings (as the area's name), Controls (folded into Configuration), preferences
+The desktop-only area, reached from the bottom of the rail, that holds every setting: Organization (Dashboard, Companies, Users) and the current Company (Configuration, Approval Flows, PO Mismatch Flows, Suppliers, Integrations). Account-level settings (security, sign out) live in the account menu, not in Admin. Admin › Dashboard is the per-company triage rollup for an organization with more than one company; it is not the workspace home. Three admin-ish standings exist and no fourth is added: Organization admin (the organization), Owner (a company) and Admin (this area). The platform operator role (`User.role = "admin"`, the ops console) is never shown or named in this app.
+_Avoid_: Settings (as the area's name), Controls (folded into Configuration), preferences, administrator (as a role name), superadmin
 
 **Configuration**:
 The Admin section that says what a company's queues and Detail pane show and what may happen without a person: the per-type field table (Editable, Required, Width), the autonomy level and what blocks a publish, tax, email intake and what is switched on. Every switch carries one sentence saying what it changes.
