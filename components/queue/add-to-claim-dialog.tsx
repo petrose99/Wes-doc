@@ -110,7 +110,7 @@ export function AddToClaimDialog({ open, workspaceId, candidates, forceNew = fal
     <Dialog open={open} title="Add to expense claim" description="The receipts you selected, grouped into one claim for approval." width="max-w-lg" placement="center"
       onClose={() => { if (!pending) onClose() }}
       initialFocus={showTarget ? "#claim-target-new" : "#claim-dialog-cancel"}>
-      <form aria-busy={pending} className="space-y-4" onSubmit={(event) => { event.preventDefault(); void submit() }}>
+      <form aria-busy={pending} className="space-y-4 px-5 py-4" onSubmit={(event) => { event.preventDefault(); void submit() }}>
         <EligibilityStrip eligible={eligible} total={total} label={eligibleRows.length > MAX_CLAIM_RECEIPTS ? `The first ${MAX_CLAIM_RECEIPTS} can be added` : "Can be added"} />
 
         {capped.length > 0 && <div className="max-h-[40vh] overflow-auto"><ItemizedRecapTable records={capped.map((c) => toRecord(c))} /></div>}
