@@ -134,7 +134,7 @@ Who a Bill Pay row and a payment-file line pay: the invoice's Supplier or the Ex
 _Avoid_: Beneficiary (the file's column name, not the concept), vendor (for a person)
 
 **Payment batch**:
-A named set of approved invoices and approved Expense claims, one payer account and one currency, submitted by a member for an owner's decision. Pending approval, then Approved (its payment file can be downloaded), then Paid; or Rejected with a reason. Whether the file has been downloaded is a fact shown on the batch, not a state. A batch never moves money.
+A named set of approved invoices and approved Expense claims, one payer account and one currency, submitted by a member for an owner's decision. Pending approval, then Approved (its payment file can be downloaded), then Paid; or Rejected with a reason at either step until it is marked paid, which releases its invoices to Bill Pay. Whether the file has been downloaded is a fact shown on the batch, not a state. An owner may approve a batch they submitted themselves; the approval is labelled as self-approved, never blocked. A batch never moves money.
 _Avoid_: Payment run, remittance (that is the advice sent to the supplier), transfer
 
 **Payer account**:
