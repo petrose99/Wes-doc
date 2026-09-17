@@ -118,7 +118,7 @@ export function Dialog({ open, title, description, width = "max-w-md", onClose, 
         onClick={(event) => event.stopPropagation()}>
         <div className="flex items-start justify-between gap-3 border-b px-5 py-4">
           <div>
-            <h2 id={titleId} className="text-base font-semibold text-slate-900">{title}</h2>
+            <h2 id={titleId} className="text-lg font-semibold text-slate-900">{title}</h2>
             {description && <p id={descId} className="mt-1 text-sm text-slate-500">{description}</p>}
           </div>
           <button type="button" className="-mr-1 rounded p-1 max-md:-m-2 max-md:p-3 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Close" onClick={onClose}><X className="h-4 w-4" /></button>

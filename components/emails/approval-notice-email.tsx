@@ -88,7 +88,7 @@ export const ApprovalNoticeEmail: React.FC<ApprovalNoticeEmailProps> = ({ headin
         </tbody>
       </table>
 
-      <p style={{ fontSize: "13px", color: "#64748b", marginTop: "24px", lineHeight: "20px" }}>
+      <p style={{ fontSize: "13px", color: "#64748b", marginTop: "24px", lineHeight: "20px", maxWidth: "460px" }}>
         {footerVariant === "approver"
           ? <>You get this because you can decide these approvals in {workspaceName}.<br /></>
           : <>You get this because you started this approval.<br /></>}

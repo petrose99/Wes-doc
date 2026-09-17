@@ -36,6 +36,7 @@ export function ApprovalEmailsControl({ workspaceId, initial, onSaved, switchId 
   useEffect(() => { setEnabled(initial) }, [initial])
 
   const change = async (next: boolean) => {
+    if (saving) return
     const previous = enabled
     setEnabled(next)
     setError(null)
@@ -56,7 +57,7 @@ export function ApprovalEmailsControl({ workspaceId, initial, onSaved, switchId 
   return <div>
     <div className="flex min-h-11 items-center justify-between gap-4">
       <label htmlFor={switchId} className="text-sm font-medium text-slate-800">Email me when an Approval needs me.</label>
-      <Switch id={switchId} checked={enabled} onCheckedChange={(next) => void change(next)} label="Approval emails" describedBy={helpId} disabled={saving || !online} />
+      <Switch id={switchId} checked={enabled} onCheckedChange={(next) => void change(next)} label="Approval emails" describedBy={helpId} busy={saving} disabled={!online} />
     </div>
     <p id={helpId} className="mt-1 max-w-[52ch] text-[13px] leading-relaxed text-slate-500">
       {enabled ? "One email an hour at most, only for Approvals you can decide." : "You'll still see them under Approvals. Nothing is emailed."}
