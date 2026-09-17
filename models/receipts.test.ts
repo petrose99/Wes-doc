@@ -45,7 +45,7 @@ describe("listWorkspaceReceipts", () => {
     db.document.findMany.mockResolvedValue([
       { id: "d1", filename: "a.pdf", status: "reviewed", reviewedAt: new Date(), template: { code: "expense_receipt" }, reviewedData: {} },
     ])
-    db.expenseClaimItem.findMany.mockResolvedValue([{ documentId: "d1", claim: { id: "c1", status: "submitted" } }])
+    db.expenseClaimItem.findMany.mockResolvedValue([{ documentId: "d1", claim: { id: "c1", status: "submitted", title: null, createdAt: new Date("2026-09-01T00:00:00Z"), submitterId: "u1", submitter: null } }])
     const res = await listWorkspaceReceipts({ workspaceId: "w1" })
     expect(res.receipts[0]).toMatchObject({ claimId: "c1", claimStatus: "submitted" })
   })
@@ -55,8 +55,8 @@ describe("listWorkspaceReceipts", () => {
       { id: "d1", filename: "a.pdf", status: "reviewed", reviewedAt: new Date(), template: { code: "receipt" }, reviewedData: {} },
       { id: "d2", filename: "b.pdf", status: "reviewed", reviewedAt: new Date(), template: { code: "receipt" }, reviewedData: {} },
     ])
-    db.expenseClaimItem.findMany.mockResolvedValue([{ documentId: "d1", claim: { id: "c1", status: "draft" } }])
-    const res = await listWorkspaceReceipts({ workspaceId: "w1", claimFilter: "claimed" })
+    db.expenseClaimItem.findMany.mockResolvedValue([{ documentId: "d1", claim: { id: "c1", status: "draft", title: null, createdAt: new Date("2026-09-01T00:00:00Z"), submitterId: "u1", submitter: null } }])
+    const res = await listWorkspaceReceipts({ workspaceId: "w1", claimFilter: "draft" })
     expect(res.receipts.map((r) => r.documentId)).toEqual(["d1"])
   })
 

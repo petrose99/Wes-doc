@@ -23,6 +23,7 @@ import { ClaimSection } from "@/components/queue/claim-card"
 import { decideExpenseClaimAction, getExpenseClaimDetailAction } from "@/app/(app)/workspaces/[workspaceId]/expense-claim-actions"
 import type { ExpenseClaimRow } from "@/models/expense-claims"
 import type { DocumentClaimFacts } from "@/lib/claims/facts"
+import { CLAIM_STATUS_LABELS } from "@/lib/claims/labels"
 
 /** Claims have no hard checks (no gate, no exception, no payment precondition), so unlike
  * `APPROVAL_INVOICE_FACETS` there is no "Not eligible" facet — only the approver scope (spec §6.2). */
@@ -108,7 +109,7 @@ export function ExpenseClaimQueue({ workspaceId, basePath, rows, invoiceCount, p
         return { success: true }
       }
       setDecided({ row, outcome: decision === "approve" ? "approved" : "rejected" })
-      if (!phone) toast.success(decision === "approve" ? "Approved" : "Rejected")
+      if (!phone) toast.success(decision === "approve" ? CLAIM_STATUS_LABELS.approved : CLAIM_STATUS_LABELS.rejected)
       router.refresh()
       return { success: true }
     } catch {
@@ -286,8 +287,8 @@ export function ExpenseClaimDetail({ workspaceId, facts }: { workspaceId: string
 function ClaimEvents({ facts }: { facts: DocumentClaimFacts }) {
   const events: Array<{ key: string; label: string; who: string; at: string }> = []
   if (facts.submittedAt) events.push({ key: "submitted", label: "Submitted for approval", who: facts.claimant.name, at: facts.submittedAt })
-  for (const d of facts.decisions) events.push({ key: d.id, label: `${d.decision === "approve" ? "Approved" : "Rejected"} · ${d.stageName}${d.note ? `: ${d.note}` : ""}`, who: d.actorName, at: d.decidedAt })
-  if (facts.status === "approved" && facts.approval && !facts.decisions.some((d) => d.decision === "approve" && d.decidedAt === facts.approval!.at)) events.push({ key: "approved", label: "Approved", who: facts.approval.by, at: facts.approval.at })
+  for (const d of facts.decisions) events.push({ key: d.id, label: `${d.decision === "approve" ? CLAIM_STATUS_LABELS.approved : CLAIM_STATUS_LABELS.rejected} · ${d.stageName}${d.note ? `: ${d.note}` : ""}`, who: d.actorName, at: d.decidedAt })
+  if (facts.status === "approved" && facts.approval && !facts.decisions.some((d) => d.decision === "approve" && d.decidedAt === facts.approval!.at)) events.push({ key: "approved", label: CLAIM_STATUS_LABELS.approved, who: facts.approval.by, at: facts.approval.at })
   if (facts.status === "rejected" && facts.rejection && !facts.decisions.some((d) => d.decision === "reject" && d.decidedAt === facts.rejection!.at)) events.push({ key: "rejected", label: `Rejected${facts.rejection.reason ? `: ${facts.rejection.reason}` : ""}`, who: facts.rejection.by, at: facts.rejection.at })
   if (events.length === 0) return <p className="text-sm text-slate-500">No activity recorded yet.</p>
   return <ol className="divide-y divide-slate-100">

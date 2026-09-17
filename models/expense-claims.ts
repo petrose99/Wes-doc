@@ -18,8 +18,15 @@ export const EXPENSE_CLAIM_STATUSES = ["draft", "submitted", "approved", "reject
 export type ExpenseClaimStatus = (typeof EXPENSE_CLAIM_STATUSES)[number]
 const RESOLVED_STATUSES = new Set<ExpenseClaimStatus>(["approved", "rejected"])
 
+/** Same parse as models/receipts.ts: extraction stores totals as strings ("24.50"), so a claim's
+ * sum must read them the way the Receipts list does or every submit refuses with "no amounts". */
 function asNumber(value: unknown): number | null {
-  return typeof value === "number" && Number.isFinite(value) ? value : null
+  if (typeof value === "number" && Number.isFinite(value)) return value
+  if (typeof value === "string") {
+    const n = parseFloat(value.replace(/[^0-9.\-]/g, ""))
+    return Number.isFinite(n) ? n : null
+  }
+  return null
 }
 function asString(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value : null
@@ -30,7 +37,7 @@ function asString(value: unknown): string | null {
  * left to the DB's unique constraint alone, so the caller gets a clear reason instead of a raw
  * constraint-violation error. Shared by createExpenseClaim and addExpenseClaimItems so "what counts
  * as claimable" only has one definition. */
-type Db = Pick<typeof prisma, "document" | "documentCheckResult">
+type Db = Pick<typeof prisma, "document" | "documentCheckResult" | "reviewTask">
 type ClassifiedDocument = { id: string; merchant: string; eligibility: ClaimEligibility; currencyCode: string | null }
 
 export function eligibilityCode(reason: ClaimEligibilityReason): string {
@@ -47,7 +54,7 @@ async function classifyClaimableDocuments(db: Db, workspaceId: string, documentI
   const documents = await db.document.findMany({
     where: { id: { in: documentIds }, workspaceId },
     select: {
-      id: true, status: true, approvalStatus: true, blockedByCheck: true, touchless: true, reviewedData: true, rawExtraction: true,
+      id: true, status: true, reviewedData: true, rawExtraction: true,
       template: { select: { code: true } },
       expenseClaimItems: {
         where: excludeClaimId ? { claimId: { not: excludeClaimId } } : undefined,
@@ -57,20 +64,34 @@ async function classifyClaimableDocuments(db: Db, workspaceId: string, documentI
     },
   })
   if (documents.length !== documentIds.length) throw new Error("document_not_found")
-  const escalatedIds = new Set(
-    (await db.documentCheckResult.findMany({
+  // Same derivation as models/receipts.ts's listReceipts (approval status from the newest
+  // ReviewTask, open check_failed tasks, open escalations) so a receipt's row eligibility and the
+  // server's re-check never disagree on "needs attention".
+  const [escalations, reviewTasks] = await Promise.all([
+    db.documentCheckResult.findMany({
       where: { workspaceId, documentId: { in: documentIds }, status: "escalated", OR: [{ escalationStatus: null }, { escalationStatus: { in: ["open", "in_review"] } }] },
       select: { documentId: true },
-    })).map((row) => row.documentId),
-  )
+    }),
+    db.reviewTask.findMany({
+      where: { workspaceId, documentId: { in: documentIds } },
+      select: { documentId: true, status: true, reason: true, createdAt: true },
+      orderBy: { createdAt: "desc" },
+    }),
+  ])
+  const escalatedIds = new Set(escalations.map((row) => row.documentId))
+  const blockedIds = new Set(reviewTasks.filter((t) => t.reason === "check_failed" && (t.status === "open" || t.status === "in_review")).map((t) => t.documentId))
+  const latestTaskByDoc = new Map<string, string>()
+  for (const t of reviewTasks) if (!latestTaskByDoc.has(t.documentId)) latestTaskByDoc.set(t.documentId, t.status)
   return documents.map((document) => {
     const values = (document.reviewedData ?? document.rawExtraction ?? {}) as Record<string, unknown>
     const latestClaimStatus = (document.expenseClaimItems[0]?.claim.status ?? null) as "draft" | "submitted" | "approved" | "rejected" | null
+    const latest = latestTaskByDoc.get(document.id)
+    const approvalStatus = latest === "rejected" ? "rejected" : latest === "in_review" ? "in_progress" : latest === "open" ? "not_started" : "approved"
     const state = processingState({
-      approvalStatus: (document.approvalStatus as "not_started" | "in_progress" | "approved" | "rejected" | "cancelled") ?? "not_started",
-      blockedByCheck: document.blockedByCheck ?? false,
+      approvalStatus,
+      blockedByCheck: blockedIds.has(document.id),
       escalated: escalatedIds.has(document.id),
-      touchless: document.touchless ?? false,
+      touchless: false,
       status: document.status,
     })
     const eligibility = claimEligibility({

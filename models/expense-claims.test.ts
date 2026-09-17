@@ -24,6 +24,7 @@ beforeEach(() => {
   for (const key of Object.keys(db)) delete db[key]
   db.$transaction = vi.fn(async (operations: unknown[]) => operations)
   db.documentCheckResult = { findMany: vi.fn().mockResolvedValue([]) }
+  db.reviewTask = { findMany: vi.fn().mockResolvedValue([]) }
 })
 
 describe("createExpenseClaim", () => {
