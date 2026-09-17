@@ -1,0 +1,19 @@
+=== [1/50] #285 — Build Companies (Admin, Queue-screen shell)  [sonnet · low · phase: build]
+    #285 context at exit: 71767 tokens, 2 min
+    cleaned up session pid 2428824 (pgid ?); free: 6244 MB
+    scoreboard: 123 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #285: continued (progressed), session 1/3 without progress allowed in 153s
+=== [2/50] #285 — Build Companies (Admin, Queue-screen shell)  [opus[1m] · low · phase: build]
+    #285 context at exit: 74001 tokens, 4 min
+    cleaned up session pid 2432192 (pgid ?); free: 6244 MB
+    scoreboard: 124 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #285: continued (progressed), session 1/3 without progress allowed in 273s
+=== [3/50] #285 — Build Companies (Admin, Queue-screen shell)  [opus[1m] · low · phase: build]
+    #285 crossed the hand-off line (150069 tokens ≥ 150000) — asked to hand off; hard stop at 180000
+    #285 context at exit: 170489 tokens, 66 min
+    cleaned up session pid 2438071 (pgid ?); free: 6274 MB
+    scoreboard: 125 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #285: continued (progressed), session 1/3 without progress allowed in 4002s
+=== [4/50] #285 — Build Companies (Admin, Queue-screen shell)  [opus[1m] · low · phase: build]
+    #285 context at exit: 53761 tokens, 6 min
+    cleaned up session pid 2517250 (pgid ?); free: 6255 MB

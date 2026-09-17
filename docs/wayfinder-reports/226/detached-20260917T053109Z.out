@@ -1,0 +1,6 @@
+=== [1/50] #285 — Build Companies (Admin, Queue-screen shell)  [sonnet · low · phase: build]
+    #285 context at exit: 143630 tokens, 8 min
+    cleaned up session pid 2417822 (pgid ?); free: 6203 MB
+    scoreboard: 122 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #285: continued (progressed), session 1/3 without progress allowed in 484s
+=== [2/50] #285 — Build Companies (Admin, Queue-screen shell)  [opus[1m] · low · phase: build]
