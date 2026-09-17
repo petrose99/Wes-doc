@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache"
 import type { ActionState } from "@/lib/actions"
 import { adminPaths } from "@/lib/admin/paths"
-import type { CompanyRow, CompanyViewerRole } from "@/lib/admin/companies"
+import type { CompanyDetailRow, CompanyViewerRole } from "@/lib/admin/companies"
 import { getCurrentUser } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { unscoped } from "@/lib/workspace-scope"
@@ -58,7 +58,7 @@ async function companyNameTaken(organizationId: string, name: string, exceptId?:
 /** The pane's row (spec §5). Any member of the target sees it; `not_found` covers a missing
  * workspace, a personal one and one outside the route's organization alike — the notice for a
  * dead deep link is nameless, so the client needs no finer distinction here. */
-export async function loadCompanyDetailAction(workspaceId: string, targetId: string): Promise<ActionState<CompanyRow>> {
+export async function loadCompanyDetailAction(workspaceId: string, targetId: string): Promise<ActionState<CompanyDetailRow>> {
   const user = await getCurrentUser()
   const route = await headFor(workspaceId)
   if (!route?.organizationId) return { success: false, error: "not_in_organization" }
@@ -67,7 +67,11 @@ export async function loadCompanyDetailAction(workspaceId: string, targetId: str
   const target = await unscoped(() =>
     prisma.workspace.findFirst({
       where: { id: targetId, kind: "team", organizationId: route.organizationId },
-      select: { id: true, name: true, country: true, baseCurrency: true, jurisdictionCode: true, createdAt: true, _count: { select: { members: true } } },
+      select: {
+        id: true, name: true, country: true, baseCurrency: true, jurisdictionCode: true, createdAt: true,
+        _count: { select: { members: true } },
+        members: { where: { role: "owner" }, select: { user: { select: { name: true, email: true } } } },
+      },
     }),
   )
   if (!target) return { success: false, error: "not_found" }
@@ -83,6 +87,7 @@ export async function loadCompanyDetailAction(workspaceId: string, targetId: str
       viewerRole: role,
       isCurrent: target.id === workspaceId,
       createdAt: target.createdAt.toISOString(),
+      owners: target.members.map((member) => member.user.name || member.user.email),
     },
   }
 }

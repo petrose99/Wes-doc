@@ -47,10 +47,10 @@ beforeEach(() => {
 describe("loadCompanyDetailAction", () => {
   it("returns the row for any member of the target, with the viewer's role", async () => {
     seed({ [ROUTE.id]: "owner", [SIBLING.id]: "reviewer" })
-    db.workspace.findFirst.mockResolvedValue({ ...SIBLING, country: "US", baseCurrency: "USD", jurisdictionCode: null, createdAt: new Date("2026-01-01"), _count: { members: 3 } })
+    db.workspace.findFirst.mockResolvedValue({ ...SIBLING, country: "US", baseCurrency: "USD", jurisdictionCode: null, createdAt: new Date("2026-01-01"), _count: { members: 3 }, members: [{ user: { name: "Ada Owner", email: "ada@example.com" } }] })
     const result = await actions.loadCompanyDetailAction(ROUTE.id, SIBLING.id)
     expect(result.success).toBe(true)
-    expect(result.data).toMatchObject({ id: SIBLING.id, viewerRole: "reviewer", memberCount: 3, isCurrent: false })
+    expect(result.data).toMatchObject({ id: SIBLING.id, viewerRole: "reviewer", memberCount: 3, isCurrent: false, owners: ["Ada Owner"] })
   })
 
   it("not_found when the viewer has no membership on the target", async () => {

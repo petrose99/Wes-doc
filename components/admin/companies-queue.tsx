@@ -7,7 +7,9 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Dialog } from "@/components/ui/dialog"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { QueueScreen, type QueueColumn, type SortOption } from "@/components/queue/queue-screen"
+import { PaneMenuItem } from "@/components/queue/detail-pane"
 import type { Facet } from "@/components/queue/facet-filters"
 import { ReadOnlyBand } from "@/components/admin/admin-ui"
 import { CompanyDetail } from "@/components/admin/company-detail"
@@ -20,8 +22,9 @@ import {
   createOrganizationAction,
   loadCompanyDetailAction,
   moveCompanyIntoOrganizationAction,
+  removeCompanyFromOrganizationAction,
 } from "@/app/(app)/workspaces/[workspaceId]/admin/companies/actions"
-import { createWorkspaceAction } from "@/app/(app)/workspaces/[workspaceId]/workspace-actions"
+import { createWorkspaceAction, renameWorkspaceAction } from "@/app/(app)/workspaces/[workspaceId]/workspace-actions"
 
 /** #285: the three page states the server page decides (spec §3.3). */
 export type CompaniesPageState =
@@ -44,6 +47,8 @@ export type CompaniesQueueProps = {
   viewerRole: CompanyViewerRole
   /** Owners of the current workspace other than the viewer, for the read-only band. */
   owners: string[]
+  /** The `[companyId]` deep-link route's row (spec §5.4) — opens the pane on first render. */
+  initialSelectedId?: string | null
 }
 
 const ROLE_LABEL: Record<CompanyViewerRole, string> = { owner: "Owner", reviewer: "Reviewer", member: "Member" }
@@ -62,15 +67,15 @@ function filterByRole(rows: CompanyRow[], params: URLSearchParams): CompanyRow[]
   return rows.filter((row) => wanted.has(row.viewerRole))
 }
 
-export function CompaniesQueue({ workspaceId, state, viewerRole, owners }: CompaniesQueueProps) {
-  if (state.kind === "personal") return <PersonalState workspaceId={workspaceId} />
+export function CompaniesQueue({ workspaceId, state, viewerRole, owners, initialSelectedId = null }: CompaniesQueueProps) {
+  if (state.kind === "personal") return <PersonalState />
   if (state.kind === "ungrouped") return <UngroupedState workspaceId={workspaceId} state={state} viewerRole={viewerRole} owners={owners} />
-  return <OrganizationState workspaceId={workspaceId} state={state} viewerRole={viewerRole} owners={owners} />
+  return <OrganizationState workspaceId={workspaceId} state={state} viewerRole={viewerRole} owners={owners} initialSelectedId={initialSelectedId} />
 }
 
 /* ------------------------------------------------------------------------------- (c) --- */
 
-function PersonalState({ workspaceId }: { workspaceId: string }) {
+function PersonalState() {
   const router = useRouter()
   const [creating, setCreating] = useState(false)
   return <section aria-labelledby="queue-title" className="mx-auto max-w-[60ch] px-6 py-10 text-center">
@@ -171,17 +176,20 @@ function NameOrganizationDialog({ open, onClose, workspaceId, defaultName, discl
 
 /* ------------------------------------------------------------------------------- (a) --- */
 
-function OrganizationState({ workspaceId, state, viewerRole, owners }: {
+function OrganizationState({ workspaceId, state, viewerRole, owners, initialSelectedId }: {
   workspaceId: string
   state: { organizationName: string; rows: CompanyRow[]; hiddenCount: number; movable: { id: string; name: string; memberCount: number }[] }
   viewerRole: CompanyViewerRole
   owners: string[]
+  initialSelectedId?: string | null
 }) {
   const router = useRouter()
   const isOwner = viewerRole === "owner"
   const { organizationName, rows, hiddenCount, movable } = state
   const [adding, setAdding] = useState(false)
   const [moving, setMoving] = useState(false)
+  const [renaming, setRenaming] = useState<CompanyRow | null>(null)
+  const [removing, setRemoving] = useState<{ row: CompanyRow; close: () => void } | null>(null)
   const rowsById = useMemo(() => new Map(rows.map((row) => [row.id, row])), [rows])
 
   const loadDetail = useCallback(async (id: string) => {
@@ -230,6 +238,14 @@ function OrganizationState({ workspaceId, state, viewerRole, owners }: {
       </button> : null}
       empty={{ filteredBody: "Clear a filter to widen the queue." }}
       loadDetail={loadDetail}
+      initialSelectedId={initialSelectedId}
+      paneActions={(row) => <Button asChild className="lg:h-8 lg:text-xs"><Link className="py-1.5" href={`/workspaces/${row.id}`}>Open</Link></Button>}
+      paneMenu={(row, helpers) => <>
+        <PaneMenuItem href={adminPaths(row.id).base}>Open Admin</PaneMenuItem>
+        {row.viewerRole === "owner" && <PaneMenuItem onClick={() => setRenaming(row)}>Rename…</PaneMenuItem>}
+        {row.viewerRole === "owner" && <PaneMenuItem tone="red" disabled={row.isCurrent} hint={row.isCurrent ? "Switch to another company to remove this one." : undefined}
+          onClick={() => setRemoving({ row, close: helpers.close })}>Remove from {organizationName}</PaneMenuItem>}
+      </>}
       cards={{ below: "md", label: (row) => [row.name, `${row.country} — ${countryName(row.country)}`, row.baseCurrency, `${row.memberCount} members`, ROLE_LABEL[row.viewerRole]].join(", ") }} />
 
     {!isOwner && <div className="px-6"><ReadOnlyBand owners={owners}>Ask an owner: {owners.length ? <span className="font-medium">{owners.join(", ")}</span> : "an owner"} can add or move companies.</ReadOnlyBand></div>}
@@ -241,6 +257,12 @@ function OrganizationState({ workspaceId, state, viewerRole, owners }: {
 
     <MoveCompanyDialog open={moving} onClose={() => setMoving(false)} workspaceId={workspaceId} organizationName={organizationName} candidates={movable}
       onMoved={(id, name) => { setMoving(false); toast.success(`${name} moved into ${organizationName}`, { duration: 8000 }); afterMutation(id) }} />
+
+    <RenameCompanyDialog open={renaming !== null} onClose={() => setRenaming(null)} row={renaming}
+      onRenamed={(oldName, newName) => { setRenaming(null); toast.success(`Renamed to ${newName} (was ${oldName})`); afterMutation(); router.refresh() }} />
+
+    <RemoveCompanyConfirm workspaceId={workspaceId} entry={removing} organizationName={organizationName} onClose={() => setRemoving(null)}
+      onRemoved={(name) => { removing?.close(); setRemoving(null); toast.success(`${name} removed from ${organizationName}`); afterMutation() }} />
   </>
 }
 
@@ -338,4 +360,65 @@ function MoveCompanyDialog({ open, onClose, workspaceId, organizationName, candi
       </div>
     </form>
   </Dialog>
+}
+
+function RenameCompanyDialog({ open, onClose, row, onRenamed }: {
+  open: boolean; onClose: () => void; row: CompanyRow | null
+  onRenamed: (oldName: string, newName: string) => void
+}) {
+  const [name, setName] = useState(row?.name ?? "")
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const close = () => { if (busy) return; onClose(); setError(null) }
+  return <Dialog open={open} onClose={close} title="Rename" initialFocus="#rename-company-name">
+    <form className="space-y-4 px-5 py-4" onSubmit={async (event) => {
+      event.preventDefault()
+      if (!row || !name.trim()) return
+      setBusy(true); setError(null)
+      try {
+        const result = await renameWorkspaceAction(row.id, name.trim())
+        if (result.success && result.data) onRenamed(row.name, result.data.name)
+        else setError(result.error ? `Couldn't save — ${result.error} Your entries are still here — try again.` : "Couldn't save. Your entries are still here — try again.")
+      } catch { setError("Couldn't reach the server. Your entries are still here — try again.") }
+      finally { setBusy(false) }
+    }}>
+      <div className="space-y-1">
+        <label htmlFor="rename-company-name" className="text-sm font-medium text-slate-800">Name</label>
+        <input id="rename-company-name" value={name} onChange={(event) => setName(event.target.value)} required maxLength={80} autoComplete="off"
+          onFocus={(event) => event.currentTarget.select()}
+          className="h-9 w-full rounded-md border border-slate-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600" />
+      </div>
+      {error && <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>}
+      <div className="flex justify-end gap-2">
+        <Button type="button" size="sm" variant="outline" disabled={busy} onClick={close}>Cancel</Button>
+        <Button type="submit" size="sm" disabled={busy || !name.trim()}>{busy ? "Saving…" : "Save name"}</Button>
+      </div>
+    </form>
+  </Dialog>
+}
+
+function RemoveCompanyConfirm({ workspaceId, entry, organizationName, onClose, onRemoved }: {
+  workspaceId: string
+  entry: { row: CompanyRow; close: () => void } | null
+  organizationName: string
+  onClose: () => void
+  onRemoved: (name: string) => void
+}) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const row = entry?.row
+  return <ConfirmDialog open={entry !== null} destructive busy={busy} title={row ? `Remove ${row.name} from ${organizationName}?` : ""}
+    description="It becomes an ungrouped team workspace. Its members keep their roles; nothing is deleted."
+    confirmLabel="Remove"
+    onCancel={() => { if (busy) return; onClose(); setError(null) }}
+    onConfirm={async () => {
+      if (!row) return
+      setBusy(true); setError(null)
+      const result = await removeCompanyFromOrganizationAction(workspaceId, row.id)
+      setBusy(false)
+      if (result.success && result.data) onRemoved(result.data.name)
+      else setError(companyActionErrorText(result.error ?? "failed", { name: row.name, org: organizationName }))
+    }}>
+    {error && <p role="alert" className="mt-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">Nothing was removed — {error}</p>}
+  </ConfirmDialog>
 }

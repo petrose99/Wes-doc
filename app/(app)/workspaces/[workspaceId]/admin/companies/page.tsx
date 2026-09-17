@@ -12,7 +12,10 @@ export const dynamic = "force-dynamic"
  * ungrouped team workspace: the "Name your organization" first-use state; (c) a personal
  * workspace: not a company, so the first-use state offers "Create a team workspace". The page
  * always renders; roles gate the controls, never the address. */
-export default async function CompaniesPage({ params }: { params: Promise<{ workspaceId: string }> }) {
+/** Also called directly by the `[companyId]` deep-link route (spec §5.4) with `selectedId` set,
+ * so a link to one company opens this same screen with its pane already open — the Queue-screen
+ * convention (#225), not a separate page. */
+export async function CompaniesScreen({ params, selectedId }: { params: Promise<{ workspaceId: string }>; selectedId?: string }) {
   const { workspaceId } = await params
   const context = await getAdminContext(workspaceId)
   const { workspace, membership, user } = context
@@ -50,5 +53,9 @@ export default async function CompaniesPage({ params }: { params: Promise<{ work
     hiddenCount: Math.max(0, orgTotal - rows.length),
     movable: ungrouped.map((candidate) => ({ id: candidate.id, name: candidate.name, memberCount: candidate._count.members })),
   }
-  return <CompaniesQueue workspaceId={workspaceId} state={state} viewerRole={viewerRole} owners={context.owners} />
+  return <CompaniesQueue workspaceId={workspaceId} state={state} viewerRole={viewerRole} owners={context.owners} initialSelectedId={selectedId ?? null} />
+}
+
+export default function CompaniesPage({ params }: { params: Promise<{ workspaceId: string }> }) {
+  return CompaniesScreen({ params })
 }

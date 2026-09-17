@@ -15,6 +15,10 @@ export type CompanyRow = {
   createdAt: string
 }
 
+/** The pane's row (spec §5.1) — the list row plus what only the detail view needs: owner names
+ * for the "n · owners: A, B" line. Loaded fresh per pane open; never carried in `CompanyRow`. */
+export type CompanyDetailRow = CompanyRow & { owners: string[] }
+
 /** Every refusal an action can return. The actions never return prose; the UI maps here. */
 export type CompanyActionCode =
   | "owner_required"
