@@ -1,6 +1,6 @@
 # Autopilot run log — map #226
 
-| When (UTC) | Ticket | Outcome | Duration | Log |
+| When (SAST from 2026-09-17; UTC before) | Ticket | Outcome | Duration | Log |
 |---|---|---|---|---|
 | 2026-09-15T23:06:52Z | [#229](https://github.com/petrose99/docubite/issues/229) Shape payment runs that never move money: Bill Pay queue and Payment Batches | resolved | 13m33s | [log](logs/20260915T230652Z-229.jsonl) |
 | 2026-09-15T23:20:30Z | [#231](https://github.com/petrose99/docubite/issues/231) Shape the Admin area: Configuration, Approval Flows, Mismatch Flows, Users, Companies | resolved | 15m54s | [log](logs/20260915T232030Z-231.jsonl) |
@@ -111,3 +111,5 @@
 | 2026-09-17T04:48:56Z | [#286](https://github.com/petrose99/Wes-doc/issues/286) Build Users (Admin, org-level Queue-screen shell) | continued (progressed), session 1/3 without progress allowed (opus) | 5m04s | [log](logs/20260917T044856Z-286.jsonl) |
 | 2026-09-17T04:54:07Z | [#286](https://github.com/petrose99/Wes-doc/issues/286) Build Users (Admin, org-level Queue-screen shell) | continued (progressed), session 1/3 without progress allowed (opus) | 4m04s | [log](logs/20260917T045407Z-286.jsonl) |
 | 2026-09-17T04:58:19Z | [#286](https://github.com/petrose99/Wes-doc/issues/286) Build Users (Admin, org-level Queue-screen shell) | continued (progressed), session 1/3 without progress allowed (opus) | 5m34s | [log](logs/20260917T045819Z-286.jsonl) |
+| 2026-09-17T05:07:55Z | [#286](https://github.com/petrose99/Wes-doc/issues/286) | stopped by the owner — continues on the next run | – | – |
+| 2026-09-17T05:08:13Z | [#285](https://github.com/petrose99/Wes-doc/issues/285) Build Companies (Admin, Queue-screen shell) | continued (progressed), session 1/3 without progress allowed (sonnet) | 2m33s | [log](logs/20260917T050813Z-285.jsonl) |

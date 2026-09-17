@@ -41,7 +41,7 @@ for t in $(echo "$TICKETS" | tr ' ' '\n' | sort -u); do
   fi
   gh issue comment "$t" --repo "$REPO" --body "Autopilot: continue — stopped by the owner. Work so far is committed as WIP on the branch. Next session: read \`docs/wayfinder-reports/$MAP/$t.handoff.md\` and the last commits, continue from the milestone it names." >/dev/null 2>&1 && echo "posted hand-off on #$t"
   gh issue edit "$t" --repo "$REPO" --remove-assignee "$ME" >/dev/null 2>&1 && echo "released claim on #$t"
-  printf '| %s | [#%s](https://github.com/%s/issues/%s) | stopped by the owner — continues on the next run | – | – |\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$t" "$REPO" "$t" >> "$OUT/run-log.md"
+  printf '| %s | [#%s](https://github.com/%s/issues/%s) | stopped by the owner — continues on the next run | – | – |\n' "$(TZ=Africa/Johannesburg date +%Y-%m-%dT%H:%M:%S%z)" "$t" "$REPO" "$t" >> "$OUT/run-log.md"
 done
 
 # 4. sweep

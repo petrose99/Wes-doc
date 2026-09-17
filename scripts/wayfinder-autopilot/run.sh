@@ -53,7 +53,7 @@ done
 
 OUT="$ROOT/docs/wayfinder-reports/$MAP"; LOGS="$OUT/logs"; mkdir -p "$LOGS"
 RUNLOG="$OUT/run-log.md"
-[ -f "$RUNLOG" ] || printf '# Autopilot run log — map #%s\n\n| When (UTC) | Ticket | Outcome | Duration | Log |\n|---|---|---|---|---|\n' "$MAP" > "$RUNLOG"
+[ -f "$RUNLOG" ] || printf '# Autopilot run log — map #%s\n\n| When (SAST) | Ticket | Outcome | Duration | Log |\n|---|---|---|---|---|\n' "$MAP" > "$RUNLOG"
 ME="$(gh api user --jq .login)"
 
 # --detach: re-exec this script under nohup/setsid so it survives the caller's
@@ -259,7 +259,7 @@ while [ "$n" -lt "$MAX" ]; do
     case "$(readlink "/proc/$p/cwd" 2>/dev/null)/" in "$ROOT/"*) kill -TERM "$p" 2>/dev/null || true ;; esac
   done
   sleep 2
-  START=$(date -u +%Y-%m-%dT%H:%M:%SZ); S0=$(date +%s)
+  START=$(TZ=Africa/Johannesburg date +%Y-%m-%dT%H:%M:%S%z); S0=$(date +%s)
   LOG="$LOGS/$(date -u +%Y%m%dT%H%M%SZ)-$T.jsonl"
   set +e
   # Each session gets its own process group (setsid) so everything it spawns —
