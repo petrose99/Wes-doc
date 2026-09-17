@@ -78,6 +78,7 @@ export function UsersQueue({ workspaceId, data, initialSelectedId = null, initia
         if (names.length <= 2) return names.join(", ") || "—"
         return `${names.slice(0, 2).join(", ")}, +${names.length - 2} more`
       },
+      phoneRender: (row: UserRow) => row.companies.length === 1 ? row.companies[0].workspaceName : `${row.companies.length} companies`,
     } as QueueColumn<UserRow>] : []),
     { key: "role", label: `Role in ${currentCompany.name}`, phone: "pill", render: (row) => row.roleHere ? ROLE_LABELS[row.roleHere] : "—" },
     {

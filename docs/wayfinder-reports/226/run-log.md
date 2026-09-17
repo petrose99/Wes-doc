@@ -125,3 +125,5 @@
 | 2026-09-17T09:26:22+0200 | [#286](https://github.com/petrose99/Wes-doc/issues/286) Build Users (Admin, org-level Queue-screen shell) | continued (progressed), session 1/3 without progress allowed (sonnet) | 5m03s | [log](logs/20260917T072622Z-286.jsonl) |
 | 2026-09-17T09:31:34+0200 | [#286](https://github.com/petrose99/Wes-doc/issues/286) Build Users (Admin, org-level Queue-screen shell) | continued (progressed), session 1/3 without progress allowed (opus[1m]) | 9m34s | [log](logs/20260917T073134Z-286.jsonl) |
 | 2026-09-17T09:41:17+0200 | [#286](https://github.com/petrose99/Wes-doc/issues/286) Build Users (Admin, org-level Queue-screen shell) | continued (progressed), session 1/3 without progress allowed (opus[1m]) | 41m08s | [log](logs/20260917T074117Z-286.jsonl) |
+| 2026-09-17T10:49:05+0200 | [#286](https://github.com/petrose99/Wes-doc/issues/286) | stopped by the owner — continues on the next run | – | – |
+| 2026-09-17T10:55:19+0200 | [#286](https://github.com/petrose99/Wes-doc/issues/286) | stopped by the owner — continues on the next run | – | – |
