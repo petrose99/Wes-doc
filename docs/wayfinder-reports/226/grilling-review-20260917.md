@@ -162,3 +162,5 @@ All four flagged items confirmed by the owner as decided:
 4. **Direction: Payable · Receivable** — confirmed; stored values unchanged.
 
 No decision reopened. #295, #296, #297 proceed as specified.
+
+**Amendment (owner, same day):** item 4 is reversed in a stronger form — DocuBite is accounts-payable only, so the Direction row is not built at all and the Receivable side (`sale` category, receivable ledger push, AR Aging report) is removed on #297, signed by name on #298. #283's other decisions stand.

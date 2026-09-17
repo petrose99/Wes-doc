@@ -113,3 +113,5 @@ First-pass scores are the KPI (the pre-build getting better); close scores are r
 | #285 | 20260917T033559 | opus[1m] | continued (progressed), sess | 32 | 0 | 0 | 0 | 0 | 35 | 4M | 2K | 0 | 0 | 4m33s |
 | #285 | 20260917T034041 | opus[1m] | phase spec done → build next | 32 | 0 | 0 | 0 | 0 | 69 | 8M | 3K | 0 | 1 | 12m04s |
 | #286 | 20260917T042507 | opus[1m] | continued (progressed), sess | 32 | · | · | · | · | 40 | 4M | 1K | 0 | 0 | 7m34s |
+| #286 | 20260917T043249 | opus[1m] | phase spec done → build next | 32 | · | · | · | · | 60 | 6M | 2K | 0 | 1 | 9m04s |
+| #286 | 20260917T044202 | sonnet | continued (progressed), sess | 32 | · | · | · | · | 73 | 9M | 0K | 0 | 0 | 4m33s |

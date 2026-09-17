@@ -173,8 +173,8 @@ Which kind of document a file is — Invoice, Purchase Order, Receipt, Bank Stat
 _Avoid_: Category, kind, classification (as a user-facing word), re-type, reclassify
 
 **Direction**:
-Whether a document is money the workspace owes (Payable) or money owed to it (Receivable). A field on invoices and receipts, defaulted from the document type and confirmed when the review is saved; purchase orders are always payable; bank statements and secondary kinds have no direction.
-_Avoid_: Category, Expense/Sale (as labels), document type
+Retired (owner, 2026-09-17). DocuBite is accounts-payable only: every invoice and receipt is money the workspace owes, so there is no direction to choose and no Receivable side. The ledger push is always payable. Kept here so the word is not reintroduced.
+_Avoid_: Payable/Receivable (as a field), Category, Expense/Sale (as labels), sales invoice, AR
 
 **Queue screen**:
 A typed destination's list view (Invoices, Purchase Orders, Receipts, Bank Statements, Exceptions). The queue fills the work area; selecting a row opens the Detail pane beside it, and the operator never leaves the screen to review, approve, or resolve a row. On a phone the same rows render as two-line cards (processing mark, name and amount, reference and due, state) in the same order, with Sort and the facets behind one Filters button and no selection; the queue never scrolls sideways at any width.
