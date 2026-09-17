@@ -1,7 +1,18 @@
 ## Phase brief: CLOSE
 
-Read the hand-off: the scores and triage are on it, the round script exists
-— do not re-measure first.
+Read the hand-off: the raw scores and the untriaged finding lists are on it
+(the measure session records, it does not judge), the round script exists —
+do not re-measure first.
+
+**Triage first, in one pass.** Go through `## Raw findings (untriaged)` and
+the detector counts and label each finding: *real* (fix it in the batch),
+*residue* (in the named app-wide/shared-component residue set — say which
+entry), *tooling* (dev-server overlay such as `nextjs-portal` in the tab
+order, a probe-labelling gap, a capture timing artifact — say what and how
+you verified it against source), or *decision* (a Wayfinder ticket, named
+on the close). Verify a `tooling` call against the code before dismissing
+it; a P1 dismissed without evidence is a P1 shipped. Write the triaged list
+to the hand-off, replacing the raw one, before the first edit.
 
 **One fix batch, then ship — a second only if the first removed a P1**
 (fixing a P1 changes enough that the confirm can't stand in for it).

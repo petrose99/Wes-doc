@@ -130,6 +130,7 @@ MODEL_STRONG="${WAYFINDER_MODEL_STRONG:-}"          # empty = the user's default
 MODEL_CHEAP="${WAYFINDER_MODEL_CHEAP:-}"
 [ -f "$ROOT/.claude/wayfinder-autopilot/config.sh" ] && . "$ROOT/.claude/wayfinder-autopilot/config.sh"
 MODEL_CHEAP="${MODEL_CHEAP:-$MODEL_STRONG}"
+MODEL_MEASURE="${WAYFINDER_MODEL_MEASURE:-${MODEL_MEASURE:-}}"   # optional: the measure phase's first session (plumbing only)
 # EFFORT (optional, per-project or WAYFINDER_EFFORT): pinned per session with
 # --effort so the autopilot never inherits whatever the user's own /model
 # choice wrote into ~/.claude/settings.json. Empty = inherit.
@@ -211,6 +212,10 @@ model_for() {   # $1 ticket, $2 attempt number (1-based), $3 phase
     # spec is judgement → strong. build and close are execution from the
     # tables → the exec model for their first session; a second session on
     # the same phase (cap, no close) → strong.
+    # measure is plumbing (servers, the round script, the reader agents,
+    # raw scores onto the hand-off; the triage is the close session's) →
+    # MODEL_MEASURE when set, for its first session only.
+    if [ "$phase" = measure ] && [ -n "${MODEL_MEASURE:-}" ] && [ "${PHASE_RUNS[$1:$phase]:-0}" -eq 0 ]; then echo "$MODEL_MEASURE"; return; fi
     if [ "$phase" = spec ] || [ "${PHASE_RUNS[$1:$phase]:-0}" -ge 1 ] || [ -z "${MODEL_EXEC_FIRST:-}" ]; then echo "$MODEL_STRONG"; else echo "$MODEL_EXEC_FIRST"; fi
     return
   fi
