@@ -44,7 +44,7 @@ function summary(facet: Facet, values: string[]): string {
 
 /** `sortParam` (#261): the chips' Clear filters shares `clearFilterParams` with the Filter sheet
  * and the filtered-empty state, so all three clear the same set — facets and a non-default sort. */
-export function FacetFilters({ facets, sortParam = "sort" }: { facets: Facet[]; sortParam?: string }) {
+export function FacetFilters({ facets, sortParam = "sort", extraParams = [] }: { facets: Facet[]; sortParam?: string; extraParams?: string[] }) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -58,7 +58,7 @@ export function FacetFilters({ facets, sortParam = "sort" }: { facets: Facet[]; 
     router.push(qs ? `${pathname}?${qs}` : pathname)
   }
 
-  const anyActive = facets.some((facet) => selectedValues(facet, searchParams).length > 0)
+  const anyActive = facets.some((facet) => selectedValues(facet, searchParams).length > 0) || extraParams.some((param) => (searchParams.get(param) ?? "").trim() !== "")
 
   return <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Filters">
     {facets.map((facet) => {
@@ -76,7 +76,7 @@ export function FacetFilters({ facets, sortParam = "sort" }: { facets: Facet[]; 
       return <FacetChip key={facet.param} facet={facet} values={values} onApply={(next) => apply(facet.param, next)} />
     })}
     {anyActive && <button type="button" onClick={() => {
-      const qs = clearFilterParams(searchParams, facets, sortParam).toString()
+      const qs = clearFilterParams(searchParams, facets, sortParam, extraParams).toString()
       router.push(qs ? `${pathname}?${qs}` : pathname)
     }} className="inline-flex h-8 items-center gap-1 rounded-full px-2.5 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-1">
       <X className="h-3.5 w-3.5" aria-hidden />Clear filters

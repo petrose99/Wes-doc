@@ -2,7 +2,7 @@
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react"
-import { ArrowUpDown, Download, MoreHorizontal, ShieldAlert, ShieldCheck } from "lucide-react"
+import { ArrowUpDown, Download, MoreHorizontal, Search, ShieldAlert, ShieldCheck } from "lucide-react"
 import { toast } from "sonner"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { DetailPane, DETAIL_PANE_ID, type PaneName } from "@/components/queue/detail-pane"
@@ -105,6 +105,15 @@ export type QueueScreenProps<T> = {
   views?: ReactNode
   /** One inline figure at the right end of row 1 (#186's metric; #205's band is gone). */
   stat?: ReactNode
+  /** #285/#286: an Admin queue's one primary button (Invite a user, Add a company), rendered at the
+   * right end of row 1 before `stat`. Absent on the document queues. */
+  primaryAction?: ReactNode
+  /** #285/#286: Override Mode has no meaning on an Admin list (no soft checks); `false` hides the
+   * menu item and the banner. The provider stays mounted so the pane's consumers keep working. */
+  overrideMode?: boolean
+  /** #286: one free-text filter on the facet row (≥ md) and in the Filter sheet (< md), read and
+   * written on `param`; `filterRows` does the matching. Clear filters clears it too. */
+  search?: { param: string; label: string }
   /** #229 Q8 (#251): one metric band above header row 1 — Bill Pay's *Open invoices by age*.
    * The one documented exception to #225's "no band": aging is the payer's question and lives
    * where the payer works. Absent everywhere else. */
@@ -182,7 +191,7 @@ const INTERACTIVE = "a, button, input, select, textarea, label, [role=button], [
 
 function QueueScreenInner<T>({
   title, basePath, rows, rowId, detailIdFor, rowName, paneStatus, fullHref, archivedToast, leading, columns: rawColumns, fieldTable = null, selectable = false, sortOptions = [], facets = [],
-  views, viewsPhone, stat, band, menu, onExportAll, bulkActions, empty, workspaceDocumentCount = 0, loadDetail, paneActions, paneMenu, initialSelectedId = null, sortParam = "sort", cards, phoneReadOnly = false,
+  views, viewsPhone, stat, primaryAction, overrideMode: overrideModeEnabled = true, search, band, menu, onExportAll, bulkActions, empty, workspaceDocumentCount = 0, loadDetail, paneActions, paneMenu, initialSelectedId = null, sortParam = "sort", cards, phoneReadOnly = false,
   filterRows, pinned = null, initialMissing, onOpenChange, origin = null, onControls,
 }: QueueScreenProps<T>) {
   const router = useRouter()
@@ -283,7 +292,25 @@ function QueueScreenInner<T>({
     window.addEventListener("docubite:focus-rows", onFocusRows)
     return () => window.removeEventListener("docubite:focus-rows", onFocusRows)
   }, [ids, openId, focusRow])
-  const filtered = facets.some((facet) => searchParams.get(facet.param))
+  const extraParams = useMemo(() => (search ? [search.param] : []), [search])
+  const filtered = facets.some((facet) => searchParams.get(facet.param)) || extraParams.some((param) => (searchParams.get(param) ?? "").trim() !== "")
+  // #286: the search input writes its param on a short debounce (replace, not push — typing is
+  // not history). Local state keeps the keystrokes; the URL is the truth the list filters on.
+  const [searchDraft, setSearchDraft] = useState(() => (search ? searchParams.get(search.param) ?? "" : ""))
+  const urlSearch = search ? searchParams.get(search.param) ?? "" : ""
+  useEffect(() => { setSearchDraft(urlSearch) }, [urlSearch])
+  const commitSearch = useCallback((value: string) => {
+    if (!search) return
+    const next = new URLSearchParams(window.location.search)
+    if (value.trim() === "") next.delete(search.param); else next.set(search.param, value)
+    const qs = next.toString()
+    router.replace(qs ? `${pathname}?${qs}` : pathname)
+  }, [search, router, pathname])
+  useEffect(() => {
+    if (!search || searchDraft === urlSearch) return
+    const timer = window.setTimeout(() => commitSearch(searchDraft), 200)
+    return () => window.clearTimeout(timer)
+  }, [search, searchDraft, urlSearch, commitSearch])
   const hiddenByFilters = rows.length - visibleRows.length
 
   // Reflect the open row in the URL so a refresh, a share, or Back lands on the same state — the
@@ -424,7 +451,7 @@ function QueueScreenInner<T>({
   // empty state, so focus is handed to the first control that still explains the list: the phone
   // Filters button, the first header chip, else the queue title — never body (critic D3).
   const clearFilters = () => {
-    const qs = clearFilterParams(searchParams, facets, sortParam).toString()
+    const qs = clearFilterParams(searchParams, facets, sortParam, extraParams).toString()
     router.push(qs ? `${pathname}?${qs}` : pathname)
     const root = rootRef.current
     const candidates = ["#queue-filters-trigger", "#queue-facets button", "#queue-title"]
@@ -471,8 +498,16 @@ function QueueScreenInner<T>({
           {sortOptions.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}
         </select>
       </label>}
-      {facets.length > 0 && <span id="queue-facets" className={below ? below.hideBelow : "contents"}><FacetFilters facets={facets} sortParam={sortParam} /></span>}
+      {facets.length > 0 && <span id="queue-facets" className={below ? below.hideBelow : "contents"}><FacetFilters facets={facets} sortParam={sortParam} extraParams={extraParams} /></span>}
+      {search && <span className={`${below ? below.hideBelowInline : "inline-flex"} h-8 items-center gap-1 rounded-md border border-slate-300 bg-white pl-2 pr-1 text-xs font-medium text-slate-700 focus-within:ring-2 focus-within:ring-emerald-600 focus-within:ring-offset-1`}>
+        <Search className="h-3.5 w-3.5 text-slate-500" aria-hidden />
+        <input id="queue-search" type="search" value={searchDraft} onChange={(event) => setSearchDraft(event.target.value)}
+          onKeyDown={(event) => { if (event.key === "Escape" && searchDraft !== "") { event.preventDefault(); event.stopPropagation(); setSearchDraft(""); commitSearch("") } }}
+          aria-label={search.label} placeholder={search.label} autoComplete="off"
+          className="h-full w-44 bg-transparent pr-1 text-xs font-medium text-slate-700 placeholder:text-slate-500 focus:outline-none" />
+      </span>}
       <div className="ml-auto flex items-center gap-2">
+        {primaryAction}
         {stat}
         <Popover open={menuOpen} onOpenChange={setMenuOpen}>
           <PopoverTrigger asChild>
@@ -481,14 +516,14 @@ function QueueScreenInner<T>({
             </button>
           </PopoverTrigger>
           <PopoverContent align="end" className="w-72 p-1" onClick={(event) => { if ((event.target as HTMLElement).closest("[data-menu-close]")) setMenuOpen(false) }}>
-            <button type="button" role="switch" aria-checked={overrideMode.active} onClick={overrideMode.toggle} data-menu-close
+            {overrideModeEnabled && <button type="button" role="switch" aria-checked={overrideMode.active} onClick={overrideMode.toggle} data-menu-close
               className="flex w-full items-start gap-2.5 rounded-sm px-2.5 py-2 text-left text-sm text-slate-700 hover:bg-slate-100">
               {overrideMode.active ? <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" aria-hidden /> : <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" aria-hidden />}
               <span>
                 <span className="block font-medium">{overrideMode.active ? "Turn off Override Mode" : "Turn on Override Mode"}</span>
                 <span className="block text-xs text-slate-500">Lets you override soft checks (match, confidence, trust, workspace) with a reason. Duplicate, jurisdiction and SMB-ceiling checks never can be.</span>
               </span>
-            </button>
+            </button>}
             {onExportAll && <button type="button" onClick={() => void exportAll()} disabled={exporting || rows.length === 0} data-menu-close
               className="flex w-full items-center gap-2.5 rounded-sm px-2.5 py-2 text-left text-sm text-slate-700 hover:bg-slate-100 disabled:opacity-50">
               <Download className="h-4 w-4 shrink-0 text-slate-500" aria-hidden />
@@ -503,11 +538,11 @@ function QueueScreenInner<T>({
     {cards && band}
     {/* #257 spec 3.4: below the card breakpoint the sort select and facet chips give way to one
         Filter button and its sheet — the same params, one place to change them. */}
-    {below && (facets.length > 0 || sortOptions.length > 1 || viewsPhone) && <div className={`${below.showBelowOnly} flex items-center gap-2 border-b border-slate-200 px-4 py-2`}>
+    {below && (facets.length > 0 || sortOptions.length > 1 || viewsPhone || search) && <div className={`${below.showBelowOnly} flex items-center gap-2 border-b border-slate-200 px-4 py-2`}>
       {viewsPhone}
-      {(facets.length > 0 || sortOptions.length > 1) && <>
-        <FilterButton id="queue-filters-trigger" facets={facets} sortParam={sortParam} defaultSortKey={sortOptions[0]?.key ?? null} onClick={() => setFilterOpen(true)} />
-        <FilterSheet open={filterOpen} onClose={() => setFilterOpen(false)} facets={facets} sortOptions={sortOptions} sortParam={sortParam} rows={rows} filterRows={filterRows} />
+      {(facets.length > 0 || sortOptions.length > 1 || search) && <>
+        <FilterButton id="queue-filters-trigger" facets={facets} sortParam={sortParam} defaultSortKey={sortOptions[0]?.key ?? null} onClick={() => setFilterOpen(true)} extraParams={extraParams} />
+        <FilterSheet open={filterOpen} onClose={() => setFilterOpen(false)} facets={facets} sortOptions={sortOptions} sortParam={sortParam} rows={rows} filterRows={filterRows} search={search} />
       </>}
     </div>}
     {activeNotice && <p role="status" className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-[13px] text-slate-700">
@@ -515,7 +550,7 @@ function QueueScreenInner<T>({
     </p>}
 
     {/* Override Mode banner — only while the mode is on (#203's permanent strip is gone). */}
-    {overrideMode.active && <div role="status" className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200 bg-amber-50 px-4 py-1.5 text-xs font-medium text-amber-900">
+    {overrideModeEnabled && overrideMode.active && <div role="status" className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200 bg-amber-50 px-4 py-1.5 text-xs font-medium text-amber-900">
       <span className="inline-flex items-center gap-1.5"><ShieldCheck className="h-3.5 w-3.5" aria-hidden />Override Mode is on. Open a row&apos;s Checks tab to override a soft check with a reason.</span>
       <button type="button" onClick={overrideMode.toggle} className="rounded-md border border-amber-300 bg-white px-2 py-0.5 text-xs font-medium text-amber-900 hover:bg-amber-100 max-md:h-11 max-md:px-3">Turn off</button>
     </div>}

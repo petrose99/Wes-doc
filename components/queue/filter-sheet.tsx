@@ -13,7 +13,7 @@ import { activeFilterCount, clearFilterParams, facetSelectedValues } from "@/lib
  * contract as the desktop chips (`FacetFilters`) whose params it writes. The `n` is live because
  * the caller counts the rows the draft would leave (`countFor`), from the same array the list
  * renders — one number, not two computations (B3). */
-export function FilterSheet<T>({ open, onClose, facets, sortOptions, sortParam, rows, filterRows }: {
+export function FilterSheet<T>({ open, onClose, facets, sortOptions, sortParam, rows, filterRows, search }: {
   open: boolean
   onClose: () => void
   facets: Facet[]
@@ -22,7 +22,10 @@ export function FilterSheet<T>({ open, onClose, facets, sortOptions, sortParam, 
   rows: T[]
   /** The queue's own client-side predicate, so the footer count matches the list exactly. */
   filterRows?: (rows: T[], params: URLSearchParams) => T[]
+  /** #286: a free-text search on the sheet — the same param the desktop input writes. */
+  search?: { param: string; label: string }
 }) {
+  const extraParams = search ? [search.param] : []
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -48,9 +51,14 @@ export function FilterSheet<T>({ open, onClose, facets, sortOptions, sortParam, 
     if (facet.kind === "multi") setDraftFacet(facet, current.includes(value) ? current.filter((v) => v !== value) : [...current, value])
     else setDraftFacet(facet, current[0] === value ? [] : [value])
   }
-  const clear = () => setDraft((prev) => clearFilterParams(prev, facets, sortParam))
+  const clear = () => setDraft((prev) => clearFilterParams(prev, facets, sortParam, extraParams))
+  const setDraftSearch = (value: string) => setDraft((prev) => {
+    const next = new URLSearchParams(prev.toString())
+    if (value.trim() === "") next.delete(search!.param); else next.set(search!.param, value)
+    return next
+  })
 
-  const activeCount = activeFilterCount(draft, facets, { param: sortParam, defaultKey: defaultSortKey })
+  const activeCount = activeFilterCount(draft, facets, { param: sortParam, defaultKey: defaultSortKey }, extraParams)
   const count = (filterRows ? filterRows(rows, draft) : rows).length
   const apply = () => {
     const qs = draft.toString()
@@ -78,6 +86,11 @@ export function FilterSheet<T>({ open, onClose, facets, sortOptions, sortParam, 
 
   return <Dialog open={open} placement="sheet" title="Sort and filter" onClose={onClose} initialFocus="[role=radio][aria-checked=true], [role=checkbox]">
     <div className="max-h-[60vh] overflow-y-auto py-2">
+      {search && <div className="px-5 pb-3 pt-2">
+        <label htmlFor="filter-sheet-search" className="block pb-1 text-[13px] font-medium text-slate-600">{search.label}</label>
+        <input id="filter-sheet-search" type="search" value={draft.get(search.param) ?? ""} onChange={(event) => setDraftSearch(event.target.value)} autoComplete="off"
+          className="h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-base text-slate-900 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-1" />
+      </div>}
       {sortOptions.length > 1 && <div role="radiogroup" aria-labelledby="filter-sheet-sort" onKeyDown={onGroupKeyDown} className="pb-2">
         <p id="filter-sheet-sort" className="px-5 pb-1 pt-2 text-[13px] font-medium text-slate-600">Sort</p>
         {sortOptions.map((option) => row({ key: option.key, label: option.label, checked: option.key === draftSort, onSelect: () => setDraftSort(option.key), role: "radio", tabbable: option.key === draftSort }))}
@@ -97,7 +110,7 @@ export function FilterSheet<T>({ open, onClose, facets, sortOptions, sortParam, 
           })}
         </div>
       })}
-      {facets.length === 0 && sortOptions.length <= 1 && <p className="px-5 py-4 text-sm text-slate-600">Nothing to filter on this queue.</p>}
+      {facets.length === 0 && sortOptions.length <= 1 && !search && <p className="px-5 py-4 text-sm text-slate-600">Nothing to filter on this queue.</p>}
     </div>
     <div className="grid grid-cols-2 gap-3 border-t border-slate-200 px-5 py-3">
       <button type="button" onClick={clear} disabled={activeCount === 0}
@@ -118,15 +131,16 @@ export function FilterSheet<T>({ open, onClose, facets, sortOptions, sortParam, 
 /** The button that opens the sheet — "Filters", or "Filters · 2" when anything is active, tinted
  * so an applied filter is never invisible on a phone that hides the chips (#235 d11: the label
  * matches CONTEXT.md's "Filters"; the sheet is "Sort and filter" since it holds Sort too). */
-export function FilterButton({ id, facets, sortParam, defaultSortKey, onClick }: {
+export function FilterButton({ id, facets, sortParam, defaultSortKey, onClick, extraParams = [] }: {
   id?: string
   facets: Facet[]
   sortParam: string
   defaultSortKey: string | null
   onClick: () => void
+  extraParams?: string[]
 }) {
   const searchParams = useSearchParams()
-  const count = activeFilterCount(searchParams, facets, { param: sortParam, defaultKey: defaultSortKey })
+  const count = activeFilterCount(searchParams, facets, { param: sortParam, defaultKey: defaultSortKey }, extraParams)
   const active = count > 0
   // The count is spoken through `aria-label` (visible text first, so label-in-name holds) rather than
   // an `sr-only` span: the in-page detector reads a 1px sr-only span as a 0-padding 14px text block.
