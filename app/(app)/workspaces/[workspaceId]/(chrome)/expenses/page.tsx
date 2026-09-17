@@ -8,7 +8,7 @@ import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { listApprovalWorkflows } from "@/models/approval-workflows"
 import { listExpenseClaims, listUnclaimedExpenseReceiptDocuments } from "@/models/expense-claims"
 import { requireWorkspaceRole } from "@/models/workspaces"
-import { notFound, redirect } from "next/navigation"
+import { notFound } from "next/navigation"
 
 export const dynamic = "force-dynamic"
 
@@ -89,12 +89,8 @@ export async function ExpenseClaimsPage({ params }: { params: Promise<{ workspac
   </main>
 }
 
-export default async function LegacyExpensesPage({ params, searchParams }: {
-  params: Promise<{ workspaceId: string }>
-  searchParams: Promise<{ mode?: string }>
-}) {
-  const { workspaceId } = await params
-  const { mode } = await searchParams
-  if (mode === "claims") return ExpenseClaimsPage({ params: Promise.resolve({ workspaceId }) })
-  redirect(`/workspaces/${workspaceId}/receipts?mode=claims`)
+/** #273 S6: the standalone Expenses page is closed — claims are created on Receipts and decided
+ * on Approvals › Expense claims. `ExpenseClaimsPage` stays unreferenced pending #274's sign-off. */
+export default async function LegacyExpensesPage() {
+  notFound()
 }

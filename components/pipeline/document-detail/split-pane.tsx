@@ -397,7 +397,7 @@ export function SplitPane({
           </div>}
 
           {tab === "approval" && history && <div {...panelProps("approval")} className={`mx-auto p-4 lg:p-6 ${layout === "details-only" ? "max-w-2xl" : ""}`}>
-            <ApprovalTab workspaceId={workspaceId} history={history} state={state} queueTitle={queueTitle} cancelledReason={header.cancelledReason} />
+            <ApprovalTab workspaceId={workspaceId} documentId={header.documentId} history={history} state={state} queueTitle={queueTitle} cancelledReason={header.cancelledReason} />
           </div>}
 
           {tab === "checks" && history && <div {...panelProps("checks")} className={`mx-auto p-6 ${layout === "details-only" ? "max-w-2xl" : ""}`}>

@@ -11,6 +11,8 @@ import { overrideGateAction } from "@/app/(app)/workspaces/[workspaceId]/actions
 import { formatMoney } from "@/lib/money"
 import type { ApprovalDetailFacts } from "@/models/approvals"
 import type { ProcessingState } from "@/lib/documents/processing-state"
+import { AddToClaimContext, ClaimSection } from "@/components/queue/claim-card"
+import { useContext } from "react"
 
 /** The Detail pane's history data (#225): the approval step chain (#218), the flat audit log,
  * and this document's open checks (#203). Loaded server-side by `getQueueDetailAction` alongside
@@ -187,8 +189,10 @@ export function ApprovalTimeline({ decisions, pendingStages, approval, state, re
 /** #257 spec 3.5: the Approval tab — the status line, the timeline, what is known of the
  * supplier, and (PO Mismatches) the variance figures the decision is about. Everything here is
  * read-only; the decision itself is the pane's footer. */
-export function ApprovalTab({ workspaceId, history, state, queueTitle, cancelledReason }: {
+export function ApprovalTab({ workspaceId, documentId, history, state, queueTitle, cancelledReason }: {
   workspaceId: string
+  /** #273: the receipt whose claim section this tab carries. */
+  documentId?: string
   history: DocumentHistory
   state?: ProcessingState
   queueTitle?: string
@@ -203,7 +207,18 @@ export function ApprovalTab({ workspaceId, history, state, queueTitle, cancelled
   const [from, setFrom] = useState("")
   useEffect(() => { setFrom(window.location.pathname + window.location.search) }, [])
   const stageLabel = approval ? `${approval.currentStageIndex + 1} of ${approval.stages.length} · ${approval.stages.find((s) => s.stageIndex === approval.currentStageIndex)?.name ?? ""}` : null
+  const openAddDialog = useContext(AddToClaimContext)
+  // #273 S3: for a receipt the claim *is* its approval unit (#247 d4) — the claim card carries
+  // its own timeline, so the invoice-only sections (PO match, From this supplier) are skipped.
+  if (history.claimsEnabled && history.claim) {
+    return <div className="space-y-6">
+      <ClaimSection workspaceId={workspaceId} documentId={documentId} facts={history.claim}
+        onOpenAddDialog={openAddDialog && documentId ? ({ forceNew }) => openAddDialog({ documentId, forceNew }) : undefined} />
+    </div>
+  }
   return <div className="space-y-6">
+    {history.claimsEnabled && <ClaimSection workspaceId={workspaceId} documentId={documentId} facts={null} eligibility={history.claimEligibility ?? null}
+      onOpenAddDialog={openAddDialog && documentId ? ({ forceNew }) => openAddDialog({ documentId, forceNew }) : undefined} />}
     {approval && <p className="text-sm text-slate-800" role="status">
       <span className={`font-semibold ${approval.waitingOnYou ? "text-emerald-800" : "text-slate-700"}`}>{approval.waitingOnYou ? "Waiting on you" : `Waiting on ${approval.waitingOn}`}</span>
       <span className="text-slate-500"> · {stageLabel}</span>

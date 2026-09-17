@@ -6,7 +6,8 @@ import { requireWorkspaceRole, type WorkspaceRole } from "@/models/workspaces"
 import { listSavedViews } from "@/models/saved-views"
 import { getSavedFieldTable } from "@/models/field-configs"
 import { createSavedViewAction, deleteSavedViewAction, duplicateSavedViewAction, renameSavedViewAction, saveFiltersToViewAction, shareSavedViewAction } from "@/app/(app)/workspaces/[workspaceId]/(chrome)/saved-views-actions"
-import { ExpenseClaimsPage } from "@/app/(app)/workspaces/[workspaceId]/(chrome)/expenses/page"
+import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
+import { notFound } from "next/navigation"
 import { ReceiptQueue } from "@/components/queue/receipt-queue"
 import { QueueStat } from "@/components/queue/queue-stat"
 import { SavedViewPicker } from "@/components/typed-destinations/saved-view-picker"
@@ -18,9 +19,8 @@ export const dynamic = "force-dynamic"
 
 export type ReceiptSearchParams = { mode?: string; status?: string; claim?: string; touchless?: string; view?: string; sort?: string }
 
-/** #212's Receipts on the Queue screen (#225). "Create expense claim" moved from a header button
- * to the Detail pane's overflow (a row action, per #195); `?mode=claims` still renders the claims
- * workflow, inside the reading column it was built for. */
+/** #212's Receipts on the Queue screen (#225). #273: expense claims live in place — the bulk bar
+ * and the pane's ⋯ add receipts to a claim, the Approval tab holds it; `?mode=claims` is closed. */
 export async function ReceiptsQueuePage({ params, searchParams, selectedDocumentId = null }: {
   params: Promise<{ workspaceId: string }>
   searchParams: Promise<ReceiptSearchParams>
@@ -29,14 +29,17 @@ export async function ReceiptsQueuePage({ params, searchParams, selectedDocument
   const { workspaceId } = await params
   const query = await searchParams
   const { mode, status, claim, touchless, view: selectedViewId } = query
-  if (mode === "claims") return <div className="mx-auto w-full max-w-4xl p-6">{await ExpenseClaimsPage({ params: Promise.resolve({ workspaceId }) })}</div>
+  if (mode === "claims") notFound()
 
   const user = await getCurrentUser()
   const membership = await requireWorkspaceRole(workspaceId, user.id)
   const basePath = `/workspaces/${workspaceId}/receipts`
   // #258: the five processing-state keys. A stale "unreviewed"/"reviewed" value just doesn't match.
   const statusFilter = status === "cancelled" || status === "needs_attention" || status === "in_review" || status === "touchless" || status === "approved" ? status : undefined
-  const claimFilter = claim === "unclaimed" || claim === "claimed" ? claim : undefined
+  // #273: Unclaimed + the four claim statuses; the old "claimed" value no longer matches.
+  const claimFilter = claim === "unclaimed" || claim === "draft" || claim === "submitted" || claim === "approved" || claim === "rejected" ? claim : undefined
+  const capabilities = await getWorkspaceCapabilities(workspaceId)
+  const claimsEnabled = capabilities.has("expense-approvals")
   const onlyTouchless = touchless === "1"
   const [{ receipts }, minConfidencePercent, savedViews, matchRate, fieldTable, workspaceDocumentCount, todayOutcome] = await Promise.all([
     listWorkspaceReceipts({ workspaceId, statusFilter, claimFilter, onlyTouchless }),
@@ -59,6 +62,8 @@ export async function ReceiptsQueuePage({ params, searchParams, selectedDocument
     workspaceId={workspaceId}
     basePath={basePath}
     receipts={receipts}
+    claimsEnabled={claimsEnabled}
+    currentUserId={user.id}
     minConfidencePercent={minConfidencePercent}
     fieldTable={fieldTable}
     initialSelectedId={selectedDocumentId}

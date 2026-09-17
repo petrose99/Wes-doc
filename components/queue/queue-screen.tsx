@@ -49,6 +49,9 @@ export type BulkContext = { selectedIds: string[]; clear: () => void }
 /** `next` (#257 spec 3.5 "After a decision"): opens the row after the open one, wrapping to the
  * first; null when no other row is left — the result strip's *Next to approve* reads it. */
 export type PaneHelpers = { close: () => void; refresh: () => void; next: (() => void) | null }
+/** #273: handles a surface-owned dialog (rendered beside the screen, not inside a callback) needs
+ * after a mutation — re-read the open pane + rows, and re-scope the selection. */
+export type QueueControls = { refresh: () => void; select: (ids: string[]) => void }
 
 /** Tailwind needs the literal class strings in source — a `${below}:hidden` template would never
  * be generated — so the two breakpoints the card mode supports each carry their own set. */
@@ -126,6 +129,8 @@ export type QueueScreenProps<T> = {
   loadDetail: (documentId: string) => Promise<ReactNode | null>
   paneActions?: (row: T, helpers: PaneHelpers) => ReactNode
   paneMenu?: (row: T, helpers: PaneHelpers) => ReactNode
+  /** #273: hands the screen's refresh/select handles up once they exist (see `QueueControls`). */
+  onControls?: (controls: QueueControls) => void
   /** A deep link (`/invoices/<id>`) opens the queue with that row selected and the pane open. */
   initialSelectedId?: string | null
   /** The URL search param the sort is read from and written to. Defaults to `sort`. */
@@ -178,7 +183,7 @@ const INTERACTIVE = "a, button, input, select, textarea, label, [role=button], [
 function QueueScreenInner<T>({
   title, basePath, rows, rowId, detailIdFor, rowName, paneStatus, fullHref, archivedToast, leading, columns: rawColumns, fieldTable = null, selectable = false, sortOptions = [], facets = [],
   views, viewsPhone, stat, band, menu, onExportAll, bulkActions, empty, workspaceDocumentCount = 0, loadDetail, paneActions, paneMenu, initialSelectedId = null, sortParam = "sort", cards, phoneReadOnly = false,
-  filterRows, pinned = null, initialMissing, onOpenChange, origin = null,
+  filterRows, pinned = null, initialMissing, onOpenChange, origin = null, onControls,
 }: QueueScreenProps<T>) {
   const router = useRouter()
   const pathname = usePathname()
@@ -406,6 +411,7 @@ function QueueScreenInner<T>({
     return after ? () => open(after) : null
   }, [ids, openIndex, openId, open])
   const helpers = useMemo<PaneHelpers>(() => ({ close, refresh, next }), [close, refresh, next])
+  useEffect(() => { onControls?.({ refresh, select: (next) => setChecked(new Set(next)) }) }, [onControls, refresh])
 
   const setSort = (key: string) => {
     const next = new URLSearchParams(searchParams.toString())

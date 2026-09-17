@@ -17,10 +17,14 @@ import { CLAIM_STATUS_LABELS, ELIGIBILITY_REASON_TEXT } from "@/lib/claims/label
 import { useOnlineStatus } from "@/lib/client/use-online-status"
 import { formatMoney } from "@/lib/money"
 import { useRouter } from "next/navigation"
-import { useContext, useEffect, useState } from "react"
+import { createContext, useContext, useEffect, useState } from "react"
 import { toast } from "sonner"
 
 export const DESKTOP_HINT = "Creating claims is a desktop action."
+
+/** The S2 dialog is owned by `ReceiptQueue` (Radix unmount contract); the Approval tab's openers
+ * reach it through this context. Null outside the Receipts queue (S4 pane, other queues). */
+export const AddToClaimContext = createContext<((opts: { documentId: string; forceNew: boolean }) => void) | null>(null)
 
 /** Draft slate · Submitted blue · Approved emerald · Rejected red (#247 d10); the word is the label map's. */
 export function ClaimPill({ status, className = "" }: { status: DocumentClaimFacts["status"]; className?: string }) {

@@ -55,10 +55,11 @@ export function AddToClaimDialog({ open, workspaceId, candidates, forceNew = fal
     setDraftsError(null)
     setDrafts(null)
     const result = await listMyDraftClaimsAction(workspaceId).catch(() => null)
-    if (!result || !result.success) { setDraftsError("Couldn't load your drafts."); setDrafts([]); return }
-    setDrafts(result.data)
+    if (!result || !result.success || !result.data) { setDraftsError("Couldn't load your drafts."); setDrafts([]); return }
+    const list = result.data
+    setDrafts(list)
     // Nothing to choose when there are no drafts: New claim is the sole option and is selected.
-    if (result.data.length === 0) setTarget({ kind: "new" })
+    if (list.length === 0) setTarget({ kind: "new" })
   }, [workspaceId])
 
   useEffect(() => {
@@ -98,7 +99,7 @@ export function AddToClaimDialog({ open, workspaceId, candidates, forceNew = fal
     const documentIds = capped.map((c) => c.documentId)
     const result = await addToExpenseClaimAction(workspaceId, { documentIds, target: target.kind === "new" ? { new: { title: title.trim() || null } } : { claimId: target.claimId } }).catch(() => ({ success: false as const, error: "Something went wrong. Try again." }))
     setPending(false)
-    if (!result.success) { setError(result.error || "Something went wrong. Try again."); return }
+    if (!result.success || !result.data) { setError(("error" in result && result.error) || "Something went wrong. Try again."); return }
     onAdded(result.data)
   }
 
@@ -108,14 +109,14 @@ export function AddToClaimDialog({ open, workspaceId, candidates, forceNew = fal
   return (
     <Dialog open={open} title="Add to expense claim" description="The receipts you selected, grouped into one claim for approval." width="max-w-lg" placement="center"
       onClose={() => { if (!pending) onClose() }}
-      initialFocus={showTarget ? (drafts && drafts.length > 0 && !forceNew ? "#claim-target-new" : "#claim-target-new") : "#claim-dialog-cancel"}>
+      initialFocus={showTarget ? "#claim-target-new" : "#claim-dialog-cancel"}>
       <form aria-busy={pending} className="space-y-4" onSubmit={(event) => { event.preventDefault(); void submit() }}>
         <EligibilityStrip eligible={eligible} total={total} label={eligibleRows.length > MAX_CLAIM_RECEIPTS ? `The first ${MAX_CLAIM_RECEIPTS} can be added` : "Can be added"} />
 
         {capped.length > 0 && <div className="max-h-[40vh] overflow-auto"><ItemizedRecapTable records={capped.map((c) => toRecord(c))} /></div>}
 
         {heldBackRows.length > 0 && <section aria-labelledby="claim-held-back">
-          <h3 id="claim-held-back" className="text-xs font-semibold uppercase tracking-wide text-slate-500">Held back</h3>
+          <h3 id="claim-held-back" className="text-sm font-semibold text-slate-900">Held back</h3>
           <div className="mt-2 max-h-[30vh] overflow-auto">
             <ItemizedRecapTable records={heldBackRows.map((c) => toRecord(c, ELIGIBILITY_REASON_TEXT[c.reason]))} />
           </div>
