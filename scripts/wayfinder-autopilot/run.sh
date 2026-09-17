@@ -275,20 +275,21 @@ while [ "$n" -lt "$MAX" ]; do
 
 **Hand-off file rule:** when you rewrite the hand-off, keep every \`milestone:\` line already in it and add yours below. The driver reads the phase off those lines; a dropped line re-runs a finished phase."
   case "$PHASE" in
-    spec)  CONT="$CONT
+    spec)    CONT="$CONT
 
-**This session's phase: SPEC** (1 of 4). Do the pre-build only — the \`intent\` and \`impeccable\` pre-build pass, \`preflight.md\` parts A–E filled, the spec critic run and its gate met. Write the spec and the filled pre-flight to the ticket's scratch folder. No dev server, no browser, no product code. End by writing the hand-off file with the line \`milestone: spec-done\`, committing (\`wip(autopilot): #$T spec\`), and stopping. The build is the next session's, in a fresh context." ;;
-    build) CONT="$CONT
+**This session's phase: SPEC** (1 of 4) — the phase brief above is the instruction set. Exit line: \`milestone: spec-done\`, commit \`wip(autopilot): #$T spec\`, stop." ;;
+    build)   CONT="$CONT
 
-**This session's phase: BUILD** (2 of 4) — **one step per session.** The hand-off carries the **build plan**: ordered \`step: N — ‹name› — todo|done\` lines, each naming the spec lines it comes from, the files it touches and its check. If the plan is not there yet, this session writes it (from the spec's tables, one step per surface/state group, the build gate as the last step) and builds the first step. Otherwise: build the **first \`todo\` step only**, run its check and the affected tests, mark it \`done\` on the hand-off, commit (\`wip(autopilot): #$T build step N\`), and stop — the next step is the next session's, in a fresh context. **Reading budget:** the hand-off first; then only the spec sections and pre-flight parts the step names (by line range, never whole files); one area primer; a reused component by the symbols you call (grep, then a bounded range). Do not load the \`intent\` or \`impeccable\` routers — the spec session already routed; load the specific skill the plan step names (\`specify\`, \`fortify\`, \`articulate\`, \`include\`) and read \`craft-floor.md\`. For recon (\"where does the shell expose X\", \"which callers\"), use a foreground \`Explore\` agent and keep its answer, not the files, in context. **Build gate — the last step, before \`build-done\`:** seed and servers up; write the ticket's round script on \`scripts/wayfinder-autopilot/capture-round.mjs\` (every state at **both 1440 and 390**, detector JSON, keyboard probes for every Part B focus/keyboard contract — a B line is ticked only by a probe that exercised it, never from the spec text) and run it once as \`shots-r0\`; fix every real detector finding and every failing probe in place (pure execution, no readers); write the r0 counts per width to the hand-off. The measure session reuses that round script — the first-pass scores are measured on a surface the build has already seen at 390. No critique, no evaluate, no include readers — those are the next session's, in a fresh context. Run \`tsc --noEmit\` once at the end, stop the servers. End by writing the hand-off with what is built and where, the r0 counts, the line \`milestone: build-done\`, committing (\`wip(autopilot): #$T build\`), and stopping." ;;
+**This session's phase: BUILD** (2 of 4) — one plan step, per the phase brief above. Exit: mark the step \`done\`, commit \`wip(autopilot): #$T build step N\`, stop; after the build gate, \`milestone: build-done\`." ;;
     measure) CONT="$CONT
 
-**This session's phase: MEASURE** (3 of 4). Read the hand-off. Seed and servers up in one call; one capture round with the build's existing round script (\`shots-r0\` in the scratch folder — reuse it, do not rewrite it) as \`shots-r1\`; contact sheets; then the three readers — critique, evaluate, include — as fresh \`sonnet\` agents on that set. No product fixes in this phase. End by writing the scores (every heuristic, health, P0–P3, include verdict) and the triage of real detector findings into the hand-off with the line \`milestone: measured\`, committing (\`wip(autopilot): #$T measured\`), and stopping. The fix batch is the next session's, in a fresh context." ;;
-    close) CONT="$CONT
+**This session's phase: MEASURE** (3 of 4) — per the phase brief above. No fixes. Exit line: \`milestone: measured\`, commit \`wip(autopilot): #$T measured\`, stop." ;;
+    close)   CONT="$CONT
 
-**This session's phase: CLOSE** (4 of 4). Read the hand-off: the scores and triage are on it, the capture round script exists — do not re-measure first. The fix batch (every P1, every heuristic under 3, every real detector finding); the confirming round with the same round script and the readers re-run on it; then once each: affected tests → full suite → \`tsc --noEmit\` → \`eslint\` → \`next build\` (dev server stopped first). Report, lessons with their \`check:\`, close at the bar. If the bar is not reached, update the hand-off with the new scores, post \`Autopilot: continue —\`, commit, stop." ;;
+**This session's phase: CLOSE** (4 of 4) — per the phase brief above. Fix batch → confirm round → checks once → lessons → primer → report → close at the bar, or \`Autopilot: continue —\` with the hand-off updated." ;;
   esac
-  { cat "$BRIEF"; printf '\n\n## Paths for this run\n\n- Generic lessons (every project): `%s`\n- Project lessons (this repo): `%s`\n- Report: `%s/%s.md`\n- Hand-off file (keep it current at every milestone): `%s/%s.handoff.md`\n- Scratch folder for captures and the filled preflight: `%s/scratch-%s/`\n\n%s\n' "$GENERIC_LESSONS" "$PROJECT_LESSONS" "$OUT" "$T" "$OUT" "$T" "$LOGS" "$T" "$CONT"; } > "$RUN_BRIEF"
+  PHASE_BRIEF="$AP/phases/${PHASE:-single}.md"
+  { cat "$BRIEF"; [ -f "$PHASE_BRIEF" ] && { printf '\n\n'; cat "$PHASE_BRIEF"; }; printf '\n\n## Paths for this run\n\n- Generic lessons (every project): `%s`\n- Project lessons (this repo): `%s`\n- Report: `%s/%s.md`\n- Hand-off file (keep it current at every milestone): `%s/%s.handoff.md`\n- Scratch folder for captures and the filled preflight: `%s/scratch-%s/`\n\n%s\n' "$GENERIC_LESSONS" "$PROJECT_LESSONS" "$OUT" "$T" "$OUT" "$T" "$LOGS" "$T" "$CONT"; } > "$RUN_BRIEF"
   # Memory: the whole session (claude + dev server + headless browser + node
   # workers) runs inside one cgroup scope with a hard ceiling, so the kernel
   # reclaims/kills inside the scope instead of the box-wide earlyoom shooting
@@ -318,6 +319,7 @@ while [ "$n" -lt "$MAX" ]; do
       --allowedTools "${ALLOWED_TOOLS[@]}" \
       --disallowedTools AskUserQuestion \
       --no-session-persistence \
+      --strict-mcp-config \
       --output-format stream-json --verbose \
       > "$LOG" 2>"$LOG.stderr" ) &
   SESSION_PID=$!

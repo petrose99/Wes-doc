@@ -69,7 +69,7 @@ so the driver passes it as the `-p` prompt, which counts as a user invocation.
   missed → what to put in the spec. Read whole each session, appended at
   close, capped ~80 lines by merging. The project's own
   `.claude/wayfinder-autopilot/lessons.md` holds codebase-specific ones.
-- `brief.md` — appended system prompt: standing delegation (take the
+- `brief.md` + `phases/{spec,build,measure,close,single}.md` — appended system prompt (core + one phase brief per session): standing delegation (take the
   recommended answer, never AskUserQuestion, never remove a feature without
   owner sign-off), one ticket per session, build → score → improve on
   execution tickets with the CLAUDE.md bar as definition of done, mandatory
