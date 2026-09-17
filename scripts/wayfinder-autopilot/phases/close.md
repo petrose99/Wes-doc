@@ -14,6 +14,16 @@ on the close). Verify a `tooling` call against the code before dismissing
 it; a P1 dismissed without evidence is a P1 shipped. Write the triaged list
 to the hand-off, replacing the raw one, before the first edit.
 
+**A dismissed finding is re-scored, never subtracted by hand.** If the
+triage removed anything the readers counted (a tooling artifact, a residue
+entry), re-run the `evaluate` reader — and `critique` if a heuristic under 3
+was driven by a dismissed finding — as fresh `sonnet` agents on the *same*
+capture set, with the triaged list and the reason each item was dismissed
+in their prompt, so the close score is a number the reader produced. The
+`scores:` line carries only integers; "50 read as pass" is not a score and
+breaks the scoreboard. If the re-scored number is still under the bar, the
+fix batch or an `Autopilot: continue —` follows, as for any other gap.
+
 **One fix batch, then ship — a second only if the first removed a P1**
 (fixing a P1 changes enough that the confirm can't stand in for it).
 Sequence: the batch fixing every P1, every heuristic under 3 and every real
