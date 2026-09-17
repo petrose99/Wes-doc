@@ -160,3 +160,10 @@
     scoreboard: 87 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
 --- #271: continued (progressed), session 1/3 without progress allowed in 575s
 === [30/50] #271 — Build the Approval notice: coalesced email when an Approval reaches its Approver, re-pointed reminders, per-user switch  [opus · low · phase: build · hard (3 sessions on this phase)]
+    #271 context at exit: 109456 tokens, 26 min
+    cleaned up session pid 2005896 (pgid ?); free: 6293 MB
+    scoreboard: 88 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #271: phase build done → measure next in 1566s
+=== [31/50] #271 — Build the Approval notice: coalesced email when an Approval reaches its Approver, re-pointed reminders, per-user switch  [sonnet · low · phase: measure]
+    #271 context at exit: 90647 tokens, 8 min
+    cleaned up session pid 2039613 (pgid ?); free: 6292 MB

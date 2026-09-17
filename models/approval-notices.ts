@@ -132,8 +132,6 @@ async function loadCandidates(): Promise<Candidate[]> {
   return candidates
 }
 
-type Deciders = { deciders: string[] }
-
 /** Resolves each candidate's actual deciders: the stage's named approvers when any are set,
  * otherwise every current workspace owner — never every member (spec §1.2). */
 async function resolveDeciders(candidates: Candidate[]): Promise<Map<string, string[]>> {

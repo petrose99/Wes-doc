@@ -157,7 +157,7 @@ describe("decideReviewTaskStage", () => {
 
     await decideReviewTaskStage({ workspaceId: "w1", taskId: "t1", decision: "approve", actorId: "u1", actorRole: "member" })
 
-    expect(db.reviewTask.update).toHaveBeenCalledWith({ where: { id: "t1" }, data: { status: "in_review", currentStageIndex: 1, resolvedAt: null } })
+    expect(db.reviewTask.update).toHaveBeenCalledWith({ where: { id: "t1" }, data: { status: "in_review", currentStageIndex: 1, resolvedAt: null, stageReachedAt: expect.any(Date) } })
   })
 
   it("resolves as approved once the last stage clears", async () => {
@@ -404,7 +404,7 @@ describe("sendReviewTaskBackForReview", () => {
 
     await sendReviewTaskBackForReview({ workspaceId: "w1", taskId: "t1", actorId: "u1", reason: "wrong supplier" })
 
-    expect(db.reviewTask.update).toHaveBeenCalledWith({ where: { id: "t1" }, data: { status: "open", workflowId: null, currentStageIndex: null, resolvedAt: null } })
+    expect(db.reviewTask.update).toHaveBeenCalledWith({ where: { id: "t1" }, data: { status: "open", workflowId: null, currentStageIndex: null, stageReachedAt: null, resolvedAt: null } })
     expect(db.documentAuditEvent.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ type: "review_task_sent_back", detail: { reason: "wrong supplier" } }) }))
   })
 })

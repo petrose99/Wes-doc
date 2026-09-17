@@ -97,7 +97,7 @@ describe("startWorkflowOnReviewTask", () => {
 
     await startWorkflowOnReviewTask({ workspaceId: "w1", taskId: "t1", workflowId: "wf1", actorId: "u1" })
 
-    expect(db.reviewTask.update).toHaveBeenCalledWith({ where: { id: "t1" }, data: { workflowId: "wf1", currentStageIndex: 0, status: "in_review" } })
+    expect(db.reviewTask.update).toHaveBeenCalledWith({ where: { id: "t1" }, data: { workflowId: "wf1", currentStageIndex: 0, status: "in_review", stageReachedAt: expect.any(Date) } })
   })
 })
 
@@ -121,7 +121,7 @@ describe("startApprovalOnInvoice", () => {
 
     await startApprovalOnInvoice({ workspaceId: "w1", documentId: "d1", workflowId: "wf1", actorId: "u1" })
 
-    expect(db.reviewTask.update).toHaveBeenCalledWith({ where: { id: "t1" }, data: { workflowId: "wf1", currentStageIndex: 0, status: "in_review" } })
+    expect(db.reviewTask.update).toHaveBeenCalledWith({ where: { id: "t1" }, data: { workflowId: "wf1", currentStageIndex: 0, status: "in_review", stageReachedAt: expect.any(Date) } })
   })
 
   it("creates a fresh task at stage 0 when the invoice has no ReviewTask at all", async () => {
