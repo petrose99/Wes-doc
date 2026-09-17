@@ -183,3 +183,49 @@
 === [34/50] #273 — Build expense claims in place: Add to claim on Receipts, the claim on the Approval tab, an Expense claims view on Approvals  [opus[1m] · low · phase: spec]
     #273 context at exit: 138574 tokens, 8 min
     cleaned up session pid 2091410 (pgid ?); free: 6301 MB
+    scoreboard: 92 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #273: phase spec done → build next in 514s
+=== [35/50] #273 — Build expense claims in place: Add to claim on Receipts, the claim on the Approval tab, an Expense claims view on Approvals  [sonnet · low · phase: build]
+    #273 context at exit: 138801 tokens, 7 min
+    cleaned up session pid 2101263 (pgid ?); free: 6306 MB
+    scoreboard: 93 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #273: continued (progressed), session 1/3 without progress allowed in 454s
+=== [36/50] #273 — Build expense claims in place: Add to claim on Receipts, the claim on the Approval tab, an Expense claims view on Approvals  [opus[1m] · low · phase: build]
+    #273 crossed the hand-off line (158789 tokens ≥ 150000) — asked to hand off; hard stop at 180000
+    #273 context at exit: 171092 tokens, 4 min
+    cleaned up session pid 2110167 (pgid ?); free: 6296 MB
+    scoreboard: 94 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #273: continued (progressed), session 1/3 without progress allowed in 244s
+=== [37/50] #273 — Build expense claims in place: Add to claim on Receipts, the claim on the Approval tab, an Expense claims view on Approvals  [opus · low · phase: build · hard (2 sessions on this phase)]
+    #273 crossed the hand-off line (152777 tokens ≥ 150000) — asked to hand off; hard stop at 180000
+    #273 context at exit: 163783 tokens, 9 min
+    cleaned up session pid 2115140 (pgid ?); free: 6299 MB
+    scoreboard: 95 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #273: continued (progressed), session 1/3 without progress allowed in 544s
+=== [38/50] #273 — Build expense claims in place: Add to claim on Receipts, the claim on the Approval tab, an Expense claims view on Approvals  [opus · low · phase: build · hard (3 sessions on this phase)]
+    #273 crossed the hand-off line (152629 tokens ≥ 150000) — asked to hand off; hard stop at 180000
+    #273 context at exit: 156679 tokens, 6 min
+    cleaned up session pid 2125841 (pgid ?); free: 6307 MB
+    scoreboard: 96 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #273: continued (progressed), session 1/3 without progress allowed in 364s
+=== [39/50] #273 — Build expense claims in place: Add to claim on Receipts, the claim on the Approval tab, an Expense claims view on Approvals  [opus · low · phase: build · hard (4 sessions on this phase)]
+    #273 crossed the hand-off line (150107 tokens ≥ 150000) — asked to hand off; hard stop at 180000
+    #273 context at exit: 160007 tokens, 8 min
+    cleaned up session pid 2133056 (pgid ?); free: 6300 MB
+    scoreboard: 97 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #273: continued (progressed), session 1/3 without progress allowed in 514s
+=== [40/50] #273 — Build expense claims in place: Add to claim on Receipts, the claim on the Approval tab, an Expense claims view on Approvals  [opus · low · phase: build · hard (5 sessions on this phase)]
+    #273 crossed the hand-off line (150374 tokens ≥ 150000) — asked to hand off; hard stop at 180000
+    #273 context at exit: 158115 tokens, 11 min
+    cleaned up session pid 2143074 (pgid ?); free: 6290 MB
+    scoreboard: 98 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #273: continued (progressed), session 1/3 without progress allowed in 695s
+=== [41/50] #273 — Build expense claims in place: Add to claim on Receipts, the claim on the Approval tab, an Expense claims view on Approvals  [opus · low · phase: build · hard (6 sessions on this phase)]
+    #273 crossed the hand-off line (152656 tokens ≥ 150000) — asked to hand off; hard stop at 180000
+    #273 context at exit: 160033 tokens, 20 min
+    cleaned up session pid 2157712 (pgid ?); free: 6304 MB
+    scoreboard: 99 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #273: continued (progressed), session 1/3 without progress allowed in 1236s
+=== [42/50] #273 — Build expense claims in place: Add to claim on Receipts, the claim on the Approval tab, an Expense claims view on Approvals  [opus · low · phase: build · hard (7 sessions on this phase)]
+    #273 context at exit: 89268 tokens, 12 min
+    cleaned up session pid 2184339 (pgid ?); free: 6289 MB
