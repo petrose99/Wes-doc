@@ -229,3 +229,8 @@
 === [42/50] #273 — Build expense claims in place: Add to claim on Receipts, the claim on the Approval tab, an Expense claims view on Approvals  [opus · low · phase: build · hard (7 sessions on this phase)]
     #273 context at exit: 89268 tokens, 12 min
     cleaned up session pid 2184339 (pgid ?); free: 6289 MB
+    scoreboard: 100 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #273: phase build done → measure next in 755s
+=== [43/50] #273 — Build expense claims in place: Add to claim on Receipts, the claim on the Approval tab, an Expense claims view on Approvals  [sonnet · low · phase: measure]
+    #273 context at exit: 110685 tokens, 17 min
+    cleaned up session pid 2200722 (pgid ?); free: 6295 MB

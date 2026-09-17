@@ -35,6 +35,9 @@ beforeEach(() => {
   db.documentCheckResult = { findMany: vi.fn().mockResolvedValue([]) }
   db.workspaceMember = { findMany: vi.fn().mockResolvedValue([OWNER, MEMBER]) }
   db.integrationPush = { findMany: vi.fn().mockResolvedValue([]) }
+  db.workspace = { findUniqueOrThrow: vi.fn().mockResolvedValue({ industry: "finance" }) }
+  db.workspaceModule = { findMany: vi.fn().mockResolvedValue([]) }
+  db.expenseClaim = { findMany: vi.fn().mockResolvedValue([]) }
 })
 
 describe("listApprovalInvoiceRows", () => {

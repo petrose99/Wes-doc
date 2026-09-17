@@ -11,12 +11,10 @@ import { getDefaultApprovalFlow } from "@/models/approval-defaults"
 import { sumReceiptTotals } from "@/lib/claims/totals"
 import { prisma } from "@/lib/db"
 import { processingState } from "@/lib/documents/processing-state"
-import { addCents, fromCents } from "@/lib/money"
 import { cache } from "react"
 
 export const EXPENSE_CLAIM_STATUSES = ["draft", "submitted", "approved", "rejected"] as const
 export type ExpenseClaimStatus = (typeof EXPENSE_CLAIM_STATUSES)[number]
-const RESOLVED_STATUSES = new Set<ExpenseClaimStatus>(["approved", "rejected"])
 
 /** Same parse as models/receipts.ts: extraction stores totals as strings ("24.50"), so a claim's
  * sum must read them the way the Receipts list does or every submit refuses with "no amounts". */
