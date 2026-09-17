@@ -53,7 +53,14 @@ export async function CompaniesScreen({ params, selectedId }: { params: Promise<
     hiddenCount: Math.max(0, orgTotal - rows.length),
     movable: ungrouped.map((candidate) => ({ id: candidate.id, name: candidate.name, memberCount: candidate._count.members })),
   }
-  return <CompaniesQueue workspaceId={workspaceId} state={state} viewerRole={viewerRole} owners={context.owners} initialSelectedId={selectedId ?? null} />
+  // Spec §5.4: a deep link to an id outside the viewer's unfiltered rows (not a member, personal
+  // id, garbage) gets the nameless notice — never a named "was deleted", nothing happened here.
+  const selectedPresent = selectedId ? rows.some((row) => row.id === selectedId) : false
+  const initialMissing = selectedId && !selectedPresent
+    ? { text: `That company isn't in ${state.organizationName}, or you're not a member of it.` }
+    : undefined
+  return <CompaniesQueue workspaceId={workspaceId} state={state} viewerRole={viewerRole} owners={context.owners}
+    initialSelectedId={selectedPresent ? selectedId : null} initialMissing={initialMissing} />
 }
 
 export default function CompaniesPage({ params }: { params: Promise<{ workspaceId: string }> }) {

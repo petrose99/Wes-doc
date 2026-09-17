@@ -45,12 +45,12 @@ export function CompanyDangerActions({ workspaceId, name, isOwner }: { workspace
     <h2 className="text-sm font-semibold text-slate-900">Danger zone</h2>
 
     {isOwner && <div className="mt-3 space-y-2">
-      <p className="text-sm leading-relaxed text-slate-600">Delete {name} — removes the company and everything in it for every member.</p>
+      <p className="max-w-[60ch] text-sm leading-relaxed text-slate-600">Delete {name} — removes the company and everything in it for every member.</p>
       <Button type="button" variant="outline" className="border-red-300 text-red-700 hover:bg-red-50" disabled={pending} onClick={() => { setConfirmName(""); setDeleting(true) }}>Delete company…</Button>
     </div>}
 
     <div className="mt-3 space-y-2">
-      <p className="text-sm leading-relaxed text-slate-600">Leave {name} — you lose access; nothing is deleted and an owner can invite you again.</p>
+      <p className="max-w-[60ch] text-sm leading-relaxed text-slate-600">Leave {name} — you lose access; nothing is deleted and an owner can invite you again.</p>
       <Button type="button" variant="outline" className="border-red-300 text-red-700 hover:bg-red-50" disabled={pending} onClick={() => setLeaving(true)}>Leave company…</Button>
     </div>
 

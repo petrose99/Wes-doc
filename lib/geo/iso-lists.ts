@@ -29,15 +29,15 @@ export function buildCurrencyList(): IsoOption[] {
   try {
     const names = new Intl.DisplayNames(["en"], { type: "currency" })
     return Intl.supportedValuesOf("currency")
-      .map((code) => ({ value: code, label: `${code} — ${names.of(code) ?? code}` }))
+      .map((code) => ({ value: code, label: `${code} · ${names.of(code) ?? code}` }))
       .sort((a, b) => a.value.localeCompare(b.value))
   } catch {
     return [
-      { value: "USD", label: "USD — US Dollar" }, { value: "EUR", label: "EUR — Euro" },
-      { value: "GBP", label: "GBP — British Pound" }, { value: "CAD", label: "CAD — Canadian Dollar" },
-      { value: "AUD", label: "AUD — Australian Dollar" }, { value: "JPY", label: "JPY — Japanese Yen" },
-      { value: "INR", label: "INR — Indian Rupee" }, { value: "BRL", label: "BRL — Brazilian Real" },
-      { value: "ZAR", label: "ZAR — South African Rand" },
+      { value: "USD", label: "USD · US Dollar" }, { value: "EUR", label: "EUR · Euro" },
+      { value: "GBP", label: "GBP · British Pound" }, { value: "CAD", label: "CAD · Canadian Dollar" },
+      { value: "AUD", label: "AUD · Australian Dollar" }, { value: "JPY", label: "JPY · Japanese Yen" },
+      { value: "INR", label: "INR · Indian Rupee" }, { value: "BRL", label: "BRL · Brazilian Real" },
+      { value: "ZAR", label: "ZAR · South African Rand" },
     ]
   }
 }

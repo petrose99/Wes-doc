@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useMemo, useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -49,6 +49,7 @@ export type CompaniesQueueProps = {
   owners: string[]
   /** The `[companyId]` deep-link route's row (spec §5.4) — opens the pane on first render. */
   initialSelectedId?: string | null
+  initialMissing?: { text: string }
 }
 
 const ROLE_LABEL: Record<CompanyViewerRole, string> = { owner: "Owner", reviewer: "Reviewer", member: "Member" }
@@ -57,6 +58,12 @@ const SORTS: SortOption<CompanyRow>[] = [
   { key: "name", label: "Name A–Z", compare: (a, b) => a.name.localeCompare(b.name) },
   { key: "members", label: "Most members", compare: (a, b) => b.memberCount - a.memberCount },
 ]
+
+/** r0 probe: a dialog opened from a menu item has no opener left to return to (the popover item is
+ * gone by the time the dialog closes), so preflight B5 names the trigger explicitly. */
+const focusAfterClose = (selector: string) => { requestAnimationFrame(() => document.querySelector<HTMLElement>(selector)?.focus()) }
+const QUEUE_MENU_TRIGGER = 'button[aria-label="Queue options"]'
+const PANE_MENU_TRIGGER = 'button[aria-label="More actions"]'
 
 const ROLE_FACET: Facet = { param: "role", label: "Your role", options: [{ value: "owner", label: "Owner" }, { value: "reviewer", label: "Reviewer" }, { value: "member", label: "Member" }] }
 
@@ -67,10 +74,10 @@ function filterByRole(rows: CompanyRow[], params: URLSearchParams): CompanyRow[]
   return rows.filter((row) => wanted.has(row.viewerRole))
 }
 
-export function CompaniesQueue({ workspaceId, state, viewerRole, owners, initialSelectedId = null }: CompaniesQueueProps) {
+export function CompaniesQueue({ workspaceId, state, viewerRole, owners, initialSelectedId = null, initialMissing }: CompaniesQueueProps) {
   if (state.kind === "personal") return <PersonalState />
   if (state.kind === "ungrouped") return <UngroupedState workspaceId={workspaceId} state={state} viewerRole={viewerRole} owners={owners} />
-  return <OrganizationState workspaceId={workspaceId} state={state} viewerRole={viewerRole} owners={owners} initialSelectedId={initialSelectedId} />
+  return <OrganizationState workspaceId={workspaceId} state={state} viewerRole={viewerRole} owners={owners} initialSelectedId={initialSelectedId} initialMissing={initialMissing} />
 }
 
 /* ------------------------------------------------------------------------------- (c) --- */
@@ -155,7 +162,7 @@ function NameOrganizationDialog({ open, onClose, workspaceId, defaultName, discl
       try {
         const result = await createOrganizationAction(workspaceId, { name: name.trim() })
         if (result.success && result.data) { onClose(); onCreated(result.data.name) }
-        else setError(companyActionErrorText(result.error ?? "failed", { org: name.trim() }))
+        else setError(result.error === "name_taken" ? `You already have an organization called ${name.trim()}.` : companyActionErrorText(result.error ?? "failed", { org: name.trim() }))
       } catch { setError("Couldn't reach the server. Your entries are still here — try again.") }
       finally { setBusy(false) }
     }}>
@@ -176,12 +183,13 @@ function NameOrganizationDialog({ open, onClose, workspaceId, defaultName, discl
 
 /* ------------------------------------------------------------------------------- (a) --- */
 
-function OrganizationState({ workspaceId, state, viewerRole, owners, initialSelectedId }: {
+function OrganizationState({ workspaceId, state, viewerRole, owners, initialSelectedId, initialMissing }: {
   workspaceId: string
   state: { organizationName: string; rows: CompanyRow[]; hiddenCount: number; movable: { id: string; name: string; memberCount: number }[] }
   viewerRole: CompanyViewerRole
   owners: string[]
   initialSelectedId?: string | null
+  initialMissing?: { text: string }
 }) {
   const router = useRouter()
   const isOwner = viewerRole === "owner"
@@ -191,6 +199,11 @@ function OrganizationState({ workspaceId, state, viewerRole, owners, initialSele
   const [renaming, setRenaming] = useState<CompanyRow | null>(null)
   const [removing, setRemoving] = useState<{ row: CompanyRow; close: () => void } | null>(null)
   const rowsById = useMemo(() => new Map(rows.map((row) => [row.id, row])), [rows])
+  useEffect(() => { if (initialMissing) document.getElementById("queue-title")?.focus() }, [initialMissing])
+  // Rename keeps the pane open on the same row; the refreshed rows remount it, so the focus return
+  // to the pane ⋯ trigger (B5) waits for the new rows rather than racing the remount.
+  const [paneFocusPending, setPaneFocusPending] = useState(false)
+  useEffect(() => { if (paneFocusPending) { setPaneFocusPending(false); focusAfterClose(PANE_MENU_TRIGGER) } }, [rows, paneFocusPending])
 
   const loadDetail = useCallback(async (id: string) => {
     const result = await loadCompanyDetailAction(workspaceId, id)
@@ -201,7 +214,7 @@ function OrganizationState({ workspaceId, state, viewerRole, owners, initialSele
   // Plain path with no carried-over query — clears the Your role facet and sort as spec §4.1
   // requires, so a fresh row is never left hidden behind a stale filter.
   const afterMutation = (selectId?: string) => {
-    router.push(`/workspaces/${workspaceId}/admin/companies${selectId ? `?company=${selectId}` : ""}`)
+    router.push(`/workspaces/${workspaceId}/admin/companies${selectId ? `/${selectId}` : ""}`)
     router.refresh()
   }
 
@@ -230,7 +243,6 @@ function OrganizationState({ workspaceId, state, viewerRole, owners, initialSele
       filterRows={filterByRole}
       selectable={false}
       overrideMode={false}
-      stat={<span className="text-sm text-slate-600">{rows.length} {rows.length === 1 ? "company" : "companies"}</span>}
       primaryAction={isOwner ? <Button type="button" size="sm" onClick={() => setAdding(true)}>Add a company</Button> : undefined}
       menu={isOwner && movable.length > 0 ? <button type="button" data-menu-close onClick={() => setMoving(true)}
         className="flex w-full items-center gap-2.5 rounded-sm px-2.5 py-2 text-left text-sm text-slate-700 hover:bg-slate-100">
@@ -239,6 +251,7 @@ function OrganizationState({ workspaceId, state, viewerRole, owners, initialSele
       empty={{ filteredBody: "Clear a filter to widen the queue." }}
       loadDetail={loadDetail}
       initialSelectedId={initialSelectedId}
+      initialMissing={initialMissing}
       paneActions={(row) => <Button asChild className="lg:h-8 lg:text-xs"><Link className="py-1.5" href={`/workspaces/${row.id}`}>Open</Link></Button>}
       paneMenu={(row, helpers) => <>
         <PaneMenuItem href={adminPaths(row.id).base}>Open Admin</PaneMenuItem>
@@ -255,14 +268,14 @@ function OrganizationState({ workspaceId, state, viewerRole, owners, initialSele
       currentRow={rowsById.get(workspaceId)}
       onAdded={(id, name) => { setAdding(false); toast.success(`${name} added`, { action: { label: "Open", onClick: () => router.push(`${adminPaths(id).companies}`) } }); afterMutation(id) }} />
 
-    <MoveCompanyDialog open={moving} onClose={() => setMoving(false)} workspaceId={workspaceId} organizationName={organizationName} candidates={movable}
+    <MoveCompanyDialog open={moving} onClose={() => { setMoving(false); focusAfterClose(QUEUE_MENU_TRIGGER) }} workspaceId={workspaceId} organizationName={organizationName} candidates={movable}
       onMoved={(id, name) => { setMoving(false); toast.success(`${name} moved into ${organizationName}`, { duration: 8000 }); afterMutation(id) }} />
 
-    <RenameCompanyDialog open={renaming !== null} onClose={() => setRenaming(null)} row={renaming}
-      onRenamed={(oldName, newName) => { setRenaming(null); toast.success(`Renamed to ${newName} (was ${oldName})`); afterMutation(); router.refresh() }} />
+    <RenameCompanyDialog key={renaming?.id ?? "none"} open={renaming !== null} onClose={() => { setRenaming(null); focusAfterClose(PANE_MENU_TRIGGER) }} row={renaming}
+      onRenamed={(oldName, newName) => { setRenaming(null); toast.success(`Renamed to ${newName} (was ${oldName})`); setPaneFocusPending(true); router.refresh() }} />
 
-    <RemoveCompanyConfirm workspaceId={workspaceId} entry={removing} organizationName={organizationName} onClose={() => setRemoving(null)}
-      onRemoved={(name) => { removing?.close(); setRemoving(null); toast.success(`${name} removed from ${organizationName}`); afterMutation() }} />
+    <RemoveCompanyConfirm workspaceId={workspaceId} entry={removing} organizationName={organizationName} onClose={() => { setRemoving(null); focusAfterClose(PANE_MENU_TRIGGER) }}
+      onRemoved={(name) => { removing?.close(); setRemoving(null); toast.success(`${name} removed from ${organizationName}`); afterMutation(); requestAnimationFrame(() => document.getElementById("queue-title")?.focus()) }} />
   </>
 }
 
@@ -349,14 +362,15 @@ function MoveCompanyDialog({ open, onClose, workspaceId, organizationName, candi
         {candidates.map((candidate) => <label key={candidate.id} className="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-2 text-sm hover:bg-slate-50">
           <input type="radio" name="move-target" value={candidate.id} checked={chosenId === candidate.id} onChange={() => setChosenId(candidate.id)} className="h-4 w-4 accent-emerald-700" />
           <span className="text-slate-900">{candidate.name}</span>
-          <span className="text-xs text-slate-600">{candidate.memberCount} members</span>
+          <span className="text-sm text-slate-600">{candidate.memberCount} members</span>
         </label>)}
       </fieldset>}
-      <p className="text-xs leading-relaxed text-slate-600">Its members keep their roles. Owners of {organizationName} who are also its members will see it under Companies and Users — belonging to {organizationName} opens nothing by itself. Nothing is shared between companies. You can remove it from {organizationName} later.</p>
+      <p className="text-sm leading-relaxed text-slate-600">Its members keep their roles. Owners of {organizationName} who are also its members will see it under Companies and Users — belonging to {organizationName} opens nothing by itself. Nothing is shared between companies. You can remove it from {organizationName} later.</p>
       {error && <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>}
       <div className="flex justify-end gap-2">
         <Button type="button" size="sm" variant="outline" disabled={busy} onClick={close}>Cancel</Button>
-        <Button type="submit" size="sm" disabled={busy || !chosenId || candidates.length === 0}>{busy ? "Moving…" : "Move into"} {organizationName}</Button>
+        {/* r0 detector: the long 12px label read as a cramped text block at h-8 — give it real vertical padding. */}
+        <Button type="submit" size="sm" className="h-auto py-2" disabled={busy || !chosenId || candidates.length === 0}>{busy ? "Moving…" : `Move into ${organizationName}`}</Button>
       </div>
     </form>
   </Dialog>
@@ -370,7 +384,7 @@ function RenameCompanyDialog({ open, onClose, row, onRenamed }: {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const close = () => { if (busy) return; onClose(); setError(null) }
-  return <Dialog open={open} onClose={close} title="Rename" initialFocus="#rename-company-name">
+  return <Dialog open={open} onClose={close} title={`Rename ${row?.name ?? ""}`} initialFocus="#rename-company-name">
     <form className="space-y-4 px-5 py-4" onSubmit={async (event) => {
       event.preventDefault()
       if (!row || !name.trim()) return
@@ -383,7 +397,7 @@ function RenameCompanyDialog({ open, onClose, row, onRenamed }: {
       finally { setBusy(false) }
     }}>
       <div className="space-y-1">
-        <label htmlFor="rename-company-name" className="text-sm font-medium text-slate-800">Name</label>
+        <label htmlFor="rename-company-name" className="text-sm font-medium text-slate-800">Company name</label>
         <input id="rename-company-name" value={name} onChange={(event) => setName(event.target.value)} required maxLength={80} autoComplete="off"
           onFocus={(event) => event.currentTarget.select()}
           className="h-9 w-full rounded-md border border-slate-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600" />

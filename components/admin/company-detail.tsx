@@ -45,7 +45,7 @@ export function CompanyDetail({ workspaceId, row }: CompanyDetailProps) {
     {row.isCurrent
       ? <CompanyDangerActions workspaceId={workspaceId} name={row.name} isOwner={row.viewerRole === "owner"} />
       : <div className="border-t border-slate-200 px-5 py-4">
-          <p className="text-sm text-slate-600">To leave or delete {row.name}, open it and use its danger zone under Admin › Companies. <Link href={`/workspaces/${row.id}`} className="font-medium text-emerald-700 hover:underline">Open</Link></p>
+          <p className="max-w-[60ch] text-sm text-slate-600">To leave or delete {row.name}, open it and use its danger zone under Admin › Companies. <Link href={`/workspaces/${row.id}`} className="font-medium text-emerald-700 hover:underline">Open</Link></p>
         </div>}
   </div>
 }
