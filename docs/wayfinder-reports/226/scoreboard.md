@@ -94,13 +94,20 @@ First-pass scores are the KPI (the pre-build getting better); close scores are r
 | #271 | 20260917T000159 | opus | phase build done → measure n | 32 | 32 | 32 | 87 | 87 | 79 | 7M | 2K | 2 | 0 | 26m06s |
 | #271 | 20260917T002813 | sonnet | phase measure done → close n | 32 | 32 | 32 | 87 | 87 | 90 | 6M | 1K | 0 | 3 | 8m05s |
 | #271 | 20260917T003626 | sonnet | resolved | 32 | 32 | 32 | 87 | 87 | 134 | 13M | 1K | 0 | 0 | 23m36s |
-| #273 | 20260917T010016 | opus[1m] | continued (progressed), sess | 33 | · | · | · | · | 45 | 5M | 2K | 0 | 0 | 7m34s |
-| #273 | 20260917T010758 | opus[1m] | phase spec done → build next | 33 | · | · | · | · | 35 | 3M | 2K | 0 | 1 | 8m34s |
-| #273 | 20260917T011640 | sonnet | continued (progressed), sess | 33 | · | · | · | · | 83 | 9M | 0K | 0 | 0 | 7m34s |
-| #273 | 20260917T012422 | opus[1m] | continued (progressed), sess | 33 | · | · | · | · | 38 | 5M | 1K | 0 | 0 | 4m04s |
-| #273 | 20260917T012833 | opus | continued (progressed), sess | 33 | · | · | · | · | 67 | 8M | 2K | 0 | 0 | 9m04s |
-| #273 | 20260917T013744 | opus | continued (progressed), sess | 33 | · | · | · | · | 64 | 7M | 2K | 0 | 0 | 6m04s |
-| #273 | 20260917T014356 | opus | continued (progressed), sess | 33 | · | · | · | · | 67 | 8M | 1K | 0 | 0 | 8m34s |
-| #273 | 20260917T015237 | opus | continued (progressed), sess | 33 | · | · | · | · | 94 | 10M | 2K | 0 | 0 | 11m35s |
-| #273 | 20260917T020419 | opus | continued (progressed), sess | 33 | · | · | · | · | 147 | 16M | 2K | 2 | 0 | 20m36s |
-| #273 | 20260917T022503 | opus | phase build done → measure n | 33 | · | · | · | · | 68 | 5M | 2K | 3 | 0 | 12m35s |
+| #273 | 20260917T010016 | opus[1m] | continued (progressed), sess | 33 | 37 | 37 | 84 | 84 | 45 | 5M | 2K | 0 | 0 | 7m34s |
+| #273 | 20260917T010758 | opus[1m] | phase spec done → build next | 33 | 37 | 37 | 84 | 84 | 35 | 3M | 2K | 0 | 1 | 8m34s |
+| #273 | 20260917T011640 | sonnet | continued (progressed), sess | 33 | 37 | 37 | 84 | 84 | 83 | 9M | 0K | 0 | 0 | 7m34s |
+| #273 | 20260917T012422 | opus[1m] | continued (progressed), sess | 33 | 37 | 37 | 84 | 84 | 38 | 5M | 1K | 0 | 0 | 4m04s |
+| #273 | 20260917T012833 | opus | continued (progressed), sess | 33 | 37 | 37 | 84 | 84 | 67 | 8M | 2K | 0 | 0 | 9m04s |
+| #273 | 20260917T013744 | opus | continued (progressed), sess | 33 | 37 | 37 | 84 | 84 | 64 | 7M | 2K | 0 | 0 | 6m04s |
+| #273 | 20260917T014356 | opus | continued (progressed), sess | 33 | 37 | 37 | 84 | 84 | 67 | 8M | 1K | 0 | 0 | 8m34s |
+| #273 | 20260917T015237 | opus | continued (progressed), sess | 33 | 37 | 37 | 84 | 84 | 94 | 10M | 2K | 0 | 0 | 11m35s |
+| #273 | 20260917T020419 | opus | continued (progressed), sess | 33 | 37 | 37 | 84 | 84 | 147 | 16M | 2K | 2 | 0 | 20m36s |
+| #273 | 20260917T022503 | opus | phase build done → measure n | 33 | 37 | 37 | 84 | 84 | 68 | 5M | 2K | 3 | 0 | 12m35s |
+| #273 | 20260917T023747 | sonnet | phase measure done → close n | 33 | 37 | 37 | 84 | 84 | 139 | 11M | 1K | 4 | 3 | 17m06s |
+| #273 | 20260917T025501 | sonnet | resolved | 33 | 37 | 37 | 84 | 84 | 100 | 8M | 1K | 0 | 0 | 17m06s |
+| #276 | 20260917T031220 | opus[1m] | resolved | · | · | · | · | · | 47 | 4M | 2K | 0 | 0 | 4m03s |
+| #277 | 20260917T031636 | opus[1m] | resolved | · | · | · | · | · | 68 | 7M | 2K | 0 | 0 | 6m34s |
+| #278 | 20260917T032324 | opus[1m] | resolved | · | · | · | · | · | 53 | 5M | 2K | 0 | 0 | 4m33s |
+| #283 | 20260917T032810 | opus[1m] | resolved | · | · | · | · | · | 64 | 6M | 2K | 0 | 0 | 7m34s |
+| #285 | 20260917T033559 | opus[1m] | continued (progressed), sess | 0 | 0 | 0 | 0 | 0 | 35 | 4M | 2K | 0 | 0 | 4m33s |

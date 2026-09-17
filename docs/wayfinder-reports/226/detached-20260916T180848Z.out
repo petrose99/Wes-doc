@@ -234,3 +234,44 @@
 === [43/50] #273 — Build expense claims in place: Add to claim on Receipts, the claim on the Approval tab, an Expense claims view on Approvals  [sonnet · low · phase: measure]
     #273 context at exit: 110685 tokens, 17 min
     cleaned up session pid 2200722 (pgid ?); free: 6295 MB
+    scoreboard: 101 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #273: phase measure done → close next in 1026s
+=== [44/50] #273 — Build expense claims in place: Add to claim on Receipts, the claim on the Approval tab, an Expense claims view on Approvals  [sonnet · low · phase: close]
+    #273 context at exit: 107782 tokens, 17 min
+    cleaned up session pid 2223737 (pgid ?); free: 6290 MB
+    scoreboard: 102 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #273: resolved in 1026s
+=== [45/50] #276 — Decide whether Bill Pay rows that cannot be batched are selectable at all (Scheduled · Needs bank details) or selectable-then-left-out  [opus[1m] · low]
+    #276 context at exit: 106744 tokens, 4 min
+    cleaned up session pid 2247639 (pgid ?); free: 6291 MB
+scripts/wayfinder-autopilot/run.sh: line 417: /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/276.handoff.md: No such file or directory
+    scoreboard: 103 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #276: resolved in 243s
+=== [46/50] #277 — Decide whether an approved Expense claim becomes a Bill Pay row for the Claimant and a line in a Payment batch  [opus[1m] · low]
+    #277 context at exit: 124484 tokens, 6 min
+    cleaned up session pid 2252721 (pgid ?); free: 6292 MB
+scripts/wayfinder-autopilot/run.sh: line 417: /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/277.handoff.md: No such file or directory
+    scoreboard: 104 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #277: resolved in 394s
+=== [47/50] #278 — Decide the single-owner speed bump: is labelling self-approval enough before a payment file leaves a one-owner workspace  [opus[1m] · low]
+    #278 context at exit: 106355 tokens, 4 min
+    cleaned up session pid 2260680 (pgid ?); free: 6291 MB
+scripts/wayfinder-autopilot/run.sh: line 417: /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/278.handoff.md: No such file or directory
+    scoreboard: 105 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #278: resolved in 273s
+=== [48/50] #283 — Decide whether a typed queue's Details tab still asks "What type of document is this?" now the Configuration field table drives the pane  [opus[1m] · low]
+    #283 context at exit: 128749 tokens, 7 min
+    cleaned up session pid 2266371 (pgid ?); free: 6296 MB
+scripts/wayfinder-autopilot/run.sh: line 417: /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/283.handoff.md: No such file or directory
+    scoreboard: 106 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #283: resolved in 454s
+=== [49/50] #285 — Build Companies (Admin, Queue-screen shell)  [opus[1m] · low · phase: spec]
+    #285 crossed the hand-off line (153447 tokens ≥ 150000) — asked to hand off; hard stop at 180000
+    #285 context at exit: 164743 tokens, 4 min
+    cleaned up session pid 2276132 (pgid ?); free: 6292 MB
+    scoreboard: 107 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #285: continued (progressed), session 1/3 without progress allowed in 273s
+=== [50/50] #285 — Build Companies (Admin, Queue-screen shell)  [opus[1m] · low · phase: spec]
+    #285 crossed the hand-off line (152173 tokens ≥ 150000) — asked to hand off; hard stop at 180000
+    #285 context at exit: 159899 tokens, 12 min
+    cleaned up session pid 2281627 (pgid ?); free: 6286 MB
