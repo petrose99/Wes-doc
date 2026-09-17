@@ -168,7 +168,7 @@ export function ClaimSection({ workspaceId, documentId, facts, eligibility, read
     {facts.status === "draft" && !draftEditable && <p className="text-sm text-slate-600">{facts.claimant.name}&rsquo;s draft — only they or an owner can change it.</p>}
 
     {showActions && draftEditable && <div className="mt-3 flex flex-wrap items-center gap-2">
-      <Button size="sm" className="bg-emerald-600 text-white hover:bg-emerald-700" disabled={!facts.canSubmit || !online} aria-describedby={facts.submitDisabledReason || !online ? "claim-submit-reason" : undefined} onClick={() => setConfirm("submit")}>Submit for approval</Button>
+      <Button size="sm" disabled={!facts.canSubmit || !online} aria-describedby={facts.submitDisabledReason || !online ? "claim-submit-reason" : undefined} onClick={() => setConfirm("submit")}>Submit for approval</Button>
       {receipt && <Button size="sm" variant="outline" disabled={busy || !online} onClick={() => void removeReceipt()}>{busy && confirm === null ? "Removing…" : "Remove this receipt"}</Button>}
       <Button size="sm" variant="ghost" className="text-red-700 hover:bg-red-50 hover:text-red-800" disabled={!online} onClick={() => setConfirm("delete")}>Delete draft</Button>
       {(facts.submitDisabledReason || !online) && <p id="claim-submit-reason" role="status" className="basis-full text-[13px] text-slate-600">{!online ? OFFLINE_REASON : facts.submitDisabledReason}</p>}

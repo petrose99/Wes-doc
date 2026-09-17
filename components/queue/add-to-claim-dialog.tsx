@@ -152,11 +152,13 @@ export function AddToClaimDialog({ open, workspaceId, candidates, forceNew = fal
 
         {error && <p role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>}
 
-        <div className="flex items-center justify-end gap-2 border-t border-slate-200 pt-4">
+        {/* The disabled-primary reason sits in the footer beside the buttons (r0: it rendered below the
+            footer, outside the dialog's padding, as a stray line). */}
+        <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 pt-4">
+          {disabledReason && <p id="claim-dialog-reason" role="status" className="mr-auto text-[13px] text-slate-600">{disabledReason}</p>}
           <Button id="claim-dialog-cancel" type="button" variant="ghost" size="sm" onClick={onClose} disabled={pending}>Cancel</Button>
-          <Button type="submit" size="sm" className="bg-emerald-600 text-white hover:bg-emerald-700" disabled={!!disabledReason || pending} aria-busy={pending} aria-describedby={disabledReason ? "claim-dialog-reason" : undefined}>{primaryLabel}</Button>
+          <Button type="submit" size="sm" disabled={!!disabledReason || pending} aria-busy={pending} aria-describedby={disabledReason ? "claim-dialog-reason" : undefined}>{primaryLabel}</Button>
         </div>
-        {disabledReason && <p id="claim-dialog-reason" role="status" className="text-[13px] text-slate-600">{disabledReason}</p>}
       </form>
     </Dialog>
   )

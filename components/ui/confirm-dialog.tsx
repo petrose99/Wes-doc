@@ -42,10 +42,13 @@ export function ConfirmDialog({ open, title, description, confirmLabel = "Confir
   useEffect(() => {
     if (!open) return
     openerRef.current = typeof document !== "undefined" ? document.activeElement : null
-    // With extra content present (the stage-reject note field), initial focus belongs to that
-    // content, not the destructive Confirm — a reviewer whose intent is "reject with a reason"
-    // shouldn't have to Tab backwards past the button their reflexive Enter would fire.
-    if (children) {
+    // Initial focus always moves here, after the opener is read — never via `autoFocus`, which React
+    // applies before this effect runs and so made a mounted-open dialog record its own button as the
+    // opener (#273: Esc returned focus to a detached node → body). With extra content present (the
+    // stage-reject note field), initial focus belongs to that content, not the destructive Confirm —
+    // a reviewer whose intent is "reject with a reason" shouldn't have to Tab backwards past the
+    // button their reflexive Enter would fire.
+    {
       // rAF so the portal content exists before focusing; if the dialog closed in the same
       // tick, contentRef is null and the optional chain makes this a no-op.
       window.requestAnimationFrame(() => {
@@ -97,8 +100,8 @@ export function ConfirmDialog({ open, title, description, confirmLabel = "Confir
           {children && <div className="mt-3">{children}</div>}
         </div>
         <div className="flex justify-end gap-2 border-t border-hairline px-5 py-3">
-          <Button type="button" variant="outline" size="sm" autoFocus={destructive && !children} disabled={busy} onClick={onCancel}>Cancel</Button>
-          <Button type="button" variant={destructive ? "destructive" : "default"} size="sm" autoFocus={!children && !destructive} disabled={busy} onClick={onConfirm}>
+          <Button type="button" variant="outline" size="sm" disabled={busy} onClick={onCancel}>Cancel</Button>
+          <Button type="button" variant={destructive ? "destructive" : "default"} size="sm" disabled={busy} onClick={onConfirm}>
             {busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}{confirmLabel}
           </Button>
         </div>
