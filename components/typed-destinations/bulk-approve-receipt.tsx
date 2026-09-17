@@ -18,12 +18,12 @@ import { Button } from "@/components/ui/button"
  * (the actual `markDocumentsReviewed` hold-back reason, "missing required fields or document
  * type", isn't otherwise exposed on the row) — good enough to warn, not a guarantee the server
  * won't hold back an additional row it discovers is still incomplete. */
-export function EligibilityStrip({ eligible, total }: { eligible: number; total: number }) {
+export function EligibilityStrip({ eligible, total, label = "Eligible for Approval" }: { eligible: number; total: number; label?: string }) {
   const allEligible = eligible === total
   return (
     <div className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm ${allEligible ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}`}>
       <span className={`h-2 w-2 shrink-0 rounded-full ${allEligible ? "bg-emerald-500" : "bg-amber-500"}`} aria-hidden />
-      <span className="font-medium">Eligible for Approval ({eligible} of {total})</span>
+      <span className="font-medium">{label} ({eligible} of {total})</span>
     </div>
   )
 }
@@ -37,6 +37,9 @@ export type ItemizedRecord = {
   currencyCode: string | null
   dateLabel: string
   date: Date | null
+  /** #273: a trailing per-row note (the Held-back reason in the Add to claim dialog). The column
+   * renders only when at least one record carries one. */
+  note?: string
 }
 
 /** The compact recap table shown inside a pre-action confirm (Prepare payment run — no separate
@@ -50,6 +53,7 @@ export function ItemizedRecapTable({ records }: { records: ItemizedRecord[] }) {
   // get bulk actions (#210 and friends), which is why this reads the label off the first row
   // rather than hardcoding it.
   const dateLabel = records[0]?.dateLabel ?? "Date"
+  const withNotes = records.some((record) => record.note)
   return (
     <div className="max-h-64 overflow-y-auto rounded-md border">
       <table className="w-full text-left text-sm">
@@ -60,6 +64,7 @@ export function ItemizedRecapTable({ records }: { records: ItemizedRecord[] }) {
             <th className="px-3 py-2 font-medium">Number</th>
             <th className="px-3 py-2 font-medium text-right">Amount</th>
             <th className="px-3 py-2 font-medium">{dateLabel}</th>
+            {withNotes && <th className="px-3 py-2 font-medium">Reason</th>}
           </tr>
         </thead>
         <tbody>
@@ -70,6 +75,7 @@ export function ItemizedRecapTable({ records }: { records: ItemizedRecord[] }) {
               <td className="px-3 py-2 text-slate-600">{record.number ?? "—"}</td>
               <td className="px-3 py-2 text-right tabular-nums text-slate-800">{record.amount !== null ? formatMoney(record.amount, record.currencyCode) : "—"}</td>
               <td className="px-3 py-2 tabular-nums text-slate-600">{record.date ? record.date.toISOString().slice(0, 10) : "—"}</td>
+              {withNotes && <td className="px-3 py-2 text-slate-600">{record.note ?? ""}</td>}
             </tr>
           ))}
         </tbody>
