@@ -54,7 +54,7 @@ A bundle of expense receipts one person paid for personally, submitted for appro
 _Avoid_: Expense report, expenses (as a destination), reimbursement request
 
 **Claimant**:
-The person an Expense claim reimburses: the member who assembled and submitted it. Distinct from the Approver who decides it.
+The person an Expense claim reimburses: the member who assembled and submitted it. Distinct from the Approver who decides it. Once the claim is approved the Claimant is a Payee on Bill Pay; their bank details belong to their membership of the workspace, shown masked, written only into the payment file.
 _Avoid_: Submitter, employee
 
 **Bank Statement**:
@@ -126,11 +126,15 @@ The ledger connection's own page: whether the workspace is connected, when it la
 _Avoid_: Accounting (the surface), the ledger (that is what Finance opens), push list
 
 **Bill Pay**:
-The queue of approved, unpaid invoices from which payment batches are created. An invoice reaches it only once its processing state is Approved; one that cannot be paid yet (no supplier bank details) stays visible with the reason. A row held by a pending or approved payment batch reads *Scheduled* — still on the queue, not batchable again until the batch is rejected or paid. Amount to pay defaults to the discounted total inside an open discount window, else what is still due; an operator may set a smaller amount (a partial payment) per row.
+The queue of approved, unpaid invoices and approved, unpaid Expense claims from which payment batches are created. An invoice reaches it only once its processing state is Approved, a claim once it is approved; a row that cannot be paid yet (no bank details for its Payee) stays visible with the reason. A claim row has no terms, no discount, no countdown and no partial payment: its amount is the frozen claim total. A row held by a pending or approved payment batch reads *Scheduled* — still on the queue, not batchable again until the batch is rejected or paid. Amount to pay defaults to the discounted total inside an open discount window, else what is still due; an operator may set a smaller amount (a partial payment) per row.
 _Avoid_: Payables, payment run (the queue), pay list
 
+**Payee**:
+Who a Bill Pay row and a payment-file line pay: the invoice's Supplier or the Expense claim's Claimant. Bill Pay's first column. A claim's paid state is derived from its own payment records (never the ledger); the claim's status stays Approved and gains a paid date.
+_Avoid_: Beneficiary (the file's column name, not the concept), vendor (for a person)
+
 **Payment batch**:
-A named set of approved invoices, one payer account and one currency, submitted by a member for an owner's decision. Pending approval, then Approved (its payment file can be downloaded), then Paid; or Rejected with a reason. Whether the file has been downloaded is a fact shown on the batch, not a state. A batch never moves money.
+A named set of approved invoices and approved Expense claims, one payer account and one currency, submitted by a member for an owner's decision. Pending approval, then Approved (its payment file can be downloaded), then Paid; or Rejected with a reason. Whether the file has been downloaded is a fact shown on the batch, not a state. A batch never moves money.
 _Avoid_: Payment run, remittance (that is the advice sent to the supplier), transfer
 
 **Payer account**:
