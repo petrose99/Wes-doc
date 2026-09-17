@@ -167,3 +167,19 @@
 === [31/50] #271 — Build the Approval notice: coalesced email when an Approval reaches its Approver, re-pointed reminders, per-user switch  [sonnet · low · phase: measure]
     #271 context at exit: 90647 tokens, 8 min
     cleaned up session pid 2039613 (pgid ?); free: 6292 MB
+    scoreboard: 89 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #271: phase measure done → close next in 485s
+=== [32/50] #271 — Build the Approval notice: coalesced email when an Approval reaches its Approver, re-pointed reminders, per-user switch  [sonnet · low · phase: close]
+    #271 context at exit: 139288 tokens, 23 min
+    cleaned up session pid 2050252 (pgid ?); free: 6289 MB
+    scoreboard: 90 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #271: resolved in 1416s
+=== [33/50] #273 — Build expense claims in place: Add to claim on Receipts, the claim on the Approval tab, an Expense claims view on Approvals  [opus[1m] · low · phase: spec]
+    #273 crossed the hand-off line (158292 tokens ≥ 150000) — asked to hand off; hard stop at 180000
+    #273 context at exit: 174161 tokens, 7 min
+    cleaned up session pid 2082481 (pgid ?); free: 6301 MB
+    scoreboard: 91 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #273: continued (progressed), session 1/3 without progress allowed in 454s
+=== [34/50] #273 — Build expense claims in place: Add to claim on Receipts, the claim on the Approval tab, an Expense claims view on Approvals  [opus[1m] · low · phase: spec]
+    #273 context at exit: 138574 tokens, 8 min
+    cleaned up session pid 2091410 (pgid ?); free: 6301 MB

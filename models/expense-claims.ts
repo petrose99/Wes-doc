@@ -3,7 +3,10 @@
 // app/(app)/workspaces/[workspaceId]/expense-claim-actions.ts and do the auth + capability gate.
 import { canDecideStage, decideStage, findCurrentStage, toWorkflowStageInputs } from "@/lib/approvals/engine"
 import { auditEventData, getRequestAuditContext } from "@/lib/audit"
+import { claimEligibility } from "@/lib/claims/eligibility"
+import { sumReceiptTotals } from "@/lib/claims/totals"
 import { prisma } from "@/lib/db"
+import { processingState } from "@/lib/documents/processing-state"
 import { addCents, fromCents } from "@/lib/money"
 import { cache } from "react"
 
@@ -23,16 +26,52 @@ function asString(value: unknown): string | null {
  * left to the DB's unique constraint alone, so the caller gets a clear reason instead of a raw
  * constraint-violation error. Shared by createExpenseClaim and addExpenseClaimItems so "what counts
  * as claimable" only has one definition. */
-async function validateClaimableDocuments(workspaceId: string, documentIds: string[]) {
+async function validateClaimableDocuments(workspaceId: string, documentIds: string[], targetCurrencyCode?: string | null, excludeClaimId?: string) {
   const documents = await prisma.document.findMany({
     where: { id: { in: documentIds }, workspaceId },
-    select: { id: true, template: { select: { code: true } } },
+    select: {
+      id: true, status: true, approvalStatus: true, blockedByCheck: true, touchless: true, reviewedData: true, rawExtraction: true,
+      template: { select: { code: true } },
+      expenseClaimItems: {
+        where: excludeClaimId ? { claimId: { not: excludeClaimId } } : undefined,
+        select: { claim: { select: { status: true } } },
+        orderBy: { createdAt: "desc" },
+      },
+    },
   })
   if (documents.length !== documentIds.length) throw new Error("document_not_found")
-  if (documents.some((document) => document.template?.code !== "expense_receipt")) throw new Error("document_not_an_expense_receipt")
-
-  const alreadyClaimed = await prisma.expenseClaimItem.findFirst({ where: { workspaceId, documentId: { in: documentIds } }, select: { id: true } })
-  if (alreadyClaimed) throw new Error("document_already_claimed")
+  const escalatedIds = new Set(
+    (await prisma.documentCheckResult.findMany({
+      where: { workspaceId, documentId: { in: documentIds }, status: "escalated", OR: [{ escalationStatus: null }, { escalationStatus: { in: ["open", "in_review"] } }] },
+      select: { documentId: true },
+    })).map((row) => row.documentId),
+  )
+  for (const document of documents) {
+    const values = (document.reviewedData ?? document.rawExtraction ?? {}) as Record<string, unknown>
+    const latestClaimStatus = (document.expenseClaimItems[0]?.claim.status ?? null) as "draft" | "submitted" | "approved" | "rejected" | null
+    const state = processingState({
+      approvalStatus: (document.approvalStatus as "not_started" | "in_progress" | "approved" | "rejected" | "cancelled") ?? "not_started",
+      blockedByCheck: document.blockedByCheck ?? false,
+      escalated: escalatedIds.has(document.id),
+      touchless: document.touchless ?? false,
+      status: document.status,
+    })
+    const eligibility = claimEligibility({
+      templateCode: document.template?.code ?? null,
+      processingState: state,
+      latestClaimStatus,
+      currencyCode: typeof values.currency_code === "string" ? values.currency_code : null,
+      targetCurrencyCode,
+    })
+    if (eligibility.status === "not_eligible") {
+      throw new Error(
+        eligibility.reason === "supplier_receipt" ? "document_not_an_expense_receipt"
+        : eligibility.reason === "needs_attention" ? "document_needs_attention"
+        : eligibility.reason === "in_claim" ? "document_already_claimed"
+        : "expense_claim_currency_mismatch",
+      )
+    }
+  }
 }
 
 /** Creates the claim and its items in one transaction, "draft" status. */
@@ -139,16 +178,20 @@ export async function submitExpenseClaim(input: { workspaceId: string; claimId: 
     if (!workflow) throw new Error("approval_workflow_not_found")
   }
 
-  // Sum in integer cents so the frozen claim total isn't off by a stray fractional cent from
-  // chained Float addition (0.1 + 0.2 = 0.30000000000000004). See lib/money.ts.
-  const amounts: Array<number | null> = []
-  let currencyCode: string | null = null
-  for (const item of claim.items) {
-    const values = (item.document.reviewedData ?? item.document.rawExtraction ?? {}) as Record<string, unknown>
-    amounts.push(asNumber(values.total))
-    currencyCode = currencyCode ?? asString(values.currency_code)
-  }
-  const total = fromCents(addCents(amounts))
+  // Re-check every item against the same eligibility a receipt was added under (§2): another
+  // member may have claimed one of these documents elsewhere since it was added to this draft.
+  await validateClaimableDocuments(input.workspaceId, claim.items.map((item) => item.documentId), undefined, claim.id)
+
+  const totals = sumReceiptTotals(
+    claim.items.map((item) => {
+      const values = (item.document.reviewedData ?? item.document.rawExtraction ?? {}) as Record<string, unknown>
+      return { amount: asNumber(values.total), currencyCode: asString(values.currency_code) }
+    }),
+  )
+  if (totals.mixed) throw new Error("expense_claim_mixed_currency")
+  if (totals.missing === claim.items.length) throw new Error("expense_claim_no_amounts")
+  const total = totals.total
+  const currencyCode = totals.currencyCode
 
   const context = await getRequestAuditContext()
   const [updated] = await prisma.$transaction([
@@ -207,3 +250,63 @@ export async function decideExpenseClaimStage(input: { workspaceId: string; clai
   ])
   return updated
 }
+
+/** Takes a submitted claim back to draft — refused once any stage has decided it (spec §5.3):
+ * once a stage has weighed in, going back to draft would erase that decision silently, so the
+ * claimant deletes and recreates instead in that case. Resets the frozen total/currency/stage
+ * fields so the next submit re-takes the freeze rather than reusing a stale one. */
+export async function withdrawExpenseClaim(input: { workspaceId: string; claimId: string; actorId: string }) {
+  const claim = await prisma.expenseClaim.findFirst({ where: { id: input.claimId, workspaceId: input.workspaceId }, select: { id: true, status: true, currentStageIndex: true } })
+  if (!claim) throw new Error("expense_claim_not_found")
+  if (claim.status !== "submitted") throw new Error("expense_claim_not_submitted")
+  if (claim.currentStageIndex !== null && claim.currentStageIndex > 0) throw new Error("expense_claim_stage_decided")
+
+  const decidedEvent = await prisma.documentAuditEvent.findFirst({ where: { workspaceId: input.workspaceId, type: "expense_claim_stage_decided", detail: { path: ["claimId"], equals: claim.id } }, select: { id: true } })
+  if (decidedEvent) throw new Error("expense_claim_stage_decided")
+
+  const context = await getRequestAuditContext()
+  const [updated] = await prisma.$transaction([
+    prisma.expenseClaim.update({
+      where: { id: claim.id },
+      data: { status: "draft", total: null, currencyCode: null, submittedAt: null, currentStageIndex: null, workflowId: null },
+    }),
+    prisma.documentAuditEvent.create({ data: auditEventData({ workspaceId: input.workspaceId, actorId: input.actorId, type: "expense_claim_withdrawn", detail: { claimId: claim.id } }, context) }),
+  ])
+  return updated
+}
+
+export type ExpenseClaimRow = {
+  claimId: string
+  name: string
+  claimant: { id: string; name: string | null } | null
+  receiptCount: number
+  total: number | null
+  currencyCode: string | null
+  submittedAt: Date | null
+  firstDocumentId: string | null
+}
+
+/** Submitted claims for the Approvals › Expense claims list (S4) — the shape `filterExpenseClaimRows`
+ * / `QueueScreen<ExpenseClaimRow>` reads. Approval-stage filtering (canDecide, waiting-on) happens
+ * in `lib/approvals/filters.ts`, same split as the Invoices view. */
+export const listExpenseClaimRows = cache(async (workspaceId: string): Promise<ExpenseClaimRow[]> => {
+  const claims = await prisma.expenseClaim.findMany({
+    where: { workspaceId, status: "submitted" },
+    include: {
+      submitter: { select: { id: true, name: true } },
+      items: { select: { documentId: true }, orderBy: { createdAt: "asc" } },
+    },
+    orderBy: { submittedAt: "asc" },
+    take: 500,
+  })
+  return claims.map((claim) => ({
+    claimId: claim.id,
+    name: claim.title?.trim() || `Claim of ${claim.createdAt.toLocaleDateString("en-US", { month: "long", day: "numeric" })}`,
+    claimant: claim.submitter ? { id: claim.submitter.id, name: claim.submitter.name } : null,
+    receiptCount: claim.items.length,
+    total: claim.total != null ? Number(claim.total) : null,
+    currencyCode: claim.currencyCode,
+    submittedAt: claim.submittedAt,
+    firstDocumentId: claim.items[0]?.documentId ?? null,
+  }))
+})

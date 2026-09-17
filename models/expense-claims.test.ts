@@ -11,10 +11,19 @@ const { prisma } = await import("@/lib/db")
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = prisma as any
 
+function doc(overrides: Record<string, unknown>) {
+  return {
+    id: "d1", status: "reviewed", approvalStatus: "not_started", blockedByCheck: false, touchless: false,
+    reviewedData: {}, rawExtraction: null, template: { code: "expense_receipt" }, expenseClaimItems: [],
+    ...overrides,
+  }
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   for (const key of Object.keys(db)) delete db[key]
   db.$transaction = vi.fn(async (operations: unknown[]) => operations)
+  db.documentCheckResult = { findMany: vi.fn().mockResolvedValue([]) }
 })
 
 describe("createExpenseClaim", () => {
@@ -28,19 +37,17 @@ describe("createExpenseClaim", () => {
   })
 
   it("refuses a document that isn't an expense_receipt", async () => {
-    db.document = { findMany: vi.fn().mockResolvedValue([{ id: "d1", template: { code: "invoice" } }]) }
+    db.document = { findMany: vi.fn().mockResolvedValue([doc({ id: "d1", template: { code: "invoice" } })]) }
     await expect(createExpenseClaim({ workspaceId: "w1", submitterId: "u1", documentIds: ["d1"] })).rejects.toThrow("document_not_an_expense_receipt")
   })
 
   it("refuses a document already claimed elsewhere", async () => {
-    db.document = { findMany: vi.fn().mockResolvedValue([{ id: "d1", template: { code: "expense_receipt" } }]) }
-    db.expenseClaimItem = { findFirst: vi.fn().mockResolvedValue({ id: "existing" }) }
+    db.document = { findMany: vi.fn().mockResolvedValue([doc({ id: "d1", expenseClaimItems: [{ claim: { status: "draft" } }] })]) }
     await expect(createExpenseClaim({ workspaceId: "w1", submitterId: "u1", documentIds: ["d1"] })).rejects.toThrow("document_already_claimed")
   })
 
   it("creates the claim with an item per document", async () => {
-    db.document = { findMany: vi.fn().mockResolvedValue([{ id: "d1", template: { code: "expense_receipt" } }, { id: "d2", template: { code: "expense_receipt" } }]) }
-    db.expenseClaimItem = { findFirst: vi.fn().mockResolvedValue(null) }
+    db.document = { findMany: vi.fn().mockResolvedValue([doc({ id: "d1" }), doc({ id: "d2" })]) }
     db.expenseClaim = { create: vi.fn().mockResolvedValue({ id: "c1" }) }
 
     await createExpenseClaim({ workspaceId: "w1", submitterId: "u1", title: "Trip", documentIds: ["d1", "d2"] })
@@ -71,14 +78,14 @@ describe("addExpenseClaimItems", () => {
 
   it("reuses the same claimable-document validation as createExpenseClaim", async () => {
     db.expenseClaim = { findFirst: vi.fn().mockResolvedValue({ id: "c1", status: "draft" }) }
-    db.document = { findMany: vi.fn().mockResolvedValue([{ id: "d1", template: { code: "invoice" } }]) }
+    db.document = { findMany: vi.fn().mockResolvedValue([doc({ id: "d1", template: { code: "invoice" } })]) }
     await expect(addExpenseClaimItems("w1", "c1", ["d1"])).rejects.toThrow("document_not_an_expense_receipt")
   })
 
   it("adds an item per document", async () => {
     db.expenseClaim = { findFirst: vi.fn().mockResolvedValue({ id: "c1", status: "draft" }) }
-    db.document = { findMany: vi.fn().mockResolvedValue([{ id: "d1", template: { code: "expense_receipt" } }]) }
-    db.expenseClaimItem = { findFirst: vi.fn().mockResolvedValue(null), createMany: vi.fn() }
+    db.document = { findMany: vi.fn().mockResolvedValue([doc({ id: "d1" })]) }
+    db.expenseClaimItem = { createMany: vi.fn() }
 
     await addExpenseClaimItems("w1", "c1", ["d1"])
 
@@ -149,12 +156,13 @@ describe("submitExpenseClaim", () => {
       findFirst: vi.fn().mockResolvedValue({
         id: "c1", status: "draft",
         items: [
-          { document: { reviewedData: { total: 100, currency_code: "USD" }, rawExtraction: null } },
-          { document: { reviewedData: { total: 50, currency_code: "USD" }, rawExtraction: null } },
+          { documentId: "d1", document: { reviewedData: { total: 100, currency_code: "USD" }, rawExtraction: null } },
+          { documentId: "d2", document: { reviewedData: { total: 50, currency_code: "USD" }, rawExtraction: null } },
         ],
       }),
       update: vi.fn().mockReturnValue("update"),
     }
+    db.document = { findMany: vi.fn().mockResolvedValue([doc({ id: "d1" }), doc({ id: "d2" })]) }
     db.documentAuditEvent = { create: vi.fn().mockReturnValue("audit") }
 
     await submitExpenseClaim({ workspaceId: "w1", claimId: "c1", actorId: "u1" })
@@ -173,9 +181,10 @@ describe("submitExpenseClaim", () => {
 
   it("starts at stage 0 when a workflow is given", async () => {
     db.expenseClaim = {
-      findFirst: vi.fn().mockResolvedValue({ id: "c1", status: "draft", items: [{ document: { reviewedData: { total: 10 }, rawExtraction: null } }] }),
+      findFirst: vi.fn().mockResolvedValue({ id: "c1", status: "draft", items: [{ documentId: "d1", document: { reviewedData: { total: 10 }, rawExtraction: null } }] }),
       update: vi.fn().mockReturnValue("update"),
     }
+    db.document = { findMany: vi.fn().mockResolvedValue([doc({ id: "d1" })]) }
     db.approvalWorkflow = { findFirst: vi.fn().mockResolvedValue({ id: "wf1" }) }
     db.documentAuditEvent = { create: vi.fn().mockReturnValue("audit") }
 
