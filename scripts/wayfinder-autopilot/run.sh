@@ -320,6 +320,7 @@ while [ "$n" -lt "$MAX" ]; do
       --disallowedTools AskUserQuestion \
       --no-session-persistence \
       --strict-mcp-config \
+      --setting-sources project,local \
       --output-format stream-json --verbose \
       > "$LOG" 2>"$LOG.stderr" ) &
   SESSION_PID=$!
