@@ -69,6 +69,61 @@ export const listOrganizationUsers = cache(async (organizationId: string, userId
   }),
 )
 
+/** The workspace ids in `organizationId` where `userId` is an owner — the invitation scope: an
+ * invitation is one record owned by its primary company, so only owners of that company see
+ * and act on it (#286 §3.4). */
+export async function ownedWorkspaceIds(organizationId: string, userId: string): Promise<string[]> {
+  return unscoped(async () => {
+    const rows = await prisma.workspace.findMany({
+      where: { organizationId, members: { some: { userId, role: "owner" } } },
+      select: { id: true },
+    })
+    return rows.map((row) => row.id)
+  })
+}
+
+export type OrganizationInvitationRow = {
+  id: string
+  email: string
+  createdAt: Date
+  expiresAt: Date
+  sentBy: { name: string | null; email: string }
+  /** Primary company first, then the additional grants — the order Resend re-issues them in. */
+  grants: { workspaceId: string; workspaceName: string; role: string }[]
+}
+
+/** Users (#286): pending invitations across the companies the caller owns, one row per
+ * invitation with its grants resolved to company names. Not deduped by email on purpose: two
+ * owners of two companies can each hold an invitation for the same address, and each is its
+ * own record with its own Revoke. */
+export const listOrganizationInvitations = cache(async (organizationId: string, userId: string): Promise<OrganizationInvitationRow[]> =>
+  unscoped(async () => {
+    const owned = await ownedWorkspaceIds(organizationId, userId)
+    if (owned.length === 0) return []
+    const invitations = await prisma.workspaceInvitation.findMany({
+      where: { workspaceId: { in: owned }, acceptedAt: null },
+      include: {
+        workspace: { select: { id: true, name: true } },
+        sentBy: { select: { name: true, email: true } },
+        additionalGrants: { include: { workspace: { select: { id: true, name: true } } } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 500,
+    })
+    return invitations.map((invitation) => ({
+      id: invitation.id,
+      email: invitation.email,
+      createdAt: invitation.createdAt,
+      expiresAt: invitation.expiresAt,
+      sentBy: invitation.sentBy,
+      grants: [
+        { workspaceId: invitation.workspace.id, workspaceName: invitation.workspace.name, role: invitation.role },
+        ...invitation.additionalGrants.map((grant) => ({ workspaceId: grant.workspace.id, workspaceName: grant.workspace.name, role: grant.role })),
+      ],
+    }))
+  }),
+)
+
 /** Dashboard (#287): membership check for "does this org have ≥2 companies the caller can see" —
  * the rollups and the Companies-picker-over-/workspaces only show once true. */
 export async function countAccessibleCompanies(organizationId: string, userId: string): Promise<number> {
