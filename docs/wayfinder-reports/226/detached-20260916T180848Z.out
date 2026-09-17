@@ -275,3 +275,6 @@ scripts/wayfinder-autopilot/run.sh: line 417: /home/ubuntu/Dev/Wes-doc/docs/wayf
     #285 crossed the hand-off line (152173 tokens ≥ 150000) — asked to hand off; hard stop at 180000
     #285 context at exit: 159899 tokens, 12 min
     cleaned up session pid 2281627 (pgid ?); free: 6286 MB
+    scoreboard: 108 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #285: phase spec done → build next in 724s
+Run log: /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/run-log.md
