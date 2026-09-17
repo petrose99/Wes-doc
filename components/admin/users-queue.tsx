@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useCallback, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -11,7 +11,9 @@ import { NativeSelect } from "@/components/ui/native-select"
 import { QueueScreen, type QueueColumn, type SortOption } from "@/components/queue/queue-screen"
 import type { Facet } from "@/components/queue/facet-filters"
 import { ReadOnlyBand, Consequence } from "@/components/admin/admin-ui"
-import { UserDetail } from "@/components/admin/user-detail"
+import { UserDetail, type UserPaneApi } from "@/components/admin/user-detail"
+import { PaneMenuItem } from "@/components/queue/detail-pane"
+import type { PaneHelpers } from "@/components/queue/queue-screen"
 import { adminPaths } from "@/lib/admin/paths"
 import {
   type UserRow, type UsersPageData, ROLE_LABELS, ROLE_CONSEQUENCE,
@@ -90,10 +92,27 @@ export function UsersQueue({ workspaceId, data, initialSelectedId = null, initia
 
   const facets = [ROLE_FACET, STATUS_FACET, ...(companyFacet ? [companyFacet] : [])]
 
-  const loadDetail = async (key: string) => {
+  // The pane content is rendered by `loadDetail` without the shell's helpers; `paneMenu` receives
+  // them on every render, so a ref carries close/refresh to the content and the content's actions
+  // (Resend · Revoke · Leave, spec §5.1) back to the ⋯ menu.
+  const helpersRef = useRef<PaneHelpers | null>(null)
+  const paneHelpers = useMemo(() => ({ close: () => helpersRef.current?.close(), refresh: () => helpersRef.current?.refresh() }), [])
+  const [paneApi, setPaneApi] = useState<UserPaneApi | null>(null)
+  const register = useCallback((api: UserPaneApi | null) => setPaneApi(api), [])
+  const loadDetail = useCallback(async (key: string) => {
     const result = await loadUserDetailAction(workspaceId, key)
     if (!result.success || !result.data) return null
-    return <UserDetail workspaceId={workspaceId} row={result.data} currentWorkspaceId={currentCompany.workspaceId} ownersByCompany={ownersByCompany} />
+    return <UserDetail workspaceId={workspaceId} row={result.data} currentWorkspaceId={currentCompany.workspaceId} currentCompanyName={currentCompany.name}
+      currentCompanyKind={currentCompany.kind} ownersByCompany={ownersByCompany} ownedCompanies={ownedCompanies} helpers={paneHelpers} register={register} />
+  }, [workspaceId, currentCompany, ownersByCompany, ownedCompanies, paneHelpers, register])
+  const paneMenu = (row: UserRow, helpers: PaneHelpers) => {
+    helpersRef.current = helpers
+    return <>
+      <PaneMenuItem onClick={() => { void navigator.clipboard.writeText(row.email); toast.success("Email copied") }}>Copy email</PaneMenuItem>
+      {paneApi?.resend && <PaneMenuItem onClick={paneApi.resend}>Resend</PaneMenuItem>}
+      {paneApi?.revoke && <PaneMenuItem tone="red" onClick={paneApi.revoke}>Revoke invitation</PaneMenuItem>}
+      {paneApi?.leave && <PaneMenuItem tone="red" onClick={paneApi.leave}>Leave {currentCompany.name}</PaneMenuItem>}
+    </>
   }
 
   const bandLine = mode === "org"
@@ -121,7 +140,7 @@ export function UsersQueue({ workspaceId, data, initialSelectedId = null, initia
       basePath={adminPaths(workspaceId).users}
       rows={rows}
       rowId={(row) => row.key}
-      rowName={(row) => ({ title: displayName(row), suffix: `${row.companies.length} ${row.companies.length === 1 ? "company" : "companies"} · ${row.roleHere ? ROLE_LABELS[row.roleHere] : "not a member here"} · ${statusLabel(row)}` })}
+      rowName={(row) => ({ title: displayName(row), suffix: `${row.companies.length} ${row.companies.length === 1 ? "company" : "companies"} · ${row.roleHere ? ROLE_LABELS[row.roleHere] : "not in this company"} · ${statusLabel(row)}` })}
       columns={columns}
       sortOptions={SORTS}
       facets={facets}
@@ -141,9 +160,10 @@ export function UsersQueue({ workspaceId, data, initialSelectedId = null, initia
         URL.revokeObjectURL(url)
       }}
       loadDetail={loadDetail}
+      paneMenu={paneMenu}
       initialSelectedId={initialSelectedId}
       initialMissing={initialMissing}
-      cards={{ below: "md", label: (row) => [displayName(row), row.email, `${row.companies.length} ${row.companies.length === 1 ? "company" : "companies"}`, row.roleHere ? ROLE_LABELS[row.roleHere] : "not a member here", statusLabel(row)].join(", ") }} />
+      cards={{ below: "md", label: (row) => [displayName(row), row.email, `${row.companies.length} ${row.companies.length === 1 ? "company" : "companies"}`, row.roleHere ? ROLE_LABELS[row.roleHere] : "not in this company", statusLabel(row)].join(", ") }} />
 
     {!isOwner && <div className="px-6"><ReadOnlyBand owners={currentOwners}>Ask an owner: {currentOwners.length ? <span className="font-medium">{currentOwners.join(", ")}</span> : "an owner"} can invite people and change roles.</ReadOnlyBand></div>}
 
