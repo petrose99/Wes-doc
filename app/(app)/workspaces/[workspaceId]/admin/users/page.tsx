@@ -1,38 +1,35 @@
-import { AdminPage } from "@/components/admin/admin-ui"
-import { Panel } from "@/components/automation/automation-ui"
-import { InvitePanel } from "@/components/workspace/invite-panel"
-import { MembersTable } from "@/components/workspace/members-table"
+import { UsersQueue } from "@/components/admin/users-queue"
 import { getAdminContext } from "@/lib/admin/context"
-import { getWorkspaceMode, listWorkspaceInvitations } from "@/models/workspaces"
+import { loadUsersPage } from "@/models/admin-users"
 
 export const dynamic = "force-dynamic"
 
-/** #231 Q14 (#252): Admin › Users — this company's members and invitations (the org-level list
- * on the Queue-screen shell is #254's; without an organization the same address shows this
- * company's people). The "firm / SMB mode" pill is gone: the fact it stood for is one sentence
- * under the title. The company's name and its deletion live on Companies (evaluate H8). */
-export default async function UsersPage({ params }: { params: Promise<{ workspaceId: string }> }) {
+/** #286 (spec §2, §3.3): Admin › Users as a Queue screen. The current workspace decides the
+ * page's state — (a) in an organization: every person in the companies the viewer is a member
+ * of, plus pending invitations across the companies the viewer owns; (b) an ungrouped team
+ * workspace: this company's members and invitations; (c) a personal workspace: the viewer alone.
+ * Roles gate the controls, never the address. The incumbent `AdminPage` + `MembersTable` +
+ * `InvitePanel` is replaced whole — its intent/confirm logic lives in the pane's Companies tab
+ * (one save grammar per page, #252 P1 lesson). */
+/** Also called directly by the `[userKey]` deep-link route (spec §5.4) with `selectedId` set, so
+ * a link to one person (`<userId>` or `inv:<invitationId>`) opens this same screen with the pane
+ * already open — the Queue-screen convention (#225), not a separate page. */
+export async function UsersScreen({ params, selectedId }: { params: Promise<{ workspaceId: string }>; selectedId?: string }) {
   const { workspaceId } = await params
-  const context = await getAdminContext(workspaceId)
-  const { owner, members, membership, user, workspace } = context
-  const [invitations, mode] = await Promise.all([owner ? listWorkspaceInvitations(workspaceId) : Promise.resolve([]), getWorkspaceMode(workspaceId)])
-  const modeSentence = mode === "firm"
-    ? "At least one reviewer is on the team, so close needs a reviewer's sign-off."
-    : "No reviewer yet, so the owner signs off on close."
+  const { workspace, user } = await getAdminContext(workspaceId)
+  const data = await loadUsersPage(workspace, user)
 
-  return <AdminPage title="Users" intro={<>People with access to {workspace.name}. Owners manage access; reviewers sign off on close; members upload, review, search and export. {modeSentence}</>}>
-    <Panel title="Members" note={`${members.length} ${members.length === 1 ? "person has" : "people have"} access.`}>
-      <MembersTable
-        workspaceId={workspaceId}
-        workspaceKind={workspace.kind}
-        viewerId={user.id}
-        viewerRole={membership.role}
-        members={members.map((member) => ({ userId: member.userId, name: member.user.name, email: member.user.email, role: member.role }))} />
-    </Panel>
+  // Spec §5.4: a deep link outside the viewer's unfiltered rows (not a shared company, a revoked
+  // invitation, garbage) gets the nameless notice — never a name that wasn't loaded. A row that
+  // is present but hidden by the current filters is the shell's own case (it clears them).
+  const selectedPresent = selectedId ? data.rows.some((row) => row.key === selectedId) : false
+  const initialMissing = selectedId && !selectedPresent
+    ? { text: "That person isn't in a company you're a member of." }
+    : undefined
+  return <UsersQueue workspaceId={workspaceId} data={data}
+    initialSelectedId={selectedPresent ? selectedId : null} initialMissing={initialMissing} />
+}
 
-    {owner && <Panel title="Invitations" note="An invitation expires seven days after it is sent. Resending issues a fresh link and invalidates the previous one.">
-      <InvitePanel workspaceId={workspaceId} invitations={invitations.map((invitation) => ({ id: invitation.id, email: invitation.email, role: invitation.role, expiresAt: invitation.expiresAt.toISOString() }))} />
-    </Panel>}
-
-  </AdminPage>
+export default function UsersPage({ params }: { params: Promise<{ workspaceId: string }> }) {
+  return UsersScreen({ params })
 }

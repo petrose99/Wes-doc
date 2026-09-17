@@ -1,13 +1,14 @@
 import { AdminLeaveGuard } from "@/components/admin/admin-leave-guard"
 import { AdminNav, type AdminNavGroup } from "@/components/admin/admin-nav"
 import { CompanyDetail } from "@/components/admin/company-detail"
+import { UserDetail } from "@/components/admin/user-detail"
 import { getAdminContext } from "@/lib/admin/context"
 import { adminPaths } from "@/lib/admin/paths"
 
 /** #285: Companies' Detail pane arrives from a server action as JSX. The RSC bundler only lists
  * a client component in a route's client manifest when a server component on the route's graph
  * imports it, so this layout references the pane — same trick as `(queue)/layout.tsx`. */
-const CLIENT_MANIFEST_ANCHORS = [CompanyDetail]
+const CLIENT_MANIFEST_ANCHORS = [CompanyDetail, UserDetail]
 
 /** #231 Q9/Q10/Q20 (#252): the Admin area — one rail item, one left nav with Vic's two groups,
  * one reading column. Replaces Settings' tab strip and Controls' tabs (nothing removed: every

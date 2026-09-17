@@ -115,7 +115,11 @@ export function UsersQueue({ workspaceId, data, initialSelectedId = null, initia
     </>
   }
 
-  const bandLine = mode === "org"
+  // Spec §3.3 (c): the personal workspace is still a one-row list (You · Owner) whose pane opens
+  // for your bank details; the header sentence replaces Invite, and there is nothing to filter.
+  const bandLine = mode === "personal"
+    ? <p className="px-4 py-1.5 text-xs text-slate-500">Your personal workspace is just you. Create a team workspace on <Link href={adminPaths(workspaceId).companies} className="font-medium text-emerald-700 hover:underline">Companies</Link> to invite people.</p>
+    : mode === "org"
     ? <p className="px-4 py-1.5 text-xs text-slate-500">
         Across {new Set(rows.flatMap((row) => row.companies.map((company) => company.workspaceId))).size} companies in {organizationName}.
         {hiddenCompanyCount > 0 && ` ${hiddenCompanyCount} more ${hiddenCompanyCount === 1 ? "company" : "companies"} in ${organizationName} aren't shown — you're not a member of ${hiddenCompanyCount === 1 ? "it" : "them"}.`}
@@ -127,13 +131,6 @@ export function UsersQueue({ workspaceId, data, initialSelectedId = null, initia
         </p>
       : null
 
-  if (mode === "personal") {
-    return <section aria-labelledby="queue-title" className="mx-auto max-w-[60ch] px-6 py-10 text-center">
-      <h1 id="queue-title" tabIndex={-1} className="text-lg font-semibold text-slate-900 focus:outline-none">Users</h1>
-      <p className="mt-2 text-sm leading-relaxed text-slate-600">Your personal workspace is just you. Create a team workspace on <Link href={adminPaths(workspaceId).companies} className="font-medium text-emerald-700 hover:underline">Companies</Link> to invite people.</p>
-    </section>
-  }
-
   return <>
     <QueueScreen<UserRow>
       title="Users"
@@ -142,10 +139,10 @@ export function UsersQueue({ workspaceId, data, initialSelectedId = null, initia
       rowId={(row) => row.key}
       rowName={(row) => ({ title: displayName(row), suffix: `${row.companies.length} ${row.companies.length === 1 ? "company" : "companies"} · ${row.roleHere ? ROLE_LABELS[row.roleHere] : "not in this company"} · ${statusLabel(row)}` })}
       columns={columns}
-      sortOptions={SORTS}
-      facets={facets}
+      sortOptions={mode === "personal" ? [] : SORTS}
+      facets={mode === "personal" ? [] : facets}
       filterRows={filterUserRows}
-      search={{ param: "q", label: "Find by name or email" }}
+      search={mode === "personal" ? undefined : { param: "q", label: "Find by name or email" }}
       selectable={false}
       overrideMode={false}
       primaryAction={isOwner ? <Button type="button" size="sm" onClick={() => setInviting(true)}>Invite a user</Button> : undefined}
@@ -165,7 +162,7 @@ export function UsersQueue({ workspaceId, data, initialSelectedId = null, initia
       initialMissing={initialMissing}
       cards={{ below: "md", label: (row) => [displayName(row), row.email, `${row.companies.length} ${row.companies.length === 1 ? "company" : "companies"}`, row.roleHere ? ROLE_LABELS[row.roleHere] : "not in this company", statusLabel(row)].join(", ") }} />
 
-    {!isOwner && <div className="px-6"><ReadOnlyBand owners={currentOwners}>Ask an owner: {currentOwners.length ? <span className="font-medium">{currentOwners.join(", ")}</span> : "an owner"} can invite people and change roles.</ReadOnlyBand></div>}
+    {!isOwner && mode !== "personal" && <div className="px-6"><ReadOnlyBand owners={currentOwners}>Ask an owner: {currentOwners.length ? <span className="font-medium">{currentOwners.join(", ")}</span> : "an owner"} can invite people and change roles.</ReadOnlyBand></div>}
 
     <InviteDialog open={inviting} onClose={() => setInviting(false)} workspaceId={workspaceId} currentWorkspaceId={currentCompany.workspaceId}
       ownedCompanies={ownedCompanies} unownedCompanies={unownedCompanies}
