@@ -1,5 +1,0 @@
-=== [1/50] #253 — Build Approval Flows and PO Mismatch Flows in Admin: default flow, tolerances, who approves a mismatch  [sonnet · low]
-    #253 context at exit: 149915 tokens, 15 min
-    cleaned up session pid 903129 (pgid ?); free: 5667 MB
---- #253: not closed (rc=0) in 935s
-=== [2/50] #255 — Close the scope-guard gap: guard the 32 workspace-keyed models outside WORKSPACE_SCOPED_MODELS, or record why each is global  [sonnet · low]
