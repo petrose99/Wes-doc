@@ -12,6 +12,7 @@ import { prisma } from "@/lib/db"
 import { unscoped } from "@/lib/workspace-scope"
 import { ApprovalNoticeEmail, type ApprovalNoticeRow } from "@/components/emails/approval-notice-email"
 import { render } from "@react-email/render"
+import { stopHeaders, stopPageUrl } from "@/lib/notices/stop-urls"
 
 const NOTICE_FLOOR_MS = 60 * 60 * 1000
 const NUDGE_AFTER_MS = 48 * 60 * 60 * 1000
@@ -161,7 +162,7 @@ function multiLink(workspaceId: string): string {
   return `${config.app.baseURL}/workspaces/${workspaceId}/approvals/invoices?via=notice`
 }
 
-function subjectAndHeading(rows: { kind: "reached" | "nudge" }[], workspaceName: string): { subject: string; heading: string } {
+function subjectAndHeading(rows: { kind: ApprovalNoticeRow["kind"] }[], workspaceName: string): { subject: string; heading: string } {
   const reached = rows.filter((row) => row.kind === "reached")
   const nudges = rows.filter((row) => row.kind === "nudge")
   if (reached.length) {
@@ -176,7 +177,7 @@ async function sendOne(opts: {
   to: string; workspaceId: string; workspaceName: string; rows: ApprovalNoticeRow[]; stopToken: string
 }): Promise<boolean> {
   const { subject, heading } = subjectAndHeading(opts.rows, opts.workspaceName)
-  const stopUrl = `${config.app.baseURL}/notices/stop?t=${opts.stopToken}`
+  const stopUrl = stopPageUrl(opts.stopToken)
   const openUrl = opts.rows.length === 1 ? opts.rows[0].url : multiLink(opts.workspaceId)
   const props = { heading, rows: opts.rows, workspaceName: opts.workspaceName, openUrl, stopUrl, footerVariant: "approver" as const }
   const html = React.createElement(ApprovalNoticeEmail, props)
@@ -184,7 +185,7 @@ async function sendOne(opts: {
     await resend.emails.send({
       from: config.email.from, to: opts.to, subject, react: html,
       text: await render(html, { plainText: true }),
-      headers: { "List-Unsubscribe": `<${stopUrl}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" },
+      headers: stopHeaders(opts.stopToken),
     })
     return true
   } catch (error) {
@@ -294,7 +295,7 @@ export async function sendSentBackNotice(input: {
   const row: ApprovalNoticeRow = { kind: "sent_back", supplier: input.supplier, invoiceNumber: input.invoiceNumber, amount: input.amount, currency: input.currency ?? "USD", url: link(input.workspaceId, input.documentId), waitingDays: 0 }
   const { signStopToken } = await import("@/lib/notices/stop-token")
   const stopToken = signStopToken(input.createdById, input.workspaceId)
-  const stopUrl = `${config.app.baseURL}/notices/stop?t=${stopToken}`
+  const stopUrl = stopPageUrl(stopToken)
   const heading = `${input.actorName} sent ${input.supplier ?? "an invoice"} back for review`
   const props = { heading, rows: [row], workspaceName: input.workspaceName, openUrl: row.url, stopUrl, footerVariant: "starter" as const, reason: input.reason }
   const html = React.createElement(ApprovalNoticeEmail, props)
@@ -302,7 +303,7 @@ export async function sendSentBackNotice(input: {
     await resend.emails.send({
       from: config.email.from, to: user.email, subject: `Sent back for review: ${input.supplier ?? "an invoice"} — ${input.workspaceName}`, react: html,
       text: await render(html, { plainText: true }),
-      headers: { "List-Unsubscribe": `<${stopUrl}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" },
+      headers: stopHeaders(stopToken),
     })
   } catch (error) {
     console.warn(`[approval-notices] sent-back email failed for ${user.email}:`, error instanceof Error ? error.message : error)

@@ -1061,7 +1061,7 @@ export async function setApprovalNoticeEmailsAction(workspaceId: string, enabled
     revalidatePath(`/workspaces/${workspaceId}`, "layout")
     return { success: true, data: { enabled: updated.approvalNoticeEmails } }
   } catch (error) {
-    return { success: false, error: errorMessage(error) }
+    return { success: false, error: errorMessage(error, "Couldn't save this. Check your connection and try again.") }
   }
 }
 
