@@ -68,6 +68,7 @@ const ORIGIN_LABELS: Record<string, string> = {
   exceptions: "Exceptions",
   "approvals/invoices": "Approvals",
   "approvals/po-mismatches": "Approvals",
+  "approvals/expense-claims": "Approvals",
   finance: "Finance",
   search: "Search",
   // documentDestinationPath's untyped fallback (`library/documents/<id>`); the rail calls it Archive (#245).

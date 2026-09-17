@@ -54,7 +54,7 @@ export async function describeOrigin(workspaceId: string, from: string | null): 
 }
 
 /** Path segments that look id-shaped by the regex above but are route names. */
-const ORIGIN_SEGMENTS: Record<string, true> = { "purchase-orders": true, "bank-statements": true, "po-mismatches": true }
+const ORIGIN_SEGMENTS: Record<string, true> = { "purchase-orders": true, "bank-statements": true, "po-mismatches": true, "expense-claims": true }
 
 /** The row-notice model for a `?doc=` (or `gone=`) id that is not among the queue's rows (#268
  * spec §2.5 cases 2/3): the document moved to another queue, or it is gone. `null` when the id is

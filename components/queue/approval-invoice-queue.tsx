@@ -57,7 +57,7 @@ function eligibilityText(row: ApprovalInvoiceRow): string {
  * screen (#225). A row's Approve/Reject decide the invoice's *current stage*
  * (`decideReviewTaskStageAction`, already generic across every workflow surface); "Send back for
  * review" lives in the pane's header overflow, not the sticky footer, per decision #6. */
-export function ApprovalInvoiceQueue({ workspaceId, basePath, rows, poMismatchCount, views, viewsPhone, initialSelectedId, workspaceDocumentCount, arrival }: {
+export function ApprovalInvoiceQueue({ workspaceId, basePath, rows, poMismatchCount, expenseClaimCount = null, views, viewsPhone, initialSelectedId, workspaceDocumentCount, arrival }: {
   workspaceId: string
   basePath: string
   /** Every row the actor may see — the Approver/Status facets apply client-side
@@ -65,6 +65,8 @@ export function ApprovalInvoiceQueue({ workspaceId, basePath, rows, poMismatchCo
   rows: ApprovalInvoiceRow[]
   /** PO mismatches through the same facets, for the segment count. */
   poMismatchCount: number
+  /** #273: submitted expense claims through the approver scope; `null` hides the segment (module off). */
+  expenseClaimCount?: number | null
   /** The saved-view picker (#201) — composed here, after the queue picker, matching every other
    * typed destination's `views` slot; PO Mismatches has no saved views yet, so it omits this. */
   views?: ReactNode
@@ -161,8 +163,9 @@ export function ApprovalInvoiceQueue({ workspaceId, basePath, rows, poMismatchCo
       sortOptions={SORTS}
       facets={APPROVAL_INVOICE_FACETS}
       band={<div className="px-4 pt-3"><QueueSegments segments={[
-        { key: "invoices", label: "Invoice approvals", count: ownCount, href: basePath },
+        { key: "invoices", label: "Invoice approvals", shortLabel: "Invoices", count: ownCount, href: basePath },
         { key: "po-mismatches", label: "PO mismatches", count: poMismatchCount, href: basePath.replace(/\/invoices$/, "/po-mismatches") },
+        ...(expenseClaimCount === null ? [] : [{ key: "expense-claims", label: "Expense claims", shortLabel: "Claims", count: expenseClaimCount, href: basePath.replace(/\/invoices$/, "/expense-claims") }]),
       ]} active="invoices" /></div>}
       views={views}
       viewsPhone={viewsPhone}

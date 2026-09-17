@@ -3,7 +3,10 @@
 import Link from "next/link"
 import { useRef } from "react"
 
-export type QueueSegment = { key: string; label: string; count: number; href: string }
+export type QueueSegment = { key: string; label: string; count: number; href: string
+  /** #273 S5: a shorter visible label below `md` so three segments fit at 390; the accessible
+   * name is always the full label + count. */
+  shortLabel?: string }
 
 /** #257 S2/B4: the segmented control every Approval-kind screen below `lg` uses to switch queues
  * (Invoice approvals · PO mismatches · Claims once #273 lands) — replaces the desktop
@@ -34,9 +37,12 @@ export function QueueSegments({ segments, active, label = "Approval queues" }: {
       return <Link key={segment.key} href={segment.href}
         ref={(el) => { if (el) refs.current.set(segment.key, el); else refs.current.delete(segment.key) }}
         role="tab" aria-selected={selected} tabIndex={selected ? 0 : -1}
+        aria-label={`${segment.label} (${segment.count})`}
         onKeyDown={(event) => onKeyDown(event, index)}
         className={`flex h-10 flex-1 items-center justify-center rounded-md px-2 py-2 text-sm font-medium tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-1 ${selected ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-800"}`}>
-        {segment.label} ({segment.count})
+        {segment.shortLabel
+          ? <><span aria-hidden className="md:hidden">{segment.shortLabel}</span><span aria-hidden className="max-md:hidden">{segment.label}</span></>
+          : <span aria-hidden>{segment.label}</span>}<span aria-hidden>&nbsp;({segment.count})</span>
       </Link>
     })}
   </div>

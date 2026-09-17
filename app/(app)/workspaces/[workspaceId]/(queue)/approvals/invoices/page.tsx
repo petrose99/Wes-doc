@@ -4,7 +4,8 @@ import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { listApprovalInvoiceRows, listPoMismatchRows } from "@/models/approvals"
 import { listSavedViews } from "@/models/saved-views"
 import { countWorkspaceDocuments } from "@/models/documents"
-import { filterPoMismatchRows, searchParamsOf } from "@/lib/approvals/filters"
+import { filterExpenseClaimRows, filterPoMismatchRows, searchParamsOf } from "@/lib/approvals/filters"
+import { listExpenseClaimRows } from "@/models/expense-claims"
 import { requireWorkspaceRole, type WorkspaceRole } from "@/models/workspaces"
 import { createSavedViewAction, deleteSavedViewAction, duplicateSavedViewAction, renameSavedViewAction, saveFiltersToViewAction, shareSavedViewAction } from "@/app/(app)/workspaces/[workspaceId]/(chrome)/saved-views-actions"
 import { ApprovalInvoiceQueue } from "@/components/queue/approval-invoice-queue"
@@ -48,6 +49,9 @@ export async function ApprovalsInvoicesQueuePage({ params, searchParams, selecte
   // Mismatches count goes through the same predicate so the two stay comparable.
   const onlyNotEligible = status === "not_eligible"
   const poMismatchCount = filterPoMismatchRows(poMismatchRows, searchParamsOf(query)).length
+  // #273: the third segment counts submitted claims through the approver scope; hidden when the
+  // Expense approvals module is off.
+  const expenseClaimCount = capabilities.has("expense-approvals") ? filterExpenseClaimRows(await listExpenseClaimRows(workspaceId, actor), searchParamsOf(query)).length : null
 
   // #271: an Approval notice links here with `?doc=<id>&via=notice`. The row opens as if the
   // `[documentId]` route had been hit (a missing row falls through to queueArrival's notice); the
@@ -69,6 +73,7 @@ export async function ApprovalsInvoicesQueuePage({ params, searchParams, selecte
     basePath={basePath}
     rows={allRows}
     poMismatchCount={poMismatchCount}
+    expenseClaimCount={expenseClaimCount}
     workspaceDocumentCount={workspaceDocumentCount}
     initialSelectedId={initialSelectedId}
     views={<SavedViewPicker views={savedViews} selectedViewId={selectedViewId ?? null} currentFilters={currentViewFilters}

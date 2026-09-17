@@ -52,13 +52,15 @@ function variancePercent(row: PoMismatchRow): number {
  * Override Mode already uses from the Checks tab — decision #3 asks for the primitive, not a
  * second mechanism); Reject ends the invoice's Approval, same action as the Invoices queue's own
  * Reject. */
-export function PoMismatchQueue({ workspaceId, basePath, rows, invoiceCount, initialSelectedId, workspaceDocumentCount, arrival }: {
+export function PoMismatchQueue({ workspaceId, basePath, rows, invoiceCount, expenseClaimCount = null, initialSelectedId, workspaceDocumentCount, arrival }: {
   workspaceId: string
   basePath: string
   /** Every row the actor may see — facets apply client-side (`filterPoMismatchRows`). */
   rows: PoMismatchRow[]
   /** Invoice approvals through the same facets, for the segment count. */
   invoiceCount: number
+  /** #273: submitted expense claims through the approver scope; `null` hides the segment (module off). */
+  expenseClaimCount?: number | null
   initialSelectedId?: string | null
   /** #264 spec §2: passed through to `QueueScreen` (the state function needs it for every queue). */
   workspaceDocumentCount: number
@@ -138,8 +140,9 @@ export function PoMismatchQueue({ workspaceId, basePath, rows, invoiceCount, ini
       sortOptions={SORTS}
       facets={PO_MISMATCH_FACETS}
       band={<div className="px-4 pt-3"><QueueSegments segments={[
-        { key: "invoices", label: "Invoice approvals", count: invoiceCount, href: basePath.replace(/\/po-mismatches$/, "/invoices") },
+        { key: "invoices", label: "Invoice approvals", shortLabel: "Invoices", count: invoiceCount, href: basePath.replace(/\/po-mismatches$/, "/invoices") },
         { key: "po-mismatches", label: "PO mismatches", count: ownCount, href: basePath },
+        ...(expenseClaimCount === null ? [] : [{ key: "expense-claims", label: "Expense claims", shortLabel: "Claims", count: expenseClaimCount, href: basePath.replace(/\/po-mismatches$/, "/expense-claims") }]),
       ]} active="po-mismatches" /></div>}
       // #261: the shared `QueueCard` fed by the columns' phone slots; #257's comma-separated name.
       cards={{ below: "lg", title: "Ready to Approve", label: (row) => [
