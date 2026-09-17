@@ -42,8 +42,9 @@ properly, not skimmed:
 5. **Write the build plan onto the hand-off** as the last act of this phase:
    ordered `step: N — ‹name› — todo` lines, one per surface/state group,
    each naming the spec lines it comes from, the files it touches and its
-   check; the build gate as the last step. The build sessions run one step
-   each from this plan.
+   check; the three gate steps last (`G1 — round script`, `G2 — r0 and
+   fixes`, `G3 — build-done`, as `phases/build.md` defines them). The build
+   sessions run one step each from this plan.
 
 **Score the new UI, not the old one.** The incumbent may be critiqued as
 *evidence* for the spec (what the old surface got wrong), never as a number

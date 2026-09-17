@@ -18,17 +18,31 @@ contracts it touches are checked the grep-able way the pre-flight names
 (reachability grep, string extraction, primitive diff, focus probe) and what
 they show is fixed in place.
 
-**The build gate is the last step.** Seed and servers up in one call; write
-the ticket's round script on `scripts/wayfinder-autopilot/capture-round.mjs`
-(every state at **both 1440 and 390**, detector JSON, keyboard probes for
-every Part B focus/keyboard contract — a B line is ticked only by a probe
-that exercised it, never from the spec text) and run it once as `shots-r0`;
-fix every real detector finding and every failing probe in place (pure
-execution, no readers); write the r0 counts per width to the hand-off. The
-measure session reuses that round script. Run `tsc --noEmit` once, stop the
-servers, write `milestone: build-done`, commit (`wip(autopilot): #<ticket>
-build`), stop. No critique, no evaluate, no include readers — those are the
-next session's.
+**The build gate is the last three steps, not one.** On #285 and #286 the
+gate as a single step ran 66 minutes and crossed the hand-off line; as
+three it fits. The plan ends with:
+
+- `step: G1 — round script` — seed and servers up in one call; write the
+  ticket's round script on `scripts/wayfinder-autopilot/capture-round.mjs`:
+  every state at **both 1440 and 390**, detector JSON, and a keyboard probe
+  for every Part B focus/keyboard contract (a B line is ticked only by a
+  probe that exercised it, never from the spec text). Run it once to prove
+  it executes end to end; do not start fixing what it shows. Stop the
+  servers; `done`; commit.
+- `step: G2 — r0 and fixes` — servers up; run the round as `shots-r0`; fix
+  every real detector finding and every failing probe in place (pure
+  execution, no readers); re-run only the states you touched; write the r0
+  counts per width to the hand-off. If the fixes outgrow the session, hand
+  off with the list of what is fixed and what is left — this is the one gate
+  step that may take two sessions. Stop the servers; `done`; commit.
+- `step: G3 — build-done` — `tsc --noEmit` once, full project, servers
+  stopped; the Part B contract checks over the whole surface (reachability
+  grep, string extraction, primitive diff); write `milestone: build-done`,
+  commit (`wip(autopilot): #<ticket> build`), stop.
+
+The measure session reuses the round script from G1. No critique, no
+evaluate, no include readers in any gate step — those are the next
+session's.
 
 **The area primer is the map of this surface family.** Read it before the
 codebase; if this step changes what it says (a new primitive, a route, a
