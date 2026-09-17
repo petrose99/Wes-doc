@@ -24,7 +24,7 @@ export async function UsersScreen({ params, selectedId }: { params: Promise<{ wo
   // is present but hidden by the current filters is the shell's own case (it clears them).
   const selectedPresent = selectedId ? data.rows.some((row) => row.key === selectedId) : false
   const initialMissing = selectedId && !selectedPresent
-    ? { text: "That person isn't in a company you're a member of." }
+    ? { text: "That person isn't in a company you belong to." }
     : undefined
   return <UsersQueue workspaceId={workspaceId} data={data}
     initialSelectedId={selectedPresent ? selectedId : null} initialMissing={initialMissing} />

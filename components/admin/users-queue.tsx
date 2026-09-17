@@ -123,7 +123,7 @@ export function UsersQueue({ workspaceId, data, initialSelectedId = null, initia
     : mode === "org"
     ? <p className="max-w-[70ch] px-4 py-1.5 text-xs text-slate-500">
         Across {new Set(rows.flatMap((row) => row.companies.map((company) => company.workspaceId))).size} companies in {organizationName}.
-        {hiddenCompanyCount > 0 && ` ${hiddenCompanyCount} more ${hiddenCompanyCount === 1 ? "company" : "companies"} in ${organizationName} aren't shown — you're not a member of ${hiddenCompanyCount === 1 ? "it" : "them"}.`}
+        {hiddenCompanyCount > 0 && ` ${hiddenCompanyCount} more ${hiddenCompanyCount === 1 ? "company" : "companies"} in ${organizationName} aren't shown — you don't belong to ${hiddenCompanyCount === 1 ? "it" : "them"}.`}
       </p>
     : mode === "team"
       ? <p className="max-w-[70ch] px-4 py-1.5 text-xs text-slate-500">
