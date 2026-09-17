@@ -17,3 +17,8 @@
 === [4/50] #285 — Build Companies (Admin, Queue-screen shell)  [opus[1m] · low · phase: build]
     #285 context at exit: 53761 tokens, 6 min
     cleaned up session pid 2517250 (pgid ?); free: 6255 MB
+    scoreboard: 126 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #285: phase build done → measure next in 364s
+=== [5/50] #285 — Build Companies (Admin, Queue-screen shell)  [haiku · low · phase: measure]
+    #285 context at exit: 98490 tokens, 10 min
+    cleaned up session pid 2524948 (pgid ?); free: 6288 MB
