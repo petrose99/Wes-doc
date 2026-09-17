@@ -1,0 +1,12 @@
+=== [1/50] #286 — Build Users (Admin, org-level Queue-screen shell)  [sonnet · low · phase: build]
+    #286 crossed the hand-off line (151439 tokens ≥ 150000) — asked to hand off; hard stop at 180000
+    #286 context at exit: 158574 tokens, 19 min
+    cleaned up session pid 2763586 (pgid ?); free: 6308 MB
+    scoreboard: 15 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #286: continued (progressed), session 1/3 without progress allowed, hand-off 175 lines (limit 120) in 1146s
+=== [2/50] #286 — Build Users (Admin, org-level Queue-screen shell)  [opus[1m] · low · phase: build]
+    #286 context at exit: 82475 tokens, 4 min
+    cleaned up session pid 2789548 (pgid ?); free: 6303 MB
+    scoreboard: 16 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #286: phase build done → measure next in 273s
+=== [3/50] #286 — Build Users (Admin, org-level Queue-screen shell)  [haiku · low · phase: measure]
