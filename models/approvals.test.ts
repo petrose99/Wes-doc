@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 vi.mock("@/lib/db", () => ({ prisma: {} }))
 
-const { listApprovalInvoiceRows, listPoMismatchRows, countReadyToApprove } = await import("@/models/approvals")
+const { listApprovalInvoiceRows, listPoMismatchRows, countReadyToApprove, countInvoiceApprovalsReadyToApprove, countPoMismatchesReadyToApprove } = await import("@/models/approvals")
 const { prisma } = await import("@/lib/db")
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -139,5 +139,32 @@ describe("countReadyToApprove", () => {
   it("never counts a not-eligible row", async () => {
     db.documentCheckResult.findMany.mockResolvedValue([{ documentId: "doc-1" }])
     expect(await countReadyToApprove("w1", OWNER)).toBe(0)
+  })
+})
+
+describe("#287 disjoint rollup counts", () => {
+  it("a ready task with no mismatch counts as an invoice approval, not a PO mismatch", async () => {
+    expect(await countInvoiceApprovalsReadyToApprove("w1", OWNER)).toBe(1)
+    expect(await countPoMismatchesReadyToApprove("w1", OWNER)).toBe(0)
+  })
+
+  it("a ready task with an open match-variance gate counts as a PO mismatch, not an invoice approval", async () => {
+    db.gate.findMany.mockResolvedValue([{
+      id: "g1", documentId: "doc-1", gateType: "match-variance", severity: "soft", firedAt: new Date(),
+      payload: { matchType: "2-way", variance: 600, threshold: 500, anchorTotal: 950, invoiceTotal: 1000 },
+    }])
+    expect(await countInvoiceApprovalsReadyToApprove("w1", OWNER)).toBe(0)
+    expect(await countPoMismatchesReadyToApprove("w1", OWNER)).toBe(1)
+  })
+
+  it("the two halves sum to countReadyToApprove (invariant, no expense claims)", async () => {
+    db.gate.findMany.mockResolvedValue([{
+      id: "g1", documentId: "doc-1", gateType: "match-variance", severity: "soft", firedAt: new Date(),
+      payload: { matchType: "2-way", variance: 600, threshold: 500, anchorTotal: 950, invoiceTotal: 1000 },
+    }])
+    const invoice = await countInvoiceApprovalsReadyToApprove("w1", OWNER)
+    const mismatch = await countPoMismatchesReadyToApprove("w1", OWNER)
+    const total = await countReadyToApprove("w1", OWNER)
+    expect(invoice + mismatch).toBe(total)
   })
 })
