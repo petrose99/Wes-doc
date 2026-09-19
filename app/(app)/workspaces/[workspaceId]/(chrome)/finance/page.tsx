@@ -39,7 +39,7 @@ export default async function FinancePage({ params, searchParams }: { params: Pr
     <header className="flex items-start justify-between gap-4">
       <div>
         <h1 className="text-2xl font-bold text-slate-900">Finance</h1>
-        <p className="mt-1 text-sm text-slate-500">Your workspace&apos;s ledger and integrations — coded accounts and vendors, ready for documents to push into. More integrations coming.</p>
+        <p className="mt-1 max-w-xl text-sm text-slate-500">Your workspace&apos;s ledger and integrations — coded accounts and vendors, ready for documents to push into. More integrations coming.</p>
         {membership.role !== "owner" && <p className="mt-2 text-xs text-slate-400">Only workspace owners can manage this connection.</p>}
       </div>
       {connection?.status === "active" && connection.externalTenantId && (

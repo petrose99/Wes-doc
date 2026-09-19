@@ -129,7 +129,7 @@ function ConnectionCard({ workspaceId, isOwner, connection, job, lastSyncedAt, e
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold text-slate-800">{connection?.tenantName || "Your organization"}</p>
-            <p className={`mt-0.5 text-xs font-medium ${isActive ? "text-emerald-600" : needsRepair ? "text-red-700" : "text-slate-600"}`}>
+            <p className={`mt-0.5 text-xs font-medium ${isActive ? "text-emerald-700" : needsRepair ? "text-red-700" : "text-slate-600"}`}>
               {STATUS_LABEL[status] ?? status}
             </p>
             {job?.errorCode && !isActive && <p className="mt-0.5 text-xs text-slate-600">Last error: {job.errorCode.replaceAll("_", " ")}</p>}
