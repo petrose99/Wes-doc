@@ -21,12 +21,12 @@ function validateBank(draft: BankDraft): Partial<Record<keyof BankDraft, string>
   return errors
 }
 
-function BankField({ id, label, value, error, disabled, inputMode, onChange }: {
-  id: string; label: string; value: string; error?: string; disabled: boolean; inputMode?: "numeric"; onChange: (value: string) => void
+function BankField({ id, label, value, error, disabled, inputMode, autoFocus, onChange }: {
+  id: string; label: string; value: string; error?: string; disabled: boolean; inputMode?: "numeric"; autoFocus?: boolean; onChange: (value: string) => void
 }) {
   return <div className="flex flex-col gap-1">
     <label htmlFor={id} className="text-[13px] text-slate-600">{label}</label>
-    <input id={id} value={value} disabled={disabled} inputMode={inputMode} autoComplete="off" aria-invalid={error ? true : undefined} aria-describedby={error ? `${id}-error` : undefined}
+    <input id={id} value={value} disabled={disabled} inputMode={inputMode} autoComplete="off" autoFocus={autoFocus} aria-invalid={error ? true : undefined} aria-describedby={error ? `${id}-error` : undefined}
       onChange={(event) => onChange(event.target.value)}
       className="h-9 w-full max-w-[20rem] rounded-md border border-slate-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 disabled:opacity-50" />
     {error && <p id={`${id}-error`} role="alert" className="text-[13px] text-red-700">{error}</p>}
@@ -52,10 +52,18 @@ export function BankDetailsPanel({ workspaceId, userId, bank }: { workspaceId: s
 
   const submit = async (details: BankDraft | null) => {
     setSaving(true); setSaveError(null)
-    const result = await saveMemberBankDetailsAction(workspaceId, {
-      userId, workspaceId,
-      details: details ? { bankName: details.bankName.trim(), accountNumber: details.accountNumber.replace(/\s+/g, ""), branchCode: details.branchCode.trim() } : null,
-    })
+    let result: Awaited<ReturnType<typeof saveMemberBankDetailsAction>>
+    try {
+      result = await saveMemberBankDetailsAction(workspaceId, {
+        userId, workspaceId,
+        details: details ? { bankName: details.bankName.trim(), accountNumber: details.accountNumber.replace(/\s+/g, ""), branchCode: details.branchCode.trim() } : null,
+      })
+    } catch {
+      // network failure (offline, aborted request) — the action never returned, not a validation result
+      setSaving(false)
+      setSaveError("Couldn't save. Your entries are still here — try again.")
+      return false
+    }
     setSaving(false)
     if (!result.success) {
       const code = result.error ?? "bank_failed"
@@ -71,7 +79,7 @@ export function BankDetailsPanel({ workspaceId, userId, bank }: { workspaceId: s
 
   if (draft) {
     return <div className="space-y-3">
-      <BankField id="bank-name" label="Bank name" value={draft.bankName} error={errors.bankName} disabled={saving} onChange={(v) => setDraft({ ...draft, bankName: v })} />
+      <BankField id="bank-name" label="Bank name" value={draft.bankName} error={errors.bankName} disabled={saving} autoFocus onChange={(v) => setDraft({ ...draft, bankName: v })} />
       <BankField id="bank-account" label="Account number" value={draft.accountNumber} error={errors.accountNumber} disabled={saving} inputMode="numeric" onChange={(v) => setDraft({ ...draft, accountNumber: v })} />
       <BankField id="bank-branch" label="Branch code" value={draft.branchCode} error={errors.branchCode} disabled={saving} onChange={(v) => setDraft({ ...draft, branchCode: v })} />
       <Consequence>Used only in payment files for your claims. Shown as bank and last four digits everywhere else.</Consequence>
