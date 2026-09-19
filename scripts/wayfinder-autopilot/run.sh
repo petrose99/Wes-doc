@@ -53,6 +53,10 @@ while [ $# -gt 0 ]; do
 done
 
 OUT="$ROOT/docs/wayfinder-reports/$MAP"; LOGS="$OUT/logs"; mkdir -p "$LOGS"
+# What was untracked before this run is the owner's, not a session's: WIP
+# commits (wip-add.sh, also used by stop.sh) never sweep it in.
+PRE_UNTRACKED="$LOGS/pre-untracked.txt"
+( cd "$ROOT" && git ls-files --others --exclude-standard --directory ) > "$PRE_UNTRACKED"
 RUNLOG="$OUT/run-log.md"
 [ -f "$RUNLOG" ] || printf '# Autopilot run log — map #%s\n\n| When (SAST) | Ticket | Outcome | Duration | Log |\n|---|---|---|---|---|\n' "$MAP" > "$RUNLOG"
 ME="$(gh api user --jq .login)"
@@ -146,7 +150,7 @@ EFFORT="${WAYFINDER_EFFORT:-${EFFORT:-}}"
 # only *consecutive sessions that made no progress* (no new commit, no
 # hand-off change); a session that moved the work resets the count.
 wip_handoff() {   # $1 ticket, $2 reason
-  ( cd "$ROOT" && git add -A -- . ':!.scratch' ':!.impeccable/live' ":!docs/wayfinder-reports/$MAP/logs" && git commit -q -m "wip(autopilot): #$1 $2; continued in the next session" ) 2>/dev/null || true
+  ( cd "$ROOT" && "$AP/wip-add.sh" "$PRE_UNTRACKED" && git commit -q -m "wip(autopilot): #$1 $2; continued in the next session" ) || echo "    (WIP commit for #$1 did not happen — see above)"
   gh issue comment "$1" --repo "$REPO" --body "Autopilot: continue — $2. Work so far is committed as WIP on the branch. Next session: read \`docs/wayfinder-reports/$MAP/$1.handoff.md\` and the last commits, continue from the milestone it names, do the build in this session (no background build agent — a session that ends its turn waiting on one exits and takes it down), keep the hand-off file current, and close at the bar. If the previous session left a question for the owner, answer it under the standing delegation and continue. Do not narrow the ticket to fit a session: the whole scope ships, over as many sessions as it takes." >/dev/null 2>&1 || true
 }
 progress_mark() {   # a fingerprint of "did this session move the work": HEAD + hand-off file
@@ -524,7 +528,7 @@ PY
   elif [ -n "$PHASE" ] && [ "$(phase_of "$T")" != "$PHASE" ]; then
     # The phase's exit milestone is on the hand-off: same ticket, next phase,
     # fresh context. Keep the claim; commit anything the session left.
-    ( cd "$ROOT" && git add -A -- . ':!.scratch' ':!.impeccable/live' ":!docs/wayfinder-reports/$MAP/logs" && git commit -q -m "wip(autopilot): #$T $PHASE phase done" ) 2>/dev/null || true
+    ( cd "$ROOT" && "$AP/wip-add.sh" "$PRE_UNTRACKED" && git commit -q -m "wip(autopilot): #$T $PHASE phase done" ) || true
     ATTEMPTS[$T]=0; NEXT_T="$T"
     echo "$(phase_of "$T")" > "$OUT/$T.phase"
     OUTCOME="phase $PHASE done → $(phase_of "$T") next"
