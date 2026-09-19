@@ -286,7 +286,19 @@ while [ "$n" -lt "$MAX" ]; do
   TT="$(title "$T")"
   PHASE="$(phase_of "$T")"
   MODEL="$(model_for "$T" $(( ${ATTEMPTS[$T]:-0} + 1 )) "$PHASE")"
+  # Per-phase effort (config: EFFORT_SPEC / EFFORT_BUILD / EFFORT_MEASURE /
+  # EFFORT_CLOSE / EFFORT_SINGLE), falling back to EFFORT. Output tokens are
+  # under 1% of a session's bill (map #226: 0–5K output against 4–19M in),
+  # so thinking is cheap where it saves turns — the judgement phases — and
+  # pointless where the work is plumbing.
   SESSION_EFFORT="$EFFORT"; HARD=""
+  case "${PHASE:-single}" in
+    spec)    SESSION_EFFORT="${EFFORT_SPEC:-$EFFORT}" ;;
+    build)   SESSION_EFFORT="${EFFORT_BUILD:-$EFFORT}" ;;
+    measure) SESSION_EFFORT="${EFFORT_MEASURE:-$EFFORT}" ;;
+    close)   SESSION_EFFORT="${EFFORT_CLOSE:-$EFFORT}" ;;
+    *)       SESSION_EFFORT="${EFFORT_SINGLE:-$EFFORT}" ;;
+  esac
   if hard_ticket "$T"; then SESSION_EFFORT="$EFFORT_HARD"; HARD=" · hard ($(sessions_on "$T") sessions on this phase)"; fi
   echo "=== [$n/$MAX] #$T — $TT  [${MODEL:-default model}${SESSION_EFFORT:+ · $SESSION_EFFORT}${PHASE:+ · phase: $PHASE}$HARD]"
   if [ "$DRY" = 1 ]; then SKIP[$T]=1; continue; fi
@@ -393,7 +405,8 @@ while [ "$n" -lt "$MAX" ]; do
   fi
   while :; do
   ( cd "$ROOT" && NODE_OPTIONS="${WAYFINDER_NODE_OPTIONS:---max-old-space-size=3072}" \
-    WAYFINDER_CTX_FILE="$CTXF" WAYFINDER_HANDOFF_FILE="$OUT/$T.handoff.md" WAYFINDER_TICKET="$T" WAYFINDER_MAP="$MAP" \
+    WAYFINDER_CTX_FILE="$CTXF" WAYFINDER_HANDOFF_FILE="$OUT/$T.handoff.md" WAYFINDER_TICKET="$T" WAYFINDER_MAP="$MAP" WAYFINDER_PHASE="${PHASE:-single}" \
+    WAYFINDER_READ_MAX_LINES="${WAYFINDER_READ_MAX_LINES:-${READ_MAX_LINES:-220}}" WAYFINDER_READ_PNG_MAX="${WAYFINDER_READ_PNG_MAX:-${READ_PNG_MAX:-10}}" \
     WAYFINDER_HANDOFF_ALLOWANCE_K="$(( ${WAYFINDER_HANDOFF_ALLOWANCE:-30000} / 1000 ))" \
     setsid "${SCOPE[@]}" claude -p "$SESSION_PROMPT_CUR" \
       --append-system-prompt-file "$RUN_BRIEF" \

@@ -14,6 +14,19 @@ MODEL_UNBLOCK="opus"        # the push model: one step in a stalled session, the
 UNBLOCK_MAX=2               # pushes per session
 SESSION_NUDGES=1            # same-model "continue with a tool call" before a push
 EFFORT="low"                # every autopilot session, whichever model; independent of ~/.claude/settings.json
+# Per phase (override EFFORT). Output is <1% of the bill (map #226: 0–5K out
+# vs 4–19M in per session); the judgement phases get medium so they spend
+# thinking instead of turns — the 173- and 190-turn close sessions on #286
+# were flailing at low. Build and measure are execution from tables: low.
+EFFORT_SPEC="medium"
+EFFORT_CLOSE="medium"
+EFFORT_BUILD="low"
+EFFORT_MEASURE="low"
+EFFORT_SINGLE="medium"
+# Token guard (hooks/token-guard.sh): Read without a range refused past this
+# many lines; images refused past this many per session.
+READ_MAX_LINES=220
+READ_PNG_MAX=10
 # Hard phases: after HARD_AFTER no-progress sessions on one phase, every
 # further session on that phase runs on MODEL_HARD at EFFORT_HARD until the
 # phase completes.

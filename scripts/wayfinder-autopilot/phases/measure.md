@@ -29,16 +29,19 @@ steps below in order; every step is one or two tool calls.
 5. **The three readers**, each a fresh foreground `Agent` with
    `model: "sonnet"`: `critique`, `evaluate`, `include`. Give each the
    contact sheet path, the detector JSON path, `keyboard.json`, the spec
-   path, and the rubric it scores against; ask each for its full output
-   (every heuristic with score and evidence; every finding with severity,
-   state, and location; the include verdict per width). Launch all three in
-   one turn.
-6. **Record, do not triage.** Write to the hand-off, verbatim from the
-   readers: the `scores:` line, every heuristic's score, health, every
-   P0–P3 finding as the reader stated it, the include verdict per width,
-   and the detector counts per width per state (r0 vs r1). Append the
-   complete finding lists under a `## Raw findings (untriaged)` heading —
-   nothing dropped, nothing labelled real or residue. Then the line
+   path, and the rubric it scores against. Each reader **writes its full
+   output to `<scratch>/readers-r1/<critique|evaluate|include>.md`** (every
+   heuristic with score and evidence; every finding with severity, state,
+   and location; the include verdict per width — nothing dropped) and
+   **returns only** the score line, the health/verdict, and the P0/P1
+   list, under 15 lines. Launch all three in one turn. Do not read the
+   files back; the close session reads them.
+6. **Record, do not triage.** Write to the hand-off: the `scores:` line,
+   each reader's headline (critique total and lowest heuristics; evaluate
+   health, P0/P1 count, anti-pattern verdict; include verdict per width),
+   the detector counts per width per state (r0 vs r1), and under
+   `## Raw findings (untriaged)` the three file paths — the lists
+   themselves stay in the files, unlabelled. Then the line
    `milestone: measured`.
 7. **Stop the servers**, commit (`wip(autopilot): #<ticket> measured`), stop.
 

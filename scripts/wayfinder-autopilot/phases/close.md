@@ -1,8 +1,11 @@
 ## Phase brief: CLOSE
 
-Read the hand-off: the raw scores and the untriaged finding lists are on it
-(the measure session records, it does not judge), the round script exists —
-do not re-measure first.
+Read the hand-off: the raw scores are on it and the untriaged finding lists
+are in the files it points to under `## Raw findings (untriaged)`
+(`<scratch>/readers-r1/*.md` — the measure session records, it does not
+judge); the round script exists — do not re-measure first. Read each
+reader file by range (`grep -n '^## \|P0\|P1'` first): the P0/P1 and
+sub-3 sections whole, the rest only as the triage needs them.
 
 **The close state lives in one file, not in your context.** Keep
 `<scratch>/close.md` (create it on the first close session): the triaged
@@ -12,8 +15,8 @@ carries one pointer to it and the `milestone:` lines, nothing else from
 this phase — a fresh close session reads `close.md` and continues; it never
 re-derives what an earlier one tried.
 
-**Triage first, in one pass.** Go through `## Raw findings (untriaged)` and
-the detector counts and label each finding: *real* (fix it in the batch),
+**Triage first, in one pass.** Go through the reader files and the
+detector counts and label each finding: *real* (fix it in the batch),
 *residue* (in the area primer's residue set — say which entry), *tooling*
 (dev-server overlay such as `nextjs-portal` in the tab order, a
 probe-labelling gap, a capture timing artifact — say what and how you
@@ -50,7 +53,8 @@ what a fix batch changes can be checked without them. The loop is:
    Wayfinder ticket, not into a fourth batch.
 4. **Confirm**: on the round that passed the gate (or the third), the
    contact sheet and the three readers as fresh `sonnet` agents, exactly as
-   in measure. This is the only reader run in the phase. Its scores are the
+   in measure — full output to `<scratch>/readers-c<n>/*.md`, headline
+   back. This is the only reader run in the phase. Its scores are the
    close scores.
 5. **Close at the bar.** Confirm under the bar with no P1s: close and record
    the gap. A P1 still open: update `close.md` and the hand-off, leave the

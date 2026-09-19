@@ -125,14 +125,18 @@ critic) and you are within 20K of it, hand off before the step.
 Every turn re-reads the whole context; a session at 150K pays 150K per tool
 call. Map #226's data: a build session that read everything first spent
 147K before its first edit; one that read by range built a whole step with
-tests in 45K.
+tests in 45K. A hook enforces the read rules below (a denied call comes
+back with the reason; do what it says, do not retry the same call).
 
 - **Every turn calls a tool.** A text-only turn re-reads the context for
   nothing. Do not announce what you are about to do — do it. Put independent
   tool calls in the same turn. The only text-only turn is the last one.
-- **Read ranges, never whole files.** `grep -n` first, then `sed -n a,bp` of
-  the lines you need. The area primer in `docs/agents/areas/` says what a
-  surface family is made of — read it instead of the codebase file by file.
+- **Read ranges, never whole files.** `grep -n` first, then `Read` with
+  offset+limit (or `sed -n a,bp`) of the lines you need; files over ~220
+  lines cannot be read whole. A persisted "output too large" file is
+  grepped or tailed, never read back whole. The area primer in
+  `docs/agents/areas/` says what a surface family is made of — read it
+  instead of the codebase file by file.
 - **One script per step, not one command per fact.** Put a multi-step check
   in a `.mjs`/`.py` file and run it once; read the summary.
 - **Recon through `Explore`.** A foreground `Explore` agent returns the
@@ -140,7 +144,8 @@ tests in 45K.
 - **Skills by name on a continuation.** The spec session ran the `intent`
   and `impeccable` routers; later sessions load the specific skills the plan
   names (`specify`, `fortify`, `articulate`, `include`; the Impeccable
-  sub-command) and read `craft-floor.md`, not the routers again. The same
+  sub-command) and read `craft-floor.md`, not the routers again — the hook
+  refuses `intent` and `impeccable shape` once a hand-off exists. The same
   holds for the Headcount department skills (`product:*`, `marketing:*`):
   the spec session picks them; later sessions load only the one the Action
   Summary or hand-off names.
@@ -151,7 +156,14 @@ tests in 45K.
 - **Images only where something is flagged.** A screenshot is ~1–1.5K tokens
   and stays in context for every later turn. Read the gate's summary and
   detector JSON first; open a PNG only for a flagged state, at most eight
-  per round; one contact sheet per round, never the PNG set.
+  per round (the hook stops the session at ten); one contact sheet per
+  round, never the PNG set. Readers (`Agent`) look at images in their own
+  context, not yours.
+- **Agents return pointers, not transcripts.** Any `Agent` you launch
+  writes its full output to a file in the scratch folder and returns the
+  path plus a summary under ~15 lines (scores, counts, the P0/P1 list).
+  A reader's full finding list pasted into your context is paid for on
+  every later turn; a file is read by range when it is needed.
 - **Hand off at a milestone when context is high, deliberately.** With the
   hand-off current, a fresh session resumes at a sixth of the cost of
   continuing at 150K+.
@@ -161,39 +173,10 @@ tests in 45K.
 Before ending, write the report at the path the system prompt gives (create
 the folder if needed) and include it in your commit if you made one; if the
 session made no code change, commit the report alone
-(`docs(wayfinder): autopilot report for #<ticket>`). Format:
-
-```markdown
-# Autopilot report — #<ticket> <ticket title>
-
-- Map: #<map> <map title>
-- Type: <wayfinder label> · Started: <local time> · Finished: <local time>
-- Outcome: resolved | blocked | partial
-
-## What I did
-<ordered list of the steps taken, with links to comments/commits/tickets>
-
-## Questions I answered on the owner's behalf
-| # | Question | Answer taken | Why (rule/evidence) |
-
-## Decisions recorded
-<gist of the resolution comment>
-
-## Tickets created / changed
-<new tickets with names, blocking edges, fog graduated or added>
-
-## Scores and counts (rendered surfaces only)
-scores: predicted-critique=<n> first-critique=<n> close-critique=<n> first-evaluate=<n> close-evaluate=<n>
-<that line exactly, machine-read by scoreboard.py; then: gate counts first-pass/close at 1440 and 390 per state · include check · which pre-build step was weak if the first pass fell short>
-
-## First-pass findings → lessons (rendered surfaces only)
-| Finding (heuristic, severity) | Lesson / contract that should have caught it | Status: none · unchecked · wrong · new class | Action taken |
-
-## Needs the owner
-<anything deferred: removals, credentials, decisions you were unsure about>
-```
-
-Keep the report factual: what happened, not what should have happened.
+(`docs(wayfinder): autopilot report for #<ticket>`). The format is in
+`scripts/wayfinder-autopilot/report.md` — read it once, at the end, not
+before. Keep the report factual: what happened, not what should have
+happened.
 
 ## Leave the machine clean
 
