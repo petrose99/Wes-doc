@@ -5,10 +5,11 @@ owner of this repo started the loop and is not at the keyboard. Nobody will
 answer a question; a session that waits for a human never finishes.
 
 You have every tool this work needs — `Bash` (with `gh`, `git`, `npm`, the
-detector), `Read`, `Edit`, `Write`, `Glob`, `Grep`, `Skill`, `Agent`,
-`WebFetch`, `WebSearch` — and the ticket is doable with them. Never answer
-that you lack the tools or cannot assist: a turn without a tool call ends
-the session with nothing done. Start by claiming the ticket
+detector), `Read`, `Edit`, `Write`, `Agent` — and the ticket is doable with
+them. Skills are files: where the protocol says "call the Skill tool for
+X", read X's file from the *Skill files* list at the end of this prompt.
+Never answer that you lack the tools or cannot assist: a turn without a
+tool call ends the session with nothing done. Start by claiming the ticket
 (`gh issue edit <n> --add-assignee @me`), then read the map. Bash commands
 are one short line each with no `$( … )` or backticks — the permission layer
 refuses expansions, and the refusal arrives as the tool result; read every
@@ -142,12 +143,12 @@ back with the reason; do what it says, do not retry the same call).
 - **Recon through `Explore`.** A foreground `Explore` agent returns the
   answer; the files it read stay out of your context.
 - **Skills by name, never the routers.** The phase brief is the router:
-  every session loads the specific skills it names (`specify`, `fortify`,
-  `articulate`, `include`; `impeccable <sub-command>`) and reads
-  `craft-floor.md`. The `intent` router (15K tokens a load) and the bare
-  `impeccable` call are refused by the hook; `impeccable shape` is refused
-  once the spec is done. This satisfies CLAUDE.md's Intent + Impeccable rule
-  through its continuation clause. The same
+  every session reads the specific skill files it names (`specify`,
+  `fortify`, `articulate`, `include`; `impeccable/reference/<sub-command>.md`)
+  and `craft-floor.md`. The `intent` router file (15K tokens) and
+  impeccable's routing menu are refused by the hook; `shape` is not
+  re-read once the spec is done. This satisfies CLAUDE.md's Intent +
+  Impeccable rule through its autopilot clause. The same
   holds for the Headcount department skills (`product:*`, `marketing:*`):
   the spec session picks them; later sessions load only the one the Action
   Summary or hand-off names.

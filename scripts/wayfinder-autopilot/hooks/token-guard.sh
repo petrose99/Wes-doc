@@ -1,5 +1,5 @@
 #!/bin/bash
-# PreToolUse hook (Read, Skill). Silent unless the wayfinder driver set
+# PreToolUse hook (Read, Skill, Bash). Silent unless the wayfinder driver set
 # WAYFINDER_CTX_FILE for this session. Denies the tool calls that map #226's
 # logs showed cost the most for the least — deterministically, so the brief's
 # prose rules do not have to be obeyed to hold:
@@ -10,9 +10,9 @@
 #   3. More than WAYFINDER_READ_PNG_MAX images in one session (a PNG is
 #      ~1.5K tokens that every later turn re-reads; the brief's cap is eight
 #      per round).
-#   4. The `intent` router on a continuation session (43 KB ≈ 11K tokens;
-#      loaded on six consecutive build sessions of #286 after the spec had
-#      already named `specify`). The named skill is called directly.
+#   4. The `intent` router — as a Skill call, a Read, or a Bash cat (15K
+#      tokens on #287: 102K → 117K in one call) — the phase brief is the
+#      router and names the skills. Same for impeccable's routing menu.
 #   5. `impeccable shape` after spec-done — the pre-build sub-command; the
 #      later phases use polish/critique/audit, which stay allowed.
 [ -n "${WAYFINDER_CTX_FILE:-}" ] || exit 0
@@ -26,8 +26,25 @@ cont = bool(hand and os.path.exists(hand))
 def deny(reason):
     print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse",
           "permissionDecision": "deny", "permissionDecisionReason": reason}})); sys.exit(0)
+ROUTER = "AUTOPILOT: the `intent` router is not loaded here — the phase brief is the router (15K tokens per load, paid on every later turn). Read the named skill's file instead (the *Skill files* list in the system prompt): specify, fortify, articulate, include for a spec; evaluate, journey, organize, strategize where the brief names them. Project context comes from CONTEXT.md and the map's Notes."
+MENU = "AUTOPILOT: impeccable's routing menu is not needed — the phase brief names the sub-command; read its reference file directly (reference/shape.md, layout.md, typeset.md, clarify.md at spec; polish.md, critique.md, audit.md, adapt.md at close)."
+def is_router(p): return "skills/intent/SKILL.md" in p or "skills/intent/intent/SKILL.md" in p
+def spec_done():
+    try: return "milestone: spec-done" in open(hand).read()
+    except Exception: return False
+if tool == "Bash":
+    c = inp.get("command", "")
+    if is_router(c): deny(ROUTER)
+    if "impeccable/reference/routing.md" in c: deny(MENU)
+    if cont and "impeccable/reference/shape.md" in c and spec_done():
+        deny("CONTINUATION: `impeccable shape` is the pre-build sub-command and the spec phase already ran it. Read craft-floor.md by range and the sub-command this phase needs (polish, critique, audit, clarify, adapt).")
+    sys.exit(0)
 if tool == "Read":
     p = inp.get("file_path", ""); ranged = "limit" in inp or "offset" in inp
+    if is_router(p): deny(ROUTER)
+    if "impeccable/reference/routing.md" in p: deny(MENU)
+    if cont and "impeccable/reference/shape.md" in p and spec_done():
+        deny("CONTINUATION: `impeccable shape` is the pre-build sub-command and the spec phase already ran it. Read craft-floor.md by range and the sub-command this phase needs (polish, critique, audit, clarify, adapt).")
     if p.lower().endswith((".png", ".jpg", ".jpeg", ".webp")):
         cf = ctx + ".png-count"; n = 0
         try: n = int(open(cf).read().strip() or 0)
@@ -49,17 +66,9 @@ if tool == "Read":
     sys.exit(0)
 if tool == "Skill":
     s = (inp.get("skill") or "").strip(); a = (inp.get("args") or "").strip()
-    # The routers cost 15K (intent, measured on #287's spec session: 102K → 117K
-    # for one call) and ~4K (impeccable) to tell the session which skill to
-    # load next — and the phase brief has already named it. Autopilot sessions
-    # call the named skills directly; CLAUDE.md's continuation clause covers it.
-    if s in ("intent", "intent:intent"):
-        deny("AUTOPILOT: the `intent` router is not called here — the phase brief is the router (15K tokens per load, paid on every later turn). Call the named Intent skill directly: `specify`, `fortify`, `articulate`, `include` for a spec; `evaluate`, `journey`, `organize`, `strategize` where the brief names them. Establish project context from CONTEXT.md and the map's Notes, as the brief says.")
-    if s == "impeccable" and a == "":
-        deny("AUTOPILOT: call `impeccable` with its sub-command as the argument (`shape`, `layout`, `typeset`, `clarify` at spec; `polish`, `critique`, `audit`, `adapt` at close) — the bare router only tells you to pick one, and the phase brief already has.")
-    if cont and s == "impeccable" and a.split()[0].lower() == "shape":
-        try: done = "milestone: spec-done" in open(hand).read()
-        except Exception: done = False
-        if done: deny("CONTINUATION: `impeccable shape` is the pre-build sub-command and the spec phase already ran it. Read `craft-floor.md` by range and call the sub-command this phase needs — `impeccable polish`, `critique`, `audit`, `clarify`, `adapt` — with that name as the argument.")
+    if s in ("intent", "intent:intent"): deny(ROUTER)
+    if s == "impeccable" and a == "": deny(MENU)
+    if cont and s == "impeccable" and a.split()[0].lower() == "shape" and spec_done():
+        deny("CONTINUATION: `impeccable shape` is the pre-build sub-command and the spec phase already ran it. Read `craft-floor.md` by range and call the sub-command this phase needs — `impeccable polish`, `critique`, `audit`, `clarify`, `adapt` — with that name as the argument.")
 sys.exit(0)
 PY

@@ -348,8 +348,31 @@ while [ "$n" -lt "$MAX" ]; do
   # not Claude answers the slash-injected skill with a canned "I don't have
   # the tools" (0/6 engaged on #302, 2026-09-18) but works the same protocol
   # from the system prompt (3/3). Anthropic runs keep the slash form.
-  { if [ "${PROMPT_MODE:-slash}" = system ]; then printf '# Wayfinder protocol (the /wayfinder skill, loaded by the driver)\n\n'; awk 'f{print} /^---$/{c++; if(c==2)f=1}' "$ROOT/.claude/skills/wayfinder/SKILL.md"; printf '\n\nARGUMENTS: %s %s\n\n---\n\n' "$MAP" "$T"; fi
-    cat "$BRIEF"; [ -f "$PHASE_BRIEF" ] && { printf '\n\n'; cat "$PHASE_BRIEF"; }; printf '\n\n## Paths for this run\n\n- Generic lessons (every project): `%s`\n- Project lessons (this repo): `%s`\n- Report: `%s/%s.md`\n- Hand-off file (keep it current at every milestone): `%s/%s.handoff.md`\n- Scratch folder for captures and the filled preflight: `%s/scratch-%s/`\n\n%s\n' "$GENERIC_LESSONS" "$PROJECT_LESSONS" "$OUT" "$T" "$OUT" "$T" "$LOGS" "$T" "$CONT"; } > "$RUN_BRIEF"
+  # PROMPT_MODE=bare (config): core.md *replaces* Claude Code's default
+  # system prompt (--system-prompt-file), the slash-command menu is off and
+  # skills are read as files from the list appended here; the tool set is
+  # SESSION_TOOL_SET. Measured on sonnet: 43.4K → 18.4K before the
+  # autopilot text. Hooks (the token guard, ponytail) still run.
+  skill_file() {   # $1 name (specify | product:product-requirements | grilling …) → path or ""
+    local n="$1" base="${1#*:}" plug="${1%%:*}" f
+    [ "$plug" = "$n" ] && plug=""
+    f="$ROOT/.claude/skills/$base/SKILL.md"; [ -z "$plug" ] && [ -f "$f" ] && { echo "$f"; return; }
+    f="$(ls -t "$HOME/.claude/plugins/cache/"*/"${plug:-*}"/*/skills/"$base"/SKILL.md "$HOME/.claude/plugins/cache/"*/*/*/skills/*/"$base"/SKILL.md 2>/dev/null | head -1)"
+    [ -n "$f" ] && echo "$f"
+  }
+  skill_table() {
+    printf '\n\n## Skill files (read these; there is no Skill tool in this session)\n\n'
+    local s p
+    for s in specify fortify articulate include evaluate journey organize strategize wireframe grilling domain-modeling product:product-requirements product:chief-product-officer marketing:positioning-and-messaging marketing:marketing-copywriting; do
+      p="$(skill_file "$s")"; [ -n "$p" ] && printf -- '- `%s` → `%s`\n' "$s" "$p"
+    done
+    printf -- '- `impeccable` → `%s/.claude/skills/impeccable/SKILL.md` (§Setup, §How to design); sub-commands `shape`, `layout`, `typeset`, `clarify`, `polish`, `critique`, `audit`, `adapt`, … → `%s/.claude/skills/impeccable/reference/<name>.md`; craft floor → `%s/.claude/skills/impeccable/reference/craft-floor.md`\n' "$ROOT" "$ROOT" "$ROOT"
+    printf -- '- Detector: `impeccable detect --json <targets>` (CLI) and the in-page `detect.js` overlay — see the area primer.\n'
+  }
+  { if [ "${PROMPT_MODE:-slash}" = bare ]; then cat "$AP/core.md"; printf '\n\n---\n\n'; fi
+    if [ "${PROMPT_MODE:-slash}" = system ] || [ "${PROMPT_MODE:-slash}" = bare ]; then printf '# Wayfinder protocol (the /wayfinder skill, loaded by the driver)\n\n'; awk 'f{print} /^---$/{c++; if(c==2)f=1}' "$ROOT/.claude/skills/wayfinder/SKILL.md"; printf '\n\nARGUMENTS: %s %s\n\n---\n\n' "$MAP" "$T"; fi
+    cat "$BRIEF"; [ -f "$PHASE_BRIEF" ] && { printf '\n\n'; cat "$PHASE_BRIEF"; }; printf '\n\n## Paths for this run\n\n- Repository: `%s` (branch `%s`)\n- Generic lessons (every project): `%s`\n- Project lessons (this repo): `%s`\n- Report: `%s/%s.md`\n- Hand-off file (keep it current at every milestone): `%s/%s.handoff.md`\n- Scratch folder for captures and the filled preflight: `%s/scratch-%s/`\n- Report template: `%s/report.md` · project rules: `%s/CLAUDE.md`, `%s/CONTEXT.md`\n\n%s\n' "$ROOT" "$(git -C "$ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null)" "$GENERIC_LESSONS" "$PROJECT_LESSONS" "$OUT" "$T" "$OUT" "$T" "$LOGS" "$T" "$AP" "$ROOT" "$ROOT" "$CONT"
+    [ "${PROMPT_MODE:-slash}" = bare ] && skill_table; } > "$RUN_BRIEF"
   # Memory: the whole session (claude + dev server + headless browser + node
   # workers) runs inside one cgroup scope with a hard ceiling, so the kernel
   # reclaims/kills inside the scope instead of the box-wide earlyoom shooting
@@ -368,7 +391,13 @@ while [ "$n" -lt "$MAX" ]; do
   # wired in .claude/settings.json) tells the session to hand off. The hard
   # stop is the soft cap plus the hand-off allowance.
   CTXF="$LOGS/ctx-$T"; echo "0 0" > "$CTXF"; rm -f "$CTXF.signal"
-  if [ "${PROMPT_MODE:-slash}" = system ]; then
+  SYSFLAG="--append-system-prompt-file"; BAREFLAGS=()
+  if [ "${PROMPT_MODE:-slash}" = bare ]; then
+    SESSION_PROMPT="Work Wayfinder map #$MAP, ticket #$T, per the Wayfinder protocol and autopilot brief in your system prompt. Begin by claiming the ticket: run gh issue edit $T --add-assignee @me"
+    SESSION_TOOLS="${SESSION_TOOL_SET:-Bash,Read,Edit,Write,Agent}"
+    [ -z "$PHASE" ] && SESSION_TOOLS="$SESSION_TOOLS,WebFetch,WebSearch"   # research / decision tickets may need the web
+    SYSFLAG="--system-prompt-file"; BAREFLAGS=(--disable-slash-commands)
+  elif [ "${PROMPT_MODE:-slash}" = system ]; then
     SESSION_PROMPT="Work Wayfinder map #$MAP, ticket #$T, per the Wayfinder protocol and autopilot brief in your system prompt. Begin by claiming the ticket: run gh issue edit $T --add-assignee @me"
     SESSION_TOOLS="${SESSION_TOOL_SET:-Task,Bash,Edit,Glob,Grep,Read,Skill,WebFetch,WebSearch,Write}"
   else
@@ -410,7 +439,7 @@ while [ "$n" -lt "$MAX" ]; do
     PONYTAIL_DEFAULT_MODE="${PONYTAIL_MODE:-full}" PONYTAIL_SUBAGENT_MATCHER="${PONYTAIL_SUBAGENT_MATCHER:-^\$}" \
     WAYFINDER_HANDOFF_ALLOWANCE_K="$(( ${WAYFINDER_HANDOFF_ALLOWANCE:-30000} / 1000 ))" \
     setsid "${SCOPE[@]}" claude -p "$SESSION_PROMPT_CUR" \
-      --append-system-prompt-file "$RUN_BRIEF" \
+      "$SYSFLAG" "$RUN_BRIEF" "${BAREFLAGS[@]}" \
       ${RESUME_SID:+--resume "$RESUME_SID"} \
       ${SESSION_TOOLS:+--tools "$SESSION_TOOLS"} \
       ${MODEL_CUR:+--model "$MODEL_CUR"} \

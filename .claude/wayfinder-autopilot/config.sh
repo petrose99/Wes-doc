@@ -36,6 +36,13 @@ EFFORT_HARD="low"
 # Tokens. Cost per session is turns × context, so shorter sessions with a
 # current hand-off are cheaper than long ones: hand-off line at 110K (hard
 # stop 30K above it), hand-off file nagged past 80 lines.
+# Load. PROMPT_MODE=bare replaces Claude Code's default system prompt with
+# core.md and disables the slash-command menu: skills are read as files from
+# the paths the driver lists, the tool set is the five the work uses.
+# Measured first-turn load (sonnet, before the autopilot text): default
+# 43.4K → bare 18.4K; with brief + protocol + phase ≈ 26K instead of 55K.
+PROMPT_MODE=bare
+SESSION_TOOL_SET="Bash,Read,Edit,Write,Agent"          # + WebFetch,WebSearch on single-session (research) tickets
 SESSION_MAX_TOKENS=110000
 # The spec phase's mandatory loads (~60K over the base) do not fit under 110K:
 # #287's first spec session hit the hard stop at 145K in 27 calls, and its

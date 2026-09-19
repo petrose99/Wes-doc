@@ -4,17 +4,17 @@
 code on an execution ticket, the pre-build pass is mandatory and is done
 properly, not skimmed:
 
-1. `specify` (called directly — this brief is the router; the `intent`
-   router costs 15K tokens to name the same four skills, and the hook
-   refuses it) — screen-by-screen spec: behaviour, layout, copy,
+1. `specify` (its file, read directly — this brief is the router; the
+   `intent` router costs 15K tokens to name the same four skills, and the
+   hook refuses it) — screen-by-screen spec: behaviour, layout, copy,
    interaction logic, every state, accessibility. `fortify` — the full state
    inventory (empty, loading, error, partial, offline, first-run, long
    content, zero results). `articulate` — every label, empty state, error
    and confirmation written before it is coded. `include` — focus order,
    names, targets, announcements planned, not retrofitted.
-   **Headcount department skills (installed plugins, `product:*` and
-   `marketing:*`) sit alongside these and shape the content, not just the
-   form.** Load by name, at most two per session, only where they apply:
+   **Headcount department skills (`product:*` and `marketing:*`, files
+   under *Skill files*) sit alongside these and shape the content, not just
+   the form.** Read by name, at most two per session, only where they apply:
    `product:product-requirements` before `specify` on any execution ticket
    (problem and success measure before solution; scope by exclusion); and
    for a marketing-site surface (`app/(marketing)`, `components/marketing`)
@@ -24,8 +24,9 @@ properly, not skimmed:
    skill and an Intent skill disagree on copy or scope, Intent's
    anti-pattern catalog wins; note the conflict in the spec.
 2. `impeccable shape` then `layout`, `typeset`, `clarify` for the surface
-   (each as the argument to `impeccable`; never the bare router); read
-   `.claude/skills/impeccable/reference/craft-floor.md`; read the stored
+   (`.claude/skills/impeccable/SKILL.md` §Setup and §How to design once,
+   then each sub-command's `reference/<name>.md`; never the routing menu);
+   read `.claude/skills/impeccable/reference/craft-floor.md`; read the stored
    critique of the nearest shipped surface (`.impeccable/critique/`) and the
    resolution's Action Summary.
    **Read both lessons files in full, in one Bash call** (paths are in the

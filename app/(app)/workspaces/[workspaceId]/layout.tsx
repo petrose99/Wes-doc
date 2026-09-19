@@ -69,7 +69,14 @@ export default async function WorkspaceLayout({ children, params }: { children: 
     ? await countReadyToApprove(workspaceId, { userId: user.id, role: membership.role as "owner" | "reviewer" | "member" })
     : 0
 
-  const switchable = workspaces.map((workspace) => ({ id: workspace.id, name: workspace.name, kind: workspace.kind, role: workspace.members[0]?.role }))
+  const switchable = workspaces.map((workspace) => ({
+    id: workspace.id,
+    name: workspace.name,
+    kind: workspace.kind,
+    role: workspace.members[0]?.role,
+    organizationId: workspace.organizationId,
+    organizationName: workspace.organization?.name ?? null,
+  }))
 
   return <div className="flex min-h-screen bg-white text-slate-900">
     <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[200] focus:rounded-md focus:bg-slate-900 focus:px-3 focus:py-1.5 focus:text-sm focus:font-medium focus:text-white focus:shadow-lg">Skip to content</a>
