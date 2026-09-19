@@ -48,6 +48,7 @@ export function PaymentBatchDetail({ workspaceId, detail, currentUserId, isOwner
         {batch.earliestDue && <Fact label="Earliest due">{formatPaymentDate(batch.earliestDue)}</Fact>}
       </dl>
       {batch.view === "approved" && <p className="max-w-[48ch] text-xs text-slate-600">The payment file is a bulk-payment CSV ({batch.filename}) for your bank&apos;s portal. Upload it there, then mark the batch paid.</p>}
+      {batch.view === "approved" && isOwner && batch.approvedBy?.id === batch.submittedBy?.id && <p className="max-w-[48ch] text-xs text-slate-600">You submitted this batch. Approving it yourself is recorded on the audit trail; you can still reject it until it is marked paid.</p>}
       {batch.view === "rejected" && batch.rejectedReason && <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900"><span className="font-medium">Reason:</span> {batch.rejectedReason}. The invoices are back on Bill Pay.</p>}
       {batch.comment && <p className="text-xs text-slate-700"><span className="font-medium text-slate-800">Comment:</span> {batch.comment}</p>}
       {fileProblems.length > 0 && batch.view !== "paid" && batch.view !== "rejected" && <div role="alert" className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-800">
@@ -133,6 +134,7 @@ function auditDetail(detail: Record<string, unknown> | null): string {
   const parts: string[] = []
   if (typeof detail.reason === "string") parts.push(`“${detail.reason}”`)
   if (detail.selfApproved === true) parts.push("self-approved")
+  if (detail.fromStatus === "approved") parts.push("from Approved")
   if (typeof detail.paidOn === "string") parts.push(`paid on ${detail.paidOn}`)
   if (Array.isArray(detail.leftOut) && detail.leftOut.length) parts.push(`${detail.leftOut.length} left out`)
   return parts.length ? ` — ${parts.join(", ")}` : ""

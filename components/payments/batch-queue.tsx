@@ -143,6 +143,7 @@ export function PaymentBatchQueue({ workspaceId, basePath, rows: serverRows, fal
         if (batch.view === "approved") {
           return <>
             {!isOwner && <p className="mr-auto text-xs text-slate-600">An owner marks it paid once the bank has taken the file.</p>}
+            {isOwner && <Button type="button" className="lg:h-8 lg:text-xs" variant="outline" disabled={busy} onClick={() => setRejecting(batch)}><XCircle className="h-3.5 w-3.5" aria-hidden />Reject…</Button>}
             {batch.fileProblems > 0
               ? <Button asChild className="lg:h-8 lg:text-xs" variant="outline"><Link className="py-1.5" href={withOrigin(`/workspaces/${workspaceId}/admin/suppliers`, origin)}><Landmark className="h-3.5 w-3.5" aria-hidden />Fix bank details to download</Link></Button>
               : <Button asChild className="lg:h-8 lg:text-xs" variant="outline"><a className="py-1.5" href={`/api/workspaces/${workspaceId}/payment-runs/${batch.id}/download`} download onClick={() => { const onFocus = () => { window.removeEventListener("focus", onFocus); refreshAll() }; window.addEventListener("focus", onFocus); window.setTimeout(refreshAll, 2500) }}><Download className="h-3.5 w-3.5" aria-hidden />{batch.exportedAt ? "Download again" : "Download payment file"}</a></Button>}
@@ -164,7 +165,7 @@ export function PaymentBatchQueue({ workspaceId, basePath, rows: serverRows, fal
       {approving && <dl className="space-y-1 text-sm text-slate-700">
         <div className="flex gap-2"><dt className="w-24 shrink-0 font-medium text-slate-800">Batch</dt><dd>{approving.billCount} bill{approving.billCount === 1 ? "" : "s"} · <span className="font-semibold tabular-nums text-slate-900">{money(approving.total, approving.currencyCode)}</span> · Pay From {approving.payFromLabel}</dd></div>
         <div className="flex gap-2"><dt className="w-24 shrink-0 font-medium text-slate-800">Submitted</dt><dd>{approving.submittedBy?.name ?? "—"} · {formatPaymentDateTime(approving.createdAt)}</dd></div>
-        {approving.submittedBy?.id === currentUserId && <div className="rounded bg-amber-50 px-2 py-1 text-xs text-amber-800">You submitted this batch — approving it yourself is allowed and recorded as such.</div>}
+        {approving.submittedBy?.id === currentUserId && <div className="rounded bg-amber-50 px-2 py-1 text-xs text-amber-800">You submitted this batch. Approving it yourself is recorded on the audit trail; you can still reject it until it is marked paid.</div>}
         {approving.discountExpiresInDays !== null && <div className="rounded bg-purple-50 px-2 py-1 text-xs text-purple-800">A discount in this batch expires {approving.discountExpiresInDays === 0 ? "today" : `in ${approving.discountExpiresInDays} day${approving.discountExpiresInDays === 1 ? "" : "s"}`}; the file pays the discounted amount.</div>}
       </dl>}
     </ConfirmDialog>
@@ -189,7 +190,9 @@ export function PaymentBatchQueue({ workspaceId, basePath, rows: serverRows, fal
         return result
       }}
       title={`Reject ${rejecting?.name ?? "this batch"}`}
-      description="The batch closes and every invoice in it returns to Bill Pay. The reason is recorded on the batch and the audit trail."
+      description={rejecting?.exportedAt
+        ? `The batch closes and every invoice in it returns to Bill Pay. The reason is recorded on the batch and the audit trail. The payment file was downloaded on ${formatPaymentDate(rejecting.exportedAt)} by ${rejecting.exportedBy?.name ?? "—"}. If it has already been uploaded to the bank, mark the batch as paid instead.`
+        : "The batch closes and every invoice in it returns to Bill Pay. The reason is recorded on the batch and the audit trail."}
       submitLabel="Reject batch"
       placeholder="Why is this batch being rejected?" />
 

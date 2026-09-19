@@ -317,7 +317,7 @@ export async function createPaymentBatches(input: {
 }
 
 async function loadForDecision(workspaceId: string, batchId: string) {
-  const batch = await prisma.paymentRun.findFirst({ where: { id: batchId, workspaceId }, select: { id: true, status: true, name: true, submittedById: true, items: { where: { active: true }, select: { documentId: true, expenseClaimId: true, amount: true, currencyCode: true } } } })
+  const batch = await prisma.paymentRun.findFirst({ where: { id: batchId, workspaceId }, select: { id: true, status: true, name: true, submittedById: true, exportedAt: true, items: { where: { active: true }, select: { documentId: true, expenseClaimId: true, amount: true, currencyCode: true } } } })
   if (!batch) throw new Error("payment_batch_not_found")
   return batch
 }
@@ -330,18 +330,24 @@ export async function approvePaymentBatch(input: { workspaceId: string; actorId:
   await recordDocumentAudit({ workspaceId: input.workspaceId, actorId: input.actorId, type: "payment_batch.approved", detail: { batchId: batch.id, selfApproved: batch.submittedById === input.actorId } })
 }
 
+/** #278: Approve is reversible until Paid — an Approved batch can be Rejected exactly like a
+ * Pending one, same transaction, same "back on Bill Pay" outcome. */
 export async function rejectPaymentBatch(input: { workspaceId: string; actorId: string; batchId: string; reason: string }): Promise<void> {
   const reason = input.reason.trim()
   if (!reason) throw new Error("reason_required")
   const batch = await loadForDecision(input.workspaceId, input.batchId)
-  if (batch.status !== "pending_approval") throw new Error("payment_batch_not_pending")
+  if (!["pending_approval", "approved"].includes(batch.status)) throw new Error("payment_batch_not_pending")
+  const fromStatus = batch.status
   const now = new Date()
   await prisma.$transaction([
     prisma.paymentRun.update({ where: { id: batch.id }, data: { status: "rejected", rejectedById: input.actorId, rejectedAt: now, rejectedReason: reason } }),
     // Releases the invoices back to Bill Pay: the unique (workspace, document, active) slot frees.
     prisma.paymentRunItem.updateMany({ where: { runId: batch.id }, data: { active: false } }),
   ])
-  await recordDocumentAudit({ workspaceId: input.workspaceId, actorId: input.actorId, type: "payment_batch.rejected", detail: { batchId: batch.id, reason } })
+  await recordDocumentAudit({
+    workspaceId: input.workspaceId, actorId: input.actorId, type: "payment_batch.rejected",
+    detail: { batchId: batch.id, reason, fromStatus, ...(batch.exportedAt ? { exportedAt: batch.exportedAt.toISOString() } : {}) },
+  })
 }
 
 /** The download route calls this after streaming the file: a fact on the batch, never a state. */
