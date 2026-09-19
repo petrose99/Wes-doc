@@ -137,13 +137,14 @@ export async function listWorkspaceBills(input: {
   onlyUnpaid?: boolean
   /** #211's Status filter-chip group. "unreviewed"/"reviewed" map onto doc.status; there is no
    * model field for the taxonomy's Posted/Exported/Transferred values (no push/ledger status of
-   * that shape exists), so "paid" stands in as the only real "closed" state. #220 adds "synced":
-   * pushed successfully but not yet confirmed paid by the ledger — see BillRow.paymentStatus. */
+   * that shape exists), so "paid" stands in as the only real "closed" state. #220/#281 adds
+   * "posted": pushed successfully but not yet confirmed paid by the ledger — see
+   * BillRow.paymentStatus. */
   /** #258: the five `ProcessingState` keys, filtered via `processingState(row)` (the row's own
-   * derivation), plus the ledger facts `synced`/`paid`, which stay independent of processing
+   * derivation), plus the ledger facts `posted`/`paid`, which stay independent of processing
    * state. Old `"unreviewed"`/`"reviewed"` values from a stale URL are ignored (no match, no
    * redirect — the chip just shows nothing selected). */
-  statusFilter?: ProcessingState | "synced" | "paid"
+  statusFilter?: ProcessingState | "posted" | "paid"
   /** #211's Invoice Approval filter-chip group. See BillRow.approvalStatus. */
   approvalFilter?: BillRow["approvalStatus"]
   /** #201's "Touchless" system saved view: rows that went out with no human review. */
@@ -302,7 +303,7 @@ export async function listWorkspaceBills(input: {
   const filtered = bills.filter((bill) => {
     if (input.onlyBlocked && !bill.blockedByCheck) return false
     if (input.onlyUnpaid && bill.paidState.state === "paid") return false
-    if (input.statusFilter === "synced" && bill.paymentStatus?.toLowerCase() !== "synced") return false
+    if (input.statusFilter === "posted" && bill.paymentStatus?.toLowerCase() !== "posted") return false
     if (input.statusFilter === "paid" && bill.paidState.state !== "paid") return false
     if (input.statusFilter && (PROCESSING_STATES as string[]).includes(input.statusFilter) &&
       processingState({ approvalStatus: bill.approvalStatus, blockedByCheck: bill.blockedByCheck, escalated: bill.escalated, touchless: bill.touchless, status: bill.status }) !== input.statusFilter) return false

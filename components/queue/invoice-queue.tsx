@@ -45,7 +45,10 @@ export const INVOICE_FACETS: Facet[] = [
       {
         label: "Processing state", options: PROCESSING_STATES.map((value) => ({ value, label: PROCESSING_STATE_LABELS[value] })),
       },
-      { label: "Ledger", options: [{ value: "synced", label: "Posted" }, { value: "paid", label: "Paid" }] },
+      { label: "Ledger", options: [
+        { value: "posting", label: "Posting…" }, { value: "posted", label: "Posted" },
+        { value: "failed", label: "Post failed" }, { value: "paid", label: "Paid" },
+      ] },
     ],
   },
   {
@@ -132,7 +135,7 @@ export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercen
   // confirm time). Limited to signals BillRow already carries; category/currency confirmation
   // isn't one of them, so a row this marks eligible can still come back ineligible server-side —
   // that outcome shows in the confirm dialog's per-row reason, not as a silent drop (H9).
-  const postEligible = (bill: BillRow) => !bill.cancelledAt && bill.status === "reviewed" && bill.paymentStatus?.toLowerCase() !== "synced"
+  const postEligible = (bill: BillRow) => !bill.cancelledAt && bill.status === "reviewed" && bill.paymentStatus?.toLowerCase() !== "posted"
 
   // One state per row, shared by the leading glyph and the State column / pane Status line
   // (#258): heldBack folds in here so the glyph and the pill can no longer disagree (#258 closed
@@ -222,7 +225,7 @@ export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercen
     const status = bill.paymentStatus?.toLowerCase() ?? null
     if (bill.paidState.state === "paid" || bill.paidState.state === "partially_paid") return { canCancel: false, reason: "Already paid, so it can no longer be cancelled." }
     if (bill.paidState.state === "scheduled") return { canCancel: false, reason: "In a payment batch. Reject the batch first." }
-    if (status === "synced") return { canCancel: false, reason: "Already synced to your ledger, so it can no longer be cancelled." }
+    if (status === "posted") return { canCancel: false, reason: "Already posted to your ledger, so it can no longer be cancelled." }
     return { canCancel: true, reason: null }
   }
 

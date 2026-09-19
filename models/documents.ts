@@ -911,7 +911,7 @@ export async function cancelDocument(input: { workspaceId: string; documentId: s
 
   const paymentStatuses = await getDocumentPaymentStatuses(input.workspaceId, [document.id])
   const paymentStatus = paymentStatuses.get(document.id)?.paymentStatus?.toLowerCase() ?? null
-  if (paymentStatus && ["synced", "paid", "reconciled"].includes(paymentStatus)) throw new DocumentCancellationBlockedError(paymentStatus)
+  if (paymentStatus && ["posted", "paid", "reconciled"].includes(paymentStatus)) throw new DocumentCancellationBlockedError(paymentStatus)
 
   const context = await getRequestAuditContext()
   const now = new Date()

@@ -268,7 +268,7 @@ export async function DocumentDetailPage({ params, searchParams, embedded = fals
       : failedPushCount > 0 ? "blocked"
       : approvalState === "done" ? "current"
       : "upcoming"
-    const syncDetail = succeededPushCount > 0 ? `${LEDGER_FACT_LABELS.synced} × ${succeededPushCount}` : failedPushCount > 0 ? "Post failed" : undefined
+    const syncDetail = succeededPushCount > 0 ? `${LEDGER_FACT_LABELS.posted} × ${succeededPushCount}` : failedPushCount > 0 ? "Post failed" : undefined
     // Pay
     const payState: import("@/components/pipeline/document-detail/stage-indicator").StageStep["state"] =
       confirmedPaid || ledgerPaid ? "done"
@@ -364,7 +364,7 @@ export async function DocumentDetailPage({ params, searchParams, embedded = fals
     : { title: document.filename, suffix: invoiceNumber || null }
   // #258: the Status line in full mode is server-rendered with the actor already known — the
   // same `StatusLine` the pane shows, fed by the same `processingFact`.
-  const ledger = succeededPushCount > 0 ? "synced" : confirmedPaid || ledgerPaid ? "paid" : null
+  const ledger = succeededPushCount > 0 ? "posted" : confirmedPaid || ledgerPaid ? "paid" : null
   const status = processing && state
     ? <StatusLine state={state} fact={processingFact({ ...processing, now: new Date() })} ledger={ledger} openCheckCodes={processing.openCheckCodes} cancelledReason={processing.cancelledReason} />
     : undefined

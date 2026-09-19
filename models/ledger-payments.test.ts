@@ -29,18 +29,18 @@ describe("getDocumentPaymentStatuses", () => {
 
   // #220: a succeeded push with no matching ledger row (or a ledger row with no confirmed
   // status) used to be left out of the map entirely — invisible to the UI. It now surfaces as
-  // "synced" so a pushed-but-unconfirmed invoice isn't indistinguishable from one never pushed.
-  it("surfaces a succeeded push with no confirmed ledger status as synced", async () => {
+  // "posted" so a pushed-but-unconfirmed invoice isn't indistinguishable from one never pushed.
+  it("surfaces a succeeded push with no confirmed ledger status as posted", async () => {
     db.integrationPush.findMany.mockResolvedValue([
       { documentId: "d1", externalBillId: "eb1", connectionId: "c1", externalRecordKind: "bill", completedAt: new Date("2026-09-14T00:00:00Z") },
     ])
     db.ledgerTransaction.findMany.mockResolvedValue([])
     const result = await getDocumentPaymentStatuses("w1", ["d1"])
-    expect(result.get("d1")?.paymentStatus).toBe("synced")
+    expect(result.get("d1")?.paymentStatus).toBe("posted")
     expect(result.get("d1")?.syncedAt).toEqual(new Date("2026-09-14T00:00:00Z"))
   })
 
-  it("surfaces synced when the ledger row exists but has no computed payment status", async () => {
+  it("surfaces posted when the ledger row exists but has no computed payment status", async () => {
     db.integrationPush.findMany.mockResolvedValue([
       { documentId: "d1", externalBillId: "eb1", connectionId: "c1", externalRecordKind: "bill", completedAt: new Date() },
     ])
@@ -48,7 +48,7 @@ describe("getDocumentPaymentStatuses", () => {
       { connectionId: "c1", externalId: "eb1", kind: "bill", paymentStatus: null, dueAmount: null, paidAmount: null, syncedAt: new Date("2026-09-12T00:00:00Z") },
     ])
     const result = await getDocumentPaymentStatuses("w1", ["d1"])
-    expect(result.get("d1")?.paymentStatus).toBe("synced")
+    expect(result.get("d1")?.paymentStatus).toBe("posted")
     // Prefers the ledger row's own syncedAt over the push's completedAt when a row exists.
     expect(result.get("d1")?.syncedAt).toEqual(new Date("2026-09-12T00:00:00Z"))
   })

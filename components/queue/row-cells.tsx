@@ -1,5 +1,5 @@
 import type { ReactNode } from "react"
-import { PROCESSING_STATE_LABELS, LEDGER_FACT_LABELS, type ProcessingState } from "@/lib/documents/processing-state"
+import { PROCESSING_STATE_LABELS, LEDGER_FACT_LABELS, type ProcessingState, type LedgerFact } from "@/lib/documents/processing-state"
 
 export function formatMoney(amount: number, currency?: string | null): string {
   const currencyCode = currency && /^[A-Z]{3}$/.test(currency) ? currency : "USD"
@@ -34,16 +34,26 @@ const STATE_PILL_TONE: Record<ProcessingState, string> = {
   approved: "bg-emerald-100 text-emerald-800",
 }
 
+// #281: the Ledger mark's own tones, distinct from `STATE_PILL_TONE` so a `failed` mark never
+// blurs into the row's own red "Needs attention" state pill (spec.md §4) — they always co-occur,
+// never stand alone.
+const LEDGER_PILL_TONE: Record<LedgerFact, string> = {
+  posting: "bg-slate-100 text-slate-700",
+  posted: "bg-emerald-100 text-emerald-800",
+  failed: "bg-amber-100 text-amber-900",
+  paid: "bg-slate-100 text-slate-700",
+}
+
 /** The row's state pill, one word from `PROCESSING_STATE_LABELS` — the one vocabulary #258 built
  * so the row, the pane's Status line, the stepper and the Approval tab always agree. `state` is
- * total (always one of the five keys), so there is no fallback branch. Ledger facts (Posted /
- * Paid) render after, separately, because they are not processing states. */
+ * total (always one of the five keys), so there is no fallback branch. Ledger facts (Posting… /
+ * Posted / Post failed / Paid) render after, separately, because they are not processing states. */
 export function StatePills({ state, ledger, openCheckCodes, cancelledReason, trailing }: {
   state: ProcessingState
   openCheckCodes?: string[]
   cancelledReason?: string | null
-  /** A ledger fact key such as "synced" or "paid". */
-  ledger?: string | null
+  /** A ledger fact key: "posting" | "posted" | "failed" | "paid" (#281 — "synced" retired, #248). */
+  ledger?: LedgerFact | string | null
   trailing?: ReactNode
 }) {
   const openCount = state === "needs_attention" ? openCheckCodes?.length ?? 0 : 0
@@ -54,7 +64,7 @@ export function StatePills({ state, ledger, openCheckCodes, cancelledReason, tra
     <span className={`${PILL} ${STATE_PILL_TONE[state]}`} title={title}>
       {PROCESSING_STATE_LABELS[state]}{openCount > 0 ? ` · ${openCount}` : ""}
     </span>
-    {ledger && <span className={`${PILL} bg-slate-100 text-slate-700`}>{LEDGER_FACT_LABELS[ledger as "synced" | "paid"] ?? ledger}</span>}
+    {ledger && <span className={`${PILL} ${LEDGER_PILL_TONE[ledger as LedgerFact] ?? "bg-slate-100 text-slate-700"}`}>{LEDGER_FACT_LABELS[ledger as LedgerFact] ?? ledger}</span>}
     {trailing}
   </span>
 }

@@ -46,11 +46,14 @@ export const PROCESSING_STATE_LABELS: Record<ProcessingState, string> = {
   approved: "Approved",
 }
 
-/** The ledger word, one place until #281 rewires its source to `IntegrationPush` and adds
- * "Posting…" / "Post failed". "Synced" retired from every user-visible surface (#248's decision);
- * `synced` stays the internal key. */
-export const LEDGER_FACT_LABELS: Record<"synced" | "paid", string> = {
-  synced: "Posted",
+/** The ledger word, one place (#281, map #226): "Synced" retired from every user-visible surface
+ * (#248's decision) — the internal key is `posted` too, not just the label, so no surface can
+ * regress by printing the raw key. */
+export type LedgerFact = "posting" | "posted" | "failed" | "paid"
+export const LEDGER_FACT_LABELS: Record<LedgerFact, string> = {
+  posting: "Posting…",
+  posted: "Posted",
+  failed: "Post failed",
   paid: "Paid",
 }
 

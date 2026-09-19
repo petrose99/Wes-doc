@@ -20,8 +20,10 @@ describe("StatePills (#258)", () => {
     expect(text(renderToStaticMarkup(<StatePills state="approved" openCheckCodes={["a"]} />))).toBe("Approved")
   })
 
-  it("maps ledger keys to Posted / Paid and passes an unknown key through", () => {
-    expect(text(renderToStaticMarkup(<StatePills state="approved" ledger="synced" />))).toBe("Approved Posted")
+  it("maps ledger keys to Posting… / Posted / Post failed / Paid and passes an unknown key through", () => {
+    expect(text(renderToStaticMarkup(<StatePills state="approved" ledger="posting" />))).toBe("Approved Posting…")
+    expect(text(renderToStaticMarkup(<StatePills state="approved" ledger="posted" />))).toBe("Approved Posted")
+    expect(text(renderToStaticMarkup(<StatePills state="needs_attention" ledger="failed" />))).toBe("Needs attention Post failed")
     expect(text(renderToStaticMarkup(<StatePills state="approved" ledger="paid" />))).toBe("Approved Paid")
     expect(text(renderToStaticMarkup(<StatePills state="approved" ledger="other" />))).toBe("Approved other")
   })

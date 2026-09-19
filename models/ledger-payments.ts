@@ -46,12 +46,13 @@ export async function getDocumentPaymentStatuses(
         syncedAt: row.syncedAt,
       })
     } else {
-      // #220: the push itself succeeded (accounting has the record) but the ledger sync hasn't
-      // confirmed a payment status yet — either the ledger hasn't pulled this record down, or it
-      // has and simply reports no status. Surfaced as its own "synced" value rather than left out
-      // of the map entirely, so a pushed-but-unconfirmed invoice isn't invisible in the UI.
+      // #220/#281: the push itself succeeded (accounting has the record) but the ledger sync
+      // hasn't confirmed a payment status yet — either the ledger hasn't pulled this record down,
+      // or it has and simply reports no status. Surfaced as its own "posted" value (#248's
+      // vocabulary — "Synced" retired) rather than left out of the map entirely, so a
+      // pushed-but-unconfirmed invoice isn't invisible in the UI.
       result.set(push.documentId, {
-        paymentStatus: "synced",
+        paymentStatus: "posted",
         dueAmount: row ? decimalToNumber(row.dueAmount) : null,
         paidAmount: row ? decimalToNumber(row.paidAmount) : null,
         syncedAt: row?.syncedAt ?? push.completedAt ?? new Date(),

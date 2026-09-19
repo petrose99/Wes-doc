@@ -40,7 +40,9 @@ export const RECEIPT_FACETS: Facet[] = [
     param: "status", label: "Status",
     sections: [
       { label: "Processing state", options: PROCESSING_STATES.map((value) => ({ value, label: PROCESSING_STATE_LABELS[value] })) },
-      { label: "Ledger", options: [{ value: "synced", label: "Posted" }] },
+      { label: "Ledger", options: [
+        { value: "posting", label: "Posting…" }, { value: "posted", label: "Posted" }, { value: "failed", label: "Post failed" },
+      ] },
     ],
   },
   // #273: Unclaimed + the four claim statuses, words from the one label map.

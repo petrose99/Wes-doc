@@ -128,15 +128,15 @@ describe("listWorkspaceBills", () => {
     expect(res.bills[0].paidAmount).toBe(100)
   })
 
-  it("filters to synced bills via the Status chip (#220)", async () => {
+  it("filters to posted bills via the Status chip (#220/#281)", async () => {
     db.document.findMany.mockResolvedValue([
       { id: "d1", filename: "a.pdf", status: "reviewed", reviewedAt: new Date(), template: { code: "invoice" }, reviewedData: { total: 100 } },
       { id: "d2", filename: "b.pdf", status: "reviewed", reviewedAt: new Date(), template: { code: "invoice" }, reviewedData: { total: 200 } },
     ])
     vi.mocked(getDocumentPaymentStatuses).mockResolvedValue(
-      new Map([["d1", { paymentStatus: "synced", dueAmount: null, paidAmount: null, syncedAt: new Date() }]]),
+      new Map([["d1", { paymentStatus: "posted", dueAmount: null, paidAmount: null, syncedAt: new Date() }]]),
     )
-    const res = await listWorkspaceBills({ workspaceId: "w1", statusFilter: "synced" })
+    const res = await listWorkspaceBills({ workspaceId: "w1", statusFilter: "posted" })
     expect(res.bills.map((b) => b.documentId)).toEqual(["d1"])
   })
 

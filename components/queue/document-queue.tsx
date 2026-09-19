@@ -57,7 +57,9 @@ export const PURCHASE_ORDER_FACETS: Facet[] = [
  * (recon §6: today there is none). Value/labels renamed alongside Invoices' in build step 4. */
 export const BANK_STATEMENT_FACETS: Facet[] = (() => {
   const [status, ...rest] = DOCUMENT_FACETS_BASE()
-  return [{ ...status, sections: [...status.sections!, { label: "Ledger", options: [{ value: "synced", label: "Posted" }] }] }, ...rest]
+  return [{ ...status, sections: [...status.sections!, { label: "Ledger", options: [
+    { value: "posting", label: "Posting…" }, { value: "posted", label: "Posted" }, { value: "failed", label: "Post failed" },
+  ] }] }, ...rest]
 })()
 
 const SORTS: SortOption<DocumentQueueRow>[] = [

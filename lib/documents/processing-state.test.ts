@@ -23,8 +23,8 @@ describe("the one status vocabulary (#258)", () => {
     })
   })
 
-  it("ledger facts read Posted / Paid — never Synced", () => {
-    expect(LEDGER_FACT_LABELS).toEqual({ synced: "Posted", paid: "Paid" })
+  it("ledger facts read Posting…/Posted/Post failed/Paid — never Synced (#281)", () => {
+    expect(LEDGER_FACT_LABELS).toEqual({ posting: "Posting…", posted: "Posted", failed: "Post failed", paid: "Paid" })
   })
 
   it("heldBack folds into needs_attention like any other attention cause", () => {
