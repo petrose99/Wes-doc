@@ -1,0 +1,35 @@
+/* Shared stylesheet for the token-usage course. Tufte-leaning: one measure, generous margins, sidenotes. */
+:root{--ink:#1a1a1a;--muted:#5c5c5c;--rule:#d9d4c7;--paper:#fdfcf8;--accent:#8a3b12;--ok:#2e6b3a;--bad:#9a2f2f;--mono:"SF Mono",Menlo,Consolas,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--ink:#e8e4da;--muted:#a09a8c;--rule:#3a372f;--paper:#161511;--accent:#e0925e;--ok:#7fc48f;--bad:#e08a8a}}
+:root[data-theme="dark"]{--ink:#e8e4da;--muted:#a09a8c;--rule:#3a372f;--paper:#161511;--accent:#e0925e;--ok:#7fc48f;--bad:#e08a8a}
+*{box-sizing:border-box}
+html{font-size:18px}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:Georgia,"Iowan Old Style",serif;line-height:1.5}
+main{max-width:42rem;margin:0 auto;padding:3rem 16px 6rem}
+h1{font-weight:400;font-size:2rem;line-height:1.15;margin:0 0 .25rem}
+h2{font-weight:400;font-size:1.35rem;margin:2.5rem 0 .5rem;border-top:1px solid var(--rule);padding-top:1rem}
+h3{font-weight:600;font-size:1rem;margin:1.5rem 0 .25rem}
+p{margin:.6rem 0}
+.kicker{color:var(--muted);font-size:.85rem;letter-spacing:.06em;text-transform:uppercase}
+.lede{font-size:1.15rem;color:var(--muted)}
+a{color:var(--accent)}
+code,pre{font-family:var(--mono);font-size:.85em}
+pre{background:rgba(127,127,127,.08);padding:.75rem 1rem;overflow-x:auto;border-left:3px solid var(--rule)}
+table{border-collapse:collapse;width:100%;margin:1rem 0;font-size:.95rem}
+th,td{text-align:left;padding:.4rem .5rem;border-bottom:1px solid var(--rule);vertical-align:top}
+th{font-weight:600;color:var(--muted);font-size:.85rem}
+td.num,th.num{text-align:right;font-family:var(--mono);font-size:.85em}
+.note{border-left:3px solid var(--accent);padding:.5rem 1rem;margin:1rem 0;background:rgba(138,59,18,.06)}
+.card{border:1px solid var(--rule);padding:1rem 1.25rem;margin:1.25rem 0;border-radius:4px}
+.calc label{display:block;margin:.5rem 0 .15rem;font-size:.9rem;color:var(--muted)}
+.calc input[type=range]{width:100%}
+.calc output{font-family:var(--mono);font-size:1.1rem}
+.big{font-size:1.6rem;font-family:var(--mono)}
+.quiz .q{margin:1.25rem 0}
+.quiz button{font:inherit;display:block;width:100%;text-align:left;margin:.3rem 0;padding:.5rem .75rem;background:transparent;color:var(--ink);border:1px solid var(--rule);border-radius:4px;cursor:pointer}
+.quiz button:hover{border-color:var(--accent)}
+.quiz button.right{border-color:var(--ok);color:var(--ok)}
+.quiz button.wrong{border-color:var(--bad);color:var(--bad)}
+.quiz .why{font-size:.9rem;color:var(--muted);margin-top:.35rem;min-height:1.2em}
+.next{margin-top:3rem;padding-top:1rem;border-top:1px solid var(--rule);font-size:.95rem}
+footer{margin-top:3rem;color:var(--muted);font-size:.85rem}

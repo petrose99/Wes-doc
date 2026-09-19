@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Four words, two axes</title><link rel="stylesheet" href="../assets/course.css"></head>
+<body><main>
+<p class="kicker">Lesson 1 · about 7 minutes</p>
+<h1>Four words, two axes</h1>
+<p class="lede">You got lost at Companies because Bite had just changed the language underneath it (ticket #300). This lesson gives you the four words and the one rule they hang on, then checks it stuck.</p>
+
+<h2>The one idea</h2>
+<p>There are <b>two axes</b>, and they never mix:</p>
+<table>
+<tr><th>Axis</th><th>Words</th><th>What it decides</th></tr>
+<tr><td>Company role</td><td>Owner · Reviewer · Member</td><td>Everything you can do in <em>that</em> company's books and Admin sections</td></tr>
+<tr><td>Organization admin</td><td>a single flag, or “—”</td><td>Renaming the organization; seeing it in Admin. Nothing else.</td></tr>
+</table>
+<p class="big">Belonging to an organization opens no company.</p>
+<p>Access to each company is granted separately, with its own role. The same person can be Owner in Acme Ltd and Member in Acme Holdings. Source: <a href="../../../../CONTEXT.md">CONTEXT.md</a> §Organization, §Role; the reason is <a href="../../../adr/0002-organization-above-workspace-workspace-is-the-company.md">ADR 0002</a> — <code>Workspace.organizationId</code> is a grouping column, <code>WorkspaceMember</code> is the only access grant.</p>
+
+<h2>Why #300 said it this way</h2>
+<ul>
+<li><b>"Workspace" never appears on screen.</b> A team workspace is a <b>Company</b>; your own one is <b>Personal</b>. The word survives only in code and URLs (<code>/workspaces/[id]/…</code>).</li>
+<li><b>Organization admin is not a ladder.</b> In the code only <code>createOrganization</code> ever writes an <code>OrganizationMember</code>, and it always writes <code>"admin"</code>. There is no org "member", so the screen must not invent one — it shows the fact or “—”.</li>
+<li><b>One admin vocabulary.</b> Organization admin (the org), Owner (a company), Admin (the area at the bottom of the rail). No fourth word; the platform operator role is never shown.</li>
+</ul>
+<div class="note">Not yet on screen: #300 <em>decided</em> these words, but the execution ticket that renders them (<a href="https://github.com/petrose99/Wes-doc/issues/301">#301</a>) is still open. The switcher still says "Team workspace" and "New workspace" (<code>components/workspace/switcher.tsx</code> lines 48, 54, 79). When you see that, it is a known gap, not a new bug.</div>
+
+<h2>Look at it</h2>
+<p>On the tunnel URL, open the rail's bottom item → <b>Admin</b>. The left column has two captions: <b>Organization</b> (Dashboard, Companies, Users) and the current company's name (Configuration, Approval Flows, …). Dashboard appears only when you belong to two or more companies (<code>admin/layout.tsx</code> line 34).</p>
+
+<h2>Check yourself</h2>
+<p>Answer from memory before clicking. Score: <span data-quiz-score>0 / 0</span></p>
+<div class="quiz" data-quiz>
+<div class="q"><p class="stem">A person is Organization admin of Acme and has no membership of Acme Ltd. What can they do in Acme Ltd's books?</p>
+<button data-why="Organization admin opens no company. They need a WorkspaceMember row with a role.">View invoices only</button>
+<button data-why="Nothing at all. Belonging to an organization opens no company; only a per-company role does." data-a="1">Nothing, no access</button>
+<button data-why="Owner is a company role, and they have none in Acme Ltd.">Everything, as Owner</button>
+</div>
+<div class="q"><p class="stem">Which words belong to the company role ladder?</p>
+<button data-why="Admin is the area, Organization admin is a flag on the person.">Admin, Owner, Member</button>
+<button data-why="Owner, Reviewer, Member — per company, and those three words belong to this ladder alone." data-a="1">Owner, Reviewer, Member</button>
+<button data-why="There is no organization member or organization owner; the org axis is one flag.">Owner, Member, Organization member</button>
+</div>
+<div class="q"><p class="stem">What does the screen show for a person who is not an Organization admin?</p>
+<button data-why="Never 'member': the org axis is not a ladder, so there is no lower rung to name.">Organization member</button>
+<button data-why="A dash. The flag is shown as a fact when present and as “—” when absent." data-a="1">A dash, nothing</button>
+<button data-why="Reviewer is a company role; it says nothing about the organization.">Company Reviewer</button>
+</div>
+<div class="q"><p class="stem">Where does the word "workspace" still legitimately appear?</p>
+<button data-why="The switcher's 'Team workspace' is the known #301 gap, not a legitimate place.">The switcher label</button>
+<button data-why="Code and URLs keep the word; the screen says Company or Personal." data-a="1">Code and URLs</button>
+<button data-why="On screen it is Company or Personal, never workspace.">The rail item</button>
+</div>
+<div class="q"><p class="stem">Same person: Owner in Acme Ltd, Member in Acme Holdings. Is that allowed?</p>
+<button data-why="Roles are per company; there is no single role for a person across the organization.">No, one role</button>
+<button data-why="Yes. A role is standing in one company; each membership carries its own." data-a="1">Yes, per company</button>
+<button data-why="Organization admin does not override or unify company roles.">Only if admin</button>
+</div>
+</div>
+
+<h2>Read next</h2>
+<p>Primary source: <a href="../../../../CONTEXT.md">CONTEXT.md</a>, the entries Organization, Role, Organization admin, Admin — about 300 words, and every label in the app is checked against them. The compressed version is the <a href="../reference/glossary.html">glossary card</a>.</p>
+
+<p class="next">Next lesson: <b>Companies</b> — the three states of the page (Personal / ungrouped / in an organization) and the one action you can never do from inside a company. Ask the teacher anything unclear first; that is what it is for.</p>
+<footer>Lesson 1 of the <a href="../MISSION.md">bite-admin-build</a> course · 2026-09-19</footer>
+</main><script src="../assets/quiz.js"></script></body></html>
