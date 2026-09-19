@@ -378,10 +378,18 @@ while [ "$n" -lt "$MAX" ]; do
     printf -- '- `impeccable <sub-command>` (`shape`, `layout`, `typeset`, `clarify`, `polish`, `critique`, `audit`, `adapt`, …) → `%s/.claude/skills/impeccable/reference/<name>.md`\n- craft floor → `%s/.claude/skills/impeccable/reference/craft-floor.md` (read whole before the first UI edit)\n' "$ROOT" "$ROOT"
     printf -- '- Detector: `impeccable detect --json <targets>` (CLI) and the in-page `detect.js` overlay — see the area primer.\n'
   }
+  # Prompt-cache order: everything identical across tickets and phases first
+  # (core, protocol, brief, skill table), then the phase brief (identical
+  # across sessions of one phase), and the ticket-specific text (arguments,
+  # paths, continuation note) last. The cache is a prefix match, so a new
+  # ticket then re-writes only the tail (~1–2K) instead of everything after
+  # the first differing byte (~20K on #287's phase change, 2026-09-19).
   { if [ "${PROMPT_MODE:-slash}" = bare ]; then cat "$AP/core.md"; printf '\n\n---\n\n'; fi
-    if [ "${PROMPT_MODE:-slash}" = system ] || [ "${PROMPT_MODE:-slash}" = bare ]; then printf '# Wayfinder protocol (the /wayfinder skill, loaded by the driver)\n\n'; awk 'f{print} /^---$/{c++; if(c==2)f=1}' "$ROOT/.claude/skills/wayfinder/SKILL.md"; printf '\n\nARGUMENTS: %s %s\n\n---\n\n' "$MAP" "$T"; fi
-    cat "$BRIEF"; [ -f "$PHASE_BRIEF" ] && { printf '\n\n'; cat "$PHASE_BRIEF"; }; printf '\n\n## Paths for this run\n\n- Repository: `%s` (branch `%s`)\n- Generic lessons (every project): `%s`\n- Project lessons (this repo): `%s`\n- Report: `%s/%s.md`\n- Hand-off file (keep it current at every milestone): `%s/%s.handoff.md`\n- Scratch folder for captures and the filled preflight: `%s/scratch-%s/`\n- Report template: `%s/report.md` · project rules: `%s/CLAUDE.md`, `%s/CONTEXT.md`\n\n%s\n' "$ROOT" "$(git -C "$ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null)" "$GENERIC_LESSONS" "$PROJECT_LESSONS" "$OUT" "$T" "$OUT" "$T" "$LOGS" "$T" "$AP" "$ROOT" "$ROOT" "$CONT"
-    [ "${PROMPT_MODE:-slash}" = bare ] && skill_table; } > "$RUN_BRIEF"
+    if [ "${PROMPT_MODE:-slash}" = system ] || [ "${PROMPT_MODE:-slash}" = bare ]; then printf '# Wayfinder protocol (the /wayfinder skill, loaded by the driver)\n\n'; awk 'f{print} /^---$/{c++; if(c==2)f=1}' "$ROOT/.claude/skills/wayfinder/SKILL.md"; printf '\n\n(ARGUMENTS — the map and ticket — are given under "This run" at the end of this prompt.)\n\n---\n\n'; fi
+    cat "$BRIEF"
+    [ "${PROMPT_MODE:-slash}" = bare ] && skill_table
+    [ -f "$PHASE_BRIEF" ] && { printf '\n\n'; cat "$PHASE_BRIEF"; }
+    printf '\n\n## This run\n\nARGUMENTS: %s %s (map #%s, ticket #%s)\n\n- Repository: `%s` (branch `%s`)\n- Generic lessons (every project): `%s`\n- Project lessons (this repo): `%s`\n- Report: `%s/%s.md`\n- Hand-off file (keep it current at every milestone): `%s/%s.handoff.md`\n- Scratch folder for captures and the filled preflight: `%s/scratch-%s/`\n- Report template: `%s/report.md` · project rules: `%s/CLAUDE.md`, `%s/CONTEXT.md`\n\n%s\n' "$MAP" "$T" "$MAP" "$T" "$ROOT" "$(git -C "$ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null)" "$GENERIC_LESSONS" "$PROJECT_LESSONS" "$OUT" "$T" "$OUT" "$T" "$LOGS" "$T" "$AP" "$ROOT" "$ROOT" "$CONT"; } > "$RUN_BRIEF"
   # Memory: the whole session (claude + dev server + headless browser + node
   # workers) runs inside one cgroup scope with a hard ceiling, so the kernel
   # reclaims/kills inside the scope instead of the box-wide earlyoom shooting
@@ -405,7 +413,9 @@ while [ "$n" -lt "$MAX" ]; do
     SESSION_PROMPT="Work Wayfinder map #$MAP, ticket #$T, per the Wayfinder protocol and autopilot brief in your system prompt. Begin by claiming the ticket: run gh issue edit $T --add-assignee @me"
     SESSION_TOOLS="${SESSION_TOOL_SET:-Bash,Read,Edit,Write,Agent}"
     [ -z "$PHASE" ] && SESSION_TOOLS="$SESSION_TOOLS,WebFetch,WebSearch"   # research / decision tickets may need the web
-    SYSFLAG="--system-prompt-file"; BAREFLAGS=(--disable-slash-commands)
+    # --exclude-dynamic-system-prompt-sections keeps cwd/env/git-status out
+    # of the system prompt so its prefix is identical from session to session.
+    SYSFLAG="--system-prompt-file"; BAREFLAGS=(--disable-slash-commands --exclude-dynamic-system-prompt-sections)
   elif [ "${PROMPT_MODE:-slash}" = system ]; then
     SESSION_PROMPT="Work Wayfinder map #$MAP, ticket #$T, per the Wayfinder protocol and autopilot brief in your system prompt. Begin by claiming the ticket: run gh issue edit $T --add-assignee @me"
     SESSION_TOOLS="${SESSION_TOOL_SET:-Task,Bash,Edit,Glob,Grep,Read,Skill,WebFetch,WebSearch,Write}"
