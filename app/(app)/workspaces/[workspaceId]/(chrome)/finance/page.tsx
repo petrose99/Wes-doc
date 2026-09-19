@@ -1,12 +1,11 @@
-import { AccountingDashboard } from "@/components/accounting/accounting-dashboard"
+import { LedgerConnectionPanel } from "@/components/accounting/accounting-dashboard"
 import { AccountingErrorBanner } from "@/components/accounting/error-banner"
+import { Panel } from "@/components/automation/automation-ui"
 import { getCurrentUser } from "@/lib/auth"
 import config from "@/lib/config"
 import { getEntityCounts, getLastSyncedAt } from "@/models/accounting-entities"
 import { getWorkspaceProvisionJob } from "@/models/bigcapital"
-import { listReadyToPushDocuments } from "@/models/documents"
-import { listCategoryAccountMappings } from "@/models/category-account-mappings"
-import { getCategoryAccountMap, getWorkspaceIntegrationConnection } from "@/models/integrations"
+import { getWorkspaceIntegrationConnection } from "@/models/integrations"
 import { requireWorkspaceRole } from "@/models/workspaces"
 import { notFound } from "next/navigation"
 
@@ -14,7 +13,12 @@ import { notFound } from "next/navigation"
  * Worksheets, not a side "Accounting" utility. Named Finance rather than Accounting because the roadmap
  * is a hub: the in-house Bigcapital ledger today, external integrations (Xero, QuickBooks, banking,
  * tax) tomorrow. "Accounting" would sound like a lightweight duplicate of a category the vendors
- * own; Finance names the user's job. Route moved from /accounting; old URL redirects here. */
+ * own; Finance names the user's job. Route moved from /accounting; old URL redirects here.
+ *
+ * Per #248: Finance holds no rows and no work — pushing documents to the ledger happens at the
+ * document (pane, row, bulk action), not here. Finance's job is the connection itself: status,
+ * Sync now, entity counts, default account (all in the reused Admin › Integrations panel), plus
+ * the primary "Open ledger" action. */
 export default async function FinancePage({ params, searchParams }: { params: Promise<{ workspaceId: string }>; searchParams: Promise<{ error?: string }> }) {
   if (!config.integrations.bigcapital.enabled) notFound()
   const { workspaceId } = await params
@@ -29,16 +33,6 @@ export default async function FinancePage({ params, searchParams }: { params: Pr
   const [lastSyncedAt, entityCounts] = connection
     ? await Promise.all([getLastSyncedAt(workspaceId, connection.id), getEntityCounts(workspaceId, connection.id)])
     : [null, { accounts: 0, vendors: 0 }]
-
-  // Same "pushable" gate PushToAccountingCard uses on a single document: an active connection with
-  // a default expense account chosen. No point loading the ready list otherwise — nothing could push.
-  const pushable = connection?.status === "active" && !!connection.defaultExpenseAccountId
-  const [readyResult, inferredMap, explicitMappings] = pushable
-    ? await Promise.all([listReadyToPushDocuments(workspaceId, connection.id), getCategoryAccountMap(workspaceId, connection.id), listCategoryAccountMappings(workspaceId, connection.id)])
-    : [{ documents: [], droppedCount: 0 }, {}, []]
-  const { documents: readyToPush, droppedCount: notPushableCount } = readyResult
-  const categoryAccountMap = { ...inferredMap }
-  for (const m of explicitMappings) { categoryAccountMap[m.category] = m.accountExternalId }
 
   return <main className="space-y-8">
     {error && <AccountingErrorBanner workspaceId={workspaceId} error={error} isOwner={membership.role === "owner"} />}
@@ -60,17 +54,8 @@ export default async function FinancePage({ params, searchParams }: { params: Pr
         </a>
       )}
     </header>
-    <AccountingDashboard
-      workspaceId={workspaceId}
-      isOwner={membership.role === "owner"}
-      apiBase={config.integrations.bigcapital.apiBase}
-      connection={connection}
-      job={job}
-      lastSyncedAt={lastSyncedAt}
-      entityCounts={entityCounts}
-      readyToPush={readyToPush}
-      notPushableCount={notPushableCount}
-      categoryAccountMap={categoryAccountMap}
-    />
+    <Panel title="Ledger connection">
+      <LedgerConnectionPanel workspaceId={workspaceId} isOwner={membership.role === "owner"} connection={connection} job={job} lastSyncedAt={lastSyncedAt} entityCounts={entityCounts} />
+    </Panel>
   </main>
 }
