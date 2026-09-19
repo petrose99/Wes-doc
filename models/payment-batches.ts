@@ -2,7 +2,7 @@
 import { prisma } from "@/lib/db"
 import { recordDocumentAudit } from "@/lib/audit"
 import { decimalToNumber } from "@/lib/money"
-import { listBillPay, supplierHasBankAccount, type BillPayRow } from "@/models/bill-pay"
+import { listBillPay, supplierHasBankAccount, type BillPayBillRow as BillPayRow } from "@/models/bill-pay"
 import { listWorkspaceBills } from "@/models/bills"
 import { payerAccountLabel, type PayerAccountRow } from "@/models/payer-accounts"
 import { splitBatchName, splitIntoBatches, suggestBatchName } from "@/lib/payments/batch-split"
@@ -264,7 +264,8 @@ export async function createPaymentBatches(input: {
   now?: Date
 }): Promise<CreateBatchesResult> {
   const now = input.now ?? new Date()
-  const { rows } = await listBillPay({ workspaceId: input.workspaceId, asOf: now })
+  const { rows: allRows } = await listBillPay({ workspaceId: input.workspaceId, asOf: now })
+  const rows = allRows.filter((row): row is BillPayRow => row.kind === "bill")
   const selected = new Set(input.documentIds)
   const chosen = rows.filter((row) => selected.has(row.bill.documentId))
   const leftOut: CreateBatchesResult["leftOut"] = []
@@ -374,7 +375,8 @@ export type MarkPaidResult = { recorded: Array<{ documentId: string; amount: num
 /** #229 Q10: the bulk-bar Mark as paid — a manual Payment record per selected Bill Pay row for
  * its current Amount to pay. Scheduled rows are left out (the batch will record them). */
 export async function markInvoicesPaid(input: { workspaceId: string; actorId: string; documentIds: string[]; paidOn: Date; reference: string | null }): Promise<MarkPaidResult> {
-  const { rows } = await listBillPay({ workspaceId: input.workspaceId })
+  const { rows: allRows } = await listBillPay({ workspaceId: input.workspaceId })
+  const rows = allRows.filter((row): row is BillPayRow => row.kind === "bill")
   const byId = new Map(rows.map((row) => [row.bill.documentId, row]))
   const recorded: MarkPaidResult["recorded"] = []
   const leftOut: MarkPaidResult["leftOut"] = []

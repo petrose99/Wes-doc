@@ -1,7 +1,7 @@
 import { getCurrentUser } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { requireWorkspaceRole } from "@/models/workspaces"
-import { listBillPay, type BillPayFacet } from "@/models/bill-pay"
+import { listBillPay, type BillPayFacet, type BillPayBillRow } from "@/models/bill-pay"
 import { suggestBatchName } from "@/lib/payments/batch-split"
 import type { AgingBucket } from "@/lib/bills/due-date"
 import { BillPayQueue } from "@/components/payments/bill-pay-queue"
@@ -29,7 +29,9 @@ export async function BillPayQueuePage({ params, searchParams, selectedDocumentI
     prisma.workspace.findFirst({ where: { id: workspaceId }, select: { baseCurrency: true } }),
     prisma.paymentRun.findMany({ where: { workspaceId, createdAt: { gte: new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000) } }, select: { name: true } }),
   ])
-  let rows = result.rows
+  // #295: listBillPay now also returns claim rows; the Bill Pay queue only renders bills until
+  // #331 (Build claim rows in Bill Pay) adds the claim-row UI.
+  let rows = result.rows.filter((row): row is BillPayBillRow => row.kind === "bill")
   if (discount === "1" && facet !== "discount") rows = rows.filter((row) => row.discount !== null)
   if (agingFilter.size > 0) rows = rows.filter((row) => agingFilter.has(row.bill.agingBucket ?? "none"))
 

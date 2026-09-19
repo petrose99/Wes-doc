@@ -10,7 +10,7 @@ import { splitBatchName, splitIntoBatches } from "@/lib/payments/batch-split"
 import { ELIGIBILITY_COPY } from "@/lib/payments/eligibility"
 import { payerAccountLabel } from "@/lib/payments/payer-account-label"
 import { withOrigin } from "@/lib/navigation/origin"
-import type { BillPayRow } from "@/models/bill-pay"
+import type { BillPayBillRow as BillPayRow } from "@/models/bill-pay"
 import type { CreateBatchesResult } from "@/models/payment-batches"
 
 /** #229 Q1/Q4 (#251): the Create batch dialog — the batch's only draft. A real Dialog (the

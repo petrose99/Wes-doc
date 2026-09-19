@@ -24,7 +24,7 @@ import { withOrigin } from "@/lib/navigation/origin"
 import { useOriginHere } from "@/components/documents/po-compare"
 import { getQueueDetailAction } from "@/app/(app)/workspaces/[workspaceId]/queue-actions"
 import { createPaymentBatchesAction, markInvoicesPaidAction, removePaymentRecordsForDocumentAction, setAmountToPayAction, setPayFromAction } from "@/app/(app)/workspaces/[workspaceId]/(queue)/payments/actions"
-import type { BillPayRow } from "@/models/bill-pay"
+import type { BillPayBillRow as BillPayRow } from "@/models/bill-pay"
 import type { BillsSummary } from "@/models/bills"
 import type { PayerAccountRow } from "@/models/payer-accounts"
 

@@ -1,7 +1,7 @@
 // Deliberately NOT a "use server" module: server actions live upstream and do the auth.
 import { prisma } from "@/lib/db"
 import { decimalToNumber } from "@/lib/money"
-import { listWorkspaceBills, type BillRow, type BillsSummary } from "@/models/bills"
+import { listWorkspaceBills, type BillRow as Bill, type BillsSummary } from "@/models/bills"
 import { listPayerAccounts, type PayerAccountRow } from "@/models/payer-accounts"
 import { processingState } from "@/lib/documents/processing-state"
 import { batchEligibility, isOnBillPay, type BatchEligibility } from "@/lib/payments/eligibility"
@@ -14,8 +14,9 @@ import { agingBucket } from "@/lib/bills/due-date"
  * *Amount to pay* / *Pay From* (a `BillPayPreference`), bank-detail presence and the batch
  * eligibility read off all of that. A projection over `listWorkspaceBills`, never a table. */
 
-export type BillPayRow = {
-  bill: BillRow
+export type BillPayBillRow = {
+  kind: "bill"
+  bill: Bill
   terms: PaymentTerms
   termsLabel: string
   discount: DiscountWindow | null
@@ -32,6 +33,25 @@ export type BillPayRow = {
   /** Scheduled while a pending/approved batch holds the row; the batch's id lets the row link. */
   scheduledBatch: { id: string; name: string | null; status: string } | null
 }
+
+export type ClaimEligibilityReason = "needs_bank_details" | "left_workspace" | "needs_currency"
+export type ClaimEligibility = { eligible: true } | { eligible: false; reason: ClaimEligibilityReason }
+
+/** #295: a reimbursement claim on the same queue as bills — no terms, no discount, no aging (its
+ * Due is the approval date, not a countdown). Eligible once approved with a frozen total, a
+ * currency, and the Claimant's own WorkspaceMember bank details on file; otherwise it stays
+ * visible with the reason (folded into the `needs_bank_details` facet, same chip, wider
+ * membership — the reason on the row picks the detail-pane copy, built on #331). */
+export type BillPayClaimRow = {
+  kind: "claim"
+  claim: { id: string; title: string | null; total: number | null; currencyCode: string | null; submittedAt: Date | null; resolvedAt: Date | null }
+  submitter: { id: string; name: string | null; email: string } | null
+  eligibility: ClaimEligibility
+  paidState: "paid" | "scheduled" | "unpaid"
+  scheduledBatch: { id: string; name: string | null; status: string } | null
+}
+
+export type BillPayRow = BillPayBillRow | BillPayClaimRow
 
 export type BillPayFacet = "ready" | "scheduled" | "needs_bank_details" | "discount"
 
@@ -75,7 +95,7 @@ export async function listBillPay(input: { workspaceId: string; asOf?: Date; fac
   const preferenceByDoc = new Map(preferences.map((p) => [p.documentId, p]))
   const batchByDoc = new Map(batchItems.filter((i) => i.documentId).map((i) => [i.documentId!, i.run]))
 
-  const rows: BillPayRow[] = onQueue.map((bill) => {
+  const billRows: BillPayBillRow[] = onQueue.map((bill) => {
     const supplier = bill.supplierId ? supplierById.get(bill.supplierId) : undefined
     const terms = supplierTerms(supplier)
     const due = remainingDue(bill.total, bill.paidState.paidAmount)
@@ -87,22 +107,75 @@ export async function listBillPay(input: { workspaceId: string; asOf?: Date; fac
     const payFrom = chosen ?? defaultPayerAccount
     const hasBankAccount = supplierHasBankAccount(supplier)
     return {
-      bill, terms, termsLabel: formatTerms(terms), discount, due, amountToPayOverride, amountToPay, payFrom, payFromChosen: chosen !== null, hasBankAccount,
+      kind: "bill", bill, terms, termsLabel: formatTerms(terms), discount, due, amountToPayOverride, amountToPay, payFrom, payFromChosen: chosen !== null, hasBankAccount,
       eligibility: batchEligibility({ hasBankAccount, paidState: bill.paidState.state, amountToPay, hasSupplier: !!bill.supplierId, hasPayerAccount: payFrom !== null }),
       scheduledBatch: batchByDoc.get(bill.documentId) ?? null,
     }
   })
 
+  const claimRows = await listClaimRows(input.workspaceId)
+
+  const rows: BillPayRow[] = [...billRows, ...claimRows]
   const facet = input.facet
   const filtered = rows.filter((row) => {
     if (facet === "ready") return row.eligibility.eligible
-    if (facet === "scheduled") return row.bill.paidState.state === "scheduled"
-    if (facet === "needs_bank_details") return !row.eligibility.eligible && row.eligibility.reason === "needs_bank_details"
-    if (facet === "discount") return row.discount !== null
+    if (facet === "scheduled") return row.kind === "bill" ? row.bill.paidState.state === "scheduled" : row.paidState === "scheduled"
+    if (facet === "needs_bank_details") {
+      if (row.kind === "bill") return !row.eligibility.eligible && row.eligibility.reason === "needs_bank_details"
+      return !row.eligibility.eligible // #295: left_workspace/needs_currency fold into the same chip
+    }
+    if (facet === "discount") return row.kind === "bill" && row.discount !== null
     return true
   })
 
-  return { rows: filtered, summary: summarizeAging(rows, asOf), payerAccounts, defaultPayerAccount, anySupplierHasDiscount }
+  return { rows: filtered, summary: summarizeAging(billRows, asOf), payerAccounts, defaultPayerAccount, anySupplierHasDiscount }
+}
+
+/** #295: approved claims, eligible once they have a frozen total, a currency, and the Claimant's
+ * own bank details on file — mirrors the bill-row shape but with no terms/discount/aging. */
+async function listClaimRows(workspaceId: string): Promise<BillPayClaimRow[]> {
+  const claims = await prisma.expenseClaim.findMany({
+    where: { workspaceId, status: "approved" },
+    select: { id: true, title: true, total: true, currencyCode: true, submitterId: true, submittedAt: true, resolvedAt: true, submitter: { select: { id: true, name: true, email: true } } },
+  })
+  if (claims.length === 0) return []
+  const submitterIds = [...new Set(claims.map((c) => c.submitterId).filter((id): id is string => !!id))]
+  const claimIds = claims.map((c) => c.id)
+  const [members, payments, batchItems] = await Promise.all([
+    submitterIds.length === 0 ? [] : prisma.workspaceMember.findMany({ where: { workspaceId, userId: { in: submitterIds } }, select: { userId: true, bankName: true, bankAccountNumber: true, bankBranchCode: true } }),
+    prisma.expenseClaimPayment.findMany({ where: { workspaceId, claimId: { in: claimIds }, removedAt: null }, select: { claimId: true, amount: true } }),
+    prisma.paymentRunItem.findMany({
+      where: { workspaceId, expenseClaimId: { in: claimIds }, active: true, run: { status: { in: ["pending_approval", "approved", "draft", "sent"] } } },
+      select: { expenseClaimId: true, run: { select: { id: true, name: true, status: true } } },
+    }),
+  ])
+  const memberByUser = new Map(members.map((m) => [m.userId, m]))
+  const paidByClaim = new Map<string, number>()
+  for (const p of payments) paidByClaim.set(p.claimId, (paidByClaim.get(p.claimId) ?? 0) + (decimalToNumber(p.amount) ?? 0))
+  const batchByClaim = new Map(batchItems.filter((i) => i.expenseClaimId).map((i) => [i.expenseClaimId!, i.run]))
+
+  return claims.map((claim) => {
+    const total = decimalToNumber(claim.total)
+    const member = claim.submitterId ? memberByUser.get(claim.submitterId) : undefined
+    const eligibility = claimEligibility({ total, currencyCode: claim.currencyCode, submitterId: claim.submitterId, member })
+    const scheduledBatch = batchByClaim.get(claim.id) ?? null
+    const paidAmount = paidByClaim.get(claim.id) ?? 0
+    const paidState: BillPayClaimRow["paidState"] = total !== null && Math.round(paidAmount * 100) >= Math.round(total * 100) ? "paid" : scheduledBatch !== null ? "scheduled" : "unpaid"
+    return {
+      kind: "claim",
+      claim: { id: claim.id, title: claim.title, total, currencyCode: claim.currencyCode, submittedAt: claim.submittedAt, resolvedAt: claim.resolvedAt },
+      submitter: claim.submitter,
+      eligibility, paidState, scheduledBatch,
+    }
+  })
+}
+
+function claimEligibility(input: { total: number | null; currencyCode: string | null; submitterId: string | null; member: { bankName: string | null; bankAccountNumber: string | null; bankBranchCode: string | null } | undefined }): ClaimEligibility {
+  if (!input.submitterId || !input.member) return { eligible: false, reason: "left_workspace" }
+  if (input.currencyCode === null) return { eligible: false, reason: "needs_currency" }
+  if (input.total === null) return { eligible: false, reason: "needs_currency" }
+  if (!input.member.bankName || !input.member.bankAccountNumber || !input.member.bankBranchCode) return { eligible: false, reason: "needs_bank_details" }
+  return { eligible: true }
 }
 
 function supplierTerms(supplier: { paymentTermsDays: number | null; earlyPaymentDiscountPercent: unknown; earlyPaymentDiscountDays: number | null } | undefined): PaymentTerms {
@@ -119,7 +192,7 @@ export function supplierHasBankAccount(supplier: { iban: string | null; bankDeta
 
 /** The queue's one metric: what is still owed, by age, over the whole queue (not the facet) —
  * the bar reads the same whichever chip is on. */
-function summarizeAging(rows: BillPayRow[], asOf: Date): BillsSummary {
+function summarizeAging(rows: BillPayBillRow[], asOf: Date): BillsSummary {
   const acc: BillsSummary = { current: { count: 0, total: 0 }, "1-30": { count: 0, total: 0 }, "31-60": { count: 0, total: 0 }, "61-90": { count: 0, total: 0 }, "90+": { count: 0, total: 0 }, unknown: { count: 0, total: 0 } }
   for (const row of rows) {
     const key = agingBucket(row.bill.dueDate, asOf) ?? "unknown"
@@ -168,7 +241,7 @@ export async function setPayFromOnRows(input: { workspaceId: string; actorId: st
 export async function earlyPaymentSavings(workspaceId: string, asOf = new Date()): Promise<{ captured: number; capturedCount: number; available: number; availableCount: number; anySupplierHasDiscount: boolean }> {
   const { rows, anySupplierHasDiscount } = await listBillPay({ workspaceId, asOf })
   let available = 0, availableCount = 0
-  for (const row of rows) if (row.discount) { available += row.discount.discountAmount; availableCount += 1 }
+  for (const row of rows) if (row.kind === "bill" && row.discount) { available += row.discount.discountAmount; availableCount += 1 }
   const items = await prisma.paymentRunItem.findMany({
     where: { workspaceId, run: { status: { in: ["approved", "paid"] } }, documentId: { not: null } },
     select: { amount: true, supplier: true, document: { select: { reviewedData: true } } },
