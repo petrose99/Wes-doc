@@ -3,8 +3,9 @@
 import type { QueueArrival } from "@/lib/navigation/origin-server"
 import { useCallback, useState, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
-import { FolderPlus } from "lucide-react"
+import { FolderPlus, Send } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { PostConfirmDialog } from "@/components/queue/post-confirm-dialog"
 import { AddToClaimContext, ClaimPill, useCanCreateClaims, DESKTOP_HINT } from "@/components/queue/claim-card"
 import { AddToClaimDialog, type ClaimCandidate } from "@/components/queue/add-to-claim-dialog"
 import type { AddToClaimResult } from "@/lib/claims/facts"
@@ -33,11 +34,14 @@ import type { ReceiptRow } from "@/models/receipts"
 /** #212's Status and Claim taxonomy as summary chips (#225). */
 export const RECEIPT_FACETS: Facet[] = [
   {
-    // #258: the five processing states — Receipts have no ledger facet (they never post/pay).
+    // #258/#281: the five processing states plus the ledger's own fact, same two-section shape
+    // Invoices' Status facet uses (spec.md §5) — value/label renamed alongside Invoices' in build
+    // step 4.
     param: "status", label: "Status",
-    sections: [{
-      label: "Processing state", options: PROCESSING_STATES.map((value) => ({ value, label: PROCESSING_STATE_LABELS[value] })),
-    }],
+    sections: [
+      { label: "Processing state", options: PROCESSING_STATES.map((value) => ({ value, label: PROCESSING_STATE_LABELS[value] })) },
+      { label: "Ledger", options: [{ value: "synced", label: "Posted" }] },
+    ],
   },
   // #273: Unclaimed + the four claim statuses, words from the one label map.
   { param: "claim", label: "Claim", options: [{ value: "unclaimed", label: "Unclaimed" }, ...(Object.keys(CLAIM_STATUS_LABELS) as Array<keyof typeof CLAIM_STATUS_LABELS>).map((value) => ({ value, label: CLAIM_STATUS_LABELS[value] }))] },
@@ -51,7 +55,7 @@ const SORTS: SortOption<ReceiptRow>[] = [
   { key: "merchant", label: "Merchant A–Z", compare: (a, b) => (a.merchant ?? "￿").localeCompare(b.merchant ?? "￿") },
 ]
 
-export function ReceiptQueue({ workspaceId, basePath, receipts, claimsEnabled = false, currentUserId = null, minConfidencePercent, views, viewsPhone, stat, initialSelectedId, fieldTable = null, workspaceDocumentCount, todayOutcome, arrival }: {
+export function ReceiptQueue({ workspaceId, basePath, receipts, claimsEnabled = false, currentUserId = null, minConfidencePercent, views, viewsPhone, stat, initialSelectedId, fieldTable = null, workspaceDocumentCount, todayOutcome, arrival, connectionId = null }: {
   workspaceId: string
   basePath: string
   receipts: ReceiptRow[]
@@ -73,8 +77,13 @@ export function ReceiptQueue({ workspaceId, basePath, receipts, claimsEnabled = 
   todayOutcome: { approvedToday: number; postedToday: number }
   /** #268: the Origin strip's model + the missing-row notice, from `queueArrival` on the server. */
   arrival?: QueueArrival
+  /** #281: the workspace's active ledger connection id, or null with none/inactive — the bulk
+   * Post button still shows (§3 never hides it); every row reads ineligible and the confirm
+   * dialog's Post stays disabled until a connection exists. */
+  connectionId?: string | null
 }) {
   const [needsAttention, setNeedsAttention] = useState<Set<string>>(new Set())
+  const [posting, setPosting] = useState<string[] | null>(null)
   const router = useRouter()
   const canCreateClaims = useCanCreateClaims()
   // #273 S2: one dialog for every opener; its state lives here (Radix unmount contract).
@@ -88,6 +97,9 @@ export function ReceiptQueue({ workspaceId, basePath, receipts, claimsEnabled = 
     const receipt = byId.get(id)
     return { id, type: "Receipt", vendor: receipt?.merchant ?? null, number: receipt?.receiptNumber ?? null, amount: receipt?.total ?? null, currencyCode: receipt?.currencyCode ?? null, dateLabel: "Date", date: receipt?.purchaseDate ?? null }
   }
+  // #281 spec.md §2: the client's eligibility guess (never the gate — the server re-resolves at
+  // confirm time). Receipts have no cancel concept, so status is the only signal this row carries.
+  const postEligible = (receipt: ReceiptRow) => receipt.status === "reviewed"
 
   // One state per row, shared by the leading glyph and the State column / pane Status line (#258).
   const receiptState = (receipt: ReceiptRow) => processingState({
@@ -210,14 +222,21 @@ export function ReceiptQueue({ workspaceId, basePath, receipts, claimsEnabled = 
     bulkActions={({ selectedIds, clear }) => <DocumentBulkActions
       workspaceId={workspaceId} noun="receipt" selectedIds={selectedIds} clear={clear} toRecord={toRecord}
       eligibleIds={selectedIds.filter((id) => !byId.get(id)?.blockedByCheck)} exportFilename="receipts.csv"
-      extra={claimsEnabled && canCreateClaims ? (() => {
-        const claimable = selectedIds.filter((id) => byId.get(id)?.claimEligibility.status === "ready").length
-        return <>
-          {claimable === 0 && <span className="w-full text-xs text-slate-600 sm:w-auto" id="bulk-claim-reason">None of these can be claimed</span>}
-          <Button type="button" size="sm" variant="outline" disabled={claimable === 0} aria-describedby={claimable === 0 ? "bulk-claim-reason" : undefined}
-            onClick={() => setClaimDialog({ ids: selectedIds, forceNew: false })}><FolderPlus className="h-3.5 w-3.5" aria-hidden />Add to claim</Button>
-        </>
-      })() : null}
+      extra={<>
+        {claimsEnabled && canCreateClaims && (() => {
+          const claimable = selectedIds.filter((id) => byId.get(id)?.claimEligibility.status === "ready").length
+          return <>
+            {claimable === 0 && <span className="w-full text-xs text-slate-600 sm:w-auto" id="bulk-claim-reason">None of these can be claimed</span>}
+            <Button type="button" size="sm" variant="outline" disabled={claimable === 0} aria-describedby={claimable === 0 ? "bulk-claim-reason" : undefined}
+              onClick={() => setClaimDialog({ ids: selectedIds, forceNew: false })}><FolderPlus className="h-3.5 w-3.5" aria-hidden />Add to claim</Button>
+          </>
+        })()}
+        {/* #281 (#248): Post — bulk-bar order Approve · Post · Export | Delete; enabled whenever
+            the selection is non-empty, never gated on the client's eligibility guess (spec.md §3). */}
+        <Button type="button" size="sm" variant="outline" disabled={selectedIds.length === 0} onClick={() => setPosting(selectedIds)}>
+          <Send className="h-3.5 w-3.5" aria-hidden />Post
+        </Button>
+      </>}
       onHeldBack={(heldBack, approved) => setNeedsAttention((prev) => { const next = new Set(prev); for (const id of heldBack) next.add(id); for (const id of approved) next.delete(id); return next })} />}
     paneActions={(receipt, { refresh }) => <DocumentPaneActions workspaceId={workspaceId} documentId={receipt.documentId} noun="receipt"
       status={receipt.status} openReviewTaskId={receipt.openReviewTaskId} onDone={refresh} />}
@@ -228,5 +247,8 @@ export function ReceiptQueue({ workspaceId, basePath, receipts, claimsEnabled = 
     {claimsEnabled && <AddToClaimDialog open={claimDialog !== null} workspaceId={workspaceId} forceNew={claimDialog?.forceNew ?? false}
       candidates={(claimDialog?.ids ?? []).map(toCandidate).filter((c): c is ClaimCandidate => c !== null)}
       onClose={() => setClaimDialog(null)} onAdded={onClaimAdded} />}
+    <PostConfirmDialog open={posting !== null} onClose={() => setPosting(null)} workspaceId={workspaceId} connectionId={connectionId}
+      records={(posting ?? []).map(toRecord)} eligibleIds={(posting ?? []).filter((id) => { const receipt = byId.get(id); return receipt && postEligible(receipt) })}
+      onPosted={() => router.refresh()} />
   </AddToClaimContext.Provider>
 }

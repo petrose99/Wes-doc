@@ -294,3 +294,13 @@ export async function kickIntegrationPushDrain(): Promise<void> {
     })
   } catch { /* swallowed: the drain drivers are the guarantee, this is only latency */ }
 }
+
+/** #281: the bulk Post button's target connection, shared by the Invoice, Receipt and Bank
+ * Statement queue pages (hoisted once a third page needed the same lookup — ladder rung 2). Null
+ * (integrations off, none configured, or none active) still lets the button render — the confirm
+ * dialog and the connection-failure band are what tell the operator why, never a hidden button. */
+export async function getActiveIntegrationConnectionId(workspaceId: string): Promise<string | null> {
+  if (!config.integrations.enabled) return null
+  const connection = await prisma.integrationConnection.findFirst({ where: { workspaceId, status: "active" }, select: { id: true } })
+  return connection?.id ?? null
+}

@@ -2,13 +2,16 @@
 
 import type { QueueArrival } from "@/lib/navigation/origin-server"
 import { useState, type ReactNode } from "react"
+import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { AlertTriangle, CheckCircle2, Loader2, Search } from "lucide-react"
+import { AlertTriangle, CheckCircle2, Loader2, Search, Send } from "lucide-react"
 import type { FieldTable } from "@/lib/configuration/field-table"
 import { QueueScreen, type QueueColumn, type SortOption } from "@/components/queue/queue-screen"
 import { joinSegments } from "@/components/queue/queue-card"
 import { DocumentBulkActions, DocumentPaneActions } from "@/components/queue/document-actions"
 import { formatDate, formatMoney, TitleCell } from "@/components/queue/row-cells"
+import { Button } from "@/components/ui/button"
+import { PostConfirmDialog } from "@/components/queue/post-confirm-dialog"
 import type { Facet } from "@/components/queue/facet-filters"
 import type { ItemizedRecord } from "@/components/typed-destinations/bulk-approve-receipt"
 import { bulkExportDocumentsAction } from "@/app/(app)/workspaces/[workspaceId]/pipeline-actions"
@@ -50,6 +53,12 @@ export const PURCHASE_ORDER_FACETS: Facet[] = [
   ...DOCUMENT_FACETS_BASE(),
   { param: "consumed", label: "Consumption", options: [{ value: "open", label: "Open" }, { value: "full", label: "Fully invoiced" }] },
 ]
+/** #281 spec.md §5: Bank Statements get the same Ledger vocabulary as Invoices' Status facet
+ * (recon §6: today there is none). Value/labels renamed alongside Invoices' in build step 4. */
+export const BANK_STATEMENT_FACETS: Facet[] = (() => {
+  const [status, ...rest] = DOCUMENT_FACETS_BASE()
+  return [{ ...status, sections: [...status.sections!, { label: "Ledger", options: [{ value: "synced", label: "Posted" }] }] }, ...rest]
+})()
 
 const SORTS: SortOption<DocumentQueueRow>[] = [
   { key: "newest", label: "Newest first", compare: () => 0 },
@@ -73,7 +82,7 @@ function StatusPill({ status }: { status: string }) {
   return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}>{STATUS_LABEL[status] ?? status.replaceAll("_", " ")}</span>
 }
 
-export function DocumentQueue({ workspaceId, basePath, title, noun, itemType, rows, supplierLabel = "Supplier", views, viewsPhone, stat, initialSelectedId, emptyBody, showInstitution = false, purchaseOrders = false, fieldTable = null, workspaceDocumentCount, todayOutcome, arrival }: {
+export function DocumentQueue({ workspaceId, basePath, title, noun, itemType, rows, supplierLabel = "Supplier", views, viewsPhone, stat, initialSelectedId, emptyBody, showInstitution = false, purchaseOrders = false, fieldTable = null, workspaceDocumentCount, todayOutcome, arrival, connectionId = null }: {
   /** #252: Admin › Configuration › Fields for this queue's type, when one has been saved. */
   fieldTable?: FieldTable | null
   workspaceId: string
@@ -100,13 +109,24 @@ export function DocumentQueue({ workspaceId, basePath, title, noun, itemType, ro
   todayOutcome?: { approvedToday: number; postedToday: number }
   /** #268: the Origin strip's model + the missing-row notice, from `queueArrival` on the server. */
   arrival?: QueueArrival
+  /** #281: the bulk Post button's target connection — Bank Statements only (`todayOutcome` set
+   * marks the postable queue, same signal the done-state sentence already uses). Purchase Orders
+   * never posts, so it's left undefined there. */
+  connectionId?: string | null
 }) {
+  const router = useRouter()
   const [needsAttention, setNeedsAttention] = useState<Set<string>>(new Set())
+  const [posting, setPosting] = useState<string[] | null>(null)
+  const postable = todayOutcome !== undefined
   const byId = new Map(rows.map((row) => [row.id, row]))
   const toRecord = (id: string): ItemizedRecord => {
     const row = byId.get(id)
     return { id, type: itemType, vendor: row?.supplier ?? null, number: null, amount: null, currencyCode: null, dateLabel: "Received", date: row?.receivedAt ?? null }
   }
+  // #281 spec.md §2: the client's eligibility guess (never the gate — the server re-resolves at
+  // confirm time). `DocumentQueueRow` carries no cancelled/category-confirmed signal, so this is
+  // status only; a row this marks eligible can still come back ineligible server-side.
+  const postEligible = (row: DocumentQueueRow) => row.status === "reviewed"
 
   const columns: QueueColumn<DocumentQueueRow>[] = [
     {
@@ -158,7 +178,8 @@ export function DocumentQueue({ workspaceId, basePath, title, noun, itemType, ro
     toast.success(`Exported ${rows.length} ${noun}${rows.length === 1 ? "" : "s"}`)
   }
 
-  return <QueueScreen<DocumentQueueRow>
+  return <>
+    <QueueScreen<DocumentQueueRow>
     origin={arrival?.origin ?? null}
     initialMissing={arrival?.initialMissing}
     title={title}
@@ -175,7 +196,7 @@ export function DocumentQueue({ workspaceId, basePath, title, noun, itemType, ro
     fieldTable={fieldTable}
     selectable
     sortOptions={SORTS}
-    facets={purchaseOrders ? PURCHASE_ORDER_FACETS : DOCUMENT_FACETS}
+    facets={purchaseOrders ? PURCHASE_ORDER_FACETS : postable ? BANK_STATEMENT_FACETS : DOCUMENT_FACETS}
     views={views}
     viewsPhone={viewsPhone}
     stat={stat}
@@ -200,6 +221,15 @@ export function DocumentQueue({ workspaceId, basePath, title, noun, itemType, ro
     bulkActions={({ selectedIds, clear }) => <DocumentBulkActions
       workspaceId={workspaceId} noun={noun} selectedIds={selectedIds} clear={clear} toRecord={toRecord}
       eligibleIds={selectedIds.filter((id) => byId.get(id)?.status !== "failed" && byId.get(id)?.status !== "queued")} exportFilename={`${noun.replaceAll(" ", "-")}s.csv`}
+      // #281 (#248): Post — bulk-bar order Approve · Post · Export | Delete; enabled whenever the
+      // selection is non-empty, never gated on the client's eligibility guess (spec.md §3).
+      extra={postable ? <Button type="button" size="sm" variant="outline" disabled={selectedIds.length === 0} onClick={() => setPosting(selectedIds)}>
+        <Send className="h-3.5 w-3.5" aria-hidden />Post
+      </Button> : null}
       onHeldBack={(heldBack, approved) => setNeedsAttention((prev) => { const next = new Set(prev); for (const id of heldBack) next.add(id); for (const id of approved) next.delete(id); return next })} />}
     paneActions={(row, { refresh }) => <DocumentPaneActions workspaceId={workspaceId} documentId={row.id} noun={noun} status={row.status} openReviewTaskId={null} onDone={refresh} />} />
+    {postable && <PostConfirmDialog open={posting !== null} onClose={() => setPosting(null)} workspaceId={workspaceId} connectionId={connectionId ?? null}
+      records={(posting ?? []).map(toRecord)} eligibleIds={(posting ?? []).filter((id) => { const row = byId.get(id); return row && postEligible(row) })}
+      onPosted={() => router.refresh()} />}
+  </>
 }
