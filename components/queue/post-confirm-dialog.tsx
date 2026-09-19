@@ -74,8 +74,7 @@ export function PostConfirmDialog({ open, onClose, workspaceId, connectionId, re
 
   const tableRecords: ItemizedRecord[] = records.map((r) => eligibleSet.has(r.id) ? r : { ...r, struck: true, note: r.note ?? (connectionId ? "Selection may be stale — recheck after posting" : "No ledger connected") })
 
-  return <Dialog open={open} onClose={close} title="Post to ledger" width="max-w-2xl"
-    description="This sends the reviewed data to the ledger.">
+  return <Dialog open={open} onClose={close} title="Post to ledger" width="max-w-2xl">
     <div className="space-y-3 px-5 py-4">
       <EligibilityStrip eligible={eligibleSet.size} total={records.length} label="Eligible to post" />
       <ItemizedRecapTable records={tableRecords}
