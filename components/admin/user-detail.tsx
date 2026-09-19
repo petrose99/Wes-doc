@@ -472,7 +472,10 @@ function MemberBody({ workspaceId, row, currentWorkspaceId, currentCompanyName, 
               toast.success(`Bank details for ${currentCompanyName} removed`)
               refreshBoth()
             }}>Remove…</Button>}
-          </div> : <Consequence>Ask an owner: <span className="font-medium">{ownerNames(ownersByCompany[currentWorkspaceId])}</span> can change bank details, or {name} can under their Account.</Consequence>}
+          </div> : (viewerOwnsCurrent || row.isViewer)
+            // Phone-only gate: the PhoneNote above already says to use a wider screen, so no "ask an owner" here.
+            ? null
+            : <Consequence>Ask an owner: <span className="font-medium">{ownerNames(ownersByCompany[currentWorkspaceId])}</span> can change bank details, or {name} can under their Account.</Consequence>}
         </>}
         {companies.length > 1 && <Consequence>Bank details for other companies are set from within each company.</Consequence>}
       </fieldset>}
@@ -487,14 +490,16 @@ function MemberBody({ workspaceId, row, currentWorkspaceId, currentCompanyName, 
         const errorId = `${selectId}-error`
         const otherOwners = ownersByCompany[section.workspaceId] ?? []
         const onlyOwner = row.isViewer && section.role === "owner" && otherOwners.length === 0
-        const canRemove = editable && !onlyOwner && !(row.isViewer && currentCompanyKind === "personal" && section.workspaceId === currentWorkspaceId)
+        // Leave (own row) needs no ownership of the company being left; Remove (someone else's row) does.
+        const showRemove = !phone && (row.isViewer ? !(currentCompanyKind === "personal" && section.workspaceId === currentWorkspaceId) : section.viewerOwns)
+        const canRemove = showRemove && !onlyOwner
         const removeLabel = row.isViewer ? `Leave ${section.workspaceName}` : `Remove from ${section.workspaceName}`
         return <section key={section.workspaceId} aria-labelledby={`${selectId}-heading`} className="flex flex-col gap-2">
           <div className="flex items-start justify-between gap-3">
             <h3 id={`${selectId}-heading`} className="text-sm font-semibold text-slate-900">
               {section.workspaceName}{section.isCurrent && <span className="ml-2 text-xs font-normal text-slate-500">This company</span>}
             </h3>
-            {editable && <Button type="button" size="sm" variant="ghost" disabled={!canRemove} aria-describedby={onlyOwner ? reasonId : undefined}
+            {showRemove && <Button type="button" size="sm" variant="ghost" disabled={!canRemove} aria-describedby={onlyOwner ? reasonId : undefined}
               aria-label={row.isViewer ? removeLabel : `Remove ${name} from ${section.workspaceName}`}
               className="h-8 gap-1.5 text-slate-700 hover:bg-red-50 hover:text-red-800" onClick={() => { void removeFrom(section) }}>
               <X aria-hidden className="h-3.5 w-3.5" /><span className="hidden md:inline">{removeLabel}</span>
