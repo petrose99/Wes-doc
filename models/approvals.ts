@@ -267,6 +267,39 @@ export async function countReadyToApprove(workspaceId: string, actor: ApprovalAc
   return count
 }
 
+/** #287 Admin Dashboard "Ready to Approve" column: the disjoint half of `countReadyToApprove`'s
+ * invoice-task set — same ready predicate, but excluding any task `listPoMismatchRows` would also
+ * match (no open `match-variance` gate), so the Dashboard's two columns never double-count the
+ * same task. Does not include the expense-claim addend `countReadyToApprove` adds (#273) — that's
+ * a separate, unrelated queue this column isn't about. */
+export async function countInvoiceApprovalsReadyToApprove(workspaceId: string, actor: ApprovalActor): Promise<number> {
+  const ctx = await loadSubmittedApprovals(workspaceId)
+  let count = 0
+  for (const task of ctx.tasks) {
+    const gates = ctx.openGatesByDocument.get(task.documentId) ?? []
+    const hasMismatch = gates.some((gate) => gate.gateType === MATCH_VARIANCE_GATE_TYPE)
+    if (hasMismatch) continue
+    const { canDecide, eligibility } = deriveRowFacts(task, actor, ctx)
+    if (canDecide && eligibility.status === "ready") count += 1
+  }
+  return count
+}
+
+/** #287 Admin Dashboard "Pending PO mismatch approvals" column: the other disjoint half — same
+ * ready predicate, but only tasks with the open `match-variance` gate `listPoMismatchRows` shows. */
+export async function countPoMismatchesReadyToApprove(workspaceId: string, actor: ApprovalActor): Promise<number> {
+  const ctx = await loadSubmittedApprovals(workspaceId)
+  let count = 0
+  for (const task of ctx.tasks) {
+    const gates = ctx.openGatesByDocument.get(task.documentId) ?? []
+    const hasMismatch = gates.some((gate) => gate.gateType === MATCH_VARIANCE_GATE_TYPE)
+    if (!hasMismatch) continue
+    const { canDecide, eligibility } = deriveRowFacts(task, actor, ctx)
+    if (canDecide && eligibility.status === "ready") count += 1
+  }
+  return count
+}
+
 /** #257 S6/S7: what the Detail sheet's Approval tab shows beyond the decisions themselves — who
  * started the run and when, whose turn it is now, the supplier's standing facts and the near
  * duplicate the duplicate check named. Loaded with the document (`getQueueDetailAction`), never

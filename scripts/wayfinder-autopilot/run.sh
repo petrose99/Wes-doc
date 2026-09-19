@@ -360,13 +360,22 @@ while [ "$n" -lt "$MAX" ]; do
     f="$(ls -t "$HOME/.claude/plugins/cache/"*/"${plug:-*}"/*/skills/"$base"/SKILL.md "$HOME/.claude/plugins/cache/"*/*/*/skills/*/"$base"/SKILL.md 2>/dev/null | head -1)"
     [ -n "$f" ] && echo "$f"
   }
+  # Digests: $AP/skills/<name>.md is the skill with its overview, routing,
+  # voice and scope prose removed and every checklist, rubric and output
+  # format kept verbatim (a spec session read ~92 KB of Intent skills and
+  # ~35 KB of Impeccable, ≈30K tokens, much of it not operative). The digest
+  # is what a session reads; the full file is named beside it as fallback.
   skill_table() {
-    printf '\n\n## Skill files (read these; there is no Skill tool in this session)\n\n'
-    local s p
+    printf '\n\n## Skill files (read these; there is no Skill tool in this session)\n\nA `digest` is the skill with only its operative content (checklists, rubrics, output formats, verbatim); read it instead of the full file, and the full file by range only for a section the digest lacks.\n\n'
+    local s p d
     for s in specify fortify articulate include evaluate journey organize strategize wireframe grilling domain-modeling product:product-requirements product:chief-product-officer marketing:positioning-and-messaging marketing:marketing-copywriting; do
-      p="$(skill_file "$s")"; [ -n "$p" ] && printf -- '- `%s` → `%s`\n' "$s" "$p"
+      p="$(skill_file "$s")"; d="$AP/skills/${s#*:}.md"
+      if [ -f "$d" ]; then printf -- '- `%s` → digest `%s` (full: `%s`)\n' "$s" "$d" "$p"
+      elif [ -n "$p" ]; then printf -- '- `%s` → `%s`\n' "$s" "$p"; fi
     done
-    printf -- '- `impeccable` → `%s/.claude/skills/impeccable/SKILL.md` (§Setup, §How to design); sub-commands `shape`, `layout`, `typeset`, `clarify`, `polish`, `critique`, `audit`, `adapt`, … → `%s/.claude/skills/impeccable/reference/<name>.md`; craft floor → `%s/.claude/skills/impeccable/reference/craft-floor.md`\n' "$ROOT" "$ROOT" "$ROOT"
+    if [ -f "$AP/skills/impeccable.md" ]; then printf -- '- `impeccable` → digest `%s/skills/impeccable.md` (full: `%s/.claude/skills/impeccable/SKILL.md`)\n' "$AP" "$ROOT"
+    else printf -- '- `impeccable` → `%s/.claude/skills/impeccable/SKILL.md` (§Setup, §How to design)\n' "$ROOT"; fi
+    printf -- '- `impeccable <sub-command>` (`shape`, `layout`, `typeset`, `clarify`, `polish`, `critique`, `audit`, `adapt`, …) → `%s/.claude/skills/impeccable/reference/<name>.md`\n- craft floor → `%s/.claude/skills/impeccable/reference/craft-floor.md` (read whole before the first UI edit)\n' "$ROOT" "$ROOT"
     printf -- '- Detector: `impeccable detect --json <targets>` (CLI) and the in-page `detect.js` overlay — see the area primer.\n'
   }
   { if [ "${PROMPT_MODE:-slash}" = bare ]; then cat "$AP/core.md"; printf '\n\n---\n\n'; fi
