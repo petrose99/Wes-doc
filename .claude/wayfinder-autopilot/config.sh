@@ -18,11 +18,11 @@ EFFORT="low"                # every autopilot session, whichever model; independ
 # vs 4–19M in per session); the judgement phases get medium so they spend
 # thinking instead of turns — the 173- and 190-turn close sessions on #286
 # were flailing at low. Build and measure are execution from tables: low.
-EFFORT_SPEC="medium"
-EFFORT_CLOSE="medium"
+EFFORT_SPEC="low"
+EFFORT_CLOSE="low"
 EFFORT_BUILD="low"
 EFFORT_MEASURE="low"
-EFFORT_SINGLE="medium"
+EFFORT_SINGLE="low"
 # Token guard (hooks/token-guard.sh): Read without a range refused past this
 # many lines; images refused past this many per session.
 READ_MAX_LINES=220
