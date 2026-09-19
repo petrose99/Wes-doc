@@ -12,6 +12,8 @@ import { DocumentBulkActions, DocumentPaneActions } from "@/components/queue/doc
 import { formatDate, formatMoney, TitleCell } from "@/components/queue/row-cells"
 import { Button } from "@/components/ui/button"
 import { PostConfirmDialog } from "@/components/queue/post-confirm-dialog"
+import { ConnectionBand } from "@/components/queue/connection-band"
+import type { LedgerBandStatus } from "@/lib/integration-push"
 import type { Facet } from "@/components/queue/facet-filters"
 import type { ItemizedRecord } from "@/components/typed-destinations/bulk-approve-receipt"
 import { bulkExportDocumentsAction } from "@/app/(app)/workspaces/[workspaceId]/pipeline-actions"
@@ -84,7 +86,7 @@ function StatusPill({ status }: { status: string }) {
   return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}>{STATUS_LABEL[status] ?? status.replaceAll("_", " ")}</span>
 }
 
-export function DocumentQueue({ workspaceId, basePath, title, noun, itemType, rows, supplierLabel = "Supplier", views, viewsPhone, stat, initialSelectedId, emptyBody, showInstitution = false, purchaseOrders = false, fieldTable = null, workspaceDocumentCount, todayOutcome, arrival, connectionId = null }: {
+export function DocumentQueue({ workspaceId, basePath, title, noun, itemType, rows, supplierLabel = "Supplier", views, viewsPhone, stat, initialSelectedId, emptyBody, showInstitution = false, purchaseOrders = false, fieldTable = null, workspaceDocumentCount, todayOutcome, arrival, connectionId = null, connectionBandStatus = null, isOwner = false }: {
   /** #252: Admin › Configuration › Fields for this queue's type, when one has been saved. */
   fieldTable?: FieldTable | null
   workspaceId: string
@@ -115,6 +117,10 @@ export function DocumentQueue({ workspaceId, basePath, title, noun, itemType, ro
    * marks the postable queue, same signal the done-state sentence already uses). Purchase Orders
    * never posts, so it's left undefined there. */
   connectionId?: string | null
+  /** #281 spec.md §6: the connection-failure band's cause — Bank Statements only, same `postable`
+   * gate as `connectionId`. */
+  connectionBandStatus?: LedgerBandStatus | null
+  isOwner?: boolean
 }) {
   const router = useRouter()
   const [needsAttention, setNeedsAttention] = useState<Set<string>>(new Set())
@@ -184,6 +190,7 @@ export function DocumentQueue({ workspaceId, basePath, title, noun, itemType, ro
     <QueueScreen<DocumentQueueRow>
     origin={arrival?.origin ?? null}
     initialMissing={arrival?.initialMissing}
+    connectionBand={postable ? <ConnectionBand status={connectionBandStatus} workspaceId={workspaceId} isOwner={isOwner} /> : null}
     title={title}
     basePath={basePath}
     rows={rows}

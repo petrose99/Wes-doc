@@ -11,7 +11,7 @@ import { getSavedFieldTable } from "@/models/field-configs"
 import { isFieldTableType } from "@/lib/configuration/field-table"
 import { summarizePoConsumption, type PoConsumption } from "@/models/po-matching"
 import type { ItemizedRecord } from "@/components/typed-destinations/bulk-approve-receipt"
-import { getActiveIntegrationConnectionId } from "@/lib/integration-push"
+import { getActiveIntegrationConnectionId, getLedgerConnectionBandStatus } from "@/lib/integration-push"
 
 const STATUSES = new Set(["queued", "needs_review", "ready_for_review", "reviewed", "failed"])
 
@@ -39,14 +39,16 @@ export async function DocumentQueuePage({ params, searchParams, docType, title, 
   const user = await getCurrentUser()
   const membership = await requireWorkspaceRole(workspaceId, user.id)
   const isBank = docType === "bank_statement"
-  const [documents, institutions, workspaceDocumentCount, todayOutcome, connectionId] = await Promise.all([
+  const [documents, institutions, workspaceDocumentCount, todayOutcome, connectionId, connectionBandStatus] = await Promise.all([
     listWorkspaceDocuments(workspaceId, { docType, status: status && STATUSES.has(status) ? status : undefined }),
     isBank ? listWorkspaceInstitutions(workspaceId) : Promise.resolve([]),
     // #264 spec §2: first-use means the workspace has never held a document of any type.
     countWorkspaceDocuments(workspaceId),
     showTodayOutcome ? getTodayOutcome(workspaceId) : Promise.resolve(undefined),
-    // #281: the bulk Post button's target connection — Bank Statements only.
+    // #281: the bulk Post button's target connection and spec.md §6's connection-failure band —
+    // Bank Statements only.
     isBank ? getActiveIntegrationConnectionId(workspaceId) : Promise.resolve(null),
+    isBank ? getLedgerConnectionBandStatus(workspaceId) : Promise.resolve(null),
   ])
   const institutionName = new Map(institutions.map((institution) => [institution.id, institution.name]))
   // #228 Q8: the Purchase Orders queue reads consumption per PO — Invoiced (amount and %) and
@@ -96,5 +98,7 @@ export async function DocumentQueuePage({ params, searchParams, docType, title, 
     purchaseOrders={purchaseOrders}
     workspaceDocumentCount={workspaceDocumentCount}
     todayOutcome={todayOutcome}
-    connectionId={connectionId} />
+    connectionId={connectionId}
+    connectionBandStatus={connectionBandStatus}
+    isOwner={membership.role === "owner"} />
 }

@@ -19,6 +19,8 @@ import { ReasonDialog } from "@/components/list-screen/reason-dialog-button"
 import type { Facet } from "@/components/queue/facet-filters"
 import { ApprovalBulkAction, type ApprovalWorkflowOption } from "@/components/typed-destinations/approval-bulk-action"
 import { PostConfirmDialog } from "@/components/queue/post-confirm-dialog"
+import { ConnectionBand } from "@/components/queue/connection-band"
+import type { LedgerBandStatus } from "@/lib/integration-push"
 import { Button } from "@/components/ui/button"
 import { Send } from "lucide-react"
 import { ConfidenceField, ProcessingStateGlyph } from "@/components/typed-destinations/row-signals"
@@ -88,7 +90,7 @@ const SORTS: SortOption<BillRow>[] = [
   { key: "supplier", label: "Supplier A–Z", compare: (a, b) => (a.supplier ?? "￿").localeCompare(b.supplier ?? "￿") },
 ]
 
-export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercent, availableWorkflows = [], views, viewsPhone, stat, initialSelectedId, fieldTable = null, workspaceDocumentCount, todayOutcome, inboundAddress, arrival, connectionId = null }: {
+export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercent, availableWorkflows = [], views, viewsPhone, stat, initialSelectedId, fieldTable = null, workspaceDocumentCount, todayOutcome, inboundAddress, arrival, connectionId = null, connectionBandStatus = null, isOwner = false }: {
   workspaceId: string
   basePath: string
   bills: BillRow[]
@@ -117,6 +119,10 @@ export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercen
    * Post button still shows (§3's enablement rule never hides it), but every row reads ineligible
    * and the confirm dialog's Post stays disabled until a connection exists. */
   connectionId?: string | null
+  /** #281 spec.md §6: the connection-failure band's cause, null when connected and healthy (band
+   * hidden) or integrations are off. */
+  connectionBandStatus?: LedgerBandStatus | null
+  isOwner?: boolean
 }) {
   const router = useRouter()
   const origin = useOriginHere()
@@ -136,6 +142,15 @@ export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercen
   // isn't one of them, so a row this marks eligible can still come back ineligible server-side —
   // that outcome shows in the confirm dialog's per-row reason, not as a silent drop (H9).
   const postEligible = (bill: BillRow) => !bill.cancelledAt && bill.status === "reviewed" && bill.paymentStatus?.toLowerCase() !== "posted"
+  // #281 spec.md §7: the pane ⋯'s "Post to ledger" reason — the same guess as `postEligible`,
+  // named so a keyboard/screen-reader user gets it via `aria-describedby` (H6), not a hover tooltip.
+  const postIneligibleReason = (bill: BillRow): string | null => {
+    if (!connectionId) return "No ledger connected"
+    if (bill.cancelledAt) return "Invoice is cancelled"
+    if (bill.status !== "reviewed") return "Not yet reviewed"
+    if (bill.paymentStatus?.toLowerCase() === "posted") return "Already posted to your ledger"
+    return null
+  }
 
   // One state per row, shared by the leading glyph and the State column / pane Status line
   // (#258): heldBack folds in here so the glyph and the pill can no longer disagree (#258 closed
@@ -233,6 +248,7 @@ export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercen
     <QueueScreen<BillRow>
     origin={arrival?.origin ?? null}
     initialMissing={arrival?.initialMissing}
+    connectionBand={<ConnectionBand status={connectionBandStatus} workspaceId={workspaceId} isOwner={isOwner} />}
       title="Invoices"
       basePath={basePath}
       rows={bills}
@@ -308,7 +324,11 @@ export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercen
         status={bill.status} openReviewTaskId={bill.openReviewTaskId} cancelled={!!bill.cancelledAt} onDone={refresh} />}
       paneMenu={(bill) => {
         const info = cancelInfo(bill)
+        const reason = postIneligibleReason(bill)
         return <>
+          {/* #281 spec.md §7: single-doc "Post to ledger" — disabled (not hidden, H9) when
+              ineligible, reusing the bulk dialog's shape for a one-row selection. */}
+          <PaneMenuItem disabled={!!reason} hint={reason ?? undefined} onClick={() => setPosting([bill.documentId])}>Post to ledger</PaneMenuItem>
           {info && <PaneMenuItem tone="amber" disabled={!info.canCancel} hint={info.reason ?? undefined} onClick={() => setCancelling(bill)}>Cancel invoice…</PaneMenuItem>}
         </>
       }} />

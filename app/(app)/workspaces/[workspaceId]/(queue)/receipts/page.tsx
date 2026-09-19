@@ -14,7 +14,7 @@ import { SavedViewPicker } from "@/components/typed-destinations/saved-view-pick
 import { getDocumentMatchRateStats } from "@/lib/analytics/workspace-analytics"
 import { countWorkspaceDocuments } from "@/models/documents"
 import { getTodayOutcome } from "@/models/queue-outcome"
-import { getActiveIntegrationConnectionId } from "@/lib/integration-push"
+import { getActiveIntegrationConnectionId, getLedgerConnectionBandStatus } from "@/lib/integration-push"
 
 export const dynamic = "force-dynamic"
 
@@ -42,7 +42,7 @@ export async function ReceiptsQueuePage({ params, searchParams, selectedDocument
   const capabilities = await getWorkspaceCapabilities(workspaceId)
   const claimsEnabled = capabilities.has("expense-approvals")
   const onlyTouchless = touchless === "1"
-  const [{ receipts }, minConfidencePercent, savedViews, matchRate, fieldTable, workspaceDocumentCount, todayOutcome, connectionId] = await Promise.all([
+  const [{ receipts }, minConfidencePercent, savedViews, matchRate, fieldTable, workspaceDocumentCount, todayOutcome, connectionId, connectionBandStatus] = await Promise.all([
     listWorkspaceReceipts({ workspaceId, statusFilter, claimFilter, onlyTouchless }),
     getMinConfidencePercent(workspaceId),
     listSavedViews({ workspaceId, viewKey: "receipts", userId: user.id }),
@@ -51,8 +51,9 @@ export async function ReceiptsQueuePage({ params, searchParams, selectedDocument
     // #264 spec §2: the three-way empty state's inputs.
     countWorkspaceDocuments(workspaceId),
     getTodayOutcome(workspaceId),
-    // #281: the bulk Post button's target connection.
+    // #281: the bulk Post button's target connection, and spec.md §6's connection-failure band.
     getActiveIntegrationConnectionId(workspaceId),
+    getLedgerConnectionBandStatus(workspaceId),
   ])
   const currentViewFilters: Record<string, string> = {
     ...(statusFilter ? { status: statusFilter } : {}), ...(claimFilter ? { claim: claimFilter } : {}),
@@ -73,6 +74,8 @@ export async function ReceiptsQueuePage({ params, searchParams, selectedDocument
     workspaceDocumentCount={workspaceDocumentCount}
     todayOutcome={todayOutcome}
     connectionId={connectionId}
+    connectionBandStatus={connectionBandStatus}
+    isOwner={membership.role === "owner"}
     stat={<QueueStat label="Matched" value={`${Math.round(matchRate.matchRate * 100)}%`} detail={`${matchRate.matched} of ${matchRate.total} receipts reconciled, last 30 days`} />}
     views={<SavedViewPicker views={savedViews} selectedViewId={selectedViewId ?? null} currentFilters={currentViewFilters}
       currentUserId={user.id} currentUserRole={membership.role as WorkspaceRole}

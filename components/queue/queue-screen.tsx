@@ -118,6 +118,10 @@ export type QueueScreenProps<T> = {
    * The one documented exception to #225's "no band": aging is the payer's question and lives
    * where the payer works. Absent everywhere else. */
   band?: ReactNode
+  /** #281 spec.md §6: the queue-scoped connection-failure band (`ConnectionBand`) — amber, static,
+   * rendered right after `origin` and before the metric `band`. Absent (`undefined`/`null`) on
+   * every queue that never posts. */
+  connectionBand?: ReactNode
   /** Additional overflow-menu items, rendered after Override Mode and Export. */
   menu?: ReactNode
   onExportAll?: () => Promise<void>
@@ -191,7 +195,7 @@ const INTERACTIVE = "a, button, input, select, textarea, label, [role=button], [
 
 function QueueScreenInner<T>({
   title, basePath, rows, rowId, detailIdFor, rowName, paneStatus, fullHref, archivedToast, leading, columns: rawColumns, fieldTable = null, selectable = false, sortOptions = [], facets = [],
-  views, viewsPhone, stat, primaryAction, overrideMode: overrideModeEnabled = true, search, band, menu, onExportAll, bulkActions, empty, workspaceDocumentCount = 0, loadDetail, paneActions, paneMenu, initialSelectedId = null, sortParam = "sort", cards, phoneReadOnly = false,
+  views, viewsPhone, stat, primaryAction, overrideMode: overrideModeEnabled = true, search, band, connectionBand, menu, onExportAll, bulkActions, empty, workspaceDocumentCount = 0, loadDetail, paneActions, paneMenu, initialSelectedId = null, sortParam = "sort", cards, phoneReadOnly = false,
   filterRows, pinned = null, initialMissing, onOpenChange, origin = null, onControls,
 }: QueueScreenProps<T>) {
   const router = useRouter()
@@ -481,6 +485,7 @@ function QueueScreenInner<T>({
     {/* #268 spec §2.1–2.4: the cross-surface hop's way back — first focusable in `#main`, above
         even the metric band. */}
     <OriginStrip origin={origin} />
+    {connectionBand}
     {/* Bill Pay's metric band sits above row 1; a card-mode queue's band (Approvals' segments) sits
         under the title so the phone reads title → segments → Filter → list (#257 spec 3.3). */}
     {!cards && band}

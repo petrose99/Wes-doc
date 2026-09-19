@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation"
 import { FolderPlus, Send } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { PostConfirmDialog } from "@/components/queue/post-confirm-dialog"
+import { ConnectionBand } from "@/components/queue/connection-band"
+import type { LedgerBandStatus } from "@/lib/integration-push"
 import { AddToClaimContext, ClaimPill, useCanCreateClaims, DESKTOP_HINT } from "@/components/queue/claim-card"
 import { AddToClaimDialog, type ClaimCandidate } from "@/components/queue/add-to-claim-dialog"
 import type { AddToClaimResult } from "@/lib/claims/facts"
@@ -57,7 +59,7 @@ const SORTS: SortOption<ReceiptRow>[] = [
   { key: "merchant", label: "Merchant A–Z", compare: (a, b) => (a.merchant ?? "￿").localeCompare(b.merchant ?? "￿") },
 ]
 
-export function ReceiptQueue({ workspaceId, basePath, receipts, claimsEnabled = false, currentUserId = null, minConfidencePercent, views, viewsPhone, stat, initialSelectedId, fieldTable = null, workspaceDocumentCount, todayOutcome, arrival, connectionId = null }: {
+export function ReceiptQueue({ workspaceId, basePath, receipts, claimsEnabled = false, currentUserId = null, minConfidencePercent, views, viewsPhone, stat, initialSelectedId, fieldTable = null, workspaceDocumentCount, todayOutcome, arrival, connectionId = null, connectionBandStatus = null, isOwner = false }: {
   workspaceId: string
   basePath: string
   receipts: ReceiptRow[]
@@ -83,6 +85,10 @@ export function ReceiptQueue({ workspaceId, basePath, receipts, claimsEnabled = 
    * Post button still shows (§3 never hides it); every row reads ineligible and the confirm
    * dialog's Post stays disabled until a connection exists. */
   connectionId?: string | null
+  /** #281 spec.md §6: the connection-failure band's cause, null when connected/healthy or
+   * integrations are off. */
+  connectionBandStatus?: LedgerBandStatus | null
+  isOwner?: boolean
 }) {
   const [needsAttention, setNeedsAttention] = useState<Set<string>>(new Set())
   const [posting, setPosting] = useState<string[] | null>(null)
@@ -102,6 +108,12 @@ export function ReceiptQueue({ workspaceId, basePath, receipts, claimsEnabled = 
   // #281 spec.md §2: the client's eligibility guess (never the gate — the server re-resolves at
   // confirm time). Receipts have no cancel concept, so status is the only signal this row carries.
   const postEligible = (receipt: ReceiptRow) => receipt.status === "reviewed"
+  // #281 spec.md §7: the pane ⋯'s "Post to ledger" reason (H6 — aria-describedby, not a tooltip).
+  const postIneligibleReason = (receipt: ReceiptRow): string | null => {
+    if (!connectionId) return "No ledger connected"
+    if (receipt.status !== "reviewed") return "Not yet reviewed"
+    return null
+  }
 
   // One state per row, shared by the leading glyph and the State column / pane Status line (#258).
   const receiptState = (receipt: ReceiptRow) => processingState({
@@ -188,6 +200,7 @@ export function ReceiptQueue({ workspaceId, basePath, receipts, claimsEnabled = 
     onControls={onControls}
     origin={arrival?.origin ?? null}
     initialMissing={arrival?.initialMissing}
+    connectionBand={<ConnectionBand status={connectionBandStatus} workspaceId={workspaceId} isOwner={isOwner} />}
     title="Receipts"
     basePath={basePath}
     rows={receipts}
@@ -242,10 +255,11 @@ export function ReceiptQueue({ workspaceId, basePath, receipts, claimsEnabled = 
       onHeldBack={(heldBack, approved) => setNeedsAttention((prev) => { const next = new Set(prev); for (const id of heldBack) next.add(id); for (const id of approved) next.delete(id); return next })} />}
     paneActions={(receipt, { refresh }) => <DocumentPaneActions workspaceId={workspaceId} documentId={receipt.documentId} noun="receipt"
       status={receipt.status} openReviewTaskId={receipt.openReviewTaskId} onDone={refresh} />}
-    paneMenu={(receipt) => <>
+    paneMenu={(receipt) => { const reason = postIneligibleReason(receipt); return <>
+      <PaneMenuItem disabled={!!reason} hint={reason ?? undefined} onClick={() => setPosting([receipt.documentId])}>Post to ledger</PaneMenuItem>
       {claimsEnabled && !(receipt.claim && receipt.claim.status !== "rejected") && <PaneMenuItem disabled={!canCreateClaims} hint={canCreateClaims ? undefined : DESKTOP_HINT}
         onClick={() => setClaimDialog({ ids: [receipt.documentId], forceNew: false })}>Add to claim</PaneMenuItem>}
-    </>} />
+    </> }} />
     {claimsEnabled && <AddToClaimDialog open={claimDialog !== null} workspaceId={workspaceId} forceNew={claimDialog?.forceNew ?? false}
       candidates={(claimDialog?.ids ?? []).map(toCandidate).filter((c): c is ClaimCandidate => c !== null)}
       onClose={() => setClaimDialog(null)} onAdded={onClaimAdded} />}
