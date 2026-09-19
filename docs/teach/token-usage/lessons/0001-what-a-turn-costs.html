@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>What a turn costs</title><link rel="stylesheet" href="../assets/course.css"></head>
+<body><main>
+<p class="kicker">Lesson 1 · about 8 minutes</p>
+<h1>What a turn costs</h1>
+<p class="lede">You asked "which one am I paying for?" The answer is <em>all of it, every turn</em>. This lesson makes that concrete with your own session from tonight, then checks that it stuck.</p>
+
+<h2>The one idea</h2>
+<p>The model has no memory between calls. Each tool call in a session sends the <b>entire</b> conversation again: system prompt, tool schemas, every earlier tool result, every earlier reply. So the tokens you are billed for a session are not "the load" and not "what changed"; they are the sum of the context at every turn.</p>
+<p class="big">tokens sent = Σ<sub>turns</sub> context<sub>turn</sub></p>
+<p>Source: <a href="https://docs.claude.com/en/docs/build-with-claude/context-windows">Context windows</a>. The cache changes the <em>price</em> of those tokens, not the count (<a href="https://docs.claude.com/en/docs/build-with-claude/prompt-caching">Prompt caching</a>).</p>
+
+<h2>Your session, 20:56 tonight</h2>
+<table>
+<tr><th>Counter (from the log's <code>usage</code> blocks)</th><th class="num">Tokens</th><th>What it means</th></tr>
+<tr><td><code>cache_read_input_tokens</code></td><td class="num">1,365,041</td><td>Context re-sent and served from cache. 97% of the bill.</td></tr>
+<tr><td><code>cache_creation_input_tokens</code></td><td class="num">34,848</td><td>New material written to cache: tool results as they arrived.</td></tr>
+<tr><td><code>input_tokens</code></td><td class="num">72</td><td>Uncached input. Two tokens a turn.</td></tr>
+<tr><td><code>output_tokens</code></td><td class="num">184</td><td>Everything the model wrote, 36 turns.</td></tr>
+</table>
+<p>That session made <b>36</b> tool calls and its context grew from <b>29K</b> to about <b>50K</b>. 36 turns × ~39K average ≈ 1.4M, which is the first row. Nothing is hidden; the formula reproduces the log.</p>
+
+<div class="note">A first-turn "load" of 29K is paid 36 times in that session. That is why cutting it from 55K mattered more than any single read.</div>
+
+<h2>Try it</h2>
+<div class="card calc" data-cost-calc data-read-rate="0" data-write-rate="0">
+<label>Turns: <b id="turns-v"></b></label><input id="turns" type="range" min="5" max="200" value="36">
+<label>First-turn context (K): <b id="start-v"></b></label><input id="start" type="range" min="10" max="80" value="29">
+<label>Growth per turn (K): <b id="growth-v"></b></label><input id="growth" type="range" min="0" max="5" step="0.1" value="0.6">
+<p>Tokens sent: <output id="sent"></output> · average context: <output id="avg"></output> · context at the end: <output id="end"></output></p>
+<label>Optional: cache-read rate, $ per million, from the <a href="https://docs.claude.com/en/docs/about-claude/pricing">pricing page</a></label><input id="read-rate" type="number" step="0.01" placeholder="e.g. 0.30">
+<label>Cache-write rate, $ per million</label><input id="write-rate" type="number" step="0.01" placeholder="e.g. 3.75">
+<p>Estimated cost: <output id="cost"></output></p>
+</div>
+<p>Move only <b>Turns</b> from 36 to 150 and watch the total. Then put turns back and move <b>First-turn context</b> from 29 to 55. Which one hurt more?</p>
+
+<h2>Check yourself</h2>
+<p>Answer from memory before clicking. Score: <span data-quiz-score>0 / 0</span></p>
+<div class="quiz" data-quiz>
+<div class="q"><p class="stem">A session's first turn is 29K and it makes 40 tool calls with no growth. Roughly how many tokens are sent?</p>
+<button data-why="Every turn re-sends the whole context: 40 × 29K.">About one hundred sixty thousand</button>
+<button data-a="1" data-why="Every turn re-sends the whole context: 40 × 29K ≈ 1.16M.">About one million one hundred sixty</button>
+<button data-why="29K is one turn's context, not the session total.">About twenty-nine thousand tokens</button>
+<div class="why"></div></div>
+<div class="q"><p class="stem">Which counter is usually the largest in a cached agent session?</p>
+<button data-why="Output is under 1% of tokens in these sessions.">The output tokens, the model wrote</button>
+<button data-a="1" data-why="Re-sent context served from cache dominates: 95–98% tonight.">The cache read input tokens sum</button>
+<button data-why="Only new material is written; a few % of the total.">The cache creation tokens, new</button>
+<div class="why"></div></div>
+<div class="q"><p class="stem">Prompt caching changes which of these?</p>
+<button data-a="1" data-why="Same tokens are sent; cached ones cost less per token.">The price per token, not count</button>
+<button data-why="The count is fixed by turns × context; caching cannot lower it.">The count of tokens sent, then</button>
+<button data-why="Output is billed the same whether or not input was cached.">The output tokens written, too</button>
+<div class="why"></div></div>
+<div class="q"><p class="stem">Two changes: A cuts first-turn context by 20K; B cuts one 20K tool result late in a 60-turn session. Which saves more?</p>
+<button data-a="1" data-why="A is paid on all 60 turns; B only on the turns after it landed.">Change A, the first turn context</button>
+<button data-why="B saves 20K × the remaining turns only; A saves 20K × every turn.">Change B, the late tool result</button>
+<button data-why="They differ: a saving early in the session is multiplied by more turns.">Both the same, twenty K each</button>
+<div class="why"></div></div>
+</div>
+
+<h2>Read next</h2>
+<p>Primary source for this lesson: <a href="https://docs.claude.com/en/docs/build-with-claude/prompt-caching">Prompt caching</a> on docs.claude.com, sections "How prompt caching works" and "Tracking cache performance". Ten minutes.</p>
+<p>Keep the <a href="../reference/billing-cheatsheet.html">billing cheatsheet</a> and the <a href="../reference/glossary.html">glossary</a> open when you look at a log.</p>
+
+<div class="next"><b>Next lesson</b>, once this is solid: reading the cache split at session start, and why the order of text in the prompt decides what gets written versus read.</div>
+<footer>Anything unclear? Ask your teacher in the session; the mission and notes live in <code>docs/teach/token-usage/</code>.</footer>
+</main>
+<script src="../assets/cost-calc.js"></script><script src="../assets/quiz.js"></script>
+</body></html>

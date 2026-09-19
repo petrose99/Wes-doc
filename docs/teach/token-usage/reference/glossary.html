@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Token glossary</title><link rel="stylesheet" href="../assets/course.css"></head>
+<body><main>
+<p class="kicker">Reference · glossary</p>
+<h1>Token usage glossary</h1>
+<p class="lede">The words used across every lesson. Stick to these; the logs use them too.</p>
+<table>
+<tr><th>Term</th><th>Meaning</th></tr>
+<tr><td><b>Token</b></td><td>The unit the model reads and writes; roughly ¾ of an English word, or 4 characters of prose. Code and JSON tokenize less efficiently.</td></tr>
+<tr><td><b>Context</b></td><td>Everything sent to the model on one call: system prompt, tool schemas, the conversation so far, tool results. The whole of it is re-sent on every call.</td></tr>
+<tr><td><b>Turn</b></td><td>One model call. In an agent session, one tool call ≈ one turn. The log's <code>assistant</code> events, one per turn, each carry a <code>usage</code> block.</td></tr>
+<tr><td><b>Load</b></td><td>This workspace's word for the context on the first turn, before any work: harness + system prompt + brief. The run log prints it as <code>load NNK</code>.</td></tr>
+<tr><td><b>Prefix cache</b></td><td>Anthropic's prompt cache. A call whose leading bytes match a recent call reads that prefix from cache instead of paying full input price. Match is byte-exact and from the start.</td></tr>
+<tr><td><b><code>input_tokens</code></b></td><td>Uncached input this turn, billed at the base input rate. Tiny in cached agent sessions (2–4 per turn).</td></tr>
+<tr><td><b><code>cache_creation_input_tokens</code></b></td><td>Input written to the cache this turn (new tool results, a changed prefix). Billed above base input rate.</td></tr>
+<tr><td><b><code>cache_read_input_tokens</code></b></td><td>Input served from cache this turn. Billed well below base rate, but billed on every turn.</td></tr>
+<tr><td><b><code>output_tokens</code></b></td><td>What the model wrote: text, tool-call arguments, thinking. The expensive per-token rate, but usually under 1% of an agent session's tokens.</td></tr>
+<tr><td><b>Cache TTL</b></td><td>How long a cached prefix survives without being read: 5 minutes by default, 1 hour when requested. Claude Code sessions here show <code>ephemeral_1h</code>.</td></tr>
+<tr><td><b>Hand-off line</b></td><td>The autopilot's soft context cap. Crossing it asks the session to write its hand-off and stop, so the next session starts small.</td></tr>
+<tr><td><b>Turns × context</b></td><td>The cost model. Total tokens sent ≈ Σ over turns of that turn's context. Halve either factor, halve the bill.</td></tr>
+</table>
+<footer>Sources: <a href="https://docs.claude.com/en/docs/build-with-claude/prompt-caching">Prompt caching</a> · <a href="https://docs.claude.com/en/docs/build-with-claude/context-windows">Context windows</a>. Ask the teacher when a term is unclear.</footer>
+</main></body></html>
