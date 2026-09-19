@@ -26,6 +26,17 @@ Server actions in `app/(app)/workspaces/[workspaceId]/actions.ts` (owner-only vi
 ## Detector residue (report, do not chase)
 App-wide on every state: workspace-switcher avatar palette ×2, Inter as `overused-font`, dev overlay `layout-transition` + `dark-glow` on `body` — five per state. Admin adds `text-overflow` on the expanded rail's truncated workspace name (shell, 1440) and, with the account menu open, `text-occlusion` on rail labels under the popover.
 
+As regexes, for `gate.mjs --residue-file docs/agents/areas/admin.md` and the round script's `residue` option (matched against `<type> <selector> <detail>`):
+
+```residue
+ai-color-palette.*Cyan gradient background
+overused-font
+layout-transition.*transition: height
+dark-glow.*#ffba00
+text-overflow.*(workspace|rail)
+text-occlusion.*rail
+```
+
 ## Companies (#285)
 `app/(app)/workspaces/[workspaceId]/admin/companies/{page,actions}.ts` + `[companyId]/page.tsx` (deep link; exports `CompaniesScreen({params, selectedId})`, the default just calls it). `components/admin/companies-queue.tsx` (`QueueScreen<CompanyRow>`, three page states: personal / ungrouped-owner / organization), `company-detail.tsx` (pane), `company-danger-actions.tsx` (card-less Delete/Leave, refactored from `components/workspace/danger-zone.tsx`). `lib/admin/companies.ts` is the client-safe row/error-code layer (`CompanyRow`, `companyActionErrorText`). `models/organizations.ts` gained `removeWorkspaceFromOrganization`, `listOwnedUngroupedTeamWorkspaces`, `_count.members`. `/workspaces` and `/workspaces/[id]` forward `?notice=&name=` to their redirect targets; `components/shell/notice-toast.tsx` (mounted in `app/(app)/layout.tsx` inside `Suspense`) consumes and strips it — the pattern for any hard-navigation success toast that can't survive its own reload.
 Seed states (`prisma/seed.ts` `seedDevBypassOrganization`, per-item idempotent): owner pane with a movable/non-owner mix = Riverside Bakery Co. `9cdcdf3f-9608-47a1-8495-abb1e210871c` (org Acme Advisory: Riverside · Harbor Lights Cafe `a74a45c2-…` owner · Northwind Traders `c5315ed3-…` member-only, owner is Prisma-only "Priya Naidoo"); ungrouped-owner state = Pine Street Consulting `60a2b427-…`; personal state = Dev User's workspace `af91555d-…`.
