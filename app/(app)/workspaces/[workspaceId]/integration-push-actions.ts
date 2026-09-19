@@ -25,7 +25,7 @@ import { errorMessage, NO_ACCESS, requireMember } from "./action-helpers"
  * the document + connection, upserts the push row, and runs one inline attempt. Auth/plan checks
  * are the caller's job — the batch caller checks them once for the whole run rather than once per
  * document. */
-async function pushDocumentToConnection(
+export async function pushDocumentToConnection(
   workspaceId: string,
   documentId: string,
   connectionId: string,
