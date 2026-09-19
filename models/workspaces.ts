@@ -136,7 +136,10 @@ export async function createTeamWorkspace(user: Pick<User, "id" | "name" | "emai
 
 export const getWorkspacesForUser = cache(async (userId: string) => prisma.workspace.findMany({
   where: { members: { some: { userId } } },
-  include: { members: { where: { userId }, select: { role: true } } },
+  include: {
+    members: { where: { userId }, select: { role: true } },
+    organization: { select: { id: true, name: true } },
+  },
   orderBy: { createdAt: "asc" },
 }))
 
