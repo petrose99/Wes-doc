@@ -150,3 +150,4 @@
 | 2026-09-19T20:50:55+0200 | [#287](https://github.com/petrose99/Wes-doc/issues/287) | stopped by the owner — continues on the next run | – | – |
 | 2026-09-19T20:51:13+0200 | [#287](https://github.com/petrose99/Wes-doc/issues/287) Build Admin Dashboard rollups and the grouped company switcher | continued (progressed), session 1/3 without progress allowed (sonnet) | 5m17s · load 29K | [log](logs/20260919T185113Z-287.jsonl) |
 | 2026-09-19T20:56:38+0200 | [#287](https://github.com/petrose99/Wes-doc/issues/287) Build Admin Dashboard rollups and the grouped company switcher | phase build done → measure next (sonnet) | 12m30s · load 29K | [log](logs/20260919T185638Z-287.jsonl) |
+| 2026-09-19T21:09:15+0200 | [#287](https://github.com/petrose99/Wes-doc/issues/287) Build Admin Dashboard rollups and the grouped company switcher | phase measure done → close next, hand-off 117 lines (limit 80) (haiku) | 11m29s · load 21K | [log](logs/20260919T190915Z-287.jsonl) |
