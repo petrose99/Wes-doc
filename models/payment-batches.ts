@@ -2,7 +2,7 @@
 import { prisma } from "@/lib/db"
 import { recordDocumentAudit } from "@/lib/audit"
 import { decimalToNumber } from "@/lib/money"
-import { listBillPay, supplierHasBankAccount, type BillPayBillRow as BillPayRow } from "@/models/bill-pay"
+import { listBillPay, supplierHasBankAccount, type BillPayBillRow as BillPayRow, type BillPayClaimRow } from "@/models/bill-pay"
 import { listWorkspaceBills } from "@/models/bills"
 import { payerAccountLabel, type PayerAccountRow } from "@/models/payer-accounts"
 import { splitBatchName, splitIntoBatches, suggestBatchName } from "@/lib/payments/batch-split"
@@ -71,7 +71,7 @@ const BATCH_SELECT = {
   payFromAccount: { select: { id: true, name: true, bankName: true, lastFour: true, currencyCode: true, isDefault: true, archivedAt: true } },
   // All items, active or not: a paid or rejected batch releases its `active` slot (so the invoice
   // can be batched again) but keeps its lines as the record of what it held.
-  items: { select: { id: true, documentId: true, supplier: true, amount: true, currencyCode: true, reference: true, document: { select: { reviewedData: true } } } },
+  items: { select: { id: true, documentId: true, expenseClaimId: true, supplier: true, amount: true, currencyCode: true, reference: true, document: { select: { reviewedData: true } } } },
 } as const
 
 type BatchRecord = Prisma.PaymentRunGetPayload<{ select: typeof BATCH_SELECT }>
@@ -317,7 +317,7 @@ export async function createPaymentBatches(input: {
 }
 
 async function loadForDecision(workspaceId: string, batchId: string) {
-  const batch = await prisma.paymentRun.findFirst({ where: { id: batchId, workspaceId }, select: { id: true, status: true, name: true, submittedById: true, items: { where: { active: true }, select: { documentId: true, amount: true, currencyCode: true } } } })
+  const batch = await prisma.paymentRun.findFirst({ where: { id: batchId, workspaceId }, select: { id: true, status: true, name: true, submittedById: true, items: { where: { active: true }, select: { documentId: true, expenseClaimId: true, amount: true, currencyCode: true } } } })
   if (!batch) throw new Error("payment_batch_not_found")
   return batch
 }
@@ -356,18 +356,27 @@ export async function markPaymentBatchPaid(input: { workspaceId: string; actorId
   const batch = await loadForDecision(input.workspaceId, input.batchId)
   if (!["approved", "draft", "sent"].includes(batch.status)) throw new Error("payment_batch_not_approved")
   const now = new Date()
+  const billItems = batch.items.filter((i) => i.documentId)
+  const claimItems = batch.items.filter((i) => i.expenseClaimId)
   await prisma.$transaction([
     prisma.paymentRun.update({ where: { id: batch.id }, data: { status: "paid", paidById: input.actorId, paidAt: now } }),
     prisma.invoicePayment.createMany({
-      data: batch.items.filter((i) => i.documentId).map((item) => ({
+      data: billItems.map((item) => ({
         workspaceId: input.workspaceId, documentId: item.documentId!, amount: item.amount, currencyCode: item.currencyCode,
+        paidOn: input.paidOn, method: "batch", batchId: batch.id, reference: input.reference?.trim() || null, recordedById: input.actorId,
+      })),
+    }),
+    prisma.expenseClaimPayment.createMany({
+      data: claimItems.map((item) => ({
+        workspaceId: input.workspaceId, claimId: item.expenseClaimId!, amount: item.amount, currencyCode: item.currencyCode,
         paidOn: input.paidOn, method: "batch", batchId: batch.id, reference: input.reference?.trim() || null, recordedById: input.actorId,
       })),
     }),
     prisma.paymentRunItem.updateMany({ where: { runId: batch.id }, data: { active: false } }),
   ])
   await recordDocumentAudit({ workspaceId: input.workspaceId, actorId: input.actorId, type: "payment_batch.paid", detail: { batchId: batch.id, paidOn: input.paidOn.toISOString().slice(0, 10), reference: input.reference } })
-  for (const item of batch.items) if (item.documentId) await recordDocumentAudit({ workspaceId: input.workspaceId, actorId: input.actorId, documentId: item.documentId, type: "invoice.payment_recorded", detail: { batchId: batch.id, amount: decimalToNumber(item.amount), method: "batch" } })
+  for (const item of billItems) await recordDocumentAudit({ workspaceId: input.workspaceId, actorId: input.actorId, documentId: item.documentId!, type: "invoice.payment_recorded", detail: { batchId: batch.id, amount: decimalToNumber(item.amount), method: "batch" } })
+  for (const item of claimItems) await recordDocumentAudit({ workspaceId: input.workspaceId, actorId: input.actorId, type: "expense_claim.payment_recorded", detail: { batchId: batch.id, claimId: item.expenseClaimId, amount: decimalToNumber(item.amount), method: "batch" } })
 }
 
 export type MarkPaidResult = { recorded: Array<{ documentId: string; amount: number }>; leftOut: Array<{ documentId: string; reason: string }> }
@@ -401,6 +410,39 @@ export async function markInvoicesPaid(input: { workspaceId: string; actorId: st
   return { recorded, leftOut }
 }
 
+export type MarkClaimsPaidResult = { recorded: Array<{ claimId: string; amount: number }>; leftOut: Array<{ claimId: string; reason: string }> }
+
+/** Claim counterpart of markInvoicesPaid above — same manual-record shape, writing
+ * ExpenseClaimPayment instead of InvoicePayment. The claim's total (not a partial) is the amount;
+ * claims don't carry an Amount-to-pay override. */
+export async function markClaimsPaid(input: { workspaceId: string; actorId: string; claimIds: string[]; paidOn: Date; reference: string | null }): Promise<MarkClaimsPaidResult> {
+  const { rows: allRows } = await listBillPay({ workspaceId: input.workspaceId })
+  const rows = allRows.filter((row): row is BillPayClaimRow => row.kind === "claim")
+  const byId = new Map(rows.map((row) => [row.claim.id, row]))
+  const recorded: MarkClaimsPaidResult["recorded"] = []
+  const leftOut: MarkClaimsPaidResult["leftOut"] = []
+  const toRecord: BillPayClaimRow[] = []
+  for (const claimId of input.claimIds) {
+    const row = byId.get(claimId)
+    if (!row) { leftOut.push({ claimId, reason: "No longer on Bill Pay" }); continue }
+    if (!row.eligibility.eligible) { leftOut.push({ claimId, reason: "Missing bank details" }); continue }
+    if (row.paidState !== "unpaid") { leftOut.push({ claimId, reason: row.paidState === "scheduled" ? "Already in a batch" : "Already paid" }); continue }
+    if (row.claim.total === null || row.claim.total <= 0) { leftOut.push({ claimId, reason: "No amount to pay" }); continue }
+    toRecord.push(row)
+  }
+  await prisma.$transaction(async (tx) => {
+    for (const row of toRecord) {
+      const claimId = row.claim.id
+      await tx.expenseClaimPayment.create({
+        data: { workspaceId: input.workspaceId, claimId, amount: row.claim.total!, currencyCode: (row.claim.currencyCode ?? "ZAR").toUpperCase(), paidOn: input.paidOn, method: "manual", reference: input.reference?.trim() || null, recordedById: input.actorId },
+      })
+      await recordDocumentAudit({ workspaceId: input.workspaceId, actorId: input.actorId, type: "expense_claim.payment_recorded", detail: { claimId, amount: row.claim.total, method: "manual", paidOn: input.paidOn.toISOString().slice(0, 10) } }, tx)
+      recorded.push({ claimId, amount: row.claim.total! })
+    }
+  })
+  return { recorded, leftOut }
+}
+
 export async function removePaymentRecord(input: { workspaceId: string; actorId: string; paymentId: string; reason: string }): Promise<void> {
   const reason = input.reason.trim()
   if (!reason) throw new Error("reason_required")
@@ -424,27 +466,62 @@ export async function removePaymentRecordsForDocument(input: { workspaceId: stri
   return { removed: manual.length, batchHeld: records.length - manual.length }
 }
 
+export async function removeClaimPaymentRecord(input: { workspaceId: string; actorId: string; paymentId: string; reason: string }): Promise<void> {
+  const reason = input.reason.trim()
+  if (!reason) throw new Error("reason_required")
+  const record = await prisma.expenseClaimPayment.findFirst({ where: { id: input.paymentId, workspaceId: input.workspaceId, removedAt: null }, select: { id: true, claimId: true, amount: true } })
+  if (!record) throw new Error("payment_record_not_found")
+  await prisma.expenseClaimPayment.update({ where: { id: record.id }, data: { removedAt: new Date(), removedById: input.actorId, removedReason: reason } })
+  await recordDocumentAudit({ workspaceId: input.workspaceId, actorId: input.actorId, type: "expense_claim.payment_record_removed", detail: { claimId: record.claimId, paymentId: record.id, amount: decimalToNumber(record.amount), reason } })
+}
+
+/** Claim counterpart of removePaymentRecordsForDocument above. */
+export async function removePaymentRecordsForClaim(input: { workspaceId: string; actorId: string; claimId: string; reason: string }): Promise<{ removed: number; batchHeld: number }> {
+  const reason = input.reason.trim()
+  if (!reason) throw new Error("reason_required")
+  const records = await prisma.expenseClaimPayment.findMany({ where: { workspaceId: input.workspaceId, claimId: input.claimId, removedAt: null }, select: { id: true, amount: true, method: true } })
+  const manual = records.filter((r) => r.method === "manual")
+  if (manual.length === 0 && records.length === 0) throw new Error("payment_record_not_found")
+  const now = new Date()
+  await prisma.expenseClaimPayment.updateMany({ where: { id: { in: manual.map((r) => r.id) } }, data: { removedAt: now, removedById: input.actorId, removedReason: reason } })
+  for (const record of manual) await recordDocumentAudit({ workspaceId: input.workspaceId, actorId: input.actorId, type: "expense_claim.payment_record_removed", detail: { claimId: input.claimId, paymentId: record.id, amount: decimalToNumber(record.amount), reason } })
+  return { removed: manual.length, batchHeld: records.length - manual.length }
+}
+
 /** Un-marks a Paid batch: its payment records come off with one reason and the batch returns to
  * Approved (the file is still a fact). The invoices read Unpaid / Scheduled again. */
 export async function unmarkPaymentBatchPaid(input: { workspaceId: string; actorId: string; batchId: string; reason: string }): Promise<void> {
   const reason = input.reason.trim()
   if (!reason) throw new Error("reason_required")
-  const batch = await prisma.paymentRun.findFirst({ where: { id: input.batchId, workspaceId: input.workspaceId }, select: { id: true, status: true, items: { select: { id: true, documentId: true } } } })
+  const batch = await prisma.paymentRun.findFirst({ where: { id: input.batchId, workspaceId: input.workspaceId }, select: { id: true, status: true, items: { select: { id: true, documentId: true, expenseClaimId: true } } } })
   if (!batch) throw new Error("payment_batch_not_found")
   if (batch.status !== "paid") throw new Error("payment_batch_not_paid")
   const now = new Date()
   await prisma.$transaction([
     prisma.invoicePayment.updateMany({ where: { workspaceId: input.workspaceId, batchId: batch.id, removedAt: null }, data: { removedAt: now, removedById: input.actorId, removedReason: reason } }),
+    prisma.expenseClaimPayment.updateMany({ where: { workspaceId: input.workspaceId, batchId: batch.id, removedAt: null }, data: { removedAt: now, removedById: input.actorId, removedReason: reason } }),
     prisma.paymentRun.update({ where: { id: batch.id }, data: { status: "approved", paidAt: null, paidById: null } }),
     prisma.paymentRunItem.updateMany({ where: { runId: batch.id }, data: { active: true } }),
   ])
   await recordDocumentAudit({ workspaceId: input.workspaceId, actorId: input.actorId, type: "payment_batch.unpaid", detail: { batchId: batch.id, reason } })
-  for (const item of batch.items) if (item.documentId) await recordDocumentAudit({ workspaceId: input.workspaceId, actorId: input.actorId, documentId: item.documentId, type: "invoice.payment_record_removed", detail: { batchId: batch.id, reason } })
+  for (const item of batch.items) {
+    if (item.documentId) await recordDocumentAudit({ workspaceId: input.workspaceId, actorId: input.actorId, documentId: item.documentId, type: "invoice.payment_record_removed", detail: { batchId: batch.id, reason } })
+    if (item.expenseClaimId) await recordDocumentAudit({ workspaceId: input.workspaceId, actorId: input.actorId, type: "expense_claim.payment_record_removed", detail: { batchId: batch.id, claimId: item.expenseClaimId, reason } })
+  }
 }
 
 export async function listPaymentRecords(workspaceId: string, documentId: string) {
   const records = await prisma.invoicePayment.findMany({
     where: { workspaceId, documentId, removedAt: null },
+    orderBy: { paidOn: "desc" },
+    select: { id: true, amount: true, currencyCode: true, paidOn: true, method: true, reference: true, batchId: true, batch: { select: { name: true } }, recordedBy: { select: { name: true } } },
+  })
+  return records.map((r) => ({ id: r.id, amount: decimalToNumber(r.amount) ?? 0, currencyCode: r.currencyCode, paidOn: r.paidOn, method: r.method as "batch" | "manual", reference: r.reference, batchId: r.batchId, batchName: r.batch?.name ?? null, recordedBy: r.recordedBy?.name ?? null }))
+}
+
+export async function listClaimPaymentRecords(workspaceId: string, claimId: string) {
+  const records = await prisma.expenseClaimPayment.findMany({
+    where: { workspaceId, claimId, removedAt: null },
     orderBy: { paidOn: "desc" },
     select: { id: true, amount: true, currencyCode: true, paidOn: true, method: true, reference: true, batchId: true, batch: { select: { name: true } }, recordedBy: { select: { name: true } } },
   })
