@@ -72,5 +72,18 @@ Gating grammar: the role select and Remove need `section.viewerOwns`; **Leave (�
 Seed: Riverside (org owner, 6 rows), Northwind `c5315ed3-…` (viewer is Member), Pine `60a2b427-…` (team, ungrouped), personal `af91555d-…` (must hold exactly its owner — `scripts/dev/db253.ts` once planted two extra members there; `logs/scratch-286/check-personal.mts` verifies). Round script: `docs/wayfinder-reports/226/logs/scratch-286/round-286.mjs` via `run-round.mjs <rN> [only]`; `servers.mjs up|down`. If `next dev` idles at `Compiling /` for minutes, clear `.next/dev/cache/turbopack` + `.next/dev/lock` and restart.
 Known shell gap (#327): Escape and the pane ✕ close an editable pane without an unsaved-changes confirm (`queue-screen.tsx` ~415); `AdminLeaveGuard` only covers links and Back.
 
+## Account — self-service Bank details (#295)
+`app/(app)/workspaces/[workspaceId]/account/page.tsx` gained a "Bank details" `Panel` (shared
+shell from `components/automation/automation-ui.tsx`) fed by `components/account/bank-details-panel.tsx`
+(`BankDetailsPanel`, client). View/edit/saving state machine copies `components/admin/user-detail.tsx`'s
+`BankField` input pattern; same vocabulary ("Bank details", "Bank name", "Account number", "Branch
+code") as the admin panel. Reuses `saveMemberBankDetailsAction` (`actions.ts:184`) directly — it
+already authorises the caller for their own row, no wrapper action needed. `submit()` wraps the
+call in try/catch (an unhandled rejection previously left the form stuck in "Saving…" forever on
+network failure); opening edit sets `autoFocus` on the first field (`bank-name`) per B5.
+Gate: clean, 0 real findings; critique 36/40, evaluate 88 Clean, include PASS/PASS both widths —
+findings are all pre-existing shell chrome (text-overflow/dark-glow, see Detector residue above)
+or capture-script evidence gaps (Enter-to-submit unprobed), not defects in this panel.
+
 ## Conventions the bar checks
 Vocabulary: "company" in Admin copy (not "workspace"); one term per concept, one casing. Keys: Tab order reaches the save bar, Escape closes menus and returns focus, Ctrl+S saves, tablists use arrow keys. States per form: loading frame, empty ("Add a …" with the consequence), error with the values kept ("Couldn't save — … Your changes are still here." with Reload on stale), read-only band for members. Below `md`: `PhoneNote` + company caption from the layout, tables scroll horizontally with the header not clipping.
