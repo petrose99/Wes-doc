@@ -175,6 +175,15 @@ export const getOpenReviewTaskForDocument = cache(async (workspaceId: string, do
   orderBy: { createdAt: "desc" },
 }))
 
+/** #281 spec.md §7: the Checks tab's Retry action — an open `push_preflight` task means the last
+ * ledger push failed pre-flight (`lib/integration-push.ts:103-107`); its `detail` is the failure
+ * reason to show, never a bare "failed again". */
+export const getOpenLedgerRetryTask = cache(async (workspaceId: string, documentId: string) => prisma.reviewTask.findFirst({
+  where: { workspaceId, documentId, reason: "push_preflight", status: { in: ["open", "in_review"] } },
+  select: { id: true, detail: true },
+  orderBy: { createdAt: "desc" },
+}))
+
 export const getReviewTask = cache(async (workspaceId: string, taskId: string) => prisma.reviewTask.findFirst({
   where: { id: taskId, workspaceId },
   include: {

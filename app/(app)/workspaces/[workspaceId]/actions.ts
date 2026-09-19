@@ -21,7 +21,7 @@ import { refreshDocumentReadiness } from "@/lib/readiness/refresh"
 import { expandZipBuffer } from "@/lib/zip-ingestion"
 import { cancelDocument, deleteWorkspaceDocuments, DocumentCancellationBlockedError, getDocumentsStatus, getWorkspaceDocument, markDocumentsReviewed, requeueAdaptiveExtraction, requeueDocumentExtraction, updateDocumentField, updateDocumentReview, validateDocumentInput } from "@/models/documents"
 import { listDocumentAuditEvents, listDocumentStageDecisions } from "@/models/audit-events"
-import { getActiveWorkflowStageState } from "@/models/review-tasks"
+import { getActiveWorkflowStageState, getOpenLedgerRetryTask } from "@/models/review-tasks"
 import { getApprovalDetailFacts } from "@/models/approvals"
 import type { WorkspaceRole } from "@/models/workspaces"
 import { overrideGate } from "@/lib/gates/actions"
@@ -237,7 +237,7 @@ export async function getSelectionAuditPanelDataAction(workspaceId: string, docu
   const user = await getCurrentUser()
   const membership = await requireMember(workspaceId, user.id)
   if (!membership) return null
-  const [auditEvents, stageDecisions, gates, stageState, escalations, facts, claimsEnabled, processing] = await Promise.all([
+  const [auditEvents, stageDecisions, gates, stageState, escalations, facts, claimsEnabled, processing, ledgerRetryTask] = await Promise.all([
     listDocumentAuditEvents(workspaceId, documentId),
     listDocumentStageDecisions(workspaceId, documentId),
     listOpenGatesForDocument(workspaceId, documentId),
@@ -250,6 +250,8 @@ export async function getSelectionAuditPanelDataAction(workspaceId: string, docu
     // #258: who approved with no flow / whether it went touchless — the Approval tab is never
     // empty on an Approved document, and the Status line names the actor once this lands.
     getProcessingStateInput(workspaceId, documentId).catch(() => null),
+    // #281 spec.md §7: the Checks tab's ledger-push Retry — null when no push has failed.
+    getOpenLedgerRetryTask(workspaceId, documentId).catch(() => null),
   ])
   // #218: a stage only reads as "Pending" while its task is still open/in_review (stageState is
   // null once resolved or workflow-less) and it hasn't already produced a review_task_stage_decided
@@ -281,6 +283,7 @@ export async function getSelectionAuditPanelDataAction(workspaceId: string, docu
         refusalReason: eligibility.overridable ? null : eligibility.reason,
       }
     }),
+    ledgerRetry: ledgerRetryTask ? { id: ledgerRetryTask.id, detail: ledgerRetryTask.detail ?? "The last push to your ledger failed." } : null,
     escalations: escalations.map((escalation) => ({
       id: escalation.id,
       checkCode: escalation.checkCode,

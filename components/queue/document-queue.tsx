@@ -9,6 +9,7 @@ import type { FieldTable } from "@/lib/configuration/field-table"
 import { QueueScreen, type QueueColumn, type SortOption } from "@/components/queue/queue-screen"
 import { joinSegments } from "@/components/queue/queue-card"
 import { DocumentBulkActions, DocumentPaneActions } from "@/components/queue/document-actions"
+import { PaneMenuItem } from "@/components/queue/detail-pane"
 import { formatDate, formatMoney, TitleCell } from "@/components/queue/row-cells"
 import { Button } from "@/components/ui/button"
 import { PostConfirmDialog } from "@/components/queue/post-confirm-dialog"
@@ -135,6 +136,14 @@ export function DocumentQueue({ workspaceId, basePath, title, noun, itemType, ro
   // confirm time). `DocumentQueueRow` carries no cancelled/category-confirmed signal, so this is
   // status only; a row this marks eligible can still come back ineligible server-side.
   const postEligible = (row: DocumentQueueRow) => row.status === "reviewed"
+  // #281 spec.md §7: single-doc "Post to ledger" reason — Bank Statements only (postable). No
+  // per-row ledger/cancelled signal exists on `DocumentQueueRow` (unlike `BillRow`), so this is
+  // status + connection only, same guess `postEligible` already makes.
+  const postIneligibleReason = (row: DocumentQueueRow): string | null => {
+    if (!connectionId) return "No ledger connected"
+    if (row.status !== "reviewed") return "Not yet reviewed"
+    return null
+  }
 
   const columns: QueueColumn<DocumentQueueRow>[] = [
     {
@@ -236,7 +245,13 @@ export function DocumentQueue({ workspaceId, basePath, title, noun, itemType, ro
         <Send className="h-3.5 w-3.5" aria-hidden />Post
       </Button> : null}
       onHeldBack={(heldBack, approved) => setNeedsAttention((prev) => { const next = new Set(prev); for (const id of heldBack) next.add(id); for (const id of approved) next.delete(id); return next })} />}
-    paneActions={(row, { refresh }) => <DocumentPaneActions workspaceId={workspaceId} documentId={row.id} noun={noun} status={row.status} openReviewTaskId={null} onDone={refresh} />} />
+    paneActions={(row, { refresh }) => <DocumentPaneActions workspaceId={workspaceId} documentId={row.id} noun={noun} status={row.status} openReviewTaskId={null} onDone={refresh} />}
+    paneMenu={postable ? (row) => {
+      const reason = postIneligibleReason(row)
+      // #281 spec.md §7: disabled (not hidden, H9) when ineligible, reusing the bulk dialog's
+      // shape for a one-row selection.
+      return <PaneMenuItem disabled={!!reason} hint={reason ?? undefined} onClick={() => setPosting([row.id])}>Post to ledger</PaneMenuItem>
+    } : undefined} />
     {postable && <PostConfirmDialog open={posting !== null} onClose={() => setPosting(null)} workspaceId={workspaceId} connectionId={connectionId ?? null}
       records={(posting ?? []).map(toRecord)} eligibleIds={(posting ?? []).filter((id) => { const row = byId.get(id); return row && postEligible(row) })}
       onPosted={() => router.refresh()} />}

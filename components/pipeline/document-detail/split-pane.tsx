@@ -289,7 +289,7 @@ export function SplitPane({
               ? <>
                 {tabButton("approval", "Approval")}
                 {tabButton("details", "Details")}
-                {tabButton("checks", "Checks", history.gates.length)}
+                {tabButton("checks", "Checks", history.gates.length + (history.ledgerRetry ? 1 : 0))}
                 {tabButton("activity", "Audit")}
                 {tabButton("note", "Note")}
               </>
@@ -300,7 +300,7 @@ export function SplitPane({
                   ? <>
                     {tabButton("approval", "Approval")}
                     {tabButton("activity", "Audit")}
-                    {tabButton("checks", "Checks", history.gates.length)}
+                    {tabButton("checks", "Checks", history.gates.length + (history.ledgerRetry ? 1 : 0))}
                   </>
                   : tabButton("activity", "Activity")}
               </>}
@@ -401,7 +401,7 @@ export function SplitPane({
           </div>}
 
           {tab === "checks" && history && <div {...panelProps("checks")} className={`mx-auto p-6 ${layout === "details-only" ? "max-w-2xl" : ""}`}>
-            <ChecksTab workspaceId={workspaceId} gates={history.gates} escalations={history.escalations} />
+            <ChecksTab workspaceId={workspaceId} documentId={header.documentId} gates={history.gates} escalations={history.escalations} ledgerRetry={history.ledgerRetry} />
           </div>}
         </div>
       </div>}

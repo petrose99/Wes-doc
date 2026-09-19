@@ -13,7 +13,7 @@ import { getCurrentUser } from "@/lib/auth"
 import config from "@/lib/config"
 import { BillMappingError, normalizeBillFromDocument } from "@/lib/integration-bill-mapping"
 import { extractBankStatementPayload } from "@/lib/integrations/bigcapital/bank-statement-mapper"
-import { attemptIntegrationPush, kickIntegrationPushDrain } from "@/lib/integration-push"
+import { attemptIntegrationPush, getActiveIntegrationConnectionId, kickIntegrationPushDrain } from "@/lib/integration-push"
 import { getWorkspaceDocument, listReadyToPushDocuments } from "@/models/documents"
 import { getCategoryAccountMap, upsertWorkspaceIntegrationPush, workspaceIntegrationsPlanEnabled } from "@/models/integrations"
 import { listCategoryAccountMappings, resolveCategoryAccount } from "@/models/category-account-mappings"
@@ -96,6 +96,12 @@ export async function pushDocumentToConnection(
   await attemptIntegrationPush(push.id)
   const updated = await prisma.integrationPush.findUnique({ where: { id: push.id }, select: { status: true, errorCode: true } })
   if (updated?.status === "pending") await kickIntegrationPushDrain()
+  // #281 spec.md §7: a succeeded push (fresh or a Checks-tab Retry) closes any open
+  // `push_preflight` task on this document — the task named the pre-flight cause the push has now
+  // cleared, so it never sits open once the ledger holds the document.
+  if (updated?.status === "succeeded") {
+    await prisma.reviewTask.updateMany({ where: { workspaceId, documentId, reason: "push_preflight", status: { in: ["open", "in_review"] } }, data: { status: "approved", resolvedAt: new Date() } })
+  }
   return { status: updated?.status ?? "pending", errorCode: updated?.errorCode ?? null }
 }
 
@@ -120,6 +126,14 @@ export async function pushDocumentToAccountingAction(
     if (error instanceof BillMappingError) return { success: false, error: "This document has no total to push" }
     return { success: false, error: errorMessage(error, "Could not push this document") }
   }
+}
+
+/** #281 spec.md §7: the Checks tab's Retry — re-runs the same push against the workspace's active
+ * connection (there is exactly one, per §2), closing the open `push_preflight` task on success. */
+export async function retryLedgerPushAction(workspaceId: string, documentId: string): Promise<ActionState<{ status: string }>> {
+  const connectionId = await getActiveIntegrationConnectionId(workspaceId)
+  if (!connectionId) return { success: false, error: "No ledger connected" }
+  return pushDocumentToAccountingAction(workspaceId, documentId, connectionId)
 }
 
 /** Batch counterpart to pushDocumentToAccountingAction: resolves the "ready to push" set
