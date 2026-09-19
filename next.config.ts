@@ -22,6 +22,15 @@ const nextConfig: NextConfig = {
       { source: "/solutions/scanned-pdfs", destination: "/product/extraction", permanent: true },
     ]
   },
+  // Same-origin proxy for PostHog (cookieless analytics on marketing/auth pages): keeps the CSP's
+  // connect-src at 'self' and survives ad blockers. EU cloud; switch the hosts for the US region.
+  async rewrites() {
+    return [
+      { source: "/ingest/static/:path*", destination: "https://eu-assets.i.posthog.com/static/:path*" },
+      { source: "/ingest/:path*", destination: "https://eu.i.posthog.com/:path*" },
+    ]
+  },
+  skipTrailingSlashRedirect: true,
   async headers() {
     // Baseline browser protections. The Content-Security-Policy itself lives in proxy.ts now, not
     // here: an enforced, nonce-based script-src has to be generated per-request (a fresh nonce

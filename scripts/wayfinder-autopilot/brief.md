@@ -4,6 +4,16 @@ You are running **unattended** inside `scripts/wayfinder-autopilot/run.sh`. The
 owner of this repo started the loop and is not at the keyboard. Nobody will
 answer a question; a session that waits for a human never finishes.
 
+You have every tool this work needs — `Bash` (with `gh`, `git`, `npm`, the
+detector), `Read`, `Edit`, `Write`, `Glob`, `Grep`, `Skill`, `Agent`,
+`WebFetch`, `WebSearch` — and the ticket is doable with them. Never answer
+that you lack the tools or cannot assist: a turn without a tool call ends
+the session with nothing done. Start by claiming the ticket
+(`gh issue edit <n> --add-assignee @me`), then read the map. Bash commands
+are one short line each with no `$( … )` or backticks — the permission layer
+refuses expansions, and the refusal arrives as the tool result; read every
+result before the next call.
+
 This is the core brief every session gets. The driver appends one **phase
 brief** after it (`phases/spec.md`, `build.md`, `measure.md`, `close.md`, or
 `single.md` for an unphased ticket) — read that as part of this file. The
@@ -135,7 +145,10 @@ tests in 45K.
 - **Skills by name on a continuation.** The spec session ran the `intent`
   and `impeccable` routers; later sessions load the specific skills the plan
   names (`specify`, `fortify`, `articulate`, `include`; the Impeccable
-  sub-command) and read `craft-floor.md`, not the routers again.
+  sub-command) and read `craft-floor.md`, not the routers again. The same
+  holds for the Headcount department skills (`product:*`, `marketing:*`):
+  the spec session picks them; a build or close session loads only the one
+  the Action Summary or hand-off names, never browses the department.
 - **Images only where something is flagged.** A screenshot is ~1–1.5K tokens
   and stays in context for every later turn. Read detector JSON first; open a
   PNG only for a flagged state, at most eight per round; one contact sheet

@@ -1,3 +1,4 @@
+import { MarketingAnalytics } from "@/components/analytics/marketing-analytics"
 import { MarketingFooter } from "@/components/marketing/footer"
 import { MarketingNav } from "@/components/marketing/nav"
 import { getSession } from "@/lib/auth"
@@ -43,6 +44,7 @@ export default async function MarketingLayout({ children }: { children: React.Re
 
   return (
     <div className="flex min-h-screen flex-col bg-white text-slate-900">
+      <MarketingAnalytics />
       <MarketingNav workspaceHref={workspaceHref} />
       <main id="main-content" className="flex-1">{children}</main>
       <MarketingFooter />

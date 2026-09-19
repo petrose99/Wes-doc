@@ -1,4 +1,5 @@
-# Per-project autopilot settings for docubite (map #226 run, Sep 2026).
+# Per-project autopilot settings for docubite (map #226 run, Sep 2026) — Anthropic ladder, used by run.sh.
+# The Mistral ladder is config.mistral.sh, used by run-mistral.sh.
 # Not part of the tool — remove or change freely.
 MODEL_STRONG="opus[1m]"   # grilling and execution tickets
 MODEL_CHEAP="sonnet"      # research tickets and polish passes

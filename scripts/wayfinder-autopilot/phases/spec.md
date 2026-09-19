@@ -10,6 +10,17 @@ properly, not skimmed:
    content, zero results). `articulate` — every label, empty state, error
    and confirmation written before it is coded. `include` — focus order,
    names, targets, announcements planned, not retrofitted.
+   **Headcount department skills (installed plugins, `product:*` and
+   `marketing:*`) sit alongside these and shape the content, not just the
+   form.** Load by name, at most two per session, only where they apply:
+   `product:product-requirements` before `specify` on any execution ticket
+   (problem and success measure before solution; scope by exclusion); and
+   for a marketing-site surface (`app/(marketing)`, `components/marketing`)
+   `marketing:positioning-and-messaging` before `articulate` so every
+   headline, CTA and body line inherits one positioning, with
+   `marketing:marketing-copywriting` for the copy itself. Where a Headcount
+   skill and an Intent skill disagree on copy or scope, Intent's
+   anti-pattern catalog wins; note the conflict in the spec.
 2. `impeccable shape` then `layout`, `typeset`, `clarify` for the surface;
    read `craft-floor.md`; read the stored critique of the nearest shipped
    surface (`.impeccable/critique/`) and the resolution's Action Summary.

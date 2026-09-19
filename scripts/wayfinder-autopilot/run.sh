@@ -128,7 +128,8 @@ cleanup_session() {
 # per-project, never part of the tool. WAYFINDER_MODEL=<model> overrides a run.
 MODEL_STRONG="${WAYFINDER_MODEL_STRONG:-}"          # empty = the user's default model
 MODEL_CHEAP="${WAYFINDER_MODEL_CHEAP:-}"
-[ -f "$ROOT/.claude/wayfinder-autopilot/config.sh" ] && . "$ROOT/.claude/wayfinder-autopilot/config.sh"
+CONFIG="${WAYFINDER_CONFIG:-$ROOT/.claude/wayfinder-autopilot/config.sh}"   # WAYFINDER_CONFIG=<file> swaps the provider/model ladder
+[ -f "$CONFIG" ] && . "$CONFIG"
 MODEL_CHEAP="${MODEL_CHEAP:-$MODEL_STRONG}"
 MODEL_MEASURE="${WAYFINDER_MODEL_MEASURE:-${MODEL_MEASURE:-}}"   # optional: the measure phase's first session (plumbing only)
 # EFFORT (optional, per-project or WAYFINDER_EFFORT): pinned per session with
@@ -234,7 +235,7 @@ model_for() {   # $1 ticket, $2 attempt number (1-based), $3 phase
 state()  { gh api "repos/$REPO/issues/$1" --jq .state; }
 title()  { gh api "repos/$REPO/issues/$1" --jq .title; }
 
-n=0; NEXT_T=""
+n=0; NEXT_T=""; declare -A DUDS
 while [ "$n" -lt "$MAX" ]; do
   if [ -n "$NEXT_T" ]; then
     T="$NEXT_T"; NEXT_T=""
@@ -294,7 +295,13 @@ while [ "$n" -lt "$MAX" ]; do
 **This session's phase: CLOSE** (4 of 4) — per the phase brief above. Fix batch → confirm round → checks once → lessons → primer → report → close at the bar, or \`Autopilot: continue —\` with the hand-off updated." ;;
   esac
   PHASE_BRIEF="$AP/phases/${PHASE:-single}.md"
-  { cat "$BRIEF"; [ -f "$PHASE_BRIEF" ] && { printf '\n\n'; cat "$PHASE_BRIEF"; }; printf '\n\n## Paths for this run\n\n- Generic lessons (every project): `%s`\n- Project lessons (this repo): `%s`\n- Report: `%s/%s.md`\n- Hand-off file (keep it current at every milestone): `%s/%s.handoff.md`\n- Scratch folder for captures and the filled preflight: `%s/scratch-%s/`\n\n%s\n' "$GENERIC_LESSONS" "$PROJECT_LESSONS" "$OUT" "$T" "$OUT" "$T" "$LOGS" "$T" "$CONT"; } > "$RUN_BRIEF"
+  # PROMPT_MODE=system (config): the /wayfinder skill body goes into the
+  # system prompt and the user turn is a plain instruction. A model that is
+  # not Claude answers the slash-injected skill with a canned "I don't have
+  # the tools" (0/6 engaged on #302, 2026-09-18) but works the same protocol
+  # from the system prompt (3/3). Anthropic runs keep the slash form.
+  { if [ "${PROMPT_MODE:-slash}" = system ]; then printf '# Wayfinder protocol (the /wayfinder skill, loaded by the driver)\n\n'; awk 'f{print} /^---$/{c++; if(c==2)f=1}' "$ROOT/.claude/skills/wayfinder/SKILL.md"; printf '\n\nARGUMENTS: %s %s\n\n---\n\n' "$MAP" "$T"; fi
+    cat "$BRIEF"; [ -f "$PHASE_BRIEF" ] && { printf '\n\n'; cat "$PHASE_BRIEF"; }; printf '\n\n## Paths for this run\n\n- Generic lessons (every project): `%s`\n- Project lessons (this repo): `%s`\n- Report: `%s/%s.md`\n- Hand-off file (keep it current at every milestone): `%s/%s.handoff.md`\n- Scratch folder for captures and the filled preflight: `%s/scratch-%s/`\n\n%s\n' "$GENERIC_LESSONS" "$PROJECT_LESSONS" "$OUT" "$T" "$OUT" "$T" "$LOGS" "$T" "$CONT"; } > "$RUN_BRIEF"
   # Memory: the whole session (claude + dev server + headless browser + node
   # workers) runs inside one cgroup scope with a hard ceiling, so the kernel
   # reclaims/kills inside the scope instead of the box-wide earlyoom shooting
@@ -313,21 +320,38 @@ while [ "$n" -lt "$MAX" ]; do
   # wired in .claude/settings.json) tells the session to hand off. The hard
   # stop is the soft cap plus the hand-off allowance.
   CTXF="$LOGS/ctx-$T"; echo "0 0" > "$CTXF"; rm -f "$CTXF.signal"
+  if [ "${PROMPT_MODE:-slash}" = system ]; then
+    SESSION_PROMPT="Work Wayfinder map #$MAP, ticket #$T, per the Wayfinder protocol and autopilot brief in your system prompt. Begin by claiming the ticket: run gh issue edit $T --add-assignee @me"
+    SESSION_TOOLS="${SESSION_TOOL_SET:-Task,Bash,Edit,Glob,Grep,Read,Skill,WebFetch,WebSearch,Write}"
+  else
+    SESSION_PROMPT="/wayfinder $MAP $T"; SESSION_TOOLS=""
+  fi
+  # Nudges (SESSION_NUDGES in the config, default 0): a weaker model ends a
+  # turn narrating its next step ("Next, I'll read the map") instead of
+  # making the call, and a -p session ends on a text-only turn. With nudges
+  # on, the session is kept on disk and, when it ends early with the ticket
+  # open and no hand-off, is resumed with "continue — with a tool call", up
+  # to SESSION_NUDGES times. The caps below run over the whole chain.
+  NUDGE_N=0; RESUME_SID=""; SESSION_PROMPT_CUR="$SESSION_PROMPT"
+  PERSIST="--no-session-persistence"; [ "${SESSION_NUDGES:-0}" -gt 0 ] && PERSIST=""
+  while :; do
   ( cd "$ROOT" && NODE_OPTIONS="${WAYFINDER_NODE_OPTIONS:---max-old-space-size=3072}" \
     WAYFINDER_CTX_FILE="$CTXF" WAYFINDER_HANDOFF_FILE="$OUT/$T.handoff.md" WAYFINDER_TICKET="$T" WAYFINDER_MAP="$MAP" \
     WAYFINDER_HANDOFF_ALLOWANCE_K="$(( ${WAYFINDER_HANDOFF_ALLOWANCE:-30000} / 1000 ))" \
-    setsid "${SCOPE[@]}" claude -p "/wayfinder $MAP $T" \
+    setsid "${SCOPE[@]}" claude -p "$SESSION_PROMPT_CUR" \
       --append-system-prompt-file "$RUN_BRIEF" \
+      ${RESUME_SID:+--resume "$RESUME_SID"} \
+      ${SESSION_TOOLS:+--tools "$SESSION_TOOLS"} \
       ${MODEL:+--model "$MODEL"} \
       ${SESSION_EFFORT:+--effort "$SESSION_EFFORT"} \
       --permission-mode acceptEdits \
       --allowedTools "${ALLOWED_TOOLS[@]}" \
       --disallowedTools AskUserQuestion \
-      --no-session-persistence \
+      $PERSIST \
       --strict-mcp-config \
       --setting-sources project,local \
       --output-format stream-json --verbose \
-      > "$LOG" 2>"$LOG.stderr" ) &
+      >> "$LOG" 2>>"$LOG.stderr" ) &
   SESSION_PID=$!
   # Two hard caps per session, enforced here because the model cannot see its
   # own budget in -p mode: wall time (default 3h30) and context size (default
@@ -378,7 +402,7 @@ PY
       if [ -n "$UNIT" ] && systemctl --user is-active -q "$UNIT" 2>/dev/null; then
         systemctl --user stop "$UNIT" 2>/dev/null || true
       else
-        cpid="$(pgrep -f "claude -p /wayfinder $MAP $T " | head -1)"; pgid="$(ps -o pgid= -p "${cpid:-0}" 2>/dev/null | tr -d ' ')"
+        cpid="$(pgrep -f "claude -p (/wayfinder $MAP $T |Work Wayfinder map #$MAP, ticket #$T,)" | head -1)"; pgid="$(ps -o pgid= -p "${cpid:-0}" 2>/dev/null | tr -d ' ')"
         if [ -n "$pgid" ] && [ "$pgid" != "$(ps -o pgid= -p $$ | tr -d ' ')" ]; then kill -TERM -- "-$pgid" 2>/dev/null || true; sleep 8; kill -KILL -- "-$pgid" 2>/dev/null || true; fi
       fi
       break
@@ -386,10 +410,40 @@ PY
   done
   wait "$SESSION_PID" 2>/dev/null; RC=$?
   [ -n "$CAPPED" ] && RC=124
+  if [ "$RC" = 0 ] && [ "${SESSION_NUDGES:-0}" -gt 0 ] && [ "$NUDGE_N" -lt "${SESSION_NUDGES:-0}" ] \
+     && grep -q '"type":"tool_use"' "$LOG" 2>/dev/null && [ "$(state "$T")" != "closed" ]; then
+    lastc="$(gh api "repos/$REPO/issues/$T/comments" --jq 'last.body // ""' | head -c 40)"
+    if [[ "$lastc" != "Autopilot: partial"* && "$lastc" != "Autopilot: continue"* ]]; then
+      RESUME_SID="$(grep -o '"session_id":"[^"]*"' "$LOG" | tail -1 | cut -d'"' -f4)"
+      if [ -n "$RESUME_SID" ]; then
+        NUDGE_N=$((NUDGE_N+1))
+        echo "    #$T ended on a text-only turn with the ticket open — nudge $NUDGE_N/${SESSION_NUDGES} (resume $RESUME_SID)"
+        SESSION_PROMPT_CUR="You stopped after describing your next step instead of doing it. Continue working ticket #$T now — every turn must contain a tool call until the ticket is closed with its resolution comment, or handed off with an 'Autopilot: continue —' comment and the hand-off file. Do the step you just described."
+        continue
+      fi
+    fi
+  fi
+  break
+  done
   echo "    #$T context at exit: $(context_tokens "$LOG") tokens, $(( ( $(date +%s) - S0 ) / 60 )) min"
   cleanup_session "$SESSION_PID" "$S0"
   set -e
   DUR=$(( $(date +%s) - S0 ))
+  # A dud: the session ended without a single tool call (a weaker model
+  # through the proxy answers the first turn with a canned "I don't have the
+  # tools" a coin-flip of the time — seen on map #302, 2026-09-18). Four
+  # seconds of nothing is not a no-progress session: relaunch the same ticket
+  # at once, bounded by WAYFINDER_DUD_RETRIES, without counting it.
+  if [ "$RC" != 124 ] && ! grep -q '"type":"tool_use"' "$LOG" 2>/dev/null; then
+    DUDS[$T]=$(( ${DUDS[$T]:-0} + 1 ))
+    if [ "${DUDS[$T]}" -le "${WAYFINDER_DUD_RETRIES:-6}" ]; then
+      echo "--- #$T: dud (no tool call in ${DUR}s) — relaunching, ${DUDS[$T]}/${WAYFINDER_DUD_RETRIES:-6}"
+      printf '| %s | [#%s](https://github.com/%s/issues/%s) %s | dud — no tool call, relaunched %s/%s (%s) | %dm%02ds | [log](logs/%s) |\n' \
+        "$START" "$T" "$REPO" "$T" "$TT" "${DUDS[$T]}" "${WAYFINDER_DUD_RETRIES:-6}" "${MODEL:-default}" $((DUR/60)) $((DUR%60)) "$(basename "$LOG")" >> "$RUNLOG"
+      NEXT_T="$T"; n=$((n-1)); continue
+    fi
+    echo "    #$T: ${DUDS[$T]} duds in a row — counting this one as a session"
+  fi
 
   ATTEMPTS[$T]=$(( ${ATTEMPTS[$T]:-0} + 1 ))
   [ -n "$PHASE" ] && PHASE_RUNS[$T:$PHASE]=$(( ${PHASE_RUNS[$T:$PHASE]:-0} + 1 ))

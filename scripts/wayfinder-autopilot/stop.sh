@@ -27,7 +27,7 @@ for u in $(systemctl --user list-units "wayfinder-$MAP-*" --no-legend --plain 2>
   systemctl --user stop "$u" 2>/dev/null && echo "stopped session scope $u (ticket #$t)"
 done
 # no systemd: the session's own process group
-for p in $(pgrep -f "claude -p /wayfinder $MAP " 2>/dev/null); do
+for p in $(pgrep -f "claude -p (/wayfinder $MAP |Work Wayfinder map #$MAP,)" 2>/dev/null); do
   t="$(ps -o args= -p "$p" | sed -E "s/.*\/wayfinder $MAP ([0-9]+).*/\1/")"; TICKETS="$TICKETS $t"
   pg="$(ps -o pgid= -p "$p" | tr -d ' ')"; [ -n "$pg" ] && kill -TERM -- "-$pg" 2>/dev/null && echo "stopped session pid $p (ticket #$t)"
 done

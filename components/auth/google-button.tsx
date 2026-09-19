@@ -21,10 +21,11 @@ import { useEffect, useRef, useState } from "react"
  * never appear) that reads as the feature being missing rather than broken. This button is real,
  * static markup — it always renders — and only touches Google's script when clicked, so a network
  * or FedCM failure surfaces as a click that produces an error message, not an absent control. */
-export function GoogleButton({ redirectTo = "/workspaces", intent = "signin", onError }: {
+export function GoogleButton({ redirectTo = "/workspaces", intent = "signin", onError, onStart }: {
   redirectTo?: string
   intent?: "signin" | "signup"
   onError?: (message: string) => void
+  onStart?: () => void
 }) {
   const [busy, setBusy] = useState(false)
   // initialize() needs a fresh nonce per attempt, but the script itself only needs loading once —
@@ -58,6 +59,7 @@ export function GoogleButton({ redirectTo = "/workspaces", intent = "signin", on
   }
 
   const onClick = async () => {
+    onStart?.()
     setBusy(true)
     onError?.("")
     try {

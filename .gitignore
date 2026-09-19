@@ -74,3 +74,6 @@ docs/wayfinder-reports/*/logs/
 # wayfinder driver state: the phase high-water mark per ticket
 docs/wayfinder-reports/*/*.phase
 .preview/
+
+# wayfinder autopilot: provider secrets
+.claude/wayfinder-autopilot/mistral/.env

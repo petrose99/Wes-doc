@@ -61,5 +61,5 @@ export async function proxy(request: NextRequest) {
  * all, the same UX-shortcut role it played under better-auth. The platform `role` check still has
  * to happen where Prisma is reachable, which the edge runtime this file runs in is not. */
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|css|js)$).*)"],
+  matcher: ["/((?!ingest|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|css|js)$).*)"],
 }

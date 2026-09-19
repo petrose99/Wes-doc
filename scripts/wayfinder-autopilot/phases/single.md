@@ -5,7 +5,12 @@ This ticket is not a phased build. Resolve it in this session.
 **Grilling and decision tickets.** Read `docs/agents/design-tickets.md`
 §"Grilling a design ticket" by range (it carries Intent's and Impeccable's
 round agendas). Call the Skill tool for `grilling` and `domain-modeling`,
-plus the Intent skill and Impeccable sub-command the map's Notes name. Establish the facts from code before the first question. Run the
+plus the Intent skill and Impeccable sub-command the map's Notes name. For
+a product-scope or prioritisation question also load
+`product:chief-product-officer`; for a marketing-site or messaging question
+`marketing:positioning-and-messaging` — one Headcount skill per session, and
+name it in the Action Summary so the execution session inherits it.
+Establish the facts from code before the first question. Run the
 rounds, take every `➡️`, record the Q&A table in the report. Close with an
 ordered Action Summary (Intent skills first, then Impeccable commands) on the
 resolution comment so an execution session inherits it.

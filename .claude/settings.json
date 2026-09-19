@@ -11,5 +11,17 @@
         ]
       }
     ]
+  },
+  "enabledPlugins": {
+    "product@headcount": true,
+    "marketing@headcount": true
+  },
+  "extraKnownMarketplaces": {
+    "headcount": {
+      "source": {
+        "source": "github",
+        "repo": "cbrock84/headcount"
+      }
+    }
   }
 }

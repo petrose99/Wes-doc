@@ -3,6 +3,7 @@
 import { submitDemoRequest } from "@/app/(marketing)/demo/actions"
 import { VOLUME_OPTIONS } from "@/app/(marketing)/demo/volume-options"
 import { FormError } from "@/components/forms/error"
+import { track } from "@/lib/analytics"
 import { Input } from "@/components/ui/input"
 import { NativeSelect } from "@/components/ui/native-select"
 import { Textarea } from "@/components/ui/textarea"
@@ -85,6 +86,7 @@ export function DemoForm() {
         setError(result.error)
         return
       }
+      track("demo_requested", { volume: String(data.get("volume") ?? "") })
       setSent(true)
       toast.success("Demo request sent — we will be in touch shortly")
     } catch {
