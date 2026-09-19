@@ -325,7 +325,7 @@ export function ChecksTab({ workspaceId, documentId, gates, escalations, ledgerR
   return <ul className="space-y-2">
     {ledgerRetry && <li className="rounded-md border border-slate-200 px-3 py-2">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-medium text-slate-800">Ledger push</span>
+        <span className="text-sm font-medium text-slate-800">Post to ledger</span>
         <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700">Failed</span>
       </div>
       <p className="mt-0.5 text-xs text-slate-500">{retryFailure ?? ledgerRetry.detail}</p>
