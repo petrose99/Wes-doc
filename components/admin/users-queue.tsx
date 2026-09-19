@@ -190,12 +190,14 @@ function InviteDialog({ open, onClose, workspaceId, currentWorkspaceId, ownedCom
   const [roles, setRoles] = useState<Record<string, "owner" | "reviewer" | "member">>(() => ({ [currentWorkspaceId]: "member" }))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // The existing row's key when the invitee already has access (spec §4.1: "Open their row" links to it).
+  const [errorRow, setErrorRow] = useState<string | null>(null)
   const grants = ownedCompanies.filter((company) => ticked[company.workspaceId])
   // One owned company (every (b) team workspace, some (a) viewers): pre-ticked and locked, with the
   // lock's visible reason — an invitation with nothing ticked would be nothing (spec §3.3 b).
   const locked = ownedCompanies.length === 1
   const emailRef = useRef<HTMLInputElement>(null)
-  const failWith = (message: string) => { setError(message); window.requestAnimationFrame(() => emailRef.current?.focus()) }
+  const failWith = (message: string, row: string | null = null) => { setError(message); setErrorRow(row); window.requestAnimationFrame(() => emailRef.current?.focus()) }
   const close = () => { if (busy) return; onClose(); setEmail(""); setTicked({ [currentWorkspaceId]: true }); setRoles({ [currentWorkspaceId]: "member" }); setError(null) }
   return <Dialog open={open} onClose={close} title="Invite a user" description="One invitation can open several companies. They get an email with a link that works for seven days." initialFocus="#invite-email">
     <form className="space-y-4 px-5 py-4" onSubmit={async (event) => {
@@ -205,7 +207,11 @@ function InviteDialog({ open, onClose, workspaceId, currentWorkspaceId, ownedCom
       try {
         const result = await inviteUserAction(workspaceId, { email: email.trim(), grants: grants.map((company) => ({ workspaceId: company.workspaceId, role: roles[company.workspaceId] ?? "member" })) })
         if (result.success && result.data) onSent(result.data.inviteUrl, result.data.invitationId, email.trim(), result.data.companies)
-        else failWith(actionErrorText(result.error ?? "invite_failed", { email: email.trim() }))
+        else {
+          const code = result.error ?? "invite_failed"
+          const rowKey = code.startsWith("member_already_exists:") ? code.split(":").pop() ?? null : null
+          failWith(actionErrorText(code, { email: email.trim() }), rowKey && /^[0-9a-f-]{36}$/i.test(rowKey) ? rowKey : null)
+        }
       } catch { failWith("Couldn't send the invitation. Your entries are still here — try again.") }
       finally { setBusy(false) }
     }}>
@@ -239,7 +245,9 @@ function InviteDialog({ open, onClose, workspaceId, currentWorkspaceId, ownedCom
         {unownedCompanies.length > 0 && <p className="mt-2 text-xs text-slate-500">You can&apos;t invite to {unownedCompanies.map((c) => c.name).join(", ")} — ask their owners.</p>}
       </fieldset>
       {grants.length === 0 && <p className="text-xs text-slate-500">Tick at least one company</p>}
-      {error && <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>}
+      {error && <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">
+        {errorRow ? <>{error.replace(/ Open their row.*$/, "")} <Link href={`${adminPaths(workspaceId).users}/u:${errorRow}`} onClick={close} className="font-medium underline">Open their row</Link> to add companies or change roles.</> : error}
+      </p>}
       <div className="flex justify-end gap-2">
         <Button type="button" size="sm" variant="outline" disabled={busy} onClick={close}>Cancel</Button>
         <Button type="submit" size="sm" disabled={busy || !email.trim() || grants.length === 0}>{busy ? "Sending…" : "Send invitation"}</Button>

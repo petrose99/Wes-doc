@@ -13,7 +13,7 @@ import { AdminSaveBar } from "@/components/admin/admin-save-bar"
 import { useAsyncConfirm } from "@/components/admin/user-confirm"
 import { usePhoneLane } from "@/lib/client/use-phone-lane"
 import {
-  ROLE_CONSEQUENCE, ROLE_LABELS, actionErrorText, displayName,
+  ROLE_CONSEQUENCE, ROLE_LABELS, actionErrorText, displayName, endSentence,
   type UserRole, type UserRow, type UserRowCompany,
 } from "@/lib/admin/users"
 import {
@@ -362,7 +362,7 @@ function MemberBody({ workspaceId, row, currentWorkspaceId, currentCompanyName, 
     if (!result.success || !result.data) {
       const code = result.error ?? "remove_failed"
       if (code === "last_owner_required" || code === "transfer_ownership_before_leaving" || code === "delete_workspace_instead") {
-        confirm.refuse(self ? actionErrorText("transfer_ownership_before_leaving", { company: section.workspaceName }) : `${name} is the only owner of ${section.workspaceName}. Make someone else an owner first.`)
+        confirm.refuse(self ? actionErrorText("transfer_ownership_before_leaving", { company: section.workspaceName }) : `${name} is the only owner of ${endSentence(section.workspaceName)} Make someone else an owner first.`)
         return
       }
       confirm.fail(code === "remove_failed" ? "Nothing was changed — try again." : actionErrorText(code, { name, company: section.workspaceName }))
@@ -514,7 +514,7 @@ function MemberBody({ workspaceId, row, currentWorkspaceId, currentCompanyName, 
             </NativeSelect>
             <Consequence>{ROLE_CONSEQUENCE[pending](section.workspaceName)}</Consequence>
             {pending !== section.role && <p className="text-[13px] text-slate-600">Now: {ROLE_LABELS[section.role]}.</p>}
-            {onlyOwner && <p id={reasonId} className="text-[13px] text-slate-600">You&apos;re the only owner of {section.workspaceName}. Make someone else an owner first.</p>}
+            {onlyOwner && <p id={reasonId} className="text-[13px] text-slate-600">You&apos;re the only owner of {endSentence(section.workspaceName)} Make someone else an owner first.</p>}
             {sectionErrors[section.workspaceId] && <p id={errorId} role="alert" className="text-[13px] text-red-700">{sectionErrors[section.workspaceId]}</p>}
           </div> : <div className="flex flex-col gap-1">
             <p className="text-sm text-slate-900">{ROLE_LABELS[section.role]}</p>

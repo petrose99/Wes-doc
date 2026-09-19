@@ -63,6 +63,11 @@ export const ROLE_CONSEQUENCE: Record<UserRole, (company: string) => string> = {
   member: () => "Uploads, reviews, searches and exports.",
 }
 
+/** A sentence that ends on a company name: "Riverside Bakery Co." must not become "Co..". */
+export function endSentence(name: string): string {
+  return name.endsWith(".") ? name : `${name}.`
+}
+
 export function displayName(row: Pick<UserRow, "name" | "email">): string {
   return row.name?.trim() || row.email
 }
@@ -109,16 +114,16 @@ export function actionErrorText(code: string, context: { name?: string; company?
   switch (base) {
     case "invalid_email": return "Enter an email address like name@company.com."
     case "self_invite": return "That's you — you're already here."
-    case "member_already_exists": return `${context.email ?? who} already has access to ${company}. Open their row to add companies or change roles.`
-    case "owner_required": return suffix ? `Only an owner of ${company} can invite to it — untick it or ask ${owners}.` : `You're no longer an owner of ${company}.`
+    case "member_already_exists": return `${context.email ?? who} already has access to ${endSentence(company)} Open their row to add companies or change roles.`
+    case "owner_required": return suffix ? `Only an owner of ${company} can invite to it — untick it or ask ${owners}.` : `You're no longer an owner of ${endSentence(company)}`
     case "last_owner_required": return `${who} is now the only owner of ${company} — choose another owner first.`
-    case "last_reviewer_removal_requires_confirmation": return `${who} is the only reviewer of ${company}.`
+    case "last_reviewer_removal_requires_confirmation": return `${who} is the only reviewer of ${endSentence(company)}`
     case "cannot_leave_personal_workspace": return "You can't leave your personal workspace."
     case "transfer_ownership_before_leaving":
     case "delete_workspace_instead": return `You're the only owner of ${company} — make someone else an owner, or delete the company on Companies.`
     case "invitation_expired": return "That link has expired — resend to issue a new one."
     case "invalid_bank_details": return "Check the bank details: bank name, a 6–20 digit account number and a 3–10 character branch code."
-    case "not_found": return context.email ? "That invitation no longer exists." : `${who} is no longer in ${company}.`
+    case "not_found": return context.email ? "That invitation no longer exists." : `${who} is no longer in ${endSentence(company)}`
     case "offline": return "You're offline — nothing was changed."
     default: return code.replaceAll("_", " ")
   }

@@ -85,8 +85,9 @@ export async function inviteUserAction(workspaceId: string, input: { email: stri
   // checks the primary only; an accepted secondary grant would overwrite an existing role).
   for (const grant of grants) {
     if (!(await isOwner(grant.workspaceId, user.id))) return { success: false, error: `owner_required:${await workspaceName(grant.workspaceId)}` }
-    const existing = await unscoped(() => prisma.workspaceMember.findFirst({ where: { workspaceId: grant.workspaceId, user: { email } }, select: { id: true } }))
-    if (existing) return { success: false, error: `member_already_exists:${await workspaceName(grant.workspaceId)}` }
+    const existing = await unscoped(() => prisma.workspaceMember.findFirst({ where: { workspaceId: grant.workspaceId, user: { email } }, select: { userId: true } }))
+    // Third segment is the existing row's key so the dialog's "Open their row" can link to it (spec §4.1).
+    if (existing) return { success: false, error: `member_already_exists:${await workspaceName(grant.workspaceId)}:${existing.userId}` }
   }
   const primary = grants.find((grant) => grant.workspaceId === workspaceId) ?? grants[0]
   const others = grants.filter((grant) => grant !== primary)
