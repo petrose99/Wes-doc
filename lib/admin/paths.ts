@@ -5,6 +5,7 @@ export const adminPaths = (workspaceId: string) => {
   const base = `/workspaces/${workspaceId}/admin`
   return {
     base,
+    dashboard: `${base}/dashboard`,
     companies: `${base}/companies`,
     users: `${base}/users`,
     configuration: `${base}/configuration`,

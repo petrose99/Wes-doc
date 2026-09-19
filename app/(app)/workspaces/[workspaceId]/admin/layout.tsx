@@ -4,6 +4,7 @@ import { CompanyDetail } from "@/components/admin/company-detail"
 import { UserDetail } from "@/components/admin/user-detail"
 import { getAdminContext } from "@/lib/admin/context"
 import { adminPaths } from "@/lib/admin/paths"
+import { getWorkspacesForUser } from "@/models/workspaces"
 
 /** #285: Companies' Detail pane arrives from a server action as JSX. The RSC bundler only lists
  * a client component in a route's client manifest when a server component on the route's graph
@@ -15,10 +16,9 @@ const CLIENT_MANIFEST_ANCHORS = [CompanyDetail, UserDetail]
  * old address 308-redirects to its section here). The rail collapses to its icon width on
  * `/admin/*` exactly as on a queue, so the nav and the page get the work area.
  *
- * ORGANIZATION lists Companies and Users; the org-level Dashboard only exists at two or more
- * companies (#231 Q16), which no workspace on this branch has, so it is not a link yet — a link
- * to a screen that cannot open is a dead end. Approval Flows and PO Mismatch Flows carry the
- * pages that moved from Controls; #253 fills in the rest. */
+ * ORGANIZATION lists Dashboard (only at two or more companies, #231 Q16/#287), Companies and
+ * Users. Approval Flows and PO Mismatch Flows carry the pages that moved from Controls; #253
+ * fills in the rest. */
 export default async function AdminLayout({ children, params }: { children: React.ReactNode; params: Promise<{ workspaceId: string }> }) {
   const { workspaceId } = await params
   const context = await getAdminContext(workspaceId)
@@ -26,9 +26,12 @@ export default async function AdminLayout({ children, params }: { children: Reac
   void CLIENT_MANIFEST_ANCHORS
   const hasTouchless = context.capabilities.has("touchless-automation")
   const hasTax = context.capabilities.has("jurisdiction")
+  const memberships = await getWorkspacesForUser(context.user.id)
+  const companyCount = memberships.filter((membership) => membership.kind === "team").length
 
   const groups: AdminNavGroup[] = [
     { caption: "Organization", items: [
+      ...(companyCount >= 2 ? [{ href: paths.dashboard, label: "Dashboard" }] : []),
       { href: paths.companies, label: "Companies" },
       { href: paths.users, label: "Users" },
     ] },
