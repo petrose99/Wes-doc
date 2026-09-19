@@ -135,7 +135,9 @@ export function BillPayQueue({ workspaceId, basePath, rows, summary, payerAccoun
         const chosen = selectedRows(selectedIds)
         const eligible = chosen.filter((row) => row.eligibility.eligible).length
         const payable = chosen.filter((row) => row.bill.paidState.state !== "scheduled").length
-        const hint = eligible === 0 ? (payerAccounts.length === 0 ? "Add a payer account first." : "Nothing selected can be batched — each row says why.") : null
+        const hint = eligible === 0
+          ? (payerAccounts.length === 0 ? "Add a payer account first." : "Nothing selected can be batched — each row says why.")
+          : eligible < selectedIds.length ? `${selectedIds.length - eligible} of ${selectedIds.length} selected can't be batched — each row says why.` : null
         return <>
           <Button type="button" className="lg:h-8 lg:text-xs" disabled={eligible === 0} onClick={() => setBatching(selectedIds)}>
             <Layers className="h-3.5 w-3.5" aria-hidden />Create batch{eligible > 0 && eligible !== selectedIds.length ? ` (${eligible})` : ""}
@@ -143,8 +145,8 @@ export function BillPayQueue({ workspaceId, basePath, rows, summary, payerAccoun
           {isOwner && <Button type="button" className="lg:h-8 lg:text-xs" variant="outline" disabled={payable === 0} onClick={() => setMarkingPaid(selectedIds)}>
             <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />Mark as paid{payable > 0 && payable !== selectedIds.length ? ` (${payable})` : ""}
           </Button>}
-          <Button type="button" className="lg:h-8 lg:text-xs" variant="outline" disabled={payerAccounts.length === 0} onClick={() => setSettingPayFrom(selectedIds)}>
-            <Wallet className="h-3.5 w-3.5" aria-hidden />Set Pay From
+          <Button type="button" className="lg:h-8 lg:text-xs" variant="outline" disabled={payable === 0 || payerAccounts.length === 0} onClick={() => setSettingPayFrom(chosen.filter((row) => row.bill.paidState.state !== "scheduled").map((row) => row.bill.documentId))}>
+            <Wallet className="h-3.5 w-3.5" aria-hidden />Set Pay From{payable > 0 && payable !== selectedIds.length ? ` (${payable})` : ""}
           </Button>
           {hint && <span className="text-xs text-slate-600">{hint}</span>}
         </>
