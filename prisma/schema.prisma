@@ -86,6 +86,8 @@ model User {
   paidPaymentBatches                PaymentRun[]                @relation("PaymentBatchPayer")
   recordedInvoicePayments           InvoicePayment[]            @relation("InvoicePaymentRecorder")
   removedInvoicePayments            InvoicePayment[]            @relation("InvoicePaymentRemover")
+  recordedExpenseClaimPayments      ExpenseClaimPayment[]       @relation("ExpenseClaimPaymentRecorder")
+  removedExpenseClaimPayments       ExpenseClaimPayment[]       @relation("ExpenseClaimPaymentRemover")
   billPayPreferences                BillPayPreference[]         @relation("BillPayPreferenceEditor")
   resolvedGates                     Gate[]                      @relation("GateResolver")
   assignedExceptions                DocumentCheckResult[]       @relation("CheckResultEscalationAssignee")
@@ -243,6 +245,7 @@ model Workspace {
   paymentRunItems            PaymentRunItem[]
   payerAccounts              PayerAccount[]
   invoicePayments            InvoicePayment[]
+  expenseClaimPayments       ExpenseClaimPayment[]
   billPayPreferences         BillPayPreference[]
   fieldConfigs               WorkspaceFieldConfig[]
   suppliers                  Supplier[]
@@ -258,24 +261,24 @@ model Workspace {
 }
 
 model WorkspaceMember {
-  id               String    @id @default(uuid()) @db.Uuid
-  workspaceId      String    @map("workspace_id") @db.Uuid
-  userId           String    @map("user_id") @db.Uuid
-  role             String    @default("member")
+  id                String    @id @default(uuid()) @db.Uuid
+  workspaceId       String    @map("workspace_id") @db.Uuid
+  userId            String    @map("user_id") @db.Uuid
+  role              String    @default("member")
   /// #271: the per-person, per-workspace hourly floor on Approval notice emails — the last time
   /// one was sent to this member in this workspace, from any candidate task. Not stamped by a
   /// send-back notice (models/approval-notices.ts): that is a reply to one decision, not subject
   /// to the floor that exists to stop per-invoice fan-out to approvers.
-  noticeLastSentAt DateTime? @map("notice_last_sent_at")
+  noticeLastSentAt  DateTime? @map("notice_last_sent_at")
   /// #286 (ADR 0003): bank details for this person on this company only — never shared between
   /// companies, deleted with the membership. Masked to bank + last four everywhere but the edit
   /// form; written into the payment file by #295.
   bankName          String?   @map("bank_name")
   bankAccountNumber String?   @map("bank_account_number")
   bankBranchCode    String?   @map("bank_branch_code")
-  createdAt        DateTime  @default(now()) @map("created_at")
-  workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt         DateTime  @default(now()) @map("created_at")
+  workspace         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([workspaceId, userId])
   @@index([userId])
@@ -1839,13 +1842,13 @@ model ApprovalWorkflowStage {
 /// should survive a departed employee's account being removed, the same reasoning ReviewTask's
 /// assigneeId/createdById are SetNull rather than Cascade.
 model ExpenseClaim {
-  id                String             @id @default(uuid()) @db.Uuid
-  workspaceId       String             @map("workspace_id") @db.Uuid
-  submitterId       String?            @map("submitter_id") @db.Uuid
+  id                String                @id @default(uuid()) @db.Uuid
+  workspaceId       String                @map("workspace_id") @db.Uuid
+  submitterId       String?               @map("submitter_id") @db.Uuid
   title             String?
   /// draft | submitted | approved | rejected — same shape as ReviewTask.status, "draft" standing
   /// in for ReviewTask's "open" (not yet sent for a decision) and "submitted" for "in_review".
-  status            String             @default("draft")
+  status            String                @default("draft")
   /// The sum of each linked receipt's own `total` (from Document.reviewedData), frozen at the
   /// moment the claim was submitted — not a live recompute. Null while still a draft. A snapshot
   /// so approving a claim later never silently changes what it says a person is owed just because
@@ -1855,21 +1858,23 @@ model ExpenseClaim {
   /// ledger totals during reconciliation. See lib/money.ts for the boundary helpers that convert
   /// Prisma's Decimal.js instance back to `number` at read sites — the app layer still speaks
   /// plain `number | null` above the DB.
-  total             Decimal?           @db.Decimal(18, 2)
-  currencyCode      String?            @map("currency_code")
-  workflowId        String?            @map("workflow_id") @db.Uuid
-  currentStageIndex Int?               @map("current_stage_index")
-  submittedAt       DateTime?          @map("submitted_at")
-  resolvedAt        DateTime?          @map("resolved_at")
+  total             Decimal?              @db.Decimal(18, 2)
+  currencyCode      String?               @map("currency_code")
+  workflowId        String?               @map("workflow_id") @db.Uuid
+  currentStageIndex Int?                  @map("current_stage_index")
+  submittedAt       DateTime?             @map("submitted_at")
+  resolvedAt        DateTime?             @map("resolved_at")
   /// Dext-parity Phase 3 WP3.4: mirrors ReviewTask.lastReminderAt — when a reminder email was
   /// last sent for this claim, so lib/reminders.ts never re-sends inside its repeat window.
-  lastReminderAt    DateTime?          @map("last_reminder_at")
-  createdAt         DateTime           @default(now()) @map("created_at")
-  updatedAt         DateTime           @updatedAt @map("updated_at")
-  workspace         Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  submitter         User?              @relation("ExpenseClaimSubmitter", fields: [submitterId], references: [id], onDelete: SetNull)
-  workflow          ApprovalWorkflow?  @relation(fields: [workflowId], references: [id], onDelete: SetNull)
+  lastReminderAt    DateTime?             @map("last_reminder_at")
+  createdAt         DateTime              @default(now()) @map("created_at")
+  updatedAt         DateTime              @updatedAt @map("updated_at")
+  workspace         Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  submitter         User?                 @relation("ExpenseClaimSubmitter", fields: [submitterId], references: [id], onDelete: SetNull)
+  workflow          ApprovalWorkflow?     @relation(fields: [workflowId], references: [id], onDelete: SetNull)
   items             ExpenseClaimItem[]
+  payments          ExpenseClaimPayment[]
+  paymentRunItems   PaymentRunItem[]
 
   @@index([workspaceId, status, createdAt])
   @@index([workspaceId, submitterId])
@@ -2458,73 +2463,110 @@ model WorkspaceBudget {
 /// exists purely to track what was included in a downloaded payment file so an unpaid bill isn't
 /// silently re-batched into a second run.
 model PaymentRun {
-  id               String           @id @default(uuid()) @db.Uuid
-  workspaceId      String           @map("workspace_id") @db.Uuid
-  createdById      String?          @map("created_by_id") @db.Uuid
-  format           String           @default("za_eft_csv")
-  status           String           @default("draft")
-  itemCount        Int              @default(0) @map("item_count")
-  totalsJson       Json?            @map("totals_json")
-  filename         String?
-  sentAt           DateTime?        @map("sent_at")
+  id                   String                @id @default(uuid()) @db.Uuid
+  workspaceId          String                @map("workspace_id") @db.Uuid
+  createdById          String?               @map("created_by_id") @db.Uuid
+  format               String                @default("za_eft_csv")
+  status               String                @default("draft")
+  itemCount            Int                   @default(0) @map("item_count")
+  totalsJson           Json?                 @map("totals_json")
+  filename             String?
+  sentAt               DateTime?             @map("sent_at")
   /// #229 / #251 (map #226): the user-facing *Payment batch*. Additive over the WP-AP2 run —
   /// `status` gains `pending_approval` | `approved` | `paid` | `rejected` beside the legacy
   /// `draft` / `sent`; the decision, export and paid facts each carry who and when. Downloading
   /// the file is a fact (`exportedAt`), never a state.
-  name             String?
-  comment          String?
-  submittedById    String?          @map("submitted_by_id") @db.Uuid
-  approvedById     String?          @map("approved_by_id") @db.Uuid
-  approvedAt       DateTime?        @map("approved_at")
-  rejectedById     String?          @map("rejected_by_id") @db.Uuid
-  rejectedAt       DateTime?        @map("rejected_at")
-  rejectedReason   String?          @map("rejected_reason")
-  exportedAt       DateTime?        @map("exported_at")
-  exportedById     String?          @map("exported_by_id") @db.Uuid
-  paidAt           DateTime?        @map("paid_at")
-  paidById         String?          @map("paid_by_id") @db.Uuid
-  payFromAccountId String?          @map("pay_from_account_id") @db.Uuid
-  currencyCode     String?          @map("currency_code")
-  createdAt        DateTime         @default(now()) @map("created_at")
-  updatedAt        DateTime         @updatedAt @map("updated_at")
-  workspace        Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  createdBy        User?            @relation("PaymentRunCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  submittedBy      User?            @relation("PaymentBatchSubmitter", fields: [submittedById], references: [id], onDelete: SetNull)
-  approvedBy       User?            @relation("PaymentBatchApprover", fields: [approvedById], references: [id], onDelete: SetNull)
-  rejectedBy       User?            @relation("PaymentBatchRejecter", fields: [rejectedById], references: [id], onDelete: SetNull)
-  exportedBy       User?            @relation("PaymentBatchExporter", fields: [exportedById], references: [id], onDelete: SetNull)
-  paidBy           User?            @relation("PaymentBatchPayer", fields: [paidById], references: [id], onDelete: SetNull)
-  payFromAccount   PayerAccount?    @relation(fields: [payFromAccountId], references: [id], onDelete: SetNull)
-  items            PaymentRunItem[]
-  invoicePayments  InvoicePayment[]
+  name                 String?
+  comment              String?
+  submittedById        String?               @map("submitted_by_id") @db.Uuid
+  approvedById         String?               @map("approved_by_id") @db.Uuid
+  approvedAt           DateTime?             @map("approved_at")
+  rejectedById         String?               @map("rejected_by_id") @db.Uuid
+  rejectedAt           DateTime?             @map("rejected_at")
+  rejectedReason       String?               @map("rejected_reason")
+  exportedAt           DateTime?             @map("exported_at")
+  exportedById         String?               @map("exported_by_id") @db.Uuid
+  paidAt               DateTime?             @map("paid_at")
+  paidById             String?               @map("paid_by_id") @db.Uuid
+  payFromAccountId     String?               @map("pay_from_account_id") @db.Uuid
+  currencyCode         String?               @map("currency_code")
+  createdAt            DateTime              @default(now()) @map("created_at")
+  updatedAt            DateTime              @updatedAt @map("updated_at")
+  workspace            Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy            User?                 @relation("PaymentRunCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  submittedBy          User?                 @relation("PaymentBatchSubmitter", fields: [submittedById], references: [id], onDelete: SetNull)
+  approvedBy           User?                 @relation("PaymentBatchApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  rejectedBy           User?                 @relation("PaymentBatchRejecter", fields: [rejectedById], references: [id], onDelete: SetNull)
+  exportedBy           User?                 @relation("PaymentBatchExporter", fields: [exportedById], references: [id], onDelete: SetNull)
+  paidBy               User?                 @relation("PaymentBatchPayer", fields: [paidById], references: [id], onDelete: SetNull)
+  payFromAccount       PayerAccount?         @relation(fields: [payFromAccountId], references: [id], onDelete: SetNull)
+  items                PaymentRunItem[]
+  invoicePayments      InvoicePayment[]
+  expenseClaimPayments ExpenseClaimPayment[]
 
   @@index([workspaceId, status])
   @@index([workspaceId, createdAt])
   @@map("payment_runs")
 }
 
-/// One bill (a Document) included in one PaymentRun. `documentId` is nullable + SetNull because
-/// a workspace deleting the underlying document should not orphan the whole run; the item stays
-/// as an audit record ("we tried to pay for this then the source was deleted"). Unique on
-/// (workspaceId, documentId, active) so the same bill isn't in two open runs at once.
+/// One bill (a Document) or one expense claim included in one PaymentRun. `documentId` and
+/// `expenseClaimId` are nullable + SetNull because a workspace deleting the underlying record
+/// should not orphan the whole run; the item stays as an audit record ("we tried to pay for this
+/// then the source was deleted"). Exactly one of documentId/expenseClaimId is set — Prisma has no
+/// native XOR constraint, so the write path enforces it (models/bill-pay.ts). Unique on
+/// (workspaceId, documentId, active) / (workspaceId, expenseClaimId, active) so the same bill or
+/// claim isn't in two open runs at once.
 model PaymentRunItem {
-  id           String     @id @default(uuid()) @db.Uuid
-  workspaceId  String     @map("workspace_id") @db.Uuid
-  runId        String     @map("run_id") @db.Uuid
-  documentId   String?    @map("document_id") @db.Uuid
-  supplier     String
-  amount       Decimal    @db.Decimal(18, 2)
-  currencyCode String     @map("currency_code")
-  reference    String
-  active       Boolean    @default(true)
-  createdAt    DateTime   @default(now()) @map("created_at")
-  workspace    Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  run          PaymentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
-  document     Document?  @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  id             String        @id @default(uuid()) @db.Uuid
+  workspaceId    String        @map("workspace_id") @db.Uuid
+  runId          String        @map("run_id") @db.Uuid
+  documentId     String?       @map("document_id") @db.Uuid
+  expenseClaimId String?       @map("expense_claim_id") @db.Uuid
+  supplier       String
+  amount         Decimal       @db.Decimal(18, 2)
+  currencyCode   String        @map("currency_code")
+  reference      String
+  active         Boolean       @default(true)
+  createdAt      DateTime      @default(now()) @map("created_at")
+  workspace      Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  run            PaymentRun    @relation(fields: [runId], references: [id], onDelete: Cascade)
+  document       Document?     @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  expenseClaim   ExpenseClaim? @relation(fields: [expenseClaimId], references: [id], onDelete: SetNull)
 
+  @@unique([workspaceId, expenseClaimId, active])
   @@index([workspaceId, runId])
   @@index([workspaceId, documentId, active])
   @@map("payment_run_items")
+}
+
+/// One expense-claim payment record — mirrors InvoicePayment (see its doc-comment for the shape
+/// rationale) but against an ExpenseClaim instead of a Document/bill. Never pushed to the ledger
+/// by this path. Removal is a soft delete with a reason so the audit keeps the trail; `removedAt`
+/// rows are excluded from the derived paid state.
+model ExpenseClaimPayment {
+  id            String       @id @default(uuid()) @db.Uuid
+  workspaceId   String       @map("workspace_id") @db.Uuid
+  claimId       String       @map("claim_id") @db.Uuid
+  amount        Decimal      @db.Decimal(18, 2)
+  currencyCode  String       @map("currency_code")
+  paidOn        DateTime     @map("paid_on") @db.Date
+  method        String
+  batchId       String?      @map("batch_id") @db.Uuid
+  reference     String?
+  recordedById  String?      @map("recorded_by_id") @db.Uuid
+  removedAt     DateTime?    @map("removed_at")
+  removedById   String?      @map("removed_by_id") @db.Uuid
+  removedReason String?      @map("removed_reason")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  workspace     Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  claim         ExpenseClaim @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  batch         PaymentRun?  @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  recordedBy    User?        @relation("ExpenseClaimPaymentRecorder", fields: [recordedById], references: [id], onDelete: SetNull)
+  removedBy     User?        @relation("ExpenseClaimPaymentRemover", fields: [removedById], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, claimId])
+  @@index([workspaceId, batchId])
+  @@map("expense_claim_payments")
 }
 
 /// #229 Q4 (#251): a *Payer account* — the named workspace bank account a payment batch is paid
