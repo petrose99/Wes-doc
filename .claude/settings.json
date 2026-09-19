@@ -26,13 +26,20 @@
   },
   "enabledPlugins": {
     "product@headcount": true,
-    "marketing@headcount": true
+    "marketing@headcount": true,
+    "ponytail@ponytail": true
   },
   "extraKnownMarketplaces": {
     "headcount": {
       "source": {
         "source": "github",
         "repo": "cbrock84/headcount"
+      }
+    },
+    "ponytail": {
+      "source": {
+        "source": "github",
+        "repo": "DietrichGebert/ponytail"
       }
     }
   }

@@ -13,6 +13,14 @@ fixing findings as they appear. Run its check and the affected tests
 hand-off, commit (`wip(autopilot): #<ticket> build step N`), and stop — the
 next step is the next session's, in a fresh context.
 
+**Ponytail's ladder governs the code, the spec governs the scope.** The
+session starts with the ponytail ruleset (YAGNI, reuse before write, one
+line before ten). Climb it for every piece of code: the shell primitives and
+helpers the area primer names are rung 2, never rewritten. What it may never
+cut is the "explicitly requested" set: every state in the spec's tables,
+every Part B contract, the craft floor, accessibility. A state the spec
+names is not YAGNI.
+
 **Part B is lint, not scoring.** Before a step is `done`, the Part B
 contracts it touches are checked the grep-able way the pre-flight names
 (reachability grep, string extraction, primitive diff, focus probe) and what

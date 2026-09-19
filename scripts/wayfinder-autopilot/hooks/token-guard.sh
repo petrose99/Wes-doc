@@ -49,9 +49,15 @@ if tool == "Read":
     sys.exit(0)
 if tool == "Skill":
     s = (inp.get("skill") or "").strip(); a = (inp.get("args") or "").strip()
-    if cont and s in ("intent", "intent:intent"):
-        deny("CONTINUATION: the `intent` router already ran at spec (11K tokens per load). Call the named Intent skill directly — `specify`, `fortify`, `articulate`, `include`, `evaluate`, `journey`, `organize` — the one the hand-off or Action Summary names.")
-    if cont and s == "impeccable" and (a == "" or a.split()[0].lower() == "shape"):
+    # The routers cost 15K (intent, measured on #287's spec session: 102K → 117K
+    # for one call) and ~4K (impeccable) to tell the session which skill to
+    # load next — and the phase brief has already named it. Autopilot sessions
+    # call the named skills directly; CLAUDE.md's continuation clause covers it.
+    if s in ("intent", "intent:intent"):
+        deny("AUTOPILOT: the `intent` router is not called here — the phase brief is the router (15K tokens per load, paid on every later turn). Call the named Intent skill directly: `specify`, `fortify`, `articulate`, `include` for a spec; `evaluate`, `journey`, `organize`, `strategize` where the brief names them. Establish project context from CONTEXT.md and the map's Notes, as the brief says.")
+    if s == "impeccable" and a == "":
+        deny("AUTOPILOT: call `impeccable` with its sub-command as the argument (`shape`, `layout`, `typeset`, `clarify` at spec; `polish`, `critique`, `audit`, `adapt` at close) — the bare router only tells you to pick one, and the phase brief already has.")
+    if cont and s == "impeccable" and a.split()[0].lower() == "shape":
         try: done = "milestone: spec-done" in open(hand).read()
         except Exception: done = False
         if done: deny("CONTINUATION: `impeccable shape` is the pre-build sub-command and the spec phase already ran it. Read `craft-floor.md` by range and call the sub-command this phase needs — `impeccable polish`, `critique`, `audit`, `clarify`, `adapt` — with that name as the argument.")

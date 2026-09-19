@@ -407,6 +407,7 @@ while [ "$n" -lt "$MAX" ]; do
   ( cd "$ROOT" && NODE_OPTIONS="${WAYFINDER_NODE_OPTIONS:---max-old-space-size=3072}" \
     WAYFINDER_CTX_FILE="$CTXF" WAYFINDER_HANDOFF_FILE="$OUT/$T.handoff.md" WAYFINDER_TICKET="$T" WAYFINDER_MAP="$MAP" WAYFINDER_PHASE="${PHASE:-single}" \
     WAYFINDER_READ_MAX_LINES="${WAYFINDER_READ_MAX_LINES:-${READ_MAX_LINES:-220}}" WAYFINDER_READ_PNG_MAX="${WAYFINDER_READ_PNG_MAX:-${READ_PNG_MAX:-10}}" \
+    PONYTAIL_DEFAULT_MODE="${PONYTAIL_MODE:-full}" PONYTAIL_SUBAGENT_MATCHER="${PONYTAIL_SUBAGENT_MATCHER:-^\$}" \
     WAYFINDER_HANDOFF_ALLOWANCE_K="$(( ${WAYFINDER_HANDOFF_ALLOWANCE:-30000} / 1000 ))" \
     setsid "${SCOPE[@]}" claude -p "$SESSION_PROMPT_CUR" \
       --append-system-prompt-file "$RUN_BRIEF" \
@@ -436,6 +437,20 @@ while [ "$n" -lt "$MAX" ]; do
   # posting do not count against the line; only a session that ignores the
   # request is torn down.
   SOFT_CTX="${WAYFINDER_SESSION_MAX_TOKENS:-${SESSION_MAX_TOKENS:-150000}}"
+  # Per-phase line (config: SESSION_MAX_TOKENS_SPEC / _BUILD / _MEASURE /
+  # _CLOSE / _SINGLE). The spec phase carries ~60K of mandatory loads (the
+  # map, four skills, both lessons files, primer, craft floor, pre-flight
+  # template) on top of the base load, and a hand-off in the middle of it
+  # re-pays most of that: #287's first spec session hit the hard stop at
+  # 145K after 27 calls and the second re-read the map, primer, lessons and
+  # craft floor before it could continue.
+  case "${PHASE:-single}" in
+    spec)    SOFT_CTX="${SESSION_MAX_TOKENS_SPEC:-$SOFT_CTX}" ;;
+    build)   SOFT_CTX="${SESSION_MAX_TOKENS_BUILD:-$SOFT_CTX}" ;;
+    measure) SOFT_CTX="${SESSION_MAX_TOKENS_MEASURE:-$SOFT_CTX}" ;;
+    close)   SOFT_CTX="${SESSION_MAX_TOKENS_CLOSE:-$SOFT_CTX}" ;;
+    *)       SOFT_CTX="${SESSION_MAX_TOKENS_SINGLE:-$SOFT_CTX}" ;;
+  esac
   [ -n "$CLOSE_RESUMED" ] && SOFT_CTX="$CLOSE_RESUME_MAX_TOKENS"
   MAX_CTX=$(( SOFT_CTX + ${WAYFINDER_HANDOFF_ALLOWANCE:-30000} ))
   CAPPED=""; SIGNALLED=""
@@ -452,8 +467,11 @@ for line in open(sys.argv[1]):
 print(last)
 PY
   }
+  # Polled every 10s, not 30: a skill load or a whole-file read moves the
+  # context 8–15K in one call, and #287 went from under the line to past the
+  # hard stop inside one 30s poll, with no chance to hand off.
   while kill -0 "$SESSION_PID" 2>/dev/null; do
-    sleep 30
+    sleep "${WAYFINDER_POLL_SECONDS:-10}"
     ELAPSED=$(( $(date +%s) - S0 )); CTX="$(context_tokens "$LOG")"; CTX="${CTX:-0}"
     echo "$CTX $SOFT_CTX" > "$CTXF"
     if [ -z "$SIGNALLED" ] && [ "$CTX" -ge "$SOFT_CTX" ]; then

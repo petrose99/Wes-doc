@@ -39,7 +39,10 @@ expensive step (a capture round, a contact sheet, three agents); most of
 what a fix batch changes can be checked without them. The loop is:
 
 1. **Batch**: fix every P1, every heuristic under 3 and every *real*
-   detector finding from the triage.
+   detector finding from the triage. Each fix at the lowest rung of the
+   ponytail ladder that holds — the smallest diff in the right place (the
+   shared primitive, not one guard per caller); never a fix that drops a
+   spec state, a Part B contract or an accessibility basic.
 2. **Gate**: servers up; run the round script as `shots-c<n>`; run
    `node scripts/wayfinder-autopilot/gate.mjs shots-c<n> --baseline
    <previous round> --residue-file residue.txt --json gate-c<n>.json`.

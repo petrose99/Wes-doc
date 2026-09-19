@@ -136,3 +136,5 @@
 | 2026-09-19T20:01:28+0200 | [#286](https://github.com/petrose99/Wes-doc/issues/286) | stopped by the owner — continues on the next run | – | – |
 | 2026-09-19T20:04:47+0200 | [#286](https://github.com/petrose99/Wes-doc/issues/286) | stopped by the owner — continues on the next run | – | – |
 | 2026-09-19T20:05:09+0200 | [#286](https://github.com/petrose99/Wes-doc/issues/286) Build Users (Admin, org-level Queue-screen shell) | resolved (sonnet) | 8m34s · load 53K | [log](logs/20260919T180509Z-286.jsonl) |
+| 2026-09-19T20:13:58+0200 | [#287](https://github.com/petrose99/Wes-doc/issues/287) Build Admin Dashboard rollups and the grouped company switcher | continued (progressed), session 1/3 without progress allowed, no report, hand-off not updated (sonnet) | 1m34s · load 53K | [log](logs/20260919T181358Z-287.jsonl) |
+| 2026-09-19T20:15:41+0200 | [#287](https://github.com/petrose99/Wes-doc/issues/287) Build Admin Dashboard rollups and the grouped company switcher | continued (progressed), session 1/3 without progress allowed, no report (sonnet) | 3m05s · load 53K | [log](logs/20260919T181541Z-287.jsonl) |

@@ -37,4 +37,9 @@ EFFORT_HARD="low"
 # current hand-off are cheaper than long ones: hand-off line at 110K (hard
 # stop 30K above it), hand-off file nagged past 80 lines.
 SESSION_MAX_TOKENS=110000
+# The spec phase's mandatory loads (~60K over the base) do not fit under 110K:
+# #287's first spec session hit the hard stop at 145K in 27 calls, and its
+# continuation re-paid ~20K re-reading what the first had. One longer spec
+# session is cheaper than two that overlap.
+SESSION_MAX_TOKENS_SPEC=150000
 export WAYFINDER_HANDOFF_MAX_LINES=80

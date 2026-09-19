@@ -4,7 +4,9 @@
 code on an execution ticket, the pre-build pass is mandatory and is done
 properly, not skimmed:
 
-1. `intent specify` — screen-by-screen spec: behaviour, layout, copy,
+1. `specify` (called directly — this brief is the router; the `intent`
+   router costs 15K tokens to name the same four skills, and the hook
+   refuses it) — screen-by-screen spec: behaviour, layout, copy,
    interaction logic, every state, accessibility. `fortify` — the full state
    inventory (empty, loading, error, partial, offline, first-run, long
    content, zero results). `articulate` — every label, empty state, error
@@ -21,12 +23,15 @@ properly, not skimmed:
    `marketing:marketing-copywriting` for the copy itself. Where a Headcount
    skill and an Intent skill disagree on copy or scope, Intent's
    anti-pattern catalog wins; note the conflict in the spec.
-2. `impeccable shape` then `layout`, `typeset`, `clarify` for the surface;
-   read `craft-floor.md`; read the stored critique of the nearest shipped
-   surface (`.impeccable/critique/`) and the resolution's Action Summary.
-   **Read both lessons files in full** (paths are in the system prompt after
-   this brief): the generic one is what every earlier first pass missed in
-   any project; the project one is what this codebase in particular trips on.
+2. `impeccable shape` then `layout`, `typeset`, `clarify` for the surface
+   (each as the argument to `impeccable`; never the bare router); read
+   `.claude/skills/impeccable/reference/craft-floor.md`; read the stored
+   critique of the nearest shipped surface (`.impeccable/critique/`) and the
+   resolution's Action Summary.
+   **Read both lessons files in full, in one Bash call** (paths are in the
+   system prompt after this brief): the generic one is what every earlier
+   first pass missed in any project; the project one is what this codebase
+   in particular trips on.
    Each lesson that applies to this surface becomes a line in the spec now;
    the pre-flight cites it.
 3. **Read the area primer** for the ticket's surface family in

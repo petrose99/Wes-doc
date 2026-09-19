@@ -141,11 +141,13 @@ back with the reason; do what it says, do not retry the same call).
   in a `.mjs`/`.py` file and run it once; read the summary.
 - **Recon through `Explore`.** A foreground `Explore` agent returns the
   answer; the files it read stay out of your context.
-- **Skills by name on a continuation.** The spec session ran the `intent`
-  and `impeccable` routers; later sessions load the specific skills the plan
-  names (`specify`, `fortify`, `articulate`, `include`; the Impeccable
-  sub-command) and read `craft-floor.md`, not the routers again — the hook
-  refuses `intent` and `impeccable shape` once a hand-off exists. The same
+- **Skills by name, never the routers.** The phase brief is the router:
+  every session loads the specific skills it names (`specify`, `fortify`,
+  `articulate`, `include`; `impeccable <sub-command>`) and reads
+  `craft-floor.md`. The `intent` router (15K tokens a load) and the bare
+  `impeccable` call are refused by the hook; `impeccable shape` is refused
+  once the spec is done. This satisfies CLAUDE.md's Intent + Impeccable rule
+  through its continuation clause. The same
   holds for the Headcount department skills (`product:*`, `marketing:*`):
   the spec session picks them; later sessions load only the one the Action
   Summary or hand-off names.
