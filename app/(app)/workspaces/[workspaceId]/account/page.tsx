@@ -2,6 +2,7 @@ import { ChevronRight } from "lucide-react"
 import Link from "next/link"
 import { AdminPage } from "@/components/admin/admin-ui"
 import { Panel } from "@/components/automation/automation-ui"
+import { BankDetailsPanel } from "@/components/account/bank-details-panel"
 import { ResetTourButton } from "@/components/onboarding/reset-tour-button"
 import { HowItWorksButton } from "@/components/shell/how-it-works"
 import { ApprovalEmailsControl } from "@/components/shell/approval-emails"
@@ -9,7 +10,7 @@ import { SignOutButton } from "@/components/shell/sign-out-button"
 import { accountPaths } from "@/lib/admin/paths"
 import { getCurrentUser } from "@/lib/auth"
 import config from "@/lib/config"
-import { getWorkspacesForUser } from "@/models/workspaces"
+import { getWorkspaceMembership, getWorkspacesForUser } from "@/models/workspaces"
 
 export const dynamic = "force-dynamic"
 
@@ -20,11 +21,18 @@ export default async function AccountPage({ params }: { params: Promise<{ worksp
   const { workspaceId } = await params
   const user = await getCurrentUser()
   const workspaces = await getWorkspacesForUser(user.id)
+  const membership = await getWorkspaceMembership(workspaceId, user.id)
+  const bank = membership?.bankName && membership.bankAccountNumber ? { bankName: membership.bankName, lastFour: membership.bankAccountNumber.slice(-4) } : null
   const roleWord = (role?: string) => role === "owner" ? "Owner" : role === "reviewer" ? "Reviewer" : "Member"
 
   return <AdminPage title="Account" intro={<>{user.name || user.email}{user.name && <span className="text-slate-500"> · {user.email}</span>}</>} phoneNote={false}>
     <Panel title="Security" note="Two-factor authentication and your signed-in sessions.">
       <Link href={accountPaths(workspaceId).security} className="inline-flex min-h-11 items-center text-sm font-medium text-emerald-700 underline-offset-2 hover:underline">Open Security</Link>
+    </Panel>
+
+    {/* #295 spec §5: self-service — the same fields admin edits for a member, scoped to `self`. */}
+    <Panel title="Bank details" note="Used to pay out your reimbursement claims.">
+      <BankDetailsPanel workspaceId={workspaceId} userId={user.id} bank={bank} />
     </Panel>
 
     {/* #271 spec §4: the phone home of the Approval-emails switch (the desktop home is the account menu's dialog). */}
