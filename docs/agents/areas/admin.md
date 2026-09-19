@@ -24,7 +24,7 @@ Server actions in `app/(app)/workspaces/[workspaceId]/actions.ts` (owner-only vi
 - Chained shell (`&&`, `;`, `$(…)`) is blocked for sub-agents: multi-step work goes in a `.mjs`/`.py` file.
 
 ## Detector residue (report, do not chase)
-App-wide on every state: workspace-switcher avatar palette ×2, Inter as `overused-font`, dev overlay `layout-transition` + `dark-glow` on `body` — five per state. Admin adds `text-overflow` on the expanded rail's truncated workspace name (shell, 1440) and, with the account menu open, `text-occlusion` on rail labels under the popover.
+App-wide on every state: workspace-switcher avatar palette ×2, Inter as `overused-font`, dev overlay `layout-transition` + `dark-glow` on `body` — five per state. Admin adds `text-overflow` on the expanded rail's truncated workspace name (shell, 1440) and, with the account menu open, `text-occlusion` on rail labels under the popover. With the switcher popover open over a queue page at 1440, the underlying queue shell's own heading sizes (`h1#queue-title` `components/queue/queue-screen.tsx:489` at `text-lg`, `h2` `components/queue/detail-pane.tsx:99` at `text-sm`) trip `flat-type-hierarchy` — pre-existing app-wide scale on the queue shell, not introduced by the switcher/dashboard/picker (#287); a fix belongs to a queue-shell typography ticket, not here.
 
 As regexes, for `gate.mjs --residue-file docs/agents/areas/admin.md` and the round script's `residue` option (matched against `<type> <selector> <detail>`):
 
@@ -35,6 +35,7 @@ layout-transition.*transition: height
 dark-glow.*#ffba00
 text-overflow.*(workspace|rail)
 text-occlusion.*rail
+flat-type-hierarchy.*h2 14px, body 16px, h1 18px
 ```
 
 ## Companies (#285)

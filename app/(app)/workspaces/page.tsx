@@ -46,7 +46,7 @@ export default async function WorkspacesPage({ searchParams }: { searchParams: P
   return <AdminPage title="Companies" intro="Choose a company to open.">
     <ul className="space-y-6">
       {groups.map((group) => <li key={group.key}>
-        {group.label && <p className="pb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+        {group.label && <p className="pb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
           {group.label}{group.workspaces.length > 1 && ` · ${group.workspaces.length} companies`}
         </p>}
         <ul className="divide-y divide-hairline rounded-lg border border-hairline">
@@ -54,7 +54,7 @@ export default async function WorkspacesPage({ searchParams }: { searchParams: P
             <Link href={`/workspaces/${workspace.id}${noticeQuery}`}
               className="flex items-center justify-between gap-4 px-4 py-3 text-sm text-slate-700 hover:bg-slate-50">
               <span className="truncate font-medium text-slate-900">{workspace.name}</span>
-              {workspace.role && <span className="shrink-0 text-xs text-slate-400">{ROLE_LABEL[workspace.role] || workspace.role}</span>}
+              {workspace.role && <span className="shrink-0 text-xs text-slate-500">{ROLE_LABEL[workspace.role] || workspace.role}</span>}
             </Link>
           </li>)}
         </ul>

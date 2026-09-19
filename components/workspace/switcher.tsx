@@ -42,20 +42,20 @@ export function WorkspaceSwitcher({ workspaces, workspaceId }: { workspaces: Swi
       </button>
     </PopoverTrigger>
     <PopoverContent align="start" className="w-64 p-1.5">
-      <p className="px-2 pb-1 pt-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Workspaces</p>
+      <p className="px-2 pb-1 pt-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Workspaces</p>
       {workspaces.length > 6 && <input type="text" value={filter} onChange={(event) => setFilter(event.target.value)}
         placeholder="Filter companies" aria-label="Filter companies"
         className="mb-1 w-full rounded-md border border-[#dbe3ea] px-2 py-1 text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-primary" />}
       <ul className="max-h-64 overflow-y-auto">
         {groups.map((group) => <li key={group.key}>
-          {group.label && <p className="px-2 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400 first:pt-0">{group.label}</p>}
+          {group.label && <p className="px-2 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 first:pt-0">{group.label}</p>}
           <ul>
             {group.workspaces.map((workspace) => <li key={workspace.id}>
               <Link href={`/workspaces/${workspace.id}`} onClick={() => setOpen(false)}
                 className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-100">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-slate-100 text-[10px] font-bold text-slate-500">{workspace.name.trim().charAt(0).toUpperCase()}</span>
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-slate-100 text-[10px] font-bold text-slate-600">{workspace.name.trim().charAt(0).toUpperCase()}</span>
                 <span className="min-w-0 flex-1 truncate">{workspace.name}</span>
-                {workspace.role && <span className="shrink-0 text-[11px] text-slate-400">{ROLE_LABEL[workspace.role] || workspace.role}</span>}
+                {workspace.role && <span className="shrink-0 text-[11px] text-slate-500">{ROLE_LABEL[workspace.role] || workspace.role}</span>}
                 <Check className={`h-3.5 w-3.5 shrink-0 text-primary ${workspace.id === workspaceId ? "" : "invisible"}`} />
               </Link>
             </li>)}
