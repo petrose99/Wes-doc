@@ -40,6 +40,18 @@ Capture rounds: `capture-round.mjs` is the shared runner for the measure and clo
 
 Hard phases: once a phase has `HARD_AFTER` run-log rows without completing (default 2) every further session on it runs on `MODEL_HARD` at `EFFORT_HARD` (per-project `config.sh`), skipping the cheap first pass; when the phase advances the count restarts and routing reverts to the normal ladder. The driver reads these once at start — restart it at a session boundary to apply a change.
 
+Model ladder on a phase: build and close sessions start on `MODEL_EXEC_FIRST` and stay there while sessions progress (a commit or a hand-off change); the ticket's last run-log row saying *no progress* moves the next session to `MODEL_STRONG`, and `HARD_AFTER` of them to `MODEL_HARD`. A model switch also drops the cached base prompt (~20K), so it is made on evidence, not on "second session".
+
+Cascade with hand-back (inside one session): a session is a chain of legs on one transcript (`--resume`), and the model may change between legs — the transcript carries the plan, not the model. A leg that ends with the ticket open, no hand-off and no tool call is first nudged on the same model (`SESSION_NUDGES`), then *pushed*: `MODEL_UNBLOCK` (Opus) is resumed into the same session to do the one step that stalled and stop with `UNBLOCKED:`; the session's own model then resumes on top of that work. `UNBLOCK_MAX` pushes per session. This is why the default model can be Sonnet everywhere: Opus is paid for the hard step only, not the session. The driver prints each push and return in the detached log.
+
+Ticket sizing: a `Build …` ticket is one surface family, at most six build steps and ten captured states. Charting sizes it (`reference/charting.md` §Tickets); the spec phase checks the plan against the limits and splits the remainder into a blocked child ticket *before any code* (`phases/spec.md` step 6). A build or close session never splits.
+
+Deterministic gate: `gate.mjs <shots-dir> [--baseline <dir>] --residue-file <area primer or residue.txt>` reads a round's `detector.json` + `keyboard.json` and prints real findings outside the residue, failing probes (`ok: false`, recorded by the round script), errored states, page errors and findings new since the baseline — exit 0 when clean. The build's G2 and the close phase's fix loop run on it; the reader agents run once, on the round that passes. Residue regexes live in the area primer's ```` ```residue ```` block.
+
+Close-phase state lives in `<scratch>/close.md` (triage, batches, gate results, next step); the hand-off holds a pointer. `CLOSE_RESUME=1` in `config.sh` instead resumes the previous close session (`--resume`, soft cap `CLOSE_RESUME_MAX_TOKENS`, [1m] models only, one driver run) — off by default: it keeps the loop's memory at the cost of every later turn re-reading a longer context.
+
+Load per session: the run-log's duration cell carries `load NK`, the tokens the first turn paid before any work. A note on caching: an identical `--append-system-prompt-file` *is* served from cache across separate `claude -p` processes (probe: second run read 12.3K, created 0), but in real sessions it never hits — Claude Code's own system context ahead of it changes every commit (git status), and a model switch changes the cache key. So the lever is the size of the load (brief, phase brief, hand-off), not cache hits; watch the column.
+
 Needs `.claude/settings.local.json` to allow `Bash(scripts/wayfinder-autopilot/run.sh:*)`
 if Claude itself is to launch it; `/wayfinder` is `disable-model-invocation`,
 so the driver passes it as the `-p` prompt, which counts as a user invocation.

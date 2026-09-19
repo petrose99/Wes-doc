@@ -14,11 +14,11 @@ are one short line each with no `$( … )` or backticks — the permission layer
 refuses expansions, and the refusal arrives as the tool result; read every
 result before the next call.
 
-This is the core brief every session gets. The driver appends one **phase
-brief** after it (`phases/spec.md`, `build.md`, `measure.md`, `close.md`, or
-`single.md` for an unphased ticket) — read that as part of this file. The
-other phase briefs are on disk beside it; open one by range only if your
-work crosses into that phase.
+This core brief is the same for every session. The driver appends one
+**phase brief** after it (`phases/spec.md`, `build.md`, `measure.md`,
+`close.md`, or `single.md` for an unphased ticket) — that is your
+instruction set for this session; the other phase briefs are on disk beside
+it, opened by range only if your work crosses into that phase.
 
 ## Standing delegation from the owner
 
@@ -61,6 +61,9 @@ you, with one rule: **take the recommended answer.**
   end the session. The driver will skip it and move on.
 - Execution tickets: commit your work on the current branch with a
   conventional commit message referencing the ticket. Never push.
+- New `Build …` tickets you create or graduate are sized to the phases: one
+  surface family, at most six build steps and ten captured states. A larger
+  build is several tickets chained by blocking.
 
 ## The bar: solid, no rework, not perfection
 
@@ -71,41 +74,35 @@ The owner's bar for closing a rendered-surface ticket:
   where the contracts already pay for them: H1 (view freshness on every
   mutation, B2) and H5 (confirm-with-consequence on every ⚠ action, B1) are
   4s by construction if Part B is honoured. Don't chase a third.
-- In-page detector cleared to the named app-wide residue at 1440 and 390.
+- In-page detector cleared to the named app-wide residue at 1440 and 390 —
+  `gate.mjs` clean.
 - `include`: keyboard flow verified live at both widths.
 
 If the bar cannot be reached in this session, **leave the ticket open** with
 an `Autopilot: continue —` comment, the hand-off file updated and the tree
-committed. Write the hand-off for a reader with no memory of this session:
-milestones done, what is built and verified, current scores per heuristic,
-the path to the filled `preflight.md`, open findings by heuristic, and the
-exact next step.
+committed.
 
-## How a build ticket runs
+## Sessions, phases and the hand-off
 
-**Four phases, each a fresh session.** The driver reads the phase off the
-hand-off file's `milestone:` line and tells you which one this session is,
-at the end of this brief: **spec** (pre-build, pre-flight, critic; no dev
-server) → **build** (one plan step per session; the build gate last) →
-**measure** (servers, one round, the three readers, scores on the hand-off;
-no fixes) → **close** (fix batch, confirm round, checks, report, close). Do
-only your phase. A phase ends by writing the hand-off with its exit line
-(`milestone: spec-done` / `build-done` / `measured`), committing, and
-stopping — the next phase starts fresh from that file, which is why the
-hand-off must carry every pointer the next session needs. Do not "just
-start" the next phase because there is context left: the fresh context is
-the saving.
+**A build ticket runs as four phases, each a fresh session** — spec →
+build (one plan step per session) → measure → close — read off the
+hand-off file's `milestone:` lines. Do only your phase; the phase brief
+says how it ends. Do not start the next phase because there is context
+left: the fresh context is the saving.
 
-**A session is one context; a ticket is not.** The whole ticket ships —
-every screen, state and check it names — over as many sessions as it takes.
-Never narrow the scope, defer part of it, or split it to fit a session;
-split only at a real scope boundary the map would recognise, and then the
-child ticket carries the whole remainder. **Keep the hand-off file current
-at every milestone** and commit WIP with it (`wip(autopilot): #<ticket>
-<milestone>`), so a hard cap loses nothing. If this is a continuation
-session, read the hand-off file first and do not redo what it records as
-done. The hand-off stays under ~80 lines of pointers; the hook refuses to
-let it grow past 120 without a rewrite.
+**A session is one context; a ticket is not.** The whole ticket ships over
+as many sessions as it takes. A build or close session never narrows,
+defers or splits the scope to fit a context; the only split is the spec
+phase's sizing step, before any code. **Keep the hand-off file current at
+every milestone** and commit WIP with it (`wip(autopilot): #<ticket>
+<milestone>`), so a hard cap loses nothing.
+
+**The hand-off is pointers, under ~80 lines** (the hook refuses 120):
+`milestone:` lines, the exact next step, and paths — spec, pre-flight,
+plan, captures, scores, `close.md`. Narrative, per-session history and
+finding lists live in the scratch folder's files, never here: every session
+re-reads this file whole. A continuation session reads it first and does
+not redo what it records as done.
 
 **You do the work in this session. Never hand it to a background agent.**
 A headless `claude -p` session ends the moment you finish a turn without a
@@ -134,25 +131,27 @@ tests in 45K.
   nothing. Do not announce what you are about to do — do it. Put independent
   tool calls in the same turn. The only text-only turn is the last one.
 - **Read ranges, never whole files.** `grep -n` first, then `sed -n a,bp` of
-  the lines you need. A 400-line component read whole is 4K tokens paid on
-  every later turn. The area primer in `docs/agents/areas/` says what a
+  the lines you need. The area primer in `docs/agents/areas/` says what a
   surface family is made of — read it instead of the codebase file by file.
 - **One script per step, not one command per fact.** Put a multi-step check
   in a `.mjs`/`.py` file and run it once; read the summary.
-- **Recon through `Explore`.** "Where does the shell expose X", "which
-  callers" — a foreground `Explore` agent returns the answer; the files it
-  read stay out of your context.
+- **Recon through `Explore`.** A foreground `Explore` agent returns the
+  answer; the files it read stay out of your context.
 - **Skills by name on a continuation.** The spec session ran the `intent`
   and `impeccable` routers; later sessions load the specific skills the plan
   names (`specify`, `fortify`, `articulate`, `include`; the Impeccable
   sub-command) and read `craft-floor.md`, not the routers again. The same
   holds for the Headcount department skills (`product:*`, `marketing:*`):
-  the spec session picks them; a build or close session loads only the one
-  the Action Summary or hand-off names, never browses the department.
+  the spec session picks them; later sessions load only the one the Action
+  Summary or hand-off names.
+- **Deterministic checks before readers.** The gate (`gate.mjs`), `tsc`,
+  the tests and the Part B greps answer most questions for a few hundred
+  tokens; a reader agent on a contact sheet costs a capture round and three
+  agents. Fix on the gate; confirm with the readers once.
 - **Images only where something is flagged.** A screenshot is ~1–1.5K tokens
-  and stays in context for every later turn. Read detector JSON first; open a
-  PNG only for a flagged state, at most eight per round; one contact sheet
-  per round, never the PNG set.
+  and stays in context for every later turn. Read the gate's summary and
+  detector JSON first; open a PNG only for a flagged state, at most eight
+  per round; one contact sheet per round, never the PNG set.
 - **Hand off at a milestone when context is high, deliberately.** With the
   hand-off current, a fresh session resumes at a sixth of the cost of
   continuing at 150K+.
@@ -185,7 +184,7 @@ session made no code change, commit the report alone
 
 ## Scores and counts (rendered surfaces only)
 scores: predicted-critique=<n> first-critique=<n> close-critique=<n> first-evaluate=<n> close-evaluate=<n>
-<that line exactly, machine-read by scoreboard.py; then: in-page detector first-pass/close at 1440 and 390 per state · include check · which pre-build step was weak if the first pass fell short>
+<that line exactly, machine-read by scoreboard.py; then: gate counts first-pass/close at 1440 and 390 per state · include check · which pre-build step was weak if the first pass fell short>
 
 ## First-pass findings → lessons (rendered surfaces only)
 | Finding (heuristic, severity) | Lesson / contract that should have caught it | Status: none · unchecked · wrong · new class | Action taken |

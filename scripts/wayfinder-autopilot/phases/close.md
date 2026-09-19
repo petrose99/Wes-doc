@@ -4,39 +4,67 @@ Read the hand-off: the raw scores and the untriaged finding lists are on it
 (the measure session records, it does not judge), the round script exists —
 do not re-measure first.
 
+**The close state lives in one file, not in your context.** Keep
+`<scratch>/close.md` (create it on the first close session): the triaged
+list, each fix batch with what it changed, every gate result, and the
+current next step. Update it after every batch and every gate. The hand-off
+carries one pointer to it and the `milestone:` lines, nothing else from
+this phase — a fresh close session reads `close.md` and continues; it never
+re-derives what an earlier one tried.
+
 **Triage first, in one pass.** Go through `## Raw findings (untriaged)` and
 the detector counts and label each finding: *real* (fix it in the batch),
-*residue* (in the named app-wide/shared-component residue set — say which
-entry), *tooling* (dev-server overlay such as `nextjs-portal` in the tab
-order, a probe-labelling gap, a capture timing artifact — say what and how
-you verified it against source), or *decision* (a Wayfinder ticket, named
-on the close). Verify a `tooling` call against the code before dismissing
-it; a P1 dismissed without evidence is a P1 shipped. Write the triaged list
-to the hand-off, replacing the raw one, before the first edit.
+*residue* (in the area primer's residue set — say which entry), *tooling*
+(dev-server overlay such as `nextjs-portal` in the tab order, a
+probe-labelling gap, a capture timing artifact — say what and how you
+verified it against source), or *decision* (a Wayfinder ticket, named on
+the close). Verify a `tooling` call against the code before dismissing it;
+a P1 dismissed without evidence is a P1 shipped. Write the triaged list to
+`close.md`, replace the raw list on the hand-off with the pointer, and
+write the residue entries you relied on to `<scratch>/residue.txt` (one
+regex per line) so the gate and the round script count the same way.
 
 **A dismissed finding is re-scored, never subtracted by hand.** If the
-triage removed anything the readers counted (a tooling artifact, a residue
-entry), re-run the `evaluate` reader — and `critique` if a heuristic under 3
-was driven by a dismissed finding — as fresh `sonnet` agents on the *same*
-capture set, with the triaged list and the reason each item was dismissed
-in their prompt, so the close score is a number the reader produced. The
-`scores:` line carries only integers; "50 read as pass" is not a score and
-breaks the scoreboard. If the re-scored number is still under the bar, the
-fix batch or an `Autopilot: continue —` follows, as for any other gap.
+triage removed anything the readers counted, re-run the `evaluate` reader —
+and `critique` if a heuristic under 3 was driven by a dismissed finding —
+as fresh `sonnet` agents on the *same* capture set, with the triaged list
+and the reason each item was dismissed in their prompt, so the close score
+is a number the reader produced. The `scores:` line carries only integers.
 
-**One fix batch, then ship — a second only if the first removed a P1**
-(fixing a P1 changes enough that the confirm can't stand in for it).
-Sequence: the batch fixing every P1, every heuristic under 3 and every real
-detector finding → the confirming round with the same round script and the
-readers re-run on it (fresh `sonnet` agents on the contact sheet + JSON, as
-in measure) → close at the bar. Confirm under the bar with no P1s: close and
-record the gap. A P1 still open after the allowed batches: update the
-hand-off, leave the ticket open with `Autopilot: continue —`. Never a batch
-to turn a 3 into a 4.
+**Fix on the gate, confirm with the readers — once.** The readers are the
+expensive step (a capture round, a contact sheet, three agents); most of
+what a fix batch changes can be checked without them. The loop is:
+
+1. **Batch**: fix every P1, every heuristic under 3 and every *real*
+   detector finding from the triage.
+2. **Gate**: servers up; run the round script as `shots-c<n>`; run
+   `node scripts/wayfinder-autopilot/gate.mjs shots-c<n> --baseline
+   <previous round> --residue-file residue.txt --json gate-c<n>.json`.
+   It is deterministic: real detector findings outside the residue, failing
+   keyboard probes (`ok: false` in `keyboard.json`), errored states, page
+   errors, and findings *new since the baseline* (a fix that broke
+   something). Read its summary, not the PNGs.
+3. **Repeat** 1–2 on what the gate lists, at most **three gate rounds** in
+   total. A finding the gate still shows after the third: record it in
+   `close.md` and move on — it goes on the ticket as a named gap or a
+   Wayfinder ticket, not into a fourth batch.
+4. **Confirm**: on the round that passed the gate (or the third), the
+   contact sheet and the three readers as fresh `sonnet` agents, exactly as
+   in measure. This is the only reader run in the phase. Its scores are the
+   close scores.
+5. **Close at the bar.** Confirm under the bar with no P1s: close and record
+   the gap. A P1 still open: update `close.md` and the hand-off, leave the
+   ticket open with `Autopilot: continue —`. Never a batch to turn a 3 into
+   a 4.
+
+Fixing a P1 the readers raised, where the gate cannot see it (a copy or
+flow problem, not a detector or probe finding): make the confirm round the
+check for it — the readers re-score it — and if it is still open after
+confirm, hand off; do not spend a second reader run in this session.
 
 **Checks, each exactly once, dev server stopped first** (this box cannot run
 them beside it — #252 lost an hour swapping): affected tests → full suite →
-`tsc --noEmit` → `eslint` → `next build`.
+`tsc --noEmit` → `eslint` on the ticket's changed files → `next build`.
 
 **Findings split two ways.** A finding with a real decision behind it
 becomes a Wayfinder ticket named on the close, with the score it costs. A
@@ -61,13 +89,13 @@ means a Part B row was filled optimistically; say which.
   caught. Generic (holds in any product) → the generic file; codebase-only →
   the project file. Merge with an existing line when it is the same lesson;
   keep each file under ~80 lines — they are read whole by the spec phase.
-  Commit the project file with the ticket. A first pass that met the bar
-  still records what nearly slipped.
+  Commit the project file with the ticket.
 
 **Write the area primer back.** `docs/agents/areas/` holds one page per
 surface family. If none exists for this area, write one; if one exists,
-refresh it with what the build changed. Under ~80 lines, facts only, no
-history. Commit it with the ticket.
+refresh it with what the build changed — including its **Detector residue**
+section, which is what `residue.txt` was built from. Under ~80 lines, facts
+only, no history. Commit it with the ticket.
 
 **Keep the map an index.** Your *Decisions so far* entry is one line: the
 ticket's linked title and a gist of ≤ 25 words. If an existing entry runs

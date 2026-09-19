@@ -42,6 +42,8 @@ Each ticket is a **child issue** of the map; the tracker's issue id is its ident
 
 Each ticket carries a `wayfinder:<type>` label, one of `research`, `prototype`, `grilling`, `task` (see [Ticket Types](#ticket-types)).
 
+An execution ticket on a map whose Notes carry execution (a `task` titled `Build …`) is sized to its phases, not to one session: one surface family, at most **six build steps and ten captured states**. "Build the whole Admin area" is a map section, not a ticket; "Build the Users list and its invite dialog" is a ticket. When the frontier reaches a build too large for that, chart it as several `Build …` tickets chained by blocking, each one whole on its own — the spec phase splits again only if the plan proves the sizing wrong.
+
 A session **claims** a ticket by assigning it to the dev driving the map, **first**, before any work, so concurrent sessions skip it. That assignee _is_ the claim: an open, unassigned ticket is unclaimed.
 
 Blocking uses the tracker's **native** dependency relationship: essential because it renders the frontier _visually_ in the tracker's own UI, so the human sees what's takeable without opening the map. Only a tracker that lacks native blocking falls back to a body convention. A ticket is **unblocked** when every ticket blocking it is closed; the **frontier** is the open, unblocked, unclaimed children, the edge of the known.

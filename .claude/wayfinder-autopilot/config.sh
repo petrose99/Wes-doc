@@ -1,15 +1,27 @@
-# Per-project autopilot settings for docubite (map #226 run, Sep 2026) — Anthropic ladder, used by run.sh.
-# The Mistral ladder is config.mistral.sh, used by run-mistral.sh.
+# Per-project autopilot settings for docubite — sourced by run.sh and chart.sh.
 # Not part of the tool — remove or change freely.
-MODEL_STRONG="opus[1m]"   # grilling and execution tickets
-MODEL_CHEAP="sonnet"      # research tickets and polish passes
-MODEL_EXEC_FIRST="sonnet"  # execution tickets: first attempt on Sonnet; a "partial" retry escalates to MODEL_STRONG
-MODEL_MEASURE="haiku"      # measure phase, first session: servers, round script, reader agents, raw scores — no triage (owner, 2026-09-17); a second measure session runs on MODEL_STRONG
-EFFORT="low"               # every autopilot session, whichever model; independent of ~/.claude/settings.json
-# Hard phases: after HARD_AFTER sessions on one phase without it completing,
-# every further session on that phase runs on MODEL_HARD at EFFORT_HARD (the
-# Sonnet first pass is skipped). Once the phase completes, routing reverts to
-# the normal ladder — Sonnet first on the next phase. Owner's call, 2026-09-16.
+#
+# Model policy (owner, 2026-09-19): Sonnet by default, everywhere. Opus is
+# paid for only where it buys something — a push into a stalled session
+# (cascade with hand-back: Opus does the one step the weaker model would not,
+# Sonnet resumes on top of it), a hard phase, and the spec critic on money /
+# approval / schema / auth tickets (phases/spec.md Part D).
+MODEL_STRONG="sonnet"       # grilling, spec, decisions; also the escalation after a no-progress session
+MODEL_CHEAP="sonnet"        # research tickets and polish passes
+MODEL_EXEC_FIRST="sonnet"   # build/close phases while sessions progress
+MODEL_MEASURE="haiku"       # measure phase, first session: plumbing only, raw scores, no triage
+MODEL_UNBLOCK="opus"        # the push model: one step in a stalled session, then hand back
+UNBLOCK_MAX=2               # pushes per session
+SESSION_NUDGES=1            # same-model "continue with a tool call" before a push
+EFFORT="low"                # every autopilot session, whichever model; independent of ~/.claude/settings.json
+# Hard phases: after HARD_AFTER no-progress sessions on one phase, every
+# further session on that phase runs on MODEL_HARD at EFFORT_HARD until the
+# phase completes.
 HARD_AFTER=2
-MODEL_HARD="opus"          # Opus 5, standard window; sessions hand off at 150K so the [1m] window is unused
+MODEL_HARD="opus"
 EFFORT_HARD="low"
+# Tokens. Cost per session is turns × context, so shorter sessions with a
+# current hand-off are cheaper than long ones: hand-off line at 110K (hard
+# stop 30K above it), hand-off file nagged past 80 lines.
+SESSION_MAX_TOKENS=110000
+export WAYFINDER_HANDOFF_MAX_LINES=80

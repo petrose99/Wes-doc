@@ -26,15 +26,23 @@ three it fits. The plan ends with:
   ticket's round script on `scripts/wayfinder-autopilot/capture-round.mjs`:
   every state at **both 1440 and 390**, detector JSON, and a keyboard probe
   for every Part B focus/keyboard contract (a B line is ticked only by a
-  probe that exercised it, never from the spec text). Run it once to prove
-  it executes end to end; do not start fixing what it shows. Stop the
-  servers; `done`; commit.
-- `step: G2 — r0 and fixes` — servers up; run the round as `shots-r0`; fix
-  every real detector finding and every failing probe in place (pure
-  execution, no readers); re-run only the states you touched; write the r0
-  counts per width to the hand-off. If the fixes outgrow the session, hand
-  off with the list of what is fixed and what is left — this is the one gate
-  step that may take two sessions. Stop the servers; `done`; commit.
+  probe that exercised it, never from the spec text). **Every probe records
+  its own verdict**: `keyboard("name", { ok: <bool>, reason, seq })` — the
+  script compares what the walk reached against what the contract says,
+  so the gate can fail it without a reader. Copy the area primer's
+  *Detector residue* lines to `<scratch>/residue.txt` and pass the same
+  regex to the round's `residue` option. Run it once to prove it executes
+  end to end; do not start fixing what it shows. Stop the servers; `done`;
+  commit.
+- `step: G2 — r0 and fixes` — servers up; run the round as `shots-r0`; run
+  `node scripts/wayfinder-autopilot/gate.mjs shots-r0 --residue-file
+  residue.txt` and fix what it lists — real detector findings, failing
+  probes, errored states, page errors — in place (pure execution, no
+  readers); re-run only the states you touched and gate again; write the
+  gate's counts per width to the hand-off. If the fixes outgrow the session,
+  hand off with the gate output as the list of what is left — this is the
+  one gate step that may take two sessions. Stop the servers; `done`;
+  commit.
 - `step: G3 — build-done` — `tsc --noEmit` once, full project, servers
   stopped; the Part B contract checks over the whole surface (reachability
   grep, string extraction, primitive diff); write `milestone: build-done`,

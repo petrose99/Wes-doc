@@ -185,6 +185,33 @@ phase_of() {   # $1 ticket → "" (single session) | spec | build | close
   if [ "$(phase_rank "$m")" -ge "$(phase_rank "$f")" ]; then echo "$m"; else echo "$f"; fi
 }
 declare -A PHASE_RUNS=()   # "ticket:phase" → sessions already spent on that phase
+# CLOSE_RESUME=1 (config, default off): a close session that handed off at
+# the context line is *resumed* (`--resume`) by the next close session on the
+# same ticket instead of started fresh, with the soft cap raised to
+# CLOSE_RESUME_MAX_TOKENS (default 400K). Only on a [1m]-window model, and
+# only within one driver run. The fix→gate loop keeps its memory; the price
+# is that every later turn re-reads the whole longer context — quadratic —
+# which is why it is off by default and the close phase keeps its state in
+# <scratch>/close.md instead (phases/close.md).
+CLOSE_RESUME="${WAYFINDER_CLOSE_RESUME:-${CLOSE_RESUME:-0}}"
+CLOSE_RESUME_MAX_TOKENS="${WAYFINDER_CLOSE_RESUME_MAX_TOKENS:-${CLOSE_RESUME_MAX_TOKENS:-400000}}"
+declare -A CLOSE_SID=()    # ticket → session id of its last close session that handed off at the line
+last_no_progress() {   # $1 ticket → the ticket's last run-log row was a no-progress session
+  [ -f "$RUNLOG" ] || return 1
+  grep -F "[#$1](" "$RUNLOG" | tail -1 | grep -q "no progress"
+}
+load_tokens() {   # $1 log → tokens the first main assistant turn paid before any work (read + created + input)
+  python3 - "$1" 2>/dev/null <<'PY'
+import json,sys
+for line in open(sys.argv[1]):
+    if '"usage"' not in line: continue
+    try: d=json.loads(line)
+    except: continue
+    if d.get('type')=='assistant' and not d.get('parent_tool_use_id'):
+        u=d['message']['usage']; print(u.get('input_tokens',0)+u.get('cache_read_input_tokens',0)+u.get('cache_creation_input_tokens',0)); break
+else: print(0)
+PY
+}
 # Hard phases. A phase that has already burned HARD_AFTER sessions without
 # completing is hard: every further session on it runs on MODEL_HARD at
 # EFFORT_HARD — no cheap first pass, no waiting for a "partial" to escalate.
@@ -211,13 +238,18 @@ model_for() {   # $1 ticket, $2 attempt number (1-based), $3 phase
   title="$(title "$1")"
   if [ -n "$phase" ]; then
     # spec is judgement → strong. build and close are execution from the
-    # tables → the exec model for their first session; a second session on
-    # the same phase (cap, no close) → strong.
+    # tables → the exec model, and it *stays* the exec model while the
+    # sessions progress (a build runs one step per session by design; a
+    # close that commits a fix batch is moving). Escalation is on evidence:
+    # the last session on this ticket made no progress → strong; HARD_AFTER
+    # of them → MODEL_HARD. Switching models between sessions also throws
+    # away the cached base prompt (~20K per switch, per the run-log load
+    # column), so a switch has to buy something.
     # measure is plumbing (servers, the round script, the reader agents,
     # raw scores onto the hand-off; the triage is the close session's) →
     # MODEL_MEASURE when set, for its first session only.
     if [ "$phase" = measure ] && [ -n "${MODEL_MEASURE:-}" ] && [ "${PHASE_RUNS[$1:$phase]:-0}" -eq 0 ]; then echo "$MODEL_MEASURE"; return; fi
-    if [ "$phase" = spec ] || [ "${PHASE_RUNS[$1:$phase]:-0}" -ge 1 ] || [ -z "${MODEL_EXEC_FIRST:-}" ]; then echo "$MODEL_STRONG"; else echo "$MODEL_EXEC_FIRST"; fi
+    if [ "$phase" = spec ] || [ -z "${MODEL_EXEC_FIRST:-}" ] || last_no_progress "$1"; then echo "$MODEL_STRONG"; else echo "$MODEL_EXEC_FIRST"; fi
     return
   fi
   # A continuation (a hand-off file exists from an earlier session) always runs
@@ -326,14 +358,35 @@ while [ "$n" -lt "$MAX" ]; do
   else
     SESSION_PROMPT="/wayfinder $MAP $T"; SESSION_TOOLS=""
   fi
-  # Nudges (SESSION_NUDGES in the config, default 0): a weaker model ends a
-  # turn narrating its next step ("Next, I'll read the map") instead of
-  # making the call, and a -p session ends on a text-only turn. With nudges
-  # on, the session is kept on disk and, when it ends early with the ticket
-  # open and no hand-off, is resumed with "continue — with a tool call", up
-  # to SESSION_NUDGES times. The caps below run over the whole chain.
-  NUDGE_N=0; RESUME_SID=""; SESSION_PROMPT_CUR="$SESSION_PROMPT"
-  PERSIST="--no-session-persistence"; [ "${SESSION_NUDGES:-0}" -gt 0 ] && PERSIST=""
+  # A session is a chain of legs on one transcript (`--resume`), and the
+  # model can change between legs — the transcript carries the plan, not
+  # the model. Three kinds of leg after the first:
+  #   nudge   — same model, "continue with a tool call": a weaker model ends
+  #             a turn narrating its next step instead of making the call,
+  #             and a -p session ends on a text-only turn (SESSION_NUDGES,
+  #             default 1).
+  #   push    — MODEL_UNBLOCK (the strong model) for ONE step: when a leg
+  #             ends with the ticket open, no hand-off and no tool call
+  #             made, the strong model is resumed into the same session to
+  #             do the step that stalled and stop; its reasoning and tool
+  #             results stay in the transcript.
+  #   return  — the session's own model resumes on top of the push and
+  #             carries on. Cascade with hand-back: the strong model is paid
+  #             for the hard step only (UNBLOCK_MAX pushes per session,
+  #             default 2).
+  # The caps below run over the whole chain; every leg is on disk.
+  NUDGE_N=0; UNBLOCK_N=0; PUSHING=""; TOOLS_BEFORE=0; RESUME_SID=""; SESSION_PROMPT_CUR="$SESSION_PROMPT"
+  BASE_MODEL="$MODEL"; MODEL_CUR="$MODEL"
+  PERSIST=""
+  CLOSE_RESUMED=""
+  if [ "$PHASE" = close ] && [ "$CLOSE_RESUME" = 1 ] && [[ "$MODEL" == *"[1m]"* ]]; then
+    PERSIST=""   # keep the close session on disk so the next close session can resume it
+    if [ -n "${CLOSE_SID[$T]:-}" ]; then
+      RESUME_SID="${CLOSE_SID[$T]}"; CLOSE_RESUMED=1
+      SESSION_PROMPT_CUR="Continue the close phase of ticket #$T in this same session: you handed off at the context line; the hand-off file and <scratch>/close.md are current. Pick up at the next step they name — do not re-triage or re-measure."
+      echo "    #$T resuming close session $RESUME_SID (CLOSE_RESUME; soft cap ${CLOSE_RESUME_MAX_TOKENS})"
+    fi
+  fi
   while :; do
   ( cd "$ROOT" && NODE_OPTIONS="${WAYFINDER_NODE_OPTIONS:---max-old-space-size=3072}" \
     WAYFINDER_CTX_FILE="$CTXF" WAYFINDER_HANDOFF_FILE="$OUT/$T.handoff.md" WAYFINDER_TICKET="$T" WAYFINDER_MAP="$MAP" \
@@ -342,7 +395,7 @@ while [ "$n" -lt "$MAX" ]; do
       --append-system-prompt-file "$RUN_BRIEF" \
       ${RESUME_SID:+--resume "$RESUME_SID"} \
       ${SESSION_TOOLS:+--tools "$SESSION_TOOLS"} \
-      ${MODEL:+--model "$MODEL"} \
+      ${MODEL_CUR:+--model "$MODEL_CUR"} \
       ${SESSION_EFFORT:+--effort "$SESSION_EFFORT"} \
       --permission-mode acceptEdits \
       --allowedTools "${ALLOWED_TOOLS[@]}" \
@@ -366,6 +419,7 @@ while [ "$n" -lt "$MAX" ]; do
   # posting do not count against the line; only a session that ignores the
   # request is torn down.
   SOFT_CTX="${WAYFINDER_SESSION_MAX_TOKENS:-${SESSION_MAX_TOKENS:-150000}}"
+  [ -n "$CLOSE_RESUMED" ] && SOFT_CTX="$CLOSE_RESUME_MAX_TOKENS"
   MAX_CTX=$(( SOFT_CTX + ${WAYFINDER_HANDOFF_ALLOWANCE:-30000} ))
   CAPPED=""; SIGNALLED=""
   context_tokens() {
@@ -410,22 +464,40 @@ PY
   done
   wait "$SESSION_PID" 2>/dev/null; RC=$?
   [ -n "$CAPPED" ] && RC=124
-  if [ "$RC" = 0 ] && [ "${SESSION_NUDGES:-0}" -gt 0 ] && [ "$NUDGE_N" -lt "${SESSION_NUDGES:-0}" ] \
-     && grep -q '"type":"tool_use"' "$LOG" 2>/dev/null && [ "$(state "$T")" != "closed" ]; then
-    lastc="$(gh api "repos/$REPO/issues/$T/comments" --jq 'last.body // ""' | head -c 40)"
-    if [[ "$lastc" != "Autopilot: partial"* && "$lastc" != "Autopilot: continue"* ]]; then
-      RESUME_SID="$(grep -o '"session_id":"[^"]*"' "$LOG" | tail -1 | cut -d'"' -f4)"
-      if [ -n "$RESUME_SID" ]; then
-        NUDGE_N=$((NUDGE_N+1))
-        echo "    #$T ended on a text-only turn with the ticket open — nudge $NUDGE_N/${SESSION_NUDGES} (resume $RESUME_SID)"
-        SESSION_PROMPT_CUR="You stopped after describing your next step instead of doing it. Continue working ticket #$T now — every turn must contain a tool call until the ticket is closed with its resolution comment, or handed off with an 'Autopilot: continue —' comment and the hand-off file. Do the step you just described."
-        continue
-      fi
-    fi
+  [ "$RC" = 124 ] && break
+  [ "$(state "$T")" = "closed" ] && break
+  lastc="$(gh api "repos/$REPO/issues/$T/comments" --jq 'last.body // ""' | head -c 40)"
+  [[ "$lastc" == "Autopilot: partial"* || "$lastc" == "Autopilot: continue"* || "$lastc" == "Autopilot: blocked"* ]] && break
+  # The leg ended on its own with the ticket open and no hand-off.
+  RESUME_SID="$(grep -o '"session_id":"[^"]*"' "$LOG" | tail -1 | cut -d'"' -f4)"
+  [ -z "$RESUME_SID" ] && break
+  TOOLS_NOW="$(grep -c '"type":"tool_use"' "$LOG" 2>/dev/null || echo 0)"; LEG_TOOLS=$(( TOOLS_NOW - ${TOOLS_BEFORE:-0} )); TOOLS_BEFORE="$TOOLS_NOW"
+  if [ -n "$PUSHING" ]; then
+    # return leg: the strong model did its step; hand the session back
+    PUSHING=""; MODEL_CUR="$BASE_MODEL"
+    echo "    #$T push done ($LEG_TOOLS tool calls) — returning to ${BASE_MODEL:-default model}"
+    SESSION_PROMPT_CUR="A stronger model stepped into this session for the step that stalled; its work and results are in the transcript above (it ended with UNBLOCKED:). Continue ticket #$T from there on your own — every turn a tool call — until the ticket is closed with its resolution comment or handed off with an 'Autopilot: continue —' comment and the hand-off file."
+    continue
+  fi
+  if [ "$LEG_TOOLS" -gt 0 ] && [ "$NUDGE_N" -lt "${SESSION_NUDGES:-1}" ]; then
+    NUDGE_N=$((NUDGE_N+1))
+    echo "    #$T ended on a text-only turn with the ticket open — nudge $NUDGE_N/${SESSION_NUDGES:-1} (resume $RESUME_SID)"
+    SESSION_PROMPT_CUR="You stopped after describing your next step instead of doing it. Continue working ticket #$T now — every turn must contain a tool call until the ticket is closed with its resolution comment, or handed off with an 'Autopilot: continue —' comment and the hand-off file. Do the step you just described."
+    continue
+  fi
+  if [ -n "${MODEL_UNBLOCK:-}" ] && [ "$UNBLOCK_N" -lt "${UNBLOCK_MAX:-2}" ] && [ "$BASE_MODEL" != "$MODEL_UNBLOCK" ]; then
+    UNBLOCK_N=$((UNBLOCK_N+1)); PUSHING=1; MODEL_CUR="$MODEL_UNBLOCK"
+    echo "    #$T stalled ($LEG_TOOLS tool calls this leg) — push $UNBLOCK_N/${UNBLOCK_MAX:-2} on $MODEL_UNBLOCK (resume $RESUME_SID)"
+    SESSION_PROMPT_CUR="You are a stronger model stepping into this session because the previous model stalled on ticket #$T (it ended its turn without a tool call, or declined). Read the last turns of the transcript. Do the ONE step that stalled — the tool-driven action the session needed next, done fully (a read, an edit, a command, a skill call) — and no more. Then end your turn with one line: 'UNBLOCKED: <the next step, in one sentence>'. Do not continue past that step, do not close or hand off the ticket; the session's own model resumes after you."
+    continue
   fi
   break
   done
-  echo "    #$T context at exit: $(context_tokens "$LOG") tokens, $(( ( $(date +%s) - S0 ) / 60 )) min"
+  LOAD="$(load_tokens "$LOG")"; LOAD="${LOAD:-0}"
+  echo "    #$T context at exit: $(context_tokens "$LOG") tokens, $(( ( $(date +%s) - S0 ) / 60 )) min; loaded ${LOAD} before the first action"
+  if [ "$PHASE" = close ] && [ "$CLOSE_RESUME" = 1 ]; then
+    CLOSE_SID[$T]="$(grep -o '"session_id":"[^"]*"' "$LOG" | tail -1 | cut -d'"' -f4)"
+  fi
   cleanup_session "$SESSION_PID" "$S0"
   set -e
   DUR=$(( $(date +%s) - S0 ))
@@ -481,8 +553,11 @@ PY
   [ -f "$OUT/$T.md" ] || OUTCOME="$OUTCOME, no report"
   if [ "$(state "$T")" != "closed" ] && { [ ! -f "$OUT/$T.handoff.md" ] || [ "$(stat -c %Y "$OUT/$T.handoff.md")" -lt "$S0" ]; }; then OUTCOME="$OUTCOME, hand-off not updated"; fi
   HL=$(wc -l < "$OUT/$T.handoff.md" 2>/dev/null || echo 0); [ "${HL:-0}" -gt "${WAYFINDER_HANDOFF_MAX_LINES:-120}" ] && OUTCOME="$OUTCOME, hand-off $HL lines (limit ${WAYFINDER_HANDOFF_MAX_LINES:-120})"
-  printf '| %s | [#%s](https://github.com/%s/issues/%s) %s | %s (%s) | %dm%02ds | [log](logs/%s) |\n' \
-    "$START" "$T" "$REPO" "$T" "$TT" "$OUTCOME" "${MODEL:-default}" $((DUR/60)) $((DUR%60)) "$(basename "$LOG")" >> "$RUNLOG"
+  # Duration cell also carries the load: tokens on the first turn before any
+  # work (brief + skill + CLAUDE.md + hand-off). Compare it across sessions
+  # to see what a brief or hand-off change bought.
+  printf '| %s | [#%s](https://github.com/%s/issues/%s) %s | %s (%s) | %dm%02ds · load %dK | [log](logs/%s) |\n' \
+    "$START" "$T" "$REPO" "$T" "$TT" "$OUTCOME" "${MODEL:-default}" $((DUR/60)) $((DUR%60)) $((LOAD/1000)) "$(basename "$LOG")" >> "$RUNLOG"
   # Cost beside the score, every session: turns × context is the bill.
   python3 "$(dirname "$0")/scoreboard.py" "$MAP" "$ROOT" 2>/dev/null | sed 's/^/    /' || true
   echo "--- #$T: $OUTCOME in ${DUR}s"

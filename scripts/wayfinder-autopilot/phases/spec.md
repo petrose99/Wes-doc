@@ -56,6 +56,21 @@ properly, not skimmed:
    check; the three gate steps last (`G1 — round script`, `G2 — r0 and
    fixes`, `G3 — build-done`, as `phases/build.md` defines them). The build
    sessions run one step each from this plan.
+6. **Size the ticket to the phases, now — before any code.** The four-phase
+   run assumes each phase fits a session. The plan tells you whether it
+   will: a ticket whose plan has **more than 6 build steps before the
+   gates, or more than 10 states in the round** (each captured at two
+   widths) will not measure or close in one session — #286's did not close
+   in twelve. If the plan exceeds either limit, split *here*, at a scope
+   boundary the map would recognise (a screen, a role's view, a dialog
+   family): this ticket keeps the first part, and the remainder becomes a
+   new child ticket of the map, labelled `wayfinder:task`, titled
+   `Build …` for the same surface family, blocked by this ticket, with the
+   spec lines and plan steps it inherits named in its body. Post a comment
+   on this ticket saying what moved and why, trim the plan to what stays,
+   and carry on. This is the one place a build ticket is split: never in a
+   build or close session to fit a context, only at spec to fit the phases.
+   The spec critic checks the sizing as part of D.
 
 **Score the new UI, not the old one.** The incumbent may be critiqued as
 *evidence* for the spec (what the old surface got wrong), never as a number

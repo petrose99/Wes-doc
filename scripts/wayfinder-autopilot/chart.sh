@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Chart a new Wayfinder map unattended: one headless `claude -p "/wayfinder <idea>"`
-# session under the autopilot's config (WAYFINDER_CONFIG, default the Anthropic
-# ladder; run-mistral-chart via `WAYFINDER_CONFIG=.claude/wayfinder-autopilot/config.mistral.sh`).
-# The session charts only — the map issue, its first tickets, the fog — and
-# resolves nothing; then work it with run.sh / run-mistral.sh <map>.
+# session under the autopilot's config (WAYFINDER_CONFIG, default
+# .claude/wayfinder-autopilot/config.sh). The session charts only — the map
+# issue, its first tickets, the fog — and resolves nothing; then work it with
+# run.sh <map>.
 #
 #   scripts/wayfinder-autopilot/chart.sh "<idea>" [--detach]
 #
@@ -80,6 +80,10 @@ recommendation, never remove a feature, never AskUserQuestion.
   the code and the named skills — not generic programme work (CRM, A/B
   frameworks, market analysis). Fog and tickets never overlap: a line is in
   **Not yet specified** or it is a ticket, not both.
+- A `Build …` task is one surface family, at most six build steps and ten
+  captured states (`reference/charting.md` §Tickets). A larger build is
+  several `Build …` tickets chained by blocking, never one — #286, "Build
+  Users (the whole Admin shell)", took eighteen sessions.
 - Read before you create: `CONTEXT.md`, the tracker doc
   (`docs/agents/issue-tracker.md`), the existing `wayfinder:map` issues
   (`gh issue list --label wayfinder:map`) so the new map's **Out of scope**

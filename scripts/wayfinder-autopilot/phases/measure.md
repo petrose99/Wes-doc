@@ -17,7 +17,11 @@ steps below in order; every step is one or two tool calls.
    as `shots-r1` — never a Playwright harness from scratch (#257 spent four
    sessions on one). It produces every state × 1440 and 390 as PNGs, the
    in-page detector JSON per state, and `keyboard.json`. If a state errors,
-   the script isolates it; record which.
+   the script isolates it; record which. Then
+   `node scripts/wayfinder-autopilot/gate.mjs shots-r1 --baseline shots-r0
+   --residue-file residue.txt --json gate-r1.json` and copy its one-line
+   summary to the hand-off — that is the detector count the close session
+   starts from.
 4. **One contact sheet** with
    `node scripts/wayfinder-autopilot/contact-sheet.mjs <png-dir> --out <sheet.png>`
    (copy it beside the scratch Playwright first, as with the capture runner).
