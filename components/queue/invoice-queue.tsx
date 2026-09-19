@@ -18,6 +18,9 @@ import { PoChip, useOriginHere } from "@/components/documents/po-compare"
 import { ReasonDialog } from "@/components/list-screen/reason-dialog-button"
 import type { Facet } from "@/components/queue/facet-filters"
 import { ApprovalBulkAction, type ApprovalWorkflowOption } from "@/components/typed-destinations/approval-bulk-action"
+import { PostConfirmDialog } from "@/components/queue/post-confirm-dialog"
+import { Button } from "@/components/ui/button"
+import { Send } from "lucide-react"
 import { ConfidenceField, ProcessingStateGlyph } from "@/components/typed-destinations/row-signals"
 import { PROCESSING_STATES, PROCESSING_STATE_LABELS, processingState } from "@/lib/documents/processing-state"
 import { type ItemizedRecord } from "@/components/typed-destinations/bulk-approve-receipt"
@@ -82,7 +85,7 @@ const SORTS: SortOption<BillRow>[] = [
   { key: "supplier", label: "Supplier A–Z", compare: (a, b) => (a.supplier ?? "￿").localeCompare(b.supplier ?? "￿") },
 ]
 
-export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercent, availableWorkflows = [], views, viewsPhone, stat, initialSelectedId, fieldTable = null, workspaceDocumentCount, todayOutcome, inboundAddress, arrival }: {
+export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercent, availableWorkflows = [], views, viewsPhone, stat, initialSelectedId, fieldTable = null, workspaceDocumentCount, todayOutcome, inboundAddress, arrival, connectionId = null }: {
   workspaceId: string
   basePath: string
   bills: BillRow[]
@@ -107,6 +110,10 @@ export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercen
   inboundAddress: string | null
   /** #268: the Origin strip's model + the missing-row notice, from `queueArrival` on the server. */
   arrival?: QueueArrival
+  /** #281: the workspace's active ledger connection id, or null with none/inactive — the bulk
+   * Post button still shows (§3's enablement rule never hides it), but every row reads ineligible
+   * and the confirm dialog's Post stays disabled until a connection exists. */
+  connectionId?: string | null
 }) {
   const router = useRouter()
   const origin = useOriginHere()
@@ -114,12 +121,18 @@ export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercen
   // #261: the card's "overdue" reads against one instant per mount (the same as Approvals' card).
   const [renderedAt] = useState(() => Date.now())
   const [cancelling, setCancelling] = useState<BillRow | null>(null)
+  const [posting, setPosting] = useState<string[] | null>(null)
   const minConfidence = minConfidenceFromPercent(minConfidencePercent)
   const billsById = new Map(bills.map((bill) => [bill.documentId, bill]))
   const toRecord = (id: string): ItemizedRecord => {
     const bill = billsById.get(id)
     return { id, type: "Invoice", vendor: bill?.supplier ?? null, number: bill?.invoiceNumber ?? null, amount: bill?.total ?? null, currencyCode: bill?.currencyCode ?? null, dateLabel: "Due", date: bill?.dueDate ?? null }
   }
+  // #281 spec.md §2: the client's eligibility guess (never the gate — the server re-resolves at
+  // confirm time). Limited to signals BillRow already carries; category/currency confirmation
+  // isn't one of them, so a row this marks eligible can still come back ineligible server-side —
+  // that outcome shows in the confirm dialog's per-row reason, not as a silent drop (H9).
+  const postEligible = (bill: BillRow) => !bill.cancelledAt && bill.status === "reviewed" && bill.paymentStatus?.toLowerCase() !== "synced"
 
   // One state per row, shared by the leading glyph and the State column / pane Status line
   // (#258): heldBack folds in here so the glyph and the pill can no longer disagree (#258 closed
@@ -281,6 +294,12 @@ export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercen
           <ApprovalBulkAction workspaceId={workspaceId} selectedIds={selectedIds} clear={clear} toRecord={toRecord} workflows={availableWorkflows}
             startEligibleIds={selectedIds.filter((id) => { const status = billsById.get(id)?.approvalStatus; return status === "not_started" || status === "rejected" })}
             cancelEligibleIds={selectedIds.filter((id) => billsById.get(id)?.approvalStatus === "in_progress")} />
+          {/* #281 (#248): Post — bulk-bar order is Approve · Post · Export | Delete (spec.md §3);
+              enabled whenever the selection is non-empty, never gated on the client's eligibility
+              guess (that only informs the dialog's strip/reasons). */}
+          <Button type="button" size="sm" variant="outline" disabled={selectedIds.length === 0} onClick={() => setPosting(selectedIds)}>
+            <Send className="h-3.5 w-3.5" aria-hidden />Post
+          </Button>
         </>} />}
       paneActions={(bill, { refresh }) => <DocumentPaneActions workspaceId={workspaceId} documentId={bill.documentId} noun="invoice"
         status={bill.status} openReviewTaskId={bill.openReviewTaskId} cancelled={!!bill.cancelledAt} onDone={refresh} />}
@@ -302,5 +321,9 @@ export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercen
       description="This is final. There is no way to un-cancel once confirmed. The reason is recorded on the audit trail."
       submitLabel="Cancel invoice"
       placeholder="Why is this invoice being cancelled?" />
+
+    <PostConfirmDialog open={posting !== null} onClose={() => setPosting(null)} workspaceId={workspaceId} connectionId={connectionId}
+      records={(posting ?? []).map(toRecord)} eligibleIds={(posting ?? []).filter((id) => { const bill = billsById.get(id); return bill && postEligible(bill) })}
+      onPosted={() => router.refresh()} />
   </>
 }

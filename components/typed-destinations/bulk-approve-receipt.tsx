@@ -1,5 +1,6 @@
 "use client"
 
+import type { ReactNode } from "react"
 import { CheckCircle2, X } from "lucide-react"
 import Link from "next/link"
 import { Dialog } from "@/components/ui/dialog"
@@ -40,6 +41,9 @@ export type ItemizedRecord = {
   /** #273: a trailing per-row note (the Held-back reason in the Add to claim dialog). The column
    * renders only when at least one record carries one. */
   note?: string
+  /** #281: strikes the amount through — a row the caller already knows can't go through (e.g.
+   * ineligible to Post), shown but visually demoted rather than dropped from the table (H9). */
+  struck?: boolean
 }
 
 /** The compact recap table shown inside a pre-action confirm (Prepare payment run — no separate
@@ -47,7 +51,12 @@ export type ItemizedRecord = {
  * and reused as the row layout for the post-action receipt modal below (Approve, which stays on
  * the page and so gets a real "here's what happened" step). Vic's own column order: Type / Vendor
  * / Number / Amount, per `docs/vic-ai-ux-tour-findings.md`. */
-export function ItemizedRecapTable({ records }: { records: ItemizedRecord[] }) {
+export function ItemizedRecapTable({ records, extraColumn }: {
+  records: ItemizedRecord[]
+  /** #281: an optional per-row column slotted before Reason (e.g. the Post dialog's account
+   * override select) — kept generic here rather than growing this table's own props per feature. */
+  extraColumn?: { header: string; render: (record: ItemizedRecord) => ReactNode }
+}) {
   // One typed table's rows always share a dateLabel ("Due" for invoices, "Date" for receipts) —
   // Purchase Order/Bank Statement rows carry their own per-decision fields once those surfaces
   // get bulk actions (#210 and friends), which is why this reads the label off the first row
@@ -64,17 +73,19 @@ export function ItemizedRecapTable({ records }: { records: ItemizedRecord[] }) {
             <th className="px-3 py-2 font-medium">Number</th>
             <th className="px-3 py-2 font-medium text-right">Amount</th>
             <th className="px-3 py-2 font-medium">{dateLabel}</th>
+            {extraColumn && <th className="px-3 py-2 font-medium">{extraColumn.header}</th>}
             {withNotes && <th className="px-3 py-2 font-medium">Reason</th>}
           </tr>
         </thead>
         <tbody>
           {records.map((record) => (
-            <tr key={record.id} className="border-t border-slate-100">
+            <tr key={record.id} className={`border-t border-slate-100 ${record.struck ? "text-slate-400" : ""}`}>
               <td className="px-3 py-2 text-slate-600">{record.type}</td>
-              <td className="px-3 py-2 text-slate-800">{record.vendor ?? <span className="italic text-slate-400">unknown</span>}</td>
+              <td className={`px-3 py-2 ${record.struck ? "text-slate-400" : "text-slate-800"}`}>{record.vendor ?? <span className="italic text-slate-400">unknown</span>}</td>
               <td className="px-3 py-2 text-slate-600">{record.number ?? "—"}</td>
-              <td className="px-3 py-2 text-right tabular-nums text-slate-800">{record.amount !== null ? formatMoney(record.amount, record.currencyCode) : "—"}</td>
+              <td className={`px-3 py-2 text-right tabular-nums ${record.struck ? "text-slate-400 line-through" : "text-slate-800"}`}>{record.amount !== null ? formatMoney(record.amount, record.currencyCode) : "—"}</td>
               <td className="px-3 py-2 tabular-nums text-slate-600">{record.date ? record.date.toISOString().slice(0, 10) : "—"}</td>
+              {extraColumn && <td className="px-3 py-2">{extraColumn.render(record)}</td>}
               {withNotes && <td className="px-3 py-2 text-slate-600">{record.note ?? ""}</td>}
             </tr>
           ))}

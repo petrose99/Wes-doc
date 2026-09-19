@@ -17,6 +17,7 @@ import config from "@/lib/config"
 import { countWorkspaceDocuments } from "@/models/documents"
 import { getTodayOutcome } from "@/models/queue-outcome"
 import { ensureInboundEmailToken } from "@/models/inbound-email"
+import { prisma } from "@/lib/db"
 
 export const dynamic = "force-dynamic"
 
@@ -76,6 +77,12 @@ export async function InvoicesQueuePage({ params, searchParams, selectedDocument
   }
 
   const trend = touchlessTrend.trend ? `${touchlessTrend.trend.deltaPercentagePoints > 0 ? "+" : ""}${touchlessTrend.trend.deltaPercentagePoints}pt` : null
+  // #281: the bulk Post button's target connection — same "active" lookup health/page.tsx already
+  // uses. Null (off, none, or inactive) still renders the button (§3 never hides it); the dialog
+  // reads every row as ineligible and the connection-failure band (a later build step) says why.
+  const activeConnection = config.integrations.enabled
+    ? await prisma.integrationConnection.findFirst({ where: { workspaceId, status: "active" }, select: { id: true } })
+    : null
 
   const arrival = await queueArrival(workspaceId, { searchParams: query as Record<string, string | string[] | undefined>, queuePath: "invoices", selectedId: selectedDocumentId, rowIds: bills.map((bill) => bill.documentId), unfilteredRowIds: allBills.map((bill) => bill.documentId) })
   return <InvoiceQueue
@@ -90,6 +97,7 @@ export async function InvoicesQueuePage({ params, searchParams, selectedDocument
     workspaceDocumentCount={workspaceDocumentCount}
     todayOutcome={todayOutcome}
     inboundAddress={inboundAddress}
+    connectionId={activeConnection?.id ?? null}
     stat={<QueueStat label="Touchless" value={`${Math.round(touchlessTrend.touchlessRate * 100)}%`}
       detail={`${touchlessTrend.totalPushedTouchless} of ${touchlessTrend.totalExtracted} sent without review, last 30 days${trend ? `, ${trend} vs. prior 30` : ""}`}
       trend={touchlessTrend.trend?.direction ?? null} />}
