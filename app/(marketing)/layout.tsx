@@ -44,9 +44,9 @@ export default async function MarketingLayout({ children }: { children: React.Re
 
   return (
     <div className="flex min-h-screen flex-col bg-white text-slate-900">
-      <MarketingAnalytics />
       <MarketingNav workspaceHref={workspaceHref} />
       <main id="main-content" className="flex-1">{children}</main>
+      <MarketingAnalytics />
       <MarketingFooter />
     </div>
   )

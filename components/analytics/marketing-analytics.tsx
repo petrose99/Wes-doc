@@ -1,6 +1,6 @@
 "use client"
 
-import { initAnalytics, track } from "@/lib/analytics"
+import { initAnalytics, track } from "@/lib/marketing-analytics"
 import { usePathname } from "next/navigation"
 import { useEffect } from "react"
 
