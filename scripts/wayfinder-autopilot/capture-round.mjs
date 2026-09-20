@@ -78,7 +78,8 @@ export async function round(opts, body) {
     if (!el || el === document.body) return "body"
     const name = el.getAttribute("aria-label") || el.textContent?.trim().slice(0, 40) || ""
     const role = el.getAttribute("role") ? `[${el.getAttribute("role")}]` : ""
-    return `${el.tagName.toLowerCase()}${role}:${name}`
+    const id = el.id ? `#${el.id}` : ""
+    return `${el.tagName.toLowerCase()}${role}${id}:${name}`
   })
 
   for (const width of widths) {

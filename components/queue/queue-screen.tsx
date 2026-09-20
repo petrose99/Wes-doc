@@ -79,6 +79,10 @@ export type QueueScreenProps<T> = {
   title: string
   /** The route this queue lives at; a selected row is reflected as `${basePath}/${id}`. */
   basePath: string
+  /** #270: Search has no per-document route (it's a filtered list, not a queue-per-document
+   * path) — a selected row is reflected as `?${selectedIdParam}=<id>` alongside `q`/facets
+   * instead of a path segment. Omit for the typed queues' normal `${basePath}/${id}` mechanic. */
+  selectedIdParam?: string
   rows: T[]
   rowId: (row: T) => string
   /** The document a row's Detail pane shows. Defaults to `rowId` — Exceptions differ, since a
@@ -214,13 +218,23 @@ const INTERACTIVE = "a, button, input, select, textarea, label, [role=button], [
 
 function QueueScreenInner<T>({
   title, basePath, rows, rowId, detailIdFor, rowName, paneStatus, fullHref, archivedToast, leading, columns: rawColumns, fieldTable = null, selectable = false, sortOptions = [], facets = [],
-  views, viewsPhone, stat, primaryAction, addAction, dropZone, overrideMode: overrideModeEnabled = true, search, extraFilterParams, loadingRows = false, band, connectionBand, menu, onExportAll, bulkActions, empty, workspaceDocumentCount = 0, loadDetail, paneActions, paneMenu, initialSelectedId = null, sortParam = "sort", cards, phoneReadOnly = false,
+  views, viewsPhone, stat, primaryAction, addAction, dropZone, overrideMode: overrideModeEnabled = true, search, extraFilterParams, loadingRows = false, band, connectionBand, menu, onExportAll, bulkActions, empty, workspaceDocumentCount = 0, loadDetail, paneActions, paneMenu, initialSelectedId = null, sortParam = "sort", cards, phoneReadOnly = false, selectedIdParam,
   filterRows, pinned = null, initialMissing, onOpenChange, origin = null, onControls,
 }: QueueScreenProps<T>) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const overrideMode = useOverrideMode()
+  // #270: `selectedIdParam` set (Search) → the selected row is a query param on this same path,
+  // dropping every other query param on the way (matches `${basePath}/${id}`'s "drop filters"
+  // behavior for the deep-linked-but-filtered notice below). Unset → the normal per-queue path.
+  const rowUrl = useCallback((id: string | null) => {
+    if (!selectedIdParam) return id ? `${basePath}/${id}` : basePath
+    if (!id) return basePath
+    const qs = new URLSearchParams()
+    qs.set(selectedIdParam, id)
+    return `${basePath}?${qs.toString()}`
+  }, [basePath, selectedIdParam])
   const [checked, setChecked] = useState<Set<string>>(new Set())
   const [openId, setOpenId] = useState<string | null>(initialSelectedId)
   const [reloadKey, setReloadKey] = useState(0)
@@ -292,8 +306,8 @@ function QueueScreenInner<T>({
     if (!row || visibleRows.some((r) => rowId(r) === initialSelectedId)) return undefined
     const { title, suffix } = rowName(row)
     const name = [title, suffix].filter(Boolean).join(" ")
-    return { text: `${[title, suffix].filter(Boolean).join(" · ")} no longer matches these filters.`, showHref: `${basePath}/${initialSelectedId}`, name }
-  }, [initialSelectedId, rows, visibleRows, rowId, rowName, basePath])
+    return { text: `${[title, suffix].filter(Boolean).join(" · ")} no longer matches these filters.`, showHref: rowUrl(initialSelectedId), name }
+  }, [initialSelectedId, rows, visibleRows, rowId, rowName, rowUrl])
   // The notice belongs to the row the URL addressed at arrival; opening another row clears it (spec §2.5).
   const activeNotice = openId && openId !== initialSelectedId ? undefined : (filteredNotice ?? missingNotice)
   const sortedRows = useMemo(() => {
@@ -367,11 +381,18 @@ function QueueScreenInner<T>({
   // the pane sits beside the table, so arrowing through rows still replaces in place.
   const syncUrl = useCallback((id: string | null, push: boolean) => {
     if (typeof window === "undefined") return
-    const qs = window.location.search
-    const url = `${id ? `${basePath}/${id}` : basePath}${qs}`
+    let url: string
+    if (selectedIdParam) {
+      const qs = new URLSearchParams(window.location.search)
+      if (id) qs.set(selectedIdParam, id); else qs.delete(selectedIdParam)
+      const qsStr = qs.toString()
+      url = qsStr ? `${basePath}?${qsStr}` : basePath
+    } else {
+      url = `${id ? `${basePath}/${id}` : basePath}${window.location.search}`
+    }
     if (push) window.history.pushState(window.history.state, "", url)
     else window.history.replaceState(window.history.state, "", url)
-  }, [basePath])
+  }, [basePath, selectedIdParam])
 
   // Opening another row or closing the pane unmounts whatever is in it; unsaved work there
   // (Match manually's pending line matches, #250) gets one chance to say so.
@@ -729,7 +750,7 @@ function QueueScreenInner<T>({
         documentId={(detailIdFor ?? rowId)(openRow)}
         name={rowName(openRow)}
         status={paneStatus?.(openRow)}
-        fullHref={withOrigin(fullHref ? fullHref(openRow) : `${basePath}/${(detailIdFor ?? rowId)(openRow)}?full=1`, here)}
+        fullHref={withOrigin(fullHref ? fullHref(openRow) : `${rowUrl((detailIdFor ?? rowId)(openRow))}${selectedIdParam ? "&" : "?"}full=1`, here)}
         archivedToast={archivedToast}
         onMutated={(kind) => { if (kind === "removed") { close(); router.refresh() } else refresh() }}
         position={{ index: openIndex + 1, total: sortedRows.length }}

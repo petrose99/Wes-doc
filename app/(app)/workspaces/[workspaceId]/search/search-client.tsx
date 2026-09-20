@@ -62,6 +62,9 @@ export function SearchPageClient({ workspaceId, initialQuery }: {
   // ‹Queue›" round-trips back to the same scroll position (#244's contract) via `withOrigin`.
   const hereQuery = searchParams.toString()
   const here = hereQuery ? `${pathname}?${hereQuery}` : pathname
+  // #270: Search has no per-document route (see queue-screen.tsx's `selectedIdParam`) — the
+  // opened row lives in `?doc=<id>` alongside `q`/facets instead of a path segment.
+  const initialSelectedId = searchParams.get("doc")
 
   // #262: arrival from the `/` shortcut — the input already autofocuses on mount, this only
   // matters when the operator was already on this page and pressed `/` again.
@@ -142,6 +145,8 @@ export function SearchPageClient({ workspaceId, initialQuery }: {
     <QueueScreen<SearchRow>
       title="Search"
       basePath={basePath}
+      selectedIdParam="doc"
+      initialSelectedId={initialSelectedId}
       rows={rows}
       rowId={(row) => row.id}
       detailIdFor={(row) => row.documentId}
