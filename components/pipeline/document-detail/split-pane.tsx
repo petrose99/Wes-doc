@@ -38,7 +38,7 @@ export function SplitPane({
   workspaceId, source, fields, data, fieldConfidence, provenanceFields, provenanceItems, initialTarget, conflictingLabels, missingRequiredFields,
   saveReview, documentType: initialDocumentType, note: initialNote, auditEvents,
   header, canPush, pushCard, canCreateRule, defaultSupplier, matchKind, bankMatches, documentMatches, rationales, checks, fxBadge, stageIndicator,
-  institutions, institutionId, institutionName, history, po = null, initialTab, state, queueTitle, queueDocType,
+  institutions, institutionId, institutionName, history, po = null, initialTab, state, queueTitle, queueDocType, moveDisabledReason,
 }: {
   workspaceId: string
   source: SourceDocument
@@ -59,6 +59,10 @@ export function SplitPane({
   /** What the frame around this pane needs to carry its ⋯ (#259): identity, flag/archive/cancel
    * state and the open review task's link. */
   header: { filename: string; documentId: string; fileId: string; status: string; flagged: boolean; archived: boolean; cancelled: boolean; cancelledReason: string | null; reviewLink: { href: string; label: string } | null }
+  /** #297: the guard caption when the document can't move (pending approval / Posted-Paid / PO
+   * with matched invoices) — computed server-side, never re-derived client-side (B1). Null means
+   * eligible. */
+  moveDisabledReason?: string | null
   canPush: boolean
   pushCard: ReactNode
   canCreateRule: boolean
@@ -144,6 +148,7 @@ export function SplitPane({
   useRegisterDocumentActions({
     workspaceId, documentId: header.documentId, fileId: header.fileId, filename: header.filename,
     flagged: header.flagged, archived: header.archived, cancelled: header.cancelled, cancelledReason: header.cancelledReason, reviewLink: header.reviewLink,
+    docType: queueDocType, moveDisabledReason: moveDisabledReason ?? null,
     decision,
   })
 

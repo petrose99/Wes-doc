@@ -16,6 +16,7 @@ import { listDocumentMatchesForDocument } from "@/models/document-matches-query"
 import { PoConsumptionPanel } from "@/components/matching/po-consumption-panel"
 import type { LineItemsPoProps } from "@/components/pipeline/document-detail/line-items-section"
 import { resolveDocType } from "@/lib/doc-types"
+import { describeMoveIneligibility } from "@/lib/reclassify"
 import { summarizeInvoicePoLinks, summarizePoConsumption, type PoConsumption } from "@/models/po-matching"
 import { getCurrentUser } from "@/lib/auth"
 import { parseTemplateFields } from "@/lib/document-templates"
@@ -193,6 +194,9 @@ export async function DocumentDetailPage({ params, searchParams, embedded = fals
   } else if (docType === "purchase_order") {
     poConsumption = (await summarizePoConsumption(workspaceId, [documentId])).get(documentId) ?? null
   }
+  // #297: Move-to-another-queue eligibility, computed once here (same three preconditions the
+  // server action re-checks on submit) so the pane never re-derives it client-side (B1).
+  const moveDisabledReason = await describeMoveIneligibility(workspaceId, documentId, docType)
 
   // A content-search result (Files browser, AP-aging chart, pipeline list) links here with an
   // ad-hoc page/bbox — a hit that matched full-text search rather than a named field, so there is
@@ -311,6 +315,7 @@ export async function DocumentDetailPage({ params, searchParams, embedded = fals
       // a workflow-less task, since most ReviewTasks aren't Approvals at all — decision #1).
       reviewLink: reviewQueueEnabled && openReviewTask ? { href: `/workspaces/${workspaceId}/approvals/invoices/${documentId}`, label: openReviewTask.status === "in_review" ? "In review" : "Open — view review task" } : null,
     }}
+    moveDisabledReason={moveDisabledReason}
     canPush={canPush}
     paymentStatus={paymentStatuses.get(documentId)?.paymentStatus ?? null}
     pushCard={null}
