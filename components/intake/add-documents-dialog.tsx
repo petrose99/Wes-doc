@@ -143,7 +143,7 @@ export const AddDocumentsDialog = forwardRef<AddDocumentsDialogHandle, {
         </label>
 
         <div role="button" tabIndex={0} aria-disabled={locked}
-          className="flex flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-slate-300 px-4 py-6 text-sm text-slate-600 hover:border-emerald-400 hover:bg-emerald-50/40"
+          className="flex flex-col items-center justify-center gap-1.5 border-y-2 border-dashed border-slate-300 px-4 py-6 text-sm text-slate-600 hover:border-emerald-400 hover:bg-emerald-50/40"
           onDrop={(event) => { event.preventDefault(); if (!locked) addFiles(event.dataTransfer.files) }}
           onDragOver={(event) => event.preventDefault()}
           onClick={() => !locked && inputRef.current?.click()}
