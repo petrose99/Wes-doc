@@ -2,6 +2,7 @@
 
 import { AccountMenu } from "@/components/shell/account-menu"
 import { ApprovalEmailsDialog } from "@/components/shell/approval-emails"
+import type { RailWidth } from "@/components/shell/rail-width-control"
 import { KeyboardShortcuts, SHORTCUT_DESTINATIONS } from "@/components/shell/keyboard-shortcuts"
 import { HowItWorksDialog } from "@/components/shell/how-it-works"
 
@@ -10,13 +11,11 @@ import { BiteMark } from "@/components/marketing/logo"
 import { WorkspacePulse } from "@/components/shell/workspace-pulse"
 import { MODULES } from "@/lib/modules"
 import { isUnpluggedPath } from "@/lib/unplugged"
-import { AlertTriangle, BadgeCheck, Banknote, CheckCircle2, ClipboardCheck, Files, HeartPulse, Landmark, Library, PanelLeftClose, PanelLeftOpen, Percent, Receipt, Search, Settings, Wallet, Workflow, Zap } from "lucide-react"
+import { AlertTriangle, BadgeCheck, Banknote, CheckCircle2, ClipboardCheck, Files, HeartPulse, Landmark, Library, Percent, Receipt, Search, Settings, Wallet, Workflow, Zap } from "lucide-react"
 import { adminPaths } from "@/lib/admin/paths"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useEffect, useState } from "react"
 
-const RAIL_PIN_KEY = "docubite.rail.pinned"
 // #231 Q20 (#252): Admin collapses the rail exactly as a queue does — its own left nav needs the width.
 const QUEUE_SEGMENTS = ["invoices", "purchase-orders", "receipts", "bank-statements", "exceptions", "payments", "approvals", "admin"]
 
@@ -57,7 +56,7 @@ const ICONS: Record<string, typeof Files> = {
 export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, accountingEnabled = false, pipelineReviewCount = 0, reviewTaskCount = 0, financePushableCount = 0, openExceptionsCount = 0, batchesPendingApprovalCount = 0, approvalsReadyCount = 0, inboundAddress = null }: {
   workspaceId: string
   workspaces: SwitchableWorkspace[]
-  user: { name: string; email: string; approvalEmails?: boolean }
+  user: { name: string; email: string; approvalEmails?: boolean; /** #342: server-persisted, replaces the old localStorage pin. */ railWidth?: RailWidth }
   /** Every module key currently enabled for this workspace (getWorkspaceCapabilities(...).enabled),
    * used to build the nav entries each module registers via ModuleDefinition.navItems. */
   enabledModuleKeys: string[]
@@ -93,23 +92,16 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
 
   // #225: on a Queue screen (and its `/<queue>/<id>` deep links, which render the same screen)
   // the rail collapses to a 56px icon rail so the queue gets the work area. It expands over the
-  // content on hover or keyboard focus, and a pin toggle keeps it expanded; the pin is a
-  // per-browser convenience, so it lives in localStorage rather than the workspace.
+  // content on hover or keyboard focus. #342 spec §4 replaces the old localStorage pin with a
+  // server-persisted three-state control (Icons only / Full labels / Auto), reachable from
+  // Account and the account-menu, not gated on isQueue:
+  //   - "icons"  → always collapsed, never expands (even on hover) — expandsOnHover = false.
+  //   - "labels" → always expanded — compact = false, everywhere.
+  //   - "auto" (default) → today's behavior: collapses only on a Queue page, expands on hover.
   const isQueue = QUEUE_SEGMENTS.some((segment) => pathname === `${base}/${segment}` || pathname.startsWith(`${base}/${segment}/`))
-  const [pinned, setPinned] = useState(false)
-  useEffect(() => {
-    // Read after hydration (the server can't know the browser's pin), off the effect's own tick.
-    const id = window.setTimeout(() => {
-      try { setPinned(window.localStorage.getItem(RAIL_PIN_KEY) === "1") } catch { /* private mode: stay unpinned */ }
-    }, 0)
-    return () => window.clearTimeout(id)
-  }, [])
-  const togglePin = () => setPinned((current) => {
-    const next = !current
-    try { window.localStorage.setItem(RAIL_PIN_KEY, next ? "1" : "0") } catch { /* ignore */ }
-    return next
-  })
-  const compact = isQueue && !pinned
+  const railWidth = user.railWidth ?? "auto"
+  const compact = railWidth === "icons" || (railWidth === "auto" && isQueue)
+  const expandsOnHover = railWidth !== "icons"
 
   // Sheet and document-detail pages get the mini-map treatment. The rail keeps its full 236px
   // width — the pulse card + secondaries + bottom items need it — but its contents change: pulse
@@ -214,7 +206,10 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
   // popover is open: the popover content is portaled to <body>, so focus moving into it drops
   // :focus-within on the rail and the trigger (and its label) would otherwise vanish mid-open,
   // stranding Escape's focus-return with nowhere to land (#287 close, F2).
-  const labelClass = compact ? "hidden group-hover/rail:inline group-focus-within/rail:inline group-has-[[aria-expanded=true]]/rail:inline" : ""
+  // #342 spec §4: "Icons only" (expandsOnHover = false) never reveals these on hover/focus —
+  // a genuinely new state, every other compact rail expands on hover.
+  const expandClasses = (display: string) => !compact ? "" : !expandsOnHover ? "hidden" : `hidden group-hover/rail:${display} group-focus-within/rail:${display} group-has-[[aria-expanded=true]]/rail:${display}`
+  const labelClass = expandClasses("inline")
   // #262: collapsed-rail tooltip carries the `g` jump key beside the label (H6 recognition — the
   // dialog is the source of truth, this is a hint). Only the eight destinations the shortcut
   // listener actually registers get one.
@@ -243,12 +238,12 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
 
   // TODAY caption. Muted uppercase, small — a promise the badges keep. When totalToday is 0 the
   // caption goes one step quieter and the "caught up" line under the group carries the meaning.
-  const todayLabel = <div className={`mb-1 px-2.5 pt-1 text-[11px] font-bold uppercase tracking-[0.08em] text-slate-600 ${compact ? "hidden group-hover/rail:block group-focus-within/rail:block group-has-[[aria-expanded=true]]/rail:block" : ""}`}>Today</div>
+  const todayLabel = <div className={`mb-1 px-2.5 pt-1 text-[11px] font-bold uppercase tracking-[0.08em] text-slate-600 ${expandClasses("block")}`}>Today</div>
 
   // Compact: the aside holds a 56px slot in the flow; the panel inside it widens over the
   // content on hover/focus so the queue never reflows while the operator glances at a label.
   return <aside className={`group/rail relative hidden shrink-0 md:flex ${compact ? "w-16" : "w-[236px]"}`}>
-  <div className={`flex flex-col gap-0.5 border-r border-slate-200 bg-slate-100 py-3.5 transition-shadow duration-150 ease-out ${compact ? "absolute inset-y-0 left-0 z-30 w-16 overflow-hidden px-2 group-hover/rail:w-[236px] group-hover/rail:px-3 group-hover/rail:shadow-[8px_0_24px_-16px_rgba(15,23,42,0.35)] group-focus-within/rail:w-[236px] group-focus-within/rail:px-3 group-focus-within/rail:shadow-[8px_0_24px_-16px_rgba(15,23,42,0.35)] group-has-[[aria-expanded=true]]/rail:w-[236px] group-has-[[aria-expanded=true]]/rail:px-3 group-has-[[aria-expanded=true]]/rail:shadow-[8px_0_24px_-16px_rgba(15,23,42,0.35)]" : "w-full px-3"}`}>
+  <div className={`flex flex-col gap-0.5 border-r border-slate-200 bg-slate-100 py-3.5 transition-shadow duration-150 ease-out ${compact ? `absolute inset-y-0 left-0 z-30 w-16 overflow-hidden px-2 ${expandsOnHover ? "group-hover/rail:w-[236px] group-hover/rail:px-3 group-hover/rail:shadow-[8px_0_24px_-16px_rgba(15,23,42,0.35)] group-focus-within/rail:w-[236px] group-focus-within/rail:px-3 group-focus-within/rail:shadow-[8px_0_24px_-16px_rgba(15,23,42,0.35)] group-has-[[aria-expanded=true]]/rail:w-[236px] group-has-[[aria-expanded=true]]/rail:px-3 group-has-[[aria-expanded=true]]/rail:shadow-[8px_0_24px_-16px_rgba(15,23,42,0.35)]" : ""}` : "w-full px-3"}`}>
     <Link href={home} className="flex items-center gap-2 px-1.5 py-1" aria-label="DocuBite home">
       <BiteMark className="h-7 w-7 shrink-0" />
       <span className={`truncate text-sm font-bold font-display text-slate-900 ${labelClass}`}>DocuBite</span>
@@ -285,7 +280,7 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
             ))}
             <div className="space-y-0.5">{primaryItems.map(navLink)}</div>
           </div>
-          {todayTotal === 0 && <p className={`mt-1 px-2.5 text-[11px] font-medium text-slate-600 ${compact ? "hidden group-hover/rail:block group-focus-within/rail:block group-has-[[aria-expanded=true]]/rail:block" : ""}`}>You&apos;re caught up.</p>}
+          {todayTotal === 0 && <p className={`mt-1 px-2.5 text-[11px] font-medium text-slate-600 ${expandClasses("block")}`}>You&apos;re caught up.</p>}
         </>
       )}
 
@@ -296,16 +291,11 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
 
       <div className="mt-auto space-y-0.5">
         {bottomItems.map(navLink)}
-        {isQueue && <button type="button" onClick={togglePin} aria-pressed={pinned} title={pinned ? "Collapse the rail" : "Keep the rail open"}
-          className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-300/40 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600">
-          {pinned ? <PanelLeftClose className="h-4 w-4 shrink-0" /> : <PanelLeftOpen className="h-4 w-4 shrink-0" />}
-          <span className={`truncate ${labelClass}`}>{pinned ? "Collapse rail" : "Keep rail open"}</span>
-        </button>}
       </div>
     </nav>
 
     <div className="mt-auto pt-3">
-      <AccountMenu name={user.name} email={user.email} collapsed={compact} workspaceId={workspaceId} approvalEmails={user.approvalEmails ?? true} />
+      <AccountMenu name={user.name} email={user.email} collapsed={compact} workspaceId={workspaceId} approvalEmails={user.approvalEmails ?? true} railWidth={railWidth} />
     </div>
   </div>
   <KeyboardShortcuts destinations={SHORTCUT_DESTINATIONS(workspaceId, adminPaths(workspaceId).configuration, accountingEnabled ? adminPaths(workspaceId).integrations : undefined)} />

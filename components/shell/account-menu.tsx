@@ -4,6 +4,7 @@ import { useSignOut } from "@/components/shell/sign-out-button"
 import { openKeyboardShortcutsDialog } from "@/components/shell/keyboard-shortcuts"
 import { openHowItWorksDialog } from "@/components/shell/how-it-works"
 import { openApprovalEmailsDialog } from "@/components/shell/approval-emails"
+import { RailWidthMenuSelect, type RailWidth } from "@/components/shell/rail-width-control"
 import { useKeyboardShortcutsEnabled } from "@/lib/shell/keyboard-shortcuts"
 import { accountPaths } from "@/lib/admin/paths"
 import { ChevronsUpDown, CircleHelp, Keyboard, LogOut, Mail, ShieldCheck } from "lucide-react"
@@ -13,7 +14,7 @@ import { useEffect, useRef, useState } from "react"
 /** The rail's account chip and its menu. #231 Q10 (#252): account-level items live here, not in
  * a company's Admin — Security (MFA, sessions) and the two help surfaces — beside the everyday
  * sign-out. "Sign out everywhere" stays on Security, where its weight belongs. */
-export function AccountMenu({ name, email, collapsed = false, workspaceId, approvalEmails = true }: { name: string; email: string; collapsed?: boolean; workspaceId?: string; /** #271: the saved "Approval emails" value, for the row's Off suffix. */ approvalEmails?: boolean }) {
+export function AccountMenu({ name, email, collapsed = false, workspaceId, approvalEmails = true, railWidth = "auto" }: { name: string; email: string; collapsed?: boolean; workspaceId?: string; /** #271: the saved "Approval emails" value, for the row's Off suffix. */ approvalEmails?: boolean; /** #342: the saved rail-width value, for the inline select and its Off-style suffix. */ railWidth?: RailWidth }) {
   const [open, setOpen] = useState(false)
   const wrapper = useRef<HTMLDivElement>(null)
   const trigger = useRef<HTMLButtonElement>(null)
@@ -30,6 +31,9 @@ export function AccountMenu({ name, email, collapsed = false, workspaceId, appro
     const onPointerDown = (event: MouseEvent) => { if (!wrapper.current?.contains(event.target as Node)) setOpen(false) }
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") { event.preventDefault(); close(); return }
+      // The Rail width select (not a role=menuitem row, see rail-width-control.tsx) needs its
+      // own native Tab/Arrow-key behavior — don't let the menu's roving-item nav hijack it.
+      if ((document.activeElement as HTMLElement | null)?.tagName === "SELECT") return
       if (event.key === "Tab") { close(false); return }
       if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return
       const list = items()
@@ -83,6 +87,8 @@ export function AccountMenu({ name, email, collapsed = false, workspaceId, appro
           <Mail className="h-4 w-4" aria-hidden /><span className="flex-1">Approval emails</span>
           {!approvalEmails && <span className="text-xs text-slate-500">Off</span>}
         </button>
+        {/* #342 spec §4: no dialog — a select has no destructive consequence to confirm. */}
+        <RailWidthMenuSelect workspaceId={workspaceId} initial={railWidth} />
         <div className="my-1 border-t border-hairline" aria-hidden />
       </>}
       <button type="button" role="menuitem" className={itemClass} disabled={busy} onClick={() => void signOut()}>

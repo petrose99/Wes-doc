@@ -1,5 +1,6 @@
 import { MobileHeader } from "@/components/shell/mobile-header"
 import { MobileTabBar } from "@/components/shell/mobile-tab-bar"
+import { toRailWidth } from "@/components/shell/rail-width-control"
 import { Sidebar } from "@/components/shell/sidebar"
 import { SkipToListLink } from "@/components/shell/skip-to-list-link"
 import { getCurrentUser, getSession } from "@/lib/auth"
@@ -93,7 +94,7 @@ export default async function WorkspaceLayout({ children, params }: { children: 
     <Sidebar
       workspaceId={workspaceId}
       workspaces={switchable}
-      user={{ name: user.name, email: user.email, approvalEmails: user.approvalNoticeEmails }}
+      user={{ name: user.name, email: user.email, approvalEmails: user.approvalNoticeEmails, railWidth: toRailWidth(user.railWidth) }}
       enabledModuleKeys={[...capabilities.enabled]}
       accountingEnabled={anyAccountingProviderEnabled()}
       pipelineReviewCount={pipelineCounts.review}

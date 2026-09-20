@@ -6,6 +6,7 @@ import { BankDetailsPanel } from "@/components/account/bank-details-panel"
 import { ResetTourButton } from "@/components/onboarding/reset-tour-button"
 import { HowItWorksButton } from "@/components/shell/how-it-works"
 import { ApprovalEmailsControl } from "@/components/shell/approval-emails"
+import { RailWidthControl, toRailWidth } from "@/components/shell/rail-width-control"
 import { SignOutButton } from "@/components/shell/sign-out-button"
 import { accountPaths } from "@/lib/admin/paths"
 import { getCurrentUser } from "@/lib/auth"
@@ -38,6 +39,12 @@ export default async function AccountPage({ params }: { params: Promise<{ worksp
     {/* #271 spec §4: the phone home of the Approval-emails switch (the desktop home is the account menu's dialog). */}
     <Panel title="Approval emails">
       <ApprovalEmailsControl workspaceId={workspaceId} initial={user.approvalNoticeEmails} switchId="approval-emails-switch-panel" />
+    </Panel>
+
+    {/* #342 spec §4: the phone home of the Rail-width control (the desktop home is the account
+        menu's inline select). */}
+    <Panel title="Rail width">
+      <RailWidthControl workspaceId={workspaceId} initial={toRailWidth(user.railWidth)} />
     </Panel>
 
     <Panel title="Switch company" note="Every company you belong to.">
