@@ -1,5 +1,4 @@
 import { AdminPage, ReadOnlyBand } from "@/components/admin/admin-ui"
-import { LedgerConnectionPanel } from "@/components/accounting/accounting-dashboard"
 import { AccountingErrorBanner } from "@/components/accounting/error-banner"
 import { Panel } from "@/components/automation/automation-ui"
 import { IntegrationsManager } from "@/components/integrations/integrations-manager"
@@ -8,10 +7,10 @@ import { getAdminContext } from "@/lib/admin/context"
 import { resolveAccountOptions } from "@/lib/automation/account-options"
 import config from "@/lib/config"
 import { WEBHOOK_EVENT_TYPES } from "@/lib/webhooks"
-import { getEntityCounts, getLastSyncedAt, listAccountingEntities } from "@/models/accounting-entities"
+import { getLastSyncedAt, listAccountingEntities } from "@/models/accounting-entities"
 import { getWorkspaceProvisionJob } from "@/models/bigcapital"
 import { listCategoryAccountMappings } from "@/models/category-account-mappings"
-import { getWorkspaceIntegrationConnection, listWorkspaceApiKeys, listWorkspaceIntegrationConnections, listWorkspaceWebhookDeliveries, listWorkspaceWebhookEndpoints } from "@/models/integrations"
+import { listWorkspaceApiKeys, listWorkspaceIntegrationConnections, listWorkspaceWebhookDeliveries, listWorkspaceWebhookEndpoints } from "@/models/integrations"
 import { listLibraryFacets } from "@/models/library-facets"
 
 export const dynamic = "force-dynamic"
@@ -29,18 +28,14 @@ export default async function IntegrationsPage({ params, searchParams }: { param
     return <AdminPage title="Integrations"><p className="text-sm text-slate-600">Integrations are off on this deployment.</p></AdminPage>
   }
 
-  const ledgerEnabled = config.integrations.bigcapital.enabled
-  const [apiKeys, endpoints, deliveries, connections, ledger, job] = await Promise.all([
+  const bigcapitalEnabled = config.integrations.bigcapital.enabled
+  const [apiKeys, endpoints, deliveries, connections, job] = await Promise.all([
     listWorkspaceApiKeys(workspaceId),
     listWorkspaceWebhookEndpoints(workspaceId),
     listWorkspaceWebhookDeliveries(workspaceId, 50),
     listWorkspaceIntegrationConnections(workspaceId),
-    ledgerEnabled ? getWorkspaceIntegrationConnection(workspaceId, "bigcapital") : Promise.resolve(null),
-    ledgerEnabled ? getWorkspaceProvisionJob(workspaceId) : Promise.resolve(null),
+    bigcapitalEnabled ? getWorkspaceProvisionJob(workspaceId) : Promise.resolve(null),
   ])
-  const [ledgerSyncedAt, entityCounts] = ledger
-    ? await Promise.all([getLastSyncedAt(workspaceId, ledger.id), getEntityCounts(workspaceId, ledger.id)])
-    : [null, { accounts: 0, vendors: 0 }]
   const connectionsWithSync = await Promise.all(connections.map(async (connection) => ({ ...connection, lastSyncedAt: await getLastSyncedAt(workspaceId, connection.id) })))
 
   const activeConnection = connections.find((c) => c.status === "active")
@@ -50,13 +45,9 @@ export default async function IntegrationsPage({ params, searchParams }: { param
   const accountOptions = resolveAccountOptions(entities.map((e) => ({ code: e.externalId ?? e.code, name: e.name })))
   const categories = facets ? facets.categories.map((c) => c.value) : []
 
-  return <AdminPage title="Integrations" intro="The ledger this company posts to, the API keys and webhooks that push document data into other tools, and which account each category lands in.">
+  return <AdminPage title="Integrations" intro="Connect an accounting provider, manage API keys and webhooks, and map categories to accounts.">
     {error && <AccountingErrorBanner workspaceId={workspaceId} error={error} isOwner={owner} />}
     {!owner && <ReadOnlyBand owners={context.owners} />}
-
-    {ledgerEnabled && <Panel title="Ledger connection" note="Every company gets its own isolated ledger organization, created automatically — nothing to connect by hand.">
-      <LedgerConnectionPanel workspaceId={workspaceId} isOwner={owner} connection={ledger} job={job} lastSyncedAt={ledgerSyncedAt} entityCounts={entityCounts} />
-    </Panel>}
 
     <IntegrationsManager
       workspaceId={workspaceId}
@@ -65,8 +56,9 @@ export default async function IntegrationsPage({ params, searchParams }: { param
       apiKeys={apiKeys}
       endpoints={endpoints}
       deliveries={deliveries}
-      accountingProviders={{ quickbooks: config.integrations.quickbooks.enabled, xero: config.integrations.xero.enabled }}
+      accountingProviders={{ quickbooks: config.integrations.quickbooks.enabled, xero: config.integrations.xero.enabled, bigcapital: bigcapitalEnabled }}
       connections={connectionsWithSync}
+      bigcapitalJob={job}
     />
 
     <Panel title="Account mapping" note="Which expense or income account a document category posts to. A category with no row uses the connection's default expense account.">

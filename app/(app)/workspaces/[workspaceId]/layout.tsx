@@ -3,7 +3,7 @@ import { MobileTabBar } from "@/components/shell/mobile-tab-bar"
 import { Sidebar } from "@/components/shell/sidebar"
 import { SkipToListLink } from "@/components/shell/skip-to-list-link"
 import { getCurrentUser, getSession } from "@/lib/auth"
-import config from "@/lib/config"
+import { anyAccountingProviderEnabled } from "@/lib/finance/provider-flags"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { createClient } from "@/lib/supabase/server"
 import { countReadyToApprove } from "@/models/approvals"
@@ -88,7 +88,7 @@ export default async function WorkspaceLayout({ children, params }: { children: 
       workspaces={switchable}
       user={{ name: user.name, email: user.email, approvalEmails: user.approvalNoticeEmails }}
       enabledModuleKeys={[...capabilities.enabled]}
-      accountingEnabled={config.integrations.bigcapital.enabled}
+      accountingEnabled={anyAccountingProviderEnabled()}
       pipelineReviewCount={pipelineCounts.review}
       reviewTaskCount={reviewTaskCount}
       /* pipelineCounts.approved is the Approved-stage count from countDocumentsByStage: documents
@@ -102,7 +102,7 @@ export default async function WorkspaceLayout({ children, params }: { children: 
       <MobileHeader workspaceId={workspaceId} workspaces={switchable} user={{ name: user.name, email: user.email }} />
       {/* #261 (#240's input): the tab bar precedes the queue in DOM order so its landmark comes
           before every row in Tab order; it is `fixed`, so nothing moves visually. */}
-      <MobileTabBar workspaceId={workspaceId} approvalsReadyCount={approvalsReadyCount} openExceptionsCount={openExceptionsCount} approvalsEnabled={capabilities.has("review-queue")} accountingEnabled={config.integrations.bigcapital.enabled} />
+      <MobileTabBar workspaceId={workspaceId} approvalsReadyCount={approvalsReadyCount} openExceptionsCount={openExceptionsCount} approvalsEnabled={capabilities.has("review-queue")} accountingEnabled={anyAccountingProviderEnabled()} />
       <div id="main" role="main" tabIndex={-1} className="flex min-h-0 flex-1 flex-col pb-[72px] md:pb-0">{children}</div>
     </div>
   </div>

@@ -259,12 +259,8 @@ The hard limit of 200 MB of stored documents per workspace. It must be disclosed
 _Avoid_: Unlimited storage
 
 **Connected accounting system**:
-An external accounting platform a workspace can connect to today, currently QuickBooks Online or Xero.
+An external accounting platform a workspace can connect to today, currently QuickBooks Online, Xero or Bigcapital.
 _Avoid_: Available integration when the connector is not live
-
-**Built-in ledger**:
-DocuBite's own double-entry ledger destination. It is a product capability, not an external integration.
-_Avoid_: Third-party integration
 
 **Planned integration**:
 A named future accounting destination shown as roadmap intent, not as a capability available today. Planned integrations must not be presented with vendor marks without approved permission.
@@ -303,7 +299,7 @@ The Product capability that surfaces scored pipeline, ledger, and tax hygiene so
 _Avoid_: Data correctness guarantee, audit certification
 
 **Integrations & API**:
-The Product capability for sending reviewed data to the built-in ledger, connected accounting systems, and workspace-scoped external systems through documented API and webhook surfaces.
+The Product capability for sending reviewed data to a connected accounting system (Xero, QuickBooks or Bigcapital) and workspace-scoped external systems through documented API and webhook surfaces.
 _Avoid_: Universal integration, available connector when it is only planned
 
 **Capability page**:

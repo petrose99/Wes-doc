@@ -19,9 +19,10 @@ import {
   setDefaultExpenseAccountAction,
   syncAccountingEntitiesAction,
 } from "@/app/(app)/workspaces/[workspaceId]/integration-connection-actions"
-import { Check, Copy } from "lucide-react"
+import { getBigcapitalStatusAction, repairBigcapitalConnectionAction } from "@/app/(app)/workspaces/[workspaceId]/accounting-actions"
+import { Check, Copy, Loader2 } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { useState, useTransition } from "react"
+import { useEffect, useRef, useState, useTransition } from "react"
 import { toast } from "sonner"
 
 type ApiKey = { id: string; name: string; keyPrefix: string; lastUsedAt: Date | null; revokedAt: Date | null; createdAt: Date }
@@ -39,7 +40,9 @@ type IntegrationConnection = {
   lastSyncedAt: Date | null
 }
 
-const PROVIDER_LABELS: Record<string, string> = { quickbooks: "QuickBooks", xero: "Xero" }
+// Kept in sync with lib/finance/actions.ts's copy (that module can't import client components) —
+// this is the only client-side fork; both list the same three providers.
+const PROVIDER_LABELS: Record<string, string> = { quickbooks: "QuickBooks", xero: "Xero", bigcapital: "Bigcapital" }
 
 /** One connected-provider card: shows tenant/status, a default-expense-account picker (fetched live
  * from the provider on demand — the chart of accounts isn't cached), and Disconnect. */
@@ -91,6 +94,19 @@ function AccountingConnectionCard({ workspaceId, connection, isOwner, onChanged 
             })}>
             Sync accounts
           </Button>
+        )}
+        {/* #329: only Bigcapital has a session/deep-link destination route today
+         * (/api/accounting/session — reused from accounting-dashboard.tsx). QuickBooks/Xero have
+         * none in this codebase yet; adding one for them is separate scope, left as fog. */}
+        {connection.status === "active" && connection.provider === "bigcapital" && (
+          <a
+            className="text-sm font-medium text-emerald-700 hover:underline"
+            href={`/api/accounting/session?workspaceId=${workspaceId}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Open in Bigcapital
+          </a>
         )}
         {isOwner && (
           <Button type="button" size="sm" variant="ghost" disabled={pending}
@@ -170,8 +186,103 @@ function SecretReveal({ label, value, onDone }: { label: string; value: string; 
   )
 }
 
+/** Bigcapital's not-connected/needs-reconnect row: no OAuth redirect exists for it (it provisions
+ * via a background job, not a redirect), so Connect/Reconnect call `repairBigcapitalConnectionAction`
+ * directly and then poll `getBigcapitalStatusAction` for the job to resolve, rather than navigating
+ * away like QuickBooks/Xero do. Polling stops on unmount, on a connection appearing, or after ~15
+ * attempts (30s) — spec.md §1 state 2, B5. */
+function BigcapitalRow({ workspaceId, isOwner, initialJob, onChanged }: {
+  workspaceId: string
+  isOwner: boolean
+  // Read fresh on page load (server component) so a reload lands correctly in Authorising… without
+  // needing the client poll to have survived — spec.md §1 state 2/3, "tab closed and reopened".
+  initialJob: { status: string; errorCode: string | null } | null
+  onChanged: () => void
+}) {
+  const [authorising, setAuthorising] = useState(initialJob?.status === "pending")
+  // A job exists but didn't resolve to a connection (error/failed) — same "not_started" collapse
+  // as a fresh workspace, just with the reconnect label per preflight's states table.
+  const needsReconnect = Boolean(initialJob) && initialJob?.status !== "pending"
+  const [pending, setPending] = useState(false)
+  const pollAttempts = useRef(0)
+  const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    if (initialJob?.status === "pending") poll()
+    return () => { if (pollTimer.current) clearTimeout(pollTimer.current) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const poll = () => {
+    pollTimer.current = setTimeout(async () => {
+      pollAttempts.current += 1
+      const { connection, job } = await getBigcapitalStatusAction(workspaceId)
+      if (connection) {
+        setAuthorising(false)
+        onChanged()
+        return
+      }
+      if (job?.status && job.status !== "pending") {
+        setAuthorising(false)
+        toast.error(`Could not connect Bigcapital — ${job.errorCode ? job.errorCode.replaceAll("_", " ") : "unknown error"}`)
+        onChanged()
+        return
+      }
+      if (pollAttempts.current >= 15) {
+        setAuthorising(false)
+        toast.error("Couldn't confirm the connection — refresh to check")
+        return
+      }
+      poll()
+    }, 2000)
+  }
+
+  const connect = () => {
+    setPending(true)
+    ;(async () => {
+      const res = await repairBigcapitalConnectionAction(workspaceId)
+      setPending(false)
+      if (res.success) {
+        pollAttempts.current = 0
+        setAuthorising(true)
+        poll()
+      } else {
+        toast.error(res.error || "Could not connect Bigcapital")
+      }
+    })()
+  }
+
+  if (authorising) {
+    return (
+      <li className="flex items-center justify-between rounded-md border border-hairline px-3 py-2">
+        <span className="font-medium">{PROVIDER_LABELS.bigcapital}</span>
+        <span role="status" aria-live="polite" className="flex items-center gap-1.5 text-xs text-slate-600">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+          Authorising…
+        </span>
+      </li>
+    )
+  }
+
+  return (
+    <li className="flex items-center justify-between rounded-md border border-hairline px-3 py-2">
+      <span className="min-w-0">
+        <span className="font-medium">{PROVIDER_LABELS.bigcapital}</span>
+        {needsReconnect && <span className="ml-2 text-xs text-red-600">needs reconnect</span>}
+      </span>
+      {isOwner ? (
+        <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={connect}>
+          {needsReconnect ? "Reconnect" : "Connect"}
+        </Button>
+      ) : (
+        <span className="text-xs text-slate-600">{needsReconnect ? "Bigcapital · needs reconnect" : "Not connected"}</span>
+      )}
+    </li>
+  )
+}
+
 export function IntegrationsManager({
-  workspaceId, isOwner, eventTypes, apiKeys, endpoints, deliveries, accountingProviders, connections,
+  workspaceId, isOwner, eventTypes, apiKeys, endpoints, deliveries, accountingProviders, connections, bigcapitalJob,
 }: {
   workspaceId: string
   isOwner: boolean
@@ -179,8 +290,11 @@ export function IntegrationsManager({
   apiKeys: ApiKey[]
   endpoints: Endpoint[]
   deliveries: Delivery[]
-  accountingProviders: { quickbooks: boolean; xero: boolean }
+  accountingProviders: { quickbooks: boolean; xero: boolean; bigcapital: boolean }
   connections: IntegrationConnection[]
+  // Only meaningful when there's no bigcapital connection yet — a pending/failed provisioning job,
+  // read fresh on page load. See BigcapitalRow.
+  bigcapitalJob: { status: string; errorCode: string | null } | null
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
@@ -203,20 +317,24 @@ export function IntegrationsManager({
     setSelectedEvents((prev) => (prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]))
 
   const connectionsByProvider = new Map(connections.map((c) => [c.provider, c]))
-  const anyProviderConfigured = accountingProviders.quickbooks || accountingProviders.xero
+  const anyProviderConfigured = accountingProviders.quickbooks || accountingProviders.xero || accountingProviders.bigcapital
 
   return (
     <div className="space-y-10">
-      {/* Accounting connectors (P2) — omitted entirely if neither provider is configured on this deployment. */}
+      {/* Accounting connectors (P2) — omitted entirely if no provider is configured on this deployment. */}
       {anyProviderConfigured && (
         <Card>
           <CardHeader>
             <CardTitle>Accounting</CardTitle>
-            <CardDescription>Connect QuickBooks or Xero to push a reviewed invoice or receipt as a bill.</CardDescription>
+            <CardDescription>
+              Connect QuickBooks, Xero or Bigcapital to push a reviewed invoice or receipt as a bill. Already use
+              one of these to run your books? Pick that one — DocuBite posts to whichever you connect, nothing
+              changes which system stays your ledger of record.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <ul className="space-y-2 text-sm">
-              {(["quickbooks", "xero"] as const)
+              {(["quickbooks", "xero", "bigcapital"] as const)
                 .filter((provider) => accountingProviders[provider])
                 .map((provider) => {
                   const connection = connectionsByProvider.get(provider)
@@ -227,6 +345,17 @@ export function IntegrationsManager({
                         workspaceId={workspaceId}
                         connection={connection}
                         isOwner={isOwner}
+                        onChanged={() => router.refresh()}
+                      />
+                    )
+                  }
+                  if (provider === "bigcapital") {
+                    return (
+                      <BigcapitalRow
+                        key={provider}
+                        workspaceId={workspaceId}
+                        isOwner={isOwner}
+                        initialJob={bigcapitalJob}
                         onChanged={() => router.refresh()}
                       />
                     )
