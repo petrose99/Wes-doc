@@ -3,7 +3,7 @@ import type { CompanyRow } from "@/lib/admin/companies"
 import { getAdminContext } from "@/lib/admin/context"
 import { unscoped } from "@/lib/workspace-scope"
 import { prisma } from "@/lib/db"
-import { listOrganizationCompanies, listOwnedUngroupedTeamWorkspaces, organizationCompanyCount } from "@/models/organizations"
+import { getOrganizationMembership, listOrganizationCompanies, listOwnedUngroupedTeamWorkspaces, organizationCompanyCount } from "@/models/organizations"
 
 export const dynamic = "force-dynamic"
 
@@ -29,11 +29,12 @@ export async function CompaniesScreen({ params, selectedId }: { params: Promise<
   }
 
   const organizationId = workspace.organizationId
-  const [organization, companies, orgTotal, ungrouped] = await Promise.all([
+  const [organization, companies, orgTotal, ungrouped, orgMembership] = await Promise.all([
     unscoped(() => prisma.organization.findUnique({ where: { id: organizationId }, select: { name: true } })),
     listOrganizationCompanies(organizationId, user.id),
     organizationCompanyCount(organizationId),
     viewerRole === "owner" ? listOwnedUngroupedTeamWorkspaces(user.id) : Promise.resolve([]),
+    getOrganizationMembership(organizationId, user.id),
   ])
   const rows: CompanyRow[] = companies.map((company) => ({
     id: company.id,
@@ -52,6 +53,7 @@ export async function CompaniesScreen({ params, selectedId }: { params: Promise<
     rows,
     hiddenCount: Math.max(0, orgTotal - rows.length),
     movable: ungrouped.map((candidate) => ({ id: candidate.id, name: candidate.name, memberCount: candidate._count.members })),
+    viewerIsOrgAdmin: orgMembership?.role === "admin",
   }
   // Spec §5.4: a deep link to an id outside the viewer's unfiltered rows (not a member, personal
   // id, garbage) gets the nameless notice — never a named "was deleted", nothing happened here.

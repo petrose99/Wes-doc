@@ -163,6 +163,14 @@ export const listOrganizationsForUser = cache(async (userId: string) =>
   ),
 )
 
+/** Rename organization (#301): the organization's name change, gated by the caller's
+ * OrganizationMember role in the action layer, not here — this just writes it. */
+export async function renameOrganization(organizationId: string, name: string) {
+  const trimmed = name.trim()
+  if (!trimmed) throw new Error("name_required")
+  return unscoped(() => prisma.organization.update({ where: { id: organizationId }, data: { name: trimmed } }))
+}
+
 export async function createOrganization(name: string, ownerId: string) {
   const trimmed = name.trim()
   if (!trimmed) throw new Error("organization_name_required")

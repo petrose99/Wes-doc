@@ -88,7 +88,7 @@ export function UsersQueue({ workspaceId, data, initialSelectedId = null, initia
         {row.kind === "invited" && <span className="text-xs text-slate-500">Expires in {daysUntil(row.expiresAt)} days</span>}
       </span>,
     },
-    ...(mode === "org" ? [{ key: "org", label: "Organization", priority: "low", render: (row: UserRow) => row.orgRole === "admin" ? "Org admin" : "—" } as QueueColumn<UserRow>] : []),
+    ...(mode === "org" ? [{ key: "org", label: "Organization", priority: "low", render: (row: UserRow) => row.orgRole === "admin" ? "Organization admin" : "—" } as QueueColumn<UserRow>] : []),
   ]
 
   const facets = [ROLE_FACET, STATUS_FACET, ...(companyFacet ? [companyFacet] : [])]
@@ -121,10 +121,13 @@ export function UsersQueue({ workspaceId, data, initialSelectedId = null, initia
   const bandLine = mode === "personal"
     ? <p className="max-w-[70ch] px-4 py-1.5 text-xs text-slate-500">Your personal workspace is just you. Create a team workspace on <Link href={adminPaths(workspaceId).companies} className="font-medium text-emerald-700 hover:underline">Companies</Link> to invite people.</p>
     : mode === "org"
-    ? <p className="max-w-[70ch] px-4 py-1.5 text-xs text-slate-500">
-        Across {new Set(rows.flatMap((row) => row.companies.map((company) => company.workspaceId))).size} companies in {organizationName}.
-        {hiddenCompanyCount > 0 && ` ${hiddenCompanyCount} more ${hiddenCompanyCount === 1 ? "company" : "companies"} in ${organizationName} aren't shown — you don't belong to ${hiddenCompanyCount === 1 ? "it" : "them"}.`}
-      </p>
+    ? <div className="max-w-[70ch] space-y-0.5 px-4 py-1.5 text-xs text-slate-500">
+        <p>Access is per company: a person&apos;s role in each company is what they can do there. Organization admin opens no company; it only lets them rename the organization.</p>
+        <p>
+          Across {new Set(rows.flatMap((row) => row.companies.map((company) => company.workspaceId))).size} companies in {organizationName}.
+          {hiddenCompanyCount > 0 && ` ${hiddenCompanyCount} more ${hiddenCompanyCount === 1 ? "company" : "companies"} in ${organizationName} aren't shown — you don't belong to ${hiddenCompanyCount === 1 ? "it" : "them"}.`}
+        </p>
+      </div>
     : mode === "team"
       ? <p className="max-w-[70ch] px-4 py-1.5 text-xs text-slate-500">
           People with access to {currentCompany.name}.{" "}

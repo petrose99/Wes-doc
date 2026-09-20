@@ -10,9 +10,11 @@ import { unscoped } from "@/lib/workspace-scope"
 import {
   addCompanyToOrganization,
   createOrganization,
+  getOrganizationMembership,
   listOrganizationsForUser,
   moveWorkspaceIntoOrganization,
   removeWorkspaceFromOrganization,
+  renameOrganization,
 } from "@/models/organizations"
 import { getWorkspaceMembership } from "@/models/workspaces"
 
@@ -175,5 +177,26 @@ export async function removeCompanyFromOrganizationAction(workspaceId: string, t
     await removeWorkspaceFromOrganization(targetId, user.id)
     revalidate(workspaceId)
     return { success: true, data: { workspaceId: target.id, name: target.name } }
+  } catch (error) { return { success: false, error: code(error, "failed") } }
+}
+
+/* --------------------------------------------------------------------------- org admin --- */
+
+/** #301: the organization's own name, gated on the caller's OrganizationMember role — the only
+ * standing "organization admin" carries. Unchanged name is a no-op success (idempotent submit,
+ * no toast wording distinction needed); a concurrent rename by another admin just loses the race
+ * and this write becomes the name shown, same as any other last-write-wins field. */
+export async function renameOrganizationAction(workspaceId: string, input: { name: string }): Promise<ActionState<{ name: string }>> {
+  const user = await getCurrentUser()
+  const name = cleanName(input.name)
+  if (!name || name.length > NAME_MAX) return { success: false, error: "name_required" }
+  const route = await headFor(workspaceId)
+  if (!route?.organizationId) return { success: false, error: "not_in_organization" }
+  const membership = await getOrganizationMembership(route.organizationId, user.id)
+  if (membership?.role !== "admin") return { success: false, error: "admin_required" }
+  try {
+    const organization = await renameOrganization(route.organizationId, name)
+    revalidate(workspaceId)
+    return { success: true, data: { name: organization.name } }
   } catch (error) { return { success: false, error: code(error, "failed") } }
 }

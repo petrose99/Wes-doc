@@ -32,7 +32,7 @@ export function CompanyNameForm({ workspaceId, workspaceName, noun }: { workspac
   }, [dirty, blocker, name, workspaceId, router])
 
   return <>
-    <Panel title={noun === "company" ? "Company name" : "Workspace name"} note="Shown in the sidebar switcher, in the Admin nav and on every invitation.">
+    <Panel title={noun === "company" ? "Company name" : "Name"} note="Shown in the sidebar switcher, in the Admin nav and on every invitation.">
       <div className="flex flex-col gap-1.5">
         <label htmlFor={id} className="text-xs font-medium text-slate-600">Name</label>
         <Input id={id} value={name} onChange={(event) => setName(event.target.value)} className="max-w-xs" minLength={2} maxLength={80} required disabled={pending} />

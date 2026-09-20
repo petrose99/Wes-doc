@@ -443,7 +443,12 @@ function MemberBody({ workspaceId, row, currentWorkspaceId, currentCompanyName, 
       <dl className="divide-y divide-slate-100 border-y border-slate-100">
         <Fact term="Name">{row.name?.trim() || "—"}</Fact>
         <Fact term="Email">{row.email}</Fact>
-        <Fact term="Organization">{row.orgRole === "admin" ? "Org admin" : "—"}</Fact>
+        <Fact term="Organization">
+          <span className="flex flex-col">
+            <span>{row.orgRole === "admin" ? "Organization admin" : "—"}</span>
+            <span className="text-xs text-slate-500">Access is per company: a person&apos;s role in each company is what they can do there. Organization admin opens no company; it only lets them rename the organization.</span>
+          </span>
+        </Fact>
         <Fact term="Companies">{companies.length} · {companies.map((c) => c.workspaceName).join(", ")}</Fact>
         <Fact term={`Joined ${currentCompanyName}`}>{current ? formatDate(row.createdAt) : "Not in this company"}</Fact>
       </dl>

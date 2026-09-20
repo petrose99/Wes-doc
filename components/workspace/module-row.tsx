@@ -44,7 +44,7 @@ export function ModuleRow({ workspaceId, moduleKey, name, description, kind, ena
     startTransition(async () => {
       const result = await requestModuleAction(workspaceId, moduleKey)
       if (!result.success) { setRequested(false); toast.error(result.error || "Could not send that request") }
-      else toast.success("Request sent to the workspace owner")
+      else toast.success("Request sent to the owner")
     })
   }
 

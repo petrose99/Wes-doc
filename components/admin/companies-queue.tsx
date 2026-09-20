@@ -23,6 +23,7 @@ import {
   loadCompanyDetailAction,
   moveCompanyIntoOrganizationAction,
   removeCompanyFromOrganizationAction,
+  renameOrganizationAction,
 } from "@/app/(app)/workspaces/[workspaceId]/admin/companies/actions"
 import { createWorkspaceAction, renameWorkspaceAction } from "@/app/(app)/workspaces/[workspaceId]/workspace-actions"
 
@@ -38,6 +39,9 @@ export type CompaniesPageState =
       hiddenCount: number
       /** Team workspaces the viewer owns that are in no organization — the Move dialog's list. */
       movable: { id: string; name: string; memberCount: number }[]
+      /** Is the viewer an OrganizationMember with role "admin" — the only standing that can
+       * rename the organization (#301, #300 decision 3). */
+      viewerIsOrgAdmin: boolean
     }
 
 export type CompaniesQueueProps = {
@@ -89,7 +93,7 @@ function PersonalState() {
     <h1 id="queue-title" className="text-lg font-semibold text-slate-900">Your personal workspace isn&apos;t a company</h1>
     <p className="mt-2 text-sm leading-relaxed text-slate-600">Companies are team workspaces inside an organization. Create one to start a separate set of books with you as its owner, then name its organization — or switch to a company you already belong to.</p>
     <div className="mt-5 flex flex-col items-center gap-3">
-      <Button type="button" onClick={() => setCreating(true)}>Create a team workspace</Button>
+      <Button type="button" onClick={() => setCreating(true)}>Create a company</Button>
       <Link href="/workspaces" className="text-sm font-medium text-emerald-700 hover:underline">Switch company</Link>
     </div>
     <CreateTeamWorkspaceDialog open={creating} onClose={() => setCreating(false)}
@@ -102,7 +106,7 @@ function CreateTeamWorkspaceDialog({ open, onClose, onCreated }: { open: boolean
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const close = () => { if (busy) return; onClose(); setName(""); setError(null) }
-  return <Dialog open={open} onClose={close} title="Create a team workspace" initialFocus="#new-team-workspace-name">
+  return <Dialog open={open} onClose={close} title="Create a company" initialFocus="#new-team-workspace-name">
     <form className="space-y-4 px-5 py-4" onSubmit={async (event) => {
       event.preventDefault()
       if (!name.trim()) return
@@ -123,7 +127,7 @@ function CreateTeamWorkspaceDialog({ open, onClose, onCreated }: { open: boolean
       {error && <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>}
       <div className="flex justify-end gap-2">
         <Button type="button" size="sm" variant="outline" disabled={busy} onClick={close}>Cancel</Button>
-        <Button type="submit" size="sm" disabled={busy || !name.trim()}>{busy ? "Creating…" : "Create workspace"}</Button>
+        <Button type="submit" size="sm" disabled={busy || !name.trim()}>{busy ? "Creating…" : "Create company"}</Button>
       </div>
     </form>
   </Dialog>
@@ -135,7 +139,7 @@ function UngroupedState({ workspaceId, state, viewerRole, owners }: { workspaceI
   const router = useRouter()
   const [naming, setNaming] = useState(false)
   const isOwner = viewerRole === "owner"
-  const disclosure = `An organization groups companies under one login. Name yours to add companies, move other team workspaces you own into it, and see the people across them on Users. ${state.workspaceName} becomes its first company. The organization's name can't be changed here yet.`
+  const disclosure = `An organization groups companies under one login. Name yours to add companies, move other companies you own into it, and see the people across them on Users. ${state.workspaceName} becomes its first company.`
   return <section aria-labelledby="queue-title" className="mx-auto max-w-[60ch] px-6 py-10 text-center">
     <h1 id="queue-title" className="text-lg font-semibold text-slate-900">Name your organization</h1>
     <p className="mt-2 text-sm leading-relaxed text-slate-600">{disclosure}</p>
@@ -185,7 +189,7 @@ function NameOrganizationDialog({ open, onClose, workspaceId, defaultName, discl
 
 function OrganizationState({ workspaceId, state, viewerRole, owners, initialSelectedId, initialMissing }: {
   workspaceId: string
-  state: { organizationName: string; rows: CompanyRow[]; hiddenCount: number; movable: { id: string; name: string; memberCount: number }[] }
+  state: { organizationName: string; rows: CompanyRow[]; hiddenCount: number; movable: { id: string; name: string; memberCount: number }[]; viewerIsOrgAdmin: boolean }
   viewerRole: CompanyViewerRole
   owners: string[]
   initialSelectedId?: string | null
@@ -193,9 +197,10 @@ function OrganizationState({ workspaceId, state, viewerRole, owners, initialSele
 }) {
   const router = useRouter()
   const isOwner = viewerRole === "owner"
-  const { organizationName, rows, hiddenCount, movable } = state
+  const { organizationName, rows, hiddenCount, movable, viewerIsOrgAdmin } = state
   const [adding, setAdding] = useState(false)
   const [moving, setMoving] = useState(false)
+  const [renamingOrg, setRenamingOrg] = useState(false)
   const [renaming, setRenaming] = useState<CompanyRow | null>(null)
   const [removing, setRemoving] = useState<{ row: CompanyRow; close: () => void } | null>(null)
   const rowsById = useMemo(() => new Map(rows.map((row) => [row.id, row])), [rows])
@@ -244,10 +249,16 @@ function OrganizationState({ workspaceId, state, viewerRole, owners, initialSele
       selectable={false}
       overrideMode={false}
       primaryAction={isOwner ? <Button type="button" size="sm" onClick={() => setAdding(true)}>Add a company</Button> : undefined}
-      menu={isOwner && movable.length > 0 ? <button type="button" data-menu-close onClick={() => setMoving(true)}
-        className="flex w-full items-center gap-2.5 rounded-sm px-2.5 py-2 text-left text-sm text-slate-700 hover:bg-slate-100">
-        Move a company into {organizationName}…
-      </button> : null}
+      menu={(isOwner && movable.length > 0) || viewerIsOrgAdmin ? <>
+        {isOwner && movable.length > 0 && <button type="button" data-menu-close onClick={() => setMoving(true)}
+          className="flex w-full items-center gap-2.5 rounded-sm px-2.5 py-2 text-left text-sm text-slate-700 hover:bg-slate-100">
+          Move a company into {organizationName}…
+        </button>}
+        {viewerIsOrgAdmin && <button type="button" data-menu-close onClick={() => setRenamingOrg(true)}
+          className="flex w-full items-center gap-2.5 rounded-sm px-2.5 py-2 text-left text-sm text-slate-700 hover:bg-slate-100">
+          Rename organization…
+        </button>}
+      </> : null}
       empty={{ filteredBody: "Clear a filter to widen the queue." }}
       loadDetail={loadDetail}
       initialSelectedId={initialSelectedId}
@@ -273,6 +284,9 @@ function OrganizationState({ workspaceId, state, viewerRole, owners, initialSele
 
     <RenameCompanyDialog key={renaming?.id ?? "none"} open={renaming !== null} onClose={() => { setRenaming(null); focusAfterClose(PANE_MENU_TRIGGER) }} row={renaming}
       onRenamed={(oldName, newName) => { setRenaming(null); toast.success(`Renamed to ${newName} (was ${oldName})`); setPaneFocusPending(true); router.refresh() }} />
+
+    <RenameOrganizationDialog open={renamingOrg} onClose={() => { setRenamingOrg(false); focusAfterClose(QUEUE_MENU_TRIGGER) }} workspaceId={workspaceId} currentName={organizationName}
+      onRenamed={(oldName, newName) => { setRenamingOrg(false); toast.success(`Renamed to ${newName} (was ${oldName})`); router.refresh() }} />
 
     <RemoveCompanyConfirm workspaceId={workspaceId} entry={removing} organizationName={organizationName} onClose={() => { setRemoving(null); focusAfterClose(PANE_MENU_TRIGGER) }}
       onRemoved={(name) => { removing?.close(); setRemoving(null); toast.success(`${name} removed from ${organizationName}`); afterMutation(); requestAnimationFrame(() => document.getElementById("queue-title")?.focus()) }} />
@@ -345,7 +359,7 @@ function MoveCompanyDialog({ open, onClose, workspaceId, organizationName, candi
   const [error, setError] = useState<string | null>(null)
   const close = () => { if (busy) return; onClose(); setChosenId(null); setError(null) }
   const chosen = candidates.find((c) => c.id === chosenId)
-  return <Dialog open={open} onClose={close} title={`Move a company into ${organizationName}`} description="Team workspaces you own that aren't in an organization yet." initialFocus="input[type=radio]">
+  return <Dialog open={open} onClose={close} title={`Move a company into ${organizationName}`} description="Companies you own that aren't in an organization yet." initialFocus="input[type=radio]">
     <form className="space-y-4 px-5 py-4" onSubmit={async (event) => {
       event.preventDefault()
       if (!chosenId) return
@@ -358,7 +372,7 @@ function MoveCompanyDialog({ open, onClose, workspaceId, organizationName, candi
       finally { setBusy(false) }
     }}>
       {candidates.length === 0 ? <p className="text-sm text-slate-600">Nothing left to move.</p> : <fieldset className="max-h-[60vh] space-y-1 overflow-y-auto">
-        <legend className="mb-1 text-sm font-medium text-slate-800">Team workspaces</legend>
+        <legend className="mb-1 text-sm font-medium text-slate-800">Companies</legend>
         {candidates.map((candidate) => <label key={candidate.id} className="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-2 text-sm hover:bg-slate-50">
           <input type="radio" name="move-target" value={candidate.id} checked={chosenId === candidate.id} onChange={() => setChosenId(candidate.id)} className="h-4 w-4 accent-emerald-700" />
           <span className="text-slate-900">{candidate.name}</span>
@@ -411,6 +425,45 @@ function RenameCompanyDialog({ open, onClose, row, onRenamed }: {
   </Dialog>
 }
 
+/** #301: the header ⋯ item for an Organization admin — the org's only rename surface. Reuses the
+ * Rename-company dialog pattern (title, one field, one consequence line, "Rename" submit). */
+function RenameOrganizationDialog({ open, onClose, workspaceId, currentName, onRenamed }: {
+  open: boolean; onClose: () => void; workspaceId: string; currentName: string
+  onRenamed: (oldName: string, newName: string) => void
+}) {
+  const [name, setName] = useState(currentName)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const close = () => { if (busy) return; onClose(); setError(null) }
+  return <Dialog key={open ? currentName : "closed"} open={open} onClose={close} title={`Rename ${currentName}`}
+    description="Shown on Companies, Users and the switcher for everyone in it." initialFocus="#rename-org-name">
+    <form className="space-y-4 px-5 py-4" onSubmit={async (event) => {
+      event.preventDefault()
+      const trimmed = name.trim()
+      if (!trimmed) return
+      setBusy(true); setError(null)
+      try {
+        const result = await renameOrganizationAction(workspaceId, { name: trimmed })
+        if (result.success && result.data) onRenamed(currentName, result.data.name)
+        else setError("Couldn't save. Your entries are still here — try again.")
+      } catch { setError("Couldn't reach the server. Your entries are still here — try again.") }
+      finally { setBusy(false) }
+    }}>
+      <div className="space-y-1">
+        <label htmlFor="rename-org-name" className="text-sm font-medium text-slate-800">Organization name</label>
+        <input id="rename-org-name" value={name} onChange={(event) => setName(event.target.value)} required maxLength={80} autoComplete="off"
+          onFocus={(event) => event.currentTarget.select()}
+          className="h-9 w-full rounded-md border border-slate-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600" />
+      </div>
+      {error && <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>}
+      <div className="flex justify-end gap-2">
+        <Button type="button" size="sm" variant="outline" disabled={busy} onClick={close}>Cancel</Button>
+        <Button type="submit" size="sm" disabled={busy || !name.trim()}>{busy ? "Renaming…" : "Rename"}</Button>
+      </div>
+    </form>
+  </Dialog>
+}
+
 function RemoveCompanyConfirm({ workspaceId, entry, organizationName, onClose, onRemoved }: {
   workspaceId: string
   entry: { row: CompanyRow; close: () => void } | null
@@ -422,7 +475,7 @@ function RemoveCompanyConfirm({ workspaceId, entry, organizationName, onClose, o
   const [error, setError] = useState<string | null>(null)
   const row = entry?.row
   return <ConfirmDialog open={entry !== null} destructive busy={busy} title={row ? `Remove ${row.name} from ${organizationName}?` : ""}
-    description="It becomes an ungrouped team workspace. Its members keep their roles; nothing is deleted."
+    description="It becomes a company on its own. Its members keep their roles; nothing is deleted."
     confirmLabel="Remove"
     onCancel={() => { if (busy) return; onClose(); setError(null) }}
     onConfirm={async () => {
