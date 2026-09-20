@@ -113,7 +113,7 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
     .filter((module) => enabled.has(module.key))
     .flatMap((module) => module.navItems ?? [])
     .filter((item) => !item.href.startsWith("settings/") && !item.href.startsWith("admin/") && item.href !== "health" && !isUnpluggedPath(`${base}/${item.href}`))
-    .map((item) => ({ href: `${base}/${item.href}`, label: item.label, icon: ICONS[item.icon] ?? Files, exact: false }))
+    .map((item) => ({ href: `${base}/${item.href}`, label: item.label, icon: ICONS[item.icon] ?? Files, matchPrefixes: [`${base}/${item.href}`] }))
 
   // The review-queue module's "Review" item is dropped (#238): since #225 every queue is the
   // review surface, so a second entry for the same job was a second grammar. Controls
@@ -128,30 +128,36 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
   // #270: Search sits above the typed group — its own predicate spans every document, typed or
   // not, so it isn't paired with either pair below it. `/` is its own shortcut (#262); no `g`
   // letter is reserved for it.
-  const searchItem = { href: `${base}/search`, label: "Search", icon: Search, exact: false }
+  const searchItem = { href: `${base}/search`, label: "Search", icon: Search, matchPrefixes: [`${base}/search`] }
   const typedDestinationGroups = [
     [
-      { href: `${base}/invoices`, label: "Invoices", icon: Receipt, exact: false },
-      { href: `${base}/purchase-orders`, label: "Purchase Orders", icon: ClipboardCheck, exact: false },
+      // #342 §5: Invoices also lights up on the legacy/generic work surfaces it still stands in
+      // for (Ingestion/review) until their queues are migrated.
+      { href: `${base}/invoices`, label: "Invoices", icon: Receipt, matchPrefixes: [`${base}/invoices`, `${base}/pipeline`, `${base}/documents`, `${base}/review`, `${base}/bills`] },
+      { href: `${base}/purchase-orders`, label: "Purchase Orders", icon: ClipboardCheck, matchPrefixes: [`${base}/purchase-orders`] },
     ],
     [
-      { href: `${base}/receipts`, label: "Receipts", icon: Receipt, exact: false },
-      { href: `${base}/bank-statements`, label: "Bank Statements", icon: Landmark, exact: false },
+      { href: `${base}/receipts`, label: "Receipts", icon: Receipt, matchPrefixes: [`${base}/receipts`] },
+      { href: `${base}/bank-statements`, label: "Bank Statements", icon: Landmark, matchPrefixes: [`${base}/bank-statements`] },
     ],
   ]
-  const exceptionsItem = { href: `${base}/exceptions`, label: "Exceptions", icon: AlertTriangle, exact: false, badge: openExceptionsCount > 0 ? openExceptionsCount : undefined }
+  const exceptionsItem = { href: `${base}/exceptions`, label: "Exceptions", icon: AlertTriangle, matchPrefixes: [`${base}/exceptions`], badge: openExceptionsCount > 0 ? openExceptionsCount : undefined }
   // #236: Approvals sits right after Exceptions (map's Notes: "after Exceptions, before
   // Worksheets" — Worksheets is unplugged per #237/#238, so Exceptions is the item it actually
   // lands beside). Its badge is the signed-in person's own Ready-to-Approve count, never the
   // workspace-wide total — see CONTEXT.md's "Ready to Approve".
-  const approvalsItem = { href: `${base}/approvals/invoices`, label: "Approvals", icon: BadgeCheck, exact: false, badge: approvalsReadyCount > 0 ? approvalsReadyCount : undefined }
+  const approvalsItem = { href: `${base}/approvals/invoices`, label: "Approvals", icon: BadgeCheck, matchPrefixes: [`${base}/approvals`], badge: approvalsReadyCount > 0 ? approvalsReadyCount : undefined }
   // #229 Q9 (#251): one rail item, Payments, after Exceptions (after Approvals, #236); two queues behind it, Bill Pay and Payment Batches. Badge = the
   // batches pending approval — the one number that is somebody's work.
-  const paymentsItem = { href: `${base}/payments/bill-pay`, label: "Payments", icon: Banknote, exact: false, badge: batchesPendingApprovalCount > 0 ? batchesPendingApprovalCount : undefined }
+  const paymentsItem = { href: `${base}/payments/bill-pay`, label: "Payments", icon: Banknote, matchPrefixes: [`${base}/payments`], badge: batchesPendingApprovalCount > 0 ? batchesPendingApprovalCount : undefined }
   // #342 §2 (execution of #291): Accounting reverses #282's "no rail item" clause — the badge
   // reuses financePushableCount (prop name kept for API stability; every user-facing reference is
   // Accounting now), destination is #329's connector picker inside Admin › Integrations.
-  const accountingItem = { href: adminPaths(workspaceId).integrations, label: "Accounting", icon: Landmark, exact: false, badge: financePushableCount > 0 ? financePushableCount : undefined }
+  // #342 §5: Accounting's own href sits inside /admin — its matchPrefixes entry there is longer/
+  // more specific than Admin's `${base}/admin`, so the longest-prefix-wins reduce below resolves
+  // it correctly with no Admin-side exclusion clause. It also keeps the legacy /accounting
+  // redirect lit (§2).
+  const accountingItem = { href: adminPaths(workspaceId).integrations, label: "Accounting", icon: Landmark, matchPrefixes: [adminPaths(workspaceId).integrations, `${base}/accounting`], badge: financePushableCount > 0 ? financePushableCount : undefined }
   const primaryItems = [
     exceptionsItem,
     approvalsItem,
@@ -170,8 +176,11 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
     // "Archive" is the accountant's own word for the permanent source-document record (Dext and
     // Hubdoc both name this surface Archive). Route stays /library — same label-over-URL stance
     // as Controls (/automation) and Finance's /accounting redirect.
-    { href: `${base}/library`, label: "Archive", icon: Library, exact: false, tourTarget: "library" as const },
-    { href: adminPaths(workspaceId).configuration, label: "Admin", icon: Settings, exact: false, alwaysLabelled: true as const },
+    { href: `${base}/library`, label: "Archive", icon: Library, matchPrefixes: [`${base}/library`], tourTarget: "library" as const },
+    // #342 §5: matchPrefixes covers every /admin/* route plus the two legacy aliases that used to
+    // need their own `||` clause (/settings, /automation) — Accounting's more specific prefix
+    // (above) wins the one overlapping route via longest-prefix-wins, no exclusion needed here.
+    { href: adminPaths(workspaceId).configuration, label: "Admin", icon: Settings, matchPrefixes: [`${base}/admin`, `${base}/settings`, `${base}/automation`], alwaysLabelled: true as const },
   ]
 
   // Sum across primary badges tells us whether the TODAY label is a promise or a reward. When the
@@ -179,24 +188,21 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
   // instead of a promise the badges are supposed to keep.
   const todayTotal = (pipelineReviewCount || 0) + (accountingEnabled ? (financePushableCount || 0) : 0) + (openExceptionsCount || 0) + (batchesPendingApprovalCount || 0) + (approvalsReadyCount || 0)
 
-  const isActive = (item: { href: string; label: string; exact: boolean }) => item.exact
-    ? pathname === item.href
-    : pathname === item.href || pathname.startsWith(`${item.href}/`)
-      // #342 §2/§5: Accounting's own href is inside /admin — it wins that one prefix (checked
-      // first below via the plain href match) so Admin's broader match excludes it here. Folded
-      // into the generic matchPrefixes reduce at §5; this is the minimal fix for §1's reorder.
-      || (item.label === "Admin" && !pathname.startsWith(adminPaths(workspaceId).integrations) && (pathname.startsWith(`${base}/admin`) || pathname.startsWith(`${base}/settings`) || pathname.startsWith(`${base}/automation`)))
-      // Ingestion and review are still reachable through the typed destinations. Keep the first
-      // destination lit for those legacy/generic work surfaces until their queues are migrated.
-      || (item.label === "Invoices" && (pathname.startsWith(`${base}/pipeline`) || pathname.startsWith(`${base}/documents`) || pathname.startsWith(`${base}/review`) || pathname.startsWith(`${base}/bills`)))
-      || (item.label === "Invoices" && pathname.startsWith(`${base}/invoices`))
-      || (item.label === "Purchase Orders" && pathname.startsWith(`${base}/purchase-orders`))
-      || (item.label === "Receipts" && pathname.startsWith(`${base}/receipts`))
-      || (item.label === "Bank Statements" && pathname.startsWith(`${base}/bank-statements`))
-      || (item.label === "Payments" && pathname.startsWith(`${base}/payments`))
-      || (item.label === "Approvals" && pathname.startsWith(`${base}/approvals`))
-      // Accounting keeps its rail lit on the legacy /accounting URL too, which redirects here.
-      || (item.label === "Accounting" && pathname.startsWith(`${base}/accounting`))
+  // #342 §5: one generic prefix-match reduce replaces the accreted per-label `||` clauses.
+  // matchPrefixes replaces href-prefix-plus-special-case; when two items both match (Accounting's
+  // href sits inside Admin's `/admin` prefix) the longest matching prefix wins, so Accounting
+  // resolves correctly with no exclusion clause on Admin's side.
+  type RailNavItem = { href: string; label: string; matchPrefixes: string[] }
+  const matchLength = (item: RailNavItem) => item.matchPrefixes
+    .filter((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))
+    .reduce((longest, prefix) => Math.max(longest, prefix.length), -1)
+  const allNavItems: RailNavItem[] = [searchItem, ...typedDestinationGroups.flat(), exceptionsItem, approvalsItem, paymentsItem, accountingItem, ...secondaryItems, ...bottomItems]
+  const activeItem = allNavItems.reduce<RailNavItem | null>((winner, item) => {
+    const length = matchLength(item)
+    if (length < 0) return winner
+    return !winner || length > matchLength(winner) ? item : winner
+  }, null)
+  const isActive = (item: RailNavItem) => item === activeItem
 
   // In the compact rail every label is hidden until the rail expands (hover / focus-within /
   // pin), and the link keeps a `title` so a hover over the icon alone still names it. The badge
@@ -214,7 +220,7 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
   // dialog is the source of truth, this is a hint). Only the eight destinations the shortcut
   // listener actually registers get one.
   const SHORTCUT_KEY_BY_LABEL: Record<string, string> = { Invoices: "i", "Purchase Orders": "p", Receipts: "r", "Bank Statements": "b", Exceptions: "e", Approvals: "a", Payments: "y", Accounting: "c", Admin: "d" }
-  const navLink = (item: { href: string; label: string; icon: typeof Files; exact: boolean; badge?: number; tourTarget?: string; alwaysLabelled?: boolean }) => {
+  const navLink = (item: RailNavItem & { icon: typeof Files; badge?: number; tourTarget?: string; alwaysLabelled?: boolean }) => {
     const active = isActive(item)
     const shortcutKey = SHORTCUT_KEY_BY_LABEL[item.label]
     const tooltip = compact && !item.alwaysLabelled ? (shortcutKey ? `${item.label} · g ${shortcutKey}` : item.label) : undefined

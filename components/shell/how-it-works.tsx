@@ -57,6 +57,13 @@ export function HowItWorksDialog({ inboundAddress = null }: { inboundAddress?: s
       {inboundAddress && <div className="mt-4 border-t border-hairline pt-3">
         <InboundAddressLine address={inboundAddress} />
       </div>}
+      {/* #342 H10: the spec critic scored H10 2/4 — the rail-width control's own Account-page
+          help text explains how Auto behaves, but nothing upstream told a new operator the
+          control (or Accounting) exists. Two sentences here, no new dialog. */}
+      <p className="mt-4 border-t border-hairline pt-3 text-[13px] text-slate-500">
+        Accounting connects your books — find it on the rail or press <kbd className="rounded border border-hairline bg-slate-50 px-1 py-0.5 font-mono text-[11px]">g c</kbd>.
+        {" "}Prefer the rail a fixed width? Set it from your Account page.
+      </p>
       <p className="mt-4 border-t border-hairline pt-3 text-[13px] text-slate-500">
         <button type="button" className="font-medium text-emerald-700 hover:underline"
           onClick={() => { close(); openKeyboardShortcutsDialog() }}>Keyboard shortcuts</button> are under the account menu, or press ?

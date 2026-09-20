@@ -121,9 +121,9 @@ _Avoid_: Synced, Pushed, Transferred
 The one mark beside a row's processing state that says where the document stands with the ledger: Posting… (the post is queued and retrying), Posted, Post failed (the post was refused for a reason the row can fix — the row then also reads Needs attention with that reason as an open check), or Paid. A ledger problem that is not the row's — the ledger is disconnected or has no default account — never marks rows; it is said once, above the queue, while posts are waiting.
 _Avoid_: ledger status, sync status, integration state
 
-**Finance**:
-The ledger connection's own page: whether the workspace is connected, when it last synced, its default account, and the way into the ledger. It holds no rows and no work — posting happens on the queues, paying in Bill Pay — and its contents belong to Admin › Integrations once that exists.
-_Avoid_: Accounting (the surface), the ledger (that is what Finance opens), push list
+**Accounting**:
+The connected accounting provider's own page: whether the workspace is connected, when it last synced, its default account, and the way into the ledger. It holds no rows and no work — posting happens on the queues, paying in Bill Pay. Reached directly from the rail's Accounting item, inside Admin › Integrations.
+_Avoid_: Finance (retired name), the ledger (that is what Accounting opens), push list
 
 **Bill Pay**:
 The queue of approved, unpaid invoices and approved, unpaid Expense claims from which payment batches are created. An invoice reaches it only once its processing state is Approved, a claim once it is approved; a row that cannot be paid yet (no bank details for its Payee) stays visible with the reason. A claim row has no terms, no discount, no countdown and no partial payment: its amount is the frozen claim total. A row held by a pending or approved payment batch reads *Scheduled* — still on the queue, not batchable again until the batch is rejected or paid. Amount to pay defaults to the discounted total inside an open discount window, else what is still due; an operator may set a smaller amount (a partial payment) per row.
