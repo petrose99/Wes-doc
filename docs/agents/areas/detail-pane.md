@@ -22,14 +22,22 @@ inside each queue's standalone `[documentId]?full=1` route.
   *Delete…*, always last, red. Roving `role=menu` with ArrowUp/Down/Home/End + wrap; Escape and
   outside focus close it (Radix `Popover`).
 - `components/queue/document-actions-menu.tsx`: `PaneDocumentProvider`/`PaneDocumentContext`
-  (the loaded document a `SplitPane` registers, read by the frame's ⋯), `DocumentMenuTopItems`,
-  `DocumentMenuDeleteItem`, `DeleteDocumentDialog`.
+  (the loaded document a `SplitPane` registers, read by the frame's ⋯, now including `currentType`
+  — the *raw* `docType`, not the template-resolved one, #297), `DocumentMenuTopItems`,
+  `DocumentMenuDeleteItem`, `DeleteDocumentDialog`, `MoveDocumentMenuItem`/`MoveDocumentDialog`
+  (#297: move a document to another typed queue or Library; radiogroup lists valid targets minus
+  `currentType`; `bank_statement` is deliberately never a target).
   **Contract**: any dialog opened from a `PaneMenuItem` click must be rendered *outside*
   `PopoverContent`, with its open-state owned by a component above the `Popover` — Radix unmounts
   `PopoverContent` (and everything inside it) the instant the menu closes, which happens on the
   same click that requests the dialog. A dialog whose state lives inside the menu item never
   renders (#259 close-phase fix: `DeleteDocumentDialog` moved from `DocumentMenuDeleteItem` up into
   `PaneMenu`, `deleteOpen` state lifted with it).
+  **Focus-restore contract (#297)**: pass `restoreFocusTo` as the trigger's `RefObject`, never
+  `.current` — `ConfirmDialog` reads `.current` inside its own effect (after the popover that owns
+  the trigger has settled), not at the caller's render time. Passing `.current` directly is a
+  `react-hooks/refs` ESLint **error** ("Cannot access ref value during render"), not just a lint
+  nit — it also silently breaks the `document.activeElement` fallback race the prop exists to fix.
 - `components/queue/split-pane.tsx` `SplitPane`: source strip toggle (`sessionStorage["dp.source"]`),
   layout-control radiogroup, tab strip (Details · Note · Approval · Audit · Checks — order per
   queue), `useRegisterDocumentActions` (calls `PaneDocumentContext.setDoc`).
@@ -67,7 +75,11 @@ App-wide four (`ai-color-palette`, `overused-font`, `dark-glow`, `layout-transit
 `clipped-overflow-container` recurs on the pane's own scroll/motion scaffolding at 390
 (`overflow-hidden` on the sheet's flex containers, required for the slide-in animation and internal
 scroll regions) — structural, not a content-clipping bug; don't chase without a screenshot showing
-actually-clipped content.
+actually-clipped content. Also pre-existing, confirmed shell chrome (#297): `text-overflow` on the
+pane-title `h2.min-w-0.flex-1.truncate` at 390 and on the Library type-line
+`span.block.truncate.text-sm.font-medium.text-slate-800` at both widths, and `undersized-ui-text`
+("10.5px functional text") on the Library pane's count badge — none introduced by #297's
+Direction-row/Move-dialog work, all present before it and outside its diff.
 
 ## Conventions the bar checks
 One `←`/`×` per breakpoint, never both (see Primitives). Every destructive `PaneMenuItem` opens a

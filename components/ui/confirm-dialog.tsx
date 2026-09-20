@@ -33,8 +33,10 @@ export function ConfirmDialog({ open, title, description, confirmLabel = "Confir
    * before this dialog mounts (a popover menu item that closes its menu on the same click that
    * requests the dialog, #297) — `document.activeElement` at mount time is unreliable there
    * (the popover's own focus-restore hasn't necessarily settled yet, so the guess can be body).
-   * Falls back to the activeElement guess when omitted, unchanged for every other caller. */
-  restoreFocusTo?: HTMLElement | null
+   * Falls back to the activeElement guess when omitted, unchanged for every other caller.
+   * Takes the ref itself, not `.current` — reading `.current` belongs in an effect, not at
+   * the caller's render time (react-hooks/refs). */
+  restoreFocusTo?: React.RefObject<HTMLElement | null>
 }) {
   const contentRef = useRef<HTMLDivElement>(null)
   const openerRef = useRef<Element | null>(null)
@@ -58,7 +60,7 @@ export function ConfirmDialog({ open, title, description, confirmLabel = "Confir
     // to refocus a node that's about to unmount with it → body (#297: Esc after choosing a
     // Move target left focus on body).
     if (!openerCapturedRef.current) {
-      openerRef.current = restoreFocusTo ?? (typeof document !== "undefined" ? document.activeElement : null)
+      openerRef.current = restoreFocusTo?.current ?? (typeof document !== "undefined" ? document.activeElement : null)
       openerCapturedRef.current = true
     }
     // Initial focus always moves here, after the opener is read — never via `autoFocus`, which React
@@ -115,7 +117,11 @@ export function ConfirmDialog({ open, title, description, confirmLabel = "Confir
       <div ref={contentRef} role="alertdialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={description ? descId : undefined} className="w-full max-w-sm overflow-hidden rounded-xl bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
         <div className="px-5 pb-4 pt-5">
           <h2 id={titleId} className="text-base font-semibold text-slate-900">{title}</h2>
-          {description && <p id={descId} className="mt-1.5 text-sm text-slate-500">{description}</p>}
+          {/* #297: the Move dialog's consequence line updates in place as the target changes
+           * while the dialog stays open — aria-live announces that update to screen reader
+           * users, not just sighted ones watching the text change (F1). Harmless for every
+           * other caller's static description (announced once, same as before). */}
+          {description && <p id={descId} aria-live="polite" className="mt-1.5 text-sm text-slate-500">{description}</p>}
           {children && <div className="mt-3">{children}</div>}
         </div>
         <div className="flex justify-end gap-2 border-t border-hairline px-5 py-3">

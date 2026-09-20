@@ -182,10 +182,10 @@ function PaneMenu({ open, onOpenChange, fullHref, menu, onDeleted }: {
         closes, which happens on the same click that requests this dialog (#259 close-phase fix —
         the dialog previously never rendered because its state died with the menu). */}
     {deleteOpen && ctx?.doc && <DeleteDocumentDialog workspaceId={ctx.doc.workspaceId} fileId={ctx.doc.fileId} documentId={ctx.doc.documentId} filename={ctx.doc.filename}
-      onOpenChange={setDeleteOpen} restoreFocusTo={triggerRef.current}
+      onOpenChange={setDeleteOpen} restoreFocusTo={triggerRef}
       onDeleted={() => { ctx.onMutated?.("removed"); onDeleted?.() }} />}
     {moveOpen && ctx?.doc && <MoveDocumentDialog workspaceId={ctx.doc.workspaceId} documentId={ctx.doc.documentId} filename={ctx.doc.filename} currentType={ctx.doc.currentType}
-      onOpenChange={setMoveOpen} restoreFocusTo={triggerRef.current}
+      onOpenChange={setMoveOpen} restoreFocusTo={triggerRef}
       onMoved={() => ctx.onMutated?.("removed")} />}
   </>
 }

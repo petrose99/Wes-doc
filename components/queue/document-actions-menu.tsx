@@ -170,7 +170,7 @@ export function DeleteDocumentDialog({ workspaceId, fileId, documentId, filename
   onDeleted: () => void
   /** See `ConfirmDialog`'s doc — the trigger button, since this mounts after the popover
    * menu that opened it has already unmounted (#297). */
-  restoreFocusTo?: HTMLElement | null
+  restoreFocusTo?: React.RefObject<HTMLElement | null>
 }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -249,7 +249,7 @@ export function MoveDocumentDialog({ workspaceId, documentId, filename, currentT
   onOpenChange: (open: boolean) => void
   /** See `ConfirmDialog`'s doc — the trigger button, since this mounts after the popover
    * menu that opened it has already unmounted (#297). */
-  restoreFocusTo?: HTMLElement | null
+  restoreFocusTo?: React.RefObject<HTMLElement | null>
   /** Called once the move has actually succeeded — the caller drops the row / refreshes. */
   onMoved: () => void
 }) {
