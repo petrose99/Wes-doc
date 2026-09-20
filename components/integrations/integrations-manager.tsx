@@ -116,7 +116,7 @@ function AccountingConnectionCard({ workspaceId, connection, isOwner, onChanged 
         )}
       </div>
       {isOwner && connection.status === "active" && (
-        <p className="mt-1 text-xs text-slate-600">
+        <p className={connection.lastSyncedAt ? "mt-1 text-xs text-slate-600" : "mt-1 text-xs font-medium text-slate-700"}>
           {connection.lastSyncedAt ? `Accounts last synced ${connection.lastSyncedAt.toLocaleString()}` : "Accounts not yet synced"}
         </p>
       )}
@@ -318,6 +318,7 @@ export function IntegrationsManager({
 
   const connectionsByProvider = new Map(connections.map((c) => [c.provider, c]))
   const anyProviderConfigured = accountingProviders.quickbooks || accountingProviders.xero || accountingProviders.bigcapital
+  const hasAnyConnection = connections.length > 0
 
   return (
     <div className="space-y-10">
@@ -327,9 +328,9 @@ export function IntegrationsManager({
           <CardHeader>
             <CardTitle>Accounting</CardTitle>
             <CardDescription>
-              Connect QuickBooks, Xero or Bigcapital to push a reviewed invoice or receipt as a bill. Already use
-              one of these to run your books? Pick that one — DocuBite posts to whichever you connect, nothing
-              changes which system stays your ledger of record.
+              {hasAnyConnection
+                ? "Push a reviewed invoice or receipt as a bill to your connected system."
+                : "Connect QuickBooks, Xero or Bigcapital to push a reviewed invoice or receipt as a bill. Already use one of these to run your books? Pick that one — DocuBite posts to whichever you connect, nothing changes which system stays your ledger of record."}
             </CardDescription>
           </CardHeader>
           <CardContent>
