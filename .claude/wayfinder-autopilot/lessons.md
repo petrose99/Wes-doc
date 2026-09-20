@@ -44,4 +44,19 @@ What first passes missed *in this codebase* (its shell, tokens, components, seed
   `.current`, and the callee dereferences it inside the effect. · check: `grep -rn "={.*Ref\.current}"
   components/**/*.tsx` for props (not JSX children) passed a live `.current` read.
 - (#285) QueueScreen's pane ⋯ always renders a built-in "Open in a new tab" item (`fullHref`) beside any `paneMenu` items the caller adds — every queue has it. A spec's exact non-owner menu list ("Open Admin only") describes the caller's *added* items; the shell default isn't a spec violation when it's undocumented, since it's present identically on every other queue. → Part B4 primitive-reuse notes should name shell-default menu items once, so a reader doesn't score them against a per-surface spec line that was never meant to cover them.
+- (#270) The spec's `result-gone` state (§3) named the copy but the build wired the standalone
+  document route's `?gone=<id>` redirect param nowhere on Search - `page.tsx` dropped it, so the
+  banner fell back to the empty-query reset instead of "This document is no longer available."
+  Pre-flight's Part B6 called the time-axis edge covered by naming the state, not by checking the
+  param actually crossed the server-client boundary. -> A spec state driven by a URL param needs its
+  own `check:` line naming the param and the file that must read it, not just "state exists in the
+  copy table". check: any spec §3 state with a query param has a matching `searchParams.<name>`
+  read in the route's `page.tsx`.
+- (#270) `queue-empty.tsx`'s shared "filtered" empty-state prop has a default `filteredBody` string
+  ("Clear a filter to widen the queue.") that leaks through unless a caller explicitly overrides it
+  - Search's spec copy table had no such sentence, but the caller passed no `filteredBody` at all,
+  so the shared default rendered as if it were spec'd. -> When wiring a shared empty-state component
+  to a new spec copy table, pass every text prop the component defaults, even to `""`, don't rely on
+  omission matching the spec. check: `grep -n "filteredBody\|done.body"` in a new caller of
+  `queue-empty.tsx` - every prop the component defaults gets an explicit value.
 - (#266, close-phase P1 misattribution) `critique` and `evaluate` both scored a P1 for white text on `#0b8f66` (4.1:1) on the new "Add ‹type›" button, on every one of 24/30 states including pages with no #266 UI. The shipped button (`add-type-button.tsx`) actually uses `#087a54` (5.34:1, passes AA) — `#0b8f66` only exists in two pre-existing, unrelated files (`file-hub-upload-button.tsx`, `install-prompt.tsx`) that never render on these pages; Tailwind's JIT still emits the utility class into the compiled stylesheet, and the in-page detector's contrast check reads it there rather than off a rendered element. → A `low-contrast`/color finding present identically across states that share no visible surface is a stylesheet-scan artifact, not a rendered defect — grep the exact hex across the repo and check which files actually render on the captured pages before scoring it. · check: any color/contrast P0/P1 recurring on ≥80% of states gets one `grep -rln "<hex>"` + a render-path check before it's counted, not after.

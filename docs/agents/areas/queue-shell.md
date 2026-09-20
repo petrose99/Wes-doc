@@ -51,3 +51,20 @@ App-wide five on every state (workspace-avatar palette ×2, Inter overused-font,
 - `components/shell/how-it-works.tsx` (#264): `openHowItWorksDialog()` / `HowItWorksDialog` (mounted in `Sidebar`) is the account-menu item **How DocuBite works** (replaces the old "Show welcome tour again"); below `md` there's no account menu (#252), so `HowItWorksButton` opens it from the Account page instead. Its footer's "Keyboard shortcuts" mention is a real button calling `openKeyboardShortcutsDialog()` (closes itself first) — never leave a cross-reference to another dialog as inert text.
 - `"/workspaces/[workspaceId]/search/page.tsx"`: no longer redirects to the workspace root when `q` is empty (only `ask=1` with no `q` does) — the `/` shortcut needs to land on an empty, focused search page.
 - Dev-server gotcha: a **cold** `next dev` compiles each route on first hit (took 50s+ for the very first request in this session); a keyboard probe that navigates through routes never hit yet will show false no-ops. Warm every route with a `curl` first, or run the capture round twice and trust the second pass.
+
+## Search (#270)
+- `app/(app)/workspaces/[workspaceId]/search/page.tsx` + `search-client.tsx`: the one cross-type
+  destination (no per-type "Contracts" list); reuses `QueueScreen`/`QueueCard`/`QueueColumn`
+  unchanged, plus a Status-facet component (new, generic, shared — wired into the five typed queues'
+  Closed-facet retrofit by #344) and a Popover-based `?` syntax-help affordance (existing Popover
+  primitive).
+- `page.tsx` reads `?gone=<id>` (set by the standalone document route's `goneOrNotFound` redirect,
+  same as every other queue's origin-strip "gone" case) and passes `initialGone` → `initialMissing`
+  on `search-client.tsx` for the "This document is no longer available." banner. A spec state driven
+  by a query param needs the `page.tsx` read named explicitly — don't assume "the state is in the
+  copy table" means the param is wired.
+- Zero-results: `queue-empty.tsx`'s `filtered` empty passes `filteredBody: ""` explicitly — the
+  component's own default (`"Clear a filter to widen the queue."`) is not part of Search's spec copy
+  and leaks through if a caller omits the prop rather than overriding it.
+- Chip syntax (`type:`, `vendor:`, etc.) degrades safely on malformed input (falls back to plain-text
+  match); no destructive action on this read-mostly surface.
