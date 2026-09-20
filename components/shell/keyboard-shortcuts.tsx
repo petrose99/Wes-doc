@@ -11,7 +11,7 @@ export type ShortcutDestination = { key: string; label: string; href: string }
 
 /** Rail-order destinations for the `g ‹letter›` jumps and the dialog's "Go to" group (spec §2,
  * §3.5). One letter, one landing — an item not on the rail today has no key. */
-export const SHORTCUT_DESTINATIONS = (workspaceId: string, adminHref: string): ShortcutDestination[] => {
+export const SHORTCUT_DESTINATIONS = (workspaceId: string, adminHref: string, accountingHref?: string): ShortcutDestination[] => {
   const base = `/workspaces/${workspaceId}`
   return [
     { key: "i", label: "Invoices", href: `${base}/invoices` },
@@ -21,6 +21,9 @@ export const SHORTCUT_DESTINATIONS = (workspaceId: string, adminHref: string): S
     { key: "e", label: "Exceptions", href: `${base}/exceptions` },
     { key: "a", label: "Approvals (Invoices)", href: `${base}/approvals/invoices` },
     { key: "y", label: "Payments (Bill Pay)", href: `${base}/payments/bill-pay` },
+    // #342 §2: "Accounting" only when the deployment has a provider enabled — no key claimed
+    // otherwise, matching "an item not on the rail today has no key" above.
+    ...(accountingHref ? [{ key: "c", label: "Accounting", href: accountingHref }] : []),
     { key: "d", label: "Admin", href: adminHref },
   ]
 }

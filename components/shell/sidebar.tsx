@@ -10,7 +10,7 @@ import { BiteMark } from "@/components/marketing/logo"
 import { WorkspacePulse } from "@/components/shell/workspace-pulse"
 import { MODULES } from "@/lib/modules"
 import { isUnpluggedPath } from "@/lib/unplugged"
-import { AlertTriangle, BadgeCheck, Banknote, CheckCircle2, ClipboardCheck, Files, HeartPulse, History, Landmark, Library, PanelLeftClose, PanelLeftOpen, Percent, Receipt, Search, Settings, Wallet, Workflow, Zap } from "lucide-react"
+import { AlertTriangle, BadgeCheck, Banknote, CheckCircle2, ClipboardCheck, Files, HeartPulse, Landmark, Library, PanelLeftClose, PanelLeftOpen, Percent, Receipt, Search, Settings, Wallet, Workflow, Zap } from "lucide-react"
 import { adminPaths } from "@/lib/admin/paths"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -41,8 +41,11 @@ const ICONS: Record<string, typeof Files> = {
  * promise the label keeps. When every primary is quiet the label drops one notch and a "you're
  * caught up" line takes over, so an empty rail reads as a win rather than a vacuum.
  *
- * Four typed intake destinations sit in two peer pairs, followed by Exceptions, Payments, Finance
- * and Archive. Controls left the spine on #231 (#252): its pages are Admin's now. There is no Dashboard entry: the workspace home is the Invoices queue (#238), and
+ * Four typed intake destinations sit in two peer pairs, followed by Exceptions, Approvals,
+ * Payments and Accounting (#342 §2, reversing #282's "no rail item" clause — routes into #329's
+ * connector picker inside Admin › Integrations). Archive and Admin sit in the bottom group
+ * (#342 §1: Archive is the permanent record, not today's work). Controls left the spine on #231
+ * (#252): its pages are Admin's now. There is no Dashboard entry: the workspace home is the Invoices queue (#238), and
  * the logo goes there. The entries keep identical weight and badge treatment; a hairline break
  * separates the matching pair from the receipts/reconciliation pair without adding another
  * caption to the rail.
@@ -153,25 +156,29 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
   // #229 Q9 (#251): one rail item, Payments, after Exceptions (after Approvals, #236); two queues behind it, Bill Pay and Payment Batches. Badge = the
   // batches pending approval — the one number that is somebody's work.
   const paymentsItem = { href: `${base}/payments/bill-pay`, label: "Payments", icon: Banknote, exact: false, badge: batchesPendingApprovalCount > 0 ? batchesPendingApprovalCount : undefined }
+  // #342 §2 (execution of #291): Accounting reverses #282's "no rail item" clause — the badge
+  // reuses financePushableCount (prop name kept for API stability; every user-facing reference is
+  // Accounting now), destination is #329's connector picker inside Admin › Integrations.
+  const accountingItem = { href: adminPaths(workspaceId).integrations, label: "Accounting", icon: Landmark, exact: false, badge: financePushableCount > 0 ? financePushableCount : undefined }
   const primaryItems = [
     exceptionsItem,
     approvalsItem,
     paymentsItem,
-    ...(accountingEnabled ? [{ href: `${base}/finance`, label: "Finance", icon: Landmark, exact: false, badge: financePushableCount > 0 ? financePushableCount : undefined }] : []),
-    // "Archive" is the accountant's own word for the permanent source-document record (Dext and
-    // Hubdoc both name this surface Archive). Route stays /library — same label-over-URL stance
-    // as Controls (/automation) and Finance's /accounting redirect.
-    { href: `${base}/library`, label: "Archive", icon: Library, exact: false, tourTarget: "library" as const },
+    ...(accountingEnabled ? [accountingItem] : []),
   ]
 
   // Secondary destinations: per-workspace module extras only. Under a hairline, no caption — the
   // divider is the sectioning.
   const secondaryItems = otherModuleItems
 
-  // #231 Q9 (#252): one rail item, Admin, last — Settings and Controls fold into it.
+  // #342 §1: Archive leaves "Today" — it's the permanent record, not today's work — and joins the
+  // bottom group above Admin. #342 §3: Activity and Health Checks move into Admin's own nav
+  // (admin/layout.tsx); Admin is last, always-labelled (navLink's alwaysLabelled).
   const bottomItems = [
-    { href: `${base}/activity`, label: "Activity", icon: History, exact: false },
-    { href: `${base}/health`, label: "Health Checks", icon: HeartPulse, exact: false },
+    // "Archive" is the accountant's own word for the permanent source-document record (Dext and
+    // Hubdoc both name this surface Archive). Route stays /library — same label-over-URL stance
+    // as Controls (/automation) and Finance's /accounting redirect.
+    { href: `${base}/library`, label: "Archive", icon: Library, exact: false, tourTarget: "library" as const },
     { href: adminPaths(workspaceId).configuration, label: "Admin", icon: Settings, exact: false },
   ]
 
@@ -183,7 +190,10 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
   const isActive = (item: { href: string; label: string; exact: boolean }) => item.exact
     ? pathname === item.href
     : pathname === item.href || pathname.startsWith(`${item.href}/`)
-      || (item.label === "Admin" && (pathname.startsWith(`${base}/admin`) || pathname.startsWith(`${base}/settings`) || pathname.startsWith(`${base}/automation`)))
+      // #342 §2/§5: Accounting's own href is inside /admin — it wins that one prefix (checked
+      // first below via the plain href match) so Admin's broader match excludes it here. Folded
+      // into the generic matchPrefixes reduce at §5; this is the minimal fix for §1's reorder.
+      || (item.label === "Admin" && !pathname.startsWith(adminPaths(workspaceId).integrations) && (pathname.startsWith(`${base}/admin`) || pathname.startsWith(`${base}/settings`) || pathname.startsWith(`${base}/automation`)))
       // Ingestion and review are still reachable through the typed destinations. Keep the first
       // destination lit for those legacy/generic work surfaces until their queues are migrated.
       || (item.label === "Invoices" && (pathname.startsWith(`${base}/pipeline`) || pathname.startsWith(`${base}/documents`) || pathname.startsWith(`${base}/review`) || pathname.startsWith(`${base}/bills`)))
@@ -193,8 +203,8 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
       || (item.label === "Bank Statements" && pathname.startsWith(`${base}/bank-statements`))
       || (item.label === "Payments" && pathname.startsWith(`${base}/payments`))
       || (item.label === "Approvals" && pathname.startsWith(`${base}/approvals`))
-      // Finance keeps its rail lit on the legacy /accounting URL too, which redirects here.
-      || (item.label === "Finance" && pathname.startsWith(`${base}/accounting`))
+      // Accounting keeps its rail lit on the legacy /accounting URL too, which redirects here.
+      || (item.label === "Accounting" && pathname.startsWith(`${base}/accounting`))
 
   // In the compact rail every label is hidden until the rail expands (hover / focus-within /
   // pin), and the link keeps a `title` so a hover over the icon alone still names it. The badge
@@ -208,7 +218,7 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
   // #262: collapsed-rail tooltip carries the `g` jump key beside the label (H6 recognition — the
   // dialog is the source of truth, this is a hint). Only the eight destinations the shortcut
   // listener actually registers get one.
-  const SHORTCUT_KEY_BY_LABEL: Record<string, string> = { Invoices: "i", "Purchase Orders": "p", Receipts: "r", "Bank Statements": "b", Exceptions: "e", Approvals: "a", Payments: "y", Admin: "d" }
+  const SHORTCUT_KEY_BY_LABEL: Record<string, string> = { Invoices: "i", "Purchase Orders": "p", Receipts: "r", "Bank Statements": "b", Exceptions: "e", Approvals: "a", Payments: "y", Accounting: "c", Admin: "d" }
   const navLink = (item: { href: string; label: string; icon: typeof Files; exact: boolean; badge?: number; tourTarget?: string }) => {
     const active = isActive(item)
     const shortcutKey = SHORTCUT_KEY_BY_LABEL[item.label]
@@ -294,7 +304,7 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
       <AccountMenu name={user.name} email={user.email} collapsed={compact} workspaceId={workspaceId} approvalEmails={user.approvalEmails ?? true} />
     </div>
   </div>
-  <KeyboardShortcuts destinations={SHORTCUT_DESTINATIONS(workspaceId, adminPaths(workspaceId).configuration)} />
+  <KeyboardShortcuts destinations={SHORTCUT_DESTINATIONS(workspaceId, adminPaths(workspaceId).configuration, accountingEnabled ? adminPaths(workspaceId).integrations : undefined)} />
   <HowItWorksDialog inboundAddress={inboundAddress} />
   <ApprovalEmailsDialog workspaceId={workspaceId} initial={user.approvalEmails ?? true} />
   </aside>
