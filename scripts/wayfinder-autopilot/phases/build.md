@@ -13,8 +13,15 @@ fixing findings as they appear. Run its check and the affected tests
 (`vitest <paths>`; never the full suite here). Mark the step `done` on the
 hand-off — flip `todo` to `done` on the step line, update `## Next step`,
 and nothing else (no notes under the step; what you verified goes in the
-commit message) — commit (`wip(autopilot): #<ticket> build step N`), and
-stop — the next step is the next session's, in a fresh context.
+commit message) — commit (`wip(autopilot): #<ticket> build step N`).
+
+**Then read the context meter before stopping.** `cat "$WAYFINDER_CTX_FILE"`
+prints `<tokens> <hand-off line>`. If tokens are under **55000** and the
+next `todo` step is a numbered one (not G1–G3), build it now, in this
+session, the same way — re-orientation from a fresh context costs ~1.4M
+billed tokens and ~40 turns per session on #270, more than a small step
+itself. Otherwise stop: the next step is the next session's. Never start a
+step past 55K, never start a gate step after a numbered one.
 
 **Ponytail's ladder governs the code, the spec governs the scope.** The
 session starts with the ponytail ruleset (YAGNI, reuse before write, one
@@ -33,7 +40,12 @@ they show is fixed in place.
 gate as a single step ran 66 minutes and crossed the hand-off line; as
 three it fits. The plan ends with:
 
-- `step: G1 — round script` — seed and servers up in one call; write the
+- `step: G1 — round script` — servers up **only** the way the area
+  primer's *Seed, dev server, capture* lines say (`node
+  .impeccable/live/dev.mjs start|stop|status`, `node
+  .impeccable/live/livesrv257.mjs`, the seed script it names) — never
+  `npm run dev`, `nohup`, `setsid` or a background call, the hook refuses
+  them and #270's G1 lost 20 turns finding this out; write the
   ticket's round script on `scripts/wayfinder-autopilot/capture-round.mjs`:
   every state at **both 1440 and 390**, detector JSON, and a keyboard probe
   for every Part B focus/keyboard contract (a B line is ticked only by a

@@ -98,6 +98,8 @@ if tool == "Bash":
     if inp.get("run_in_background"):
         deny("NO BACKGROUND COMMANDS: a headless session ends the moment a turn has no tool call, and everything it started dies with it. Run this in the foreground (`timeout` up to 600000 ms) and read its result in the same turn; a long capture round is one foreground call, not a wait.")
     if is_router(c): deny(ROUTER)
+    if re.search(r"(npm run dev|next dev|pnpm dev|yarn dev)\b", c) or re.search(r"\b(nohup|setsid|disown)\b", c) or re.search(r"&\s*$", c.strip()):
+        deny("DEV SERVER: start and stop it only through the area primer's recipe — `node .impeccable/live/dev.mjs start|stop|status` (heap-capped, pid-filed) and `node .impeccable/live/livesrv257.mjs` for the in-page detector (kill its pid at the end). `npm run dev`, nohup, setsid, disown and trailing `&` all die with the turn or hang it.")
     closing_bar(c)
     if hand and re.search(r"\bgit\b[^|;&]*\bcommit\b", c):
         n = handoff_lines()

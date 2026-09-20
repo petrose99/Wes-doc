@@ -334,7 +334,7 @@ while [ "$n" -lt "$MAX" ]; do
 **This session's phase: SPEC** (1 of 4) — the phase brief above is the instruction set. Exit line: \`milestone: spec-done\`, commit \`wip(autopilot): #$T spec\`, stop." ;;
     build)   CONT="$CONT
 
-**This session's phase: BUILD** (2 of 4) — one plan step, per the phase brief above. Exit: mark the step \`done\`, commit \`wip(autopilot): #$T build step N\`, stop; after the build gate, \`milestone: build-done\`." ;;
+**This session's phase: BUILD** (2 of 4) — plan steps, per the phase brief above: build the first \`todo\` step, mark it \`done\`, commit \`wip(autopilot): #$T build step N\`; then \`cat \"\$WAYFINDER_CTX_FILE\"\` — under 55K and the next step numbered, build that one too; otherwise stop. No report in this phase. After the build gate, \`milestone: build-done\`." ;;
     measure) CONT="$CONT
 
 **This session's phase: MEASURE** (3 of 4) — per the phase brief above. No fixes. Exit line: \`milestone: measured\`, commit \`wip(autopilot): #$T measured\`, stop." ;;
@@ -639,7 +639,7 @@ PY
     # release the claim so the retry (or a human) can take it
     gh issue edit "$T" --repo "$REPO" --remove-assignee "$ME" >/dev/null 2>&1 || true
   fi
-  [ -f "$OUT/$T.md" ] || OUTCOME="$OUTCOME, no report"
+  case "${PHASE:-single}" in build|measure) ;; *) [ -f "$OUT/$T.md" ] || OUTCOME="$OUTCOME, no report" ;; esac
   if [ "$(state "$T")" != "closed" ] && { [ ! -f "$OUT/$T.handoff.md" ] || [ "$(stat -c %Y "$OUT/$T.handoff.md")" -lt "$S0" ]; }; then OUTCOME="$OUTCOME, hand-off not updated"; fi
   HL=$(wc -l < "$OUT/$T.handoff.md" 2>/dev/null || echo 0); [ "${HL:-0}" -gt "${WAYFINDER_HANDOFF_MAX_LINES:-120}" ] && OUTCOME="$OUTCOME, hand-off $HL lines (limit ${WAYFINDER_HANDOFF_MAX_LINES:-120})"
   # Duration cell also carries the load: tokens on the first turn before any

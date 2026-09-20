@@ -34,6 +34,8 @@ scores: predicted-critique=<n> first-critique=<n> close-critique=<n> first-evalu
 <anything deferred: removals, credentials, decisions you were unsure about>
 ```
 
-A build or measure session appends a short "## Session <n> (<phase>)" section
-to the existing report instead of rewriting it: the steps taken, the commit,
-and any counts it produced. The `scores:` line is written once, at close.
+Build and measure sessions do not touch the report — their record is the
+commit message and the hand-off. The close session writes the whole report
+once, with a "## Sessions" list built from `git log` (one line per
+`wip(autopilot)` commit: hash, step, what the body says was checked) and
+the `scores:` line.

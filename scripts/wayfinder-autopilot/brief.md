@@ -115,11 +115,16 @@ denied call returns the reason — do what it says, never retry it.
 - **Hand off at a milestone when context is high**: a fresh session resumes
   at a sixth of the cost of continuing past 150K.
 
-## Report (mandatory) and a clean machine
+## Report (close and single sessions only) and a clean machine
 
-Before ending, write the report at the path under *This run* — format in
-`scripts/wayfinder-autopilot/report.md`, read once at the end — and commit
-it with your work (or alone: `docs(wayfinder): autopilot report for
+A build or measure session writes **no report**: its record is the commit
+message (what was built, what was checked) and the hand-off's step line —
+on #270 the per-session report append cost 6–12 turns at 60–100K context
+each and repeated the commit body. The close session (or a single-session
+ticket) writes the report at the path under *This run* — format in
+`scripts/wayfinder-autopilot/report.md`, read once at the end — building
+the session history from `git log --format='%h %s%n%b' -- <ticket files>`
+and the run log, and commits it (`docs(wayfinder): autopilot report for
 #<ticket>`). Factual: what happened. Then stop everything you started —
 dev server, headless Chromium, `impeccable live`, watchers — so the next
 session starts clean.
