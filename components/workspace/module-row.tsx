@@ -2,6 +2,7 @@
 
 import { disableModuleAction, enableModuleAction, requestModuleAction } from "@/app/(app)/workspaces/[workspaceId]/module-actions"
 import { Button } from "@/components/ui/button"
+import { Switch } from "@/components/ui/switch"
 import { useState, useTransition } from "react"
 import { toast } from "sonner"
 
@@ -28,9 +29,8 @@ export function ModuleRow({ workspaceId, moduleKey, name, description, kind, ena
   const [pending, startTransition] = useTransition()
   const [announce, setAnnounce] = useState("")
 
-  const toggle = () => {
+  const toggle = (next: boolean) => {
     if (!owner) return
-    const next = !checked
     setChecked(next)
     startTransition(async () => {
       const result = next ? await enableModuleAction(workspaceId, moduleKey) : await disableModuleAction(workspaceId, moduleKey)
@@ -61,10 +61,7 @@ export function ModuleRow({ workspaceId, moduleKey, name, description, kind, ena
       <span aria-live="polite" className={`text-xs ${announce.startsWith("Couldn't") ? "text-red-700" : "text-emerald-800"}`}>{announce}</span>
       {owner
         ? (kind === "default" || activation === "enable"
-          ? <button type="button" role="switch" aria-checked={checked} aria-label={name} aria-busy={pending || undefined} disabled={pending} onClick={toggle}
-              className={`min-w-[3.25rem] rounded-full px-2.5 py-1 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 ${checked ? "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-700/15" : "bg-slate-100 text-slate-700"}`}>
-              {checked ? "On" : "Off"}
-            </button>
+          ? <Switch checked={checked} onCheckedChange={toggle} label={name} busy={pending} />
           : <span className="text-xs text-slate-600">Request-only</span>)
         : (activation === "request"
           ? <Button size="sm" variant="outline" disabled={pending || requested} onClick={request}>{requested ? "Requested" : "Request"}</Button>
