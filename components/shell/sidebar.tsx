@@ -10,7 +10,7 @@ import { BiteMark } from "@/components/marketing/logo"
 import { WorkspacePulse } from "@/components/shell/workspace-pulse"
 import { MODULES } from "@/lib/modules"
 import { isUnpluggedPath } from "@/lib/unplugged"
-import { AlertTriangle, BadgeCheck, Banknote, CheckCircle2, ClipboardCheck, Files, HeartPulse, History, Landmark, Library, PanelLeftClose, PanelLeftOpen, Percent, Receipt, Settings, Wallet, Workflow, Zap } from "lucide-react"
+import { AlertTriangle, BadgeCheck, Banknote, CheckCircle2, ClipboardCheck, Files, HeartPulse, History, Landmark, Library, PanelLeftClose, PanelLeftOpen, Percent, Receipt, Search, Settings, Wallet, Workflow, Zap } from "lucide-react"
 import { adminPaths } from "@/lib/admin/paths"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -130,6 +130,10 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
   // by weight/badge treatment, not paired with any of them since it has no document-type sibling
   // and cuts across all four), then Controls (their governing levers), Finance (booked outcome),
   // and Archive (the permanent record everything lands in) closing the group.
+  // #270: Search sits above the typed group — its own predicate spans every document, typed or
+  // not, so it isn't paired with either pair below it. `/` is its own shortcut (#262); no `g`
+  // letter is reserved for it.
+  const searchItem = { href: `${base}/search`, label: "Search", icon: Search, exact: false }
   const typedDestinationGroups = [
     [
       { href: `${base}/invoices`, label: "Invoices", icon: Receipt, exact: false },
@@ -246,16 +250,20 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
         // report status rather than list themselves — the destinations are still reachable, but
         // now they show a heartbeat too. Secondary items collapse to a small icon strip below the
         // pulse; bottom items stay in the same position on the rail.
-        <WorkspacePulse
-          workspaceId={workspaceId}
-          documentsCount={pipelineReviewCount}
-          financeCount={financePushableCount}
-          accountingEnabled={accountingEnabled}
-        />
+        <>
+          <div className="space-y-0.5">{navLink(searchItem)}</div>
+          <WorkspacePulse
+            workspaceId={workspaceId}
+            documentsCount={pipelineReviewCount}
+            financeCount={financePushableCount}
+            accountingEnabled={accountingEnabled}
+          />
+        </>
       ) : (
         <>
           {todayLabel}
           <div className="space-y-1">
+            <div className="space-y-0.5">{navLink(searchItem)}</div>
             {typedDestinationGroups.map((group, index) => (
               <div key={index} role="group" aria-label={index === 0 ? "Invoices and purchase orders" : "Receipts and bank statements"} className={index === 1 ? "border-t border-slate-200/80 pt-1" : "space-y-0.5"}>
                 {group.map(navLink)}

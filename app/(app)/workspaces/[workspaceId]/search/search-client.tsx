@@ -1,25 +1,26 @@
 "use client"
 
 import { globalSearchAction, type GlobalSearchResult } from "@/app/(app)/workspaces/[workspaceId]/search-actions"
-import { AssistantPanel } from "@/components/assistant/assistant-panel"
+import { getQueueDetailAction } from "@/app/(app)/workspaces/[workspaceId]/queue-actions"
 import type { SearchResultItem } from "@/lib/global-search"
-import { documentDestinationPath, originLabel, withOrigin } from "@/lib/navigation/origin"
-import { useOriginHere } from "@/components/documents/po-compare"
-import { FileText, Loader2, Search, Sparkles } from "lucide-react"
-import Link from "next/link"
+import { QueueScreen, type QueueColumn } from "@/components/queue/queue-screen"
+import { Search } from "lucide-react"
 import { useEffect, useRef, useState, useTransition } from "react"
 
-export function SearchPageClient({ workspaceId, initialQuery, askMode = false }: {
+/** #270: Search rebuilt on the Queue-screen shell (#225), replacing the standalone box+list page
+ * built for #262's `/` key. The predicate/columns/facets here are a step-1 skeleton — #270's
+ * later steps replace them with the every-document predicate, real columns and facets, and the
+ * empty/zero-result/slow states (spec.md §1–3). Ask AI/Sparkles/AssistantPanel are retired from
+ * this page per #245 decision 7 ("One box, one mode") — no replacement for them here.
+ */
+export function SearchPageClient({ workspaceId, initialQuery }: {
   workspaceId: string
   initialQuery: string
-  askMode?: boolean
 }) {
   const [query, setQuery] = useState(initialQuery)
   const [result, setResult] = useState<GlobalSearchResult | null>(null)
   const [searching, startSearch] = useTransition()
-  const [showAssistant, setShowAssistant] = useState(askMode)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const nullRef = useRef(null)
 
   // #262: arrival from the `/` shortcut — the input already autofocuses on mount, this only
   // matters when the operator was already on this page and pressed `/` again.
@@ -42,95 +43,45 @@ export function SearchPageClient({ workspaceId, initialQuery, askMode = false }:
     return () => { if (timerRef.current) clearTimeout(timerRef.current) }
   }, [workspaceId, query])
 
-  const base = `/workspaces/${workspaceId}`
+  const basePath = `/workspaces/${workspaceId}/search`
+  const rows = result?.items ?? []
+
+  // Step-1 skeleton columns — step 2 replaces these with the spec's real column set (mark, Type,
+  // Supplier, Number, Date, Amount, Ledger mark).
+  const columns: QueueColumn<SearchResultItem>[] = [
+    { key: "filename", label: "Document", phone: "title", render: (item) => item.filename },
+    { key: "supplier", label: "Supplier", render: (item) => item.supplier ?? "—" },
+    { key: "date", label: "Date", render: (item) => item.date ?? "—" },
+    { key: "total", label: "Amount", render: (item) => item.total ?? "—" },
+  ]
 
   return (
-    <div className="flex h-full">
-      <div className={`mx-auto max-w-3xl flex-1 px-6 py-8 ${showAssistant ? "mr-0" : ""}`}>
-        <div className="mb-6 flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm focus-within:border-emerald-300 focus-within:ring-2 focus-within:ring-emerald-100">
-          <Search className="h-5 w-5 shrink-0 text-slate-400" aria-hidden="true" />
+    <QueueScreen<SearchResultItem>
+      title="Search"
+      basePath={basePath}
+      rows={rows}
+      rowId={(item) => item.id}
+      detailIdFor={(item) => item.documentId}
+      rowName={(item) => ({ title: item.filename })}
+      columns={columns}
+      views={
+        <span className="inline-flex h-9 w-full max-w-xl flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 shadow-sm focus-within:border-emerald-300 focus-within:ring-2 focus-within:ring-emerald-100">
+          <Search className="h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
           <label htmlFor="search-input" className="sr-only">Search documents</label>
           <input
             id="search-input"
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search documents..."
-            className="flex-1 bg-transparent text-base outline-none"
+            placeholder="Search by supplier, number, amount or any words on the page"
+            className="flex-1 bg-transparent text-sm outline-none"
             autoFocus
           />
-          {searching && <Loader2 className="h-5 w-5 animate-spin text-slate-400" />}
-          {!showAssistant && (
-            <button
-              onClick={() => setShowAssistant(true)}
-              className="inline-flex items-center gap-1.5 rounded-md bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100"
-            >
-              <Sparkles className="h-3.5 w-3.5" />
-              Ask AI
-            </button>
-          )}
-        </div>
-
-        {result && result.items.length === 0 && (
-          <p className="py-12 text-center text-sm text-slate-400">No results for &ldquo;{query}&rdquo;</p>
-        )}
-
-        {result && result.items.length > 0 && (
-          <div className="space-y-1">
-            {result.items.map((item) => (
-              <ResultRow key={item.id} item={item} base={base} />
-            ))}
-          </div>
-        )}
-      </div>
-
-      {showAssistant && (
-        <AssistantPanel
-          workspaceId={workspaceId}
-          apiRef={nullRef}
-          onClose={() => setShowAssistant(false)}
-          documentSearchEnabled
-          surface="dictation"
-          title="Ask about documents"
-          initialMessage={askMode ? query : undefined}
-          className="flex w-80 shrink-0 flex-col border-l bg-slate-50"
-        />
-      )}
-    </div>
-  )
-}
-
-function ResultRow({ item, base }: { item: SearchResultItem; base: string }) {
-  // #268 H-d: the hop goes through the legacy document route (which forwards `page` and `from`
-  // to the typed queue) and carries this search as its origin — never the removed `/pipeline`.
-  const here = useOriginHere()
-  const target = `${base}/documents/${item.documentId}${item.type === "snippet" && item.page != null ? `?page=${item.page}` : ""}`
-  const href = withOrigin(target, here)
-  const queueLabel = item.docType ? originLabel(documentDestinationPath(base, { id: item.documentId, docType: item.docType })) : null
-  const name = queueLabel ? `Open ${item.filename} on ${queueLabel}` : `Open ${item.filename}`
-
-  return (
-    <Link href={href} aria-label={name} className="flex items-start gap-3 rounded-lg px-3 py-3 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600">
-      <FileText className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
-      <div className="min-w-0 flex-1">
-        <div className="flex items-baseline gap-2">
-          <span className="truncate text-sm font-medium text-slate-800">{item.filename}</span>
-          {item.page != null && (
-            <span className="shrink-0 text-[10px] text-slate-400">p.{item.page}</span>
-          )}
-          <span className="ml-auto shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-400">
-            {item.type === "document" ? "doc" : "passage"}
-          </span>
-        </div>
-        <div className="flex gap-2 text-xs text-slate-400">
-          {item.supplier && <span>{item.supplier}</span>}
-          {item.total && <span>{item.total}</span>}
-          {item.date && <span>{item.date}</span>}
-        </div>
-        {item.snippet && (
-          <p className="mt-1 line-clamp-2 text-xs text-slate-500">{item.snippet}</p>
-        )}
-      </div>
-    </Link>
+          {searching && <span className="sr-only" role="status">Searching…</span>}
+        </span>
+      }
+      empty={{ firstUse: { title: "Search your documents.", body: "Search by supplier, number, amount or any words on the page." } }}
+      loadDetail={(documentId) => getQueueDetailAction(workspaceId, documentId)}
+    />
   )
 }

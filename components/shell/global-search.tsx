@@ -3,7 +3,7 @@
 import { globalSearchAction, type GlobalSearchResult } from "@/app/(app)/workspaces/[workspaceId]/search-actions"
 import type { SearchResultItem } from "@/lib/global-search"
 import { documentDestinationPath } from "@/lib/typed-destinations"
-import { FileText, Loader2, Search, Sparkles, X } from "lucide-react"
+import { FileText, Loader2, Search, X } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useCallback, useEffect, useRef, useState } from "react"
@@ -173,16 +173,10 @@ export function GlobalSearch({ workspaceId }: { workspaceId: string }) {
               {result ? `${result.total} result${result.total === 1 ? "" : "s"}` : ""}
             </span>
             {query.trim() && (
-              <>
-                <button
-                  onClick={() => { close(); router.push(`/workspaces/${workspaceId}/search?q=${encodeURIComponent(query)}`) }}
-                  className="font-medium text-slate-500 hover:text-slate-700"
-                >See all</button>
-                <button
-                  onClick={() => { close(); router.push(`/workspaces/${workspaceId}/search?q=${encodeURIComponent(query)}&ask=1`) }}
-                  className="inline-flex items-center gap-1 font-medium text-emerald-600 hover:text-emerald-700"
-                ><Sparkles className="h-3 w-3" />Ask AI</button>
-              </>
+              <button
+                onClick={() => { close(); router.push(`/workspaces/${workspaceId}/search?q=${encodeURIComponent(query)}`) }}
+                className="font-medium text-slate-500 hover:text-slate-700"
+              >See all</button>
             )}
           </div>
           <span>
