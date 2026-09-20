@@ -88,7 +88,13 @@ body-text-viewport-edge.*57-char
 em-dash-overuse
 clipped-overflow-container.*md:overflow-hidden
 text-overflow.*h2.*truncate
+text-overflow.*span\.truncate
 ```
+
+#347 adds one: `text-overflow — span.truncate overflows its box by 38px` at 1440, on
+`components/queue/connection-band.tsx`'s "OPEN INVOICES BY AGE" status label (`span.truncate` at
+line 24) — pre-existing since #281, present on every Bill Pay queue state including the untouched
+bill list, out of `components/payments`.
 
 ## Seed, dev server, capture
 Same dev workspace/DB/server recipe as Approvals (`docs/agents/areas/approvals.md`). Capture:
