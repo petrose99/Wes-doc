@@ -38,7 +38,7 @@ export type BillPayBillRow = {
 // bill-pay-queue.tsx can read the copy without pulling Prisma into the browser bundle.
 export type { ClaimEligibilityReason, ClaimEligibility } from "@/lib/payments/eligibility"
 export { CLAIM_ELIGIBILITY_COPY } from "@/lib/payments/eligibility"
-import type { ClaimEligibilityReason, ClaimEligibility } from "@/lib/payments/eligibility"
+import type { ClaimEligibility } from "@/lib/payments/eligibility"
 
 /** #295: a reimbursement claim on the same queue as bills — no terms, no discount, no aging (its
  * Due is the approval date, not a countdown). Eligible once approved with a frozen total, a

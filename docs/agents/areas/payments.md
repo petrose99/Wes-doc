@@ -44,12 +44,22 @@ spawned as #347; the row/bulk-bar name the gap in place rather than hiding it. `
 has no `payFrom` (no `BillPayPreference` for an `ExpenseClaim`) — the Pay From cell renders "—"
 for a claim row, a disclosed model gap, not a fake value.
 
+`claim-card.tsx`'s "unpaid" status line branches on `DocumentClaimFacts.paymentEligibility`
+(`lib/claims/facts.ts`, populated by `buildClaimFacts` for approved claims) — the same
+`claimPaymentEligibility` check `BillPayClaimRow.eligibility` (`models/bill-pay.ts`) already ran
+for the row subtitle, one function. Ineligible prints `CLAIM_ELIGIBILITY_COPY[reason]` (amber,
+e.g. "Needs bank details") instead of "Ready to pay" (emerald) — fixes a self-contradiction
+(status line vs. CTA) only visible once the seed-approval-event fix below made the line render.
+
 ## Detector residue (report, do not chase)
 App-wide four (`ai-color-palette`, `overused-font`, `layout-transition`, `dark-glow`), plus a
 pre-existing (shipped by #251, unmodified by #296, just newly reachable via the Approved-origin
 reject flow) `body-text-viewport-edge` flag on the terminal-status footer `<p>` in
 `batch-queue.tsx` at 390px — the "Rejected {date}. Its invoices are back on Bill Pay." (and
-Paid/Waiting equivalents) footer line.
+Paid/Waiting equivalents) footer line. #331 adds three more, all pre-existing and named in
+`queue-shell.md`/`detail-pane.md` for other queues: `clipped-overflow-container` (queue-shell
+scroll scaffolding), `em-dash-overuse` (queue's "—" empty-cell placeholder), `text-overflow`
+(pane-title `h2` truncate at 390px).
 
 ```residue
 ai-color-palette
@@ -57,6 +67,9 @@ overused-font
 layout-transition
 dark-glow
 body-text-viewport-edge.*57-char
+em-dash-overuse
+clipped-overflow-container.*md:overflow-hidden
+text-overflow.*h2.*truncate
 ```
 
 ## Seed, dev server, capture
