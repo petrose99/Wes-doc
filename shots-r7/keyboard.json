@@ -1,0 +1,182 @@
+[
+  {
+    "state": "invoices-add-button-visibility-1440",
+    "ok": true,
+    "reason": "Add button must render md+",
+    "seq": [
+      "visible=true"
+    ]
+  },
+  {
+    "state": "invoices-dialog-open-focus-1440",
+    "ok": true,
+    "reason": "initialFocus should land on the type select",
+    "seq": [
+      "add-documents-type"
+    ]
+  },
+  {
+    "state": "invoices-refused-format-1440",
+    "ok": true,
+    "reason": "rejected file must not stage, error must show",
+    "seq": [
+      "rows=0",
+      "errorShown=true"
+    ]
+  },
+  {
+    "state": "invoices-uploading-locked-1440",
+    "ok": true,
+    "reason": "Esc must not close while uploading",
+    "seq": [
+      "dialogVisible=true"
+    ]
+  },
+  {
+    "state": "invoices-done-state-1440",
+    "ok": true,
+    "reason": "row settling should reach Done state within 6s",
+    "seq": [
+      "doneVisible=true"
+    ]
+  },
+  {
+    "state": "invoices-done-focus-return-1440",
+    "ok": true,
+    "reason": "focus returns to opener on close, never body",
+    "seq": [
+      "button:Add invoices"
+    ]
+  },
+  {
+    "state": "purchase-orders-add-button-visibility-1440",
+    "ok": true,
+    "reason": "Add button must render md+",
+    "seq": [
+      "visible=true"
+    ]
+  },
+  {
+    "state": "purchase-orders-dialog-open-focus-1440",
+    "ok": true,
+    "reason": "initialFocus should land on the type select",
+    "seq": [
+      "add-documents-type"
+    ]
+  },
+  {
+    "state": "purchase-orders-refused-format-1440",
+    "ok": true,
+    "reason": "rejected file must not stage, error must show",
+    "seq": [
+      "rows=0",
+      "errorShown=true"
+    ]
+  },
+  {
+    "state": "receipts-add-button-visibility-1440",
+    "ok": true,
+    "reason": "Add button must render md+",
+    "seq": [
+      "visible=true"
+    ]
+  },
+  {
+    "state": "receipts-dialog-open-focus-1440",
+    "ok": true,
+    "reason": "initialFocus should land on the type select",
+    "seq": [
+      "add-documents-type"
+    ]
+  },
+  {
+    "state": "receipts-refused-format-1440",
+    "ok": true,
+    "reason": "rejected file must not stage, error must show",
+    "seq": [
+      "rows=0",
+      "errorShown=true"
+    ]
+  },
+  {
+    "state": "bank-statements-add-button-visibility-1440",
+    "ok": true,
+    "reason": "Add button must render md+",
+    "seq": [
+      "visible=true"
+    ]
+  },
+  {
+    "state": "bank-statements-dialog-open-focus-1440",
+    "ok": true,
+    "reason": "initialFocus should land on the type select",
+    "seq": [
+      "add-documents-type"
+    ]
+  },
+  {
+    "state": "bank-statements-refused-format-1440",
+    "ok": true,
+    "reason": "rejected file must not stage, error must show",
+    "seq": [
+      "rows=0",
+      "errorShown=true"
+    ]
+  },
+  {
+    "state": "pipeline-redirect-url-1440",
+    "ok": true,
+    "reason": "redirect() lands on Invoices",
+    "seq": [
+      "http://localhost:3000/workspaces/af91555d-7450-4b21-a8ac-73db092617c8/invoices"
+    ]
+  },
+  {
+    "state": "invoices-add-button-visibility-390",
+    "ok": true,
+    "reason": "Add button must be hidden <md",
+    "seq": [
+      "visible=false"
+    ]
+  },
+  {
+    "state": "purchase-orders-add-button-visibility-390",
+    "ok": true,
+    "reason": "Add button must be hidden <md",
+    "seq": [
+      "visible=false"
+    ]
+  },
+  {
+    "state": "receipts-add-button-visibility-390",
+    "ok": true,
+    "reason": "Add button must be hidden <md",
+    "seq": [
+      "visible=false"
+    ]
+  },
+  {
+    "state": "bank-statements-add-button-visibility-390",
+    "ok": true,
+    "reason": "Add button must be hidden <md",
+    "seq": [
+      "visible=false"
+    ]
+  },
+  {
+    "state": "pipeline-redirect-url-390",
+    "ok": true,
+    "reason": "redirect() lands on Invoices",
+    "seq": [
+      "http://localhost:3000/workspaces/af91555d-7450-4b21-a8ac-73db092617c8/invoices"
+    ]
+  },
+  {
+    "state": "how-it-works-opens",
+    "ok": true,
+    "reason": "How DocuBite works button reachable on Account page <md",
+    "seq": [
+      "found=1"
+    ]
+  }
+]
