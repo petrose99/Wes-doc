@@ -360,3 +360,20 @@ export function isCategoryConfirmed(codingData: Record<string, unknown> | null):
   if (codingData.documentTypeSource === "human") return true
   return false
 }
+
+/** #297: types whose accounting Direction (Payable/Receivable) is asserted on the document —
+ * the field-table's Direction row and the pane's Direction radiogroup both key off this instead
+ * of a hand-picked list, so a future type only needs one flag. Purchase Order is category-bearing
+ * too, but always Payable (see directionLockedFor) — Bank Statement and every secondary type have
+ * no row at all. */
+const DIRECTION_FIELD_TYPES: DocType[] = ["invoice", "receipt", "purchase_order"]
+
+export function hasDirectionField(docType: DocType): boolean {
+  return DIRECTION_FIELD_TYPES.includes(docType)
+}
+
+/** Purchase orders are always payable — the radiogroup renders locked with a visible footnote
+ * rather than a real choice (#297). */
+export function directionLockedFor(docType: DocType): boolean {
+  return docType === "purchase_order"
+}
