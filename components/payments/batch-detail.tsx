@@ -89,7 +89,7 @@ export function PaymentBatchDetail({ workspaceId, detail, currentUserId, isOwner
           </table>
         </section>)}
         {reimbursements && <section aria-label="Reimbursements">
-          <h3 className="mb-1 flex items-baseline justify-between gap-2 text-sm font-semibold text-slate-900"><span>Reimbursements</span><span className="tabular-nums">{money(reimbursements.total, reimbursements.lines[0]?.currencyCode)}</span></h3>
+          <h3 className="mb-1 flex items-baseline justify-between gap-2 text-sm font-semibold text-slate-900"><span title="Approved expense claims being paid back to the claimant, alongside this batch's supplier bills">Reimbursements</span><span className="tabular-nums">{money(reimbursements.total, reimbursements.lines[0]?.currencyCode)}</span></h3>
           <table className="w-full text-sm">
             <thead className="text-left text-xs font-medium uppercase tracking-wide text-slate-600"><tr><th scope="col" className="py-1 pr-2">Claimant</th><th scope="col" className="py-1 pr-2">Approved</th><th scope="col" className="py-1 text-right">Amount</th></tr></thead>
             <tbody>
