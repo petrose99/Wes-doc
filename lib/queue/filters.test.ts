@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { activeFilterCount, clearFilterParams, facetOptionValues, facetSelectedValues } from "@/lib/queue/filters"
+import { activeFilterCount, clearFilterParams, facetOptionValues, facetSelectedValues, statusFacet } from "@/lib/queue/filters"
 
 const STATUS = { param: "status", options: [{ value: "not_eligible" }] }
 const APPROVER = { param: "approver", options: [{ value: "anyone" }] }
@@ -37,6 +37,16 @@ describe("activeFilterCount (#257 spec 3.3 — the 'Filter · 2' label)", () => 
 
   it("ignores a facet value that is not one of its options", () => {
     expect(activeFilterCount(new URLSearchParams("status=bogus"), [STATUS], SORT)).toBe(0)
+  })
+})
+
+describe("statusFacet (#270 — Search's generic Open/Closed split)", () => {
+  it("groups the five processing states under Open and archived under Closed", () => {
+    const facet = statusFacet()
+    expect(facet.param).toBe("status")
+    expect(facet.sections.map((s) => s.label)).toEqual(["Open", "Closed"])
+    expect(facet.sections[1].options).toEqual([{ value: "archived", label: "Closed" }])
+    expect(facetOptionValues(facet)).toContain("archived")
   })
 })
 
