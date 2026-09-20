@@ -280,7 +280,7 @@ const GATE_TYPE_LABEL: Record<string, string> = {
   "match-variance": "2/3-way match",
   "supplier-trust": "Supplier trust",
   "confidence-band": "Low-confidence extraction",
-  "warn-checks": "Workspace check",
+  "warn-checks": "Company check",
 }
 
 function gateTypeLabel(gateType: string): string {

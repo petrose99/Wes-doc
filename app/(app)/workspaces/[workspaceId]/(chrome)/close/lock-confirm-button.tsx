@@ -22,10 +22,10 @@ export function LockConfirmButton({ action, triggerLabel, periodLabel, relock, i
   const unsigned = items.filter((item) => item.state !== "signed" && item.state !== "override")
 
   const description = hardBlockingCount > 0
-    ? `${hardBlockingCount} hard-blocking exception${hardBlockingCount === 1 ? "" : "s"} against this workspace's bills will still block the lock — this attempt will be rejected.`
+    ? `${hardBlockingCount} hard-blocking exception${hardBlockingCount === 1 ? "" : "s"} against this company's bills will still block the lock — this attempt will be rejected.`
     : unsigned.length > 0
-      ? `${unsigned.length} item${unsigned.length === 1 ? "" : "s"} not yet signed off or overridden. Locking snapshots the jurisdiction pack and workspace mode; changing anything afterward requires Reopen with a reason.`
-      : "Locking snapshots the jurisdiction pack and workspace mode. Changing anything afterward requires Reopen with a reason."
+      ? `${unsigned.length} item${unsigned.length === 1 ? "" : "s"} not yet signed off or overridden. Locking snapshots the jurisdiction pack and company mode; changing anything afterward requires Reopen with a reason.`
+      : "Locking snapshots the jurisdiction pack and company mode. Changing anything afterward requires Reopen with a reason."
 
   return (
     <>

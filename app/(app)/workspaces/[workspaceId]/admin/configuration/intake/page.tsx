@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic"
 const INTAKE_OUTCOMES: Record<string, { label: string; hint: string; className: string }> = {
   ingested: { label: "Added", hint: "Extracted into a queue", className: "bg-emerald-50 text-emerald-800" },
   duplicate: { label: "Already had it", hint: "The same attachment was received before, so nothing new was created", className: "bg-slate-100 text-slate-700" },
-  no_document: { label: "Nothing to extract", hint: "No attachment this workspace could read", className: "bg-amber-50 text-amber-800" },
+  no_document: { label: "Nothing to extract", hint: "No attachment this company could read", className: "bg-amber-50 text-amber-800" },
   sender_rejected: { label: "Sender not allowed", hint: "Add the address under Allowed senders to accept it", className: "bg-red-50 text-red-800" },
 }
 
@@ -48,7 +48,7 @@ export default async function IntakePage({ params }: { params: Promise<{ workspa
     </Panel>
 
     {token === null
-      ? <Panel title="Email intake" note="Email intake is not available for this workspace: a healthcare workspace never receives documents over unencrypted email.">{null}</Panel>
+      ? <Panel title="Email intake" note="Email intake is not available for this company: a healthcare company never receives documents over unencrypted email.">{null}</Panel>
       : <>
         <Panel title="Email intake" note={config.inboundEmail.enabled
           ? "Forward or CC documents to this address and they arrive in the queue their type belongs to, the same way as an upload. Only mail from an allowed sender is accepted."

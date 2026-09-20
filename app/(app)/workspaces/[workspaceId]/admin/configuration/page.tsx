@@ -45,7 +45,7 @@ export default async function ConfigurationFieldsPage({ params, searchParams }: 
   >
     {!context.owner && <ReadOnlyBand owners={context.owners} />}
     {/* #271 spec §4: the one place an admin learns the Approval notice cannot send. Visible text, not a tooltip. */}
-    {!isEmailConfigured() && <ReadOnlyBand owners={[]}>Approval emails are off for this workspace: no sending address is configured. Approvers still see Approvals in DocuBite.</ReadOnlyBand>}
+    {!isEmailConfigured() && <ReadOnlyBand owners={[]}>Approval emails are off for this company: no sending address is configured. Approvers still see Approvals in DocuBite.</ReadOnlyBand>}
     <div id={panelId} role="tabpanel" aria-label={`${typeLabel} fields`}>
       <FieldTableEditor key={docType} workspaceId={workspaceId} docType={docType} typeLabel={typeLabel} rows={table.rows} stamp={stamp} readOnly={!context.owner} />
     </div>

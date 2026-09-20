@@ -512,7 +512,7 @@ export async function matchDocumentShapeAction(workspaceId: string, formData: Fo
   const user = await getCurrentUser()
   const membership = await requireMember(workspaceId, user.id)
   if (!membership) return { success: false, error: NO_ACCESS }
-  if (!membership.workspace.aiEnabled) return { success: false, error: "AI extraction is disabled for this workspace" }
+  if (!membership.workspace.aiEnabled) return { success: false, error: "AI extraction is disabled for this company" }
   const file = formData.get("file")
   if (!(file instanceof File) || !file.size) return { success: false, error: "Add a document first" }
   try {
@@ -686,7 +686,7 @@ export async function setPoMismatchPolicyAction(workspaceId: string, input: {
     return { success: true, data: null }
   } catch (error) {
     if (error instanceof Error && error.message === "mismatch_approver_not_a_member") {
-      return { success: false, error: "one of the people you named is no longer a member of this workspace" }
+      return { success: false, error: "one of the people you named is no longer a member of this company" }
     }
     return { success: false, error: "could not save the mismatch policy" }
   }

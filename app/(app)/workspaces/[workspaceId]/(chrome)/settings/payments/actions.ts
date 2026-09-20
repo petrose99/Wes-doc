@@ -12,7 +12,7 @@ import { archivePayerAccount, createPayerAccount, setDefaultPayerAccount, update
  * discount and bank account. Owner-only writes; refusals come back as ActionState. */
 
 const MESSAGES: Record<string, string> = {
-  owner_only: "Only a workspace owner can change payment settings.",
+  owner_only: "Only an owner can change payment settings.",
   payer_account_name_required: "Give the account a name.",
   payer_account_currency_invalid: "Currency must be a three-letter code, like ZAR.",
   payer_account_not_found: "That payer account no longer exists.",

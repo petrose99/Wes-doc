@@ -40,7 +40,7 @@ function TotalField({ field, value, ref: provenanceRef, onFocusSource, compare }
   const status = !compare || !compare.summary.link || poTotal === null ? "not_compared" : gateOpen ? "mismatch" : "match"
   const sentence = gate
     ? `Invoice total is ${formatAmount(gate.variance, compare?.currency)} off the PO total; the workspace allows ${formatAmount(gate.threshold, compare?.currency)}${gate.percent ? ` (${Math.round(gate.percent * 100)} % of the PO)` : ""}. Approve it in Override Mode with a reason, or change the match in Match manually.`
-    : status === "match" ? "Invoice total is within the workspace tolerance of the PO total." : "The PO has no total to compare."
+    : status === "match" ? "Invoice total is within the company tolerance of the PO total." : "The PO has no total to compare."
   // (the sentence names Match manually by its glossary name — "fix the match" is not a control)
   return <div className="group/total relative flex items-center gap-3">
     <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500">

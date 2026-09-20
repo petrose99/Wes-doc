@@ -16,7 +16,7 @@ import { PaymentBatchDetail } from "@/components/payments/batch-detail"
  * so the queue renders it in place — nothing is thrown to `error.tsx` (the incumbent's P0). */
 
 const MESSAGES: Record<string, string> = {
-  owner_only: "Only a workspace owner can decide a payment batch.",
+  owner_only: "Only an owner can decide a payment batch.",
   payment_batch_not_found: "That batch no longer exists.",
   payment_batch_not_pending: "This batch has already been decided.",
   payment_batch_not_approved: "This batch isn't approved yet, so it can't be marked paid.",

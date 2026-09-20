@@ -20,7 +20,7 @@ export default async function SignupPage({ searchParams }: { searchParams: Promi
 
   return <>
     <h1 className="font-display text-2xl font-bold tracking-[-0.02em] text-slate-950">
-      {invitedEmail ? "Join the workspace" : "Create your account"}
+      {invitedEmail ? "Accept your invitation" : "Create your account"}
     </h1>
     <p className="mt-1.5 mb-7 text-sm text-slate-500">
       {invitedEmail

@@ -61,7 +61,7 @@ export default async function AccountPage({ params }: { params: Promise<{ worksp
         never dead (#232). Visible at every width: harmless on desktop, where the rail already
         lists these; not `md:hidden` because Account is one page, not two. Payments (#251) is
         deliberately absent — that queue's decisions are owner-scoped to desktop for now. */}
-    <Panel title="Also in this workspace" note="The rest of what this workspace holds.">
+    <Panel title="Also in this company" note="The rest of what this company holds.">
       <ul className="divide-y divide-hairline-soft">
         {[
           { label: "Purchase Orders", href: `/workspaces/${workspaceId}/purchase-orders` },

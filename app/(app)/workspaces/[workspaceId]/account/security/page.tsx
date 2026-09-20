@@ -12,7 +12,7 @@ export default async function SecurityPage({ params }: { params: Promise<{ works
   await getCurrentUser()
 
   return <AdminPage title="Security" intro="Two-factor authentication and session controls for your account." phoneNote={false}>
-    <Panel title="Two-factor authentication" note="Required to open a workspace with HIPAA mode on.">
+    <Panel title="Two-factor authentication" note="Required to open a company with HIPAA mode on.">
       <MfaEnroll />
     </Panel>
     <Panel title="Sessions" note="If you signed in somewhere you don't recognise, end every session at once.">

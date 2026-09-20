@@ -22,7 +22,7 @@ export const sheetPath = (workspaceId: string, fileId: string) => `/workspaces/$
  * "member_not_found" into "member not found", which is fine for most codes but not all of them.
  * Codes not listed here still fall through to that behaviour. */
 const BILLING_MESSAGES: Record<string, string> = {
-  free_trial_storage_exceeded: "You've reached the 200 MB free-trial upload limit for this workspace.",
+  free_trial_storage_exceeded: "You've reached the 200 MB free-trial upload limit for this company.",
   fx_rate_pending: "This document is in a different currency and its exchange rate hasn't been fetched yet. Try again in a moment.",
   // Integrations (P1). The url_* codes come from lib/url-safety's SSRF guard.
   integrations_not_available: "Integrations aren't enabled on this deployment.",
@@ -41,7 +41,7 @@ const BILLING_MESSAGES: Record<string, string> = {
   bill_missing_total: "This document has no total to push.",
   ledger_duplicate: "A bill with this reference number already exists in your accounting ledger.",
   bank_match_not_found: "That match no longer exists.",
-  inbound_email_disabled_for_clinical: "Inbound email intake isn't available for a healthcare workspace.",
+  inbound_email_disabled_for_clinical: "Inbound email intake isn't available for a healthcare company.",
   pattern_invalid: "Enter a full email address (name@domain.com) or a domain (@domain.com).",
   allowed_sender_not_found: "That sender no longer exists.",
   // Dext-parity Phase 3 WP3.1/WP3.2: approval workflows.
@@ -49,7 +49,7 @@ const BILLING_MESSAGES: Record<string, string> = {
   workflow_needs_at_least_one_stage: "Add at least one stage.",
   review_task_has_no_workflow: "This review task has no workflow attached.",
   workflow_stage_not_found: "That workflow stage no longer exists.",
-  stage_requires_owner: "Only a workspace owner can decide this stage.",
+  stage_requires_owner: "Only an owner can decide this stage.",
   review_task_already_has_workflow: "This review task already has a workflow attached.",
   review_task_not_open: "This review task has already moved past open — a workflow can only be started while it's open.",
   // #236: Approvals — Send back for review / Cancel.
@@ -79,7 +79,7 @@ export const errorMessage = (error: unknown, fallback: string) => {
   return BILLING_MESSAGES[error.message] || error.message.replaceAll("_", " ")
 }
 
-export const NO_ACCESS = "You no longer have access to this workspace"
+export const NO_ACCESS = "You no longer have access to this company"
 
 /** requireWorkspaceRole throws on a missing membership or insufficient role. Actions call this
  * instead so the client gets an ActionState error to show, rather than a rejected promise. */

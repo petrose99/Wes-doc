@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
   try {
     await requireWorkspaceRole(workspaceId, user.id, ["owner"])
   } catch {
-    return new Response("Only workspace owners can connect an accounting provider", { status: 403 })
+    return new Response("Only owners can connect an accounting provider", { status: 403 })
   }
   if (!(await workspaceIntegrationsPlanEnabled(workspaceId))) {
     return new Response("Integrations are available on a paid plan", { status: 403 })

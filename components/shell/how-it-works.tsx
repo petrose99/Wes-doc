@@ -25,7 +25,7 @@ export function HowItWorksButton() {
 }
 
 const STEPS: { name: string; sentence: string }[] = [
-  { name: "Add", sentence: "Drop invoices on the queue, add them with Add invoices, or email them to the workspace's address." },
+  { name: "Add", sentence: "Drop invoices on the queue, add them with Add invoices, or email them to the company's address." },
   { name: "In review", sentence: "DocuBite extracts each one into a row. Open it to check the fields beside the source." },
   { name: "Approve", sentence: "Approve it yourself or start an approval flow; Needs attention marks anything a check blocked." },
   { name: "Post", sentence: "Post the approved invoice to your ledger. It stays on the queue as a Posted row." },

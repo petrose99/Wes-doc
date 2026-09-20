@@ -27,6 +27,6 @@ export async function createInitialWorkspaceAction(input: {
     })
     return { success: true, data: { workspaceId: workspace.id } }
   } catch {
-    return { success: false, error: "Could not set up your workspace" }
+    return { success: false, error: "Could not set up your company" }
   }
 }

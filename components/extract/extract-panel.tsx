@@ -356,7 +356,7 @@ export function ExtractPanel({ workspaceId, fileId, fileName, template, template
         else if (duplicates.length) {
           const first = duplicates[0]
           toast.info(duplicates.length === 1 ? "Already uploaded" : `All ${duplicates.length} files were already uploaded`, {
-            description: duplicates.length === 1 ? `“${first.filename}” is already in this workspace — nothing new to extract.` : "These documents are already in this workspace — nothing new to extract.",
+            description: duplicates.length === 1 ? `“${first.filename}” is already in this company — nothing new to extract.` : "These documents are already in this company — nothing new to extract.",
             ...(duplicates.length === 1 ? { action: { label: "View document", onClick: () => router.push(`/workspaces/${workspaceId}/documents/${first.id}`) } } : {}),
           })
         }

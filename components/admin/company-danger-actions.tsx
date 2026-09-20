@@ -57,7 +57,7 @@ export function CompanyDangerActions({ workspaceId, name, isOwner }: { workspace
     <ConfirmDialog open={leaving} destructive busy={pending} title={`Leave ${name}?`} description="You lose access to its files immediately." confirmLabel="Leave"
       onCancel={() => setLeaving(false)}
       onConfirm={() => leave()} />
-    <ConfirmDialog open={confirmingLastReviewer} destructive busy={pending} title="You are the last reviewer" description="Leaving drops this workspace to SMB mode. This cannot be undone from here." confirmLabel="Leave anyway"
+    <ConfirmDialog open={confirmingLastReviewer} destructive busy={pending} title="You are the last reviewer" description="Leaving drops this company to SMB mode. This cannot be undone from here." confirmLabel="Leave anyway"
       onCancel={() => setConfirmingLastReviewer(false)}
       onConfirm={() => leave(true)} />
 

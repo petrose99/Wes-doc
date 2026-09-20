@@ -51,7 +51,7 @@ export function WorkspacePulse({ workspaceId, documentsCount, financeCount, acco
       className="mb-2 flex items-center gap-1.5 rounded-md px-2 py-1 text-[11.5px] font-semibold uppercase tracking-[0.06em] text-slate-500 hover:bg-slate-200/50 hover:text-slate-800"
     >
       <span aria-hidden="true">←</span>
-      <span>Workspace</span>
+      <span>Company</span>
     </Link>
 
     <nav aria-label="Workspace pulse" className="rounded-lg border border-slate-200/70 bg-white/60 p-1.5 shadow-[0_1px_0_rgba(15,23,42,0.03)]">

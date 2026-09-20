@@ -202,7 +202,7 @@ export function DocumentPaneActions({ workspaceId, documentId, noun, status, ope
       destructive
       busy={busy === "reject"}
       title={`Reject this ${noun}?`}
-      description="The open approval is closed as rejected and the decision is recorded on the audit trail. The document itself stays in the workspace."
+      description="The open approval is closed as rejected and the decision is recorded on the audit trail. The document itself stays in the company."
       confirmLabel={busy === "reject" ? "Rejecting…" : "Reject"}
       onConfirm={() => void reject()}
       onCancel={() => setConfirmingReject(false)} />
