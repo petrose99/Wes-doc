@@ -42,9 +42,48 @@ def handoff_lines(text=None):
     except Exception: return 0
 hmax = int(os.environ.get("WAYFINDER_HANDOFF_MAX_LINES", "80"))
 def too_long(n): return f"HAND-OFF TOO LONG: {hand} would be {n} lines (limit {hmax}). It is a state file, not a log: keep the `milestone:` lines, the `step:` plan (a done step is one line, no notes under it), an Artifacts list of paths, Open findings as a pointer to <scratch>/close.md, and the exact next step. Delete every '(this session)' / '## G2 notes' narrative; move anything worth keeping into a file in the scratch folder and link it. Then retry."
+# Closing-bar gate. #327 and #328 closed with `close-critique=n/a` and no
+# detector run: a single-session task that changed rendered files treated
+# the bar as optional. A `gh issue close` of this session's ticket is refused
+# while the ticket has touched app/ or components/ (.tsx/.css, in commits
+# mentioning the ticket) and the report's `scores:` line
+# does not carry integer close-critique >= 30 and close-evaluate >= 80.
+def closing_bar(c):
+    t = os.environ.get("WAYFINDER_TICKET", ""); m = os.environ.get("WAYFINDER_MAP", "")
+    if not t or not re.search(r"\bgh\s+issue\s+close\b", c) or not re.search(rf"(?<![\d/])#?{t}(?!\d)", c): return
+    def sh(*a):
+        try: return subprocess.run(a, capture_output=True, text=True).stdout
+        except Exception: return ""
+    root = sh("git", "rev-parse", "--show-toplevel").strip()
+    # only this ticket's own commits count: a range or the working tree would
+    # pick up the other tickets interleaved on the branch
+    # a ticket's commit names it in the subject as the thing being worked
+    # (`wip(autopilot): #T …`, `fix(#T): …`, `… for #T`), not as a
+    # reference in the body ("execution of #288" on #328's commits)
+    files = set()
+    for row in sh("git", "log", "--format=%H %s", f"--grep=#{t}\\b", "-E").splitlines():
+        sha, _, subj = row.partition(" ")
+        if not re.search(rf"(?<![\d/])#{t}(?!\d)", subj) or re.search(rf"\b(of|from|per|via|to|by)\s+#{t}(?!\d)", subj): continue
+        if re.search(rf"#{t}\s+(filed|opened|spawned|created)", subj): continue
+        files |= set(sh("git", "diff-tree", "--no-commit-id", "--name-only", "-r", sha).split())
+    ui = sorted(f for f in files if re.match(r"^(app|components)/.*\.(tsx|css)$", f))
+    if not ui: return
+    rep = os.path.join(root, "docs", "wayfinder-reports", m, f"{t}.md")
+    line = ""
+    try: line = next((l for l in open(rep) if l.startswith("scores:")), "")
+    except Exception: pass
+    kv = dict(re.findall(r"(\S+)=(\S*)", line))
+    def num(k):
+        try: return int(kv.get(k, ""))
+        except Exception: return None
+    cc, ce = num("close-critique"), num("close-evaluate")
+    ok = cc is not None and ce is not None and cc >= 30 and ce >= 80
+    if ok: return
+    deny(f"CLOSING BAR: ticket #{t} changed rendered files ({', '.join(ui[:5])}{' …' if len(ui) > 5 else ''}), so it closes only at the bar: the report {rep} needs a `scores:` line with integer close-critique >= 30 (every heuristic >= 3) and close-evaluate >= 80, produced by the critique/evaluate readers on a capture round with the in-page detector cleared. Found: {line.strip() or 'no scores: line'}. Run phases/measure.md then close.md (a small ticket does both in this session), write the line, then close — or hand off with `Autopilot: continue —`.")
 if tool == "Bash":
     c = inp.get("command", "")
     if is_router(c): deny(ROUTER)
+    closing_bar(c)
     if hand and re.search(r"\bgit\b[^|;&]*\bcommit\b", c):
         n = handoff_lines()
         if n > hmax: deny(too_long(n))

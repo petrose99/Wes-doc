@@ -111,6 +111,13 @@ it links. Every session re-reads this file whole, so a line here is paid
 on every later session. A continuation session reads it first and does
 not redo what it records as done.
 
+**The closing bar is a gate, not a suggestion.** A ticket that changed
+anything under `app/` or `components/` cannot be closed until its report's
+`scores:` line carries integer `close-critique` ≥ 30 and `close-evaluate`
+≥ 80 from real reader runs — the hook refuses `gh issue close` otherwise.
+`n/a` is not a score; a decision ticket that built nothing has no rendered
+diff and is not gated.
+
 **You do the work in this session. Never hand it to a background agent.**
 A headless `claude -p` session ends the moment you finish a turn without a
 tool call, and everything it spawned dies with it (#253 was lost this way).
