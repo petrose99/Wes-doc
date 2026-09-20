@@ -1091,6 +1091,33 @@ export async function getApprovalNoticeEmailsAction(): Promise<ActionState<{ ena
   return { success: true, data: { enabled: user.approvalNoticeEmails } }
 }
 
+const RAIL_WIDTHS = ["icons", "labels", "auto"] as const
+type RailWidth = (typeof RAIL_WIDTHS)[number]
+
+/** #342 — the sidebar rail width ("Icons only" / "Full labels" / "Auto"), per user rather than
+ * per browser: same shape as setApprovalNoticeEmailsAction above. Layout is re-rendered so the
+ * rail, Account page and account-menu suffix all read the new value on their next render. */
+export async function setRailWidthAction(workspaceId: string, railWidth: string): Promise<ActionState<{ railWidth: RailWidth }>> {
+  const user = await getCurrentUser()
+  if (!RAIL_WIDTHS.includes(railWidth as RailWidth)) return { success: false, error: "Invalid value" }
+  try {
+    const updated = await prisma.user.update({ where: { id: user.id }, data: { railWidth }, select: { railWidth: true } })
+    revalidatePath(`/workspaces/${workspaceId}/account`)
+    revalidatePath(`/workspaces/${workspaceId}`, "layout")
+    return { success: true, data: { railWidth: updated.railWidth as RailWidth } }
+  } catch (error) {
+    return { success: false, error: errorMessage(error, "Couldn't save this. Check your connection and try again.") }
+  }
+}
+
+/** The control reads the saved value when it mounts (pre-flight B2) rather than trusting a prop
+ * rendered before a change in another tab. */
+export async function getRailWidthAction(): Promise<ActionState<{ railWidth: RailWidth }>> {
+  const user = await getCurrentUser()
+  const railWidth = RAIL_WIDTHS.includes(user.railWidth as RailWidth) ? (user.railWidth as RailWidth) : "auto"
+  return { success: true, data: { railWidth } }
+}
+
 /* Workspace lifecycle actions (create, rename, delete, members, invitations) live in the
  * sibling workspace-actions.ts — every "use server" export is a public RPC endpoint, and the
  * destructive workspace surface is worth keeping in one small reviewable file. */

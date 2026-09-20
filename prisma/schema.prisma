@@ -40,6 +40,10 @@ model User {
   /// (the Approvals badge, #232) — only the email. Default on, since the destination this ticket
   /// builds is "reachable by mail", not "opted into mail".
   approvalNoticeEmails              Boolean                     @default(true) @map("approval_notice_emails")
+  /// #342 — sidebar rail width: "icons" | "labels" | "auto". String, matching role's "grows by
+  /// data, not by migration" precedent, not a Prisma enum. Default "auto" matches every
+  /// existing user's current effective (unpinned) behavior.
+  railWidth                         String                      @default("auto") @map("rail_width")
   createdAt                         DateTime                    @default(now()) @map("created_at")
   updatedAt                         DateTime                    @updatedAt @map("updated_at")
   workspaceMemberships              WorkspaceMember[]
