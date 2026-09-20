@@ -1,6 +1,6 @@
 # Area primer — Admin
 
-Shipped by #252 (shell + Configuration) and #253 (Approval Flows, PO Mismatch Flows); Companies/Users org-level shells are #285/#286, Admin dashboard #287. Mode: Operate. Decisions live on #231 and #226; do not re-decide here.
+Shipped by #252 (shell + Configuration) and #253 (Approval Flows, PO Mismatch Flows); Companies/Users org-level shells are #285/#286, Admin dashboard #287, reorganized rail #342. Mode: Operate. Decisions live on #231 and #226; do not re-decide here.
 
 ## Routes
 `app/(app)/workspaces/[workspaceId]/admin/` — `page.tsx` (lands on Configuration › Fields), `configuration/{page,autonomy,checks,intake,payments,report,tax,whats-on}`, `approval-flows`, `po-mismatch-flows`, `suppliers`, `users`, `companies`, `integrations`; `admin/layout.tsx` owns the nav and the company caption; `admin/loading.tsx` is the loading frame. Account is `account/{page,security}` with its own `loading.tsx`. Paths come from `lib/admin/paths.ts` (`adminPaths(workspaceId)`, `accountPaths`, `legacyAdminTarget` for old Settings URLs). `getAdminContext` (cached) gives role and company.
@@ -85,6 +85,26 @@ network failure); opening edit sets `autoFocus` on the first field (`bank-name`)
 Gate: clean, 0 real findings; critique 36/40, evaluate 88 Clean, include PASS/PASS both widths —
 findings are all pre-existing shell chrome (text-overflow/dark-glow, see Detector residue above)
 or capture-script evidence gaps (Enter-to-submit unprobed), not defects in this panel.
+
+## Reorganized rail + rail-width (#342)
+`components/shell/sidebar.tsx`: `primaryItems`/`bottomItems` reordered into a Today group +
+Archive; Admin is an `alwaysLabelled` nav row (`w-16`, `text-[13px]`, never icon-collapses);
+Activity/Health moved from the bottom nav into `admin/layout.tsx`'s own `groups`. `isActive` is
+centralized: `RailNavItem.matchPrefixes` + longest-prefix-wins reduce over `allNavItems` (no more
+per-item `exact`/ad-hoc Admin-vs-Accounting checks). Three-state rail width (icons/labels/auto,
+replacing the old `pinned`/`RAIL_PIN_KEY` localStorage toggle) persists via `User.railWidth` +
+`getRailWidthAction`/`setRailWidthAction` (`actions.ts`, mirrors `ApprovalEmailsControl`) — UI is
+`components/shell/rail-width-control.tsx` (`RailWidthControl` on Account page,
+`RailWidthMenuSelect` inline in `account-menu.tsx`, no dialog: a `<select>` isn't a `menuitem`,
+and the menu's own keydown listener skips a focused select). Offline: `useOnlineStatus()` disables
+the select and shows "You're offline — the change can't be saved yet" via `role="status"
+aria-live="polite"`; a failed save reverts optimistic state and shows a `role="alert"` line —
+verified by direct screenshot, not just the detector (the static detector has no
+`skipped-offline` rule, that label means "no rule", not "broken"). `g c` shortcut routes to
+Accounting (`keyboard-shortcuts.tsx` `SHORTCUT_DESTINATIONS`); legacy `/accounting` prefix kept.
+`text-overflow.*truncate` residue (line below) widened by this ticket to cover every
+`truncate`-class nav-item label and the wordmark, not just the switcher name — same false-positive
+cause (ellipsis-by-design), confirmed by screenshot on every state.
 
 ## Conventions the bar checks
 Vocabulary: "company" in Admin copy (not "workspace"); one term per concept, one casing. Keys: Tab order reaches the save bar, Escape closes menus and returns focus, Ctrl+S saves, tablists use arrow keys. States per form: loading frame, empty ("Add a …" with the consequence), error with the values kept ("Couldn't save — … Your changes are still here." with Reload on stale), read-only band for members. Below `md`: `PhoneNote` + company caption from the layout, tables scroll horizontally with the header not clipping.

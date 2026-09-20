@@ -4,8 +4,8 @@ import { useEffect, useId, useState } from "react"
 import { useRouter } from "next/navigation"
 import { NativeSelect } from "@/components/ui/native-select"
 import { useOnlineStatus } from "@/lib/client/use-online-status"
-import { getRailWidthAction, setRailWidthAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
-import { type RailWidth, isRailWidth, toRailWidth, RAIL_WIDTH_LABEL } from "@/lib/rail-width"
+import { setRailWidthAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
+import { type RailWidth, isRailWidth } from "@/lib/rail-width"
 
 /** #342 spec §4 — the three-state rail-width control (icons only / full labels / auto),
  * replacing the old localStorage pin. Two homes, like Approval emails: the Account page field
