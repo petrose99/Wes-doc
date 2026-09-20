@@ -74,10 +74,10 @@ const nextConfig: NextConfig = {
     "/**/*": ["./node_modules/sharp/**/*", "./node_modules/@img/**/*"],
   },
   experimental: {
-    // Dev-only: bounds Turbopack's native (Rust) memory, which a V8 heap cap cannot see. Unbounded,
-    // `next dev` on this repo grows to 4–5 GB RSS on an 8 GB box; the autopilot runs a dev server,
-    // a headless browser and a Claude session side by side. Ignored by `next build`/`next start`.
-    turbopackMemoryLimit: 3 * 1024 * 1024 * 1024,
+    // `turbopackMemoryLimit` (bounded Turbopack's native Rust memory, which a V8 heap cap can't
+    // see) was removed from Next's experimental config as of 16.3 — no direct replacement exists.
+    // If `next dev` RSS becomes a problem again on constrained boxes, check
+    // `turbopackMemoryEviction`/`turbopackFileSystemCacheForDev` first.
     serverActions: {
       // Matches config.documents.maxFileSizeBytes (50MB) plus overhead for multipart framing —
       // not the 256mb this used to be. Uploads go through uploadDocumentsAction one file per
