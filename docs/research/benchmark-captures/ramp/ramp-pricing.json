@@ -1,0 +1,562 @@
+{
+ "slug": "ramp-pricing",
+ "label": "Ramp pricing",
+ "url": "https://ramp.com/pricing",
+ "accessed": "2026-09-19T12:14:26.008Z",
+ "views": {
+  "390": {
+   "status": 200,
+   "shot": "/home/ubuntu/Dev/Wes-doc/docs/research/benchmark-captures/ramp/ramp-pricing-390.png",
+   "initialMotion": {
+    "opacityZeroEls": 1,
+    "animations": {
+     "KbLogoWall-module__3RH7Jq__marquee 162s infinite": 2
+    },
+    "transitionEls": 279,
+    "total": 3289
+   },
+   "errors": [
+    "overlaysHidden=2"
+   ],
+   "title": "Ramp Pricing and Plans",
+   "h1": "Start for free. Scale with Intelligence.",
+   "subhead": "Whether you’re a startup, global enterprise, or somewhere in between, Ramp is designed to save you time and money.",
+   "headings": [
+    {
+     "tag": "H1",
+     "text": "Start for free. Scale with Intelligence.",
+     "top": 126
+    },
+    {
+     "tag": "H2",
+     "text": "Compare features",
+     "top": 4963
+    },
+    {
+     "tag": "H2",
+     "text": "FAQ",
+     "top": 13056
+    },
+    {
+     "tag": "H3",
+     "text": "Is there a free version of Ramp?",
+     "top": 13135
+    },
+    {
+     "tag": "H3",
+     "text": "Are there any limits on how many cards I can issue?",
+     "top": 13206
+    },
+    {
+     "tag": "H3",
+     "text": "Can I pay for Ramp Plus with a Ramp card?",
+     "top": 13287
+    },
+    {
+     "tag": "H3",
+     "text": "How can we manage our Ramp plan?",
+     "top": 13368
+    },
+    {
+     "tag": "H2",
+     "text": "Time is money. Save both.",
+     "top": 13519
+    }
+   ],
+   "sections": [
+    {
+     "top": 126,
+     "height": 197,
+     "heading": "Start for free. Scale with Intelligence.",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 155,
+     "snippet": "Start for free. Scale with Intelligence. Whether you’re a startup, global enterprise, or somewhere in between, Ramp is designed to save you time and money."
+    },
+    {
+     "top": 363,
+     "height": 4376,
+     "heading": "",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [
+      "Get started for free",
+      "View all features",
+      "Get started for free",
+      "View all features",
+      "Contact sales",
+      "View all features"
+     ],
+     "textLen": 2826,
+     "snippet": "AI-assisted Free $0/mo/user Best for smaller teams who want to simplify finances. Email Get started for free Key features: Corporate Card Unlimited cards Card issuing controls Travel & Expense Complete expenses via SMS o"
+    },
+    {
+     "top": 4963,
+     "height": 8011,
+     "heading": "Compare features",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [
+      "+ more",
+      "+ more"
+     ],
+     "textLen": 4512,
+     "snippet": "Compare features Free Plus Enterprise Corporate Card Corporate liability charge card Competitive credit limits Unlimited physical and virtual cards Card issuing controls Category and vendor controls Proactive policy cont"
+    },
+    {
+     "top": 13056,
+     "height": 383,
+     "heading": "FAQ",
+     "imgs": 0,
+     "svgs": 4,
+     "videos": 0,
+     "ctas": [
+      "Is there a free version of Ramp?",
+      "How can we manage our Ramp plan?"
+     ],
+     "textLen": 675,
+     "snippet": "FAQ Is there a free version of Ramp? Yes, Ramp Free is designed for smaller teams who want to get started with Ramp. If you would like to try Ramp Plus, you can sign up with a free 30-day trial, and easily switch plans a"
+    }
+   ],
+   "navLinks": [
+    "Back"
+   ],
+   "heroCtas": [
+    {
+     "text": "Get started for free",
+     "tag": "BUTTON",
+     "href": null
+    },
+    {
+     "text": "Get started for free",
+     "tag": "A",
+     "href": "/get-ramp"
+    }
+   ],
+   "bigImgs": [],
+   "imgCount": 21,
+   "logoish": 0,
+   "videos": [],
+   "canvases": 0,
+   "lotties": 0,
+   "iframes": [
+    "https://www.googletagmanager.com/ns.html?id=GTM-WFDFDWP",
+    "https://pagead2.googlesyndication.com/pagead/ads?client=ca-pub-3938919135399013&output=html&adk=1812271804&adf=302519425",
+    "https://ramp-com.chilipiper.com/chat/loader/?embedOrigin=https%3A%2F%2Framp.com&workspaceId=fef2da9a-11bc-48f7-bd29-1762",
+    "https://pagead2.googlesyndication.com/pagead/html/r20260917/r20190131/zrt_lookup_fy2021.html"
+   ],
+   "fonts": [
+    [
+     "lausanne",
+     1557
+    ],
+    [
+     "Material Icons",
+     193
+    ],
+    [
+     "Material Icons Outlined",
+     104
+    ]
+   ],
+   "sectionBgs": [
+    [
+     "lab(100 0 0)",
+     1
+    ]
+   ],
+   "buttonBgs": [
+    [
+     "lab(92.1406 -20.4979 84.7726)",
+     4
+    ],
+    [
+     "rgba(33, 33, 33, 0.05)",
+     1
+    ],
+    [
+     "lab(95.604 0.426412 1.20401)",
+     1
+    ],
+    [
+     "lab(8.86531 0.515342 0.18619)",
+     1
+    ]
+   ],
+   "type": {
+    "h1": {
+     "family": "lausanne, \"lausanne Fallback\"",
+     "size": "40px",
+     "weight": "400",
+     "lineHeight": "42px",
+     "letterSpacing": "-0.01px",
+     "color": "lab(2.83994 0.367254 0.969091)"
+    },
+    "h2": {
+     "family": "lausanne, \"lausanne Fallback\"",
+     "size": "34px",
+     "weight": "400"
+    },
+    "body": {
+     "family": "lausanne, \"lausanne Fallback\"",
+     "size": "16px",
+     "color": "lab(2.83994 0.367254 0.969091)",
+     "bg": "lab(100 0 0)"
+    }
+   },
+   "motionAfterScroll": {
+    "animations": {
+     "KbLogoWall-module__3RH7Jq__marquee 162s infinite": 2
+    },
+    "opacityZeroEls": 1,
+    "transitionEls": 283,
+    "stickyFixedEls": 115
+   },
+   "libs": {
+    "gsap": false,
+    "framer": false,
+    "webflow": false,
+    "lottie": false,
+    "splide_swiper": false,
+    "rive": false,
+    "nextjs": true,
+    "wordpress": false,
+    "hubspot": true
+   },
+   "wordCount": 1872,
+   "scrollHeight": 16451,
+   "bodyText": "Back Start for free. Scale with Intelligence. Whether you’re a startup, global enterprise, or somewhere in between, Ramp is designed to save you time and money. AI-assisted Free $0/mo/user Best for smaller teams who want to simplify finances. Email Get started for free Key features: Corporate Card Unlimited cards Card issuing controls Travel & Expense Complete expenses via SMS or Slack Create a custom travel policy Book flights, hotels, and car rentals Auto-receipt collection and matching Accounts Payable Automated invoice extraction (OCR) Configurable approval workflows Automated fraud checks Pay bills by ACH, card, check, wire, and more Treasury Earn 4.51%* in a Ramp Investment Account Earn 2%* on cash in a FDIC-insured account No fees, minimum deposits, or transfer caps Free wires and same-day ACH via Bill Pay Accounting Automation Basic accounting rules QuickBooks Online and Xero integrations Budgets & Reporting Custom reports and insights via AI reporting Custom report builder Vendor Management Automated vendor tracking and contract extraction Price intelligence View all features AI-powered Plus $15/mo/user + Platform fee based on team size Save 20% with annual billing Perfect for teams who want to use AI-driven automation to eliminate busywork. Email Get started for free All the features of Free, and: Travel & Expense AI-driven expense reviews and policy insights Auto-lock cards when compliance is unmet 24/7 phone support for travel bookings Accounts Payable Auto-coded line items AI-driven approval recommendations Automated batch payments Payment release approvals Procurement (Add-on to Plus or Enterprise) Advanced intake and approval workflows AI-driven vendor compliance reviews Automated PO creation and tracking Three-way match with Ramp purchase orders Accounting Automation NetSuite, Sage Intacct, and more integrations AI coding for every field Automate approval and sync of routine spend Support for multi-entity businesses Global Coverage Auto tax capture and coding Budgets & Reporting Share live reports and schedule exports Track budgets vs. actuals in real time User management Custom user roles Multi-entity visibility restrictions Audit log View all features AI-tailored Enterprise Custom Annual billing Specifically made for teams who need full customization. Email Contact sales All the features of Plus, and: Accounting Automation Workday, Oracle Fusion Cloud, and more integrations Global Coverage Locally funded reimbursements Pay card payments in local currency Local currency card issuing in 30+ countries White Glove Support Dedicated account and customer success manager Priority 24/7 global support Implementation Services Custom implementation scoping and roll out plan Integration setup and validation testing Employee training and change management Enterprise Services Custom development ERP extensions and configurations Custom policy and workflow configuration Advanced org, role, and entity configuration View all features 70,000+ finance teams have saved millions of hours with Ramp. Compare features Free Plus Enterprise Corporate Card Corporate liability charge card Competitive credit limits Unlimited physical and virtual cards Card issuing controls Category and vendor controls Proactive policy controls and follow up + Automatically lock cards when required receipts or items aren’t submitted on time + Automatically lock cards when required receipts or items aren’t submitted on time Travel Travel bookings Travel policies Create company-wide policies + Create custom travel policies based on role, department, location, and more + Create custom travel policies based on role, department, location, and more Guest bookings + Invite external guests to book travel in Ramp with set budgets and policy controls + Invite external guests to book travel in Ramp with set budgets and policy controls Support 24/7 chat support 24/7 phone support 24/7 phone support Expense Management Spend limits with preset accounting codes Automatic receipt collection and matching Employee repayments Reimbursements + Limit reimbursement spending + Submit and review reimbursements in bulk + Send weekly batched reimbursements + Limit reimbursement spending + Submit and review reimbursements in bulk + Send weekly batched reimbursements Transaction alerts and flags + Require itemized receipts, flag alcohol spend, weekend transactions, and more + Require itemized receipts, flag alcohol spend, weekend transactions, and more Approval workflows + Route based on GL code, entity, and other accounting conditions + Route based on GL code, entity, and other accounting conditions Complete expenses & ask policy questions via SMS or Slack Approval recommendations for every transaction Proactive policy & compliance insights Parallel approvers Missing receipt affidavits Sunshine Act Accounts Payable Invoice capture with AI-powered OCR Pay bills by check, ACH, card, and wire Advanced exports Tax management +W8 uploads +W8 uploads 1099 filing (NEC and MISC) $.65 per IRS filing. Free state filing. $.65 per IRS filing. Free state filing. $.65 per IRS filing. Free state filing. Create bills using CSV uploads Import bills from ERP Mobile bill approvals Approval rules and routing + Route based on vendor, department, accounting field, payment type, and more + Route based on vendor, department, accounting field, payment type, and more Basic vendor onboarding Automated fraud checks from AP Agents Automated card payments Automated batch payments Approval recommendations from AP agent Line item auto-coding from AP agent Payment release approvals Line item splits Three-way match with imported purchase orders and item receipts Procurement (Add-on to Plus or Enterprise) Custom intake Advanced workflow builder Integrations with CLM, TPRM, and Ticketing tools Vendor onboarding with custom forms Purchase order (PO) management Match card transactions to purchase orders AI-driven vendor compliance reviews Three-way match with Ramp purchase orders and item receipts Treasury Earn 2%* in a FDIC-insured business account Earn 4.51%* in an investment account No fees, minimum deposits, or transfer caps Free, same-day ACH, domestic and international wires* DACAs and letters of credit Accounting Automation Basic accounting rules Advanced accounting rules Advanced NetSuite support Multi-entity support Custom field support AI coding for every field Automated accruals and reconciliation Amortization Auto approvals for routine, recurring transactions Integrations Accounting integrations QuickBooks Online, Xero + NetSuite, Sage Intacct, Acumatica, Microsoft Dynamics 365 Business Central + more + Workday, Oracle Fusion Cloud, Microsoft Dynamics F&O + more HRIS integrations + Workday + Workday Continuous HRIS sync Global Pay global vendors in USD or local currency Global reimbursements funded in USD and paid in local currency Issue limits and create spend programs in local currencies Auto tax capture Global reimbursements funded and paid in local currency Pay card statements with local currency Fund bill payments with local currency Local card issuing Budgets & Reporting 1099 reporting Create custom reports using AI Ramp Budgets tracks plan vs. actuals in real time Custom report builder User management Secure logins with SCIM, SSO, and SAML Custom fields Custom user roles and multi entity restrictions Audit log Vendor management Price intelligence Contract extraction Automatic vendor tracking Support Help center Instant, 24/7 AI help for any Ramp question or task Priority support Custom support Get started for free FAQ Is there a free version of Ramp? Yes, Ramp Free is designed for smaller teams who want to get started with Ramp. If you would like to try Ramp Plus, you can sign up with a free 30-day trial, and easily switch plans anytime as your needs change. Are there any limits on how many cards I can issue? No, you can issue unlimited virtual and physical cards to your team at no extra cost. Can I pay for Ramp Plus with a Ramp card? You can pay for Ramp Plus with ACH or the rewards you earn from your Ramp card spending. How can we manage our Ramp plan? You can upgrade or downgrade anytime within your Ramp dashboard or by contacting us directly. See here for more information. Time is money. Save both. Email Get started for free About us Careers Emerging talent Customers Help center Product releases Ramp for Agents Ramp Labs API documentation Versus Products Platform Partners Solutions Free tools and resources Join the 70,000+ businesses simplifying their finances with Ramp. Email Get started for free LinkedIn X Facebook Ramp Business Corporation 28 West 23rd Street, Floor 2 New York, NY 10010 Terms of Service Editorial Guidelines Privacy Policy Your Privacy Choices Manage Preferences © 2026 Ramp Business Corporation. \"Ramp\" and the Ramp logo are registered trademarks of the company. Ramp Support: +1-855-206-7283 The Ramp Visa Corporate Card is issued in the U.S. by Celtic Bank, and to U.S. corporations operating globally by Column N.A., Member FDIC, and is subject to credit approval. The Ramp Visa Commercial Card is issued by Sutton Bank, Member FDIC. The Ramp Visa Business Card is issued by Lead Bank, Member FDIC. Each card is issued pursuant to a license from Visa USA Inc. Ramp Visa Business Cards are issued in Canada by Peoples Trust Company, pursuant to license by Visa* International. Visa Int./Peoples Trust Company, Licensed User. Card Balance not insured by the Canada Deposit Insurance Corporation. Ramp Business Corporation is registered as a Payment Service Provider with the Bank of Canada. Ramp cards are issued in the UK by Stripe Payments UK Limited, an electronic money institution authorized by the Financial Conduct Authority (firm reference number: 900461). Ramp cards are issued in the EEA by Stripe Technology Europe Limited, an electronic money institution authorized by the Central Bank of Ireland (firm reference number: C187865). Cards are issued under the Visa card scheme pursuant to a license from Visa Europe Limited. Visa is a registered trademark of Visa International Service Association. All other trademarks and service marks belong to their respective owners. Ramp Business Corporation is a financial technology company and is not a bank. Bank deposit services provided by First Internet Bank of Indiana, Member FDIC. Securities products and brokerage services are provided by Apex Clearing Corporation, an SEC registered broker dealer, member of FINRA & SIPC. The Investment Account is not a deposit product, not insured by the FDIC, and may lose value. *2% Annual Percentage Yield (APY) on eligible funds in your Ramp Checking Account. The rate is accurate as of 09/19/2026. Interest is paid by First Internet Bank of Indiana, Member FDIC. The interest rate and APY are variable and subject to change without notice. See the Checking Account Addendum for more information. *Portfolios managed by Moment Advisors, LLC. Investing involves risk, including possible loss of principal. Asset allocation does not guarantee profit or protect against loss. Past performance does not guarantee future results. Additional information can be found here. The figure shown represents yield to maturity (“YTM”) as of today based on a hypothetical $10M investment. YTM is a market-value-weighted average of security-level YTMs based on current prices and stated cash flows, assuming securities are held to maturity and coupons are reinvested at the YTM rate. YTM excludes fees, expenses, transaction costs, leverage, defaults, and calls/prepayments. It is hypothetical and not a guarantee or prediction of future performance. Actual returns will differ. *Ramp Bill payments are subject to their own terms and conditions here. *Ramp Business Corporation is a financial technology company and is not a bank. Bank deposit services provided by First Internet Bank of Indiana, Member FDIC. †Investment account with portfolios managed by Moment Advisors, LLC. Investing involves "
+  },
+  "1440": {
+   "status": 200,
+   "shot": "/home/ubuntu/Dev/Wes-doc/docs/research/benchmark-captures/ramp/ramp-pricing-1440.png",
+   "initialMotion": {
+    "opacityZeroEls": 2,
+    "animations": {
+     "KbLogoWall-module__3RH7Jq__marquee 162s infinite": 2
+    },
+    "transitionEls": 279,
+    "total": 3289
+   },
+   "errors": [
+    "overlaysHidden=1"
+   ],
+   "title": "Ramp Pricing and Plans",
+   "h1": "Start for free. Scale with Intelligence.",
+   "subhead": "Whether you’re a startup, global enterprise, or somewhere in between, Ramp is designed to save you time and money.",
+   "headings": [
+    {
+     "tag": "H1",
+     "text": "Start for free. Scale with Intelligence.",
+     "top": 142
+    },
+    {
+     "tag": "H2",
+     "text": "Compare Features",
+     "top": 2218
+    },
+    {
+     "tag": "H3",
+     "text": "Free",
+     "top": 2218
+    },
+    {
+     "tag": "H3",
+     "text": "Plus",
+     "top": 2218
+    },
+    {
+     "tag": "H3",
+     "text": "Enterprise",
+     "top": 2218
+    },
+    {
+     "tag": "H3",
+     "text": "Corporate Card",
+     "top": 2327
+    },
+    {
+     "tag": "H3",
+     "text": "Travel",
+     "top": 2758
+    },
+    {
+     "tag": "H3",
+     "text": "Expense Management",
+     "top": 3111
+    },
+    {
+     "tag": "H3",
+     "text": "Accounts Payable",
+     "top": 3980
+    },
+    {
+     "tag": "H3",
+     "text": "Procurement (Add-on to Plus or Enterprise)",
+     "top": 5107
+    },
+    {
+     "tag": "H3",
+     "text": "Treasury",
+     "top": 5660
+    },
+    {
+     "tag": "H3",
+     "text": "Accounting Automation",
+     "top": 6030
+    },
+    {
+     "tag": "H3",
+     "text": "Integrations",
+     "top": 6628
+    },
+    {
+     "tag": "H3",
+     "text": "Global",
+     "top": 6908
+    },
+    {
+     "tag": "H3",
+     "text": "Budgets & Reporting",
+     "top": 7473
+    },
+    {
+     "tag": "H3",
+     "text": "User management",
+     "top": 7786
+    },
+    {
+     "tag": "H3",
+     "text": "Vendor management",
+     "top": 8087
+    },
+    {
+     "tag": "H3",
+     "text": "Support",
+     "top": 8331
+    },
+    {
+     "tag": "H2",
+     "text": "FAQ",
+     "top": 8828
+    },
+    {
+     "tag": "H3",
+     "text": "Is there a free version of Ramp?",
+     "top": 8943
+    },
+    {
+     "tag": "H3",
+     "text": "Are there any limits on how many cards I can issue?",
+     "top": 9014
+    },
+    {
+     "tag": "H3",
+     "text": "Can I pay for Ramp Plus with a Ramp card?",
+     "top": 9085
+    },
+    {
+     "tag": "H3",
+     "text": "How can we manage our Ramp plan?",
+     "top": 9156
+    },
+    {
+     "tag": "H2",
+     "text": "Time is money. Save both.",
+     "top": 9355
+    }
+   ],
+   "sections": [
+    {
+     "top": 142,
+     "height": 186,
+     "heading": "Start for free. Scale with Intelligence.",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 155,
+     "snippet": "Start for free. Scale with Intelligence. Whether you’re a startup, global enterprise, or somewhere in between, Ramp is designed to save you time and money."
+    },
+    {
+     "top": 392,
+     "height": 1466,
+     "heading": "",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [
+      "Get started for free",
+      "View all features",
+      "Get started for free",
+      "View all features",
+      "Contact sales",
+      "View all features"
+     ],
+     "textLen": 2826,
+     "snippet": "AI-assisted Free $0/mo/user Best for smaller teams who want to simplify finances. Email Get started for free Key features: Corporate Card Unlimited cards Card issuing controls Travel & Expense Complete expenses via SMS o"
+    },
+    {
+     "top": 2194,
+     "height": 6506,
+     "heading": "Compare Features",
+     "imgs": 0,
+     "svgs": 13,
+     "videos": 0,
+     "ctas": [
+      "Corporate Card",
+      "Corporate liability charge card",
+      "Competitive credit limits",
+      "Unlimited physical and virtual cards",
+      "Card issuing controls",
+      "Category and vendor controls"
+     ],
+     "textLen": 4599,
+     "snippet": "Compare Features Free Get started for free Plus Get started for free Enterprise Contact sales Corporate Card Corporate liability charge card Competitive credit limits Unlimited physical and virtual cards Card issuing con"
+    },
+    {
+     "top": 8828,
+     "height": 399,
+     "heading": "FAQ",
+     "imgs": 0,
+     "svgs": 4,
+     "videos": 0,
+     "ctas": [
+      "Is there a free version of Ramp?",
+      "How can we manage our Ramp plan?"
+     ],
+     "textLen": 675,
+     "snippet": "FAQ Is there a free version of Ramp? Yes, Ramp Free is designed for smaller teams who want to get started with Ramp. If you would like to try Ramp Plus, you can sign up with a free 30-day trial, and easily switch plans a"
+    }
+   ],
+   "navLinks": [
+    "Products",
+    "Partners",
+    "Solutions",
+    "Resources",
+    "Customers",
+    "Pricing",
+    "Sign in",
+    "Sign in",
+    "See a demo",
+    "Get started"
+   ],
+   "heroCtas": [
+    {
+     "text": "Get started for free",
+     "tag": "BUTTON",
+     "href": null
+    },
+    {
+     "text": "Get started for free",
+     "tag": "BUTTON",
+     "href": null
+    },
+    {
+     "text": "Contact sales",
+     "tag": "BUTTON",
+     "href": null
+    }
+   ],
+   "bigImgs": [],
+   "imgCount": 21,
+   "logoish": 0,
+   "videos": [],
+   "canvases": 0,
+   "lotties": 0,
+   "iframes": [
+    "https://www.googletagmanager.com/ns.html?id=GTM-WFDFDWP",
+    "https://pagead2.googlesyndication.com/pagead/ads?client=ca-pub-3938919135399013&output=html&adk=1812271804&adf=302519425",
+    "https://ep2.adtrafficquality.google/sodar/sodar2/255/runner.html",
+    "https://ramp-com.chilipiper.com/chat/loader/?embedOrigin=https%3A%2F%2Framp.com&workspaceId=fef2da9a-11bc-48f7-bd29-1762",
+    "https://ramp-com.chilipiper.com/chat/widget/?embedOrigin=https%3A%2F%2Framp.com&workspaceId=fef2da9a-11bc-48f7-bd29-1762",
+    "https://pagead2.googlesyndication.com/pagead/html/r20260917/r20190131/zrt_lookup_fy2021.html"
+   ],
+   "fonts": [
+    [
+     "lausanne",
+     1494
+    ],
+    [
+     "Material Icons",
+     193
+    ],
+    [
+     "Material Icons Outlined",
+     103
+    ]
+   ],
+   "sectionBgs": [
+    [
+     "lab(100 0 0)",
+     1
+    ]
+   ],
+   "buttonBgs": [
+    [
+     "lab(92.1406 -20.4979 84.7726)",
+     5
+    ],
+    [
+     "lab(8.86531 0.515342 0.18619)",
+     3
+    ],
+    [
+     "lab(95.604 0.426412 1.20401)",
+     2
+    ],
+    [
+     "rgba(255, 255, 255, 0.05)",
+     1
+    ]
+   ],
+   "type": {
+    "h1": {
+     "family": "lausanne, \"lausanne Fallback\"",
+     "size": "64px",
+     "weight": "400",
+     "lineHeight": "64px",
+     "letterSpacing": "-0.01px",
+     "color": "lab(2.83994 0.367254 0.969091)"
+    },
+    "h2": {
+     "family": "lausanne, \"lausanne Fallback\"",
+     "size": "48px",
+     "weight": "400"
+    },
+    "body": {
+     "family": "lausanne, \"lausanne Fallback\"",
+     "size": "16px",
+     "color": "lab(2.83994 0.367254 0.969091)",
+     "bg": "lab(100 0 0)"
+    }
+   },
+   "motionAfterScroll": {
+    "animations": {
+     "KbLogoWall-module__3RH7Jq__marquee 162s infinite": 2
+    },
+    "opacityZeroEls": 2,
+    "transitionEls": 283,
+    "stickyFixedEls": 116
+   },
+   "libs": {
+    "gsap": false,
+    "framer": false,
+    "webflow": false,
+    "lottie": false,
+    "splide_swiper": false,
+    "rive": false,
+    "nextjs": true,
+    "wordpress": false,
+    "hubspot": true
+   },
+   "wordCount": 1995,
+   "scrollHeight": 11488,
+   "bodyText": "Products Partners Solutions Resources Customers Pricing Sign in See a demo Get started Start for free. Scale with Intelligence. Whether you’re a startup, global enterprise, or somewhere in between, Ramp is designed to save you time and money. AI-assisted Free $0/mo/user Best for smaller teams who want to simplify finances. Email Get started for free Key features: Corporate Card Unlimited cards Card issuing controls Travel & Expense Complete expenses via SMS or Slack Create a custom travel policy Book flights, hotels, and car rentals Auto-receipt collection and matching Accounts Payable Automated invoice extraction (OCR) Configurable approval workflows Automated fraud checks Pay bills by ACH, card, check, wire, and more Treasury Earn 4.51%* in a Ramp Investment Account Earn 2%* on cash in a FDIC-insured account No fees, minimum deposits, or transfer caps Free wires and same-day ACH via Bill Pay Accounting Automation Basic accounting rules QuickBooks Online and Xero integrations Budgets & Reporting Custom reports and insights via AI reporting Custom report builder Vendor Management Automated vendor tracking and contract extraction Price intelligence View all features AI-powered Plus $15/mo/user + Platform fee based on team size Save 20% with annual billing Perfect for teams who want to use AI-driven automation to eliminate busywork. Email Get started for free All the features of Free, and: Travel & Expense AI-driven expense reviews and policy insights Auto-lock cards when compliance is unmet 24/7 phone support for travel bookings Accounts Payable Auto-coded line items AI-driven approval recommendations Automated batch payments Payment release approvals Procurement (Add-on to Plus or Enterprise) Advanced intake and approval workflows AI-driven vendor compliance reviews Automated PO creation and tracking Three-way match with Ramp purchase orders Accounting Automation NetSuite, Sage Intacct, and more integrations AI coding for every field Automate approval and sync of routine spend Support for multi-entity businesses Global Coverage Auto tax capture and coding Budgets & Reporting Share live reports and schedule exports Track budgets vs. actuals in real time User management Custom user roles Multi-entity visibility restrictions Audit log View all features AI-tailored Enterprise Custom Annual billing Specifically made for teams who need full customization. Email Contact sales All the features of Plus, and: Accounting Automation Workday, Oracle Fusion Cloud, and more integrations Global Coverage Locally funded reimbursements Pay card payments in local currency Local currency card issuing in 30+ countries White Glove Support Dedicated account and customer success manager Priority 24/7 global support Implementation Services Custom implementation scoping and roll out plan Integration setup and validation testing Employee training and change management Enterprise Services Custom development ERP extensions and configurations Custom policy and workflow configuration Advanced org, role, and entity configuration View all features 70,000+ finance teams have saved millions of hours with Ramp. Compare Features Free Get started for free Plus Get started for free Enterprise Contact sales Corporate Card Corporate liability charge card Competitive credit limits Unlimited physical and virtual cards Card issuing controls Category and vendor controls Proactive policy controls and follow up + Automatically lock cards when required receipts or items aren’t submitted on time + Automatically lock cards when required receipts or items aren’t submitted on time Travel Travel bookings Travel policies Create company-wide policies + Create custom travel policies based on role, department, location, and more + Create custom travel policies based on role, department, location, and more Guest bookings + Invite external guests to book travel in Ramp with set budgets and policy controls + Invite external guests to book travel in Ramp with set budgets and policy controls Support 24/7 chat support 24/7 phone support 24/7 phone support Expense Management Spend limits with preset accounting codes Automatic receipt collection and matching Employee repayments Reimbursements + Limit reimbursement spending + Submit and review reimbursements in bulk + Send weekly batched reimbursements + Limit reimbursement spending + Submit and review reimbursements in bulk + Send weekly batched reimbursements Transaction alerts and flags + Require itemized receipts, flag alcohol spend, weekend transactions, and more + Require itemized receipts, flag alcohol spend, weekend transactions, and more Approval workflows + Route based on GL code, entity, and other accounting conditions + Route based on GL code, entity, and other accounting conditions Complete expenses & ask policy questions via SMS or Slack Approval recommendations for every transaction Proactive policy & compliance insights Parallel approvers Missing receipt affidavits Sunshine Act Accounts Payable Invoice capture with AI-powered OCR Pay bills by check, ACH, card, and wire Advanced exports Tax management +W8 uploads +W8 uploads 1099 filing (NEC and MISC) $.65 per IRS filing. Free state filing. $.65 per IRS filing. Free state filing. $.65 per IRS filing. Free state filing. Create bills using CSV uploads Import bills from ERP Mobile bill approvals Approval rules and routing + Route based on vendor, department, accounting field, payment type, and more + Route based on vendor, department, accounting field, payment type, and more Basic vendor onboarding Automated fraud checks from AP Agents Automated card payments Automated batch payments Approval recommendations from AP agent Line item auto-coding from AP agent Payment release approvals Line item splits Three-way match with imported purchase orders and item receipts Procurement (Add-on to Plus or Enterprise) Custom intake Advanced workflow builder Integrations with CLM, TPRM, and Ticketing tools Vendor onboarding with custom forms Purchase order (PO) management Match card transactions to purchase orders AI-driven vendor compliance reviews Three-way match with Ramp purchase orders and item receipts Treasury Earn 2%* in a FDIC-insured business account Earn 4.51%* in an investment account No fees, minimum deposits, or transfer caps Free, same-day ACH, domestic and international wires* DACAs and letters of credit Accounting Automation Basic accounting rules Advanced accounting rules Advanced NetSuite support Multi-entity support Custom field support AI coding for every field Automated accruals and reconciliation Amortization Auto approvals for routine, recurring transactions Integrations Accounting integrations QuickBooks Online, Xero + NetSuite, Sage Intacct, Acumatica, Microsoft Dynamics 365 Business Central + more + Workday, Oracle Fusion Cloud, Microsoft Dynamics F&O + more HRIS integrations + Workday + Workday Continuous HRIS sync Global Pay global vendors in USD or local currency Global reimbursements funded in USD and paid in local currency Issue limits and create spend programs in local currencies Auto tax capture Global reimbursements funded and paid in local currency Pay card statements with local currency Fund bill payments with local currency Local card issuing Budgets & Reporting 1099 reporting Create custom reports using AI Ramp Budgets tracks plan vs. actuals in real time Custom report builder User management Secure logins with SCIM, SSO, and SAML Custom fields Custom user roles and multi entity restrictions Audit log Vendor management Price intelligence Contract extraction Automatic vendor tracking Support Help center Instant, 24/7 AI help for any Ramp question or task Chat, email, and phone support Priority support Custom support FAQ Is there a free version of Ramp? Yes, Ramp Free is designed for smaller teams who want to get started with Ramp. If you would like to try Ramp Plus, you can sign up with a free 30-day trial, and easily switch plans anytime as your needs change. Are there any limits on how many cards I can issue? No, you can issue unlimited virtual and physical cards to your team at no extra cost. Can I pay for Ramp Plus with a Ramp card? You can pay for Ramp Plus with ACH or the rewards you earn from your Ramp card spending. How can we manage our Ramp plan? You can upgrade or downgrade anytime within your Ramp dashboard or by contacting us directly. See here for more information. Time is money. Save both. Email Get started for free About us Careers Emerging talent Customers Help center Product releases Ramp for Agents Ramp Labs API documentation Versus Products Corporate cards Expense management Spend management Budgets Banking Travel Reimbursements Procurement Accounts payable Vendor management Approvals Security Trust Mobile app Ramp Sheets Platform Platform overview Accounting automation Intelligence Reporting Savings Integrations Multi-entity Global AI Token Spend Management Router Partners Accounting firms Private equity Venture capital System integrators Technology partners Spend and payroll partners Reseller partners Franchise partners Solutions Startups Small business Mid market Enterprise Free tools and resources Perks and rewards Find an accountant Find a services partner Savings calculator Mission statement generator Charge finder Per diem calculator Mileage reimbursement calculator Card comparison tool Investor database Expense categorization Expense policy builder Vendor directory Virtual cards Answers Hub Terms of Service Editorial Guidelines Privacy Policy Your Privacy Choices Manage Preferences © 2026 Ramp Business Corporation. \"Ramp\" and the Ramp logo are registered trademarks of the company. Ramp Support: +1-855-206-7283 The Ramp Visa Corporate Card is issued in the U.S. by Celtic Bank, and to U.S. corporations operating globally by Column N.A., Member FDIC, and is subject to credit approval. The Ramp Visa Commercial Card is issued by Sutton Bank, Member FDIC. The Ramp Visa Business Card is issued by Lead Bank, Member FDIC. Each card is issued pursuant to a license from Visa USA Inc. Ramp Visa Business Cards are issued in Canada by Peoples Trust Company, pursuant to license by Visa* International. Visa Int./Peoples Trust Company, Licensed User. Card Balance not insured by the Canada Deposit Insurance Corporation. Ramp Business Corporation is registered as a Payment Service Provider with the Bank of Canada. Ramp cards are issued in the UK by Stripe Payments UK Limited, an electronic money institution authorized by the Financial Conduct Authority (firm reference number: 900461). Ramp cards are issued in the EEA by Stripe Technology Europe Limited, an electronic money institution authorized by the Central Bank of Ireland (firm reference number: C187865). Cards are issued under the Visa card scheme pursuant to a license from Visa Europe Limited. Visa is a registered trademark of Visa International Service Association. All other trademarks and service marks belong to their respective owners. Ramp Business Corporation is a financial technology company and is not a bank. Bank deposit services provided by First Internet Bank of Indiana, Member FDIC. Securities products and brokerage services are provided by Apex Clearing Corporation, an SEC registered broker dealer, member of FINRA & SIPC. The Investment Account is not a deposit product, not insured by the FDIC, and may lose value. *2% Annual Percentage Yield (APY) on eligible funds in your Ramp Checking Account. The rate is accurate as of 09/19/2026. Interest is paid by First Internet Bank of Indiana, Member FDIC. The interest rate and APY are variable and subject to change without notice. See the Checking Account Addendum for more information. *Portfolios managed by Moment Advisors, LLC. Investing involves risk, including possible loss of principal. Asset allocation does not guarantee profit or protect against loss. Past performance does not guarantee future results. Additional information can be found here. The figure shown represents yiel"
+  }
+ }
+}

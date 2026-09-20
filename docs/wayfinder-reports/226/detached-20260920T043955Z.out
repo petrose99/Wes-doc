@@ -1,0 +1,146 @@
+=== [1/50] #326 — Audit: ~16 tickets closed as "shipped" (#250–#285) have no corresponding commits anywhere in the repo  [sonnet · low]
+    #326 context at exit: 57826 tokens, 3 min; loaded 29648 before the first action
+    cleaned up session pid 3204562 (pgid ?); free: 5860 MB
+scripts/wayfinder-autopilot/run.sh: line 638: /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/326.handoff.md: No such file or directory
+    scoreboard: 95 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #326: resolved in 204s
+=== [2/50] #327 — Guard unsaved pane edits on Escape and pane ✕ in the Queue-screen shell  [sonnet · low]
+    #327 crossed the hand-off line (112170 tokens ≥ 110000) — asked to hand off; hard stop at 140000
+    #327 context at exit: 120004 tokens, 23 min; loaded 29648 before the first action
+    cleaned up session pid 3209478 (pgid ?); free: 5920 MB
+    scoreboard: 96 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #327: continued (progressed), session 1/3 without progress allowed, no report in 1413s
+=== [3/50] #327 — Guard unsaved pane edits on Escape and pane ✕ in the Queue-screen shell  [sonnet · low]
+    #327 crossed the hand-off line (110321 tokens ≥ 110000) — asked to hand off; hard stop at 140000
+    #327 context at exit: 113963 tokens, 14 min; loaded 29715 before the first action
+    cleaned up session pid 3242659 (pgid ?); free: 5862 MB
+    scoreboard: 97 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #327: resolved in 898s
+=== [4/50] #328 — Build in-place editing for Approval Flows (name, approvers, threshold)  [sonnet · low · phase: spec]
+    #328 ended on a text-only turn with the ticket open — nudge 1/1 (resume ca744f11-477d-4788-a6b1-44420e506a2b)
+    #328 crossed the hand-off line (150397 tokens ≥ 150000) — asked to hand off; hard stop at 180000
+    #328 context at exit: 151907 tokens, 16 min; loaded 29731 before the first action
+    cleaned up session pid 3267311 (pgid ?); free: 5860 MB
+    scoreboard: 98 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #328: resolved in 981s
+=== [5/50] #329 — Build the ledger-stance reversal: connector picker, provider-named links, accountingEnabled gate fix (execution of #292)  [sonnet · low · phase: spec]
+    #329 ended on a text-only turn with the ticket open — nudge 1/1 (resume d8bb404e-b82c-41ac-b996-d5b50062c68f)
+    #329 context at exit: 146437 tokens, 9 min; loaded 29731 before the first action
+    cleaned up session pid 3296287 (pgid ?); free: 5863 MB
+    scoreboard: 99 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #329: phase spec done → build next in 558s
+=== [6/50] #329 — Build the ledger-stance reversal: connector picker, provider-named links, accountingEnabled gate fix (execution of #292)  [sonnet · low · phase: build]
+    #329 context at exit: 104442 tokens, 5 min; loaded 29207 before the first action
+    cleaned up session pid 3297349 (pgid ?); free: 5843 MB
+    scoreboard: 100 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #329: continued (progressed), session 1/3 without progress allowed in 305s
+=== [7/50] #329 — Build the ledger-stance reversal: connector picker, provider-named links, accountingEnabled gate fix (execution of #292)  [sonnet · low · phase: build]
+    #329 context at exit: 89269 tokens, 7 min; loaded 29207 before the first action
+    cleaned up session pid 3304131 (pgid ?); free: 5821 MB
+    scoreboard: 101 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #329: continued (progressed), session 1/3 without progress allowed in 477s
+=== [8/50] #329 — Build the ledger-stance reversal: connector picker, provider-named links, accountingEnabled gate fix (execution of #292)  [sonnet · low · phase: build]
+    #329 context at exit: 62103 tokens, 5 min; loaded 29207 before the first action
+    cleaned up session pid 3315607 (pgid ?); free: 5843 MB
+    scoreboard: 102 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #329: continued (progressed), session 1/3 without progress allowed in 336s
+=== [9/50] #329 — Build the ledger-stance reversal: connector picker, provider-named links, accountingEnabled gate fix (execution of #292)  [sonnet · low · phase: build]
+    #329 context at exit: 51763 tokens, 3 min; loaded 29207 before the first action
+    cleaned up session pid 3324226 (pgid ?); free: 5822 MB
+    scoreboard: 103 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #329: phase build done → measure next in 225s
+=== [10/50] #329 — Build the ledger-stance reversal: connector picker, provider-named links, accountingEnabled gate fix (execution of #292)  [haiku · low · phase: measure]
+    #329 context at exit: 86694 tokens, 7 min; loaded 21745 before the first action
+    cleaned up session pid 3329088 (pgid ?); free: 5825 MB
+    scoreboard: 104 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #329: phase measure done → close next in 478s
+=== [11/50] #329 — Build the ledger-stance reversal: connector picker, provider-named links, accountingEnabled gate fix (execution of #292)  [sonnet · low · phase: close]
+    #329 crossed the hand-off line (111028 tokens ≥ 110000) — asked to hand off; hard stop at 140000
+    #329 context at exit: 125980 tokens, 9 min; loaded 30238 before the first action
+    cleaned up session pid 3340495 (pgid ?); free: 5782 MB
+    scoreboard: 105 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #329: resolved in 557s
+=== [12/50] #266 — Build intake on the typed queues: Add ‹type› header action, drop-to-add, the Add documents dialog with the inbound address  [sonnet · low · phase: spec]
+    #266 ended on a text-only turn with the ticket open — nudge 1/1 (resume 2d87c409-e271-4219-8d62-9ff135d9dbd2)
+    #266 crossed the hand-off line (151525 tokens ≥ 150000) — asked to hand off; hard stop at 180000
+    #266 context at exit: 155409 tokens, 10 min; loaded 29731 before the first action
+    cleaned up session pid 3363244 (pgid ?); free: 5864 MB
+    scoreboard: 106 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #266: phase spec done → build next in 619s
+=== [13/50] #266 — Build intake on the typed queues: Add ‹type› header action, drop-to-add, the Add documents dialog with the inbound address  [sonnet · low · phase: build]
+    #266 context at exit: 41541 tokens, 2 min; loaded 29207 before the first action
+    cleaned up session pid 3366197 (pgid ?); free: 5853 MB
+    scoreboard: 107 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #266: continued (progressed), session 1/3 without progress allowed in 125s
+=== [14/50] #266 — Build intake on the typed queues: Add ‹type› header action, drop-to-add, the Add documents dialog with the inbound address  [sonnet · low · phase: build]
+    #266 context at exit: 80025 tokens, 4 min; loaded 29207 before the first action
+    cleaned up session pid 3369250 (pgid ?); free: 5854 MB
+    scoreboard: 108 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #266: continued (progressed), session 1/3 without progress allowed in 275s
+=== [15/50] #266 — Build intake on the typed queues: Add ‹type› header action, drop-to-add, the Add documents dialog with the inbound address  [sonnet · low · phase: build]
+    #266 context at exit: 52801 tokens, 2 min; loaded 29207 before the first action
+    cleaned up session pid 3375291 (pgid ?); free: 5843 MB
+    scoreboard: 109 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #266: continued (progressed), session 1/3 without progress allowed in 135s
+=== [16/50] #266 — Build intake on the typed queues: Add ‹type› header action, drop-to-add, the Add documents dialog with the inbound address  [sonnet · low · phase: build]
+    #266 context at exit: 66117 tokens, 3 min; loaded 29207 before the first action
+    cleaned up session pid 3378504 (pgid ?); free: 5788 MB
+    scoreboard: 110 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #266: continued (progressed), session 1/3 without progress allowed in 205s
+=== [17/50] #266 — Build intake on the typed queues: Add ‹type› header action, drop-to-add, the Add documents dialog with the inbound address  [sonnet · low · phase: build]
+    #266 crossed the hand-off line (110812 tokens ≥ 110000) — asked to hand off; hard stop at 140000
+    #266 context at exit: 115163 tokens, 9 min; loaded 29207 before the first action
+    cleaned up session pid 3383342 (pgid ?); free: 5793 MB
+    scoreboard: 111 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #266: continued (progressed), session 1/3 without progress allowed in 557s
+=== [18/50] #266 — Build intake on the typed queues: Add ‹type› header action, drop-to-add, the Add documents dialog with the inbound address  [sonnet · low · phase: build]
+    #266 crossed the hand-off line (112641 tokens ≥ 110000) — asked to hand off; hard stop at 140000
+    #266 context at exit: 124878 tokens, 11 min; loaded 29358 before the first action
+    cleaned up session pid 3395738 (pgid ?); free: 5833 MB
+    scoreboard: 112 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #266: continued (progressed), session 1/3 without progress allowed in 700s
+=== [19/50] #266 — Build intake on the typed queues: Add ‹type› header action, drop-to-add, the Add documents dialog with the inbound address  [sonnet · low · phase: build]
+    #266 crossed the hand-off line (110089 tokens ≥ 110000) — asked to hand off; hard stop at 140000
+    #266 context at exit: 117307 tokens, 20 min; loaded 29358 before the first action
+    cleaned up session pid 3412925 (pgid ?); free: 5881 MB
+    scoreboard: 113 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #266: continued (progressed), session 1/3 without progress allowed in 1205s
+=== [20/50] #266 — Build intake on the typed queues: Add ‹type› header action, drop-to-add, the Add documents dialog with the inbound address  [sonnet · low · phase: build]
+    #266 crossed the hand-off line (113393 tokens ≥ 110000) — asked to hand off; hard stop at 140000
+    #266 context at exit: 132259 tokens, 21 min; loaded 29358 before the first action
+    cleaned up session pid 3441016 (pgid ?); free: 5883 MB
+    scoreboard: 114 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #266: continued (progressed), session 1/3 without progress allowed in 1316s
+=== [21/50] #266 — Build intake on the typed queues: Add ‹type› header action, drop-to-add, the Add documents dialog with the inbound address  [sonnet · low · phase: build]
+    #266 crossed the hand-off line (110545 tokens ≥ 110000) — asked to hand off; hard stop at 140000
+    #266 context at exit: 116005 tokens, 29 min; loaded 29358 before the first action
+    cleaned up session pid 3472776 (pgid ?); free: 5922 MB
+    scoreboard: 115 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #266: continued (progressed), session 1/3 without progress allowed in 1744s
+=== [22/50] #266 — Build intake on the typed queues: Add ‹type› header action, drop-to-add, the Add documents dialog with the inbound address  [sonnet · low · phase: build]
+    #266 context at exit: 54072 tokens, 7 min; loaded 29358 before the first action
+    cleaned up session pid 3515592 (pgid ?); free: 5738 MB
+    scoreboard: 116 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #266: continued (progressed), session 1/3 without progress allowed, hand-off not updated in 470s
+=== [23/50] #266 — Build intake on the typed queues: Add ‹type› header action, drop-to-add, the Add documents dialog with the inbound address  [sonnet · low · phase: build]
+    #266 crossed the hand-off line (110164 tokens ≥ 110000) — asked to hand off; hard stop at 140000
+    #266 context at exit: 132604 tokens, 21 min; loaded 27858 before the first action
+    cleaned up session pid 3527646 (pgid ?); free: 6184 MB
+    scoreboard: 117 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #266: continued (progressed), session 1/3 without progress allowed in 1276s
+=== [24/50] #266 — Build intake on the typed queues: Add ‹type› header action, drop-to-add, the Add documents dialog with the inbound address  [sonnet · low · phase: build]
+    #266 context at exit: 42438 tokens, 2 min; loaded 27858 before the first action
+    cleaned up session pid 3561746 (pgid ?); free: 6249 MB
+    scoreboard: 118 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #266: phase build done → measure next in 135s
+=== [25/50] #266 — Build intake on the typed queues: Add ‹type› header action, drop-to-add, the Add documents dialog with the inbound address  [haiku · low · phase: measure]
+    #266 context at exit: 101319 tokens, 13 min; loaded 20677 before the first action
+    cleaned up session pid 3565045 (pgid ?); free: 6207 MB
+    scoreboard: 119 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #266: phase measure done → close next in 800s
+=== [26/50] #266 — Build intake on the typed queues: Add ‹type› header action, drop-to-add, the Add documents dialog with the inbound address  [sonnet · low · phase: close]
+    #266 context at exit: 46472 tokens, 6 min; loaded 28923 before the first action
+    cleaned up session pid 3583556 (pgid ?); free: 6027 MB
+    scoreboard: 120 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #266: continued (no progress), session 1/3 without progress allowed, hand-off not updated in 387s
+=== [27/50] #266 — Build intake on the typed queues: Add ‹type› header action, drop-to-add, the Add documents dialog with the inbound address  [sonnet · low · phase: close]

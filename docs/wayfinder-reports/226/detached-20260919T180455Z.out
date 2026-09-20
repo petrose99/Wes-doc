@@ -1,0 +1,20 @@
+=== [1/50] #286 — Build Users (Admin, org-level Queue-screen shell)  [sonnet · low · phase: close]
+    #286 context at exit: 76374 tokens, 8 min; loaded 53771 before the first action
+    cleaned up session pid 2379382 (pgid ?); free: 5759 MB
+    scoreboard: 22 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #286: resolved in 514s
+=== [2/50] #287 — Build Admin Dashboard rollups and the grouped company switcher  [sonnet · low · phase: spec]
+    #287 crossed the hand-off line (145009 tokens ≥ 110000) — asked to hand off; hard stop at 140000
+    #287 hit the context cap (145009 tokens ≥ 140000) — saving WIP and handing off
+    #287 context at exit: 145009 tokens, 1 min; loaded 53238 before the first action
+    cleaned up session pid 2391360 (pgid ?); free: 5761 MB
+./scripts/wayfinder-autopilot/run.sh: line 559: /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/287.handoff.md: No such file or directory
+    scoreboard: 23 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #287: continued (progressed), session 1/3 without progress allowed, no report, hand-off not updated in 94s
+=== [3/50] #287 — Build Admin Dashboard rollups and the grouped company switcher  [sonnet · low · phase: spec]
+    #287 crossed the hand-off line (112685 tokens ≥ 110000) — asked to hand off; hard stop at 140000
+    #287 context at exit: 119550 tokens, 3 min; loaded 53220 before the first action
+    cleaned up session pid 2394150 (pgid ?); free: 5758 MB
+    scoreboard: 24 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #287: continued (progressed), session 1/3 without progress allowed, no report in 185s
+=== [4/50] #287 — Build Admin Dashboard rollups and the grouped company switcher  [sonnet · low · phase: spec]

@@ -1,0 +1,374 @@
+{
+ "slug": "docubite-product",
+ "label": "DocuBite product",
+ "url": "http://localhost:3000/product",
+ "accessed": "2026-09-19T11:51:38.499Z",
+ "views": {
+  "390": {
+   "status": 200,
+   "shot": "/home/ubuntu/Dev/Wes-doc/docs/research/benchmark-captures/docubite/docubite-product-390.png",
+   "initialMotion": {
+    "opacityZeroEls": 0,
+    "animations": {},
+    "transitionEls": 30,
+    "total": 345
+   },
+   "errors": [],
+   "title": "Product — DocuBite",
+   "h1": "See the mechanism behind the paperwork.",
+   "subhead": "DocuBite turns supported documents into reviewable rows, keeps every exception visible, and carries approved work toward your ledger. Explore the parts that make the workflow explainable.",
+   "headings": [
+    {
+     "tag": "H1",
+     "text": "See the mechanism behind the paperwork.",
+     "top": 129
+    },
+    {
+     "tag": "H2",
+     "text": "Follow one piece of work all the way through.",
+     "top": 766
+    },
+    {
+     "tag": "H3",
+     "text": "The workflow stays visible",
+     "top": 1949
+    },
+    {
+     "tag": "H2",
+     "text": "Useful detail, with the limits in view.",
+     "top": 2483
+    },
+    {
+     "tag": "H3",
+     "text": "Reviewable, not infallible",
+     "top": 2683
+    },
+    {
+     "tag": "H3",
+     "text": "Connected, not universal",
+     "top": 2811
+    },
+    {
+     "tag": "H3",
+     "text": "Account creation, not a trial",
+     "top": 2963
+    }
+   ],
+   "sections": [
+    {
+     "top": 65,
+     "height": 637,
+     "heading": "See the mechanism behind the paperwork.",
+     "imgs": 0,
+     "svgs": 2,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 260,
+     "snippet": "See the mechanism behind the paperwork. DocuBite turns supported documents into reviewable rows, keeps every exception visible, and carries approved work toward your ledger. Explore the parts that make the workflow expla"
+    },
+    {
+     "top": 702,
+     "height": 1717,
+     "heading": "Follow one piece of work all the way through.",
+     "imgs": 0,
+     "svgs": 5,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 1065,
+     "snippet": "Follow one piece of work all the way through. Start with the capability closest to the question you are trying to answer. Each page shows the mechanism, the evidence it keeps, and the point where a person still needs to "
+    },
+    {
+     "top": 2419,
+     "height": 694,
+     "heading": "Useful detail, with the limits in view.",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 498,
+     "snippet": "Useful detail, with the limits in view. A public explanation is only useful when it also says where the product stops. Reviewable, not infallible Confidence and source provenance stay attached to the work so a person can"
+    }
+   ],
+   "navLinks": [
+    "Skip to main content",
+    "DocuBite",
+    "Open workspace"
+   ],
+   "heroCtas": [
+    {
+     "text": "Create an account",
+     "tag": "A",
+     "href": "/signup"
+    },
+    {
+     "text": "Request a demo",
+     "tag": "A",
+     "href": "/demo"
+    }
+   ],
+   "bigImgs": [],
+   "imgCount": 0,
+   "logoish": 0,
+   "videos": [],
+   "canvases": 0,
+   "lotties": 0,
+   "iframes": [],
+   "fonts": [
+    [
+     "inter",
+     101
+    ],
+    [
+     "Bricolage Grotesque",
+     14
+    ]
+   ],
+   "sectionBgs": [
+    [
+     "rgb(255, 255, 255)",
+     3
+    ],
+    [
+     "lab(98.1434 -0.369519 -1.05966)",
+     2
+    ]
+   ],
+   "buttonBgs": [
+    [
+     "lab(44.4871 -41.0396 11.0361)",
+     2
+    ],
+    [
+     "rgb(255, 255, 255)",
+     2
+    ]
+   ],
+   "type": {
+    "h1": {
+     "family": "\"Bricolage Grotesque\", \"Bricolage Grotesque Fallback\", ui-sans-serif, system-ui, sans-serif",
+     "size": "41.6px",
+     "weight": "800",
+     "lineHeight": "40.768px",
+     "letterSpacing": "-2.08px",
+     "color": "lab(1.76974 1.32743 -9.28855)"
+    },
+    "h2": {
+     "family": "inter, \"inter Fallback\", ui-sans-serif, system-ui, sans-serif",
+     "size": "13.76px",
+     "weight": "500"
+    },
+    "body": {
+     "family": "inter, \"inter Fallback\", ui-sans-serif, system-ui, sans-serif",
+     "size": "16px",
+     "color": "rgb(15, 23, 41)",
+     "bg": "rgb(255, 255, 255)"
+    }
+   },
+   "motionAfterScroll": {
+    "animations": {},
+    "opacityZeroEls": 0,
+    "transitionEls": 30,
+    "stickyFixedEls": 1
+   },
+   "libs": {
+    "gsap": false,
+    "framer": false,
+    "webflow": false,
+    "lottie": false,
+    "splide_swiper": false,
+    "rive": false,
+    "nextjs": true,
+    "wordpress": false,
+    "hubspot": false
+   },
+   "wordCount": 299,
+   "scrollHeight": 3281,
+   "bodyText": "Skip to main content DocuBite Open workspace See the mechanism behind the paperwork. DocuBite turns supported documents into reviewable rows, keeps every exception visible, and carries approved work toward your ledger. Explore the parts that make the workflow explainable. Create an account Request a demo Follow one piece of work all the way through. Start with the capability closest to the question you are trying to answer. Each page shows the mechanism, the evidence it keeps, and the point where a person still needs to decide. Read & review Document extraction Turn supported PDFs and images into reviewable rows with confidence and source provenance. Read & review Controls & fraud Catch anomalies and enforce explainable gates before risky workflow steps. Close with confidence Close the books Coordinate close work with gated period transitions and unposted accrual drafts. Close with confidence Data health Surface scored pipeline, ledger and tax drift before reconciliation problems grow. Connect & extend Integrations & API Send reviewed data to connected accounting systems and external systems through documented interfaces. The workflow stays visible 1 Capture supported files 2 Review fields and evidence 3 Apply checks and gates 4 Close the period 5 Connect the outcome The system moves routine work forward. People keep the decisions that need context. Useful detail, with the limits in view. A public explanation is only useful when it also says where the product stops. Reviewable, not infallible Confidence and source provenance stay attached to the work so a person can verify what matters. Connected, not universal Built-in ledger, QuickBooks Online and Xero are live destinations today; roadmap systems are labelled as planned. Account creation, not a trial Create an account to explore the workspace. No billing promise is hidden in the action. DocuBite Privacy Terms Cookies How we use AI support@docubite.com"
+  },
+  "1440": {
+   "status": 200,
+   "shot": "/home/ubuntu/Dev/Wes-doc/docs/research/benchmark-captures/docubite/docubite-product-1440.png",
+   "initialMotion": {
+    "opacityZeroEls": 0,
+    "animations": {},
+    "transitionEls": 30,
+    "total": 345
+   },
+   "errors": [],
+   "title": "Product — DocuBite",
+   "h1": "See the mechanism behind the paperwork.",
+   "subhead": "DocuBite turns supported documents into reviewable rows, keeps every exception visible, and carries approved work toward your ledger. Explore the parts that make the workflow explainable.",
+   "headings": [
+    {
+     "tag": "H1",
+     "text": "See the mechanism behind the paperwork.",
+     "top": 162
+    },
+    {
+     "tag": "H2",
+     "text": "Follow one piece of work all the way through.",
+     "top": 796
+    },
+    {
+     "tag": "H3",
+     "text": "The workflow stays visible",
+     "top": 901
+    },
+    {
+     "tag": "H2",
+     "text": "Useful detail, with the limits in view.",
+     "top": 1907
+    },
+    {
+     "tag": "H3",
+     "text": "Reviewable, not infallible",
+     "top": 2103
+    },
+    {
+     "tag": "H3",
+     "text": "Connected, not universal",
+     "top": 2103
+    },
+    {
+     "tag": "H3",
+     "text": "Account creation, not a trial",
+     "top": 2103
+    }
+   ],
+   "sections": [
+    {
+     "top": 66,
+     "height": 634,
+     "heading": "See the mechanism behind the paperwork.",
+     "imgs": 0,
+     "svgs": 2,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 260,
+     "snippet": "See the mechanism behind the paperwork. DocuBite turns supported documents into reviewable rows, keeps every exception visible, and carries approved work toward your ledger. Explore the parts that make the workflow expla"
+    },
+    {
+     "top": 700,
+     "height": 1127,
+     "heading": "Follow one piece of work all the way through.",
+     "imgs": 0,
+     "svgs": 5,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 1065,
+     "snippet": "Follow one piece of work all the way through. Start with the capability closest to the question you are trying to answer. Each page shows the mechanism, the evidence it keeps, and the point where a person still needs to "
+    },
+    {
+     "top": 1827,
+     "height": 466,
+     "heading": "Useful detail, with the limits in view.",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 498,
+     "snippet": "Useful detail, with the limits in view. A public explanation is only useful when it also says where the product stops. Reviewable, not infallible Confidence and source provenance stay attached to the work so a person can"
+    }
+   ],
+   "navLinks": [
+    "Skip to main content",
+    "DocuBite",
+    "Product",
+    "Solutions",
+    "Pricing",
+    "Resources",
+    "Open workspace"
+   ],
+   "heroCtas": [
+    {
+     "text": "Create an account",
+     "tag": "A",
+     "href": "/signup"
+    },
+    {
+     "text": "Request a demo",
+     "tag": "A",
+     "href": "/demo"
+    }
+   ],
+   "bigImgs": [],
+   "imgCount": 0,
+   "logoish": 0,
+   "videos": [],
+   "canvases": 0,
+   "lotties": 0,
+   "iframes": [],
+   "fonts": [
+    [
+     "inter",
+     123
+    ],
+    [
+     "Bricolage Grotesque",
+     14
+    ]
+   ],
+   "sectionBgs": [
+    [
+     "rgb(255, 255, 255)",
+     3
+    ],
+    [
+     "lab(98.1434 -0.369519 -1.05966)",
+     2
+    ]
+   ],
+   "buttonBgs": [
+    [
+     "lab(44.4871 -41.0396 11.0361)",
+     2
+    ],
+    [
+     "rgb(255, 255, 255)",
+     1
+    ]
+   ],
+   "type": {
+    "h1": {
+     "family": "\"Bricolage Grotesque\", \"Bricolage Grotesque Fallback\", ui-sans-serif, system-ui, sans-serif",
+     "size": "83.2px",
+     "weight": "800",
+     "lineHeight": "81.536px",
+     "letterSpacing": "-4.16px",
+     "color": "lab(1.76974 1.32743 -9.28855)"
+    },
+    "h2": {
+     "family": "inter, \"inter Fallback\", ui-sans-serif, system-ui, sans-serif",
+     "size": "13.76px",
+     "weight": "500"
+    },
+    "body": {
+     "family": "inter, \"inter Fallback\", ui-sans-serif, system-ui, sans-serif",
+     "size": "16px",
+     "color": "rgb(15, 23, 41)",
+     "bg": "rgb(255, 255, 255)"
+    }
+   },
+   "motionAfterScroll": {
+    "animations": {},
+    "opacityZeroEls": 0,
+    "transitionEls": 30,
+    "stickyFixedEls": 1
+   },
+   "libs": {
+    "gsap": false,
+    "framer": false,
+    "webflow": false,
+    "lottie": false,
+    "splide_swiper": false,
+    "rive": false,
+    "nextjs": true,
+    "wordpress": false,
+    "hubspot": false
+   },
+   "wordCount": 304,
+   "scrollHeight": 2383,
+   "bodyText": "Skip to main content DocuBite Product Solutions Pricing Resources About Open workspace See the mechanism behind the paperwork. DocuBite turns supported documents into reviewable rows, keeps every exception visible, and carries approved work toward your ledger. Explore the parts that make the workflow explainable. Create an account Request a demo Follow one piece of work all the way through. Start with the capability closest to the question you are trying to answer. Each page shows the mechanism, the evidence it keeps, and the point where a person still needs to decide. Read & review Document extraction Turn supported PDFs and images into reviewable rows with confidence and source provenance. Read & review Controls & fraud Catch anomalies and enforce explainable gates before risky workflow steps. Close with confidence Close the books Coordinate close work with gated period transitions and unposted accrual drafts. Close with confidence Data health Surface scored pipeline, ledger and tax drift before reconciliation problems grow. Connect & extend Integrations & API Send reviewed data to connected accounting systems and external systems through documented interfaces. The workflow stays visible 1 Capture supported files 2 Review fields and evidence 3 Apply checks and gates 4 Close the period 5 Connect the outcome The system moves routine work forward. People keep the decisions that need context. Useful detail, with the limits in view. A public explanation is only useful when it also says where the product stops. Reviewable, not infallible Confidence and source provenance stay attached to the work so a person can verify what matters. Connected, not universal Built-in ledger, QuickBooks Online and Xero are live destinations today; roadmap systems are labelled as planned. Account creation, not a trial Create an account to explore the workspace. No billing promise is hidden in the action. DocuBite Privacy Terms Cookies How we use AI support@docubite.com"
+  }
+ }
+}

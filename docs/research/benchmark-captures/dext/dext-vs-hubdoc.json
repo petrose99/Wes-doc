@@ -1,0 +1,937 @@
+{
+ "slug": "dext-vs-hubdoc",
+ "label": "Dext vs Hubdoc",
+ "url": "https://dext.com/en/resources/compare/dext-vs-hubdoc",
+ "accessed": "2026-09-19T12:18:21.775Z",
+ "views": {
+  "390": {
+   "status": 200,
+   "shot": "/home/ubuntu/Dev/Wes-doc/docs/research/benchmark-captures/dext/dext-vs-hubdoc-390.png",
+   "initialMotion": {
+    "opacityZeroEls": 0,
+    "animations": {
+     "slider-ticker-scroll 40s infinite": 2,
+     "fadein 0.35s 1": 6
+    },
+    "transitionEls": 129,
+    "total": 2819
+   },
+   "errors": [
+    "Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-mi",
+    "overlaysHidden=2"
+   ],
+   "title": "Hubdoc Alternative with Real Bookkeeping Automation | Dext",
+   "h1": "Dext: The Hubdoc alternative that does more than store your paperwork",
+   "subhead": null,
+   "headings": [
+    {
+     "tag": "H1",
+     "text": "Dext: The Hubdoc alternative that does more than store your paperwork",
+     "top": 92
+    },
+    {
+     "tag": "H2",
+     "text": "Capture is where Hubdoc stops.",
+     "top": 1056
+    },
+    {
+     "tag": "H2",
+     "text": "It's where Dext starts.",
+     "top": 1141
+    },
+    {
+     "tag": "H2",
+     "text": "Up-to-date books start with up-to-date paperwork",
+     "top": 2667
+    },
+    {
+     "tag": "H2",
+     "text": "Books you can trust, without the double-checking",
+     "top": 3550
+    },
+    {
+     "tag": "H2",
+     "text": "Xero owns Hubdoc. Dext integrates deeper.",
+     "top": 5021
+    },
+    {
+     "tag": "H2",
+     "text": "A product that's moving forward, not standing still",
+     "top": 5925
+    },
+    {
+     "tag": "H2",
+     "text": "A product that's moving forward, not standing still",
+     "top": 6962
+    },
+    {
+     "tag": "H2",
+     "text": "Where the two tools part ways",
+     "top": 8078
+    },
+    {
+     "tag": "H2",
+     "text": "\"Hubdoc is free with Xero.\" But free isn't the full price.",
+     "top": 9432
+    },
+    {
+     "tag": "H2",
+     "text": "Running a practice? Dext scales where Hubdoc can't",
+     "top": 11297
+    },
+    {
+     "tag": "H2",
+     "text": "A smarter, more complete alternative to Hubdoc",
+     "top": 12226
+    },
+    {
+     "tag": "H2",
+     "text": "99%+",
+     "top": 12631
+    },
+    {
+     "tag": "H2",
+     "text": "700K+",
+     "top": 12802
+    },
+    {
+     "tag": "H2",
+     "text": "16+",
+     "top": 12972
+    },
+    {
+     "tag": "H2",
+     "text": "Switching from Hubdoc? We'll make it easy.",
+     "top": 13231
+    },
+    {
+     "tag": "H2",
+     "text": "Expert support you can rely on",
+     "top": 14209
+    },
+    {
+     "tag": "H2",
+     "text": "Frequently asked questions comparing Dext to Hubdoc",
+     "top": 14927
+    },
+    {
+     "tag": "H2",
+     "text": "Are you a business or an accounting & bookkeeping firm?",
+     "top": 15513
+    },
+    {
+     "tag": "H2",
+     "text": "More reasons to love Dext",
+     "top": 16708
+    }
+   ],
+   "sections": [
+    {
+     "top": 60,
+     "height": 784,
+     "heading": "",
+     "imgs": 0,
+     "svgs": 7,
+     "videos": 0,
+     "ctas": [
+      "For Businesses",
+      "For Accountants & Bookkeepers",
+      "Pricing",
+      "Resources",
+      "Start a free trial",
+      "Log in"
+     ],
+     "textLen": 95,
+     "snippet": "For Businesses For Accountants & Bookkeepers Pricing Resources Start a free trial Log in Retour"
+    },
+    {
+     "top": 60,
+     "height": 20052,
+     "heading": "Dext: The Hubdoc alternative that does more than store your paperwork",
+     "imgs": 73,
+     "svgs": 159,
+     "videos": 0,
+     "ctas": [
+      "Start a free trial",
+      "Start a free trial",
+      "View pricing",
+      "Explore receipt & invoice capture",
+      "Explore all accounting integrations",
+      "Explore new product releases"
+     ],
+     "textLen": 12340,
+     "snippet": "Start a free trial Dext: The Hubdoc alternative that does more than store your paperwork Hubdoc collects your documents. Dext gets them into your books with over 99% accurate AI data extraction, invoices fetched automati"
+    },
+    {
+     "top": 0,
+     "height": 844,
+     "heading": "",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 0,
+     "snippet": ""
+    }
+   ],
+   "navLinks": [
+    "Start a free trial"
+   ],
+   "heroCtas": [
+    {
+     "text": "For Businesses",
+     "tag": "BUTTON",
+     "href": null
+    },
+    {
+     "text": "For Accountants & Bookkeepers",
+     "tag": "BUTTON",
+     "href": null
+    },
+    {
+     "text": "Pricing",
+     "tag": "BUTTON",
+     "href": null
+    },
+    {
+     "text": "Resources",
+     "tag": "BUTTON",
+     "href": null
+    },
+    {
+     "text": "Start a free trial",
+     "tag": "A",
+     "href": "https://app.dext.com/en/signups"
+    },
+    {
+     "text": "Log in",
+     "tag": "A",
+     "href": "https://app.dext.com/login/"
+    },
+    {
+     "text": "Retour",
+     "tag": "BUTTON",
+     "href": null
+    },
+    {
+     "text": "Start a free trial",
+     "tag": "A",
+     "href": "https://app.dext.com/signups"
+    },
+    {
+     "text": "View pricing",
+     "tag": "A",
+     "href": "/business/pricing"
+    },
+    {
+     "text": "4.4 based on 580+ reviews",
+     "tag": "A",
+     "href": "https://quickbooks.intuit.com/app/apps/appdetails/dext_enhanced_version/"
+    },
+    {
+     "text": "4.8 based on 1110+ reviews",
+     "tag": "A",
+     "href": "https://apps.xero.com/app/dext-prepare?sort=ratingDesc#overview"
+    },
+    {
+     "text": "4.8 based on 91110+ ratings",
+     "tag": "A",
+     "href": "https://apps.apple.com/us/app/dext-expense-tracker/id418327708"
+    },
+    {
+     "text": "4.8 based on 12880+ reviews",
+     "tag": "A",
+     "href": "https://play.google.com/store/apps/details?id=com.receiptbank.android"
+    },
+    {
+     "text": "4.6 based on 380+ reviews",
+     "tag": "A",
+     "href": "https://www.g2.com/products/dext/reviews?utm_source=rewards-medal"
+    },
+    {
+     "text": "4.4 based on 580+ reviews",
+     "tag": "A",
+     "href": "https://quickbooks.intuit.com/app/apps/appdetails/dext_enhanced_version/"
+    },
+    {
+     "text": "4.8 based on 1110+ reviews",
+     "tag": "A",
+     "href": "https://apps.xero.com/app/dext-prepare?sort=ratingDesc#overview"
+    },
+    {
+     "text": "4.8 based on 91110+ ratings",
+     "tag": "A",
+     "href": "https://apps.apple.com/us/app/dext-expense-tracker/id418327708"
+    },
+    {
+     "text": "4.8 based on 12880+ reviews",
+     "tag": "A",
+     "href": "https://play.google.com/store/apps/details?id=com.receiptbank.android"
+    },
+    {
+     "text": "4.6 based on 380+ reviews",
+     "tag": "A",
+     "href": "https://www.g2.com/products/dext/reviews?utm_source=rewards-medal"
+    },
+    {
+     "text": "4.4 based on 580+ reviews",
+     "tag": "A",
+     "href": "https://quickbooks.intuit.com/app/apps/appdetails/dext_enhanced_version/"
+    },
+    {
+     "text": "4.8 based on 1110+ reviews",
+     "tag": "A",
+     "href": "https://apps.xero.com/app/dext-prepare?sort=ratingDesc#overview"
+    },
+    {
+     "text": "4.8 based on 91110+ ratings",
+     "tag": "A",
+     "href": "https://apps.apple.com/us/app/dext-expense-tracker/id418327708"
+    },
+    {
+     "text": "4.8 based on 12880+ reviews",
+     "tag": "A",
+     "href": "https://play.google.com/store/apps/details?id=com.receiptbank.android"
+    },
+    {
+     "text": "4.6 based on 380+ reviews",
+     "tag": "A",
+     "href": "https://www.g2.com/products/dext/reviews?utm_source=rewards-medal"
+    },
+    {
+     "text": "4.4 based on 580+ reviews",
+     "tag": "A",
+     "href": "https://quickbooks.intuit.com/app/apps/appdetails/dext_enhanced_version/"
+    },
+    {
+     "text": "4.8 based on 1110+ reviews",
+     "tag": "A",
+     "href": "https://apps.xero.com/app/dext-prepare?sort=ratingDesc#overview"
+    },
+    {
+     "text": "4.8 based on 91110+ ratings",
+     "tag": "A",
+     "href": "https://apps.apple.com/us/app/dext-expense-tracker/id418327708"
+    },
+    {
+     "text": "4.8 based on 12880+ reviews",
+     "tag": "A",
+     "href": "https://play.google.com/store/apps/details?id=com.receiptbank.android"
+    },
+    {
+     "text": "4.6 based on 380+ reviews",
+     "tag": "A",
+     "href": "https://www.g2.com/products/dext/reviews?utm_source=rewards-medal"
+    }
+   ],
+   "bigImgs": [
+    {
+     "w": 335,
+     "h": 313,
+     "alt": "Logos of tools connecting with Dext",
+     "src": "https://assets.dext.com/api/v1/image/assets%2F1b6ae8870b9341c0bb10634cd51cea2b%2F065e1da979214c91b8f40c45bb2639f4?format=webp",
+     "top": 2273
+    },
+    {
+     "w": 335,
+     "h": 275,
+     "alt": "",
+     "src": "https://assets.dext.com/api/v1/image/assets%2F1b6ae8870b9341c0bb10634cd51cea2b%2Fb9164e5d084944e5afc043c8474828b3?format=webp",
+     "top": 4250
+    },
+    {
+     "w": 335,
+     "h": 365,
+     "alt": "",
+     "src": "https://assets.dext.com/api/v1/image/assets%2F1b6ae8870b9341c0bb10634cd51cea2b%2F2a92dff2dbfa44f886b134a9c791ed96",
+     "top": 4589
+    },
+    {
+     "w": 550,
+     "h": 360,
+     "alt": "",
+     "src": "https://assets.dext.com/api/v1/image/assets%2F1b6ae8870b9341c0bb10634cd51cea2b%2F66a13695ab6d4d41ae96249f963cfbb0?format=webp",
+     "top": 6471
+    },
+    {
+     "w": 335,
+     "h": 219,
+     "alt": "",
+     "src": "https://assets.dext.com/api/v1/image/assets%2F1b6ae8870b9341c0bb10634cd51cea2b%2F66a13695ab6d4d41ae96249f963cfbb0?format=webp",
+     "top": 7759
+    },
+    {
+     "w": 335,
+     "h": 264,
+     "alt": "",
+     "src": "https://assets.dext.com/api/v1/image/assets%2F1b6ae8870b9341c0bb10634cd51cea2b%2F1ce24c57486843aaab3354187c28221d?format=webp",
+     "top": 10252
+    },
+    {
+     "w": 335,
+     "h": 501,
+     "alt": "Dext's mobile bookkeeping app user interface",
+     "src": "https://assets.dext.com/api/v1/image/assets%2F1b6ae8870b9341c0bb10634cd51cea2b%2F0aaf6fe2b3a448e68dd08e53b52cc7c1",
+     "top": 10728
+    }
+   ],
+   "imgCount": 70,
+   "logoish": 0,
+   "videos": [],
+   "canvases": 1,
+   "lotties": 0,
+   "iframes": [
+    "https://widget.trustpilot.com/trustboxes/53aa8807dec7e10d38f59f32/index.html?templateId=53aa8807dec7e10d38f59f32&busines",
+    "https://widget.trustpilot.com/trustboxes/53aa8807dec7e10d38f59f32/index.html?templateId=53aa8807dec7e10d38f59f32&busines",
+    "https://widget.trustpilot.com/trustboxes/53aa8807dec7e10d38f59f32/index.html?templateId=53aa8807dec7e10d38f59f32&busines",
+    "https://widget.trustpilot.com/trustboxes/53aa8807dec7e10d38f59f32/index.html?templateId=53aa8807dec7e10d38f59f32&busines",
+    "https://app-eu1.hubspot.com/conversations-visitor/1614934/threads/utk/07689f92e0c64a2bb4bca5f84b73fe35?uuid=f1030f72a4d5"
+   ],
+   "fonts": [
+    [
+     "Roboto",
+     1732
+    ],
+    [
+     "Inter",
+     106
+    ]
+   ],
+   "sectionBgs": [
+    [
+     "rgb(255, 255, 255)",
+     1
+    ],
+    [
+     "rgb(255, 205, 179)",
+     1
+    ]
+   ],
+   "buttonBgs": [
+    [
+     "rgb(12, 35, 64)",
+     6
+    ],
+    [
+     "rgb(0, 0, 0)",
+     1
+    ],
+    [
+     "rgb(195, 203, 213)",
+     1
+    ],
+    [
+     "rgb(233, 241, 251)",
+     1
+    ],
+    [
+     "rgb(255, 239, 230)",
+     1
+    ],
+    [
+     "rgb(240, 250, 209)",
+     1
+    ]
+   ],
+   "type": {
+    "h1": {
+     "family": "Inter, \"Inter Fallback\"",
+     "size": "32px",
+     "weight": "900",
+     "lineHeight": "36.8px",
+     "letterSpacing": "-0.96px",
+     "color": "rgb(0, 0, 0)"
+    },
+    "h2": {
+     "family": "Inter, \"Inter Fallback\"",
+     "size": "30px",
+     "weight": "900"
+    },
+    "body": {
+     "family": "\"Times New Roman\"",
+     "size": "16px",
+     "color": "rgb(0, 0, 0)",
+     "bg": "rgba(0, 0, 0, 0)"
+    }
+   },
+   "motionAfterScroll": {
+    "animations": {
+     "slider-ticker-scroll 40s infinite": 2
+    },
+    "opacityZeroEls": 1,
+    "transitionEls": 141,
+    "stickyFixedEls": 11
+   },
+   "libs": {
+    "gsap": false,
+    "framer": false,
+    "webflow": false,
+    "lottie": false,
+    "splide_swiper": false,
+    "rive": false,
+    "nextjs": true,
+    "wordpress": false,
+    "hubspot": true
+   },
+   "wordCount": 2039,
+   "scrollHeight": 20112,
+   "bodyText": "For Businesses For Accountants & Bookkeepers Pricing Resources Start a free trial Log in Retour Start a free trial Dext: The Hubdoc alternative that does more than store your paperwork Hubdoc collects your documents. Dext gets them into your books with over 99% accurate AI data extraction, invoices fetched automatically from your suppliers, and automation that saves you hours every month. Start a free trial View pricing No credit card required. 4.4 based on 580+ reviews 4.8 based on 1110+ reviews 4.8 based on 91110+ ratings 4.8 based on 12880+ reviews 4.6 based on 380+ reviews 4.4 based on 580+ reviews 4.8 based on 1110+ reviews 4.8 based on 91110+ ratings 4.8 based on 12880+ reviews 4.6 based on 380+ reviews 4.4 based on 580+ reviews 4.8 based on 1110+ reviews 4.8 based on 91110+ ratings 4.8 based on 12880+ reviews 4.6 based on 380+ reviews 4.4 based on 580+ reviews 4.8 based on 1110+ reviews 4.8 based on 91110+ ratings 4.8 based on 12880+ reviews 4.6 based on 380+ reviews G2 Regional Leader Spring 2026 G2 Momentum Leader Summer 2026 Best Expense Software 2025 Small Business App of the Year Winner 2024 • UK • US Best Accounting Cloud-Based Software 2023 G2 Regional Leader Spring 2026 G2 Momentum Leader Summer 2026 Best Expense Software 2025 Small Business App of the Year Winner 2024 • UK • US Best Accounting Cloud-Based Software 2023 G2 Regional Leader Spring 2026 G2 Momentum Leader Summer 2026 Best Expense Software 2025 Small Business App of the Year Winner 2024 • UK • US Best Accounting Cloud-Based Software 2023 G2 Regional Leader Spring 2026 G2 Momentum Leader Summer 2026 Best Expense Software 2025 Small Business App of the Year Winner 2024 • UK • US Best Accounting Cloud-Based Software 2023 WHY BUSINESSES CHOOSE DEXT OVER HUBDOC Capture is where Hubdoc stops. It's where Dext starts. Every way to send paperwork Snap it, email it, upload it – every submission method Hubdoc offers, plus Invoice Fetch, which automatically retrieves invoices from your supplier accounts. Utilities, software subscriptions: they arrive in Dext before you think to look for them. Data you don't double-check Dext reads the whole document – supplier, totals, tax, payment method and full line items – with 99%+ accuracy, trained on billions of real receipts and invoices. It lands in your books ready to use, not ready to fix. Room to grow with your business Hubdoc suits a handful of simple documents a month. Dext adds AI Assist supplier rules, bank matching, expense management and approvals. So the tool you pick today still fits when your business is twice the size. AUTOMATED DOCUMENT COLLECTION Up-to-date books start with up-to-date paperwork The biggest time sink in bookkeeping isn't processing documents, it's collecting them. Dext makes submitting so easy that paperwork flows in as it's created, keeping your books current instead of a month behind. Snap and go: photograph a receipt in the mobile app and the data is extracted before you've put your phone away Email-in address: set a rule to auto-forward supplier invoices and they process themselves, invoice after invoice Upload, scan or sync from cloud storage – whatever fits the way you already work 10 years of secure storage in Dext, searchable in seconds – so you're always audit-ready Explore receipt & invoice capture ACCURACY & DEPTH OF EXTRACTION Books you can trust, without the double-checking Basic OCR gives you a date, a currency and an invoice number. Dext reads the whole document accurately, so your numbers are right the first time, whether you do the books yourself or hand them to your accountant. Over 99% accurate data capture, trained on billions of real documents – crumpled receipts and messy handwriting included Deeper field extraction: supplier, totals, tax amounts, payment method, PO numbers and full line items – not just the basics Supplier statement reconciliation: match statements against invoices to spot what's missing – not a Hubdoc capability Duplicate and anomaly detection catches mistakes before they reach your books – or your tax return INTEGRATIONS Xero owns Hubdoc. Dext integrates deeper. It's a fair assumption that Hubdoc works best with Xero. In practice, Dext exchanges more data with Xero in both directions – and connects to 36 accounting platforms, so it works whatever software you or your accountant use. More from Xero into Dext: tracking categories, purchase orders and your full chart of accounts More from Dext into Xero: richer extracted data, plus flags for invoices missing attachments and bank transactions that match documents in Dext 36+ accounting integrations including Xero, QuickBooks, Sage and FreeAgent – Hubdoc connects to Xero, QuickBooks Online and Bill.com 11,500+ bank connections via open banking keep your transactions flowing in automatically Explore all accounting integrations CONTINUOUS INVESTMENT A product that's moving forward, not standing still The tool you choose today should be better next year. Dext ships new capability constantly; Hubdoc's development has slowed to a trickle – its only UK release in the first half of 2024 was the ability to upload 10 documents at once from the mobile app. AI built in: Dext bookkeeping AI agent codes, categorises and learns from how you work – Hubdoc has no AI capability Insights and dashboards show the state of your books at a glance – Hubdoc offers no reporting or insight tools A mobile app users love: rated 4.8 on the App Store and 4.7 on Google Play – a frequent sore point in Hubdoc user reviews. Currently rated 1.6 on the App Store and 3.5 on Google Play. New features shipping regularly across capture, automation, payments and AI – see the release log for what's landed this quarter Explore new product releases CONTINUOUS INVESTMENT A product that's moving forward, not standing still The tool you choose today should be better next year. Dext ships new capability constantly; Hubdoc's development has slowed to a trickle – its only UK release in the first half of 2024 was the ability to upload 10 documents at once from the mobile app. AI built in: Dext bookkeeping AI agent codes, categorises and learns from how you work – Hubdoc has no AI capability Insights and dashboards show the state of your books at a glance – Hubdoc offers no reporting or insight tools A mobile app users love: rated 4.8 on the App Store and 4.7 on Google Play – a frequent sore point in Hubdoc user reviews. Currently rated 1.6 on the App Store and 3.5 on Google Play. New features shipping regularly across capture, automation, payments and AI – see the release log for what's landed this quarter Explore new product releases DEXT VS HUBDOC AT A GLANCE Where the two tools part ways DEXT Document collection Mobile app, email-in, web upload and cloud storage – plus automated Invoice Fetch from supplier portals. Hubdoc Mobile app, email-in, web upload and cloud storage. Its fetch service has been withdrawn. DEXT Data extracted Supplier, totals, tax, payment method, PO numbers and full line items at over 99% accuracy. Hubdoc Core fields such as date, currency and invoice number, with users reporting occasional errors and slower processing. DEXT Beyond capture Supplier rules, bank matching, expense management, approvals and 10 years of searchable storage. Hubdoc Basic capture and publish, best suited to very low volumes of simple documents. Explore all bookkeeping features THE REAL COST OF \"FREE\" \"Hubdoc is free with Xero.\" But free isn't the full price. Hubdoc is included with Xero subscriptions, and for a handful of simple documents a month that can be enough. But the real cost of a capture tool isn't the subscription – it's your time: Evenings spent typing in the fields basic OCR misses – totals, tax, suppliers and line items Hunting through inboxes and portals for supplier invoices every month-end Double-checking extraction errors before they end up in your accounts – or your VAT return Paying your accountant to tidy up what the tool should have got right the first time Dext is built to take that time back – so you spend it running your business, not doing data entry. Example output for a typical practice. Get your own estimate below. Start a free trial \"Dext is an easy return on investment. For the costs it has to run, the time it saves. Just the time it saves, pays for itself.\" Jonathan Carr, Co-Founder, Gravitate Accounting FOR ACCOUNTANTS & BOOKKEEPERS Running a practice? Dext scales where Hubdoc can't Hubdoc works client by client, and might do for a contractor with three invoices a month. Dext gives your whole practice one standardised, automated workflow – across every client and every ledger. Practice dashboard for real-time visibility into every client's data health and outstanding work Supplier rules & AutoPublish code, categorise and publish recurring documents automatically Bank Match, Paperwork Match & PO Match pair documents with transactions for faster, cleaner reconciliation – capabilities Hubdoc doesn't have Missing Paperwork reports show exactly which documents are outstanding, per client, before deadlines bite One workflow across 36 integrations, whichever accounting software each client uses Dext for practices Get my ROI estimate A smarter, more complete alternative to Hubdoc Dext gives you the AI automation you want, with the accuracy, control and ecosystem your practice can rely on – proven by firms like yours, not just promised. Start a free trial Explore all features 99%+ accurate data capture 700K+ businesses worldwide trust Dext 16+ years of AI bookkeeping at the forefront MAKING THE SWITCH Switching from Hubdoc? We'll make it easy. Moving to Dext is straightforward. If you've used Hubdoc, you already know how – snap, email or upload, and Dext does the rest. 1 Start your free trial Sign up and connect your accounting software in minutes. No credit card required. 2 Send your first documents Snap a receipt, forward an email or drag and drop – the same habits you built with Hubdoc, with far more done for you at the other end. 3 Get expert support Our UK-based support team and 250+ tutorials are here to guide your transition. Start a free trial View pricing Expert support you can rely on Our support service answers your technical questions by chat or email and offers you valuable advice to support your digital transition. customer satisfaction rating (NPS) 48 hours median time to first response + 250 tutorials available on our Help Centre and through the Dext U certification FAQ Frequently asked questions comparing Dext to Hubdoc Why do businesses choose Dext over Hubdoc? Hubdoc is free with Xero – is Dext worth paying for? Doesn't Hubdoc integrate better with Xero, since Xero owns it? What does Dext capture that Hubdoc doesn't? I run an accounting or bookkeeping practice – is Dext right for me? How easy is it to switch from Hubdoc to Dext? Are you a business or an accounting & bookkeeping firm? Accounting & bookkeeping firms Manage bookkeeping for multiple clients with AI-powered workflows. Book a demo Small & medium businesses Automate your own bookkeeping and spend less time on admin. Start a free trial More reasons to love Dext Discover additional benefits and features that make Dext the preferred choice for modern finance teams. CUSTOMER TESTIMONIAL \"I know there's Hubdocs. I'm aware of other tools but Dext works well. So, no, I haven't tried any other software, if I'm honest. I'm aware of others, but Dext works really well for us. Our accountants use it exclusively. And we've got absolutely no issues. It's worked really, really well.\" Matt Roberts, Founder of Matt Olivers Recruitment Learn more DEXT FEATURE Bookkeeping AI agent Dext AI Assist learns how your bookkeeping works and helps automate repetitive tasks. DEXT FEATURE Deep integrations Dext connects with leading accounting software like Xero, QuickBooks, Sage, and FreeAgent. Plus, over 11,500 banks. DEXT FEATURE Mobile bookkeeping app The AI-powered mobile app practices use to run client bookkeeping fro"
+  },
+  "1440": {
+   "status": 200,
+   "shot": "/home/ubuntu/Dev/Wes-doc/docs/research/benchmark-captures/dext/dext-vs-hubdoc-1440.png",
+   "initialMotion": {
+    "opacityZeroEls": 0,
+    "animations": {
+     "slider-ticker-scroll 40s infinite": 2,
+     "fadein 0.35s 1": 6
+    },
+    "transitionEls": 129,
+    "total": 2819
+   },
+   "errors": [
+    "Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-mi",
+    "overlaysHidden=2"
+   ],
+   "title": "Hubdoc Alternative with Real Bookkeeping Automation | Dext",
+   "h1": "Dext: The Hubdoc alternative that does more than store your paperwork",
+   "subhead": null,
+   "headings": [
+    {
+     "tag": "H1",
+     "text": "Dext: The Hubdoc alternative that does more than store your paperwork",
+     "top": 144
+    },
+    {
+     "tag": "H2",
+     "text": "Capture is where Hubdoc stops.",
+     "top": 1237
+    },
+    {
+     "tag": "H2",
+     "text": "It's where Dext starts.",
+     "top": 1306
+    },
+    {
+     "tag": "H2",
+     "text": "Up-to-date books start with up-to-date paperwork",
+     "top": 1936
+    },
+    {
+     "tag": "H2",
+     "text": "Books you can trust, without the double-checking",
+     "top": 2654
+    },
+    {
+     "tag": "H2",
+     "text": "Xero owns Hubdoc. Dext integrates deeper.",
+     "top": 3314
+    },
+    {
+     "tag": "H2",
+     "text": "A product that's moving forward, not standing still",
+     "top": 4055
+    },
+    {
+     "tag": "H2",
+     "text": "A product that's moving forward, not standing still",
+     "top": 4790
+    },
+    {
+     "tag": "H2",
+     "text": "Where the two tools part ways",
+     "top": 5488
+    },
+    {
+     "tag": "H2",
+     "text": "\"Hubdoc is free with Xero.\" But free isn't the full price.",
+     "top": 6167
+    },
+    {
+     "tag": "H2",
+     "text": "Running a practice? Dext scales where Hubdoc can't",
+     "top": 7041
+    },
+    {
+     "tag": "H2",
+     "text": "A smarter, more complete alternative to Hubdoc",
+     "top": 7844
+    },
+    {
+     "tag": "H2",
+     "text": "99%+",
+     "top": 8165
+    },
+    {
+     "tag": "H2",
+     "text": "700K+",
+     "top": 8165
+    },
+    {
+     "tag": "H2",
+     "text": "16+",
+     "top": 8165
+    },
+    {
+     "tag": "H2",
+     "text": "Switching from Hubdoc? We'll make it easy.",
+     "top": 8473
+    },
+    {
+     "tag": "H2",
+     "text": "Expert support you can rely on",
+     "top": 9010
+    },
+    {
+     "tag": "H2",
+     "text": "Frequently asked questions comparing Dext to Hubdoc",
+     "top": 9545
+    },
+    {
+     "tag": "H2",
+     "text": "Are you a business or an accounting & bookkeeping firm?",
+     "top": 10019
+    },
+    {
+     "tag": "H2",
+     "text": "More reasons to love Dext",
+     "top": 10744
+    }
+   ],
+   "sections": [
+    {
+     "top": 88,
+     "height": 12510,
+     "heading": "Dext: The Hubdoc alternative that does more than store your paperwork",
+     "imgs": 73,
+     "svgs": 159,
+     "videos": 0,
+     "ctas": [
+      "Start a free trial",
+      "Log in",
+      "Start a free trial",
+      "View pricing",
+      "Explore receipt & invoice capture",
+      "Explore all accounting integrations"
+     ],
+     "textLen": 12839,
+     "snippet": "For Businesses For Accountants & Bookkeepers Pricing Resources Start a free trial Log in Dext: The Hubdoc alternative that does more than store your paperwork Hubdoc collects your documents. Dext gets them into your book"
+    },
+    {
+     "top": 0,
+     "height": 900,
+     "heading": "",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 0,
+     "snippet": ""
+    }
+   ],
+   "navLinks": [
+    "Start a free trial",
+    "Log in"
+   ],
+   "heroCtas": [
+    {
+     "text": "Start a free trial",
+     "tag": "A",
+     "href": "https://app.dext.com/signups"
+    },
+    {
+     "text": "View pricing",
+     "tag": "A",
+     "href": "/business/pricing"
+    },
+    {
+     "text": "4.4 based on 580+ reviews",
+     "tag": "A",
+     "href": "https://quickbooks.intuit.com/app/apps/appdetails/dext_enhanced_version/"
+    },
+    {
+     "text": "4.8 based on 1110+ reviews",
+     "tag": "A",
+     "href": "https://apps.xero.com/app/dext-prepare?sort=ratingDesc#overview"
+    },
+    {
+     "text": "4.8 based on 91110+ ratings",
+     "tag": "A",
+     "href": "https://apps.apple.com/us/app/dext-expense-tracker/id418327708"
+    },
+    {
+     "text": "4.8 based on 12880+ reviews",
+     "tag": "A",
+     "href": "https://play.google.com/store/apps/details?id=com.receiptbank.android"
+    },
+    {
+     "text": "4.6 based on 380+ reviews",
+     "tag": "A",
+     "href": "https://www.g2.com/products/dext/reviews?utm_source=rewards-medal"
+    },
+    {
+     "text": "4.4 based on 580+ reviews",
+     "tag": "A",
+     "href": "https://quickbooks.intuit.com/app/apps/appdetails/dext_enhanced_version/"
+    },
+    {
+     "text": "4.8 based on 1110+ reviews",
+     "tag": "A",
+     "href": "https://apps.xero.com/app/dext-prepare?sort=ratingDesc#overview"
+    },
+    {
+     "text": "4.8 based on 91110+ ratings",
+     "tag": "A",
+     "href": "https://apps.apple.com/us/app/dext-expense-tracker/id418327708"
+    },
+    {
+     "text": "4.8 based on 12880+ reviews",
+     "tag": "A",
+     "href": "https://play.google.com/store/apps/details?id=com.receiptbank.android"
+    },
+    {
+     "text": "4.6 based on 380+ reviews",
+     "tag": "A",
+     "href": "https://www.g2.com/products/dext/reviews?utm_source=rewards-medal"
+    },
+    {
+     "text": "4.4 based on 580+ reviews",
+     "tag": "A",
+     "href": "https://quickbooks.intuit.com/app/apps/appdetails/dext_enhanced_version/"
+    },
+    {
+     "text": "4.8 based on 1110+ reviews",
+     "tag": "A",
+     "href": "https://apps.xero.com/app/dext-prepare?sort=ratingDesc#overview"
+    },
+    {
+     "text": "4.8 based on 91110+ ratings",
+     "tag": "A",
+     "href": "https://apps.apple.com/us/app/dext-expense-tracker/id418327708"
+    },
+    {
+     "text": "4.8 based on 12880+ reviews",
+     "tag": "A",
+     "href": "https://play.google.com/store/apps/details?id=com.receiptbank.android"
+    },
+    {
+     "text": "4.6 based on 380+ reviews",
+     "tag": "A",
+     "href": "https://www.g2.com/products/dext/reviews?utm_source=rewards-medal"
+    },
+    {
+     "text": "4.4 based on 580+ reviews",
+     "tag": "A",
+     "href": "https://quickbooks.intuit.com/app/apps/appdetails/dext_enhanced_version/"
+    },
+    {
+     "text": "4.8 based on 1110+ reviews",
+     "tag": "A",
+     "href": "https://apps.xero.com/app/dext-prepare?sort=ratingDesc#overview"
+    },
+    {
+     "text": "4.8 based on 91110+ ratings",
+     "tag": "A",
+     "href": "https://apps.apple.com/us/app/dext-expense-tracker/id418327708"
+    },
+    {
+     "text": "4.8 based on 12880+ reviews",
+     "tag": "A",
+     "href": "https://play.google.com/store/apps/details?id=com.receiptbank.android"
+    },
+    {
+     "text": "4.6 based on 380+ reviews",
+     "tag": "A",
+     "href": "https://www.g2.com/products/dext/reviews?utm_source=rewards-medal"
+    }
+   ],
+   "bigImgs": [
+    {
+     "w": 483,
+     "h": 452,
+     "alt": "Logos of tools connecting with Dext",
+     "src": "https://assets.dext.com/api/v1/image/assets%2F1b6ae8870b9341c0bb10634cd51cea2b%2F065e1da979214c91b8f40c45bb2639f4?format=webp",
+     "top": 1956
+    },
+    {
+     "w": 483,
+     "h": 396,
+     "alt": "",
+     "src": "https://assets.dext.com/api/v1/image/assets%2F1b6ae8870b9341c0bb10634cd51cea2b%2Fb9164e5d084944e5afc043c8474828b3?format=webp",
+     "top": 2669
+    },
+    {
+     "w": 483,
+     "h": 526,
+     "alt": "",
+     "src": "https://assets.dext.com/api/v1/image/assets%2F1b6ae8870b9341c0bb10634cd51cea2b%2F2a92dff2dbfa44f886b134a9c791ed96",
+     "top": 3309
+    },
+    {
+     "w": 550,
+     "h": 360,
+     "alt": "",
+     "src": "https://assets.dext.com/api/v1/image/assets%2F1b6ae8870b9341c0bb10634cd51cea2b%2F66a13695ab6d4d41ae96249f963cfbb0?format=webp",
+     "top": 4130
+    },
+    {
+     "w": 483,
+     "h": 316,
+     "alt": "",
+     "src": "https://assets.dext.com/api/v1/image/assets%2F1b6ae8870b9341c0bb10634cd51cea2b%2F66a13695ab6d4d41ae96249f963cfbb0?format=webp",
+     "top": 4876
+    },
+    {
+     "w": 500,
+     "h": 394,
+     "alt": "",
+     "src": "https://assets.dext.com/api/v1/image/assets%2F1b6ae8870b9341c0bb10634cd51cea2b%2F1ce24c57486843aaab3354187c28221d?format=webp",
+     "top": 6111
+    },
+    {
+     "w": 500,
+     "h": 748,
+     "alt": "Dext's mobile bookkeeping app user interface",
+     "src": "https://assets.dext.com/api/v1/image/assets%2F1b6ae8870b9341c0bb10634cd51cea2b%2F0aaf6fe2b3a448e68dd08e53b52cc7c1",
+     "top": 6984
+    },
+    {
+     "w": 307,
+     "h": 266,
+     "alt": "",
+     "src": "https://assets.dext.com/api/v1/image/assets%2F1b6ae8870b9341c0bb10634cd51cea2b%2Fe5168a0d302d4097808e75252766bbcb?format=webp",
+     "top": 10173
+    },
+    {
+     "w": 316,
+     "h": 178,
+     "alt": "Bookkeeping AI agent",
+     "src": "https://assets.dext.com/api/v1/image/assets%2F1b6ae8870b9341c0bb10634cd51cea2b%2F7bd46d3d098341f4b21cbb61783857ae",
+     "top": 11152
+    },
+    {
+     "w": 316,
+     "h": 178,
+     "alt": "Deep integrations",
+     "src": "https://assets.dext.com/api/v1/image/assets%2F1b6ae8870b9341c0bb10634cd51cea2b%2Feaa7f21d53b045b5bc536bdde5414f93",
+     "top": 11615
+    },
+    {
+     "w": 316,
+     "h": 178,
+     "alt": "Mobile bookkeeping app",
+     "src": "https://assets.dext.com/api/v1/image/assets%2F1b6ae8870b9341c0bb10634cd51cea2b%2F6c757e734a2a4c219c1bbd113acb6998",
+     "top": 11615
+    },
+    {
+     "w": 316,
+     "h": 178,
+     "alt": "Expense management",
+     "src": "https://assets.dext.com/api/v1/image/assets%2F1b6ae8870b9341c0bb10634cd51cea2b%2Ffadf019a8ec542908fdd6561aa60735b",
+     "top": 11615
+    }
+   ],
+   "imgCount": 70,
+   "logoish": 0,
+   "videos": [],
+   "canvases": 1,
+   "lotties": 0,
+   "iframes": [
+    "https://widget.trustpilot.com/trustboxes/53aa8807dec7e10d38f59f32/index.html?templateId=53aa8807dec7e10d38f59f32&busines",
+    "https://widget.trustpilot.com/trustboxes/53aa8807dec7e10d38f59f32/index.html?templateId=53aa8807dec7e10d38f59f32&busines",
+    "https://widget.trustpilot.com/trustboxes/53aa8807dec7e10d38f59f32/index.html?templateId=53aa8807dec7e10d38f59f32&busines",
+    "https://widget.trustpilot.com/trustboxes/53aa8807dec7e10d38f59f32/index.html?templateId=53aa8807dec7e10d38f59f32&busines",
+    "https://app-eu1.hubspot.com/conversations-visitor/1614934/threads/utk/5c2c05f8cb914d3fbb418d302e9b80d3?uuid=7e05ed7019c8"
+   ],
+   "fonts": [
+    [
+     "Roboto",
+     1761
+    ],
+    [
+     "Inter",
+     98
+    ]
+   ],
+   "sectionBgs": [
+    [
+     "rgb(255, 255, 255)",
+     1
+    ],
+    [
+     "rgb(255, 205, 179)",
+     1
+    ]
+   ],
+   "buttonBgs": [
+    [
+     "rgb(12, 35, 64)",
+     6
+    ],
+    [
+     "rgb(195, 203, 213)",
+     1
+    ],
+    [
+     "rgb(233, 241, 251)",
+     1
+    ],
+    [
+     "rgb(255, 239, 230)",
+     1
+    ],
+    [
+     "rgb(240, 250, 209)",
+     1
+    ],
+    [
+     "rgb(255, 244, 204)",
+     1
+    ]
+   ],
+   "type": {
+    "h1": {
+     "family": "Inter, \"Inter Fallback\"",
+     "size": "60px",
+     "weight": "900",
+     "lineHeight": "69px",
+     "letterSpacing": "-1.8px",
+     "color": "rgb(0, 0, 0)"
+    },
+    "h2": {
+     "family": "Inter, \"Inter Fallback\"",
+     "size": "46px",
+     "weight": "900"
+    },
+    "body": {
+     "family": "\"Times New Roman\"",
+     "size": "16px",
+     "color": "rgb(0, 0, 0)",
+     "bg": "rgba(0, 0, 0, 0)"
+    }
+   },
+   "motionAfterScroll": {
+    "animations": {
+     "slider-ticker-scroll 40s infinite": 2
+    },
+    "opacityZeroEls": 1,
+    "transitionEls": 141,
+    "stickyFixedEls": 10
+   },
+   "libs": {
+    "gsap": false,
+    "framer": false,
+    "webflow": false,
+    "lottie": false,
+    "splide_swiper": false,
+    "rive": false,
+    "nextjs": true,
+    "wordpress": false,
+    "hubspot": true
+   },
+   "wordCount": 2091,
+   "scrollHeight": 12598,
+   "bodyText": "For Businesses For Accountants & Bookkeepers Pricing Resources Start a free trial Log in Dext: The Hubdoc alternative that does more than store your paperwork Hubdoc collects your documents. Dext gets them into your books with over 99% accurate AI data extraction, invoices fetched automatically from your suppliers, and automation that saves you hours every month. Start a free trial View pricing No credit card required. 4.4 based on 580+ reviews 4.8 based on 1110+ reviews 4.8 based on 91110+ ratings 4.8 based on 12880+ reviews 4.6 based on 380+ reviews 4.4 based on 580+ reviews 4.8 based on 1110+ reviews 4.8 based on 91110+ ratings 4.8 based on 12880+ reviews 4.6 based on 380+ reviews 4.4 based on 580+ reviews 4.8 based on 1110+ reviews 4.8 based on 91110+ ratings 4.8 based on 12880+ reviews 4.6 based on 380+ reviews 4.4 based on 580+ reviews 4.8 based on 1110+ reviews 4.8 based on 91110+ ratings 4.8 based on 12880+ reviews 4.6 based on 380+ reviews G2 Regional Leader Spring 2026 G2 Momentum Leader Summer 2026 Best Expense Software 2025 Small Business App of the Year Winner 2024 • UK • US Best Accounting Cloud-Based Software 2023 G2 Regional Leader Spring 2026 G2 Momentum Leader Summer 2026 Best Expense Software 2025 Small Business App of the Year Winner 2024 • UK • US Best Accounting Cloud-Based Software 2023 G2 Regional Leader Spring 2026 G2 Momentum Leader Summer 2026 Best Expense Software 2025 Small Business App of the Year Winner 2024 • UK • US Best Accounting Cloud-Based Software 2023 G2 Regional Leader Spring 2026 G2 Momentum Leader Summer 2026 Best Expense Software 2025 Small Business App of the Year Winner 2024 • UK • US Best Accounting Cloud-Based Software 2023 WHY BUSINESSES CHOOSE DEXT OVER HUBDOC Capture is where Hubdoc stops. It's where Dext starts. Every way to send paperwork Snap it, email it, upload it – every submission method Hubdoc offers, plus Invoice Fetch, which automatically retrieves invoices from your supplier accounts. Utilities, software subscriptions: they arrive in Dext before you think to look for them. Data you don't double-check Dext reads the whole document – supplier, totals, tax, payment method and full line items – with 99%+ accuracy, trained on billions of real receipts and invoices. It lands in your books ready to use, not ready to fix. Room to grow with your business Hubdoc suits a handful of simple documents a month. Dext adds AI Assist supplier rules, bank matching, expense management and approvals. So the tool you pick today still fits when your business is twice the size. AUTOMATED DOCUMENT COLLECTION Up-to-date books start with up-to-date paperwork The biggest time sink in bookkeeping isn't processing documents, it's collecting them. Dext makes submitting so easy that paperwork flows in as it's created, keeping your books current instead of a month behind. Snap and go: photograph a receipt in the mobile app and the data is extracted before you've put your phone away Email-in address: set a rule to auto-forward supplier invoices and they process themselves, invoice after invoice Upload, scan or sync from cloud storage – whatever fits the way you already work 10 years of secure storage in Dext, searchable in seconds – so you're always audit-ready Explore receipt & invoice capture ACCURACY & DEPTH OF EXTRACTION Books you can trust, without the double-checking Basic OCR gives you a date, a currency and an invoice number. Dext reads the whole document accurately, so your numbers are right the first time, whether you do the books yourself or hand them to your accountant. Over 99% accurate data capture, trained on billions of real documents – crumpled receipts and messy handwriting included Deeper field extraction: supplier, totals, tax amounts, payment method, PO numbers and full line items – not just the basics Supplier statement reconciliation: match statements against invoices to spot what's missing – not a Hubdoc capability Duplicate and anomaly detection catches mistakes before they reach your books – or your tax return INTEGRATIONS Xero owns Hubdoc. Dext integrates deeper. It's a fair assumption that Hubdoc works best with Xero. In practice, Dext exchanges more data with Xero in both directions – and connects to 36 accounting platforms, so it works whatever software you or your accountant use. More from Xero into Dext: tracking categories, purchase orders and your full chart of accounts More from Dext into Xero: richer extracted data, plus flags for invoices missing attachments and bank transactions that match documents in Dext 36+ accounting integrations including Xero, QuickBooks, Sage and FreeAgent – Hubdoc connects to Xero, QuickBooks Online and Bill.com 11,500+ bank connections via open banking keep your transactions flowing in automatically Explore all accounting integrations CONTINUOUS INVESTMENT A product that's moving forward, not standing still The tool you choose today should be better next year. Dext ships new capability constantly; Hubdoc's development has slowed to a trickle – its only UK release in the first half of 2024 was the ability to upload 10 documents at once from the mobile app. AI built in: Dext bookkeeping AI agent codes, categorises and learns from how you work – Hubdoc has no AI capability Insights and dashboards show the state of your books at a glance – Hubdoc offers no reporting or insight tools A mobile app users love: rated 4.8 on the App Store and 4.7 on Google Play – a frequent sore point in Hubdoc user reviews. Currently rated 1.6 on the App Store and 3.5 on Google Play. New features shipping regularly across capture, automation, payments and AI – see the release log for what's landed this quarter Explore new product releases CONTINUOUS INVESTMENT A product that's moving forward, not standing still The tool you choose today should be better next year. Dext ships new capability constantly; Hubdoc's development has slowed to a trickle – its only UK release in the first half of 2024 was the ability to upload 10 documents at once from the mobile app. AI built in: Dext bookkeeping AI agent codes, categorises and learns from how you work – Hubdoc has no AI capability Insights and dashboards show the state of your books at a glance – Hubdoc offers no reporting or insight tools A mobile app users love: rated 4.8 on the App Store and 4.7 on Google Play – a frequent sore point in Hubdoc user reviews. Currently rated 1.6 on the App Store and 3.5 on Google Play. New features shipping regularly across capture, automation, payments and AI – see the release log for what's landed this quarter Explore new product releases DEXT VS HUBDOC AT A GLANCE Where the two tools part ways DEXT Document collection Mobile app, email-in, web upload and cloud storage – plus automated Invoice Fetch from supplier portals. Hubdoc Mobile app, email-in, web upload and cloud storage. Its fetch service has been withdrawn. DEXT Data extracted Supplier, totals, tax, payment method, PO numbers and full line items at over 99% accuracy. Hubdoc Core fields such as date, currency and invoice number, with users reporting occasional errors and slower processing. DEXT Beyond capture Supplier rules, bank matching, expense management, approvals and 10 years of searchable storage. Hubdoc Basic capture and publish, best suited to very low volumes of simple documents. Explore all bookkeeping features THE REAL COST OF \"FREE\" \"Hubdoc is free with Xero.\" But free isn't the full price. Hubdoc is included with Xero subscriptions, and for a handful of simple documents a month that can be enough. But the real cost of a capture tool isn't the subscription – it's your time: Evenings spent typing in the fields basic OCR misses – totals, tax, suppliers and line items Hunting through inboxes and portals for supplier invoices every month-end Double-checking extraction errors before they end up in your accounts – or your VAT return Paying your accountant to tidy up what the tool should have got right the first time Dext is built to take that time back – so you spend it running your business, not doing data entry. Example output for a typical practice. Get your own estimate below. Start a free trial \"Dext is an easy return on investment. For the costs it has to run, the time it saves. Just the time it saves, pays for itself.\" Jonathan Carr, Co-Founder, Gravitate Accounting FOR ACCOUNTANTS & BOOKKEEPERS Running a practice? Dext scales where Hubdoc can't Hubdoc works client by client, and might do for a contractor with three invoices a month. Dext gives your whole practice one standardised, automated workflow – across every client and every ledger. Practice dashboard for real-time visibility into every client's data health and outstanding work Supplier rules & AutoPublish code, categorise and publish recurring documents automatically Bank Match, Paperwork Match & PO Match pair documents with transactions for faster, cleaner reconciliation – capabilities Hubdoc doesn't have Missing Paperwork reports show exactly which documents are outstanding, per client, before deadlines bite One workflow across 36 integrations, whichever accounting software each client uses Dext for practices Get my ROI estimate A smarter, more complete alternative to Hubdoc Dext gives you the AI automation you want, with the accuracy, control and ecosystem your practice can rely on – proven by firms like yours, not just promised. Start a free trial Explore all features 99%+ accurate data capture 700K+ businesses worldwide trust Dext 16+ years of AI bookkeeping at the forefront MAKING THE SWITCH Switching from Hubdoc? We'll make it easy. Moving to Dext is straightforward. If you've used Hubdoc, you already know how – snap, email or upload, and Dext does the rest. 1 Start your free trial Sign up and connect your accounting software in minutes. No credit card required. 2 Send your first documents Snap a receipt, forward an email or drag and drop – the same habits you built with Hubdoc, with far more done for you at the other end. 3 Get expert support Our UK-based support team and 250+ tutorials are here to guide your transition. Start a free trial View pricing Expert support you can rely on Our support service answers your technical questions by chat or email and offers you valuable advice to support your digital transition. customer satisfaction rating (NPS) 48 hours median time to first response + 250 tutorials available on our Help Centre and through the Dext U certification FAQ Frequently asked questions comparing Dext to Hubdoc Why do businesses choose Dext over Hubdoc? Hubdoc is free with Xero – is Dext worth paying for? Doesn't Hubdoc integrate better with Xero, since Xero owns it? What does Dext capture that Hubdoc doesn't? I run an accounting or bookkeeping practice – is Dext right for me? How easy is it to switch from Hubdoc to Dext? Are you a business or an accounting & bookkeeping firm? Accounting & bookkeeping firms Manage bookkeeping for multiple clients with AI-powered workflows. Book a demo Small & medium businesses Automate your own bookkeeping and spend less time on admin. Start a free trial More reasons to love Dext Discover additional benefits and features that make Dext the preferred choice for modern finance teams. CUSTOMER TESTIMONIAL \"I know there's Hubdocs. I'm aware of other tools but Dext works well. So, no, I haven't tried any other software, if I'm honest. I'm aware of others, but Dext works really well for us. Our accountants use it exclusively. And we've got absolutely no issues. It's worked really, really well.\" Matt Roberts, Founder of Matt Olivers Recruitment Learn more DEXT FEATURE Bookkeeping AI agent Dext AI Assist learns how your bookkeeping works and helps automate repetitive tasks. DEXT FEATURE Deep integrations Dext connects with leading accounting software like Xero, QuickBooks, Sage, and FreeAgent. Plus, over 11,500 banks. DEXT FEATURE Mobile bookkeeping app The AI-powered mobile app practices use to run client bookkeeping from anywhere easily. DEXT FE"
+  }
+ }
+}

@@ -1,0 +1,450 @@
+{
+ "slug": "docubite-home",
+ "label": "DocuBite homepage",
+ "url": "http://localhost:3000/",
+ "accessed": "2026-09-19T11:51:38.713Z",
+ "views": {
+  "390": {
+   "status": 200,
+   "shot": "/home/ubuntu/Dev/Wes-doc/docs/research/benchmark-captures/docubite/docubite-home-390.png",
+   "initialMotion": {
+    "opacityZeroEls": 0,
+    "animations": {},
+    "transitionEls": 31,
+    "total": 474
+   },
+   "errors": [],
+   "title": "DocuBite — Documents in. Books out.",
+   "h1": "Works with your books: or brings its own.",
+   "subhead": "Bills arrive by email, upload or API. DocuBite accepts PDFs and image files, including scans and camera photos. It parses each page to text, flags uncertain values for review, routes approvals, then posts reviewed work to QuickBooks, Xero or the built-in ledger. Payment stays on your bank's rails.",
+   "headings": [
+    {
+     "tag": "H1",
+     "text": "Works with your books: or brings its own.",
+     "top": 105
+    },
+    {
+     "tag": "H2",
+     "text": "From inbox to payment file",
+     "top": 1798
+    },
+    {
+     "tag": "H3",
+     "text": "In",
+     "top": 2022
+    },
+    {
+     "tag": "H3",
+     "text": "Through",
+     "top": 2280
+    },
+    {
+     "tag": "H3",
+     "text": "Out",
+     "top": 2538
+    },
+    {
+     "tag": "H2",
+     "text": "See the work behind the workflow",
+     "top": 3073
+    },
+    {
+     "tag": "H2",
+     "text": "The questions we get asked",
+     "top": 4028
+    },
+    {
+     "tag": "H2",
+     "text": "Start with one messy folder",
+     "top": 4562
+    }
+   ],
+   "sections": [
+    {
+     "top": 65,
+     "height": 1121,
+     "heading": "Works with your books: or brings its own.",
+     "imgs": 0,
+     "svgs": 2,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 667,
+     "snippet": "Works with your books: or brings its own. Bills arrive by email, upload or API. DocuBite accepts PDFs and image files, including scans and camera photos. It parses each page to text, flags uncertain values for review, ro"
+    },
+    {
+     "top": 1300,
+     "height": 393,
+     "heading": "",
+     "imgs": 0,
+     "svgs": 4,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 190,
+     "snippet": "Private encrypted storage Keys managed for you Multi-currency work Historical FX rates built in Your data, exportable CSV, columns and all Review before posting Uncertain values stay visible"
+    },
+    {
+     "top": 1694,
+     "height": 1323,
+     "heading": "From inbox to payment file",
+     "imgs": 0,
+     "svgs": 2,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 877,
+     "snippet": "The AP loop From inbox to payment file Your part is these three. DocuBite does the rest. 01 In CAPTURE · CODE · CHECK Bills arrive by email, upload or API. Every field is read, duplicates are paired, and checks surface a"
+    },
+    {
+     "top": 3016,
+     "height": 955,
+     "heading": "See the work behind the workflow",
+     "imgs": 0,
+     "svgs": 6,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 474,
+     "snippet": "See the work behind the workflow Documents are the entry point. Explore the controls, close work, data checks and system handoffs that carry reviewed work forward. Explore the Product Document extraction Supported docume"
+    },
+    {
+     "top": 3972,
+     "height": 525,
+     "heading": "The questions we get asked",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 147,
+     "snippet": "The questions we get asked What can it actually read? + Where do my files live? + Does DocuBite move money or pay bills? + Can I get my data out? +"
+    },
+    {
+     "top": 4497,
+     "height": 555,
+     "heading": "Start with one messy folder",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 310,
+     "snippet": "Start with one messy folder Upload a folder of documents and see which fields need your attention before they reach your books. Create an account Request a demo See pricing Create an account to explore your workspace. Yo"
+    }
+   ],
+   "navLinks": [
+    "Skip to main content",
+    "DocuBite",
+    "Open workspace"
+   ],
+   "heroCtas": [
+    {
+     "text": "Create an account",
+     "tag": "A",
+     "href": "/signup"
+    },
+    {
+     "text": "Request a demo",
+     "tag": "A",
+     "href": "/demo"
+    }
+   ],
+   "bigImgs": [],
+   "imgCount": 0,
+   "logoish": 0,
+   "videos": [],
+   "canvases": 0,
+   "lotties": 0,
+   "iframes": [],
+   "fonts": [
+    [
+     "inter",
+     209
+    ],
+    [
+     "Bricolage Grotesque",
+     20
+    ]
+   ],
+   "sectionBgs": [
+    [
+     "rgb(255, 255, 255)",
+     6
+    ],
+    [
+     "lab(98.1434 -0.369519 -1.05966)",
+     3
+    ]
+   ],
+   "buttonBgs": [
+    [
+     "lab(44.4871 -41.0396 11.0361)",
+     3
+    ],
+    [
+     "rgb(255, 255, 255)",
+     3
+    ]
+   ],
+   "type": {
+    "h1": {
+     "family": "\"Bricolage Grotesque\", \"Bricolage Grotesque Fallback\", ui-sans-serif, system-ui, sans-serif",
+     "size": "38.4px",
+     "weight": "800",
+     "lineHeight": "39.168px",
+     "letterSpacing": "-1.4592px",
+     "color": "lab(1.76974 1.32743 -9.28855)"
+    },
+    "h2": {
+     "family": "inter, \"inter Fallback\", ui-sans-serif, system-ui, sans-serif",
+     "size": "13.76px",
+     "weight": "500"
+    },
+    "body": {
+     "family": "inter, \"inter Fallback\", ui-sans-serif, system-ui, sans-serif",
+     "size": "16px",
+     "color": "rgb(15, 23, 41)",
+     "bg": "rgb(255, 255, 255)"
+    }
+   },
+   "motionAfterScroll": {
+    "animations": {},
+    "opacityZeroEls": 0,
+    "transitionEls": 31,
+    "stickyFixedEls": 1
+   },
+   "libs": {
+    "gsap": false,
+    "framer": false,
+    "webflow": false,
+    "lottie": false,
+    "splide_swiper": false,
+    "rive": false,
+    "nextjs": true,
+    "wordpress": false,
+    "hubspot": false
+   },
+   "wordCount": 479,
+   "scrollHeight": 5219,
+   "bodyText": "Skip to main content DocuBite Open workspace Works with your books: or brings its own. Bills arrive by email, upload or API. DocuBite accepts PDFs and image files, including scans and camera photos. It parses each page to text, flags uncertain values for review, routes approvals, then posts reviewed work to QuickBooks, Xero or the built-in ledger. Payment stays on your bank's rails. Create an account Request a demo Create an account to explore your workspace. Files are held in private encrypted storage. Invoice · INV-4471 EXAMPLE · SOUTH AFRICA RECEIVED Supplier Mahlangu Office Supplies Invoice number INV-4471 Subtotal R 2,840.00 VAT R 568.00 Total due R 3,408.00 Reviewable fields with source provenance READS Invoices Receipts Bank statements Scans Images (JPEG, PNG, WebP, HEIC) Any custom PDF or image Private encrypted storage Keys managed for you Multi-currency work Historical FX rates built in Your data, exportable CSV, columns and all Review before posting Uncertain values stay visible The AP loop From inbox to payment file Your part is these three. DocuBite does the rest. 01 In CAPTURE · CODE · CHECK Bills arrive by email, upload or API. Every field is read, duplicates are paired, and checks surface anomalies before anyone looks at the work. 02 Through MATCH · APPROVE Each bill is tied to its PO and routed to the right approver by amount. Discrepancies surface with the numbers side by side. Your controls, not ours. 03 Out SYNC · PAY-READY Approved bills post to the built-in ledger or sync to QuickBooks and Xero. One click assembles the bank-ready payment file with per-supplier remittance advice; you upload it to your own bank. Not on the list, on purpose: DocuBite does not move money, issue cards, or hold funds. You still pay from your own bank; we hand it a ready-to-pay file. Payment execution stays outside DocuBite. See how it works end to end See the work behind the workflow Documents are the entry point. Explore the controls, close work, data checks and system handoffs that carry reviewed work forward. Explore the Product Document extraction Supported documents into reviewable rows. Controls & fraud Explainable checks before risky steps. Close the books Gated periods and unposted accrual drafts. Data health Find pipeline, ledger and tax drift. Integrations & API Send reviewed data through connected systems. The questions we get asked What can it actually read? + Where do my files live? + Does DocuBite move money or pay bills? + Can I get my data out? + Start with one messy folder Upload a folder of documents and see which fields need your attention before they reach your books. Create an account Request a demo See pricing Create an account to explore your workspace. You still pay from your own bank. DocuBite prepares the file, and your bank sends the money. DocuBite Privacy Terms Cookies How we use AI support@docubite.com"
+  },
+  "1440": {
+   "status": 200,
+   "shot": "/home/ubuntu/Dev/Wes-doc/docs/research/benchmark-captures/docubite/docubite-home-1440.png",
+   "initialMotion": {
+    "opacityZeroEls": 0,
+    "animations": {},
+    "transitionEls": 31,
+    "total": 474
+   },
+   "errors": [],
+   "title": "DocuBite — Documents in. Books out.",
+   "h1": "Works with your books: or brings its own.",
+   "subhead": "Bills arrive by email, upload or API. DocuBite accepts PDFs and image files, including scans and camera photos. It parses each page to text, flags uncertain values for review, routes approvals, then posts reviewed work to QuickBooks, Xero or the built-in ledger. Payment stays on your bank's rails.",
+   "headings": [
+    {
+     "tag": "H1",
+     "text": "Works with your books: or brings its own.",
+     "top": 130
+    },
+    {
+     "tag": "H2",
+     "text": "From inbox to payment file",
+     "top": 1059
+    },
+    {
+     "tag": "H3",
+     "text": "In",
+     "top": 1236
+    },
+    {
+     "tag": "H3",
+     "text": "Through",
+     "top": 1236
+    },
+    {
+     "tag": "H3",
+     "text": "Out",
+     "top": 1236
+    },
+    {
+     "tag": "H2",
+     "text": "See the work behind the workflow",
+     "top": 1783
+    },
+    {
+     "tag": "H2",
+     "text": "The questions we get asked",
+     "top": 2278
+    },
+    {
+     "tag": "H2",
+     "text": "Start with one messy folder",
+     "top": 2831
+    }
+   ],
+   "sections": [
+    {
+     "top": 66,
+     "height": 657,
+     "heading": "Works with your books: or brings its own.",
+     "imgs": 0,
+     "svgs": 2,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 667,
+     "snippet": "Works with your books: or brings its own. Bills arrive by email, upload or API. DocuBite accepts PDFs and image files, including scans and camera photos. It parses each page to text, flags uncertain values for review, ro"
+    },
+    {
+     "top": 776,
+     "height": 146,
+     "heading": "",
+     "imgs": 0,
+     "svgs": 4,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 190,
+     "snippet": "Private encrypted storage Keys managed for you Multi-currency work Historical FX rates built in Your data, exportable CSV, columns and all Review before posting Uncertain values stay visible"
+    },
+    {
+     "top": 923,
+     "height": 779,
+     "heading": "From inbox to payment file",
+     "imgs": 0,
+     "svgs": 2,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 877,
+     "snippet": "The AP loop From inbox to payment file Your part is these three. DocuBite does the rest. 01 In CAPTURE · CODE · CHECK Bills arrive by email, upload or API. Every field is read, duplicates are paired, and checks surface a"
+    },
+    {
+     "top": 1702,
+     "height": 488,
+     "heading": "See the work behind the workflow",
+     "imgs": 0,
+     "svgs": 6,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 474,
+     "snippet": "See the work behind the workflow Documents are the entry point. Explore the controls, close work, data checks and system handoffs that carry reviewed work forward. Explore the Product Document extraction Supported docume"
+    },
+    {
+     "top": 2190,
+     "height": 544,
+     "heading": "The questions we get asked",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 147,
+     "snippet": "The questions we get asked What can it actually read? + Where do my files live? + Does DocuBite move money or pay bills? + Can I get my data out? +"
+    },
+    {
+     "top": 2734,
+     "height": 511,
+     "heading": "Start with one messy folder",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 310,
+     "snippet": "Start with one messy folder Upload a folder of documents and see which fields need your attention before they reach your books. Create an account Request a demo See pricing Create an account to explore your workspace. Yo"
+    }
+   ],
+   "navLinks": [
+    "Skip to main content",
+    "DocuBite",
+    "Product",
+    "Solutions",
+    "Pricing",
+    "Resources",
+    "Open workspace"
+   ],
+   "heroCtas": [
+    {
+     "text": "Create an account",
+     "tag": "A",
+     "href": "/signup"
+    },
+    {
+     "text": "Request a demo",
+     "tag": "A",
+     "href": "/demo"
+    }
+   ],
+   "bigImgs": [],
+   "imgCount": 0,
+   "logoish": 0,
+   "videos": [],
+   "canvases": 0,
+   "lotties": 0,
+   "iframes": [],
+   "fonts": [
+    [
+     "inter",
+     231
+    ],
+    [
+     "Bricolage Grotesque",
+     20
+    ]
+   ],
+   "sectionBgs": [
+    [
+     "rgb(255, 255, 255)",
+     6
+    ],
+    [
+     "lab(98.1434 -0.369519 -1.05966)",
+     3
+    ]
+   ],
+   "buttonBgs": [
+    [
+     "lab(44.4871 -41.0396 11.0361)",
+     3
+    ],
+    [
+     "rgb(255, 255, 255)",
+     2
+    ]
+   ],
+   "type": {
+    "h1": {
+     "family": "\"Bricolage Grotesque\", \"Bricolage Grotesque Fallback\", ui-sans-serif, system-ui, sans-serif",
+     "size": "64.8px",
+     "weight": "800",
+     "lineHeight": "66.096px",
+     "letterSpacing": "-2.4624px",
+     "color": "lab(1.76974 1.32743 -9.28855)"
+    },
+    "h2": {
+     "family": "inter, \"inter Fallback\", ui-sans-serif, system-ui, sans-serif",
+     "size": "13.76px",
+     "weight": "500"
+    },
+    "body": {
+     "family": "inter, \"inter Fallback\", ui-sans-serif, system-ui, sans-serif",
+     "size": "16px",
+     "color": "rgb(15, 23, 41)",
+     "bg": "rgb(255, 255, 255)"
+    }
+   },
+   "motionAfterScroll": {
+    "animations": {},
+    "opacityZeroEls": 0,
+    "transitionEls": 31,
+    "stickyFixedEls": 1
+   },
+   "libs": {
+    "gsap": false,
+    "framer": false,
+    "webflow": false,
+    "lottie": false,
+    "splide_swiper": false,
+    "rive": false,
+    "nextjs": true,
+    "wordpress": false,
+    "hubspot": false
+   },
+   "wordCount": 484,
+   "scrollHeight": 3335,
+   "bodyText": "Skip to main content DocuBite Product Solutions Pricing Resources About Open workspace Works with your books: or brings its own. Bills arrive by email, upload or API. DocuBite accepts PDFs and image files, including scans and camera photos. It parses each page to text, flags uncertain values for review, routes approvals, then posts reviewed work to QuickBooks, Xero or the built-in ledger. Payment stays on your bank's rails. Create an account Request a demo Create an account to explore your workspace. Files are held in private encrypted storage. Invoice · INV-4471 EXAMPLE · SOUTH AFRICA RECEIVED Supplier Mahlangu Office Supplies Invoice number INV-4471 Subtotal R 2,840.00 VAT R 568.00 Total due R 3,408.00 Reviewable fields with source provenance READS Invoices Receipts Bank statements Scans Images (JPEG, PNG, WebP, HEIC) Any custom PDF or image Private encrypted storage Keys managed for you Multi-currency work Historical FX rates built in Your data, exportable CSV, columns and all Review before posting Uncertain values stay visible The AP loop From inbox to payment file Your part is these three. DocuBite does the rest. 01 In CAPTURE · CODE · CHECK Bills arrive by email, upload or API. Every field is read, duplicates are paired, and checks surface anomalies before anyone looks at the work. 02 Through MATCH · APPROVE Each bill is tied to its PO and routed to the right approver by amount. Discrepancies surface with the numbers side by side. Your controls, not ours. 03 Out SYNC · PAY-READY Approved bills post to the built-in ledger or sync to QuickBooks and Xero. One click assembles the bank-ready payment file with per-supplier remittance advice; you upload it to your own bank. Not on the list, on purpose: DocuBite does not move money, issue cards, or hold funds. You still pay from your own bank; we hand it a ready-to-pay file. Payment execution stays outside DocuBite. See how it works end to end See the work behind the workflow Documents are the entry point. Explore the controls, close work, data checks and system handoffs that carry reviewed work forward. Explore the Product Document extraction Supported documents into reviewable rows. Controls & fraud Explainable checks before risky steps. Close the books Gated periods and unposted accrual drafts. Data health Find pipeline, ledger and tax drift. Integrations & API Send reviewed data through connected systems. The questions we get asked What can it actually read? + Where do my files live? + Does DocuBite move money or pay bills? + Can I get my data out? + Start with one messy folder Upload a folder of documents and see which fields need your attention before they reach your books. Create an account Request a demo See pricing Create an account to explore your workspace. You still pay from your own bank. DocuBite prepares the file, and your bank sends the money. DocuBite Privacy Terms Cookies How we use AI support@docubite.com"
+  }
+ }
+}

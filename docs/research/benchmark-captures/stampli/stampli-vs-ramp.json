@@ -1,0 +1,628 @@
+{
+ "slug": "stampli-vs-ramp",
+ "label": "Stampli vs Ramp",
+ "url": "https://www.stampli.com/stampli-vs-ramp/",
+ "accessed": "2026-09-19T12:20:43.878Z",
+ "views": {
+  "390": {
+   "status": 200,
+   "shot": "/home/ubuntu/Dev/Wes-doc/docs/research/benchmark-captures/stampli/stampli-vs-ramp-390.png",
+   "initialMotion": {
+    "opacityZeroEls": 0,
+    "animations": {},
+    "transitionEls": 418,
+    "total": 1430
+   },
+   "errors": [
+    "overlaysHidden=0"
+   ],
+   "title": "Compare Stampli vs. Ramp for AP Automation",
+   "h1": "Stampli vs. Ramp",
+   "subhead": null,
+   "headings": [
+    {
+     "tag": "H1",
+     "text": "Stampli vs. Ramp",
+     "top": 172
+    },
+    {
+     "tag": "H3",
+     "text": "Companies big and small trust Stampli with $100 billion in AP spend...and counting",
+     "top": 1693
+    },
+    {
+     "tag": "H3",
+     "text": "Ramp’s AP automation is a credit-card add-on. Not a real solution.",
+     "top": 2256
+    },
+    {
+     "tag": "H3",
+     "text": "What should you ask Ramp about?",
+     "top": 3788
+    },
+    {
+     "tag": "H3",
+     "text": "Stampli is built for the way YOU run AP",
+     "top": 5328
+    },
+    {
+     "tag": "H3",
+     "text": "Least disruption",
+     "top": 5570
+    },
+    {
+     "tag": "H3",
+     "text": "Ensure control & compliance",
+     "top": 5786
+    },
+    {
+     "tag": "H3",
+     "text": "Most control",
+     "top": 6025
+    },
+    {
+     "tag": "H3",
+     "text": "Smartest AI",
+     "top": 6268
+    },
+    {
+     "tag": "H3",
+     "text": "Fastest to value",
+     "top": 6457
+    },
+    {
+     "tag": "H3",
+     "text": "What do Stampli customers appreciate most?",
+     "top": 6667
+    },
+    {
+     "tag": "H3",
+     "text": "Skip the ramp. Own the runway.",
+     "top": 9990
+    },
+    {
+     "tag": "H3",
+     "text": "Stampli",
+     "top": 11193
+    },
+    {
+     "tag": "H3",
+     "text": "Products",
+     "top": 11250
+    },
+    {
+     "tag": "H3",
+     "text": "Accounting Systems",
+     "top": 11307
+    },
+    {
+     "tag": "H3",
+     "text": "Industries",
+     "top": 11364
+    },
+    {
+     "tag": "H3",
+     "text": "Role",
+     "top": 11413
+    },
+    {
+     "tag": "H3",
+     "text": "Resources",
+     "top": 11478
+    },
+    {
+     "tag": "H3",
+     "text": "Contact",
+     "top": 11535
+    }
+   ],
+   "sections": [
+    {
+     "top": 1693,
+     "height": 482,
+     "heading": "Companies big and small trust Stampli with $100 billion in AP spend...and counting",
+     "imgs": 6,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 82,
+     "snippet": "Companies big and small trust Stampli with $100 billion in AP spend...and counting"
+    },
+    {
+     "top": 5278,
+     "height": 1389,
+     "heading": "Stampli is built for the way YOU run AP",
+     "imgs": 1,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 405,
+     "snippet": "Stampli is built for the way YOU run AP Least disruption No need to rework the ERP or change your AP processes Ensure control & compliance Fully configurable and auditable payment workflows Most control One place for all"
+    },
+    {
+     "top": 7348,
+     "height": 2578,
+     "heading": "",
+     "imgs": 7,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 0,
+     "snippet": ""
+    }
+   ],
+   "navLinks": [],
+   "heroCtas": [
+    {
+     "text": "Let's Talk",
+     "tag": "A",
+     "href": "https://www.stampli.com/contact"
+    }
+   ],
+   "bigImgs": [
+    {
+     "w": 311,
+     "h": 350,
+     "alt": "Top 50 Accounting and Finance Products Award",
+     "src": "https://www.stampli.com/wp-content/uploads/2024/03/Top-50-AccountsFinance.png",
+     "top": 7348
+    },
+    {
+     "w": 311,
+     "h": 350,
+     "alt": "Top Procure-to-Pay Software Company",
+     "src": "https://www.stampli.com/wp-content/uploads/2026/01/G2_2025_Top10Procure_241x271_2x_NoShadow.webp",
+     "top": 7746
+    },
+    {
+     "w": 311,
+     "h": 350,
+     "alt": "Top 100 Global Softare Companies Award",
+     "src": "https://www.stampli.com/wp-content/uploads/2024/03/Top-100-Global-Softare-Companies.png",
+     "top": 8143
+    },
+    {
+     "w": 311,
+     "h": 350,
+     "alt": "AP Automation Leader Award",
+     "src": "https://www.stampli.com/wp-content/uploads/2024/03/2024-Leader-AP-Automation.png",
+     "top": 8541
+    },
+    {
+     "w": 311,
+     "h": 311,
+     "alt": "",
+     "src": "https://www.stampli.com/wp-content/uploads/2026/02/Capterra-Shortlist-2026.svg",
+     "top": 8935
+    },
+    {
+     "w": 311,
+     "h": 350,
+     "alt": "2025 GetApp Category Leaders Award for Accounts Payable",
+     "src": "https://www.stampli.com/wp-content/uploads/2024/06/GetApp.png",
+     "top": 9314
+    },
+    {
+     "w": 311,
+     "h": 215,
+     "alt": "",
+     "src": "https://www.stampli.com/wp-content/uploads/2026/02/SoftwareAdvice-Front-Runner-2026.svg",
+     "top": 9711
+    }
+   ],
+   "imgCount": 25,
+   "logoish": 6,
+   "videos": [],
+   "canvases": 0,
+   "lotties": 0,
+   "iframes": [
+    "",
+    "",
+    "",
+    "about:blank",
+    "about:blank",
+    "",
+    ""
+   ],
+   "fonts": [
+    [
+     "lato",
+     374
+    ],
+    [
+     "Lato",
+     81
+    ],
+    [
+     "Aeonik",
+     58
+    ],
+    [
+     "Oswald",
+     23
+    ],
+    [
+     "oswald",
+     1
+    ]
+   ],
+   "sectionBgs": [
+    [
+     "rgb(255, 255, 255)",
+     1
+    ]
+   ],
+   "buttonBgs": [
+    [
+     "rgb(232, 242, 254)",
+     1
+    ],
+    [
+     "rgb(0, 174, 239)",
+     1
+    ]
+   ],
+   "type": {
+    "h1": {
+     "family": "Oswald, sans-serif",
+     "size": "50px",
+     "weight": "400",
+     "lineHeight": "50px",
+     "letterSpacing": "-2px",
+     "color": "rgb(30, 60, 116)"
+    },
+    "h2": null,
+    "body": {
+     "family": "lato, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, \"Noto Sans\", sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+     "size": "16px",
+     "color": "rgb(106, 105, 134)",
+     "bg": "rgba(0, 0, 0, 0)"
+    }
+   },
+   "motionAfterScroll": {
+    "animations": {},
+    "opacityZeroEls": 1,
+    "transitionEls": 418,
+    "stickyFixedEls": 9
+   },
+   "libs": {
+    "gsap": false,
+    "framer": false,
+    "webflow": false,
+    "lottie": false,
+    "splide_swiper": true,
+    "rive": false,
+    "nextjs": false,
+    "wordpress": true,
+    "hubspot": true
+   },
+   "wordCount": 866,
+   "scrollHeight": 12133,
+   "bodyText": "STAMPLI VS. RAMP Stampli vs. Ramp The key differences between Stampli versus Ramp’s AP automation Ramp simply can’t handle anything more than basic AP needs. It’s an entry-level solution built by a credit card company that can only support basic AP processes. Without a deep understanding of AP, it’s no surprise that Ramp’s customers complain of ERP data conflicts that require constant manual repair. Stampli is different. Let's Talk Stampli vs. Ramp G2 Satisfaction Scores → 99 Stampli 76 Ramp Ease of Use 95% 94% Quality of Support 96% 91% Ease of Set Up 94% 94% Ease of Admin 94% 95% Ease of Doing Business With 96% 96% The G2 scores in this chart are from the AP Automation category officially released in December 2025. Companies big and small trust Stampli with $100 billion in AP spend...and counting Ramp’s AP automation is a credit-card add-on. Not a real solution. Stampli P2P is built for AP first Ramp is great at credit cards, but AP is new territory. Do you really want to be their guinea pig? Stampli’s AI reduces manual work Ramp is also new to AI for AP. Do you really want invoice coding and vendor onboarding to stay mostly manual? Stampli won’t disrupt your ERP data Ramp’s lack of integration experience manifests as ERP data conflicts. They overwrite your ERP’s vendor data instead of respecting it as the source of truth. Stampli adapts to how you want to run AP Ramp only offers fixed, predefined workflows. Your business will only grow more complex — do you really want your AP to be stuck? What should you ask Ramp about? If you’re comparing Stampli versus Ramp, here are a few questions you should ask Ramp. What is the level of flexibility in your approval workflows? Can we determine how we pay different vendors? How does your system handle growing invoice volumes? How do vendor communications work in your system? What do vendors have access to? Is there any manual work involved when processing invoices? How does vendor data sync between your system and our ERP? What does the implementation process look like? Stampli is built for the way YOU run AP Least disruption No need to rework the ERP or change your AP processes Ensure control & compliance Fully configurable and auditable payment workflows Most control One place for all your communication, documentation and workflows Smartest AI Billy operates across the entire invoice lifecycle Fastest to value Deploys in weeks, not months, with minimal user training What do Stampli customers appreciate most? “Stampli allows for us to more accurately project cash flow, which helps us provide drastically better financial guidance to our owners.” AMANDA BROWN Controller, Wenspok Companies “Many AP automation companies have started in the payments industry and gradually expanded to AP, but Stampli started in AP. I like that Stampli was AP first.” CURTIS ASH CFO, Avid Acceptance “Stampli was quickly integrated with our ERP and has enabled us to automate the entire invoice approval workflow.” RYAN MUSTAFA AP Accountant, Kiva “I’d say Stampli displaces $150K to $200K in labor expenses annually, while providing more accuracy and reducing human error.” ANTHONY FERNANDES Financial Controller, Alden Renewables “Stampli allows for us to more accurately project cash flow, which helps us provide drastically better financial guidance to our owners.” AMANDA BROWN Controller, Wenspok Companies “Many AP automation companies have started in the payments industry and gradually expanded to AP, but Stampli started in AP. I like that Stampli was AP first.” CURTIS ASH CFO, Avid Acceptance Skip the ramp. Own the runway. If your business is dead simple, Ramp will work. If that’s not you, connect with our team for a demo of Stampli based on your specific ERP environment. Company HQ location* Alabama Alaska Arizona Arkansas California Colorado Connecticut Delaware Florida Georgia Hawaii Idaho Illinois Indiana Iowa Kansas Kentucky Louisiana Maine Maryland Massachusetts Michigan Minnesota Mississippi Missouri Montana Nebraska Nevada New Hampshire New Jersey New Mexico New York North Carolina North Dakota Ohio Oklahoma Oregon Pennsylvania Rhode Island South Carolina South Dakota Tennessee Texas Utah Vermont Virginia Washington Washington DC West Virginia Wisconsin Wyoming Other Number of employees* 1-99 100 - 299 300-499 500-1999 2,000 to 4,999 5,000 to 9,999 10,000 or more What ERP system are you currently using?* Acumatica DealerTrack IFS Bolo IFS Cloud ERP Infinity ERP MatrixCare Microsoft Dynamics 365 Business Central Microsoft Dynamics Finance & Operations Microsoft Dynamics GP MIP Fund Netsuite Oracle Fusion Other Quickbooks Desktop Quickbooks Online Sage 100 Sage 100 Contractor Sage 300 CRE Sage Intacct Sage Intacct Construction Sage Intacct Real Estate SAP (Version Unknown) SAP ECC SAP R/3 SAP S4 HANA SAP S4 Hana Private Cloud SAP S4 Hana Public Cloud Stampli is typically a strong fit for teams at 300+ monthly invoice volume. Do you process at least 300 invoices per month? Yes No By submitting your information, you acknowledge that your data will be handled in accordance with Stampli’s Terms of Service and Privacy Policy, and you authorize Stampli to send you updates about Stampli products, services, and events. Stampli Products Accounting Systems Industries Role Resources Contact © 2026 Stampli, All rights reserved. Your Privacy Choices Policy Center Terms of Service Privacy Licenses"
+  },
+  "1440": {
+   "status": 200,
+   "shot": "/home/ubuntu/Dev/Wes-doc/docs/research/benchmark-captures/stampli/stampli-vs-ramp-1440.png",
+   "initialMotion": {
+    "opacityZeroEls": 0,
+    "animations": {},
+    "transitionEls": 413,
+    "total": 1442
+   },
+   "errors": [
+    "overlaysHidden=0"
+   ],
+   "title": "Compare Stampli vs. Ramp for AP Automation",
+   "h1": "Stampli vs. Ramp",
+   "subhead": null,
+   "headings": [
+    {
+     "tag": "H1",
+     "text": "Stampli vs. Ramp",
+     "top": 282
+    },
+    {
+     "tag": "H3",
+     "text": "Companies big and small trust Stampli with $100 billion in AP spend...and counting",
+     "top": 954
+    },
+    {
+     "tag": "H3",
+     "text": "Ramp’s AP automation is a credit-card add-on. Not a real solution.",
+     "top": 1469
+    },
+    {
+     "tag": "H3",
+     "text": "What should you ask Ramp about?",
+     "top": 1990
+    },
+    {
+     "tag": "H3",
+     "text": "Stampli is built for the way YOU run AP",
+     "top": 2857
+    },
+    {
+     "tag": "H3",
+     "text": "Least disruption",
+     "top": 3075
+    },
+    {
+     "tag": "H3",
+     "text": "Ensure control & compliance",
+     "top": 3075
+    },
+    {
+     "tag": "H3",
+     "text": "Most control",
+     "top": 3075
+    },
+    {
+     "tag": "H3",
+     "text": "Smartest AI",
+     "top": 3075
+    },
+    {
+     "tag": "H3",
+     "text": "Fastest to value",
+     "top": 3075
+    },
+    {
+     "tag": "H3",
+     "text": "What do Stampli customers appreciate most?",
+     "top": 3342
+    },
+    {
+     "tag": "H3",
+     "text": "Skip the ramp. Own the runway.",
+     "top": 4645
+    },
+    {
+     "tag": "H3",
+     "text": "Stampli",
+     "top": 5667
+    },
+    {
+     "tag": "H3",
+     "text": "Products",
+     "top": 5667
+    },
+    {
+     "tag": "H3",
+     "text": "Accounting Systems",
+     "top": 5667
+    },
+    {
+     "tag": "H3",
+     "text": "Industries",
+     "top": 5667
+    },
+    {
+     "tag": "H3",
+     "text": "Role",
+     "top": 5971
+    },
+    {
+     "tag": "H3",
+     "text": "Resources",
+     "top": 5667
+    },
+    {
+     "tag": "H3",
+     "text": "Contact",
+     "top": 5667
+    }
+   ],
+   "sections": [
+    {
+     "top": 954,
+     "height": 212,
+     "heading": "Companies big and small trust Stampli with $100 billion in AP spend...and counting",
+     "imgs": 6,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 82,
+     "snippet": "Companies big and small trust Stampli with $100 billion in AP spend...and counting"
+    },
+    {
+     "top": 2857,
+     "height": 405,
+     "heading": "Stampli is built for the way YOU run AP",
+     "imgs": 1,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 405,
+     "snippet": "Stampli is built for the way YOU run AP Least disruption No need to rework the ERP or change your AP processes Ensure control & compliance Fully configurable and auditable payment workflows Most control One place for all"
+    },
+    {
+     "top": 3923,
+     "height": 594,
+     "heading": "",
+     "imgs": 7,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 0,
+     "snippet": ""
+    },
+    {
+     "top": 5667,
+     "height": 176,
+     "heading": "Stampli",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 49,
+     "snippet": "Stampli About Us Careers Customer Support Contact"
+    },
+    {
+     "top": 5667,
+     "height": 336,
+     "heading": "Products",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 150,
+     "snippet": "Products Procure-to-Pay Procurement Vendor Management Accounts Payable Payments Expense Management Stampli Deep Finance ERP Integrations Contact Sales"
+    },
+    {
+     "top": 5667,
+     "height": 588,
+     "heading": "Accounting Systems",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 304,
+     "snippet": "Accounting Systems Acumatica Dealertrack DMS Microsoft Dynamics 365 Business Central Microsoft Dynamics 365 Finance Microsoft Dynamics Great Plains Oracle Fusion Cloud ERP Oracle NetSuite Sage 100 Sage Intacct Sage Intac"
+    },
+    {
+     "top": 5971,
+     "height": 164,
+     "heading": "Role",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 38,
+     "snippet": "Role CFO Controller AP Teams Approvers"
+    },
+    {
+     "top": 5667,
+     "height": 528,
+     "heading": "Resources",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 278,
+     "snippet": "Resources Become a Partner Refer Stampli Resources Library Blog Newsletter Stampli G2 Report Stampli Reviews & Awards Customer Stories AI Information What is Accounts Payable What is Invoice Processing What are B2B Payme"
+    },
+    {
+     "top": 5667,
+     "height": 140,
+     "heading": "Contact",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 80,
+     "snippet": "Contact sales@stampli.com 800 California Street, Floor 2 Mountain View, CA 94041"
+    }
+   ],
+   "navLinks": [
+    "Products",
+    "Integrations",
+    "Customers",
+    "Resources",
+    "Partners",
+    "Customer login",
+    "Contact sales"
+   ],
+   "heroCtas": [
+    {
+     "text": "Let's Talk",
+     "tag": "A",
+     "href": "https://www.stampli.com/contact"
+    }
+   ],
+   "bigImgs": [],
+   "imgCount": 26,
+   "logoish": 7,
+   "videos": [],
+   "canvases": 0,
+   "lotties": 0,
+   "iframes": [
+    "",
+    "",
+    "",
+    "about:blank",
+    "about:blank",
+    "",
+    ""
+   ],
+   "fonts": [
+    [
+     "lato",
+     389
+    ],
+    [
+     "Aeonik",
+     205
+    ],
+    [
+     "Lato",
+     87
+    ],
+    [
+     "Oswald",
+     23
+    ],
+    [
+     "oswald",
+     1
+    ]
+   ],
+   "sectionBgs": [
+    [
+     "rgb(255, 255, 255)",
+     1
+    ]
+   ],
+   "buttonBgs": [
+    [
+     "rgb(232, 242, 254)",
+     1
+    ],
+    [
+     "rgb(0, 136, 247)",
+     1
+    ],
+    [
+     "rgb(0, 174, 239)",
+     1
+    ]
+   ],
+   "type": {
+    "h1": {
+     "family": "Oswald, sans-serif",
+     "size": "72px",
+     "weight": "400",
+     "lineHeight": "79.2px",
+     "letterSpacing": "-2px",
+     "color": "rgb(30, 60, 116)"
+    },
+    "h2": null,
+    "body": {
+     "family": "lato, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, \"Noto Sans\", sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+     "size": "16px",
+     "color": "rgb(106, 105, 134)",
+     "bg": "rgba(0, 0, 0, 0)"
+    }
+   },
+   "motionAfterScroll": {
+    "animations": {},
+    "opacityZeroEls": 1,
+    "transitionEls": 413,
+    "stickyFixedEls": 9
+   },
+   "libs": {
+    "gsap": false,
+    "framer": false,
+    "webflow": false,
+    "lottie": false,
+    "splide_swiper": true,
+    "rive": false,
+    "nextjs": false,
+    "wordpress": true,
+    "hubspot": true
+   },
+   "wordCount": 1055,
+   "scrollHeight": 6693,
+   "bodyText": "Products Integrations Customers Resources Partners Customer login Contact sales STAMPLI VS. RAMP Stampli vs. Ramp The key differences between Stampli versus Ramp’s AP automation Ramp simply can’t handle anything more than basic AP needs. It’s an entry-level solution built by a credit card company that can only support basic AP processes. Without a deep understanding of AP, it’s no surprise that Ramp’s customers complain of ERP data conflicts that require constant manual repair. Stampli is different. Let's Talk Stampli vs. Ramp G2 Satisfaction Scores → 99 Stampli 76 Ramp Ease of Use 95% 94% Quality of Support 96% 91% Ease of Set Up 94% 94% Ease of Admin 94% 95% Ease of Doing Business With 96% 96% The G2 scores in this chart are from the AP Automation category officially released in December 2025. Companies big and small trust Stampli with $100 billion in AP spend...and counting Ramp’s AP automation is a credit-card add-on. Not a real solution. Stampli P2P is built for AP first Ramp is great at credit cards, but AP is new territory. Do you really want to be their guinea pig? Stampli’s AI reduces manual work Ramp is also new to AI for AP. Do you really want invoice coding and vendor onboarding to stay mostly manual? Stampli won’t disrupt your ERP data Ramp’s lack of integration experience manifests as ERP data conflicts. They overwrite your ERP’s vendor data instead of respecting it as the source of truth. Stampli adapts to how you want to run AP Ramp only offers fixed, predefined workflows. Your business will only grow more complex — do you really want your AP to be stuck? What should you ask Ramp about? If you’re comparing Stampli versus Ramp, here are a few questions you should ask Ramp. What is the level of flexibility in your approval workflows? Can we determine how we pay different vendors? How does your system handle growing invoice volumes? How do vendor communications work in your system? What do vendors have access to? Is there any manual work involved when processing invoices? How does vendor data sync between your system and our ERP? What does the implementation process look like? Stampli is built for the way YOU run AP Least disruption No need to rework the ERP or change your AP processes Ensure control & compliance Fully configurable and auditable payment workflows Most control One place for all your communication, documentation and workflows Smartest AI Billy operates across the entire invoice lifecycle Fastest to value Deploys in weeks, not months, with minimal user training What do Stampli customers appreciate most? “I’d say Stampli displaces $150K to $200K in labor expenses annually, while providing more accuracy and reducing human error.” ANTHONY FERNANDES Financial Controller, Alden Renewables “Stampli allows for us to more accurately project cash flow, which helps us provide drastically better financial guidance to our owners.” AMANDA BROWN Controller, Wenspok Companies “Many AP automation companies have started in the payments industry and gradually expanded to AP, but Stampli started in AP. I like that Stampli was AP first.” CURTIS ASH CFO, Avid Acceptance “Stampli was quickly integrated with our ERP and has enabled us to automate the entire invoice approval workflow.” RYAN MUSTAFA AP Accountant, Kiva “I’d say Stampli displaces $150K to $200K in labor expenses annually, while providing more accuracy and reducing human error.” ANTHONY FERNANDES Financial Controller, Alden Renewables “Stampli allows for us to more accurately project cash flow, which helps us provide drastically better financial guidance to our owners.” AMANDA BROWN Controller, Wenspok Companies “Many AP automation companies have started in the payments industry and gradually expanded to AP, but Stampli started in AP. I like that Stampli was AP first.” CURTIS ASH CFO, Avid Acceptance “Stampli was quickly integrated with our ERP and has enabled us to automate the entire invoice approval workflow.” RYAN MUSTAFA AP Accountant, Kiva Skip the ramp. Own the runway. If your business is dead simple, Ramp will work. If that’s not you, connect with our team for a demo of Stampli based on your specific ERP environment. Company HQ location* Alabama Alaska Arizona Arkansas California Colorado Connecticut Delaware Florida Georgia Hawaii Idaho Illinois Indiana Iowa Kansas Kentucky Louisiana Maine Maryland Massachusetts Michigan Minnesota Mississippi Missouri Montana Nebraska Nevada New Hampshire New Jersey New Mexico New York North Carolina North Dakota Ohio Oklahoma Oregon Pennsylvania Rhode Island South Carolina South Dakota Tennessee Texas Utah Vermont Virginia Washington Washington DC West Virginia Wisconsin Wyoming Other Number of employees* 1-99 100 - 299 300-499 500-1999 2,000 to 4,999 5,000 to 9,999 10,000 or more What ERP system are you currently using?* Acumatica DealerTrack IFS Bolo IFS Cloud ERP Infinity ERP MatrixCare Microsoft Dynamics 365 Business Central Microsoft Dynamics Finance & Operations Microsoft Dynamics GP MIP Fund Netsuite Oracle Fusion Other Quickbooks Desktop Quickbooks Online Sage 100 Sage 100 Contractor Sage 300 CRE Sage Intacct Sage Intacct Construction Sage Intacct Real Estate SAP (Version Unknown) SAP ECC SAP R/3 SAP S4 HANA SAP S4 Hana Private Cloud SAP S4 Hana Public Cloud Stampli is typically a strong fit for teams at 300+ monthly invoice volume. Do you process at least 300 invoices per month? Yes No By submitting your information, you acknowledge that your data will be handled in accordance with Stampli’s Terms of Service and Privacy Policy, and you authorize Stampli to send you updates about Stampli products, services, and events. Stampli About Us Careers Customer Support Contact Products Procure-to-Pay Procurement Vendor Management Accounts Payable Payments Expense Management Stampli Deep Finance ERP Integrations Contact Sales Accounting Systems Acumatica Dealertrack DMS Microsoft Dynamics 365 Business Central Microsoft Dynamics 365 Finance Microsoft Dynamics Great Plains Oracle Fusion Cloud ERP Oracle NetSuite Sage 100 Sage Intacct Sage Intacct Construction QuickBooks Desktop QuickBooks Online SAP ECC SAP S/4HANA All Systems Industries Automotive Construction Health Care Manufacturing Oil, Gas, & Energy Professional Services Transportation & Logistics All Industries Role CFO Controller AP Teams Approvers Resources Become a Partner Refer Stampli Resources Library Blog Newsletter Stampli G2 Report Stampli Reviews & Awards Customer Stories AI Information What is Accounts Payable What is Invoice Processing What are B2B Payments What are ACH Payments AP Automation Invoice Management Contact sales@stampli.com 800 California Street, Floor 2 Mountain View, CA 94041 © 2026 Stampli, All rights reserved. Your Privacy Choices Policy Center Terms of Service Privacy Licenses"
+  }
+ }
+}

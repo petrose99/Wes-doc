@@ -1,0 +1,1331 @@
+{
+ "slug": "ramp-ap",
+ "label": "Ramp Accounts Payable (bill pay)",
+ "url": "https://ramp.com/accounts-payable",
+ "accessed": "2026-09-19T12:14:25.064Z",
+ "views": {
+  "390": {
+   "status": 200,
+   "shot": "/home/ubuntu/Dev/Wes-doc/docs/research/benchmark-captures/ramp/ramp-ap-390.png",
+   "initialMotion": {
+    "opacityZeroEls": 4,
+    "animations": {
+     "KbLogoWall-module__3RH7Jq__marquee 153s infinite": 2
+    },
+    "transitionEls": 222,
+    "total": 24449
+   },
+   "errors": [
+    "overlaysHidden=1"
+   ],
+   "title": "Ramp Bill Pay: Accounts Payable Automation Software",
+   "h1": "A month of AP done in minutes.",
+   "subhead": "Process bills, accelerate approvals, and manage cash flow 2.4x faster than legacy software.",
+   "headings": [
+    {
+     "tag": "H1",
+     "text": "A month of AP done in minutes.",
+     "top": 153
+    },
+    {
+     "tag": "H2",
+     "text": "Drag, drop, done.",
+     "top": 1057
+    },
+    {
+     "tag": "H3",
+     "text": "Process thousands of invoices in seconds.",
+     "top": 1503
+    },
+    {
+     "tag": "H3",
+     "text": "Ramp's agent codes everything for you.",
+     "top": 2023
+    },
+    {
+     "tag": "H3",
+     "text": "Catch fraud and overbilling instantly.",
+     "top": 2564
+    },
+    {
+     "tag": "H3",
+     "text": "Keep systems in sync.",
+     "top": 3145
+    },
+    {
+     "tag": "H2",
+     "text": "AP in the age of AI.",
+     "top": 3412
+    },
+    {
+     "tag": "H2",
+     "text": "Fewer clicks. Faster close.",
+     "top": 3781
+    },
+    {
+     "tag": "H2",
+     "text": "Customization that keeps you in control.",
+     "top": 4715
+    },
+    {
+     "tag": "H3",
+     "text": "Approval flows that just flow.",
+     "top": 4849
+    },
+    {
+     "tag": "H3",
+     "text": "Approve or reject with certainty.",
+     "top": 5317
+    },
+    {
+     "tag": "H3",
+     "text": "Assign permissions. Avoid errors.",
+     "top": 5754
+    },
+    {
+     "tag": "H2",
+     "text": "Your AP software should pay you back.",
+     "top": 7198
+    },
+    {
+     "tag": "H3",
+     "text": "Earn cashback with no extra steps.",
+     "top": 7609
+    },
+    {
+     "tag": "H3",
+     "text": "Global payments in one place? Cleared.",
+     "top": 8088
+    },
+    {
+     "tag": "H3",
+     "text": "Batch payments made simple.",
+     "top": 8568
+    },
+    {
+     "tag": "H2",
+     "text": "Automate 1099s from start to finish",
+     "top": 8812
+    },
+    {
+     "tag": "H2",
+     "text": "Collect tax info in bulk",
+     "top": 9285
+    },
+    {
+     "tag": "H2",
+     "text": "Ramp AI handles the form prep",
+     "top": 9732
+    },
+    {
+     "tag": "H2",
+     "text": "One-click filing delivery",
+     "top": 10180
+    },
+    {
+     "tag": "H3",
+     "text": "Budgets Every bill, tracked against your plan.",
+     "top": 10352
+    },
+    {
+     "tag": "H2",
+     "text": "Learn about Ramp's accounts payable product.",
+     "top": 10917
+    },
+    {
+     "tag": "H3",
+     "text": "How to",
+     "top": 11262
+    },
+    {
+     "tag": "H3",
+     "text": "How to",
+     "top": 11262
+    },
+    {
+     "tag": "H3",
+     "text": "How to",
+     "top": 11262
+    },
+    {
+     "tag": "H3",
+     "text": "How to",
+     "top": 11262
+    },
+    {
+     "tag": "H3",
+     "text": "How to",
+     "top": 11262
+    },
+    {
+     "tag": "H2",
+     "text": "One platform for every part of finance—AP, procurement, expenses and more.",
+     "top": 11803
+    },
+    {
+     "tag": "H3",
+     "text": "Travel",
+     "top": 12260
+    },
+    {
+     "tag": "H3",
+     "text": "Expense management",
+     "top": 12502
+    },
+    {
+     "tag": "H3",
+     "text": "Vendor management",
+     "top": 12744
+    },
+    {
+     "tag": "H3",
+     "text": "Procurement",
+     "top": 12986
+    },
+    {
+     "tag": "H3",
+     "text": "Integrations",
+     "top": 13228
+    },
+    {
+     "tag": "H2",
+     "text": "FAQ",
+     "top": 13497
+    },
+    {
+     "tag": "H3",
+     "text": "What is accounts payable software?",
+     "top": 13562
+    },
+    {
+     "tag": "H3",
+     "text": "What is Ramp Bill Pay?",
+     "top": 13633
+    },
+    {
+     "tag": "H3",
+     "text": "Can Ramp Bill Pay be used as a standalone accounts payable software?",
+     "top": 13704
+    },
+    {
+     "tag": "H3",
+     "text": "How do I set up Ramp Bill Pay?",
+     "top": 13785
+    },
+    {
+     "tag": "H3",
+     "text": "What are Ramp AP agents and how do they work?",
+     "top": 13856
+    },
+    {
+     "tag": "H3",
+     "text": "What payment options are available in Ramp Bill Pay (ACH, check, card)?",
+     "top": 13937
+    },
+    {
+     "tag": "H3",
+     "text": "How does Ramp Bill Pay handle vendor setup and payment information?",
+     "top": 14018
+    },
+    {
+     "tag": "H3",
+     "text": "Does Ramp support recurring bill payments and amortization?",
+     "top": 14099
+    },
+    {
+     "tag": "H3",
+     "text": "Can I generate an AP aging report in Ramp Bill Pay?",
+     "top": 14180
+    },
+    {
+     "tag": "H3",
+     "text": "Can I import purchase orders into Ramp Bill Pay?",
+     "top": 14261
+    },
+    {
+     "tag": "H3",
+     "text": "What features should you look for in accounts payable software?",
+     "top": 14342
+    },
+    {
+     "tag": "H3",
+     "text": "What makes Ramp Bill Pay a top choice for accounts payable software?",
+     "top": 14423
+    },
+    {
+     "tag": "H3",
+     "text": "Who is Ramp's accounts payable software best for?",
+     "top": 14504
+    },
+    {
+     "tag": "H3",
+     "text": "Is Ramp's accounts payable software free?",
+     "top": 14585
+    },
+    {
+     "tag": "H2",
+     "text": "Time is money. Save both.",
+     "top": 14746
+    }
+   ],
+   "sections": [
+    {
+     "top": 62,
+     "height": 765,
+     "heading": "A month of AP done in minutes.",
+     "imgs": 0,
+     "svgs": 1,
+     "videos": 1,
+     "ctas": [
+      "Get started for free"
+     ],
+     "textLen": 175,
+     "snippet": "Accounts Payable Software A month of AP done in minutes. Process bills, accelerate approvals, and manage cash flow 2.4x faster than legacy software. Email Get started for free"
+    },
+    {
+     "top": 827,
+     "height": 107,
+     "heading": "",
+     "imgs": 18,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 40,
+     "snippet": "Join 70,000+ businesses running on Ramp."
+    },
+    {
+     "top": 1014,
+     "height": 2216,
+     "heading": "Drag, drop, done.",
+     "imgs": 0,
+     "svgs": 10,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 584,
+     "snippet": "AI-powered Invoice Processing Drag, drop, done. Process thousands of invoices in seconds. Ramp's OCR captures each detail and line item with 99% accuracy. Ramp's agent codes everything for you. Our agent learns from your"
+    },
+    {
+     "top": 3310,
+     "height": 268,
+     "heading": "AP in the age of AI.",
+     "imgs": 1,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 35,
+     "snippet": "AP in the age of AI. Watch the film"
+    },
+    {
+     "top": 3658,
+     "height": 934,
+     "heading": "Fewer clicks. Faster close.",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 234,
+     "snippet": "Why teams choose Ramp for AP automation Fewer clicks. Faster close. Up to 7x fewer clicks to process a bill vs Bill.com1 Up to 95% of businesses reported improved visibility2 Up to 2.4x faster invoice processing than leg"
+    },
+    {
+     "top": 4592,
+     "height": 1630,
+     "heading": "Customization that keeps you in control.",
+     "imgs": 2,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [
+      "See bills",
+      "Review bills",
+      "Make payments"
+     ],
+     "textLen": 543,
+     "snippet": "Approval Orchestration Customization that keeps you in control. Approval flows that just flow. Ramp automatically routes every bill to the right approver—from routine spend to CFO signoffs. Approve or reject with certain"
+    },
+    {
+     "top": 6302,
+     "height": 773,
+     "heading": "",
+     "imgs": 1,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 209,
+     "snippet": "“Ramp has transformed how we manage accounts payable. With the introduction of agents and AI coding, we’ve eliminated tedious manual work while streamlining internal processes.” Andrew Clarke VP Finance, Studs"
+    },
+    {
+     "top": 7155,
+     "height": 1534,
+     "heading": "Your AP software should pay you back.",
+     "imgs": 3,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 390,
+     "snippet": "Payments Your AP software should pay you back. Earn cashback with no extra steps. Ramp’s agent spots card-eligible vendors and submits payments for you. Global payments in one place? Cleared. Pay any vendor, anywhere in "
+    },
+    {
+     "top": 8769,
+     "height": 1471,
+     "heading": "Automate 1099s from start to finish",
+     "imgs": 3,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 389,
+     "snippet": "1099 Compliance Automate 1099s from start to finish Collect tax info in bulk Request all W-9s and e-consent at once. No chasing. No one-off emails. Ramp AI handles the form prep All your bill pay spend is mapped to 1099-"
+    },
+    {
+     "top": 10320,
+     "height": 517,
+     "heading": "Budgets Every bill, tracked against your plan.",
+     "imgs": 1,
+     "svgs": 1,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 174,
+     "snippet": "Budgets Every bill, tracked against your plan. Bills automatically map to the right budget line. Real-time visibility, no manual reconciliation. Learn more about Ramp Budgets"
+    },
+    {
+     "top": 10917,
+     "height": 806,
+     "heading": "Learn about Ramp's accounts payable product.",
+     "imgs": 5,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [
+      "Previous",
+      "Next",
+      "31s How to upload and process invoices.",
+      "31s How to approve bills simply.",
+      "38s How to pay bills your way.",
+      "26s How to manage vendors."
+     ],
+     "textLen": 277,
+     "snippet": "Learn about Ramp's accounts payable product. Go step by step with our product experts. Previous Next 31s How to upload and process invoices. 31s How to approve bills simply. 38s How to pay bills your way. 29s How to get "
+    },
+    {
+     "top": 11803,
+     "height": 1614,
+     "heading": "One platform for every part of finance—AP, procurement, expenses and more.",
+     "imgs": 1,
+     "svgs": 8,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 578,
+     "snippet": "One platform for every part of finance—AP, procurement, expenses and more. Travel Turn travel policies into guardrails everyone on the team will follow. Learn more See a demo Expense management Automate expense managemen"
+    },
+    {
+     "top": 13497,
+     "height": 1169,
+     "heading": "FAQ",
+     "imgs": 0,
+     "svgs": 14,
+     "videos": 0,
+     "ctas": [
+      "What is accounts payable software?",
+      "What is Ramp Bill Pay?",
+      "How do I set up Ramp Bill Pay?"
+     ],
+     "textLen": 12198,
+     "snippet": "FAQ What is accounts payable software? Accounts payable software is a solution businesses use to process invoices and pay vendors. Instead of manually entering bills, chasing down approvals, and cutting checks, AP softwa"
+    }
+   ],
+   "navLinks": [
+    "Back"
+   ],
+   "heroCtas": [
+    {
+     "text": "Get started for free",
+     "tag": "BUTTON",
+     "href": null
+    }
+   ],
+   "bigImgs": [
+    {
+     "w": 358,
+     "h": 268,
+     "alt": "Zain talks about Ramp AP agents",
+     "src": "https://ramp.com/_next/image?url=%2Fassets%2Fimages%2Faccounts-payable%2Fap-agents-mobile.webp&w=384&q=75&dpl=dpl_3dTAA9i5wciq2cZaAdE2ha8wZjSP",
+     "top": 3310
+    },
+    {
+     "w": 358,
+     "h": 239,
+     "alt": "Approve or reject with certainty",
+     "src": "https://ramp.com/_next/image?url=%2Fassets%2Fimages%2Faccounts-payable%2Fap-agent-summary.webp&w=1920&q=75&dpl=dpl_3dTAA9i5wciq2cZaAdE2ha8wZjSP",
+     "top": 5460
+    },
+    {
+     "w": 390,
+     "h": 773,
+     "alt": "Studs quote",
+     "src": "https://ramp.com/_next/image?url=%2Fassets%2Fimages%2Faccounts-payable%2Fstuds-quote.webp&w=3840&q=75&dpl=dpl_3dTAA9i5wciq2cZaAdE2ha8wZjSP",
+     "top": 6302
+    },
+    {
+     "w": 358,
+     "h": 269,
+     "alt": "Earn cashback with no extra steps.",
+     "src": "https://ramp.com/_next/image?url=%2Fassets%2Fimages%2Faccounts-payable%2Fap-automatic-payments.webp&w=1920&q=75&dpl=dpl_3dTAA9i5wciq2cZaAdE2ha8wZjSP",
+     "top": 7300
+    },
+    {
+     "w": 358,
+     "h": 269,
+     "alt": "Global payments in one place? Cleared.",
+     "src": "https://ramp.com/_next/image?url=%2Fassets%2Fimages%2Faccounts-payable%2Fap-international-payments.webp&w=1920&q=75&dpl=dpl_3dTAA9i5wciq2cZaAdE2ha8wZjSP",
+     "top": 7780
+    },
+    {
+     "w": 358,
+     "h": 269,
+     "alt": "Pay 5 bills (or 5000) with the same effort.",
+     "src": "https://ramp.com/_next/image?url=%2Fassets%2Fimages%2Faccounts-payable%2Fap-batch-payments.webp&w=1920&q=75&dpl=dpl_3dTAA9i5wciq2cZaAdE2ha8wZjSP",
+     "top": 8259
+    },
+    {
+     "w": 358,
+     "h": 347,
+     "alt": "Request tax details from vendors",
+     "src": "https://ramp.com/_next/image?url=%2F_next%2Fstatic%2Fimmutable%2Fmedia%2Fap-1099-tax.44xm4k917-at2.webp&w=1920&q=75",
+     "top": 8914
+    },
+    {
+     "w": 358,
+     "h": 347,
+     "alt": "1099 MISC form auto-filled",
+     "src": "https://ramp.com/_next/image?url=%2F_next%2Fstatic%2Fimmutable%2Fmedia%2Fap-1099-misc.3u6kcapur0g2k.webp&w=1920&q=75",
+     "top": 9361
+    },
+    {
+     "w": 358,
+     "h": 347,
+     "alt": "File 1099s with one click",
+     "src": "https://ramp.com/_next/image?url=%2F_next%2Fstatic%2Fimmutable%2Fmedia%2Fap-1099-file.0bdubz0vrw0cw.webp&w=1920&q=75",
+     "top": 9808
+    },
+    {
+     "w": 358,
+     "h": 269,
+     "alt": "Budget dashboard tracking vendor spend against plan",
+     "src": "https://ramp.com/_next/image?url=%2F_next%2Fstatic%2Fimmutable%2Fmedia%2Fap-budgets-track.2pdepx9juj3ob.webp&w=1920&q=75",
+     "top": 10568
+    },
+    {
+     "w": 345,
+     "h": 557,
+     "alt": "Accounts payable product video",
+     "src": "https://ramp.com/_next/image?url=https%3A%2F%2Fair-prod.imgix.net%2F81189d83-6072-4ab9-a67b-cfaa7b5c1489.jpg%3Fw%3D712%26h%3D1148%26fm%3Dwebp%26fit%3Dcrop%26aut",
+     "top": 11169
+    },
+    {
+     "w": 345,
+     "h": 557,
+     "alt": "Accounts payable product video",
+     "src": "https://ramp.com/_next/image?url=https%3A%2F%2Fair-prod.imgix.net%2F91d94b17-a777-44eb-9a59-0c0549be5d5d.jpg%3Fw%3D712%26h%3D1148%26fm%3Dwebp%26fit%3Dcrop%26aut",
+     "top": 11169
+    },
+    {
+     "w": 345,
+     "h": 557,
+     "alt": "Accounts payable product video",
+     "src": "https://ramp.com/_next/image?url=https%3A%2F%2Fair-prod.imgix.net%2F6ba32598-6d88-4e1b-b933-141a00e2e158.jpg%3Fw%3D712%26h%3D1148%26fm%3Dwebp%26fit%3Dcrop%26aut",
+     "top": 11169
+    },
+    {
+     "w": 345,
+     "h": 557,
+     "alt": "Accounts payable product video",
+     "src": "https://ramp.com/_next/image?url=https%3A%2F%2Fair-prod.imgix.net%2Fe5d30c67-8936-42cd-bbd1-5b0b4571f614.jpg%3Fw%3D712%26h%3D1148%26fm%3Dwebp%26fit%3Dcrop%26aut",
+     "top": 11169
+    },
+    {
+     "w": 345,
+     "h": 557,
+     "alt": "Accounts payable product video",
+     "src": "https://ramp.com/_next/image?url=https%3A%2F%2Fair-prod.imgix.net%2Fbffe853d-a909-4a2d-86e3-7127508b714a.jpg%3Fw%3D712%26h%3D1148%26fm%3Dwebp%26fit%3Dcrop%26aut",
+     "top": 11169
+    },
+    {
+     "w": 358,
+     "h": 226,
+     "alt": "Ramp Black Card",
+     "src": "https://ramp.com/_next/image?url=%2F_next%2Fstatic%2Fimmutable%2Fmedia%2Framp-black-card.1a_u287qn7med.webp&w=828&q=75",
+     "top": 11981
+    }
+   ],
+   "imgCount": 38,
+   "logoish": 0,
+   "videos": [
+    {
+     "autoplay": true,
+     "loop": true,
+     "src": "https://assets.ramp.com/nextjs/videos/ap-hero-0420.mp4",
+     "w": 358,
+     "top": 445
+    }
+   ],
+   "canvases": 1,
+   "lotties": 0,
+   "iframes": [
+    "https://www.googletagmanager.com/ns.html?id=GTM-WFDFDWP",
+    "https://pagead2.googlesyndication.com/pagead/ads?client=ca-pub-3938919135399013&output=html&adk=1812271804&adf=302519425",
+    "https://ramp-com.chilipiper.com/chat/loader/?embedOrigin=https%3A%2F%2Framp.com&workspaceId=fef2da9a-11bc-48f7-bd29-1762",
+    "https://pagead2.googlesyndication.com/pagead/html/r20260917/r20190131/zrt_lookup_fy2021.html"
+   ],
+   "fonts": [
+    [
+     "TWK Lausanne",
+     7263
+    ],
+    [
+     "lausanne",
+     1297
+    ],
+    [
+     "Material Icons Outlined",
+     24
+    ]
+   ],
+   "sectionBgs": [
+    [
+     "lab(100 0 0)",
+     3
+    ]
+   ],
+   "buttonBgs": [
+    [
+     "lab(92.1406 -20.4979 84.7726)",
+     3
+    ],
+    [
+     "rgba(33, 33, 33, 0.05)",
+     2
+    ],
+    [
+     "lab(95.604 0.426412 1.20401)",
+     1
+    ]
+   ],
+   "type": {
+    "h1": {
+     "family": "lausanne, \"lausanne Fallback\"",
+     "size": "40px",
+     "weight": "400",
+     "lineHeight": "42px",
+     "letterSpacing": "-0.01px",
+     "color": "lab(2.83994 0.367254 0.969091)"
+    },
+    "h2": {
+     "family": "lausanne, \"lausanne Fallback\"",
+     "size": "34px",
+     "weight": "400"
+    },
+    "body": {
+     "family": "lausanne, \"lausanne Fallback\"",
+     "size": "16px",
+     "color": "lab(2.83994 0.367254 0.969091)",
+     "bg": "lab(100 0 0)"
+    }
+   },
+   "motionAfterScroll": {
+    "animations": {
+     "KbLogoWall-module__3RH7Jq__marquee 153s infinite": 2
+    },
+    "opacityZeroEls": 4,
+    "transitionEls": 226,
+    "stickyFixedEls": 9
+   },
+   "libs": {
+    "gsap": false,
+    "framer": false,
+    "webflow": false,
+    "lottie": false,
+    "splide_swiper": false,
+    "rive": false,
+    "nextjs": true,
+    "wordpress": false,
+    "hubspot": true
+   },
+   "wordCount": 2913,
+   "scrollHeight": 17365,
+   "bodyText": "Back Accounts Payable Software A month of AP done in minutes. Process bills, accelerate approvals, and manage cash flow 2.4x faster than legacy software. Email Get started for free Join 70,000+ businesses running on Ramp. AI-powered Invoice Processing Drag, drop, done. Process thousands of invoices in seconds. Ramp's OCR captures each detail and line item with 99% accuracy. Ramp's agent codes everything for you. Our agent learns from your past invoices and applies your logic instantly, across hundreds of line items. Catch fraud and overbilling instantly. Ramp checks every line item with two and three-way matching, so you know if something’s off before sending. Procurement Keep systems in sync. Ramp keeps your data clean and consistent by syncing in real time with your ERP—no double entry needed. AP in the age of AI. Watch the film Why teams choose Ramp for AP automation Fewer clicks. Faster close. Up to 7x fewer clicks to process a bill vs Bill.com1 Up to 95% of businesses reported improved visibility2 Up to 2.4x faster invoice processing than legacy software.3 Approval Orchestration Customization that keeps you in control. Approval flows that just flow. Ramp automatically routes every bill to the right approver—from routine spend to CFO signoffs. Approve or reject with certainty. Ramp’s agent recommends approvals and flags what needs review so teams make faster, fully informed decisions. Assign permissions. Avoid errors. Set roles and permissions that scale with your business. Decide who can view, approve, or pay—and keep separation of duty. Shannon Finance See bills Review bills Make payments “Ramp has transformed how we manage accounts payable. With the introduction of agents and AI coding, we’ve eliminated tedious manual work while streamlining internal processes.” Andrew Clarke VP Finance, Studs Payments Your AP software should pay you back. Earn cashback with no extra steps. Ramp’s agent spots card-eligible vendors and submits payments for you. Global payments in one place? Cleared. Pay any vendor, anywhere in the world, by card, ACH, or wire. All in one place. Batch payments made simple. Whether you’re paying 5 or 500 bills, save time and cut costs by batching vendor payments. 1099 Compliance Automate 1099s from start to finish Collect tax info in bulk Request all W-9s and e-consent at once. No chasing. No one-off emails. Ramp AI handles the form prep All your bill pay spend is mapped to 1099-NEC and 1099-MISC boxes with calculations done for you. One-click filing delivery File directly with the IRS and eligible states in minutes - no extra portals or logins. Budgets Every bill, tracked against your plan. Bills automatically map to the right budget line. Real-time visibility, no manual reconciliation. Learn more about Ramp Budgets Learn about Ramp's accounts payable product. Go step by step with our product experts. Previous Next 31s How to upload and process invoices. 31s How to approve bills simply. 38s How to pay bills your way. 29s How to get around the Bill Pay dashboard. 26s How to manage vendors. One platform for every part of finance—AP, procurement, expenses and more. Travel Turn travel policies into guardrails everyone on the team will follow. Learn more See a demo Expense management Automate expense management with Ramp’s corporate card, reimbursements, and more. Learn more Vendor management Track all your vendor data and discover pricing insights in one convenient place. Learn more Procurement Intake-to-pay simplified and automated every step of the way. Learn more Integrations Seamless automation and direct integrations for audit-proof accounting. Learn more FAQ What is accounts payable software? Accounts payable software is a solution businesses use to process invoices and pay vendors. Instead of manually entering bills, chasing down approvals, and cutting checks, AP software handles the entire invoice-to-payment workflow digitally. Here's what it does: The software captures invoice details automatically using OCR technology, matches line items against purchase orders to catch overbilling, and routes invoices through approval workflows based on your business rules. Once approved, it schedules payments via ACH, card, check, or wire, then syncs everything to your ERP or accounting system in real time. The payoff is faster processing, fewer errors, better spend visibility, and stronger financial controls. Modern accounts payable software like Ramp takes this further with AI agents that automate coding, detect fraud, and optimize payment methods—turning manual AP work into touchless workflows that save your team hours every week. What is Ramp Bill Pay? Ramp Bill Pay is an AI-powered accounts payable solution that helps you process invoices, manage approvals, and make payments 2.4x faster than legacy software3. It uses 99% accurate OCR to capture invoice details, automatically matches line items against purchase orders, and routes bills through customizable approval workflows. You can pay vendors via ACH, card, check, or international wire, all while syncing directly with your ERP like NetSuite, QuickBooks, Sage Intacct, and more. Admins and AP Clerks can track, edit, cancel, or archive bills at every stage, with full visibility into bill status throughout the process. Can Ramp Bill Pay be used as a standalone accounts payable software? Yes, Ramp Bill Pay works as a standalone AP automation solution. You get full access to invoice processing, approval workflows, vendor management, and payment capabilities without needing to use Ramp's corporate cards or expense management features. The AP platform syncs with 10 ERPs (like NetSuite, Sage Intacct, and QuickBooks) and handles everything from invoice capture to payment execution independently. Many customers use Bill Pay on its own to automate their accounts payable operations while keeping their current spend management setup. How do I set up Ramp Bill Pay? Getting started with Ramp Bill Pay is quick and flexible. You'll begin by connecting your accounting provider (or opt to skip and set it up later). Ramp can import vendor information directly from your accounting system, alternatively, you can also request vendors to submit their payments directly into Ramp. From there, you'll link a bank account for payments, choose your payment method, and set up approval flows, permissions, and optional automation like invoice forwarding. Ramp Bill Pay is flexible by design—easy to set up, and ready to scale with your team. Learn more. What are Ramp AP agents and how do they work? Ramp AP agents are agentic AI systems—autonomous agents that can analyze context, make decisions, and take action with little human intervention—built into Ramp Bill Pay to automate end-to-end accounts payable workflows. Instead of requiring manual review, these agents use historical data, vendor checks, and contract details to code expenses, detect anomalies, and route invoices with the right context. You maintain full oversight throughout: agents handle the heavy lifting while your team retains visibility and control over approvals, exceptions, and payment decisions. Here's what each agent does: Auto-coding agent: Analyzes your organization's historical coding patterns and applies that logic to new invoices automatically, mapping line items to the correct GL codes based on line items, descriptions, and location. Fraud prevention agent: Flags suspicious activity—like unexpected changes to vendor banking details or unverified accounts—before payment goes out. Approval agent: Summarizes vendor history, contract details, and PO matching to give approvers full context and suggest approval or rejection. Automatic payment agent: Identifies card-eligible invoices and can fill card details directly into vendor portals, capturing cashback opportunities automatically. Together, these agents turn time-intensive AP workflows into touchless processes while maintaining strong financial controls. What payment options are available in Ramp Bill Pay (ACH, check, card)? Ramp Bill Pay supports a range of payment methods—including standard ACH, Same-Day ACH, Ramp card, check, and domestic and international wire (in USD or foreign currencies)—all within the Ramp platform. For check payments, Ramp debits your connected bank account on the scheduled payment date and issues a check on your behalf. If you choose to pay by card, you can use an existing Ramp card or generate a one-time virtual card. One-time cards can be sent by Ramp to the vendor's default contact on the bill's due date or be entered manually. Ramp automatically marks the bill as paid. You control which vendors are paid by card. Learn more. How does Ramp Bill Pay handle vendor setup and payment information? Ramp collects vendor ACH details in two ways: If bank information is included on the invoice, Ramp automatically extracts it—along with vendor data—to create a vendor record You can also request ACH details directly from vendors within Ramp Bill Pay Ramp also supports W-9 collection. You can manually upload W-9s to vendor records or request them from within Ramp. All vendor tax info and payment history can be exported as a CSV to simplify 1099 filing. Learn more. Vendors also don't need to create a Ramp account to get paid, signing up to the vendor network is entirely optional. Ramp is designed to make payments fast and frictionless for both sides of the transaction. Once your team approves a bill, the vendor receives the payment on the scheduled payment date. Does Ramp support recurring bill payments and amortization? Yes, Ramp supports both recurring bill payments and bill amortization. You can set up recurring bills directly in Ramp's accounts payable software to automate routine vendor payments. Customize the frequency and ending date and Ramp will handle the rest. Learn more. Ramp also supports amortization for bills via our NetSuite integration. You can sync existing Amortization Templates from NetSuite and apply them directly to bills in Ramp Bill Pay. Learn more. Can I generate an AP aging report in Ramp Bill Pay? Download a CSV AP Aging report directly from Ramp Bill Pay. Get a summary on the status of unpaid bills, showing what you owe, who you owe it to, and how much is overdue. Learn more. Can I import purchase orders into Ramp Bill Pay? Yes, you can import purchase orders into Bill Pay from NetSuite or QuickBooks, enabling a seamless PO-to-Bill workflow. Ramp also allows you to create purchase orders and item receipts directly within the platform. Ramp performs 2-way (PO to invoice) and 3-way (PO, invoice, and receipt) match, ensuring you are billed correctly. Learn more. What features should you look for in accounts payable software? The best AP automation software eliminates busywork, reduces risk, and integrates directly with your accounting systems. Here are the top AP features you should look for: Smart invoice capture with OCR: Automatically extracts invoice data—vendor details, line items, amounts—from PDFs, scans, and emails with high accuracy. PO matching for fraud prevention: Automatically verify invoice line items against purchase orders and receipts (two-way and three-way matching) to catch overbilling. Custom approval workflows: Flexible routing based on invoice amount, department, vendor type, or other business rules. Approvers should get automated reminders and be able to review invoices from mobile devices. Real-time ERP integration: Sync bidirectionally with your accounting system—NetSuite, QuickBooks, Xero, Sage Intacct—so bills, payments, and vendor data update automatically without manual reconciliation. Multiple payment methods: Support for ACH, card, check, and wire payments, along with multi-currency support and compliance tools. Vendor self-service portal: Let vendors submit invoices, update payment details, and check payment status on their own. Built-in audit trails: Role-based permissions, approval histories, and detailed activity logs should be automatic t"
+  },
+  "1440": {
+   "status": 200,
+   "shot": "/home/ubuntu/Dev/Wes-doc/docs/research/benchmark-captures/ramp/ramp-ap-1440.png",
+   "initialMotion": {
+    "opacityZeroEls": 15,
+    "animations": {
+     "KbLogoWall-module__3RH7Jq__marquee 153s infinite": 2
+    },
+    "transitionEls": 221,
+    "total": 1293
+   },
+   "errors": [
+    "overlaysHidden=3"
+   ],
+   "title": "Ramp Bill Pay: Accounts Payable Automation Software",
+   "h1": "A month of AP done in minutes.",
+   "subhead": "Process bills, accelerate approvals, and manage cash flow 2.4x faster than legacy software.",
+   "headings": [
+    {
+     "tag": "H1",
+     "text": "A month of AP done in minutes.",
+     "top": 296
+    },
+    {
+     "tag": "H2",
+     "text": "Drag, drop, done.",
+     "top": 1072
+    },
+    {
+     "tag": "H3",
+     "text": "Process thousands of invoices in seconds.",
+     "top": 1320
+    },
+    {
+     "tag": "H3",
+     "text": "Ramp’s agent codes everything for you.",
+     "top": 1383
+    },
+    {
+     "tag": "H3",
+     "text": "Catch fraud and overbilling instantly.",
+     "top": 1499
+    },
+    {
+     "tag": "H3",
+     "text": "Keep systems in sync.",
+     "top": 1562
+    },
+    {
+     "tag": "H2",
+     "text": "AP in the age of AI.",
+     "top": 2019
+    },
+    {
+     "tag": "H2",
+     "text": "Fewer clicks. Faster close.",
+     "top": 2541
+    },
+    {
+     "tag": "H2",
+     "text": "Customization that keeps you in control.",
+     "top": 3148
+    },
+    {
+     "tag": "H3",
+     "text": "Approval flows that just flow.",
+     "top": 3470
+    },
+    {
+     "tag": "H3",
+     "text": "Approve or reject with certainty.",
+     "top": 3835
+    },
+    {
+     "tag": "H3",
+     "text": "Assign permissions. Avoid errors.",
+     "top": 3835
+    },
+    {
+     "tag": "H2",
+     "text": "Your AP software should pay you back.",
+     "top": 5363
+    },
+    {
+     "tag": "H3",
+     "text": "Earn cashback with no extra steps.",
+     "top": 5828
+    },
+    {
+     "tag": "H3",
+     "text": "Global payments in one place? Cleared.",
+     "top": 5828
+    },
+    {
+     "tag": "H3",
+     "text": "Batch payments made simple.",
+     "top": 5817
+    },
+    {
+     "tag": "H2",
+     "text": "Automate 1099s from start to finish",
+     "top": 6112
+    },
+    {
+     "tag": "H2",
+     "text": "Collect tax info in bulk",
+     "top": 6648
+    },
+    {
+     "tag": "H2",
+     "text": "Ramp AI handles the form prep",
+     "top": 6648
+    },
+    {
+     "tag": "H2",
+     "text": "One-click filing delivery",
+     "top": 6648
+    },
+    {
+     "tag": "H3",
+     "text": "Budgets Every bill, tracked against your plan.",
+     "top": 6997
+    },
+    {
+     "tag": "H2",
+     "text": "Learn about Ramp's accounts payable product.",
+     "top": 7459
+    },
+    {
+     "tag": "H3",
+     "text": "How to",
+     "top": 7732
+    },
+    {
+     "tag": "H3",
+     "text": "How to",
+     "top": 7732
+    },
+    {
+     "tag": "H3",
+     "text": "How to",
+     "top": 7732
+    },
+    {
+     "tag": "H3",
+     "text": "How to",
+     "top": 7732
+    },
+    {
+     "tag": "H3",
+     "text": "How to",
+     "top": 7732
+    },
+    {
+     "tag": "H2",
+     "text": "One platform for every part of finance—AP, procurement, expenses and more.",
+     "top": 8348
+    },
+    {
+     "tag": "H3",
+     "text": "Travel",
+     "top": 8532
+    },
+    {
+     "tag": "H3",
+     "text": "Expense management",
+     "top": 8532
+    },
+    {
+     "tag": "H3",
+     "text": "Vendor management",
+     "top": 8817
+    },
+    {
+     "tag": "H3",
+     "text": "Procurement",
+     "top": 8817
+    },
+    {
+     "tag": "H3",
+     "text": "Integrations",
+     "top": 8817
+    },
+    {
+     "tag": "H2",
+     "text": "FAQ",
+     "top": 9179
+    },
+    {
+     "tag": "H3",
+     "text": "What is accounts payable software?",
+     "top": 9278
+    },
+    {
+     "tag": "H3",
+     "text": "What is Ramp Bill Pay?",
+     "top": 9349
+    },
+    {
+     "tag": "H3",
+     "text": "Can Ramp Bill Pay be used as a standalone accounts payable software?",
+     "top": 9420
+    },
+    {
+     "tag": "H3",
+     "text": "How do I set up Ramp Bill Pay?",
+     "top": 9491
+    },
+    {
+     "tag": "H3",
+     "text": "What are Ramp AP agents and how do they work?",
+     "top": 9562
+    },
+    {
+     "tag": "H3",
+     "text": "What payment options are available in Ramp Bill Pay (ACH, check, card)?",
+     "top": 9633
+    },
+    {
+     "tag": "H3",
+     "text": "How does Ramp Bill Pay handle vendor setup and payment information?",
+     "top": 9704
+    },
+    {
+     "tag": "H3",
+     "text": "Does Ramp support recurring bill payments and amortization?",
+     "top": 9775
+    },
+    {
+     "tag": "H3",
+     "text": "Can I generate an AP aging report in Ramp Bill Pay?",
+     "top": 9846
+    },
+    {
+     "tag": "H3",
+     "text": "Can I import purchase orders into Ramp Bill Pay?",
+     "top": 9917
+    },
+    {
+     "tag": "H3",
+     "text": "What features should you look for in accounts payable software?",
+     "top": 9988
+    },
+    {
+     "tag": "H3",
+     "text": "What makes Ramp Bill Pay a top choice for accounts payable software?",
+     "top": 10059
+    },
+    {
+     "tag": "H3",
+     "text": "Who is Ramp's accounts payable software best for?",
+     "top": 10130
+    },
+    {
+     "tag": "H3",
+     "text": "Is Ramp's accounts payable software free?",
+     "top": 10201
+    },
+    {
+     "tag": "H2",
+     "text": "Time is money. Save both.",
+     "top": 10400
+    }
+   ],
+   "sections": [
+    {
+     "top": 62,
+     "height": 732,
+     "heading": "A month of AP done in minutes.",
+     "imgs": 0,
+     "svgs": 1,
+     "videos": 1,
+     "ctas": [
+      "Get started for free"
+     ],
+     "textLen": 188,
+     "snippet": "Accounts Payable Software A month of AP done in minutes. Process bills, accelerate approvals, and manage cash flow 2.4x faster than legacy software. Email Get started for free Explore demo"
+    },
+    {
+     "top": 794,
+     "height": 107,
+     "heading": "",
+     "imgs": 18,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 40,
+     "snippet": "Join 70,000+ businesses running on Ramp."
+    },
+    {
+     "top": 1029,
+     "height": 721,
+     "heading": "Drag, drop, done.",
+     "imgs": 0,
+     "svgs": 10,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 584,
+     "snippet": "AI-powered Invoice Processing Drag, drop, done. Process thousands of invoices in seconds. Ramp’s OCR captures each detail and line item with 99% accuracy. Ramp’s agent codes everything for you. Our agent learns from your"
+    },
+    {
+     "top": 1878,
+     "height": 364,
+     "heading": "AP in the age of AI.",
+     "imgs": 1,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 35,
+     "snippet": "AP in the age of AI. Watch the film"
+    },
+    {
+     "top": 2370,
+     "height": 607,
+     "heading": "Fewer clicks. Faster close.",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 234,
+     "snippet": "Why teams choose Ramp for AP automation Fewer clicks. Faster close. Up to 7x fewer clicks to process a bill vs Bill.com1 Up to 95% of businesses reported improved visibility2 Up to 2.4x faster invoice processing than leg"
+    },
+    {
+     "top": 2977,
+     "height": 1404,
+     "heading": "Customization that keeps you in control.",
+     "imgs": 2,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [
+      "See bills",
+      "Review bills",
+      "Make payments"
+     ],
+     "textLen": 543,
+     "snippet": "Approval Orchestration Customization that keeps you in control. Approval flows that just flow. Ramp automatically routes every bill to the right approver—from routine spend to CFO signoffs. Approve or reject with certain"
+    },
+    {
+     "top": 4509,
+     "height": 683,
+     "heading": "",
+     "imgs": 1,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 209,
+     "snippet": "“Ramp has transformed how we manage accounts payable. With the introduction of agents and AI coding, we’ve eliminated tedious manual work while streamlining internal processes.” Andrew Clarke VP Finance, Studs"
+    },
+    {
+     "top": 5320,
+     "height": 621,
+     "heading": "Your AP software should pay you back.",
+     "imgs": 3,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 390,
+     "snippet": "Payments Your AP software should pay you back. Earn cashback with no extra steps. Ramp’s agent spots card-eligible vendors and submits payments for you. Global payments in one place? Cleared. Pay any vendor, anywhere in "
+    },
+    {
+     "top": 6069,
+     "height": 641,
+     "heading": "Automate 1099s from start to finish",
+     "imgs": 3,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 389,
+     "snippet": "1099 Compliance Automate 1099s from start to finish Collect tax info in bulk Request all W-9s and e-consent at once. No chasing. No one-off emails. Ramp AI handles the form prep All your bill pay spend is mapped to 1099-"
+    },
+    {
+     "top": 6838,
+     "height": 493,
+     "heading": "Budgets Every bill, tracked against your plan.",
+     "imgs": 1,
+     "svgs": 1,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 174,
+     "snippet": "Budgets Every bill, tracked against your plan. Bills automatically map to the right budget line. Real-time visibility, no manual reconciliation. Learn more about Ramp Budgets"
+    },
+    {
+     "top": 7459,
+     "height": 762,
+     "heading": "Learn about Ramp's accounts payable product.",
+     "imgs": 5,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [
+      "Previous",
+      "Next",
+      "31s How to upload and process invoices.",
+      "31s How to approve bills simply.",
+      "38s How to pay bills your way.",
+      "26s How to manage vendors."
+     ],
+     "textLen": 277,
+     "snippet": "Learn about Ramp's accounts payable product. Go step by step with our product experts. Previous Next 31s How to upload and process invoices. 31s How to approve bills simply. 38s How to pay bills your way. 29s How to get "
+    },
+    {
+     "top": 8348,
+     "height": 703,
+     "heading": "One platform for every part of finance—AP, procurement, expenses and more.",
+     "imgs": 1,
+     "svgs": 8,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 523,
+     "snippet": "One platform for every part of finance—AP, procurement, expenses and more. Travel Turn travel policies into guardrails everyone on the team will follow. See a demo Expense management Automate expense management with Ramp"
+    },
+    {
+     "top": 9179,
+     "height": 1093,
+     "heading": "FAQ",
+     "imgs": 0,
+     "svgs": 14,
+     "videos": 0,
+     "ctas": [
+      "What is accounts payable software?",
+      "What is Ramp Bill Pay?",
+      "How do I set up Ramp Bill Pay?"
+     ],
+     "textLen": 12198,
+     "snippet": "FAQ What is accounts payable software? Accounts payable software is a solution businesses use to process invoices and pay vendors. Instead of manually entering bills, chasing down approvals, and cutting checks, AP softwa"
+    }
+   ],
+   "navLinks": [
+    "Products",
+    "Partners",
+    "Solutions",
+    "Resources",
+    "Customers",
+    "Pricing",
+    "Sign in",
+    "Sign in",
+    "See a demo",
+    "Get started"
+   ],
+   "heroCtas": [
+    {
+     "text": "Get started for free",
+     "tag": "BUTTON",
+     "href": null
+    },
+    {
+     "text": "Explore demo",
+     "tag": "A",
+     "href": "https://ramp.com/explore-ap"
+    }
+   ],
+   "bigImgs": [
+    {
+     "w": 1312,
+     "h": 364,
+     "alt": "Zain talks about Ramp AP agents",
+     "src": "https://ramp.com/_next/image?url=%2Fassets%2Fimages%2Faccounts-payable%2Fap-agents.webp&w=1920&q=75&dpl=dpl_3dTAA9i5wciq2cZaAdE2ha8wZjSP",
+     "top": 1878
+    },
+    {
+     "w": 644,
+     "h": 429,
+     "alt": "Approve or reject with certainty",
+     "src": "https://ramp.com/_next/image?url=%2Fassets%2Fimages%2Faccounts-payable%2Fap-agent-summary.webp&w=1920&q=75&dpl=dpl_3dTAA9i5wciq2cZaAdE2ha8wZjSP",
+     "top": 3952
+    },
+    {
+     "w": 1440,
+     "h": 683,
+     "alt": "Studs quote",
+     "src": "https://ramp.com/_next/image?url=%2Fassets%2Fimages%2Faccounts-payable%2Fstuds-quote.webp&w=3840&q=75&dpl=dpl_3dTAA9i5wciq2cZaAdE2ha8wZjSP",
+     "top": 4509
+    },
+    {
+     "w": 421,
+     "h": 316,
+     "alt": "Earn cashback with no extra steps.",
+     "src": "https://ramp.com/_next/image?url=%2Fassets%2Fimages%2Faccounts-payable%2Fap-automatic-payments.webp&w=1920&q=75&dpl=dpl_3dTAA9i5wciq2cZaAdE2ha8wZjSP",
+     "top": 5472
+    },
+    {
+     "w": 421,
+     "h": 316,
+     "alt": "Global payments in one place? Cleared.",
+     "src": "https://ramp.com/_next/image?url=%2Fassets%2Fimages%2Faccounts-payable%2Fap-international-payments.webp&w=1920&q=75&dpl=dpl_3dTAA9i5wciq2cZaAdE2ha8wZjSP",
+     "top": 5472
+    },
+    {
+     "w": 421,
+     "h": 316,
+     "alt": "Pay 5 bills (or 5000) with the same effort.",
+     "src": "https://ramp.com/_next/image?url=%2Fassets%2Fimages%2Faccounts-payable%2Fap-batch-payments.webp&w=1920&q=75&dpl=dpl_3dTAA9i5wciq2cZaAdE2ha8wZjSP",
+     "top": 5461
+    },
+    {
+     "w": 427,
+     "h": 414,
+     "alt": "Request tax details from vendors",
+     "src": "https://ramp.com/_next/image?url=%2F_next%2Fstatic%2Fimmutable%2Fmedia%2Fap-1099-tax.44xm4k917-at2.webp&w=1920&q=75",
+     "top": 6210
+    },
+    {
+     "w": 427,
+     "h": 414,
+     "alt": "1099 MISC form auto-filled",
+     "src": "https://ramp.com/_next/image?url=%2F_next%2Fstatic%2Fimmutable%2Fmedia%2Fap-1099-misc.3u6kcapur0g2k.webp&w=1920&q=75",
+     "top": 6210
+    },
+    {
+     "w": 427,
+     "h": 414,
+     "alt": "File 1099s with one click",
+     "src": "https://ramp.com/_next/image?url=%2F_next%2Fstatic%2Fimmutable%2Fmedia%2Fap-1099-file.0bdubz0vrw0cw.webp&w=1920&q=75",
+     "top": 6210
+    },
+    {
+     "w": 656,
+     "h": 493,
+     "alt": "Budget dashboard tracking vendor spend against plan",
+     "src": "https://ramp.com/_next/image?url=%2F_next%2Fstatic%2Fimmutable%2Fmedia%2Fap-budgets-track.2pdepx9juj3ob.webp&w=1920&q=75",
+     "top": 6838
+    },
+    {
+     "w": 362,
+     "h": 584,
+     "alt": "Accounts payable product video",
+     "src": "https://ramp.com/_next/image?url=https%3A%2F%2Fair-prod.imgix.net%2F81189d83-6072-4ab9-a67b-cfaa7b5c1489.jpg%3Fw%3D712%26h%3D1148%26fm%3Dwebp%26fit%3Dcrop%26aut",
+     "top": 7639
+    },
+    {
+     "w": 362,
+     "h": 584,
+     "alt": "Accounts payable product video",
+     "src": "https://ramp.com/_next/image?url=https%3A%2F%2Fair-prod.imgix.net%2F91d94b17-a777-44eb-9a59-0c0549be5d5d.jpg%3Fw%3D712%26h%3D1148%26fm%3Dwebp%26fit%3Dcrop%26aut",
+     "top": 7639
+    },
+    {
+     "w": 362,
+     "h": 584,
+     "alt": "Accounts payable product video",
+     "src": "https://ramp.com/_next/image?url=https%3A%2F%2Fair-prod.imgix.net%2F6ba32598-6d88-4e1b-b933-141a00e2e158.jpg%3Fw%3D712%26h%3D1148%26fm%3Dwebp%26fit%3Dcrop%26aut",
+     "top": 7639
+    },
+    {
+     "w": 362,
+     "h": 584,
+     "alt": "Accounts payable product video",
+     "src": "https://ramp.com/_next/image?url=https%3A%2F%2Fair-prod.imgix.net%2Fe5d30c67-8936-42cd-bbd1-5b0b4571f614.jpg%3Fw%3D712%26h%3D1148%26fm%3Dwebp%26fit%3Dcrop%26aut",
+     "top": 7639
+    },
+    {
+     "w": 362,
+     "h": 584,
+     "alt": "Accounts payable product video",
+     "src": "https://ramp.com/_next/image?url=https%3A%2F%2Fair-prod.imgix.net%2Fbffe853d-a909-4a2d-86e3-7127508b714a.jpg%3Fw%3D712%26h%3D1148%26fm%3Dwebp%26fit%3Dcrop%26aut",
+     "top": 7639
+    },
+    {
+     "w": 438,
+     "h": 288,
+     "alt": "Ramp Black Card",
+     "src": "https://ramp.com/_next/image?url=%2F_next%2Fstatic%2Fimmutable%2Fmedia%2Framp-black-card.1a_u287qn7med.webp&w=828&q=75",
+     "top": 8487
+    }
+   ],
+   "imgCount": 38,
+   "logoish": 0,
+   "videos": [
+    {
+     "autoplay": true,
+     "loop": true,
+     "src": "https://assets.ramp.com/nextjs/videos/ap-hero-0420.mp4",
+     "w": 684,
+     "top": 86
+    }
+   ],
+   "canvases": 1,
+   "lotties": 0,
+   "iframes": [
+    "https://www.googletagmanager.com/ns.html?id=GTM-WFDFDWP",
+    "https://pagead2.googlesyndication.com/pagead/ads?client=ca-pub-3938919135399013&output=html&adk=1812271804&adf=302519425",
+    "https://ep2.adtrafficquality.google/sodar/sodar2/255/runner.html",
+    "https://ramp-com.chilipiper.com/chat/loader/?embedOrigin=https%3A%2F%2Framp.com&workspaceId=fef2da9a-11bc-48f7-bd29-1762",
+    "https://ramp-com.chilipiper.com/chat/widget/?embedOrigin=https%3A%2F%2Framp.com&workspaceId=fef2da9a-11bc-48f7-bd29-1762",
+    "https://pagead2.googlesyndication.com/pagead/html/r20260917/r20190131/zrt_lookup_fy2021.html"
+   ],
+   "fonts": [
+    [
+     "TWK Lausanne",
+     7341
+    ],
+    [
+     "lausanne",
+     1245
+    ],
+    [
+     "Material Icons Outlined",
+     23
+    ]
+   ],
+   "sectionBgs": [
+    [
+     "lab(100 0 0)",
+     3
+    ]
+   ],
+   "buttonBgs": [
+    [
+     "lab(92.1406 -20.4979 84.7726)",
+     4
+    ],
+    [
+     "rgba(255, 255, 255, 0.05)",
+     1
+    ],
+    [
+     "lab(8.86531 0.515342 0.18619)",
+     1
+    ],
+    [
+     "rgba(33, 33, 33, 0.024)",
+     1
+    ],
+    [
+     "rgba(33, 33, 33, 0.05)",
+     1
+    ],
+    [
+     "lab(95.604 0.426412 1.20401)",
+     1
+    ]
+   ],
+   "type": {
+    "h1": {
+     "family": "lausanne, \"lausanne Fallback\"",
+     "size": "64px",
+     "weight": "400",
+     "lineHeight": "64px",
+     "letterSpacing": "-0.01px",
+     "color": "lab(2.83994 0.367254 0.969091)"
+    },
+    "h2": {
+     "family": "lausanne, \"lausanne Fallback\"",
+     "size": "48px",
+     "weight": "400"
+    },
+    "body": {
+     "family": "lausanne, \"lausanne Fallback\"",
+     "size": "16px",
+     "color": "lab(2.83994 0.367254 0.969091)",
+     "bg": "lab(100 0 0)"
+    }
+   },
+   "motionAfterScroll": {
+    "animations": {
+     "enter 0.2s 1": 1,
+     "KbLogoWall-module__3RH7Jq__marquee 153s infinite": 2
+    },
+    "opacityZeroEls": 25,
+    "transitionEls": 233,
+    "stickyFixedEls": 11
+   },
+   "libs": {
+    "gsap": false,
+    "framer": false,
+    "webflow": false,
+    "lottie": false,
+    "splide_swiper": false,
+    "rive": false,
+    "nextjs": true,
+    "wordpress": false,
+    "hubspot": true
+   },
+   "wordCount": 3017,
+   "scrollHeight": 12341,
+   "bodyText": "Products Partners Solutions Resources Customers Pricing Sign in See a demo Get started Accounts Payable Software A month of AP done in minutes. Process bills, accelerate approvals, and manage cash flow 2.4x faster than legacy software. Email Get started for free Explore demo Join 70,000+ businesses running on Ramp. AI-powered Invoice Processing Drag, drop, done. Process thousands of invoices in seconds. Ramp’s OCR captures each detail and line item with 99% accuracy. Ramp’s agent codes everything for you. Our agent learns from your past invoices and applies your logic instantly, across hundreds of line items. Catch fraud and overbilling instantly. Ramp checks every line item with two and three-way matching, so you know if something’s off before sending. Procurement Keep systems in sync. Ramp keeps your data clean and consistent by syncing in real time with your ERP—no double entry needed. AP in the age of AI. Watch the film Why teams choose Ramp for AP automation Fewer clicks. Faster close. Up to 7x fewer clicks to process a bill vs Bill.com1 Up to 95% of businesses reported improved visibility2 Up to 2.4x faster invoice processing than legacy software.3 Approval Orchestration Customization that keeps you in control. Approval flows that just flow. Ramp automatically routes every bill to the right approver—from routine spend to CFO signoffs. Approve or reject with certainty. Ramp’s agent recommends approvals and flags what needs review so teams make faster, fully informed decisions. Assign permissions. Avoid errors. Set roles and permissions that scale with your business. Decide who can view, approve, or pay—and keep separation of duty. Shannon Finance See bills Review bills Make payments “Ramp has transformed how we manage accounts payable. With the introduction of agents and AI coding, we’ve eliminated tedious manual work while streamlining internal processes.” Andrew Clarke VP Finance, Studs Payments Your AP software should pay you back. Earn cashback with no extra steps. Ramp’s agent spots card-eligible vendors and submits payments for you. Global payments in one place? Cleared. Pay any vendor, anywhere in the world, by card, ACH, or wire. All in one place. Batch payments made simple. Whether you’re paying 5 or 500 bills, save time and cut costs by batching vendor payments. 1099 Compliance Automate 1099s from start to finish Collect tax info in bulk Request all W-9s and e-consent at once. No chasing. No one-off emails. Ramp AI handles the form prep All your bill pay spend is mapped to 1099-NEC and 1099-MISC boxes with calculations done for you. One-click filing delivery File directly with the IRS and eligible states in minutes - no extra portals or logins. Budgets Every bill, tracked against your plan. Bills automatically map to the right budget line. Real-time visibility, no manual reconciliation. Learn more about Ramp Budgets Learn about Ramp's accounts payable product. Go step by step with our product experts. Previous Next 31s How to upload and process invoices. 31s How to approve bills simply. 38s How to pay bills your way. 29s How to get around the Bill Pay dashboard. 26s How to manage vendors. One platform for every part of finance—AP, procurement, expenses and more. Travel Turn travel policies into guardrails everyone on the team will follow. See a demo Expense management Automate expense management with Ramp’s corporate card, reimbursements, and more. Vendor management Track all your vendor data and discover pricing insights in one convenient place. Procurement Intake-to-pay simplified and automated every step of the way. Integrations Seamless automation and direct integrations for audit-proof accounting. FAQ What is accounts payable software? Accounts payable software is a solution businesses use to process invoices and pay vendors. Instead of manually entering bills, chasing down approvals, and cutting checks, AP software handles the entire invoice-to-payment workflow digitally. Here's what it does: The software captures invoice details automatically using OCR technology, matches line items against purchase orders to catch overbilling, and routes invoices through approval workflows based on your business rules. Once approved, it schedules payments via ACH, card, check, or wire, then syncs everything to your ERP or accounting system in real time. The payoff is faster processing, fewer errors, better spend visibility, and stronger financial controls. Modern accounts payable software like Ramp takes this further with AI agents that automate coding, detect fraud, and optimize payment methods—turning manual AP work into touchless workflows that save your team hours every week. What is Ramp Bill Pay? Ramp Bill Pay is an AI-powered accounts payable solution that helps you process invoices, manage approvals, and make payments 2.4x faster than legacy software3. It uses 99% accurate OCR to capture invoice details, automatically matches line items against purchase orders, and routes bills through customizable approval workflows. You can pay vendors via ACH, card, check, or international wire, all while syncing directly with your ERP like NetSuite, QuickBooks, Sage Intacct, and more. Admins and AP Clerks can track, edit, cancel, or archive bills at every stage, with full visibility into bill status throughout the process. Can Ramp Bill Pay be used as a standalone accounts payable software? Yes, Ramp Bill Pay works as a standalone AP automation solution. You get full access to invoice processing, approval workflows, vendor management, and payment capabilities without needing to use Ramp's corporate cards or expense management features. The AP platform syncs with 10 ERPs (like NetSuite, Sage Intacct, and QuickBooks) and handles everything from invoice capture to payment execution independently. Many customers use Bill Pay on its own to automate their accounts payable operations while keeping their current spend management setup. How do I set up Ramp Bill Pay? Getting started with Ramp Bill Pay is quick and flexible. You'll begin by connecting your accounting provider (or opt to skip and set it up later). Ramp can import vendor information directly from your accounting system, alternatively, you can also request vendors to submit their payments directly into Ramp. From there, you'll link a bank account for payments, choose your payment method, and set up approval flows, permissions, and optional automation like invoice forwarding. Ramp Bill Pay is flexible by design—easy to set up, and ready to scale with your team. Learn more. What are Ramp AP agents and how do they work? Ramp AP agents are agentic AI systems—autonomous agents that can analyze context, make decisions, and take action with little human intervention—built into Ramp Bill Pay to automate end-to-end accounts payable workflows. Instead of requiring manual review, these agents use historical data, vendor checks, and contract details to code expenses, detect anomalies, and route invoices with the right context. You maintain full oversight throughout: agents handle the heavy lifting while your team retains visibility and control over approvals, exceptions, and payment decisions. Here's what each agent does: Auto-coding agent: Analyzes your organization's historical coding patterns and applies that logic to new invoices automatically, mapping line items to the correct GL codes based on line items, descriptions, and location. Fraud prevention agent: Flags suspicious activity—like unexpected changes to vendor banking details or unverified accounts—before payment goes out. Approval agent: Summarizes vendor history, contract details, and PO matching to give approvers full context and suggest approval or rejection. Automatic payment agent: Identifies card-eligible invoices and can fill card details directly into vendor portals, capturing cashback opportunities automatically. Together, these agents turn time-intensive AP workflows into touchless processes while maintaining strong financial controls. What payment options are available in Ramp Bill Pay (ACH, check, card)? Ramp Bill Pay supports a range of payment methods—including standard ACH, Same-Day ACH, Ramp card, check, and domestic and international wire (in USD or foreign currencies)—all within the Ramp platform. For check payments, Ramp debits your connected bank account on the scheduled payment date and issues a check on your behalf. If you choose to pay by card, you can use an existing Ramp card or generate a one-time virtual card. One-time cards can be sent by Ramp to the vendor's default contact on the bill's due date or be entered manually. Ramp automatically marks the bill as paid. You control which vendors are paid by card. Learn more. How does Ramp Bill Pay handle vendor setup and payment information? Ramp collects vendor ACH details in two ways: If bank information is included on the invoice, Ramp automatically extracts it—along with vendor data—to create a vendor record You can also request ACH details directly from vendors within Ramp Bill Pay Ramp also supports W-9 collection. You can manually upload W-9s to vendor records or request them from within Ramp. All vendor tax info and payment history can be exported as a CSV to simplify 1099 filing. Learn more. Vendors also don't need to create a Ramp account to get paid, signing up to the vendor network is entirely optional. Ramp is designed to make payments fast and frictionless for both sides of the transaction. Once your team approves a bill, the vendor receives the payment on the scheduled payment date. Does Ramp support recurring bill payments and amortization? Yes, Ramp supports both recurring bill payments and bill amortization. You can set up recurring bills directly in Ramp's accounts payable software to automate routine vendor payments. Customize the frequency and ending date and Ramp will handle the rest. Learn more. Ramp also supports amortization for bills via our NetSuite integration. You can sync existing Amortization Templates from NetSuite and apply them directly to bills in Ramp Bill Pay. Learn more. Can I generate an AP aging report in Ramp Bill Pay? Download a CSV AP Aging report directly from Ramp Bill Pay. Get a summary on the status of unpaid bills, showing what you owe, who you owe it to, and how much is overdue. Learn more. Can I import purchase orders into Ramp Bill Pay? Yes, you can import purchase orders into Bill Pay from NetSuite or QuickBooks, enabling a seamless PO-to-Bill workflow. Ramp also allows you to create purchase orders and item receipts directly within the platform. Ramp performs 2-way (PO to invoice) and 3-way (PO, invoice, and receipt) match, ensuring you are billed correctly. Learn more. What features should you look for in accounts payable software? The best AP automation software eliminates busywork, reduces risk, and integrates directly with your accounting systems. Here are the top AP features you should look for: Smart invoice capture with OCR: Automatically extracts invoice data—vendor details, line items, amounts—from PDFs, scans, and emails with high accuracy. PO matching for fraud prevention: Automatically verify invoice line items against purchase orders and receipts (two-way and three-way matching) to catch overbilling. Custom approval workflows: Flexible routing based on invoice amount, department, vendor type, or other business rules. Approvers should get automated reminders and be able to review invoices from mobile devices. Real-time ERP integration: Sync bidirectionally with your accounting system—NetSuite, QuickBooks, Xero, Sage Intacct—so bills, payments, and vendor data update automatically without manual reconciliation. Multiple payment methods: Support for ACH, card, check, and wire payments, along with multi-currency support and compliance tools. Vendor self-service portal: Let vendors submit invoices, update payment details, and check payment status on their own. Built-in audit trails: Role-based permissions, approval histories, and deta"
+  }
+ }
+}

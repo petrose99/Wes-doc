@@ -1,0 +1,1029 @@
+{
+ "slug": "vicai-product",
+ "label": "Vic.ai Accounts Payable",
+ "url": "https://www.vic.ai/accounts-payable",
+ "accessed": "2026-09-19T12:22:37.099Z",
+ "views": {
+  "390": {
+   "status": 200,
+   "shot": "/home/ubuntu/Dev/Wes-doc/docs/research/benchmark-captures/vicai/vicai-product-390.png",
+   "initialMotion": {
+    "opacityZeroEls": 5,
+    "animations": {},
+    "transitionEls": 209,
+    "total": 1088
+   },
+   "errors": [
+    "overlaysHidden=0"
+   ],
+   "title": "AI-Powered AP Automation & AI Accounting Software | Vic.ai",
+   "h1": "The new era of AP automation",
+   "subhead": "Meet the Vic.ai APSuite™ — the AI-powered platform for autonomous finance.",
+   "headings": [
+    {
+     "tag": "H1",
+     "text": "The new era of AP automation",
+     "top": 220
+    },
+    {
+     "tag": "H2",
+     "text": "Less manual work, more control with intelligent AP automation",
+     "top": 949
+    },
+    {
+     "tag": "H2",
+     "text": "A modern stack for core AP operations",
+     "top": 3014
+    },
+    {
+     "tag": "H2",
+     "text": "Take AP automation to new heights with AI",
+     "top": 4597
+    },
+    {
+     "tag": "H2",
+     "text": "Leading finance teams use Vic.ai to accelerate AP and scale for growth",
+     "top": 6180
+    },
+    {
+     "tag": "H2",
+     "text": "You might also be interested in",
+     "top": 7282
+    },
+    {
+     "tag": "H2",
+     "text": "Ready to see Vic.ai in action?",
+     "top": 8542
+    }
+   ],
+   "sections": [
+    {
+     "top": 50,
+     "height": 739,
+     "heading": "The new era of AP automation",
+     "imgs": 5,
+     "svgs": 0,
+     "videos": 1,
+     "ctas": [],
+     "textLen": 144,
+     "snippet": "The new era of AP automation Meet the Vic.ai APSuite™ — the AI-powered platform for autonomous finance. Invoice Processing PO Matching Approvals"
+    },
+    {
+     "top": 909,
+     "height": 1245,
+     "heading": "Less manual work, more control with intelligent AP automation",
+     "imgs": 18,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 589,
+     "snippet": "Less manual work, more control with intelligent AP automation The Vic.ai APSuite™ revolutionizes AP with error-free data capture, faster approvals, and seamless payments — driving 5x greater efficiency across your entire"
+    },
+    {
+     "top": 2153,
+     "height": 760,
+     "heading": "",
+     "imgs": 1,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [
+      "Get the guide"
+     ],
+     "textLen": 188,
+     "snippet": "2025 AP Automation Software Buyer's Guide Confidently evaluate and select AP automation software to drive more efficiency and achieve tangible ROI for your finance operation. Get the guide"
+    },
+    {
+     "top": 2913,
+     "height": 1582,
+     "heading": "A modern stack for core AP operations",
+     "imgs": 6,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 731,
+     "snippet": "The Vic.ai APSuite™ A modern stack for core AP operations From invoice ingestion to payment execution, Vic.ai’s AI-first platform automates your entire AP process—eliminating inefficiencies, reducing errors, and deliveri"
+    },
+    {
+     "top": 4496,
+     "height": 1624,
+     "heading": "Take AP automation to new heights with AI",
+     "imgs": 6,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 819,
+     "snippet": "Achieve autonomous finance Take AP automation to new heights with AI Vic.ai isn’t just automating AP—it’s redefining financial operations. Our AI-first platform delivers visibility, control, and unmatched efficiency, ens"
+    },
+    {
+     "top": 6120,
+     "height": 1102,
+     "heading": "Leading finance teams use Vic.ai to accelerate AP and scale for growth",
+     "imgs": 14,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 867,
+     "snippet": "Leading finance teams use Vic.ai to accelerate AP and scale for growth Vic.ai eliminated all the manual components of our payments process, providing each AP analyst with an additional 3 to 6 hours of capacity each week."
+    },
+    {
+     "top": 7222,
+     "height": 1220,
+     "heading": "You might also be interested in",
+     "imgs": 24,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [
+      "View all resources"
+     ],
+     "textLen": 213,
+     "snippet": "You might also be interested in View all resources Guide 10-Step Hyperautomation Guide Case Study Why Stonewall Kitchen chose Vic.ai Webinar Pouring Efficiency Into AP: Cementing the Future of Financial Operations"
+    },
+    {
+     "top": 8442,
+     "height": 475,
+     "heading": "Ready to see Vic.ai in action?",
+     "imgs": 1,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [
+      "Request demo",
+      "Product tour"
+     ],
+     "textLen": 174,
+     "snippet": "Ready to see Vic.ai in action? Schedule a meeting with our team to learn more and get started on your path toward more enlightened Accounts Payable. Request demo Product tour"
+    },
+    {
+     "top": 8917,
+     "height": 970,
+     "heading": "",
+     "imgs": 9,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [
+      "Subscribe to our newsletter"
+     ],
+     "textLen": 268,
+     "snippet": "Why Vic.ai? Products Solutions Resources Company Request demo Vic.ai is on a mission to transform how finance teams operate by building the world’s first autonomous finance platform. Subscribe to our newsletter Copyright"
+    }
+   ],
+   "navLinks": [],
+   "heroCtas": [],
+   "bigImgs": [
+    {
+     "w": 390,
+     "h": 469,
+     "alt": "",
+     "src": "https://cdn.prod.website-files.com/67284e81c67879feb155c7f7/6759af0666a6fee7b24a9535_page-hero-left-line.svg",
+     "top": 50
+    },
+    {
+     "w": 390,
+     "h": 469,
+     "alt": "",
+     "src": "https://cdn.prod.website-files.com/67284e81c67879feb155c7f7/6759af06a05ed5c463b33f1b_page-hero-right-line.svg",
+     "top": 50
+    },
+    {
+     "w": 358,
+     "h": 233,
+     "alt": "Universal invoice capture: Man scanning invoice with phone to go into the Vic.ai",
+     "src": "https://cdn.prod.website-files.com/67284e81c67879feb155c7f7/67d1bf7d2aec2a394bc67447_Universal%20Invoice%20Capture-p-500.png",
+     "top": 1310
+    },
+    {
+     "w": 360,
+     "h": 323,
+     "alt": "2025 AP Automation Software Buyer's Guide",
+     "src": "https://cdn.prod.website-files.com/67284e81c67879feb155c7f7/67c759b1c0e6cc23e5f5c628_2025_AP_automation_software_buyers_guide-p-500.webp",
+     "top": 2526
+    },
+    {
+     "w": 358,
+     "h": 192,
+     "alt": "",
+     "src": "https://cdn.prod.website-files.com/67284e81c67879feb155c7f7/67ca230a466e7796822f668c_Invoice%20Processing.png",
+     "top": 3292
+    },
+    {
+     "w": 358,
+     "h": 192,
+     "alt": "",
+     "src": "https://cdn.prod.website-files.com/67284e81c67879feb155c7f7/67ca230a8fe0a6a1ec06209c_PO%20Matching.png",
+     "top": 3679
+    },
+    {
+     "w": 358,
+     "h": 192,
+     "alt": "",
+     "src": "https://cdn.prod.website-files.com/67284e81c67879feb155c7f7/67ca22f265bdc7164ae3b62d_Approvals.png",
+     "top": 4065
+    },
+    {
+     "w": 358,
+     "h": 192,
+     "alt": "",
+     "src": "https://cdn.prod.website-files.com/67284e81c67879feb155c7f7/67ca230afd3a1840bd97556c_VicInbox.png",
+     "top": 4875
+    },
+    {
+     "w": 358,
+     "h": 192,
+     "alt": "",
+     "src": "https://cdn.prod.website-files.com/67284e81c67879feb155c7f7/67ca230b4a91fa2e0fa4bc4a_Payments.png",
+     "top": 5282
+    },
+    {
+     "w": 358,
+     "h": 192,
+     "alt": "",
+     "src": "https://cdn.prod.website-files.com/67284e81c67879feb155c7f7/67ca230ba27a761c28791cb6_VicAnalytics.png",
+     "top": 5669
+    },
+    {
+     "w": 320,
+     "h": 340,
+     "alt": "",
+     "src": "https://cdn.prod.website-files.com/67284e81c67879feb155c7f7/67ca4cdb7354aaa2fb7e596f_Diesel%20Direct-p-500.webp",
+     "top": 6321
+    },
+    {
+     "w": 320,
+     "h": 340,
+     "alt": "",
+     "src": "https://cdn.prod.website-files.com/67284e81c67879feb155c7f7/67ca4cdb0aa5a4daa4cca1f1_Milwaukee-p-500.webp",
+     "top": 6321
+    },
+    {
+     "w": 320,
+     "h": 340,
+     "alt": "",
+     "src": "https://cdn.prod.website-files.com/67284e81c67879feb155c7f7/67ca4cdb34b63b5094a2beac_Vtrips-p-500.webp",
+     "top": 6321
+    },
+    {
+     "w": 358,
+     "h": 140,
+     "alt": "Inner resource card media",
+     "src": "https://cdn.prod.website-files.com/6744228cb0d971a21462bf5a/67d103df771ad1d3b2f8d047_67c8a3fdc3e8350434795648_Hyperautomation%2520Guide%2520(2).png",
+     "top": 7452
+    },
+    {
+     "w": 358,
+     "h": 140,
+     "alt": "Inner resource card media",
+     "src": "https://cdn.prod.website-files.com/6744228cb0d971a21462bf5a/67d1038f96516cb58595110b_67915155a90c03b326abd576_Stonewall%2520Kitchen%2520(2).png",
+     "top": 7742
+    },
+    {
+     "w": 358,
+     "h": 140,
+     "alt": "Inner resource card media",
+     "src": "https://cdn.prod.website-files.com/6744228cb0d971a21462bf5a/67d103bd7b7a37c5d4029a79_67aa7ae5b27e2405a85e9cac_February%2520Webinar%2520-%2520Pouring%2520Efficie",
+     "top": 8032
+    },
+    {
+     "w": 390,
+     "h": 142,
+     "alt": "",
+     "src": "https://cdn.prod.website-files.com/67284e81c67879feb155c7f7/6731757e55afbe7080b7af39_bottom-cta-line.svg",
+     "top": 8608
+    },
+    {
+     "w": 360,
+     "h": 65,
+     "alt": "",
+     "src": "https://cdn.prod.website-files.com/67284e81c67879feb155c7f7/6734d184796e8ed1c9f0383f_bottom-footer-logo.svg",
+     "top": 9822
+    }
+   ],
+   "imgCount": 49,
+   "logoish": 4,
+   "videos": [
+    {
+     "autoplay": false,
+     "loop": false,
+     "src": "https://vic-ai.b-cdn.net/Vic.ai%20-%20The%20Power%20of%20Autonomous%20AP.mp4",
+     "w": 360,
+     "top": 526
+    }
+   ],
+   "canvases": 0,
+   "lotties": 0,
+   "iframes": [
+    ""
+   ],
+   "fonts": [
+    [
+     "Poppins",
+     348
+    ],
+    [
+     "webflow-icons",
+     5
+    ]
+   ],
+   "sectionBgs": [],
+   "buttonBgs": [
+    [
+     "rgb(255, 255, 255)",
+     9
+    ],
+    [
+     "rgba(255, 255, 255, 0)",
+     3
+    ],
+    [
+     "rgba(255, 255, 255, 0.5)",
+     3
+    ],
+    [
+     "rgb(67, 123, 240)",
+     2
+    ]
+   ],
+   "type": {
+    "h1": {
+     "family": "Poppins, sans-serif",
+     "size": "28px",
+     "weight": "600",
+     "lineHeight": "28px",
+     "letterSpacing": "normal",
+     "color": "rgb(0, 0, 0)"
+    },
+    "h2": {
+     "family": "Poppins, sans-serif",
+     "size": "28px",
+     "weight": "500"
+    },
+    "body": {
+     "family": "Poppins, sans-serif",
+     "size": "14px",
+     "color": "rgb(51, 51, 51)",
+     "bg": "rgb(255, 255, 255)"
+    }
+   },
+   "motionAfterScroll": {
+    "animations": {},
+    "opacityZeroEls": 6,
+    "transitionEls": 215,
+    "stickyFixedEls": 6
+   },
+   "libs": {
+    "gsap": false,
+    "framer": false,
+    "webflow": true,
+    "lottie": false,
+    "splide_swiper": true,
+    "rive": false,
+    "nextjs": false,
+    "wordpress": false,
+    "hubspot": true
+   },
+   "wordCount": 570,
+   "scrollHeight": 9887,
+   "bodyText": "Access exclusive insights in the AI Momentum Report Login The new era of AP automation Meet the Vic.ai APSuite™ — the AI-powered platform for autonomous finance. Invoice Processing PO Matching Approvals Less manual work, more control with intelligent AP automation The Vic.ai APSuite™ revolutionizes AP with error-free data capture, faster approvals, and seamless payments — driving 5x greater efficiency across your entire process. Invoice Processing Universal invoice capture Universal invoice capture Seamlessly ingest and process invoices from any source — email, portal, EDI, or scan— with AI-powered universal invoice capture. Read More Superior data extraction PO Matching Multi-dimensional matching Intelligent issue detection Approval Flows Intelligent routing Approvals on Autopilot 2025 AP Automation Software Buyer's Guide Confidently evaluate and select AP automation software to drive more efficiency and achieve tangible ROI for your finance operation. Get the guide The Vic.ai APSuite™ A modern stack for core AP operations From invoice ingestion to payment execution, Vic.ai’s AI-first platform automates your entire AP process—eliminating inefficiencies, reducing errors, and delivering real-time insights for smarter decision-making. Invoice Processing Vic.ai extracts, codes, and approves invoices with unmatched accuracy — eliminating manual entry, reducing errors, and accelerating workflows. PO Matching Vic.ai intelligently matches invoices to purchase orders, ensuring accuracy and compliance while reducing manual effort and exceptions. Approvals Streamline invoice approvals with AI-driven recommendations, automated routing, and real-time visibility for more efficient decision-making. Achieve autonomous finance Take AP automation to new heights with AI Vic.ai isn’t just automating AP—it’s redefining financial operations. Our AI-first platform delivers visibility, control, and unmatched efficiency, ensuring your AP function is future-proof and built for scale. VicInbox™ VicInbox™ streamlines vendor inbox management to automatically capture, categorize, and process invoices eliminating manual sorting and ensuring seamless AP workflows. VicPay™ Automate and optimize B2B payments with VicPay™, ensuring secure, on-time vendor payments while maximizing rebates and cash flow efficiency. VicAnalytics™ Gain real-time, deep insights into your AP process with VicAnalytics™ that identifies bottlenecks, tracks processing times, and uncovers efficiency opportunities to optimize workflows and cash flow. Leading finance teams use Vic.ai to accelerate AP and scale for growth Vic.ai eliminated all the manual components of our payments process, providing each AP analyst with an additional 3 to 6 hours of capacity each week. Andrew Turkish VP and Corporate Controller, Diesel Direct Innovation is core to our ethos at Milwaukee Tool, down to the way our internal teams operate. We are excited to push the envelope with Vic.ai. It presents us with a great opportunity to incorporate AI and augment our decision-making. Conor Clair Senior Finance Manager of Accounting, Milwaukee Tool Our team needed to focus on higher-value accounting work instead of spending so much time on manual invoice processing tasks. Vic.ai was the clear choice for its ability to automate processing, improve visibility, and scale seamlessly with our growth. Stephen McCaskill Controller, VTrips You might also be interested in View all resources Guide 10-Step Hyperautomation Guide Case Study Why Stonewall Kitchen chose Vic.ai Webinar Pouring Efficiency Into AP: Cementing the Future of Financial Operations Ready to see Vic.ai in action? Schedule a meeting with our team to learn more and get started on your path toward more enlightened Accounts Payable. Request demo Product tour Why Vic.ai? Products Solutions Resources Company Request demo Vic.ai is on a mission to transform how finance teams operate by building the world’s first autonomous finance platform. Subscribe to our newsletter Copyright © 2026 Vic.ai Privacy Policy Login Request Demo"
+  },
+  "1440": {
+   "status": 200,
+   "shot": "/home/ubuntu/Dev/Wes-doc/docs/research/benchmark-captures/vicai/vicai-product-1440.png",
+   "initialMotion": {
+    "opacityZeroEls": 13,
+    "animations": {
+     "x, rotating2 2.5s, 2.5s infinite, infinite": 6
+    },
+    "transitionEls": 315,
+    "total": 1087
+   },
+   "errors": [
+    "overlaysHidden=0"
+   ],
+   "title": "AI-Powered AP Automation & AI Accounting Software | Vic.ai",
+   "h1": "The new era of AP automation",
+   "subhead": "Meet the Vic.ai APSuite™ — the AI-powered platform for autonomous finance.",
+   "headings": [
+    {
+     "tag": "H1",
+     "text": "The new era of AP automation",
+     "top": 240
+    },
+    {
+     "tag": "H2",
+     "text": "Less manual work, more control with intelligent AP automation",
+     "top": 1377
+    },
+    {
+     "tag": "H2",
+     "text": "A modern stack for core AP operations",
+     "top": 3139
+    },
+    {
+     "tag": "H2",
+     "text": "Take AP automation to new heights with AI",
+     "top": 3962
+    },
+    {
+     "tag": "H2",
+     "text": "Leading finance teams use Vic.ai to accelerate AP and scale for growth",
+     "top": 4784
+    },
+    {
+     "tag": "H2",
+     "text": "You might also be interested in",
+     "top": 5682
+    },
+    {
+     "tag": "H2",
+     "text": "Ready to see Vic.ai in action?",
+     "top": 6392
+    }
+   ],
+   "sections": [
+    {
+     "top": 50,
+     "height": 1167,
+     "heading": "The new era of AP automation",
+     "imgs": 5,
+     "svgs": 0,
+     "videos": 1,
+     "ctas": [],
+     "textLen": 144,
+     "snippet": "The new era of AP automation Meet the Vic.ai APSuite™ — the AI-powered platform for autonomous finance. Invoice Processing PO Matching Approvals"
+    },
+    {
+     "top": 1337,
+     "height": 1079,
+     "heading": "Less manual work, more control with intelligent AP automation",
+     "imgs": 18,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 589,
+     "snippet": "Less manual work, more control with intelligent AP automation The Vic.ai APSuite™ revolutionizes AP with error-free data capture, faster approvals, and seamless payments — driving 5x greater efficiency across your entire"
+    },
+    {
+     "top": 2416,
+     "height": 613,
+     "heading": "",
+     "imgs": 1,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [
+      "Get the guide"
+     ],
+     "textLen": 188,
+     "snippet": "2025 AP Automation Software Buyer's Guide Confidently evaluate and select AP automation software to drive more efficiency and achieve tangible ROI for your finance operation. Get the guide"
+    },
+    {
+     "top": 3029,
+     "height": 823,
+     "heading": "A modern stack for core AP operations",
+     "imgs": 6,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 731,
+     "snippet": "The Vic.ai APSuite™ A modern stack for core AP operations From invoice ingestion to payment execution, Vic.ai’s AI-first platform automates your entire AP process—eliminating inefficiencies, reducing errors, and deliveri"
+    },
+    {
+     "top": 3852,
+     "height": 871,
+     "heading": "Take AP automation to new heights with AI",
+     "imgs": 6,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 819,
+     "snippet": "Achieve autonomous finance Take AP automation to new heights with AI Vic.ai isn’t just automating AP—it’s redefining financial operations. Our AI-first platform delivers visibility, control, and unmatched efficiency, ens"
+    },
+    {
+     "top": 4724,
+     "height": 898,
+     "heading": "Leading finance teams use Vic.ai to accelerate AP and scale for growth",
+     "imgs": 14,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 867,
+     "snippet": "Leading finance teams use Vic.ai to accelerate AP and scale for growth Vic.ai eliminated all the manual components of our payments process, providing each AP analyst with an additional 3 to 6 hours of capacity each week."
+    },
+    {
+     "top": 5622,
+     "height": 611,
+     "heading": "You might also be interested in",
+     "imgs": 24,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [
+      "View all resources"
+     ],
+     "textLen": 213,
+     "snippet": "You might also be interested in View all resources Guide 10-Step Hyperautomation Guide Case Study Why Stonewall Kitchen chose Vic.ai Webinar Pouring Efficiency Into AP: Cementing the Future of Financial Operations"
+    },
+    {
+     "top": 6232,
+     "height": 559,
+     "heading": "Ready to see Vic.ai in action?",
+     "imgs": 1,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [
+      "Request demo",
+      "Product tour"
+     ],
+     "textLen": 174,
+     "snippet": "Ready to see Vic.ai in action? Schedule a meeting with our team to learn more and get started on your path toward more enlightened Accounts Payable. Request demo Product tour"
+    },
+    {
+     "top": 6791,
+     "height": 1045,
+     "heading": "",
+     "imgs": 9,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [
+      "Subscribe to our newsletter"
+     ],
+     "textLen": 890,
+     "snippet": "Why Vic.ai? Why Vic.ai? Customers Products Accounts Payable Invoice Processing PO Matching Approvals AP Inbox Bill Pay and Vendor Portal Expense Management Analytics and Insights Autonomous Finance Platform How It Works "
+    }
+   ],
+   "navLinks": [
+    "Invoice Processing",
+    "PO Matching",
+    "Approvals",
+    "How It Works",
+    "ERP Integrations",
+    "Trust and Security",
+    "Centralize AP Operations",
+    "Faster Monthly Close",
+    "Fraud Prevention",
+    "Vendor Management",
+    "Scale For Growth",
+    "CFO",
+    "Controller",
+    "Accounts Payable",
+    "Freight and Logistics",
+    "Construction",
+    "Manufacturing",
+    "Retail",
+    "Case Studies",
+    "Datasheets",
+    "Guides",
+    "Videos",
+    "Podcasts",
+    "Glossary",
+    "Webinars",
+    "Events",
+    "Become a Partner"
+   ],
+   "heroCtas": [
+    {
+     "text": "Why Vic.ai? AI-first. People-centric. Industry lea",
+     "tag": "A",
+     "href": "/why-vic-ai"
+    },
+    {
+     "text": "Customers See why industry-leading finance teams a",
+     "tag": "A",
+     "href": "/customers"
+    },
+    {
+     "text": "CEO Perspective VicAgents™ and the future of auton",
+     "tag": "A",
+     "href": "/blog/vic-agents-future-of-autonomous-finance"
+    },
+    {
+     "text": "Accounts Payable Experience the power of AI-first ",
+     "tag": "A",
+     "href": "/accounts-payable"
+    },
+    {
+     "text": "Invoice Processing",
+     "tag": "A",
+     "href": "/accounts-payable/invoice-processing"
+    },
+    {
+     "text": "PO Matching",
+     "tag": "A",
+     "href": "/accounts-payable/po-matching"
+    },
+    {
+     "text": "Approvals",
+     "tag": "A",
+     "href": "/accounts-payable/approvals"
+    },
+    {
+     "text": "AP Inbox Meet Victoria, our agent-powered AP inbox",
+     "tag": "A",
+     "href": "/ap-inbox"
+    },
+    {
+     "text": "Bill Pay and Vendor Portal Save money and take ful",
+     "tag": "A",
+     "href": "/payments"
+    },
+    {
+     "text": "Expense Management Put AI-powered expense manageme",
+     "tag": "A",
+     "href": "/expense-management-corporate-card"
+    },
+    {
+     "text": "Analytics and Insights Uncover AI-powered insights",
+     "tag": "A",
+     "href": "/analytics-and-insights"
+    },
+    {
+     "text": "How It Works",
+     "tag": "A",
+     "href": "/how-it-works"
+    },
+    {
+     "text": "ERP Integrations",
+     "tag": "A",
+     "href": "/erp-integrations"
+    },
+    {
+     "text": "Trust and Security",
+     "tag": "A",
+     "href": "/trust-and-security"
+    },
+    {
+     "text": "VicAgents™ Discover agentic AI partners built spec",
+     "tag": "A",
+     "href": "/vic-agents"
+    },
+    {
+     "text": "Centralize AP Operations",
+     "tag": "A",
+     "href": "/solutions/centralize-ap-operations"
+    },
+    {
+     "text": "Faster Monthly Close",
+     "tag": "A",
+     "href": "/solutions/faster-monthly-close"
+    },
+    {
+     "text": "Fraud Prevention",
+     "tag": "A",
+     "href": "/solutions/fraud-prevention"
+    },
+    {
+     "text": "Vendor Management",
+     "tag": "A",
+     "href": "/solutions/vendor-management"
+    },
+    {
+     "text": "Scale For Growth",
+     "tag": "A",
+     "href": "/solutions/scale-for-growth"
+    },
+    {
+     "text": "CFO",
+     "tag": "A",
+     "href": "/solutions/cfo"
+    },
+    {
+     "text": "Controller",
+     "tag": "A",
+     "href": "/solutions/controller"
+    },
+    {
+     "text": "Accounts Payable",
+     "tag": "A",
+     "href": "/solutions/ap-manager"
+    },
+    {
+     "text": "Freight and Logistics",
+     "tag": "A",
+     "href": "/solutions/transportation-freight-and-logistics"
+    },
+    {
+     "text": "Construction",
+     "tag": "A",
+     "href": "/solutions/construction"
+    },
+    {
+     "text": "Manufacturing",
+     "tag": "A",
+     "href": "/solutions/manufacturing"
+    },
+    {
+     "text": "Retail",
+     "tag": "A",
+     "href": "/solutions/retail"
+    },
+    {
+     "text": "Resource Center Discover how AI is driving real, t",
+     "tag": "A",
+     "href": "/resources"
+    },
+    {
+     "text": "Case Studies",
+     "tag": "A",
+     "href": "/resources/case-studies"
+    },
+    {
+     "text": "Datasheets",
+     "tag": "A",
+     "href": "/resources/datasheets"
+    },
+    {
+     "text": "Guides",
+     "tag": "A",
+     "href": "/resources/guides"
+    },
+    {
+     "text": "Videos",
+     "tag": "A",
+     "href": "/resources/videos"
+    },
+    {
+     "text": "Podcasts",
+     "tag": "A",
+     "href": "/resources/podcasts"
+    },
+    {
+     "text": "Glossary",
+     "tag": "A",
+     "href": "/glossary-ai-accounting"
+    },
+    {
+     "text": "Webinars",
+     "tag": "A",
+     "href": "/resources/webinars"
+    },
+    {
+     "text": "Events",
+     "tag": "A",
+     "href": "/resources/events"
+    },
+    {
+     "text": "Blog The future of finance is autonomous. Learn ho",
+     "tag": "A",
+     "href": "/blog"
+    },
+    {
+     "text": "Product Tour Explore Vic.ai and discover the benef",
+     "tag": "A",
+     "href": "/product-tour"
+    },
+    {
+     "text": "Industry Report | Download Now AI Momentum Report:",
+     "tag": "A",
+     "href": "https://content.vic.ai/ai-momentum-report"
+    },
+    {
+     "text": "About Vic.ai Vic.ai is on a mission to empower fin",
+     "tag": "A",
+     "href": "/about-us"
+    },
+    {
+     "text": "Careers Join our amazing team of AI enthusiasts an",
+     "tag": "A",
+     "href": "/careers"
+    },
+    {
+     "text": "Contact Us We look forward to hearing from you. Ge",
+     "tag": "A",
+     "href": "/contact-us"
+    },
+    {
+     "text": "Newsroom Vic.ai is making waves in accounting and ",
+     "tag": "A",
+     "href": "/news"
+    },
+    {
+     "text": "Partners Learn about our extensive partner network",
+     "tag": "A",
+     "href": "/partners"
+    },
+    {
+     "text": "Become a Partner",
+     "tag": "A",
+     "href": "/partner-request"
+    },
+    {
+     "text": "News Vic.ai launches VicPay, Vendor Portal, and Vi",
+     "tag": "A",
+     "href": "/blog/q2-product-launch-from-automation-to-agentic-ai"
+    }
+   ],
+   "bigImgs": [
+    {
+     "w": 550,
+     "h": 662,
+     "alt": "",
+     "src": "https://cdn.prod.website-files.com/67284e81c67879feb155c7f7/6759af0666a6fee7b24a9535_page-hero-left-line.svg",
+     "top": 70
+    },
+    {
+     "w": 550,
+     "h": 662,
+     "alt": "",
+     "src": "https://cdn.prod.website-files.com/67284e81c67879feb155c7f7/6759af06a05ed5c463b33f1b_page-hero-right-line.svg",
+     "top": 70
+    },
+    {
+     "w": 768,
+     "h": 499,
+     "alt": "Universal invoice capture: Man scanning invoice with phone to go into the Vic.ai",
+     "src": "https://cdn.prod.website-files.com/67284e81c67879feb155c7f7/67d1bf7d2aec2a394bc67447_Universal%20Invoice%20Capture.png",
+     "top": 1654
+    },
+    {
+     "w": 545,
+     "h": 488,
+     "alt": "2025 AP Automation Software Buyer's Guide",
+     "src": "https://cdn.prod.website-files.com/67284e81c67879feb155c7f7/67c759b1c0e6cc23e5f5c628_2025_AP_automation_software_buyers_guide.webp",
+     "top": 2476
+    },
+    {
+     "w": 368,
+     "h": 192,
+     "alt": "",
+     "src": "https://cdn.prod.website-files.com/67284e81c67879feb155c7f7/67ca230a466e7796822f668c_Invoice%20Processing.png",
+     "top": 3383
+    },
+    {
+     "w": 368,
+     "h": 192,
+     "alt": "",
+     "src": "https://cdn.prod.website-files.com/67284e81c67879feb155c7f7/67ca230a8fe0a6a1ec06209c_PO%20Matching.png",
+     "top": 3383
+    },
+    {
+     "w": 368,
+     "h": 192,
+     "alt": "",
+     "src": "https://cdn.prod.website-files.com/67284e81c67879feb155c7f7/67ca22f265bdc7164ae3b62d_Approvals.png",
+     "top": 3383
+    },
+    {
+     "w": 368,
+     "h": 192,
+     "alt": "",
+     "src": "https://cdn.prod.website-files.com/67284e81c67879feb155c7f7/67ca230afd3a1840bd97556c_VicInbox.png",
+     "top": 4206
+    },
+    {
+     "w": 368,
+     "h": 192,
+     "alt": "",
+     "src": "https://cdn.prod.website-files.com/67284e81c67879feb155c7f7/67ca230b4a91fa2e0fa4bc4a_Payments.png",
+     "top": 4206
+    },
+    {
+     "w": 368,
+     "h": 192,
+     "alt": "",
+     "src": "https://cdn.prod.website-files.com/67284e81c67879feb155c7f7/67ca230ba27a761c28791cb6_VicAnalytics.png",
+     "top": 4206
+    },
+    {
+     "w": 1170,
+     "h": 502,
+     "alt": "",
+     "src": "https://cdn.prod.website-files.com/67284e81c67879feb155c7f7/67ca4cdb7354aaa2fb7e596f_Diesel%20Direct-p-1600.webp",
+     "top": 4955
+    },
+    {
+     "w": 1170,
+     "h": 502,
+     "alt": "",
+     "src": "https://cdn.prod.website-files.com/67284e81c67879feb155c7f7/67ca4cdb0aa5a4daa4cca1f1_Milwaukee-p-1600.webp",
+     "top": 4955
+    },
+    {
+     "w": 1170,
+     "h": 502,
+     "alt": "",
+     "src": "https://cdn.prod.website-files.com/67284e81c67879feb155c7f7/67ca4cdb34b63b5094a2beac_Vtrips-p-1600.webp",
+     "top": 4955
+    },
+    {
+     "w": 368,
+     "h": 192,
+     "alt": "Inner resource card media",
+     "src": "https://cdn.prod.website-files.com/6744228cb0d971a21462bf5a/67d103df771ad1d3b2f8d047_67c8a3fdc3e8350434795648_Hyperautomation%2520Guide%2520(2).png",
+     "top": 5768
+    },
+    {
+     "w": 368,
+     "h": 192,
+     "alt": "Inner resource card media",
+     "src": "https://cdn.prod.website-files.com/6744228cb0d971a21462bf5a/67d1038f96516cb58595110b_67915155a90c03b326abd576_Stonewall%2520Kitchen%2520(2).png",
+     "top": 5768
+    },
+    {
+     "w": 368,
+     "h": 192,
+     "alt": "Inner resource card media",
+     "src": "https://cdn.prod.website-files.com/6744228cb0d971a21462bf5a/67d103bd7b7a37c5d4029a79_67aa7ae5b27e2405a85e9cac_February%2520Webinar%2520-%2520Pouring%2520Efficie",
+     "top": 5768
+    },
+    {
+     "w": 1286,
+     "h": 469,
+     "alt": "",
+     "src": "https://cdn.prod.website-files.com/67284e81c67879feb155c7f7/6731757e55afbe7080b7af39_bottom-cta-line.svg",
+     "top": 6277
+    },
+    {
+     "w": 760,
+     "h": 137,
+     "alt": "",
+     "src": "https://cdn.prod.website-files.com/67284e81c67879feb155c7f7/6734d184796e8ed1c9f0383f_bottom-footer-logo.svg",
+     "top": 7699
+    }
+   ],
+   "imgCount": 116,
+   "logoish": 4,
+   "videos": [
+    {
+     "autoplay": false,
+     "loop": false,
+     "src": "https://vic-ai.b-cdn.net/Vic.ai%20-%20The%20Power%20of%20Autonomous%20AP.mp4",
+     "w": 1170,
+     "top": 540
+    }
+   ],
+   "canvases": 0,
+   "lotties": 0,
+   "iframes": [
+    ""
+   ],
+   "fonts": [
+    [
+     "Poppins",
+     798
+    ]
+   ],
+   "sectionBgs": [],
+   "buttonBgs": [
+    [
+     "rgba(28, 32, 67, 0.1)",
+     5
+    ],
+    [
+     "rgb(67, 123, 240)",
+     4
+    ],
+    [
+     "rgba(255, 255, 255, 0)",
+     3
+    ],
+    [
+     "rgba(255, 255, 255, 0.5)",
+     3
+    ],
+    [
+     "rgb(255, 255, 255)",
+     3
+    ]
+   ],
+   "type": {
+    "h1": {
+     "family": "Poppins, sans-serif",
+     "size": "60px",
+     "weight": "500",
+     "lineHeight": "60px",
+     "letterSpacing": "normal",
+     "color": "rgb(0, 0, 0)"
+    },
+    "h2": {
+     "family": "Poppins, sans-serif",
+     "size": "44px",
+     "weight": "500"
+    },
+    "body": {
+     "family": "Poppins, sans-serif",
+     "size": "14px",
+     "color": "rgb(51, 51, 51)",
+     "bg": "rgb(255, 255, 255)"
+    }
+   },
+   "motionAfterScroll": {
+    "animations": {
+     "x, rotating2 2.5s, 2.5s infinite, infinite": 6
+    },
+    "opacityZeroEls": 13,
+    "transitionEls": 321,
+    "stickyFixedEls": 6
+   },
+   "libs": {
+    "gsap": false,
+    "framer": false,
+    "webflow": true,
+    "lottie": false,
+    "splide_swiper": true,
+    "rive": false,
+    "nextjs": false,
+    "wordpress": false,
+    "hubspot": true
+   },
+   "wordCount": 1049,
+   "scrollHeight": 7836,
+   "bodyText": "Access exclusive insights in the AI Momentum Report Why Vic.ai? WHY Why Vic.ai? AI-first. People-centric. Industry leadership. Discover the Vic.ai difference. Read More Customers See why industry-leading finance teams achieve unmatched ROI and love Vic.ai. Read More CEO Perspective VicAgents™ and the future of autonomous finance: why enterprise accounting needs agentic AI. Products Accounts Payable Experience the power of AI-first AP automation. Explore Vic.ai APSuite™ Invoice Processing PO Matching Approvals AP Inbox Meet Victoria, our agent-powered AP inbox for Accounts Payable. Explore VicInbox™ Bill Pay and Vendor Portal Save money and take full control of your cash flow. Explore VicPay™ Expense Management Put AI-powered expense management at your fingertips. Explore VicCard™ Analytics and Insights Uncover AI-powered insights for your business. Explore VicAnalytics™ Autonomous Finance Platform The industry's first AI-native accounting platform. How It Works ERP Integrations Trust and Security VicAgents™ Discover agentic AI partners built specifically for finance workflows. Explore VicAgents™ Solutions By Use Case Vic.ai is built for real-world complexity, designed for your business needs. Centralize AP Operations Faster Monthly Close Fraud Prevention Vendor Management Scale For Growth By Role Today's finance leaders use Vic.ai to stay ahead. See how Vic.ai gives you unparalleled insight and control. CFO Controller Accounts Payable By Industry Vic.ai helps move your business forward at the speed of AI. Explore our industry expertise. Freight and Logistics Construction Manufacturing Retail Resources Resource Center Discover how AI is driving real, tangible ROI for companies and finance teams. Read More LEARN Case Studies Datasheets Guides Videos Podcasts Glossary CONNECT Webinars Events Blog The future of finance is autonomous. Learn how AI is changing the game for finance teams everywhere. Read More Product Tour Explore Vic.ai and discover the benefits of our autonomous finance platform at your own pace. Take Tour Industry Report | Download Now AI Momentum Report: Benchmarking the New Era of AP Automation Company OVERVIEW About Vic.ai Vic.ai is on a mission to empower finance teams everywhere with AI-first solutions. Read More Careers Join our amazing team of AI enthusiasts and build your dream career. Read More Contact Us We look forward to hearing from you. Get In Touch Newsroom Vic.ai is making waves in accounting and finance. Read More Partners Learn about our extensive partner network from technology and solutions partners to VARs. Read More Become a Partner News Vic.ai launches VicPay, Vendor Portal, and VicAgents, introducing agentic AI partners for enterprise finance Login Request demo The new era of AP automation Meet the Vic.ai APSuite™ — the AI-powered platform for autonomous finance. Invoice Processing PO Matching Approvals Less manual work, more control with intelligent AP automation The Vic.ai APSuite™ revolutionizes AP with error-free data capture, faster approvals, and seamless payments — driving 5x greater efficiency across your entire process. Invoice Processing Universal invoice capture Superior data extraction PO Matching Multi-dimensional matching Intelligent issue detection Approval Flows Intelligent routing Approvals on Autopilot Universal invoice capture Seamlessly ingest and process invoices from any source — email, portal, EDI, or scan— with AI-powered universal invoice capture. Read More 2025 AP Automation Software Buyer's Guide Confidently evaluate and select AP automation software to drive more efficiency and achieve tangible ROI for your finance operation. Get the guide The Vic.ai APSuite™ A modern stack for core AP operations From invoice ingestion to payment execution, Vic.ai’s AI-first platform automates your entire AP process—eliminating inefficiencies, reducing errors, and delivering real-time insights for smarter decision-making. Invoice Processing Vic.ai extracts, codes, and approves invoices with unmatched accuracy — eliminating manual entry, reducing errors, and accelerating workflows. PO Matching Vic.ai intelligently matches invoices to purchase orders, ensuring accuracy and compliance while reducing manual effort and exceptions. Approvals Streamline invoice approvals with AI-driven recommendations, automated routing, and real-time visibility for more efficient decision-making. Achieve autonomous finance Take AP automation to new heights with AI Vic.ai isn’t just automating AP—it’s redefining financial operations. Our AI-first platform delivers visibility, control, and unmatched efficiency, ensuring your AP function is future-proof and built for scale. VicInbox™ VicInbox™ streamlines vendor inbox management to automatically capture, categorize, and process invoices eliminating manual sorting and ensuring seamless AP workflows. VicPay™ Automate and optimize B2B payments with VicPay™, ensuring secure, on-time vendor payments while maximizing rebates and cash flow efficiency. VicAnalytics™ Gain real-time, deep insights into your AP process with VicAnalytics™ that identifies bottlenecks, tracks processing times, and uncovers efficiency opportunities to optimize workflows and cash flow. Leading finance teams use Vic.ai to accelerate AP and scale for growth Vic.ai eliminated all the manual components of our payments process, providing each AP analyst with an additional 3 to 6 hours of capacity each week. Andrew Turkish VP and Corporate Controller, Diesel Direct Innovation is core to our ethos at Milwaukee Tool, down to the way our internal teams operate. We are excited to push the envelope with Vic.ai. It presents us with a great opportunity to incorporate AI and augment our decision-making. Conor Clair Senior Finance Manager of Accounting, Milwaukee Tool Our team needed to focus on higher-value accounting work instead of spending so much time on manual invoice processing tasks. Vic.ai was the clear choice for its ability to automate processing, improve visibility, and scale seamlessly with our growth. Stephen McCaskill Controller, VTrips You might also be interested in View all resources Guide 10-Step Hyperautomation Guide Case Study Why Stonewall Kitchen chose Vic.ai Webinar Pouring Efficiency Into AP: Cementing the Future of Financial Operations Ready to see Vic.ai in action? Schedule a meeting with our team to learn more and get started on your path toward more enlightened Accounts Payable. Request demo Product tour Why Vic.ai? Why Vic.ai? Customers Products Accounts Payable Invoice Processing PO Matching Approvals AP Inbox Bill Pay and Vendor Portal Expense Management Analytics and Insights Autonomous Finance Platform How It Works Integrations Trust and Security FAQs VicAgents Solutions By Use Case Centralize AP Operations Faster Monthly Close Fraud Prevention Vendor Management Scale For Growth By Role CFO Controller Accounts Payable By Industry Freight and Logistics Construction Manufacturing Retail Resources Blog Resource Center Case Studies Datasheets Guides Videos Podcasts Webinars Events Glossary Company About Vic.ai Careers Newsroom News Press Contact Us Partners Become a Partner Vic.ai is on a mission to transform how finance teams operate by building the world’s first autonomous finance platform. Subscribe to our newsletter Copyright © 2026 Vic.ai Privacy Policy Login Request Demo"
+  }
+ }
+}
