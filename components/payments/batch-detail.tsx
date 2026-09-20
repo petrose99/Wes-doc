@@ -6,6 +6,7 @@ import { AlertTriangle, Copy } from "lucide-react"
 import { toast } from "sonner"
 import { formatPaymentDate, formatPaymentDateTime, formatPaymentMoney } from "@/components/payments/format"
 import { BATCH_VIEW_LABEL } from "@/lib/payments/batch-status"
+import { describeBatchCounts } from "@/lib/payments/batch-counts"
 import { useOriginHere } from "@/components/documents/po-compare"
 import { withOrigin } from "@/lib/navigation/origin"
 import type { PaymentBatchDetail as Detail } from "@/models/payment-batches"
@@ -23,7 +24,7 @@ const PILL: Record<Detail["batch"]["view"], string> = {
 }
 
 export function PaymentBatchDetail({ workspaceId, detail, currentUserId, isOwner }: { workspaceId: string; detail: Detail; currentUserId: string; isOwner: boolean }) {
-  const { batch, suppliers, advices, audit, fileProblems } = detail
+  const { batch, suppliers, reimbursements, advices, audit, fileProblems } = detail
   const [tab, setTab] = useState<"lines" | "remittance" | "audit">("lines")
   const tabId = useId()
   const TABS = ["lines", "remittance", "audit"] as const
@@ -37,7 +38,7 @@ export function PaymentBatchDetail({ workspaceId, detail, currentUserId, isOwner
       <div className="flex flex-wrap items-center gap-2">
         <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${PILL[batch.view]}`}>{BATCH_VIEW_LABEL[batch.view]}</span>
         <span className="font-semibold tabular-nums text-slate-900">{money(batch.total)}</span>
-        <span className="text-slate-600">{batch.billCount} bill{batch.billCount === 1 ? "" : "s"} · {batch.currencyCode} · Pay From {batch.payFromLabel}</span>
+        <span className="text-slate-600">{describeBatchCounts(batch.billCount, batch.claimCount)} · {batch.currencyCode} · Pay From {batch.payFromLabel}</span>
       </div>
       <dl className="grid gap-x-4 gap-y-1 text-xs text-slate-700 sm:grid-cols-2">
         <Fact label="Submitted">{batch.submittedBy?.name ?? "—"} · {formatPaymentDateTime(batch.createdAt)}{selfSubmitted && batch.view === "pending_approval" && isOwner && <span className="ml-1 inline-block rounded bg-amber-50 px-1.5 py-0.5 text-amber-800">You submitted this batch</span>}</Fact>
@@ -72,7 +73,7 @@ export function PaymentBatchDetail({ workspaceId, detail, currentUserId, isOwner
     </div>
 
     <div role="tabpanel" id={`${tabId}-panel`} aria-labelledby={`${tabId}-tab-${tab}`} tabIndex={0} className="min-h-0 flex-1 overflow-y-auto px-4 py-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-600">
-      {tab === "lines" && (suppliers.length === 0 ? <p className="text-slate-600">This batch holds no lines.</p> : <div className="space-y-4">
+      {tab === "lines" && (suppliers.length === 0 && !reimbursements ? <p className="text-slate-600">This batch holds no lines.</p> : <div className="space-y-4">
         {suppliers.map((group) => <section key={group.supplier} aria-label={group.supplier}>
           <h3 className="mb-1 flex items-baseline justify-between gap-2 text-sm font-semibold text-slate-900"><span>{group.supplier}</span><span className="tabular-nums">{money(group.total, group.lines[0]?.currencyCode)}</span></h3>
           <table className="w-full text-sm">
@@ -87,6 +88,19 @@ export function PaymentBatchDetail({ workspaceId, detail, currentUserId, isOwner
             </tbody>
           </table>
         </section>)}
+        {reimbursements && <section aria-label="Reimbursements">
+          <h3 className="mb-1 flex items-baseline justify-between gap-2 text-sm font-semibold text-slate-900"><span>Reimbursements</span><span className="tabular-nums">{money(reimbursements.total, reimbursements.lines[0]?.currencyCode)}</span></h3>
+          <table className="w-full text-sm">
+            <thead className="text-left text-xs font-medium uppercase tracking-wide text-slate-600"><tr><th scope="col" className="py-1 pr-2">Claimant</th><th scope="col" className="py-1 pr-2">Approved</th><th scope="col" className="py-1 text-right">Amount</th></tr></thead>
+            <tbody>
+              {reimbursements.lines.map((line) => <tr key={line.itemId} className="border-t border-slate-100">
+                <td className="py-1.5 pr-2 text-slate-800">{line.claimId ? <Link href={withOrigin(`/workspaces/${workspaceId}/approvals/expense-claims?claim=${line.claimId}`, origin)} className="text-emerald-800 underline-offset-2 hover:underline">{line.supplier}</Link> : <span>{line.supplier}</span>}<div className="text-xs text-slate-500">{line.reference}</div></td>
+                <td className="py-1.5 pr-2 tabular-nums text-slate-700">{formatPaymentDate(line.approvedAt)}</td>
+                <td className="py-1.5 text-right tabular-nums text-slate-900">{money(line.amount, line.currencyCode)}</td>
+              </tr>)}
+            </tbody>
+          </table>
+        </section>}
       </div>)}
 
       {tab === "remittance" && <div className="space-y-3">
