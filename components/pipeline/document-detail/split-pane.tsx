@@ -23,7 +23,7 @@ import type { DocumentFieldDefinition } from "@/lib/document-templates"
 import type { Ref } from "@/lib/provenance"
 import type { FieldRationale } from "@/lib/rationale"
 import type { ProcessingState } from "@/lib/documents/processing-state"
-import { directionLockedFor, hasDirectionField, isCategoryConfirmed, type DocType } from "@/lib/doc-types"
+import { DOC_TYPE_SPECS, directionLockedFor, hasDirectionField, isCategoryConfirmed, type DocType } from "@/lib/doc-types"
 import { CheckCircle2, ChevronDown, ChevronUp, ExternalLink, Loader2 } from "lucide-react"
 import { useActionState, useContext, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react"
 import { toast } from "sonner"
@@ -34,22 +34,11 @@ const LAYOUT_KEY = "pane-layout"
 /** #257 spec 3.5: whether the phone lane's source strip is expanded; remembered for the session. */
 const SOURCE_KEY = "dp.source"
 
-/** Shared label map for the four document-type states. Extracted so the chip in the top bar, the
- * inline "Type:" line, and the future stage indicator all read the same names — a mismatch here
- * showed up in the audit as "Expense / Sale / Bank Statement / Other" competing with the Bill /
- * Sales invoice glossary elsewhere in the app. */
-const DOC_TYPE_LABELS: Record<"expense" | "sale" | "bank_statement" | "other", string> = {
-  expense: "Bill",
-  sale: "Sales invoice",
-  bank_statement: "Bank statement",
-  other: "Other",
-}
-
 export function SplitPane({
   workspaceId, source, fields, data, fieldConfidence, provenanceFields, provenanceItems, initialTarget, conflictingLabels, missingRequiredFields,
   saveReview, documentType: initialDocumentType, note: initialNote, auditEvents,
   header, canPush, pushCard, canCreateRule, defaultSupplier, matchKind, bankMatches, documentMatches, rationales, checks, fxBadge, stageIndicator,
-  institutions, institutionId, institutionName, history, po = null, initialTab, state, queueTitle,
+  institutions, institutionId, institutionName, history, po = null, initialTab, state, queueTitle, queueDocType,
 }: {
   workspaceId: string
   source: SourceDocument
@@ -107,13 +96,15 @@ export function SplitPane({
   /** #258: "Invoices" / "Receipts" — the Approval tab's in-review guidance names the queue's
    * own bulk bar (Receipts has no Start approval there). */
   queueTitle?: string
+  /** #297: the queue's own type (`resolveDocType`, not the category), the Direction row's key
+   * question — Invoice/Receipt show it, Purchase Order shows it locked, everything else shows
+   * none. Distinct from the `documentType`/category prop below. */
+  queueDocType: DocType
 }) {
   const [tab, setTab] = useState<Tab>(initialTab ?? "details")
   const [target, setTarget] = useState<ProvenanceTarget | null>(initialTarget)
   const [note, setNote] = useState(initialNote)
   const [savingNote, setSavingNote] = useState(false)
-  const [docType, setDocType] = useState<"expense" | "sale" | "bank_statement" | "other" | null>(initialDocumentType)
-  const [savingDocType, setSavingDocType] = useState(false)
   // The layout choice persists for the session so moving ↑/↓ through a queue keeps the panels
   // where the operator put them; read after mount so server and first client render agree.
   const [layout, setLayout] = useState<PanelLayout>("split")
@@ -155,20 +146,6 @@ export function SplitPane({
     flagged: header.flagged, archived: header.archived, cancelled: header.cancelled, cancelledReason: header.cancelledReason, reviewLink: header.reviewLink,
     decision,
   })
-
-  const selectDocType = async (type: "expense" | "sale" | "bank_statement" | "other") => {
-    setSavingDocType(true)
-    setDocType(type)
-    try {
-      const result = await setDocumentTypeAction(workspaceId, header.documentId, type)
-      if (!result.success) { toast.error(result.error || "Could not save document type"); setDocType(docType); return }
-    } catch {
-      toast.error("Could not reach the server")
-      setDocType(docType)
-    } finally {
-      setSavingDocType(false)
-    }
-  }
 
   const arrayIndex = fields.findIndex((field) => field.type === "array")
   let summaryStart = arrayIndex
@@ -240,7 +217,7 @@ export function SplitPane({
 
     {/* #217: the drift banner (or its calm "first statement" reading) always renders first among
         this pane's banners/notices, above the generic missing-fields one below. */}
-    {docType === "bank_statement" && institutionId && <StatementDriftBanner
+    {initialDocumentType === "bank_statement" && institutionId && <StatementDriftBanner
       workspaceId={workspaceId}
       documentId={header.documentId}
       institutionName={institutionName ?? null}
@@ -310,32 +287,9 @@ export function SplitPane({
 
         <div className="min-h-0 flex-1 overflow-y-auto">
           {tab === "details" && <div {...panelProps("details")} className={`mx-auto space-y-4 p-4 ${layout === "details-only" ? "max-w-2xl" : ""}`}>
-            {/* Document type confirmation — compact inline when confirmed, prominent when not */}
-            {docType ? (
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-xs text-slate-500">Type:</span>
-                <span className="font-medium text-slate-800">{docType === "expense" ? "Expense" : docType === "sale" ? "Sale" : docType === "bank_statement" ? "Bank Statement" : "Other"}</span>
-                <button type="button" disabled={savingDocType} onClick={() => setDocType(null)}
-                  className="text-xs text-slate-400 hover:text-slate-600">Change</button>
-              </div>
-            ) : (
-              <div>
-                <p className="mb-1.5 text-sm font-medium text-slate-800">What type of document is this?</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {(["expense", "sale", "bank_statement", "other"] as const).map((value) => (
-                    <button key={value} type="button" disabled={savingDocType} onClick={() => void selectDocType(value)}
-                      className="rounded border px-2.5 py-1 text-sm text-slate-600 hover:bg-slate-50">
-                      {DOC_TYPE_LABELS[value]}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
             {/* #217: a bank statement needs an asserted Institution before the layout-drift
-                check (#207) has anything to compare against — same "user asserts, assertion is
-                authoritative" rule as the document-type control just above. */}
-            {docType === "bank_statement" && <InstitutionAssert
+                check (#207) has anything to compare against. */}
+            {initialDocumentType === "bank_statement" && <InstitutionAssert
               workspaceId={workspaceId}
               documentId={header.documentId}
               institutions={institutions ?? []}
@@ -355,7 +309,7 @@ export function SplitPane({
             <fieldset disabled={fieldsReadOnly} className="min-w-0">
               <FieldNavForm
                 saveReview={saveReview}
-                docType={docType}
+                queueDocType={queueDocType}
                 formFields={formFields}
                 data={data}
                 fieldConfidence={fieldConfidence}
@@ -412,9 +366,9 @@ export function SplitPane({
 
 /** A4: the inner form that owns the field-nav state. Split out of SplitPane so the hook can
  * derive its ordering directly from formFields without SplitPane touching field-nav internals. */
-function FieldNavForm({ saveReview, docType, formFields, data, fieldConfidence, provenanceFields, provenanceItems, summaryFields, rationales, checks, workspaceId, documentId, setTarget, po }: {
+function FieldNavForm({ saveReview, queueDocType, formFields, data, fieldConfidence, provenanceFields, provenanceItems, summaryFields, rationales, checks, workspaceId, documentId, setTarget, po }: {
   saveReview: (formData: FormData) => Promise<ActionState<SaveReviewResult | null>>
-  docType: string | null
+  queueDocType: DocType
   formFields: DocumentFieldDefinition[]
   data: Record<string, unknown>
   fieldConfidence: Record<string, number>
@@ -432,6 +386,41 @@ function FieldNavForm({ saveReview, docType, formFields, data, fieldConfidence, 
   const nav = useFieldNav(navItems)
   const formRef = useRef<HTMLFormElement>(null)
   const [liveChecks, setLiveChecks] = useState(checks)
+  // #297: the Direction row (Payable/Receivable), where it exists for this queue type. Locked to
+  // Payable for Purchase Order (directionLockedFor). Defaults from the type's defaultCategory —
+  // already what's stored — so the row merely displays what classification asserted, pre-checked.
+  const showDirection = hasDirectionField(queueDocType)
+  const directionLocked = directionLockedFor(queueDocType)
+  const storedDirection = typeof data.documentType === "string" ? data.documentType : null
+  const [direction, setDirection] = useState<"expense" | "sale">(
+    directionLocked ? "expense" : (storedDirection === "expense" || storedDirection === "sale" ? storedDirection : DOC_TYPE_SPECS[queueDocType].defaultCategory === "sale" ? "sale" : "expense"))
+  const [savingDirection, setSavingDirection] = useState(false)
+  const [categoryConfirmed, setCategoryConfirmed] = useState(isCategoryConfirmed(data))
+  const selectDirection = async (value: "expense" | "sale") => {
+    const previous = direction
+    setSavingDirection(true)
+    setDirection(value)
+    try {
+      const result = await setDocumentTypeAction(workspaceId, documentId, value)
+      if (!result.success) { toast.error(result.error || "Could not save direction"); setDirection(previous); return }
+      setCategoryConfirmed(true)
+    } catch {
+      toast.error("Could not reach the server")
+      setDirection(previous)
+    } finally {
+      setSavingDirection(false)
+    }
+  }
+  const onDirectionKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (directionLocked || (event.key !== "ArrowDown" && event.key !== "ArrowUp" && event.key !== "ArrowLeft" && event.key !== "ArrowRight")) return
+    const items = Array.from(event.currentTarget.querySelectorAll<HTMLElement>("[role=radio]"))
+    const index = items.indexOf(document.activeElement as HTMLElement)
+    if (index < 0) return
+    event.preventDefault()
+    const next = items[(index + (event.key === "ArrowDown" || event.key === "ArrowRight" ? 1 : -1) + items.length) % items.length]
+    next.focus()
+    next.click()
+  }
   // #258 (B2): Save review is the one in-pane mutation that changes the processing state. The
   // action returns instead of redirecting; success toasts the outcome and asks the queue to
   // refresh (`onMutated` → `QueueScreen.refresh()`), so the row pill, glyph, Status line, stepper
@@ -476,6 +465,20 @@ function FieldNavForm({ saveReview, docType, formFields, data, fieldConfidence, 
       <span><span className="font-semibold">{nav.suspectsRemaining}</span> of {nav.totalSuspects} low-confidence fields to review — Enter confirms and moves to the next.</span>
       <button type="button" className="rounded-md border border-amber-300 bg-white px-2 py-0.5 font-medium text-amber-800 hover:bg-amber-100" onClick={() => nav.focusNext()}>Next suspect</button>
     </div>}
+    {showDirection && <div className="space-y-1 border-b border-slate-100 pb-3">
+      <p className="text-sm font-medium text-slate-800">Direction</p>
+      <div role="radiogroup" aria-label="Direction" onKeyDown={onDirectionKeyDown} className="flex gap-1.5">
+        {(["expense", "sale"] as const).map((value) => {
+          const checked = direction === value
+          return <button key={value} type="button" role="radio" aria-checked={checked} tabIndex={directionLocked ? -1 : checked ? 0 : -1}
+            disabled={directionLocked || savingDirection} onClick={() => void selectDirection(value)}
+            className={`rounded border px-2.5 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 disabled:cursor-not-allowed disabled:opacity-60 ${checked ? "border-emerald-700 bg-emerald-50 font-medium text-emerald-800" : "border-slate-300 text-slate-600 hover:bg-slate-50"}`}>
+            {value === "expense" ? "Payable" : "Receivable"}
+          </button>
+        })}
+      </div>
+      {directionLocked && <p className="text-xs text-slate-500">Purchase orders are always payable.</p>}
+    </div>}
     {formFields.map((field) => field.type === "array"
       ? <LineItemsSection key={field.key} field={field} value={data[field.key]} fieldKey={field.key} summaryFields={summaryFields} fieldValues={data} provenanceFields={provenanceFields} provenanceItems={provenanceItems[field.key] ?? []} onFocusSource={setTarget}
           checks={liveChecks.filter((check) => check.fields.some((f) => f === field.key || f.startsWith(`${field.key}[`)))} onEscalate={onEscalate} po={field.key === "line_items" ? po : null} />
@@ -483,10 +486,10 @@ function FieldNavForm({ saveReview, docType, formFields, data, fieldConfidence, 
           checks={liveChecks.filter((check) => checkAppliesToField(check, field.key))} onEscalate={onEscalate}
           registerNav={nav.registerField} isCurrent={nav.currentKey === field.key} isCompleted={nav.completedKeys.has(field.key)} />)}
     <div className="flex items-center gap-3 border-t border-slate-100 pt-3">
-      <button type="submit" id="save-review-submit" disabled={!docType} aria-busy={saving || undefined} className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40" title={!docType ? "Choose Expense or Sale first" : undefined}>
+      <button type="submit" id="save-review-submit" disabled={showDirection && !directionLocked && !categoryConfirmed} aria-busy={saving || undefined} className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40" title={showDirection && !directionLocked && !categoryConfirmed ? "Confirm the Direction first" : undefined}>
         {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <CheckCircle2 className="h-4 w-4" aria-hidden />}{saving ? "Saving…" : "Save review"}
       </button>
-      {!docType && <span className="text-xs text-amber-600">Choose a document type first</span>}
+      {showDirection && !directionLocked && !categoryConfirmed && <span className="text-xs text-amber-600">Confirm the Direction first</span>}
     </div>
   </form>
 }

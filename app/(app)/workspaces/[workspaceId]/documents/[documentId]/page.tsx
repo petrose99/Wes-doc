@@ -286,6 +286,7 @@ export async function DocumentDetailPage({ params, searchParams, embedded = fals
 
   const splitPane = <SplitPane
     workspaceId={workspaceId}
+    queueDocType={docType}
     source={{ documentId: document.id, filename: document.filename, mimeType: document.mimeType }}
     fields={fields}
     data={data}
