@@ -24,7 +24,7 @@ import { toast } from "sonner"
  * Audio is deliberately absent. A dictation is a clinical document that gets read back and signed,
  * not a row staged for a spreadsheet, so it has its own surface at /workspaces/:id/dictation —
  * see components/dictation/. Accepting audio here would route it into the sheet flow instead. */
-const DOCUMENT_TYPES = "application/pdf,image/jpeg,image/png,image/webp,image/heic"
+export const DOCUMENT_TYPES = "application/pdf,image/jpeg,image/png,image/webp,image/heic"
 const MAX_STAGED_FILES = 100
 
 const usageLabel = (used: number, limit: number) => (limit < 0 ? `${used} used` : `${used} of ${limit}`)
