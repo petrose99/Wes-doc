@@ -16,7 +16,8 @@ import { QueueEmpty } from "@/components/queue/queue-empty"
 import { withOrigin, type Origin } from "@/lib/navigation/origin"
 import { emptyQueueState } from "@/lib/queue/empty-state"
 import { clearFilterParams } from "@/lib/queue/filters"
-import { confirmLeave } from "@/lib/client/unsaved-changes"
+import { clearUnsaved, hasUnsaved, unsavedReason } from "@/lib/client/unsaved-changes"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { isPhoneLane } from "@/lib/client/use-phone-lane"
 import { orderColumnsByFieldTable, widthClassFor, type FieldTable } from "@/lib/configuration/field-table"
 
@@ -336,27 +337,43 @@ function QueueScreenInner<T>({
   // True while the open pane owns a history entry of its own (phone lane, opened from the list —
   // not from a deep link, which has no entry to pop).
   const [pushed, setPushed] = useState(false)
+  // #327: Escape, the pane's own ✕, and opening another row while the current one is dirty all
+  // route through this instead of unmounting straight away — same registry (lib/client/unsaved-
+  // changes) and same "Leave without saving?" dialog AdminLeaveGuard uses for links and Back, so
+  // every exit from a dirty pane reads identically. `guardLeave` stashes the real action and the
+  // dialog below runs it on confirm; nothing unsaved means it runs immediately.
+  const [pendingLeave, setPendingLeave] = useState<(() => void) | null>(null)
+  const guardLeave = useCallback((proceed: () => void) => {
+    if (!hasUnsaved()) { proceed(); return }
+    setPendingLeave(() => proceed)
+  }, [])
   const open = useCallback((id: string) => {
-    if (!confirmLeave()) return
-    const push = isPhoneLane() && openId === null
-    setOpenId(id)
-    syncUrl(id, push)
-    if (push) setPushed(true)
-  }, [syncUrl, openId])
+    guardLeave(() => {
+      const push = isPhoneLane() && openId === null
+      setOpenId(id)
+      syncUrl(id, push)
+      if (push) setPushed(true)
+    })
+  }, [syncUrl, openId, guardLeave])
   // Closing returns focus to the row that was open — recorded as state and applied in an effect
   // once the pane has unmounted, so `close` itself stays free of DOM refs.
   const [focusReturn, setFocusReturn] = useState<string | null>(null)
   const close = useCallback((fromPopstate = false) => {
-    if (!fromPopstate && !confirmLeave()) return
-    // The pane pushed its own entry: pop it, so the phone's Back gesture and the pane's Back
-    // control leave the same history behind; the popstate handler below finishes the close.
-    if (!fromPopstate && pushed) { setPushed(false); window.history.back(); return }
-    setPushed(false)
-    setFocusReturn(openId)
-    setOpenId(null)
-    // A popstate-driven close already moved history back; pushing/replacing here would fight it.
-    if (!fromPopstate) syncUrl(null, false)
-  }, [openId, pushed, syncUrl])
+    const proceed = () => {
+      // The pane pushed its own entry: pop it, so the phone's Back gesture and the pane's Back
+      // control leave the same history behind; the popstate handler below finishes the close.
+      if (!fromPopstate && pushed) { setPushed(false); window.history.back(); return }
+      setPushed(false)
+      setFocusReturn(openId)
+      setOpenId(null)
+      // A popstate-driven close already moved history back; pushing/replacing here would fight it.
+      if (!fromPopstate) syncUrl(null, false)
+    }
+    // A popstate close (Back/the phone gesture) is already guarded upstream — AdminLeaveGuard's
+    // sentinel entry asked before history moved. Asking again here would double-prompt.
+    if (fromPopstate) { proceed(); return }
+    guardLeave(proceed)
+  }, [openId, pushed, syncUrl, guardLeave])
   // Back, the browser's own gesture, or the pane's Back control (`history.back()`) all arrive as
   // popstate — close the pane to match, without touching history a second time.
   useEffect(() => {
@@ -673,6 +690,11 @@ function QueueScreenInner<T>({
         actions={paneActions?.(openRow, helpers)}
         menu={paneMenu?.(openRow, helpers)}
         reloadKey={reloadKey} />}
+      <ConfirmDialog open={pendingLeave !== null} destructive title="Leave without saving?"
+        description={`${unsavedReason() ?? "You have unsaved changes on this page."} They will be lost if you leave.`}
+        confirmLabel="Leave without saving"
+        onCancel={() => setPendingLeave(null)}
+        onConfirm={() => { const proceed = pendingLeave; setPendingLeave(null); if (proceed) { clearUnsaved(); proceed() } }} />
     </div>
   </div>
 }
