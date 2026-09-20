@@ -6,7 +6,7 @@ import type { SheetTemplate } from "@/components/extract/types"
 import { InboundAddressLine } from "@/components/intake/inbound-address-line"
 import { Dialog } from "@/components/ui/dialog"
 import { Loader2, Check, X as XIcon } from "lucide-react"
-import { useRef, useState } from "react"
+import { forwardRef, useImperativeHandle, useRef, useState } from "react"
 
 /** #266 spec Screen 3: "Add ‹type›" — the one surface that turns files on disk into rows on a
  * typed queue. Reuses `uploadDocumentsAction` (the same document-creation path `ExtractPanel`'s
@@ -18,7 +18,13 @@ const MAX_BATCH_BYTES = 200 * 1024 * 1024
 
 /** Plural queue-vocabulary labels (spec decision 9 / B3) — deliberately not `SheetTemplate.name`
  * (singular, "Invoice") since the header/footer/receipt copy is always plural ("Add invoices"). */
-const TYPE_LABELS: Record<string, string> = { invoice: "invoices", purchase_order: "purchase orders", receipt: "receipts", bank_statement: "bank statements" }
+export const TYPE_LABELS: Record<string, string> = { invoice: "invoices", purchase_order: "purchase orders", receipt: "receipts", bank_statement: "bank statements" }
+
+/** Imperative handle so `AddTypeButton` (owner of the queue-area drop target, #266 Screen 2) can
+ * pre-stage a drop's files before opening the dialog, without threading a "pending files" prop
+ * through render (this component stays mounted across open/close so its own `addFiles` closure is
+ * always live). */
+export type AddDocumentsDialogHandle = { addFiles: (files: FileList | File[]) => void }
 
 const EXTENSION_FALLBACK = /\.(pdf|jpe?g|png|webp|heic)$/i
 
@@ -37,7 +43,7 @@ function formatMB(bytes: number) {
 
 type Row = { localId: string; file: File; filename: string; sizeBytes: number; status: "staged" | "uploading" | "done" | "failed"; error: string | null }
 
-export function AddDocumentsDialog({ open, onClose, workspaceId, fileId, templates, initialType, inboundAddress, onUploaded }: {
+export const AddDocumentsDialog = forwardRef<AddDocumentsDialogHandle, {
   open: boolean
   onClose: () => void
   workspaceId: string
@@ -52,7 +58,7 @@ export function AddDocumentsDialog({ open, onClose, workspaceId, fileId, templat
    * existing toast-per-terminal-transition behavior keeps firing after this dialog closes — same
    * "survives close" pattern as `FileHubUploadButton` (spec interaction logic, B4). */
   onUploaded: (documentIds: string[]) => void
-}) {
+}>(function AddDocumentsDialog({ open, onClose, workspaceId, fileId, templates, initialType, inboundAddress, onUploaded }, ref) {
   const [type, setType] = useState(initialType)
   const [rows, setRows] = useState<Row[]>([])
   const [rejections, setRejections] = useState<string[]>([])
@@ -64,6 +70,8 @@ export function AddDocumentsDialog({ open, onClose, workspaceId, fileId, templat
 
   const locked = sending
   const totalBytes = rows.reduce((sum, row) => sum + row.sizeBytes, 0)
+
+  useImperativeHandle(ref, () => ({ addFiles }))
 
   function addFiles(incoming: FileList | File[]) {
     const files = [...incoming]
@@ -179,4 +187,4 @@ export function AddDocumentsDialog({ open, onClose, workspaceId, fileId, templat
         </>}
     </div>
   </Dialog>
-}
+})
