@@ -13,6 +13,9 @@ export type RemittanceAdvice = {
   currencyCode: string
   totalAmount: number
   invoices: Array<{ reference: string; amount: number }>
+  /** #347: a claim's advice never mixes with a bill's — Bill Pay never lets a bill and a claim
+   * share one `supplier`/payee string, so every group in `buildRemittanceAdvices` is one kind. */
+  kind: "bill" | "claim"
   text: string
 }
 
@@ -36,8 +39,9 @@ export function buildRemittanceAdvices(instructions: PaymentInstruction[], payer
     for (const [currencyCode, rows] of byCurrency) {
       const totalAmount = rows.reduce((sum, r) => sum + r.amount, 0)
       const invoices = rows.map((r) => ({ reference: r.reference, amount: r.amount }))
-      const text = renderRemittanceText({ supplier, currencyCode, totalAmount, invoices, payer })
-      advices.push({ supplier, currencyCode, totalAmount, invoices, text })
+      const kind: "bill" | "claim" = rows[0].expenseClaimId ? "claim" : "bill"
+      const text = renderRemittanceText({ supplier, currencyCode, totalAmount, invoices, kind, payer })
+      advices.push({ supplier, currencyCode, totalAmount, invoices, kind, text })
     }
   }
   return advices
@@ -48,12 +52,14 @@ function renderRemittanceText(input: {
   currencyCode: string
   totalAmount: number
   invoices: Array<{ reference: string; amount: number }>
+  kind: "bill" | "claim"
   payer: { name: string; runDate: Date }
 }): string {
   const date = input.payer.runDate.toISOString().slice(0, 10)
   const rows = input.invoices
     .map((inv) => `  ${inv.reference.padEnd(20)}  ${input.currencyCode} ${inv.amount.toFixed(2).padStart(12)}`)
     .join("\n")
+  const noun = input.kind === "claim" ? "reimbursement claim" : "invoices"
   return [
     `Remittance advice`,
     ``,
@@ -61,7 +67,7 @@ function renderRemittanceText(input: {
     `To:    ${input.supplier}`,
     `Date:  ${date}`,
     ``,
-    `Payment for the following invoices has been processed to your bank account:`,
+    `Payment for the following ${noun} has been processed to your bank account:`,
     ``,
     rows,
     ``,

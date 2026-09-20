@@ -26,17 +26,10 @@ import { getQueueDetailAction } from "@/app/(app)/workspaces/[workspaceId]/queue
 import { getExpenseClaimDetailAction } from "@/app/(app)/workspaces/[workspaceId]/expense-claim-actions"
 import { ExpenseClaimDetail } from "@/components/queue/expense-claim-queue"
 import { createPaymentBatchesAction, markClaimsPaidAction, markInvoicesPaidAction, removePaymentRecordsForClaimAction, removePaymentRecordsForDocumentAction, setAmountToPayAction, setPayFromAction } from "@/app/(app)/workspaces/[workspaceId]/(queue)/payments/actions"
-import type { BillPayBillRow, BillPayClaimRow, BillPayRow } from "@/models/bill-pay"
+import { rowId, rowPayeeName, rowDue, rowAmount, rowScheduled, type BillPayBillRow, type BillPayClaimRow, type BillPayRow } from "@/models/bill-pay"
 import type { BillsSummary } from "@/models/bills"
 import type { PayerAccountRow } from "@/models/payer-accounts"
 
-/** #331: one place per fact so every column/sort/facet reads a claim row the same way a bill
- * row is read — never a per-column ternary on `row.kind`. */
-function rowId(row: BillPayRow): string { return row.kind === "bill" ? row.bill.documentId : row.claim.id }
-function rowPayeeName(row: BillPayRow): string | null { return row.kind === "bill" ? row.bill.supplier : (row.submitter?.name || row.submitter?.email || null) }
-function rowDue(row: BillPayRow): Date | null { return row.kind === "bill" ? row.bill.dueDate : row.claim.resolvedAt }
-function rowAmount(row: BillPayRow): number | null { return row.kind === "bill" ? row.amountToPay : row.claim.total }
-function rowScheduled(row: BillPayRow): boolean { return row.kind === "bill" ? row.bill.paidState.state === "scheduled" : row.paidState === "scheduled" }
 function rowEligibilitySubtitle(row: BillPayRow): string | null {
   if (row.eligibility.eligible) return null
   return row.kind === "bill" ? ELIGIBILITY_COPY[row.eligibility.reason] : CLAIM_ELIGIBILITY_COPY[row.eligibility.reason]

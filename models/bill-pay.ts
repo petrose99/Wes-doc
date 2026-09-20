@@ -218,6 +218,20 @@ export function claimPaymentEligibility(input: { total: number | null; currencyC
   return { eligible: true }
 }
 
+/** #347: one place per fact so every column/sort/facet/dialog reads a claim row the same way a
+ * bill row is read — never a per-file re-derivation of "what is this row's payee/amount/etc."
+ * Moved here from `components/payments/bill-pay-queue.tsx` (was private to that file) so
+ * `create-batch-dialog.tsx` and `models/payment-batches.ts` share the same functions. */
+export function rowId(row: BillPayRow): string { return row.kind === "bill" ? row.bill.documentId : row.claim.id }
+export function rowPayeeName(row: BillPayRow): string | null { return row.kind === "bill" ? row.bill.supplier : (row.submitter?.name || row.submitter?.email || null) }
+export function rowDue(row: BillPayRow): Date | null { return row.kind === "bill" ? row.bill.dueDate : row.claim.resolvedAt }
+export function rowAmount(row: BillPayRow): number | null { return row.kind === "bill" ? row.amountToPay : row.claim.total }
+export function rowScheduled(row: BillPayRow): boolean { return row.kind === "bill" ? row.bill.paidState.state === "scheduled" : row.paidState === "scheduled" }
+export function rowCurrency(row: BillPayRow): string | null { return row.kind === "bill" ? row.bill.currencyCode : row.claim.currencyCode }
+/** A claim has no per-row Pay From override (no `BillPayPreference` for an `ExpenseClaim`, #331)
+ * — every claim batches from the workspace's default payer account. */
+export function rowPayFrom(row: BillPayRow, defaultPayerAccount: PayerAccountRow | null): PayerAccountRow | null { return row.kind === "bill" ? row.payFrom : defaultPayerAccount }
+
 function supplierTerms(supplier: { paymentTermsDays: number | null; earlyPaymentDiscountPercent: unknown; earlyPaymentDiscountDays: number | null } | undefined): PaymentTerms {
   if (!supplier) return { netDays: null, discountPercent: null, discountDays: null }
   return { netDays: supplier.paymentTermsDays, discountPercent: decimalToNumber(supplier.earlyPaymentDiscountPercent as never), discountDays: supplier.earlyPaymentDiscountDays }
