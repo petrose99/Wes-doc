@@ -5,6 +5,7 @@ import { canDecideStage, decideStage, findCurrentStage, toWorkflowStageInputs } 
 import { auditEventData, getRequestAuditContext } from "@/lib/audit"
 import { claimEligibility, type ClaimEligibility, type ClaimEligibilityReason } from "@/lib/claims/eligibility"
 import { claimName } from "@/lib/claims/labels"
+import { loadClaimPaidFacts } from "@/models/bill-pay"
 import type { DocumentClaimFacts, DocumentClaimView, DraftClaimOption, AddToClaimResult, ClaimReceipt } from "@/lib/claims/facts"
 import type { ApprovalActor, ApprovalStageInfo } from "@/models/approvals"
 import { getDefaultApprovalFlow } from "@/models/approval-defaults"
@@ -491,6 +492,7 @@ async function buildClaimFacts(claim: LoadedClaim, actor: ApprovalActor): Promis
   const frozen = claim.status !== "draft" && claim.total != null
   const total = frozen ? Number(claim.total) : live.total
   const currencyCode = frozen ? claim.currencyCode : live.currencyCode
+  const paidFacts = claim.status === "approved" ? (await loadClaimPaidFacts(claim.workspaceId, [{ id: claim.id, total }])).get(claim.id) : undefined
 
   const decisions = events.filter((e) => e.type === "expense_claim_stage_decided").map((e) => {
     const d = (e.detail ?? {}) as Record<string, unknown>
@@ -539,6 +541,9 @@ async function buildClaimFacts(claim: LoadedClaim, actor: ApprovalActor): Promis
     stageLabel: claim.status === "submitted" ? `${stageFacts.stage.index + 1} of ${stageFacts.stage.total} · ${stageFacts.stage.name}` : null,
     approval: claim.status === "approved" && finalEvent ? { by: nameOf(finalEvent.actorId), at: finalEvent.createdAt.toISOString() } : null,
     rejection: claim.status === "rejected" && finalEvent ? { reason: finalReason, by: nameOf(finalEvent.actorId), at: finalEvent.createdAt.toISOString() } : null,
+    paidState: paidFacts?.paidState ?? "unpaid",
+    paidAt: paidFacts?.paidAt?.toISOString() ?? null,
+    paidBy: paidFacts?.paidBy ?? null,
     deletedReceiptCount: auditItemCount !== null ? Math.max(0, auditItemCount - receipts.length) : 0,
     receipts,
     decisions,

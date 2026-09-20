@@ -40,6 +40,12 @@ export type DocumentClaimFacts = {
   stageLabel: string | null
   approval: { by: string; at: string } | null
   rejection: { reason: string | null; by: string; at: string } | null
+  /** #331: whether an approved claim has been paid on Bill Pay — same derivation as
+   * `BillPayClaimRow.paidState` (models/bill-pay.ts `loadClaimPaidFacts`), one source for both
+   * surfaces. Only meaningful once `status === "approved"`; "unpaid" otherwise. */
+  paidState: "paid" | "scheduled" | "unpaid"
+  paidAt: string | null
+  paidBy: string | null
   deletedReceiptCount: number
   receipts: ClaimReceipt[]
   decisions: ClaimDecision[]

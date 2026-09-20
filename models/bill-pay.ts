@@ -37,6 +37,12 @@ export type BillPayBillRow = {
 export type ClaimEligibilityReason = "needs_bank_details" | "left_workspace" | "needs_currency"
 export type ClaimEligibility = { eligible: true } | { eligible: false; reason: ClaimEligibilityReason }
 
+export const CLAIM_ELIGIBILITY_COPY: Record<ClaimEligibilityReason, string> = {
+  needs_bank_details: "Needs bank details",
+  left_workspace: "No longer a member",
+  needs_currency: "Needs a currency",
+}
+
 /** #295: a reimbursement claim on the same queue as bills — no terms, no discount, no aging (its
  * Due is the approval date, not a countdown). Eligible once approved with a frozen total, a
  * currency, and the Claimant's own WorkspaceMember bank details on file; otherwise it stays
@@ -131,6 +137,48 @@ export async function listBillPay(input: { workspaceId: string; asOf?: Date; fac
   return { rows: filtered, summary: summarizeAging(billRows, asOf), payerAccounts, defaultPayerAccount, anySupplierHasDiscount }
 }
 
+export type ClaimPaidFacts = {
+  paidState: "paid" | "scheduled" | "unpaid"
+  paidAt: Date | null
+  paidBy: string | null
+  scheduledBatch: { id: string; name: string | null; status: string } | null
+}
+
+/** #331: one derivation of a claim's paid/scheduled/unpaid state (and, once paid, who/when),
+ * shared by `listClaimRows` below and `buildClaimFacts` (models/expense-claims.ts) so the row
+ * and the claim-surface copy never disagree (lesson #250 H8, same as buildClaimFacts itself). */
+export async function loadClaimPaidFacts(workspaceId: string, claims: Array<{ id: string; total: number | null }>): Promise<Map<string, ClaimPaidFacts>> {
+  const claimIds = claims.map((c) => c.id)
+  if (claimIds.length === 0) return new Map()
+  const [payments, batchItems] = await Promise.all([
+    prisma.expenseClaimPayment.findMany({
+      where: { workspaceId, claimId: { in: claimIds }, removedAt: null },
+      select: { claimId: true, amount: true, paidOn: true, recordedBy: { select: { name: true, email: true } } },
+      orderBy: { paidOn: "desc" },
+    }),
+    prisma.paymentRunItem.findMany({
+      where: { workspaceId, expenseClaimId: { in: claimIds }, active: true, run: { status: { in: ["pending_approval", "approved", "draft", "sent"] } } },
+      select: { expenseClaimId: true, run: { select: { id: true, name: true, status: true } } },
+    }),
+  ])
+  const paidByClaim = new Map<string, number>()
+  const latestPaymentByClaim = new Map<string, { paidAt: Date; paidBy: string | null }>()
+  for (const p of payments) {
+    paidByClaim.set(p.claimId, (paidByClaim.get(p.claimId) ?? 0) + (decimalToNumber(p.amount) ?? 0))
+    if (!latestPaymentByClaim.has(p.claimId)) latestPaymentByClaim.set(p.claimId, { paidAt: p.paidOn, paidBy: p.recordedBy ? p.recordedBy.name || p.recordedBy.email : null })
+  }
+  const batchByClaim = new Map(batchItems.filter((i) => i.expenseClaimId).map((i) => [i.expenseClaimId!, i.run]))
+  const out = new Map<string, ClaimPaidFacts>()
+  for (const claim of claims) {
+    const scheduledBatch = batchByClaim.get(claim.id) ?? null
+    const paidAmount = paidByClaim.get(claim.id) ?? 0
+    const paidState: ClaimPaidFacts["paidState"] = claim.total !== null && Math.round(paidAmount * 100) >= Math.round(claim.total * 100) ? "paid" : scheduledBatch !== null ? "scheduled" : "unpaid"
+    const latest = latestPaymentByClaim.get(claim.id)
+    out.set(claim.id, { paidState, paidAt: paidState === "paid" ? latest?.paidAt ?? null : null, paidBy: paidState === "paid" ? latest?.paidBy ?? null : null, scheduledBatch })
+  }
+  return out
+}
+
 /** #295: approved claims, eligible once they have a frozen total, a currency, and the Claimant's
  * own bank details on file — mirrors the bill-row shape but with no terms/discount/aging. */
 async function listClaimRows(workspaceId: string): Promise<BillPayClaimRow[]> {
@@ -140,32 +188,23 @@ async function listClaimRows(workspaceId: string): Promise<BillPayClaimRow[]> {
   })
   if (claims.length === 0) return []
   const submitterIds = [...new Set(claims.map((c) => c.submitterId).filter((id): id is string => !!id))]
-  const claimIds = claims.map((c) => c.id)
-  const [members, payments, batchItems] = await Promise.all([
+  const claimTotals = claims.map((c) => ({ id: c.id, total: decimalToNumber(c.total) }))
+  const [members, paidFactsByClaim] = await Promise.all([
     submitterIds.length === 0 ? [] : prisma.workspaceMember.findMany({ where: { workspaceId, userId: { in: submitterIds } }, select: { userId: true, bankName: true, bankAccountNumber: true, bankBranchCode: true } }),
-    prisma.expenseClaimPayment.findMany({ where: { workspaceId, claimId: { in: claimIds }, removedAt: null }, select: { claimId: true, amount: true } }),
-    prisma.paymentRunItem.findMany({
-      where: { workspaceId, expenseClaimId: { in: claimIds }, active: true, run: { status: { in: ["pending_approval", "approved", "draft", "sent"] } } },
-      select: { expenseClaimId: true, run: { select: { id: true, name: true, status: true } } },
-    }),
+    loadClaimPaidFacts(workspaceId, claimTotals),
   ])
   const memberByUser = new Map(members.map((m) => [m.userId, m]))
-  const paidByClaim = new Map<string, number>()
-  for (const p of payments) paidByClaim.set(p.claimId, (paidByClaim.get(p.claimId) ?? 0) + (decimalToNumber(p.amount) ?? 0))
-  const batchByClaim = new Map(batchItems.filter((i) => i.expenseClaimId).map((i) => [i.expenseClaimId!, i.run]))
 
   return claims.map((claim) => {
     const total = decimalToNumber(claim.total)
     const member = claim.submitterId ? memberByUser.get(claim.submitterId) : undefined
     const eligibility = claimEligibility({ total, currencyCode: claim.currencyCode, submitterId: claim.submitterId, member })
-    const scheduledBatch = batchByClaim.get(claim.id) ?? null
-    const paidAmount = paidByClaim.get(claim.id) ?? 0
-    const paidState: BillPayClaimRow["paidState"] = total !== null && Math.round(paidAmount * 100) >= Math.round(total * 100) ? "paid" : scheduledBatch !== null ? "scheduled" : "unpaid"
+    const paidFacts = paidFactsByClaim.get(claim.id)!
     return {
       kind: "claim",
       claim: { id: claim.id, title: claim.title, total, currencyCode: claim.currencyCode, submittedAt: claim.submittedAt, resolvedAt: claim.resolvedAt },
       submitter: claim.submitter,
-      eligibility, paidState, scheduledBatch,
+      eligibility, paidState: paidFacts.paidState, scheduledBatch: paidFacts.scheduledBatch,
     }
   })
 }
