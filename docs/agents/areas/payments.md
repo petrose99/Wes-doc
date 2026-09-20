@@ -69,6 +69,18 @@ Capture recipe: extend `round296.mjs` with a states arg for "mixed batch open" /
 batch open" (claim-only: suppliers list renders nothing, no empty "This batch holds no lines"
 message — that's reserved for a truly empty batch).
 
+Close-phase fixes: `describeBatchCounts` omits a zero-count noun (a claim-only batch reads "1
+claim", never "0 bills · 1 claim"). The "Reimbursements" pane heading carries a native `title`
+tooltip explaining the claim-vs-bill grouping (`batch-detail.tsx:92`) — matches the surface's
+existing convention of native `title` over a bespoke popover for inline help. The claim row's
+own per-row "Create batch" dialog is nested inside the mobile Detail pane's own `[role=dialog]`
+(`#queue-detail-pane`) at 390px, same as the queue-shell convention (`approvals.md`): Escape
+closes only the innermost `[data-inner] [role=dialog]`; a probe checking any `[role=dialog]` on
+the page will false-positive "still open" against the pane, which correctly stays open behind it.
+The multi-select `bulkActions` toolbar (`bill-pay-queue.tsx:171-190`, pre-existing from #251) is
+the bulk/repeat-batch path for mixed selections too — claim rows participate fully alongside
+bills, badged by eligible count.
+
 ## Detector residue (report, do not chase)
 App-wide four (`ai-color-palette`, `overused-font`, `layout-transition`, `dark-glow`), plus a
 pre-existing (shipped by #251, unmodified by #296, just newly reachable via the Approved-origin
