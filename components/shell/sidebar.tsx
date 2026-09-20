@@ -51,7 +51,7 @@ const ICONS: Record<string, typeof Files> = {
  * <WorkspacePulse /> card — a mini-map of the workspace's living state, three rows mirroring the
  * three primaries with the same badges. The workspace stays visibly alive inside those surfaces
  * instead of vanishing behind the door of a full-screen room. */
-export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, accountingEnabled = false, pipelineReviewCount = 0, reviewTaskCount = 0, financePushableCount = 0, openExceptionsCount = 0, batchesPendingApprovalCount = 0, approvalsReadyCount = 0 }: {
+export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, accountingEnabled = false, pipelineReviewCount = 0, reviewTaskCount = 0, financePushableCount = 0, openExceptionsCount = 0, batchesPendingApprovalCount = 0, approvalsReadyCount = 0, inboundAddress = null }: {
   workspaceId: string
   workspaces: SwitchableWorkspace[]
   user: { name: string; email: string; approvalEmails?: boolean }
@@ -77,6 +77,9 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
   /** #236: countReadyToApprove(workspaceId, currentUser) — the signed-in person's own
    * Ready-to-Approve count across BOTH Approvals queues, never the workspace-wide count. */
   approvalsReadyCount?: number
+  /** #266 step 2b: null when inboundEmail.enabled is false or the token couldn't be minted —
+   * threaded to HowItWorksDialog's phone-reachable rediscovery line. */
+  inboundAddress?: string | null
 }) {
   void reviewTaskCount
   const pathname = usePathname()
@@ -284,7 +287,7 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
     </div>
   </div>
   <KeyboardShortcuts destinations={SHORTCUT_DESTINATIONS(workspaceId, adminPaths(workspaceId).configuration)} />
-  <HowItWorksDialog />
+  <HowItWorksDialog inboundAddress={inboundAddress} />
   <ApprovalEmailsDialog workspaceId={workspaceId} initial={user.approvalEmails ?? true} />
   </aside>
 }

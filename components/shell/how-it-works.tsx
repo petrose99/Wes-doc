@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { Dialog } from "@/components/ui/dialog"
+import { InboundAddressLine } from "@/components/intake/inbound-address-line"
 import { openKeyboardShortcutsDialog } from "@/components/shell/keyboard-shortcuts"
 
 const OPEN_EVENT = "docubite:open-how-it-works"
@@ -33,7 +34,7 @@ const STEPS: { name: string; sentence: string }[] = [
 
 /** The one help surface that replaces the welcome tour on the account menu (#241 d.8). A read,
  * not a form: centred at every width, nothing stored, nothing to dismiss but the dialog. */
-export function HowItWorksDialog() {
+export function HowItWorksDialog({ inboundAddress = null }: { inboundAddress?: string | null }) {
   const [open, setOpen] = useState(false)
   useEffect(() => {
     const onOpen = () => setOpen(true)
@@ -50,6 +51,12 @@ export function HowItWorksDialog() {
           <span><strong className="font-semibold text-slate-900">{step.name}</strong> — {step.sentence}</span>
         </li>)}
       </ol>
+      {/* #266 step 2b: the phone-reachable rediscovery of the inbound address — a returning phone
+          operator's only in-product way back to it outside first-use, since the header Add button
+          and drop-zone are desktop-only (#243 decision 6). Third consumer of this shared line. */}
+      {inboundAddress && <div className="mt-4 border-t border-hairline pt-3">
+        <InboundAddressLine address={inboundAddress} />
+      </div>}
       <p className="mt-4 border-t border-hairline pt-3 text-[13px] text-slate-500">
         <button type="button" className="font-medium text-emerald-700 hover:underline"
           onClick={() => { close(); openKeyboardShortcutsDialog() }}>Keyboard shortcuts</button> are under the account menu, or press ?

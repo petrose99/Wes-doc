@@ -6,9 +6,11 @@ import { getCurrentUser, getSession } from "@/lib/auth"
 import { anyAccountingProviderEnabled } from "@/lib/finance/provider-flags"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { createClient } from "@/lib/supabase/server"
+import config from "@/lib/config"
 import { countReadyToApprove } from "@/models/approvals"
 import { countDocumentsByStage } from "@/models/documents"
 import { countOpenExceptions } from "@/models/exceptions"
+import { ensureInboundEmailToken } from "@/models/inbound-email"
 import { countOpenReviewTasks } from "@/models/review-tasks"
 import { countBatchesPendingApproval } from "@/models/payment-batches"
 import { getWorkspaceMembership, getWorkspacesForUser } from "@/models/workspaces"
@@ -69,6 +71,11 @@ export default async function WorkspaceLayout({ children, params }: { children: 
     ? await countReadyToApprove(workspaceId, { userId: user.id, role: membership.role as "owner" | "reviewer" | "member" })
     : 0
 
+  // #266 step 2b: the How DocuBite works dialog is the phone-reachable place a returning operator
+  // rediscovers the inbound address (mirrors the (queue) pages' own `ensureInboundEmailToken` call).
+  const inboundToken = config.inboundEmail.enabled ? await ensureInboundEmailToken(workspaceId).catch(() => null) : null
+  const inboundAddress = config.inboundEmail.enabled && inboundToken ? `${inboundToken}@${config.inboundEmail.domain}` : null
+
   const switchable = workspaces.map((workspace) => ({
     id: workspace.id,
     name: workspace.name,
@@ -97,7 +104,8 @@ export default async function WorkspaceLayout({ children, params }: { children: 
       financePushableCount={pipelineCounts.approved}
       openExceptionsCount={openExceptionsCount}
       batchesPendingApprovalCount={batchesPendingApprovalCount}
-      approvalsReadyCount={approvalsReadyCount} />
+      approvalsReadyCount={approvalsReadyCount}
+      inboundAddress={inboundAddress} />
     <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-[radial-gradient(1200px_480px_at_100%_-10%,rgba(4,120,87,0.05),transparent_60%),#fafbfc]">
       <MobileHeader workspaceId={workspaceId} workspaces={switchable} user={{ name: user.name, email: user.email }} />
       {/* #261 (#240's input): the tab bar precedes the queue in DOM order so its landmark comes
