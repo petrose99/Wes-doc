@@ -17,6 +17,7 @@ import config from "@/lib/config"
 import { countWorkspaceDocuments } from "@/models/documents"
 import { getTodayOutcome } from "@/models/queue-outcome"
 import { ensureInboundEmailToken } from "@/models/inbound-email"
+import { getIntakeUpload } from "@/models/files"
 import { getActiveIntegrationConnectionId, getLedgerConnectionBandStatus } from "@/lib/integration-push"
 
 export const dynamic = "force-dynamic"
@@ -50,7 +51,7 @@ export async function InvoicesQueuePage({ params, searchParams, selectedDocument
   const basePath = `/workspaces/${workspaceId}/invoices`
   const capabilities = await getWorkspaceCapabilities(workspaceId)
   const workflowsEnabled = capabilities.has("approval-workflows")
-  const [{ bills: allBills }, minConfidencePercent, savedViews, touchlessTrend, fieldTable, approvalWorkflows, workspaceDocumentCount, todayOutcome, inboundToken] = await Promise.all([
+  const [{ bills: allBills }, minConfidencePercent, savedViews, touchlessTrend, fieldTable, approvalWorkflows, workspaceDocumentCount, todayOutcome, inboundToken, intakeUpload] = await Promise.all([
     listWorkspaceBills({ workspaceId, onlyBlocked, onlyUnpaid, statusFilter, approvalFilter, onlyTouchless, poFilter }),
     getMinConfidencePercent(workspaceId),
     listSavedViews({ workspaceId, viewKey: "invoices", userId: user.id }),
@@ -66,6 +67,8 @@ export async function InvoicesQueuePage({ params, searchParams, selectedDocument
     countWorkspaceDocuments(workspaceId),
     getTodayOutcome(workspaceId),
     config.inboundEmail.enabled ? ensureInboundEmailToken(workspaceId).catch(() => null) : Promise.resolve(null),
+    // #266: the Add invoices button/dialog's upload target and Document-type choices.
+    getIntakeUpload(workspaceId, user.id),
   ])
   const inboundAddress = config.inboundEmail.enabled && inboundToken ? `${inboundToken}@${config.inboundEmail.domain}` : null
   const bills = agingFilter.size === 0 ? allBills : allBills.filter((bill) => agingFilter.has(bill.agingBucket ?? "none"))
@@ -97,6 +100,8 @@ export async function InvoicesQueuePage({ params, searchParams, selectedDocument
     workspaceDocumentCount={workspaceDocumentCount}
     todayOutcome={todayOutcome}
     inboundAddress={inboundAddress}
+    fileId={intakeUpload.fileId}
+    templates={intakeUpload.templates}
     connectionId={connectionId}
     connectionBandStatus={connectionBandStatus}
     isOwner={membership.role === "owner"}

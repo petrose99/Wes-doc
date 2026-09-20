@@ -1,7 +1,10 @@
 "use client"
 
 import type { QueueArrival } from "@/lib/navigation/origin-server"
-import { useCallback, useState, type ReactNode } from "react"
+import { useCallback, useRef, useState, type ReactNode } from "react"
+import { InboundAddressLine } from "@/components/intake/inbound-address-line"
+import { AddTypeButton, type AddTypeButtonHandle } from "@/components/intake/add-type-button"
+import type { SheetTemplate } from "@/components/extract/types"
 import { useRouter } from "next/navigation"
 import { FolderPlus, Send } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -59,7 +62,7 @@ const SORTS: SortOption<ReceiptRow>[] = [
   { key: "merchant", label: "Merchant A–Z", compare: (a, b) => (a.merchant ?? "￿").localeCompare(b.merchant ?? "￿") },
 ]
 
-export function ReceiptQueue({ workspaceId, basePath, receipts, claimsEnabled = false, currentUserId = null, minConfidencePercent, views, viewsPhone, stat, initialSelectedId, fieldTable = null, workspaceDocumentCount, todayOutcome, arrival, connectionId = null, connectionBandStatus = null, isOwner = false }: {
+export function ReceiptQueue({ workspaceId, basePath, receipts, claimsEnabled = false, currentUserId = null, minConfidencePercent, views, viewsPhone, stat, initialSelectedId, fieldTable = null, workspaceDocumentCount, todayOutcome, inboundAddress, fileId, templates, arrival, connectionId = null, connectionBandStatus = null, isOwner = false }: {
   workspaceId: string
   basePath: string
   receipts: ReceiptRow[]
@@ -79,6 +82,13 @@ export function ReceiptQueue({ workspaceId, basePath, receipts, claimsEnabled = 
   workspaceDocumentCount: number
   /** #264: the done state's "n approved today, m posted." sentence. */
   todayOutcome: { approvedToday: number; postedToday: number }
+  /** #264 spec §3.1/#266 spec Screen 5: `${token}@${domain}`, or null when email intake is off or
+   * the token could not be issued. */
+  inboundAddress: string | null
+  /** #266: `ensurePipelineFile`'s id (upload target) and its Document-type choices, for the
+   * header Add button/drop zone/dialog. */
+  fileId: string
+  templates: SheetTemplate[]
   /** #268: the Origin strip's model + the missing-row notice, from `queueArrival` on the server. */
   arrival?: QueueArrival
   /** #281: the workspace's active ledger connection id, or null with none/inactive — the bulk
@@ -93,6 +103,7 @@ export function ReceiptQueue({ workspaceId, basePath, receipts, claimsEnabled = 
   const [needsAttention, setNeedsAttention] = useState<Set<string>>(new Set())
   const [posting, setPosting] = useState<string[] | null>(null)
   const router = useRouter()
+  const addButtonRef = useRef<AddTypeButtonHandle>(null)
   const canCreateClaims = useCanCreateClaims()
   // #273 S2: one dialog for every opener; its state lives here (Radix unmount contract).
   const [claimDialog, setClaimDialog] = useState<{ ids: string[]; forceNew: boolean } | null>(null)
@@ -202,6 +213,8 @@ export function ReceiptQueue({ workspaceId, basePath, receipts, claimsEnabled = 
     initialMissing={arrival?.initialMissing}
     connectionBand={<ConnectionBand status={connectionBandStatus} workspaceId={workspaceId} isOwner={isOwner} />}
     title="Receipts"
+    addAction={<AddTypeButton ref={addButtonRef} workspaceId={workspaceId} fileId={fileId} templates={templates} type="receipt" inboundAddress={inboundAddress} />}
+    dropZone={{ type: "receipts", onFiles: (files) => addButtonRef.current?.openWithFiles(files) }}
     basePath={basePath}
     rows={receipts}
     rowId={(receipt) => receipt.documentId}
@@ -229,7 +242,14 @@ export function ReceiptQueue({ workspaceId, basePath, receipts, claimsEnabled = 
       claimsEnabled && receipt.claim ? `claim ${CLAIM_STATUS_LABELS[receipt.claim.status]}` : null,
     ].filter(Boolean).join(", ") }}
     empty={{
-      firstUse: { title: "No receipts yet.", body: "Receipts appear here once one is extracted from an upload or an inbound email." },
+      firstUse: {
+        title: "No receipts yet.", body: "Receipts appear here once one is extracted from an upload or an inbound email.",
+        action: <div className="flex flex-col items-center gap-3">
+          <AddTypeButton workspaceId={workspaceId} fileId={fileId} templates={templates} type="receipt" inboundAddress={inboundAddress} />
+          {inboundAddress && <InboundAddressLine address={inboundAddress} />}
+        </div>,
+        phoneAction: inboundAddress ? <InboundAddressLine address={inboundAddress} /> : undefined,
+      },
       done: { body: `${todayOutcome.approvedToday} approved today, ${todayOutcome.postedToday} posted.` },
     }}
     workspaceDocumentCount={workspaceDocumentCount}

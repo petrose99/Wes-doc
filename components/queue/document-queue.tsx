@@ -1,13 +1,17 @@
 "use client"
 
 import type { QueueArrival } from "@/lib/navigation/origin-server"
-import { useState, type ReactNode } from "react"
+import { useRef, useState, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { AlertTriangle, CheckCircle2, Loader2, Search, Send } from "lucide-react"
 import type { FieldTable } from "@/lib/configuration/field-table"
 import { QueueScreen, type QueueColumn, type SortOption } from "@/components/queue/queue-screen"
 import { joinSegments } from "@/components/queue/queue-card"
+import { InboundAddressLine } from "@/components/intake/inbound-address-line"
+import { AddTypeButton, type AddTypeButtonHandle } from "@/components/intake/add-type-button"
+import { TYPE_LABELS } from "@/components/intake/add-documents-dialog"
+import type { SheetTemplate } from "@/components/extract/types"
 import { DocumentBulkActions, DocumentPaneActions } from "@/components/queue/document-actions"
 import { PaneMenuItem } from "@/components/queue/detail-pane"
 import { formatDate, formatMoney, TitleCell } from "@/components/queue/row-cells"
@@ -87,7 +91,7 @@ function StatusPill({ status }: { status: string }) {
   return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}>{STATUS_LABEL[status] ?? status.replaceAll("_", " ")}</span>
 }
 
-export function DocumentQueue({ workspaceId, basePath, title, noun, itemType, rows, supplierLabel = "Supplier", views, viewsPhone, stat, initialSelectedId, emptyBody, showInstitution = false, purchaseOrders = false, fieldTable = null, workspaceDocumentCount, todayOutcome, arrival, connectionId = null, connectionBandStatus = null, isOwner = false }: {
+export function DocumentQueue({ workspaceId, basePath, title, noun, itemType, rows, supplierLabel = "Supplier", views, viewsPhone, stat, initialSelectedId, emptyBody, showInstitution = false, purchaseOrders = false, fieldTable = null, workspaceDocumentCount, todayOutcome, inboundAddress, fileId, templates, docType, arrival, connectionId = null, connectionBandStatus = null, isOwner = false }: {
   /** #252: Admin › Configuration › Fields for this queue's type, when one has been saved. */
   fieldTable?: FieldTable | null
   workspaceId: string
@@ -112,6 +116,15 @@ export function DocumentQueue({ workspaceId, basePath, title, noun, itemType, ro
   /** #264: the done state's "n approved today, m posted." sentence — Bank Statements only (a
    * postable queue); Purchase Orders passes undefined and keeps the default done body. */
   todayOutcome?: { approvedToday: number; postedToday: number }
+  /** #264 spec §3.1/#266 spec Screen 5: `${token}@${domain}`, or null when email intake is off or
+   * the token could not be issued. */
+  inboundAddress: string | null
+  /** #266: `ensurePipelineFile`'s id (upload target) and its Document-type choices, for the
+   * header Add button/drop zone/dialog. */
+  fileId: string
+  templates: SheetTemplate[]
+  /** #266: this queue's own asserted type code — `purchase_order` or `bank_statement`. */
+  docType: string
   /** #268: the Origin strip's model + the missing-row notice, from `queueArrival` on the server. */
   arrival?: QueueArrival
   /** #281: the bulk Post button's target connection — Bank Statements only (`todayOutcome` set
@@ -124,6 +137,8 @@ export function DocumentQueue({ workspaceId, basePath, title, noun, itemType, ro
   isOwner?: boolean
 }) {
   const router = useRouter()
+  const addButtonRef = useRef<AddTypeButtonHandle>(null)
+  const typeLabel = TYPE_LABELS[docType] ?? docType
   const [needsAttention, setNeedsAttention] = useState<Set<string>>(new Set())
   const [posting, setPosting] = useState<string[] | null>(null)
   const postable = todayOutcome !== undefined
@@ -201,6 +216,8 @@ export function DocumentQueue({ workspaceId, basePath, title, noun, itemType, ro
     initialMissing={arrival?.initialMissing}
     connectionBand={postable ? <ConnectionBand status={connectionBandStatus} workspaceId={workspaceId} isOwner={isOwner} /> : null}
     title={title}
+    addAction={<AddTypeButton ref={addButtonRef} workspaceId={workspaceId} fileId={fileId} templates={templates} type={docType} inboundAddress={inboundAddress} />}
+    dropZone={{ type: typeLabel, onFiles: (files) => addButtonRef.current?.openWithFiles(files) }}
     basePath={basePath}
     rows={rows}
     rowId={(row) => row.id}
@@ -231,7 +248,14 @@ export function DocumentQueue({ workspaceId, basePath, title, noun, itemType, ro
       ).filter(Boolean).join(", ")
     } }}
     empty={{
-      firstUse: { title: `No ${noun}s yet.`, body: emptyBody },
+      firstUse: {
+        title: `No ${noun}s yet.`, body: emptyBody,
+        action: <div className="flex flex-col items-center gap-3">
+          <AddTypeButton workspaceId={workspaceId} fileId={fileId} templates={templates} type={docType} inboundAddress={inboundAddress} />
+          {inboundAddress && <InboundAddressLine address={inboundAddress} />}
+        </div>,
+        phoneAction: inboundAddress ? <InboundAddressLine address={inboundAddress} /> : undefined,
+      },
       done: todayOutcome ? { body: `${todayOutcome.approvedToday} approved today, ${todayOutcome.postedToday} posted.` } : undefined,
     }}
     workspaceDocumentCount={workspaceDocumentCount}

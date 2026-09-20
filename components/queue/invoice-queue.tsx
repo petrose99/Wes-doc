@@ -1,13 +1,14 @@
 "use client"
 
 import type { QueueArrival } from "@/lib/navigation/origin-server"
-import { useState, type ReactNode } from "react"
+import { useRef, useState, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
-import Link from "next/link"
 import { toast } from "sonner"
 import { QueueScreen, type QueueColumn, type SortOption } from "@/components/queue/queue-screen"
 import { joinSegments } from "@/components/queue/queue-card"
 import { InboundAddressLine } from "@/components/intake/inbound-address-line"
+import { AddTypeButton, type AddTypeButtonHandle } from "@/components/intake/add-type-button"
+import type { SheetTemplate } from "@/components/extract/types"
 import type { FieldTable } from "@/lib/configuration/field-table"
 import { PaneMenuItem } from "@/components/queue/detail-pane"
 import { DocumentBulkActions, DocumentPaneActions } from "@/components/queue/document-actions"
@@ -90,7 +91,7 @@ const SORTS: SortOption<BillRow>[] = [
   { key: "supplier", label: "Supplier A–Z", compare: (a, b) => (a.supplier ?? "￿").localeCompare(b.supplier ?? "￿") },
 ]
 
-export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercent, availableWorkflows = [], views, viewsPhone, stat, initialSelectedId, fieldTable = null, workspaceDocumentCount, todayOutcome, inboundAddress, arrival, connectionId = null, connectionBandStatus = null, isOwner = false }: {
+export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercent, availableWorkflows = [], views, viewsPhone, stat, initialSelectedId, fieldTable = null, workspaceDocumentCount, todayOutcome, inboundAddress, fileId, templates, arrival, connectionId = null, connectionBandStatus = null, isOwner = false }: {
   workspaceId: string
   basePath: string
   bills: BillRow[]
@@ -113,6 +114,10 @@ export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercen
   /** #264 spec §3.1: `${token}@${domain}`, or null when email intake is off or the token could
    * not be issued (healthcare workspace) — first-use then omits the address line entirely. */
   inboundAddress: string | null
+  /** #266: `ensurePipelineFile`'s id (upload target) and its Document-type choices, for the
+   * header Add button/drop zone/dialog. */
+  fileId: string
+  templates: SheetTemplate[]
   /** #268: the Origin strip's model + the missing-row notice, from `queueArrival` on the server. */
   arrival?: QueueArrival
   /** #281: the workspace's active ledger connection id, or null with none/inactive — the bulk
@@ -126,6 +131,7 @@ export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercen
 }) {
   const router = useRouter()
   const origin = useOriginHere()
+  const addButtonRef = useRef<AddTypeButtonHandle>(null)
   const [needsAttention, setNeedsAttention] = useState<Set<string>>(new Set())
   // #261: the card's "overdue" reads against one instant per mount (the same as Approvals' card).
   const [renderedAt] = useState(() => Date.now())
@@ -250,6 +256,8 @@ export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercen
     initialMissing={arrival?.initialMissing}
     connectionBand={<ConnectionBand status={connectionBandStatus} workspaceId={workspaceId} isOwner={isOwner} />}
       title="Invoices"
+      addAction={<AddTypeButton ref={addButtonRef} workspaceId={workspaceId} fileId={fileId} templates={templates} type="invoice" inboundAddress={inboundAddress} />}
+      dropZone={{ type: "invoices", onFiles: (files) => addButtonRef.current?.openWithFiles(files) }}
       basePath={basePath}
       rows={bills}
       rowId={(bill) => bill.documentId}
@@ -284,14 +292,13 @@ export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercen
         ].filter(Boolean).join(", ")
       } }}
       empty={{
-        // #264 spec §3.1: #266's Add-documents dialog has not shipped, so the action is the
-        // fallback link to /pipeline — TODO(#266): swap for openAddDocumentsDialog({ type: "invoice" }).
+        // #266: the header Add button is the entry point; the empty state repeats it (desktop
+        // only — `AddTypeButton` itself hides `<md`) plus the inbound address.
         firstUse: {
           title: "No invoices yet",
           body: "Add an invoice and DocuBite extracts it into a row here. You check it beside the source, approve it, and post it.",
           action: <div className="flex flex-col items-center gap-3">
-            <Link href={`/workspaces/${workspaceId}/pipeline?from=invoices`}
-              className="inline-flex h-9 items-center rounded-md bg-emerald-700 px-4 font-medium text-white hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-1 max-md:h-11">Add invoices</Link>
+            <AddTypeButton workspaceId={workspaceId} fileId={fileId} templates={templates} type="invoice" inboundAddress={inboundAddress} />
             {inboundAddress && <InboundAddressLine address={inboundAddress} />}
           </div>,
           phoneAction: inboundAddress

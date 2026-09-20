@@ -15,6 +15,9 @@ import { getDocumentMatchRateStats } from "@/lib/analytics/workspace-analytics"
 import { countWorkspaceDocuments } from "@/models/documents"
 import { getTodayOutcome } from "@/models/queue-outcome"
 import { getActiveIntegrationConnectionId, getLedgerConnectionBandStatus } from "@/lib/integration-push"
+import { ensureInboundEmailToken } from "@/models/inbound-email"
+import { getIntakeUpload } from "@/models/files"
+import config from "@/lib/config"
 
 export const dynamic = "force-dynamic"
 
@@ -42,7 +45,7 @@ export async function ReceiptsQueuePage({ params, searchParams, selectedDocument
   const capabilities = await getWorkspaceCapabilities(workspaceId)
   const claimsEnabled = capabilities.has("expense-approvals")
   const onlyTouchless = touchless === "1"
-  const [{ receipts }, minConfidencePercent, savedViews, matchRate, fieldTable, workspaceDocumentCount, todayOutcome, connectionId, connectionBandStatus] = await Promise.all([
+  const [{ receipts }, minConfidencePercent, savedViews, matchRate, fieldTable, workspaceDocumentCount, todayOutcome, connectionId, connectionBandStatus, inboundToken, intakeUpload] = await Promise.all([
     listWorkspaceReceipts({ workspaceId, statusFilter, claimFilter, onlyTouchless }),
     getMinConfidencePercent(workspaceId),
     listSavedViews({ workspaceId, viewKey: "receipts", userId: user.id }),
@@ -54,7 +57,11 @@ export async function ReceiptsQueuePage({ params, searchParams, selectedDocument
     // #281: the bulk Post button's target connection, and spec.md §6's connection-failure band.
     getActiveIntegrationConnectionId(workspaceId),
     getLedgerConnectionBandStatus(workspaceId),
+    // #266 spec Screen 5: threaded the same way `(queue)/invoices/page.tsx` already does.
+    config.inboundEmail.enabled ? ensureInboundEmailToken(workspaceId).catch(() => null) : Promise.resolve(null),
+    getIntakeUpload(workspaceId, user.id),
   ])
+  const inboundAddress = config.inboundEmail.enabled && inboundToken ? `${inboundToken}@${config.inboundEmail.domain}` : null
   const currentViewFilters: Record<string, string> = {
     ...(statusFilter ? { status: statusFilter } : {}), ...(claimFilter ? { claim: claimFilter } : {}),
     ...(onlyTouchless ? { touchless: "1" } : {}),
@@ -73,6 +80,9 @@ export async function ReceiptsQueuePage({ params, searchParams, selectedDocument
     initialSelectedId={selectedDocumentId}
     workspaceDocumentCount={workspaceDocumentCount}
     todayOutcome={todayOutcome}
+    inboundAddress={inboundAddress}
+    fileId={intakeUpload.fileId}
+    templates={intakeUpload.templates}
     connectionId={connectionId}
     connectionBandStatus={connectionBandStatus}
     isOwner={membership.role === "owner"}

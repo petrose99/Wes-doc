@@ -12,6 +12,9 @@ import { isFieldTableType } from "@/lib/configuration/field-table"
 import { summarizePoConsumption, type PoConsumption } from "@/models/po-matching"
 import type { ItemizedRecord } from "@/components/typed-destinations/bulk-approve-receipt"
 import { getActiveIntegrationConnectionId, getLedgerConnectionBandStatus } from "@/lib/integration-push"
+import { ensureInboundEmailToken } from "@/models/inbound-email"
+import { getIntakeUpload } from "@/models/files"
+import config from "@/lib/config"
 
 const STATUSES = new Set(["queued", "needs_review", "ready_for_review", "reviewed", "failed"])
 
@@ -39,7 +42,7 @@ export async function DocumentQueuePage({ params, searchParams, docType, title, 
   const user = await getCurrentUser()
   const membership = await requireWorkspaceRole(workspaceId, user.id)
   const isBank = docType === "bank_statement"
-  const [documents, institutions, workspaceDocumentCount, todayOutcome, connectionId, connectionBandStatus] = await Promise.all([
+  const [documents, institutions, workspaceDocumentCount, todayOutcome, connectionId, connectionBandStatus, inboundToken, intakeUpload] = await Promise.all([
     listWorkspaceDocuments(workspaceId, { docType, status: status && STATUSES.has(status) ? status : undefined }),
     isBank ? listWorkspaceInstitutions(workspaceId) : Promise.resolve([]),
     // #264 spec §2: first-use means the workspace has never held a document of any type.
@@ -49,7 +52,11 @@ export async function DocumentQueuePage({ params, searchParams, docType, title, 
     // Bank Statements only.
     isBank ? getActiveIntegrationConnectionId(workspaceId) : Promise.resolve(null),
     isBank ? getLedgerConnectionBandStatus(workspaceId) : Promise.resolve(null),
+    // #266 spec Screen 5: threaded the same way `(queue)/invoices/page.tsx` already does.
+    config.inboundEmail.enabled ? ensureInboundEmailToken(workspaceId).catch(() => null) : Promise.resolve(null),
+    getIntakeUpload(workspaceId, user.id),
   ])
+  const inboundAddress = config.inboundEmail.enabled && inboundToken ? `${inboundToken}@${config.inboundEmail.domain}` : null
   const institutionName = new Map(institutions.map((institution) => [institution.id, institution.name]))
   // #228 Q8: the Purchase Orders queue reads consumption per PO — Invoiced (amount and %) and
   // Open / Fully invoiced are derived from the compared invoices, never set by hand.
@@ -98,6 +105,10 @@ export async function DocumentQueuePage({ params, searchParams, docType, title, 
     purchaseOrders={purchaseOrders}
     workspaceDocumentCount={workspaceDocumentCount}
     todayOutcome={todayOutcome}
+    inboundAddress={inboundAddress}
+    fileId={intakeUpload.fileId}
+    templates={intakeUpload.templates}
+    docType={docType}
     connectionId={connectionId}
     connectionBandStatus={connectionBandStatus}
     isOwner={membership.role === "owner"} />
