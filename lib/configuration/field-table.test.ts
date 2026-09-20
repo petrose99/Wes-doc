@@ -4,7 +4,9 @@ import { applyFieldTable, labelForKey, lockedRequiredKeys, orderColumnsByFieldTa
 describe("resolveFieldTable (#231 Q11 / #252)", () => {
   it("renders every canonical key in its canonical order with the code's defaults when nothing is stored", () => {
     const table = resolveFieldTable("invoice", [], [])
-    expect(table.rows[0]).toMatchObject({ key: "vendor", label: "Supplier", editable: true, required: true, requiredLocked: true, width: "normal", position: 0, stored: false })
+    // The synthetic Direction row (#297) is pinned first for direction-bearing types.
+    expect(table.rows[0]).toMatchObject({ key: "__direction", direction: true, position: 0 })
+    expect(table.rows[1]).toMatchObject({ key: "vendor", label: "Supplier", editable: true, required: true, requiredLocked: true, width: "normal", position: 1, stored: false })
     // Optional check fields are not locked — forcing IBAN required would hold every invoice without one.
     expect(table.rows.find((row) => row.key === "payment_iban")).toMatchObject({ required: false, requiredLocked: false })
     expect(table.rows.find((row) => row.key === "shipping_total")).toMatchObject({ requiredLocked: false })
@@ -15,7 +17,7 @@ describe("resolveFieldTable (#231 Q11 / #252)", () => {
   it("keeps the fields checks read required even when the overlay says otherwise, and required implies editable", () => {
     const table = resolveFieldTable("invoice", [], [{ fieldKey: "total", editable: false, required: false, width: "wide", position: 0 }, { fieldKey: "due_date", editable: false, required: false, width: "normal", position: 1 }])
     const total = table.rows.find((row) => row.key === "total")!
-    expect(total).toMatchObject({ required: true, requiredLocked: true, editable: true, width: "wide", position: 0 })
+    expect(total).toMatchObject({ required: true, requiredLocked: true, editable: true, width: "wide", position: 1 })
     expect(table.rows.find((row) => row.key === "due_date")).toMatchObject({ required: false, editable: false })
     expect(lockedRequiredKeys("receipt").has("merchant")).toBe(true)
   })
@@ -33,7 +35,8 @@ describe("resolveFieldTable (#231 Q11 / #252)", () => {
       { fieldKey: "total", editable: true, required: true, width: "normal", position: 0 },
       { fieldKey: "supplier", editable: true, required: true, width: "normal", position: 1 },
     ])
-    expect(table.rows.slice(0, 2).map((row) => row.key)).toEqual(["total", "supplier"])
+    // Purchase Order has a locked Direction row (#297), pinned before any stored position.
+    expect(table.rows.slice(0, 3).map((row) => row.key)).toEqual(["__direction", "total", "supplier"])
     expect(table.rows.map((row) => row.position)).toEqual(table.rows.map((_, index) => index))
   })
 
@@ -46,6 +49,13 @@ describe("resolveFieldTable (#231 Q11 / #252)", () => {
 
   it("sentence-cases keys", () => {
     expect(labelForKey("statement_period_start")).toBe("Statement period start")
+  })
+
+  it("injects the Direction row only for direction-bearing types, locked and footnoted for Purchase Order", () => {
+    expect(resolveFieldTable("bank_statement", [], []).rows.some((row) => row.direction)).toBe(false)
+    const po = resolveFieldTable("purchase_order", [], []).rows.find((row) => row.direction)!
+    expect(po).toMatchObject({ editable: true, required: true, requiredLocked: true })
+    expect(po.hint).toContain("always payable")
   })
 })
 

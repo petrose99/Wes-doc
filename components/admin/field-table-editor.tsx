@@ -8,7 +8,7 @@ import { AdminSaveBar } from "@/components/admin/admin-save-bar"
 import { NativeSelect } from "@/components/ui/native-select"
 import { FIELD_WIDTHS, FIELD_WIDTH_LABELS, type FieldTableRow, type FieldTableType, type FieldWidth } from "@/lib/configuration/field-table"
 
-type EditableRow = Pick<FieldTableRow, "key" | "label" | "hint" | "custom" | "editable" | "required" | "requiredLocked" | "width">
+type EditableRow = Pick<FieldTableRow, "key" | "label" | "hint" | "custom" | "editable" | "required" | "requiredLocked" | "direction" | "width">
 
 const snapshot = (rows: EditableRow[]) => JSON.stringify(rows.map((row) => [row.key, row.editable, row.required, row.width]))
 
@@ -53,6 +53,8 @@ export function FieldTableEditor({ workspaceId, docType, typeLabel, rows: initia
       const next = [...current]
       const target = index + direction
       if (target < 0 || target >= next.length) return current
+      // The Direction row is pinned first — never a swap target or mover.
+      if (next[index].direction || next[target].direction) return current
       ;[next[index], next[target]] = [next[target], next[index]]
       setAnnounce(`${next[target].label} moved to position ${target + 1} of ${next.length}`)
       return next
@@ -61,7 +63,7 @@ export function FieldTableEditor({ workspaceId, docType, typeLabel, rows: initia
 
   const save = useCallback(async () => {
     setPending(true); setError(null)
-    const result = await saveFieldTableAction({ workspaceId, docType, expectedUpdatedAt: stamp, rows: rows.map((row) => ({ key: row.key, editable: row.editable, required: row.required, width: row.width })) })
+    const result = await saveFieldTableAction({ workspaceId, docType, expectedUpdatedAt: stamp, rows: rows.filter((row) => !row.direction).map((row) => ({ key: row.key, editable: row.editable, required: row.required, width: row.width })) })
     setPending(false)
     if (!result.success) { setError(result.error ?? "Couldn't save — the server didn't say why. Your changes are still here."); return }
     setSaved(snapshot(rows)); setStamp(result.data?.stamp ?? null); setSavedAt(Date.now())
@@ -71,7 +73,7 @@ export function FieldTableEditor({ workspaceId, docType, typeLabel, rows: initia
   const discard = () => { setRows(initial); setError(null) }
   // evaluate H6/H10 (#252): the padlock explained itself only to screen readers; sighted owners
   // saw a grey tick they could not change and no reason. One visible line under the table.
-  const locked = rows.filter((row) => row.requiredLocked)
+  const locked = rows.filter((row) => row.requiredLocked && !row.direction)
   const lockedCount = locked.length
   const lockedList = locked.map((row) => row.label).join(", ").replace(/, ([^,]*)$/, " and $1")
   const clearSaved = useCallback(() => setSavedAt(null), [])
@@ -122,14 +124,14 @@ export function FieldTableEditor({ workspaceId, docType, typeLabel, rows: initia
                       aria-label={`${row.label} required`} onChange={(event) => update(row.key, { required: event.target.checked })} />}
               </td>
               <td className="py-1.5 pr-1.5 md:pr-4">
-                <NativeSelect id={widthId} value={row.width} disabled={readOnly} aria-label={`${row.label} column width`} className="h-8 w-[6rem] md:w-[7.5rem]"
+                {!row.direction && <NativeSelect id={widthId} value={row.width} disabled={readOnly} aria-label={`${row.label} column width`} className="h-8 w-[6rem] md:w-[7.5rem]"
                   onChange={(event) => update(row.key, { width: event.target.value as FieldWidth })}>
                   {FIELD_WIDTHS.map((width) => <option key={width} value={width}>{FIELD_WIDTH_LABELS[width]}</option>)}
-                </NativeSelect>
+                </NativeSelect>}
               </td>
               <td className="py-1.5 text-right">
-                <div className="inline-flex gap-0.5">
-                  <button type="button" onClick={() => move(index, -1)} disabled={readOnly} aria-disabled={index === 0 || undefined}
+                {!row.direction && <div className="inline-flex gap-0.5">
+                  <button type="button" onClick={() => move(index, -1)} disabled={readOnly} aria-disabled={index === 0 || rows[index - 1]?.direction || undefined}
                     aria-label={`Move ${row.label} up`}
                     className="inline-flex h-8 w-7 items-center justify-center rounded-md text-slate-600 md:w-8 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 disabled:opacity-40 aria-disabled:opacity-40">
                     <ArrowUp className="h-4 w-4" />
@@ -139,7 +141,7 @@ export function FieldTableEditor({ workspaceId, docType, typeLabel, rows: initia
                     className="inline-flex h-8 w-7 items-center justify-center rounded-md text-slate-600 md:w-8 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 disabled:opacity-40 aria-disabled:opacity-40">
                     <ArrowDown className="h-4 w-4" />
                   </button>
-                </div>
+                </div>}
               </td>
             </tr>
           })}

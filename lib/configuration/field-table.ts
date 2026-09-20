@@ -1,4 +1,4 @@
-import { DOC_TYPE_SPECS, type DocType, type DocTypeSpec } from "@/lib/doc-types"
+import { DOC_TYPE_SPECS, hasDirectionField, directionLockedFor, type DocType, type DocTypeSpec } from "@/lib/doc-types"
 import type { DocumentFieldDefinition } from "@/lib/document-templates"
 
 /** #231 Q11 (#252): the field table behind Admin › Configuration › Fields.
@@ -54,6 +54,9 @@ export type FieldTableRow = {
   required: boolean
   /** Checks read this field (`checkFields`), so Required cannot be switched off. */
   requiredLocked: boolean
+  /** The synthetic Payable/Receivable row (#297) — not from `canonicalKeys` or `custom`, always
+   * Editable+Required, no Width, no reorder (pinned first). */
+  direction: boolean
   /** An owner has stored this row; until then the pane keeps the template's own flags. */
   stored: boolean
   width: FieldWidth
@@ -142,6 +145,24 @@ export function resolveFieldTable(docType: FieldTableType, custom: CustomFieldSo
   // everything the owner ordered, in canonical order, rather than at an index that may collide.
   const unstoredBase = overlay.length ? Math.max(...overlay.map((row) => row.position)) + 1 : 0
   const rows: FieldTableRow[] = []
+  if (hasDirectionField(docType)) {
+    const locked = directionLockedFor(docType)
+    rows.push({
+      key: "__direction",
+      label: "Direction",
+      hint: locked
+        ? "Payable · Receivable — the accounting direction confirmed on the document. Purchase orders are always payable."
+        : "Payable · Receivable — the accounting direction confirmed on the document.",
+      custom: false,
+      editable: true,
+      required: true,
+      requiredLocked: true,
+      direction: true,
+      stored: false,
+      width: "normal",
+      position: -1,
+    })
+  }
   spec.canonicalKeys.forEach((field, index) => {
     const stored = byKey.get(field.key)
     const requiredLocked = locked.has(field.key)
@@ -154,6 +175,7 @@ export function resolveFieldTable(docType: FieldTableType, custom: CustomFieldSo
       editable: (stored?.editable ?? true) || requiredLocked || (stored?.required ?? false),
       required: requiredLocked || (stored?.required ?? defaults[field.key]?.required ?? false),
       requiredLocked,
+      direction: false,
       stored: !!stored,
       width: stored?.width ?? "normal",
       position: stored?.position ?? unstoredBase + index,
@@ -172,6 +194,7 @@ export function resolveFieldTable(docType: FieldTableType, custom: CustomFieldSo
       editable: (stored?.editable ?? true) || (stored?.required ?? field.required ?? false),
       required: stored?.required ?? field.required ?? false,
       requiredLocked: false,
+      direction: false,
       stored: !!stored,
       width: stored?.width ?? "normal",
       position: stored?.position ?? unstoredBase + spec.canonicalKeys.length + index,
