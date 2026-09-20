@@ -119,8 +119,8 @@ export function ConfirmDialog({ open, title, description, confirmLabel = "Confir
           {children && <div className="mt-3">{children}</div>}
         </div>
         <div className="flex justify-end gap-2 border-t border-hairline px-5 py-3">
-          <Button type="button" variant="outline" size="sm" disabled={busy} onClick={onCancel}>Cancel</Button>
-          <Button type="button" variant={destructive ? "destructive" : "default"} size="sm" disabled={busy || confirmDisabled} onClick={onConfirm}>
+          <Button type="button" variant="outline" size="sm" className="py-1.5" disabled={busy} onClick={onCancel}>Cancel</Button>
+          <Button type="button" variant={destructive ? "destructive" : "default"} size="sm" className="py-1.5" disabled={busy || confirmDisabled} onClick={onConfirm}>
             {busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}{confirmLabel}
           </Button>
         </div>
