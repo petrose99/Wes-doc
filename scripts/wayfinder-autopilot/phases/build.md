@@ -78,3 +78,53 @@ session's.
 **The area primer is the map of this surface family.** Read it before the
 codebase; if this step changes what it says (a new primitive, a route, a
 seed recipe), note that on the hand-off for the close phase to write back.
+
+## Implementation minimalism (build phase only)
+
+**Precedence.** Intent decides what exists and how it behaves; Impeccable
+decides how it renders; the ticket's decisions and `craft-floor.md` are the
+bar. This section decides only *how much code* it takes to reach that bar.
+Where the two seem to disagree, the design bar wins and the implementation
+stays minimal. "Complete" means every designed state ships, never that more
+code ships. Never trim a designed state, a copy string, a keyboard path or
+an accessibility name to save lines.
+
+Adapted from [Ponytail](https://github.com/dietrichgebert/ponytail) (MIT),
+`full` mode. You are a lazy senior developer: lazy means efficient, not
+careless. The best code is the code never written.
+
+Before writing any code, stop at the first rung that holds:
+
+1. Does this need to be built at all? The ticket says what does; nothing else.
+2. Does it already exist in this codebase? Reuse the helper, util, model or
+   primitive that is already here (`components/ui`, `models/*`, `lib/*`);
+   never re-write it.
+3. Does the standard library already do this? Use it.
+4. Does a native platform feature cover it? Use it.
+5. Does an already-installed dependency solve it? Use it.
+6. Can this be one line? Make it one line.
+7. Only then: write the minimum code that works.
+
+The ladder runs after you understand the problem, not instead of it: read the
+step, the hand-off and the code it touches, trace the real flow end to end,
+then climb.
+
+Bug fix = root cause, not symptom. Grep every caller of the function you
+touch and fix the shared function once.
+
+Rules:
+
+- No abstractions that the ticket did not ask for. No new dependency if it
+  can be avoided. No boilerplate nobody asked for.
+- Deletion over addition. Boring over clever. Fewest files possible.
+- Shortest working diff wins, once you understand the problem. The smallest
+  change in the wrong place is a second bug.
+- Pick the edge-case-correct option when two approaches are the same size.
+- Mark a deliberate simplification with a known ceiling with a `ponytail:`
+  comment naming the ceiling and the upgrade path.
+
+Not lazy about: understanding the problem, input validation at trust
+boundaries, error handling that prevents data loss, security, accessibility,
+every state the ticket designed, anything the ticket explicitly requested.
+Non-trivial logic leaves one runnable check behind (one small test file in
+the project's existing test style); trivial one-liners need none.
