@@ -31,6 +31,19 @@ tab bar, #251).
   caller of `loadForDecision` should expect those fields present when the batch was rejected from
   Approved.
 
+## #331: claim rows on Bill Pay
+`components/payments/bill-pay-queue.tsx` widened to `BillPayRow = BillPayBillRow |
+BillPayClaimRow` (`models/bill-pay.ts`) — accessor helpers (`rowId`/`rowPayeeName`/`rowDue`/
+`rowAmount`/`rowScheduled`) read either kind, never a per-column ternary. A claim row's detail
+pane routes to the existing `getExpenseClaimDetailAction` → `ExpenseClaimDetail` (read-only),
+not a second loader; its paid state (`DocumentClaimFacts.paidState`/`paidAt`/`paidBy` in
+`lib/claims/facts.ts`) is the same derivation the row reads, shared with `claim-card.tsx`'s
+Status line and `ApprovalTimeline`'s "Paid" entry — one source, never forked. Batching a claim
+row (mixed-selection `createPaymentBatches`, the Reimbursements group) is out of #331's scope,
+spawned as #347; the row/bulk-bar name the gap in place rather than hiding it. `BillPayClaimRow`
+has no `payFrom` (no `BillPayPreference` for an `ExpenseClaim`) — the Pay From cell renders "—"
+for a claim row, a disclosed model gap, not a fake value.
+
 ## Detector residue (report, do not chase)
 App-wide four (`ai-color-palette`, `overused-font`, `layout-transition`, `dark-glow`), plus a
 pre-existing (shipped by #251, unmodified by #296, just newly reachable via the Approved-origin
