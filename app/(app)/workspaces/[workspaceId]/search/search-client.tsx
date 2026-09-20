@@ -197,8 +197,9 @@ export function SearchPageClient({ workspaceId, initialQuery }: {
         // reached (not a one-shot dismiss), distinct from the persistent popover above.
         done: {
           title: "Search by supplier, number, amount or any words on the page.",
-          action: <p className="text-xs text-slate-500">
-            Try {SYNTAX_EXAMPLES.map((example, i) => <span key={example}>{i > 0 && " "}<code className="rounded bg-slate-100 px-1 py-0.5 font-mono">{example}</code></span>)}
+          body: "",
+          action: <p className="text-xs text-slate-600">
+            Try {SYNTAX_EXAMPLES.map((example, i) => <span key={example}>{i > 0 && " "}<code className="whitespace-nowrap rounded bg-slate-100 px-1 py-0.5 font-mono">{example}</code></span>)}
           </p>,
         },
         filteredTitle: query.trim() ? `Nothing matches "${query.trim()}".` : undefined,

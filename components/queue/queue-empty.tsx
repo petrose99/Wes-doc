@@ -35,7 +35,7 @@ export function QueueEmpty({ state, firstUse, done, filteredTitle, filteredBody,
   }
   return <section aria-labelledby="queue-empty-title" className="mx-auto max-w-md px-6 py-16 text-center max-md:py-12">
     <h2 id="queue-empty-title" tabIndex={-1} className="text-sm font-medium text-slate-800 focus:outline-none">{done?.title ?? "Nothing needs you."}</h2>
-    <p className="mt-1 text-sm text-slate-600">{done?.body ?? "Nothing in this view needs you."}</p>
+    {(done?.body ?? "Nothing in this view needs you.") && <p className="mt-1 text-sm text-slate-600">{done?.body ?? "Nothing in this view needs you."}</p>}
     {done?.action && <div className="mt-3 text-sm">{done.action}</div>}
   </section>
 }
