@@ -24,9 +24,21 @@ import { withOrigin } from "@/lib/navigation/origin"
 import { useOriginHere } from "@/components/documents/po-compare"
 import { getQueueDetailAction } from "@/app/(app)/workspaces/[workspaceId]/queue-actions"
 import { createPaymentBatchesAction, markInvoicesPaidAction, removePaymentRecordsForDocumentAction, setAmountToPayAction, setPayFromAction } from "@/app/(app)/workspaces/[workspaceId]/(queue)/payments/actions"
-import type { BillPayBillRow as BillPayRow } from "@/models/bill-pay"
+import { CLAIM_ELIGIBILITY_COPY, type BillPayBillRow, type BillPayRow } from "@/models/bill-pay"
 import type { BillsSummary } from "@/models/bills"
 import type { PayerAccountRow } from "@/models/payer-accounts"
+
+/** #331: one place per fact so every column/sort/facet reads a claim row the same way a bill
+ * row is read — never a per-column ternary on `row.kind`. */
+function rowId(row: BillPayRow): string { return row.kind === "bill" ? row.bill.documentId : row.claim.id }
+function rowPayeeName(row: BillPayRow): string | null { return row.kind === "bill" ? row.bill.supplier : (row.submitter?.name || row.submitter?.email || null) }
+function rowDue(row: BillPayRow): Date | null { return row.kind === "bill" ? row.bill.dueDate : row.claim.resolvedAt }
+function rowAmount(row: BillPayRow): number | null { return row.kind === "bill" ? row.amountToPay : row.claim.total }
+function rowScheduled(row: BillPayRow): boolean { return row.kind === "bill" ? row.bill.paidState.state === "scheduled" : row.paidState === "scheduled" }
+function rowEligibilitySubtitle(row: BillPayRow): string | null {
+  if (row.eligibility.eligible) return null
+  return row.kind === "bill" ? ELIGIBILITY_COPY[row.eligibility.reason] : CLAIM_ELIGIBILITY_COPY[row.eligibility.reason]
+}
 
 /** #229 Q7/Q10/Q12 (#251): the Bill Pay queue on the Queue screen — Approved, unpaid invoices
  * with their terms, discount window, amount to pay and Pay From. No processing-glyph column
@@ -46,13 +58,14 @@ export const BILL_PAY_FACETS: Facet[] = [
       { value: "61-90", label: "61–90 days overdue" }, { value: "90+", label: "90+ days overdue" }, { value: "none", label: "No due date" },
     ],
   },
+  { param: "payeeKind", label: "Payee kind", options: [{ value: "supplier", label: "Suppliers" }, { value: "claimant", label: "Claimants" }] },
 ]
 
 const SORTS: SortOption<BillPayRow>[] = [
-  { key: "due", label: "Due date", compare: (a, b) => (a.bill.dueDate?.getTime() ?? Infinity) - (b.bill.dueDate?.getTime() ?? Infinity) },
-  { key: "discount", label: "Discount expiring first", compare: (a, b) => (a.discount?.daysLeft ?? Infinity) - (b.discount?.daysLeft ?? Infinity) },
-  { key: "amount", label: "Amount, high to low", compare: (a, b) => (b.amountToPay ?? -Infinity) - (a.amountToPay ?? -Infinity) },
-  { key: "supplier", label: "Supplier A–Z", compare: (a, b) => (a.bill.supplier ?? "￿").localeCompare(b.bill.supplier ?? "￿") },
+  { key: "due", label: "Due date", compare: (a, b) => (rowDue(a)?.getTime() ?? Infinity) - (rowDue(b)?.getTime() ?? Infinity) },
+  { key: "discount", label: "Discount expiring first", compare: (a, b) => (a.kind === "bill" ? a.discount?.daysLeft ?? Infinity : Infinity) - (b.kind === "bill" ? b.discount?.daysLeft ?? Infinity : Infinity) },
+  { key: "amount", label: "Amount, high to low", compare: (a, b) => (rowAmount(b) ?? -Infinity) - (rowAmount(a) ?? -Infinity) },
+  { key: "supplier", label: "Payee A–Z", compare: (a, b) => (rowPayeeName(a) ?? "￿").localeCompare(rowPayeeName(b) ?? "￿") },
 ]
 
 export function BillPayQueue({ workspaceId, basePath, rows, summary, payerAccounts, fallbackCurrency, suggestedBatchName, isOwner, initialSelectedId }: {
@@ -70,44 +83,60 @@ export function BillPayQueue({ workspaceId, basePath, rows, summary, payerAccoun
   const [batching, setBatching] = useState<string[] | null>(null)
   const [markingPaid, setMarkingPaid] = useState<string[] | null>(null)
   const [settingPayFrom, setSettingPayFrom] = useState<string[] | null>(null)
-  const [removingRecords, setRemovingRecords] = useState<BillPayRow | null>(null)
-  const rowsById = useMemo(() => new Map(rows.map((row) => [row.bill.documentId, row])), [rows])
+  const [removingRecords, setRemovingRecords] = useState<BillPayBillRow | null>(null)
+  const rowsById = useMemo(() => new Map(rows.map((row) => [rowId(row), row])), [rows])
   const money = (value: number, currency: string | null) => formatPaymentMoney(value, currency, fallbackCurrency)
   const origin = useOriginHere()
   const settingsHref = withOrigin(`/workspaces/${workspaceId}/admin/configuration/payments`, origin)
-  const [paidReceipt, setPaidReceipt] = useState<{ recorded: Array<{ documentId: string; amount: number }>; leftOut: Array<{ documentId: string; reason: string }>; rows: Map<string, BillPayRow> } | null>(null)
+  const [paidReceipt, setPaidReceipt] = useState<{ recorded: Array<{ documentId: string; amount: number }>; leftOut: Array<{ documentId: string; reason: string }>; rows: Map<string, BillPayBillRow> } | null>(null)
   // Stable identity: the pane refetches whenever `loadDetail` changes.
   const loadDetail = useCallback((documentId: string) => getQueueDetailAction(workspaceId, documentId), [workspaceId])
   const batchesHref = `/workspaces/${workspaceId}/payments/batches`
 
   const columns: QueueColumn<BillPayRow>[] = [
     {
-      key: "supplier", label: "Supplier", narrow: true, className: "min-w-[12rem]",
-      render: (row) => <TitleCell title={row.bill.supplier} missingLabel="Unknown supplier"
-        subtitle={row.bill.paidState.state === "scheduled" ? `Scheduled · ${row.scheduledBatch?.name ?? "in a batch"}` : row.bill.paidState.state === "partially_paid" ? `Partially paid · ${money(row.bill.paidState.paidAmount, row.bill.currencyCode)} so far` : !row.eligibility.eligible ? ELIGIBILITY_COPY[row.eligibility.reason] : null} />,
+      key: "supplier", label: "Payee", narrow: true, className: "min-w-[12rem]",
+      render: (row) => {
+        if (row.kind === "bill") return <TitleCell title={row.bill.supplier} missingLabel="Unknown supplier"
+          subtitle={row.bill.paidState.state === "scheduled" ? `Scheduled · ${row.scheduledBatch?.name ?? "in a batch"}` : row.bill.paidState.state === "partially_paid" ? `Partially paid · ${money(row.bill.paidState.paidAmount, row.bill.currencyCode)} so far` : !row.eligibility.eligible ? ELIGIBILITY_COPY[row.eligibility.reason] : null} />
+        // #331: a claim row's Payee subtitle/hint don't fit TitleCell's single-subtitle shape
+        // (the "Claim" mark sits beside the name; an eligible-unpaid row gets a second, fixed
+        // hint line) — same classes as TitleCell, composed by hand rather than widening it.
+        const subtitle = row.paidState === "paid" ? "Paid" : row.paidState === "scheduled" ? `Scheduled · ${row.scheduledBatch?.name ?? "in a batch"}` : rowEligibilitySubtitle(row)
+        const hint = row.paidState === "unpaid" && row.eligibility.eligible ? "Batching claims ships next — mark as paid by hand for now" : null
+        return <span className="block min-w-0">
+          <span className="block truncate text-slate-900">{rowPayeeName(row) ?? <span className="text-slate-600">Unknown claimant</span>} <span className="text-xs font-normal text-slate-500">Claim</span></span>
+          {subtitle && <span className="block truncate text-xs text-slate-600">{subtitle}</span>}
+          {hint && <span className="block truncate text-xs text-slate-500">{hint}</span>}
+        </span>
+      },
     },
-    { key: "number", label: "Invoice #", className: "whitespace-nowrap text-slate-700", render: (row) => row.bill.invoiceNumber ?? "—" },
-    { key: "date", label: "Invoice date", className: "whitespace-nowrap tabular-nums text-slate-700", render: (row) => formatPaymentDate(row.bill.documentDate) },
-    { key: "terms", label: "Terms", className: "whitespace-nowrap tabular-nums text-slate-700", render: (row) => row.termsLabel },
+    { key: "number", label: "Invoice #", className: "whitespace-nowrap text-slate-700", render: (row) => row.kind === "bill" ? row.bill.invoiceNumber ?? "—" : row.claim.title ?? "Expense claim" },
+    { key: "date", label: "Invoice date", className: "whitespace-nowrap tabular-nums text-slate-700", render: (row) => formatPaymentDate(row.kind === "bill" ? row.bill.documentDate : row.claim.submittedAt) },
+    { key: "terms", label: "Terms", className: "whitespace-nowrap tabular-nums text-slate-700", render: (row) => row.kind === "bill" ? row.termsLabel : "—" },
     {
       key: "due", label: "Due date", narrow: true, className: "whitespace-nowrap tabular-nums text-slate-700",
-      render: (row) => <span className="inline-flex flex-wrap items-center gap-1.5">
+      render: (row) => row.kind === "bill" ? <span className="inline-flex flex-wrap items-center gap-1.5">
         <span>{formatPaymentDate(row.bill.dueDate)}</span>
         <DueDateCountdownBadge dueDate={row.bill.dueDate} fallback="" />
         {row.discount && <DiscountCountdownBadge daysLeft={row.discount.daysLeft} />}
-      </span>,
+      </span> : <span>{formatPaymentDate(row.claim.resolvedAt)}</span>,
     },
-    { key: "total", label: "Bill total", className: "whitespace-nowrap text-right tabular-nums text-slate-900", render: (row) => row.bill.total !== null ? money(row.bill.total, row.bill.currencyCode) : "—" },
-    { key: "currency", label: "Currency", className: "whitespace-nowrap text-slate-700", render: (row) => (row.bill.currencyCode ?? fallbackCurrency).toUpperCase() },
+    { key: "total", label: "Bill total", className: "whitespace-nowrap text-right tabular-nums text-slate-900", render: (row) => row.kind === "bill" ? (row.bill.total !== null ? money(row.bill.total, row.bill.currencyCode) : "—") : (row.claim.total !== null ? money(row.claim.total, row.claim.currencyCode) : "—") },
+    { key: "currency", label: "Currency", className: "whitespace-nowrap text-slate-700", render: (row) => ((row.kind === "bill" ? row.bill.currencyCode : row.claim.currencyCode) ?? fallbackCurrency).toUpperCase() },
     {
       key: "amount", label: "Amount to pay", narrow: true, className: "whitespace-nowrap text-right",
-      render: (row) => <AmountToPayCell amountToPay={row.amountToPay} due={row.due} discountedTotal={row.discount?.discountedTotal ?? null} override={row.amountToPayOverride}
+      render: (row) => row.kind === "bill" ? <AmountToPayCell amountToPay={row.amountToPay} due={row.due} discountedTotal={row.discount?.discountedTotal ?? null} override={row.amountToPayOverride}
         currencyCode={row.bill.currencyCode} fallbackCurrency={fallbackCurrency} editable scheduled={row.bill.paidState.state === "scheduled"}
-        onSave={async (amount) => { const result = await setAmountToPayAction(workspaceId, row.bill.documentId, amount, row.due ?? 0); if (result.success) router.refresh(); return result }} />,
+        onSave={async (amount) => { const result = await setAmountToPayAction(workspaceId, row.bill.documentId, amount, row.due ?? 0); if (result.success) router.refresh(); return result }} />
+        // #331 spec §2: frozen claim total, no partial reimbursement — plain text, no edit affordance.
+        : <span className="block text-slate-900">{row.claim.total !== null ? money(row.claim.total, row.claim.currencyCode) : "—"}</span>,
     },
     {
       key: "payFrom", label: "Pay From", className: "whitespace-nowrap text-slate-700",
-      render: (row) => row.payFrom ? <>{payerAccountLabel(row.payFrom)}{!row.payFromChosen && <span className="ml-1 text-xs text-slate-500" title="The workspace's default payer account — change it with Set Pay From">default<span className="sr-only"> (the workspace&apos;s default payer account; change it with Set Pay From)</span></span>}</> : "—",
+      // #331: claim rows have no BillPayPreference (keyed to Document, not ExpenseClaim) — Pay
+      // From wiring for claims is out of this step's scope; "—" until that model gap is closed.
+      render: (row) => row.kind === "claim" ? "—" : row.payFrom ? <>{payerAccountLabel(row.payFrom)}{!row.payFromChosen && <span className="ml-1 text-xs text-slate-500" title="The workspace's default payer account — change it with Set Pay From">default<span className="sr-only"> (the workspace&apos;s default payer account; change it with Set Pay From)</span></span>}</> : "—",
     },
   ]
 
@@ -118,8 +147,8 @@ export function BillPayQueue({ workspaceId, basePath, rows, summary, payerAccoun
       title="Bill Pay"
       basePath={basePath}
       rows={rows}
-      rowId={(row) => row.bill.documentId}
-      rowName={(row) => ({ title: row.bill.supplier ?? "Unknown supplier", suffix: [row.bill.invoiceNumber, row.amountToPay !== null ? money(row.amountToPay, row.bill.currencyCode) : null, row.bill.dueDate ? `due ${formatPaymentDate(row.bill.dueDate)}` : null].filter(Boolean).join(" · ") })}
+      rowId={rowId}
+      rowName={(row) => ({ title: rowPayeeName(row) ?? "Unknown", suffix: [row.kind === "bill" ? row.bill.invoiceNumber : null, rowAmount(row) !== null ? money(rowAmount(row)!, row.kind === "bill" ? row.bill.currencyCode : row.claim.currencyCode) : null, rowDue(row) ? `due ${formatPaymentDate(rowDue(row))}` : null].filter(Boolean).join(" · ") })}
       columns={columns}
       selectable
       sortOptions={SORTS}
@@ -133,8 +162,10 @@ export function BillPayQueue({ workspaceId, basePath, rows, summary, payerAccoun
       loadDetail={loadDetail}
       bulkActions={({ selectedIds }) => {
         const chosen = selectedRows(selectedIds)
-        const eligible = chosen.filter((row) => row.eligibility.eligible).length
-        const payable = chosen.filter((row) => row.bill.paidState.state !== "scheduled").length
+        // #331: batching claim rows isn't wired yet — only a bill row counts toward "batchable"
+        // so Create batch (n) undercounts claims with no separate code path (spec §2).
+        const eligible = chosen.filter((row) => row.kind === "bill" && row.eligibility.eligible).length
+        const payable = chosen.filter((row) => row.kind === "bill" && rowScheduled(row) === false).length
         const hint = eligible === 0
           ? (payerAccounts.length === 0 ? "Add a payer account first." : "Nothing selected can be batched — each row says why.")
           : eligible < selectedIds.length ? `${selectedIds.length - eligible} of ${selectedIds.length} selected can't be batched — each row says why.` : null
@@ -145,13 +176,13 @@ export function BillPayQueue({ workspaceId, basePath, rows, summary, payerAccoun
           {isOwner && <Button type="button" className="lg:h-8 lg:text-xs" variant="outline" disabled={payable === 0} onClick={() => setMarkingPaid(selectedIds)}>
             <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />Mark as paid{payable > 0 && payable !== selectedIds.length ? ` (${payable})` : ""}
           </Button>}
-          <Button type="button" className="lg:h-8 lg:text-xs" variant="outline" disabled={payable === 0 || payerAccounts.length === 0} onClick={() => setSettingPayFrom(chosen.filter((row) => row.bill.paidState.state !== "scheduled").map((row) => row.bill.documentId))}>
+          <Button type="button" className="lg:h-8 lg:text-xs" variant="outline" disabled={payable === 0 || payerAccounts.length === 0} onClick={() => setSettingPayFrom(chosen.filter((row) => row.kind === "bill" && rowScheduled(row) === false).map((row) => rowId(row)))}>
             <Wallet className="h-3.5 w-3.5" aria-hidden />Set Pay From{payable > 0 && payable !== selectedIds.length ? ` (${payable})` : ""}
           </Button>
           {hint && <span className="text-xs text-slate-600">{hint}</span>}
         </>
       }}
-      paneActions={(row) => <>
+      paneActions={(row) => row.kind !== "bill" ? <></> /* #331: claim pane actions land on step 3 */ : <>
         {!row.eligibility.eligible && row.eligibility.reason === "needs_bank_details" && <Button asChild className="lg:h-8 lg:text-xs" variant="outline"><Link className="py-1.5" href={`${settingsHref}#supplier-${row.bill.supplierId ?? ""}`}><Landmark className="h-3.5 w-3.5" aria-hidden />Add bank details</Link></Button>}
         {row.bill.paidState.state === "scheduled" && row.scheduledBatch && <Button asChild className="lg:h-8 lg:text-xs" variant="outline"><Link className="py-1.5" href={withOrigin(`${batchesHref}/${row.scheduledBatch.id}`, origin)}>Open batch {row.scheduledBatch.name ?? ""}</Link></Button>}
         {isOwner && row.bill.paidState.source === "recorded" && <Button type="button" className="lg:h-8 lg:text-xs" variant="outline" onClick={() => setRemovingRecords(row)}>Remove payment records…</Button>}
@@ -159,13 +190,13 @@ export function BillPayQueue({ workspaceId, basePath, rows, summary, payerAccoun
         {payerAccounts.length > 0 && row.bill.paidState.state !== "scheduled" && <Button type="button" className="lg:h-8 lg:text-xs" variant="outline" onClick={() => setSettingPayFrom([row.bill.documentId])}><Wallet className="h-3.5 w-3.5" aria-hidden />Set Pay From…</Button>}
         {row.eligibility.eligible && <Button type="button" className="lg:h-8 lg:text-xs" onClick={() => setBatching([row.bill.documentId])}><Layers className="h-3.5 w-3.5" aria-hidden />Create batch</Button>}
       </>}
-      paneMenu={(row) => <>
+      paneMenu={(row) => row.kind !== "bill" ? <></> /* #331: "Open the claim" lands on step 3 */ : <>
         <PaneMenuItem onClick={() => router.push(withOrigin(`/workspaces/${workspaceId}/invoices/${row.bill.documentId}`, window.location.pathname + window.location.search))}>
           <ExternalLink className="mr-2 h-4 w-4 text-slate-500" aria-hidden />Open on Invoices
         </PaneMenuItem>
       </>} />
 
-    <CreateBatchDialog open={batching !== null} onClose={() => setBatching(null)} rows={batching ? selectedRows(batching) : []}
+    <CreateBatchDialog open={batching !== null} onClose={() => setBatching(null)} rows={batching ? selectedRows(batching).filter((row): row is BillPayBillRow => row.kind === "bill") : []}
       suggestedName={suggestedBatchName} fallbackCurrency={fallbackCurrency} batchesHref={batchesHref} origin={origin}
       onCreate={(input) => createPaymentBatchesAction(workspaceId, input)}
       onCreated={() => router.refresh()} />
@@ -174,11 +205,11 @@ export function BillPayQueue({ workspaceId, basePath, rows, summary, payerAccoun
       title={`Mark ${markingPaid?.length === 1 ? "this invoice" : `${markingPaid?.length ?? 0} invoices`} as paid`}
       description="Records a payment on DocuBite's side for each invoice's amount to pay. The ledger isn't changed; the row reads “Paid (recorded)” until the ledger confirms. Reversal is “Remove payment records…” on the invoice, with a reason."
       submitLabel="Record payment"
-      recap={markingPaid && <MarkPaidRecap rows={selectedRows(markingPaid)} money={money} />}
+      recap={markingPaid && <MarkPaidRecap rows={selectedRows(markingPaid).filter((row): row is BillPayBillRow => row.kind === "bill")} money={money} />}
       onSubmit={async (input) => {
-        const ids = (markingPaid ?? []).filter((id) => rowsById.get(id)?.bill.paidState.state !== "scheduled")
+        const ids = (markingPaid ?? []).filter((id) => { const row = rowsById.get(id); return row?.kind === "bill" && row.bill.paidState.state !== "scheduled" })
         const result = await markInvoicesPaidAction(workspaceId, { documentIds: ids, ...input })
-        if (result.success && result.data) { setPaidReceipt({ ...result.data, rows: new Map(selectedRows(markingPaid ?? []).map((row) => [row.bill.documentId, row])) }); router.refresh() }
+        if (result.success && result.data) { setPaidReceipt({ ...result.data, rows: new Map(selectedRows(markingPaid ?? []).filter((row): row is BillPayBillRow => row.kind === "bill").map((row) => [row.bill.documentId, row])) }); router.refresh() }
         return result
       }} />
 
@@ -219,7 +250,7 @@ export function BillPayQueue({ workspaceId, basePath, rows, summary, payerAccoun
   </>
 }
 
-function MarkPaidRecap({ rows, money }: { rows: BillPayRow[]; money: (value: number, currency: string | null) => string }) {
+function MarkPaidRecap({ rows, money }: { rows: BillPayBillRow[]; money: (value: number, currency: string | null) => string }) {
   const scheduled = rows.filter((row) => row.bill.paidState.state === "scheduled")
   const payable = rows.filter((row) => row.bill.paidState.state !== "scheduled")
   return <div className="space-y-2">

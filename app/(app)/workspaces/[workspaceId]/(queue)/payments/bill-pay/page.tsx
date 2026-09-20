@@ -1,14 +1,14 @@
 import { getCurrentUser } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { requireWorkspaceRole } from "@/models/workspaces"
-import { listBillPay, type BillPayFacet, type BillPayBillRow } from "@/models/bill-pay"
+import { listBillPay, type BillPayFacet } from "@/models/bill-pay"
 import { suggestBatchName } from "@/lib/payments/batch-split"
 import type { AgingBucket } from "@/lib/bills/due-date"
 import { BillPayQueue } from "@/components/payments/bill-pay-queue"
 
 export const dynamic = "force-dynamic"
 
-export type BillPaySearchParams = { status?: string; discount?: string; aging?: string; sort?: string }
+export type BillPaySearchParams = { status?: string; discount?: string; aging?: string; sort?: string; payeeKind?: string }
 
 /** #229 / #251: Bill Pay on the Queue screen — Approved, unpaid invoices ready to batch. Filters
  * are plain URL params; the aging band's buckets write the same `aging` param the chip reads. */
@@ -18,7 +18,7 @@ export async function BillPayQueuePage({ params, searchParams, selectedDocumentI
   selectedDocumentId?: string | null
 }) {
   const { workspaceId } = await params
-  const { status, discount, aging } = await searchParams
+  const { status, discount, aging, payeeKind } = await searchParams
   const user = await getCurrentUser()
   const membership = await requireWorkspaceRole(workspaceId, user.id)
   const facet: BillPayFacet | undefined = status === "ready" || status === "scheduled" || status === "needs_bank_details" ? status : discount === "1" ? "discount" : undefined
@@ -29,11 +29,11 @@ export async function BillPayQueuePage({ params, searchParams, selectedDocumentI
     prisma.workspace.findFirst({ where: { id: workspaceId }, select: { baseCurrency: true } }),
     prisma.paymentRun.findMany({ where: { workspaceId, createdAt: { gte: new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000) } }, select: { name: true } }),
   ])
-  // #295: listBillPay now also returns claim rows; the Bill Pay queue only renders bills until
-  // #331 (Build claim rows in Bill Pay) adds the claim-row UI.
-  let rows = result.rows.filter((row): row is BillPayBillRow => row.kind === "bill")
-  if (discount === "1" && facet !== "discount") rows = rows.filter((row) => row.discount !== null)
-  if (agingFilter.size > 0) rows = rows.filter((row) => agingFilter.has(row.bill.agingBucket ?? "none"))
+  let rows = result.rows
+  if (discount === "1" && facet !== "discount") rows = rows.filter((row) => row.kind === "bill" && row.discount !== null)
+  if (agingFilter.size > 0) rows = rows.filter((row) => row.kind === "bill" && agingFilter.has(row.bill.agingBucket ?? "none"))
+  if (payeeKind === "supplier") rows = rows.filter((row) => row.kind === "bill")
+  if (payeeKind === "claimant") rows = rows.filter((row) => row.kind === "claim")
 
   return <BillPayQueue
     workspaceId={workspaceId}
