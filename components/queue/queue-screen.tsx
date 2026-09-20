@@ -13,6 +13,7 @@ import { OverrideModeProvider, useOverrideMode } from "@/components/queue/overri
 import { OriginStrip } from "@/components/queue/origin-strip"
 import { QueueCard, joinSegments } from "@/components/queue/queue-card"
 import { QueueEmpty } from "@/components/queue/queue-empty"
+import { QueueRowSkeleton } from "@/components/queue/queue-loading"
 import { withOrigin, type Origin } from "@/lib/navigation/origin"
 import { emptyQueueState } from "@/lib/queue/empty-state"
 import { clearFilterParams } from "@/lib/queue/filters"
@@ -123,6 +124,15 @@ export type QueueScreenProps<T> = {
   /** #286: one free-text filter on the facet row (≥ md) and in the Filter sheet (< md), read and
    * written on `param`; `filterRows` does the matching. Clear filters clears it too. */
   search?: { param: string; label: string }
+  /** #270: params outside `facets`/`search` that still count as "filtered" for the empty-state
+   * choice (done vs. filtered) — Search's own `q` box, kept as local state rather than the shell's
+   * `search` slot (that slot is Search's Supplier facet). Cleared independently of `q` by the
+   * caller's own "Clear search" action, so not part of `clearFilterParams`'s extraParams. */
+  extraFilterParams?: string[]
+  /** #270 spec §3 "Slow": true while a caller's own fetch (Search's debounced `searchListAction`)
+   * has been open ≥ 300ms — swaps the row area for `QueueRowSkeleton`, header/facets stay put.
+   * Every other queue leaves this unset; their loading state is the route's `loading.tsx`. */
+  loadingRows?: boolean
   /** #229 Q8 (#251): one metric band above header row 1 — Bill Pay's *Open invoices by age*.
    * The one documented exception to #225's "no band": aging is the payer's question and lives
    * where the payer works. Absent everywhere else. */
@@ -204,7 +214,7 @@ const INTERACTIVE = "a, button, input, select, textarea, label, [role=button], [
 
 function QueueScreenInner<T>({
   title, basePath, rows, rowId, detailIdFor, rowName, paneStatus, fullHref, archivedToast, leading, columns: rawColumns, fieldTable = null, selectable = false, sortOptions = [], facets = [],
-  views, viewsPhone, stat, primaryAction, addAction, dropZone, overrideMode: overrideModeEnabled = true, search, band, connectionBand, menu, onExportAll, bulkActions, empty, workspaceDocumentCount = 0, loadDetail, paneActions, paneMenu, initialSelectedId = null, sortParam = "sort", cards, phoneReadOnly = false,
+  views, viewsPhone, stat, primaryAction, addAction, dropZone, overrideMode: overrideModeEnabled = true, search, extraFilterParams, loadingRows = false, band, connectionBand, menu, onExportAll, bulkActions, empty, workspaceDocumentCount = 0, loadDetail, paneActions, paneMenu, initialSelectedId = null, sortParam = "sort", cards, phoneReadOnly = false,
   filterRows, pinned = null, initialMissing, onOpenChange, origin = null, onControls,
 }: QueueScreenProps<T>) {
   const router = useRouter()
@@ -329,6 +339,7 @@ function QueueScreenInner<T>({
   }, [ids, openId, focusRow])
   const extraParams = useMemo(() => (search ? [search.param] : []), [search])
   const filtered = facets.some((facet) => searchParams.get(facet.param)) || extraParams.some((param) => (searchParams.get(param) ?? "").trim() !== "")
+    || (extraFilterParams ?? []).some((param) => (searchParams.get(param) ?? "").trim() !== "")
   // #286: the search input writes its param on a short debounce (replace, not push — typing is
   // not history). Local state keeps the keystrokes; the URL is the truth the list filters on.
   const [searchDraft, setSearchDraft] = useState(() => (search ? searchParams.get(search.param) ?? "" : ""))
@@ -625,7 +636,9 @@ function QueueScreenInner<T>({
           Drop to add {dropZone.type}
         </div>}
         {phoneReadOnly && <p className={`px-4 py-2 text-[13px] text-slate-600 ${below ? below.hideAbove : "lg:hidden"}`}>Full view on desktop — this list is read-only on a phone.</p>}
-        {sortedRows.length === 0
+        {loadingRows
+          ? <QueueRowSkeleton label={`Searching ${title.toLowerCase()}`} />
+          : sortedRows.length === 0
           ? <QueueEmpty
             state={emptyQueueState({ workspaceDocumentCount, rowCount: sortedRows.length, filtered, hasFirstUse: !!empty.firstUse }) ?? "done"}
             firstUse={empty.firstUse} done={empty.done}

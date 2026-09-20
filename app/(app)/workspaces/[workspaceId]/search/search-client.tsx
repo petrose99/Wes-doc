@@ -10,12 +10,13 @@ import { statusFacet } from "@/lib/queue/filters"
 import { DOC_TYPES, DOC_TYPE_SPECS } from "@/lib/doc-types"
 import { TYPED_DESTINATIONS } from "@/lib/typed-destinations"
 import { documentDestinationPath, withOrigin } from "@/lib/navigation/origin"
-import { formatDate, formatMoney, StatePills } from "@/components/queue/row-cells"
+import { formatDate, formatMoney, StatePills, ArchivedMark } from "@/components/queue/row-cells"
+import { clearFilterParams } from "@/lib/queue/filters"
 import { Badge } from "@/components/ui/badge"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Check, CircleHelp, Search } from "lucide-react"
 import { useEffect, useRef, useState, useTransition } from "react"
-import { usePathname, useSearchParams } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 
 const SYNTAX_EXAMPLES = ["vendor:acme", "amount>1000", "date:2026-01..2026-02", "type:receipt", "status:closed"]
 
@@ -49,9 +50,14 @@ export function SearchPageClient({ workspaceId, initialQuery }: {
   const [query, setQuery] = useState(initialQuery)
   const [rows, setRows] = useState<SearchRow[]>([])
   const [searching, startSearch] = useTransition()
+  // #270 spec §3 "Slow": the skeleton only shows once a request has been open ≥ 300ms, not on
+  // every keystroke's debounce — a fast reply never flashes it.
+  const [slow, setSlow] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const slowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const searchParams = useSearchParams()
   const pathname = usePathname()
+  const router = useRouter()
   // #270 spec §1: the full current URL (q, active facets, page, selected `doc=`) so "Open on
   // ‹Queue›" round-trips back to the same scroll position (#244's contract) via `withOrigin`.
   const hereQuery = searchParams.toString()
@@ -72,9 +78,19 @@ export function SearchPageClient({ workspaceId, initialQuery }: {
     const supplier = searchParams.get("supplier") ?? undefined
     if (timerRef.current) clearTimeout(timerRef.current)
     timerRef.current = setTimeout(() => {
+      // #270: `q` is bookmarkable/shareable like every other facet, and its presence has to reach
+      // `extraFilterParams` below so a text-only zero-result gets the "filtered" copy, not "done".
+      const next = new URLSearchParams(window.location.search)
+      if (query.trim() === "") next.delete("q"); else next.set("q", query)
+      const qs = next.toString()
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+      if (slowTimerRef.current) clearTimeout(slowTimerRef.current)
+      slowTimerRef.current = setTimeout(() => setSlow(true), 300)
       startSearch(async () => {
         const r = await searchListAction(workspaceId, { q: query, type, status, supplier })
         setRows(r.rows)
+        if (slowTimerRef.current) clearTimeout(slowTimerRef.current)
+        setSlow(false)
       })
     }, 300)
     return () => { if (timerRef.current) clearTimeout(timerRef.current) }
@@ -84,7 +100,7 @@ export function SearchPageClient({ workspaceId, initialQuery }: {
   const basePath = `/workspaces/${workspaceId}/search`
 
   const columns: QueueColumn<SearchRow>[] = [
-    { key: "state", label: "State", phone: "pill", render: (row) => <StatePills state={row.processingState} /> },
+    { key: "state", label: "State", phone: "pill", render: (row) => <StatePills state={row.processingState} trailing={row.archived ? <ArchivedMark /> : null} /> },
     { key: "type", label: "Type", phone: "pill", render: (row) => <Badge variant="outline">{row.typeLabel}</Badge> },
     { key: "supplier", label: "Supplier", narrow: true, className: "min-w-[12rem]", phone: "subtitle", render: (row) => row.supplier ?? "—" },
     { key: "number", label: "Number", className: "whitespace-nowrap text-slate-700", phone: "subtitle", render: (row) => row.number ?? "—" },
@@ -105,6 +121,23 @@ export function SearchPageClient({ workspaceId, initialQuery }: {
     return <PaneMenuItem href={withOrigin(target, here)}>Open on {label}</PaneMenuItem>
   }
 
+  // #270 spec §3 "Zero results": two distinct clears — Clear search only empties `q`, Clear
+  // filters only drops the facets (+ Supplier) via the shared `clearFilterParams` (B4), matching
+  // the copy table's split action pair rather than one bespoke button.
+  const clearSearch = () => {
+    setQuery("")
+    const next = new URLSearchParams(window.location.search)
+    next.delete("q")
+    const qs = next.toString()
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+  }
+  const clearFacetFilters = () => {
+    const next = clearFilterParams(searchParams, FACETS, "sort", ["supplier"])
+    const qs = next.toString()
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+  }
+  const CLEAR_BUTTON = "inline-flex h-8 items-center rounded-md border border-slate-300 bg-white px-3 text-xs font-medium text-slate-700 hover:bg-slate-50"
+
   return (
     <QueueScreen<SearchRow>
       title="Search"
@@ -116,6 +149,8 @@ export function SearchPageClient({ workspaceId, initialQuery }: {
       columns={columns}
       facets={FACETS}
       search={{ param: "supplier", label: "Supplier" }}
+      extraFilterParams={["q"]}
+      loadingRows={searching && slow}
       views={
         <div className="flex w-full max-w-xl flex-1 items-center gap-1.5">
           <span className="inline-flex h-9 min-w-0 flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 shadow-sm focus-within:border-emerald-300 focus-within:ring-2 focus-within:ring-emerald-100">
@@ -151,7 +186,22 @@ export function SearchPageClient({ workspaceId, initialQuery }: {
           </Popover>
         </div>
       }
-      empty={{ firstUse: { title: "Search your documents.", body: "Search by supplier, number, amount or any words on the page." } }}
+      empty={{
+        // #270 spec §3 "Empty query, no facets": renders whenever `filtered` is false (no `q`, no
+        // facet, no Supplier) — the chip-syntax hint under the box, shown every time this state is
+        // reached (not a one-shot dismiss), distinct from the persistent popover above.
+        done: {
+          title: "Search by supplier, number, amount or any words on the page.",
+          action: <p className="text-xs text-slate-500">
+            Try {SYNTAX_EXAMPLES.map((example, i) => <span key={example}>{i > 0 && " "}<code className="rounded bg-slate-100 px-1 py-0.5 font-mono">{example}</code></span>)}
+          </p>,
+        },
+        filteredTitle: query.trim() ? `Nothing matches "${query.trim()}".` : undefined,
+        filteredAction: <div className="flex items-center justify-center gap-2">
+          <button type="button" onClick={clearSearch} className={CLEAR_BUTTON}>Clear search</button>
+          <button type="button" onClick={clearFacetFilters} className={CLEAR_BUTTON}>Clear filters</button>
+        </div>,
+      }}
       loadDetail={(documentId) => getQueueDetailAction(workspaceId, documentId)}
       paneMenu={paneMenu}
     />

@@ -44,6 +44,13 @@ const LEDGER_PILL_TONE: Record<LedgerFact, string> = {
   paid: "bg-slate-100 text-slate-700",
 }
 
+/** #270 spec §3 "Archived row": the Closed mark, alongside the processing pill via `StatePills`'s
+ * `trailing` slot — spec §4 word is "Closed", never "Archive"/"Done" (#245 decision 11). Built
+ * once here so #344 reuses it on the five typed queues' Closed rows instead of five copies (B4). */
+export function ArchivedMark() {
+  return <span className={`${PILL} bg-slate-100 text-slate-600`}>Closed</span>
+}
+
 /** The row's state pill, one word from `PROCESSING_STATE_LABELS` — the one vocabulary #258 built
  * so the row, the pane's Status line, the stepper and the Approval tab always agree. `state` is
  * total (always one of the five keys), so there is no fallback branch. Ledger facts (Posting… /
