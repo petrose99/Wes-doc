@@ -163,7 +163,7 @@ export const AddDocumentsDialog = forwardRef<AddDocumentsDialogHandle, {
               {row.status === "uploading" && <Loader2 className="h-4 w-4 shrink-0 animate-spin text-slate-400" aria-label="Uploading" />}
               {row.status === "done" && <Check className="h-4 w-4 shrink-0 text-emerald-600" aria-label="Added" />}
               {row.status === "failed" && <>
-                <span className="shrink-0 text-xs text-red-600">{row.filename} — couldn&apos;t upload. Retry</span>
+                <span className="shrink-0 text-xs text-red-600">{row.filename} — {row.error || "couldn't upload"}</span>
                 <button type="button" className="shrink-0 text-xs font-medium text-emerald-700 hover:underline" onClick={() => void uploadAll()}>Retry</button>
               </>}
               {(row.status === "staged" || row.status === "failed") && <button type="button" aria-label={`Remove ${row.filename}`} className="shrink-0 rounded p-1 text-slate-400 hover:bg-slate-100" onClick={() => removeRow(row.localId)}><XIcon className="h-3.5 w-3.5" /></button>}
