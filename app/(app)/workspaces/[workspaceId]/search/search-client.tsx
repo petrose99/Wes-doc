@@ -3,15 +3,26 @@
 import { searchListAction } from "@/app/(app)/workspaces/[workspaceId]/search-actions"
 import { getQueueDetailAction } from "@/app/(app)/workspaces/[workspaceId]/queue-actions"
 import type { SearchRow } from "@/models/search"
-import { QueueScreen, type QueueColumn } from "@/components/queue/queue-screen"
+import { QueueScreen, type QueueColumn, type PaneHelpers } from "@/components/queue/queue-screen"
+import { PaneMenuItem } from "@/components/queue/detail-pane"
 import type { Facet } from "@/components/queue/facet-filters"
 import { statusFacet } from "@/lib/queue/filters"
 import { DOC_TYPES, DOC_TYPE_SPECS } from "@/lib/doc-types"
+import { TYPED_DESTINATIONS } from "@/lib/typed-destinations"
+import { documentDestinationPath, withOrigin } from "@/lib/navigation/origin"
 import { formatDate, formatMoney, StatePills } from "@/components/queue/row-cells"
 import { Badge } from "@/components/ui/badge"
-import { Check, Search } from "lucide-react"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Check, CircleHelp, Search } from "lucide-react"
 import { useEffect, useRef, useState, useTransition } from "react"
-import { useSearchParams } from "next/navigation"
+import { usePathname, useSearchParams } from "next/navigation"
+
+const SYNTAX_EXAMPLES = ["vendor:acme", "amount>1000", "date:2026-01..2026-02", "type:receipt", "status:closed"]
+
+/** Every typed doc type's queue segment, keyed for the row/pane "Open on ‹Queue›" link — the
+ * five secondary types (contract, delivery note, payslip, tax form, other) have no other list,
+ * so they get no entry here and no link (spec §1). */
+const TYPED_DOCTYPE_LABELS = new Map(TYPED_DESTINATIONS.map((d) => [d.docType as string, d.label]))
 
 const TYPE_FACET: Facet = {
   param: "type",
@@ -40,6 +51,11 @@ export function SearchPageClient({ workspaceId, initialQuery }: {
   const [searching, startSearch] = useTransition()
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const searchParams = useSearchParams()
+  const pathname = usePathname()
+  // #270 spec §1: the full current URL (q, active facets, page, selected `doc=`) so "Open on
+  // ‹Queue›" round-trips back to the same scroll position (#244's contract) via `withOrigin`.
+  const hereQuery = searchParams.toString()
+  const here = hereQuery ? `${pathname}?${hereQuery}` : pathname
 
   // #262: arrival from the `/` shortcut — the input already autofocuses on mount, this only
   // matters when the operator was already on this page and pressed `/` again.
@@ -80,6 +96,15 @@ export function SearchPageClient({ workspaceId, initialQuery }: {
     },
   ]
 
+  // #270 spec §1: secondary-type documents (contract, delivery note, payslip, tax form, other)
+  // have no other list — the pane is their only viewer, so no menu item renders for them.
+  const paneMenu = (row: SearchRow, _helpers: PaneHelpers) => {
+    const label = TYPED_DOCTYPE_LABELS.get(row.docType)
+    if (!label) return null
+    const target = documentDestinationPath(`/workspaces/${workspaceId}`, { id: row.documentId, docType: row.docType })
+    return <PaneMenuItem href={withOrigin(target, here)}>Open on {label}</PaneMenuItem>
+  }
+
   return (
     <QueueScreen<SearchRow>
       title="Search"
@@ -92,23 +117,43 @@ export function SearchPageClient({ workspaceId, initialQuery }: {
       facets={FACETS}
       search={{ param: "supplier", label: "Supplier" }}
       views={
-        <span className="inline-flex h-9 w-full max-w-xl flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 shadow-sm focus-within:border-emerald-300 focus-within:ring-2 focus-within:ring-emerald-100">
-          <Search className="h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
-          <label htmlFor="search-input" className="sr-only">Search documents</label>
-          <input
-            id="search-input"
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by supplier, number, amount or any words on the page"
-            className="flex-1 bg-transparent text-sm outline-none"
-            autoFocus
-          />
-          {searching && <span className="sr-only" role="status">Searching…</span>}
-        </span>
+        <div className="flex w-full max-w-xl flex-1 items-center gap-1.5">
+          <span className="inline-flex h-9 min-w-0 flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 shadow-sm focus-within:border-emerald-300 focus-within:ring-2 focus-within:ring-emerald-100">
+            <Search className="h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
+            <label htmlFor="search-input" className="sr-only">Search documents</label>
+            <input
+              id="search-input"
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search by supplier, number, amount or any words on the page"
+              className="flex-1 bg-transparent text-sm outline-none"
+              autoFocus
+            />
+            {searching && <span className="sr-only" role="status">Searching…</span>}
+          </span>
+          {/* #270 spec §2a (critic H6/H10): the chip-syntax hint is recallable, not a one-shot
+             toast — the inline under-box hint on the empty state shows once, this popover reopens
+             the same four examples every time. */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <button type="button" aria-label="Search syntax" title="Search syntax"
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600">
+                <CircleHelp className="h-4 w-4" aria-hidden />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-72 text-sm">
+              <p className="mb-2 font-medium text-slate-900">Search syntax</p>
+              <ul className="space-y-1 text-slate-600">
+                {SYNTAX_EXAMPLES.map((example) => <li key={example}><code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-xs">{example}</code></li>)}
+              </ul>
+            </PopoverContent>
+          </Popover>
+        </div>
       }
       empty={{ firstUse: { title: "Search your documents.", body: "Search by supplier, number, amount or any words on the page." } }}
       loadDetail={(documentId) => getQueueDetailAction(workspaceId, documentId)}
+      paneMenu={paneMenu}
     />
   )
 }
