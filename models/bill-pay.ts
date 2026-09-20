@@ -195,7 +195,7 @@ async function listClaimRows(workspaceId: string): Promise<BillPayClaimRow[]> {
   return claims.map((claim) => {
     const total = decimalToNumber(claim.total)
     const member = claim.submitterId ? memberByUser.get(claim.submitterId) : undefined
-    const eligibility = claimEligibility({ total, currencyCode: claim.currencyCode, submitterId: claim.submitterId, member })
+    const eligibility = claimPaymentEligibility({ total, currencyCode: claim.currencyCode, submitterId: claim.submitterId, member })
     const paidFacts = paidFactsByClaim.get(claim.id)!
     return {
       kind: "claim",
@@ -206,7 +206,11 @@ async function listClaimRows(workspaceId: string): Promise<BillPayClaimRow[]> {
   })
 }
 
-function claimEligibility(input: { total: number | null; currencyCode: string | null; submitterId: string | null; member: { bankName: string | null; bankAccountNumber: string | null; bankBranchCode: string | null } | undefined }): ClaimEligibility {
+/** Exported as `claimPaymentEligibility` — `models/expense-claims.ts`'s `buildClaimFacts` reuses
+ * it (#331 close) so the claim-card's own-pane status line and this row never disagree about
+ * whether a claim is actually payable; `lib/claims/eligibility.ts`'s `claimEligibility` is an
+ * unrelated check (receipt→claim add-eligibility), hence the distinct export name here. */
+export function claimPaymentEligibility(input: { total: number | null; currencyCode: string | null; submitterId: string | null; member: { bankName: string | null; bankAccountNumber: string | null; bankBranchCode: string | null } | undefined }): ClaimEligibility {
   if (!input.submitterId || !input.member) return { eligible: false, reason: "left_workspace" }
   if (input.currencyCode === null) return { eligible: false, reason: "needs_currency" }
   if (input.total === null) return { eligible: false, reason: "needs_currency" }

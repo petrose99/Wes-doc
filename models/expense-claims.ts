@@ -5,7 +5,7 @@ import { canDecideStage, decideStage, findCurrentStage, toWorkflowStageInputs } 
 import { auditEventData, getRequestAuditContext } from "@/lib/audit"
 import { claimEligibility, type ClaimEligibility, type ClaimEligibilityReason } from "@/lib/claims/eligibility"
 import { claimName } from "@/lib/claims/labels"
-import { loadClaimPaidFacts } from "@/models/bill-pay"
+import { loadClaimPaidFacts, claimPaymentEligibility } from "@/models/bill-pay"
 import type { DocumentClaimFacts, DocumentClaimView, DraftClaimOption, AddToClaimResult, ClaimReceipt } from "@/lib/claims/facts"
 import type { ApprovalActor, ApprovalStageInfo } from "@/models/approvals"
 import { getDefaultApprovalFlow } from "@/models/approval-defaults"
@@ -492,7 +492,15 @@ async function buildClaimFacts(claim: LoadedClaim, actor: ApprovalActor): Promis
   const frozen = claim.status !== "draft" && claim.total != null
   const total = frozen ? Number(claim.total) : live.total
   const currencyCode = frozen ? claim.currencyCode : live.currencyCode
-  const paidFacts = claim.status === "approved" ? (await loadClaimPaidFacts(claim.workspaceId, [{ id: claim.id, total }])).get(claim.id) : undefined
+  const [paidFacts, submitterMember] = await Promise.all([
+    claim.status === "approved" ? loadClaimPaidFacts(claim.workspaceId, [{ id: claim.id, total }]).then((m) => m.get(claim.id)) : undefined,
+    claim.status === "approved" && claim.submitterId
+      ? prisma.workspaceMember.findUnique({ where: { workspaceId_userId: { workspaceId: claim.workspaceId, userId: claim.submitterId } }, select: { bankName: true, bankAccountNumber: true, bankBranchCode: true } })
+      : null,
+  ])
+  const paymentEligibility = claim.status === "approved"
+    ? claimPaymentEligibility({ total, currencyCode, submitterId: claim.submitterId, member: submitterMember ?? undefined })
+    : null
 
   const decisions = events.filter((e) => e.type === "expense_claim_stage_decided").map((e) => {
     const d = (e.detail ?? {}) as Record<string, unknown>
@@ -545,6 +553,7 @@ async function buildClaimFacts(claim: LoadedClaim, actor: ApprovalActor): Promis
     paidAt: paidFacts?.paidAt?.toISOString() ?? null,
     paidBy: paidFacts?.paidBy ?? null,
     scheduledBatch: paidFacts?.scheduledBatch ? { id: paidFacts.scheduledBatch.id, name: paidFacts.scheduledBatch.name } : null,
+    paymentEligibility,
     deletedReceiptCount: auditItemCount !== null ? Math.max(0, auditItemCount - receipts.length) : 0,
     receipts,
     decisions,

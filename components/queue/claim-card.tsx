@@ -14,6 +14,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import type { ClaimEligibility } from "@/lib/claims/eligibility"
 import type { DocumentClaimFacts } from "@/lib/claims/facts"
 import { CLAIM_STATUS_LABELS, ELIGIBILITY_REASON_TEXT } from "@/lib/claims/labels"
+import { CLAIM_ELIGIBILITY_COPY } from "@/lib/payments/eligibility"
 import { useOnlineStatus } from "@/lib/client/use-online-status"
 import { formatMoney } from "@/lib/money"
 import Link from "next/link"
@@ -165,7 +166,7 @@ export function ClaimSection({ workspaceId, documentId, facts, eligibility, read
 
     {facts.status === "approved" && facts.approval && facts.paidState === "paid" && facts.paidAt && <p className="text-sm text-emerald-800" role="status">In an approved claim · Paid {formatDate(facts.paidAt)}</p>}
     {facts.status === "approved" && facts.approval && facts.paidState === "scheduled" && <p className="text-sm text-emerald-800" role="status">Approved {formatDate(facts.approval.at)} by {facts.approval.by} · Scheduled · <Link href={`/workspaces/${workspaceId}/payments/batches/${facts.scheduledBatch?.id ?? ""}`} className="underline underline-offset-2">{facts.scheduledBatch?.name ?? "batch"}</Link></p>}
-    {facts.status === "approved" && facts.approval && facts.paidState === "unpaid" && <p className="text-sm text-emerald-800" role="status">Approved {formatDate(facts.approval.at)} by {facts.approval.by} · Ready to pay</p>}
+    {facts.status === "approved" && facts.approval && facts.paidState === "unpaid" && <p className={`text-sm ${facts.paymentEligibility?.eligible === false ? "text-amber-800" : "text-emerald-800"}`} role="status">Approved {formatDate(facts.approval.at)} by {facts.approval.by} · {facts.paymentEligibility?.eligible === false ? CLAIM_ELIGIBILITY_COPY[facts.paymentEligibility.reason] : "Ready to pay"}</p>}
     {facts.status === "rejected" && facts.rejection && <p className="text-sm text-red-800" role="status">Rejected {formatDate(facts.rejection.at)} by {facts.rejection.by}{facts.rejection.reason ? `: ${facts.rejection.reason}` : ""}</p>}
     {facts.deletedReceiptCount > 0 && <p className="text-xs text-slate-600">{facts.deletedReceiptCount} receipt{facts.deletedReceiptCount === 1 ? " was" : "s were"} deleted after submission. The amount is as submitted.</p>}
     {facts.status === "draft" && !draftEditable && <p className="text-sm text-slate-600">{facts.claimant.name}&rsquo;s draft — only they or an owner can change it.</p>}

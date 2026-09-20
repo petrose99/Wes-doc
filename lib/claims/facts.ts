@@ -2,6 +2,7 @@
 // pane (S4) show about a claim. Built by models/expense-claims.ts `buildClaimFacts`; never
 // imported from a model here (components import this file, not the model).
 import type { ClaimEligibility } from "@/lib/claims/eligibility"
+import type { ClaimEligibility as ClaimPaymentEligibility } from "@/lib/payments/eligibility"
 
 export type ClaimStatus = "draft" | "submitted" | "approved" | "rejected"
 
@@ -48,6 +49,11 @@ export type DocumentClaimFacts = {
   paidBy: string | null
   /** Only set when `paidState === "scheduled"` — same shape as `BillPayClaimRow.scheduledBatch`. */
   scheduledBatch: { id: string; name: string | null } | null
+  /** #331 close: same `claimPaymentEligibility` check `BillPayClaimRow.eligibility` runs — lets
+   * the claim-card status line say *why* an unpaid approved claim isn't ready (e.g. "Needs bank
+   * details") instead of a blanket "Ready to pay" that contradicts the row/Add-bank-details CTA.
+   * Only meaningful once `status === "approved" && paidState === "unpaid"`. */
+  paymentEligibility: ClaimPaymentEligibility | null
   deletedReceiptCount: number
   receipts: ClaimReceipt[]
   decisions: ClaimDecision[]
