@@ -9,6 +9,7 @@ import { recordDocumentAudit } from "@/lib/audit"
 import config from "@/lib/config"
 import { JurisdictionRequiredError } from "@/lib/jurisdictions/require"
 import { DOC_TYPE_SPECS, isDocType } from "@/lib/doc-types"
+import { describeMoveIneligibility } from "@/lib/reclassify"
 import { processDocumentJob } from "@/lib/document-processing"
 import { sampleDocumentPages } from "@/lib/document-suggest"
 import { DocumentFieldDefinition, documentTemplateFieldsSchema, parseTemplateFields } from "@/lib/document-templates"
@@ -212,9 +213,13 @@ export async function reclassifyDocumentAction(workspaceId: string, documentId: 
   if (!(await requireMember(workspaceId, user.id))) return { success: false, error: NO_ACCESS }
   const document = await prisma.document.findFirst({
     where: { id: documentId, workspaceId },
-    select: { id: true, fileId: true, codingData: true },
+    select: { id: true, fileId: true, codingData: true, docType: true },
   })
   if (!document) return { success: false, error: "Document not found" }
+  if (document.docType) {
+    const ineligibleReason = await describeMoveIneligibility(workspaceId, documentId, document.docType)
+    if (ineligibleReason) return { success: false, error: ineligibleReason }
+  }
   const prev = (document.codingData as Record<string, unknown> | null) ?? {}
   const spec = DOC_TYPE_SPECS[docType]
   await prisma.document.update({
@@ -223,6 +228,10 @@ export async function reclassifyDocumentAction(workspaceId: string, documentId: 
       docType,
       codingData: { ...prev, documentType: spec.defaultCategory, documentTypeSource: "human", categoryConfirmed: true } as Prisma.InputJsonValue,
     },
+  })
+  await recordDocumentAudit({
+    workspaceId, documentId, actorId: user.id, type: "document_reclassified",
+    detail: { fromType: document.docType, toType: docType },
   })
   revalidatePath(`${paths(workspaceId).documents}/${documentId}`)
   return { success: true, data: null }
