@@ -10,8 +10,10 @@ reused component by the symbols you call (grep, then a bounded range). Build
 it from the tables, every state the step covers, with the detector hook
 fixing findings as they appear. Run its check and the affected tests
 (`vitest <paths>`; never the full suite here). Mark the step `done` on the
-hand-off, commit (`wip(autopilot): #<ticket> build step N`), and stop — the
-next step is the next session's, in a fresh context.
+hand-off — flip `todo` to `done` on the step line, update `## Next step`,
+and nothing else (no notes under the step; what you verified goes in the
+commit message) — commit (`wip(autopilot): #<ticket> build step N`), and
+stop — the next step is the next session's, in a fresh context.
 
 **Ponytail's ladder governs the code, the spec governs the scope.** The
 session starts with the ponytail ruleset (YAGNI, reuse before write, one

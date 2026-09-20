@@ -18,7 +18,7 @@
 [ -n "${WAYFINDER_CTX_FILE:-}" ] || exit 0
 IN="$(cat)"
 python3 - "$IN" <<'PY'
-import json, os, sys, subprocess
+import json, os, re, sys, subprocess
 d = json.loads(sys.argv[1]); tool = d.get("tool_name"); inp = d.get("tool_input") or {}
 ctx = os.environ.get("WAYFINDER_CTX_FILE", "")
 hand = os.environ.get("WAYFINDER_HANDOFF_FILE", "")
@@ -32,9 +32,22 @@ def is_router(p): return "skills/intent/SKILL.md" in p or "skills/intent/intent/
 def spec_done():
     try: return "milestone: spec-done" in open(hand).read()
     except Exception: return False
+# Hand-off size gate. The brief promised "the hook refuses 120" but the old
+# guard only nagged once per session and the nag was ignored: on #297 the
+# file grew to 247 lines, re-read whole by every later session. Now a commit
+# (and a Write/Edit of the file itself) is refused while the hand-off is over
+# WAYFINDER_HANDOFF_MAX_LINES, so the session must rewrite it as state first.
+def handoff_lines(text=None):
+    try: return (text if text is not None else open(hand).read()).count("\n") + 1
+    except Exception: return 0
+hmax = int(os.environ.get("WAYFINDER_HANDOFF_MAX_LINES", "80"))
+def too_long(n): return f"HAND-OFF TOO LONG: {hand} would be {n} lines (limit {hmax}). It is a state file, not a log: keep the `milestone:` lines, the `step:` plan (a done step is one line, no notes under it), an Artifacts list of paths, Open findings as a pointer to <scratch>/close.md, and the exact next step. Delete every '(this session)' / '## G2 notes' narrative; move anything worth keeping into a file in the scratch folder and link it. Then retry."
 if tool == "Bash":
     c = inp.get("command", "")
     if is_router(c): deny(ROUTER)
+    if hand and re.search(r"\bgit\b[^|;&]*\bcommit\b", c):
+        n = handoff_lines()
+        if n > hmax: deny(too_long(n))
     if "impeccable/reference/routing.md" in c: deny(MENU)
     if cont and "impeccable/reference/shape.md" in c and spec_done():
         deny("CONTINUATION: `impeccable shape` is the pre-build sub-command and the spec phase already ran it. Read craft-floor.md by range and the sub-command this phase needs (polish, critique, audit, clarify, adapt).")
@@ -63,6 +76,15 @@ if tool == "Read":
         mx = int(os.environ.get("WAYFINDER_READ_MAX_LINES", "220"))
         if lines > mx:
             deny(f"READ BY RANGE: {os.path.basename(p)} is {lines} lines. Whole-file reads are the largest avoidable cost in these sessions (each is re-read on every later turn). Run `grep -n <symbol|heading> {p}` first, then Read with offset+limit for just the lines you need (or `sed -n a,bp`). Files under {mx} lines may be read whole.")
+    sys.exit(0)
+if tool in ("Write", "Edit") and hand and os.path.abspath(inp.get("file_path", "")) == os.path.abspath(hand):
+    if tool == "Write": n = handoff_lines(inp.get("content", ""))
+    else:
+        try:
+            cur = open(hand).read(); o = inp.get("old_string", ""); r = inp.get("new_string", "")
+            n = handoff_lines(cur.replace(o, r) if inp.get("replace_all") else cur.replace(o, r, 1))
+        except Exception: n = 0
+    if n > hmax: deny(too_long(n))
     sys.exit(0)
 if tool == "Skill":
     s = (inp.get("skill") or "").strip(); a = (inp.get("args") or "").strip()

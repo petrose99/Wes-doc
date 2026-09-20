@@ -98,11 +98,17 @@ phase's sizing step, before any code. **Keep the hand-off file current at
 every milestone** and commit WIP with it (`wip(autopilot): #<ticket>
 <milestone>`), so a hard cap loses nothing.
 
-**The hand-off is pointers, under ~80 lines** (the hook refuses 120):
-`milestone:` lines, the exact next step, and paths — spec, pre-flight,
-plan, captures, scores, `close.md`. Narrative, per-session history and
-finding lists live in the scratch folder's files, never here: every session
-re-reads this file whole. A continuation session reads it first and does
+**The hand-off is a state file, not a log — under 80 lines, and the hook
+refuses a `git commit` (or a Write/Edit of the file) while it is longer.**
+It is *rewritten* at every milestone, never appended to. Its whole shape:
+`milestone:` lines; the `step:` plan, where a `done` step is one line with
+nothing under it; `## Artifacts` — paths only (spec, pre-flight, round
+script, captures, scores, `close.md`); `## Open findings` — a pointer to
+the scratch file that holds them; `## Next step` — one exact sentence.
+No "(this session)" sections, no per-step notes, no verification prose:
+what a step found or fixed goes into the commit message or a scratch file
+it links. Every session re-reads this file whole, so a line here is paid
+on every later session. A continuation session reads it first and does
 not redo what it records as done.
 
 **You do the work in this session. Never hand it to a background agent.**
