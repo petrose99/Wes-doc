@@ -92,6 +92,11 @@ def closing_bar(c):
     deny(f"CLOSING BAR: ticket #{t} changed rendered files ({', '.join(ui[:5])}{' …' if len(ui) > 5 else ''}), so it closes only at the bar: the report {rep} needs a `scores:` line with integer close-critique >= 30 (every heuristic >= 3) and close-evaluate >= 80, produced by the critique/evaluate readers on a capture round with the in-page detector cleared. Found: {line.strip() or 'no scores: line'}. Run phases/measure.md then close.md (a small ticket does both in this session), write the line, then close — or hand off with `Autopilot: continue —`.")
 if tool == "Bash":
     c = inp.get("command", "")
+    # A background command plus "I'll wait for the notification" ends a
+    # headless session (#266 session 26 lost a capture round this way; #253
+    # before it). Run it in the foreground with a timeout instead.
+    if inp.get("run_in_background"):
+        deny("NO BACKGROUND COMMANDS: a headless session ends the moment a turn has no tool call, and everything it started dies with it. Run this in the foreground (`timeout` up to 600000 ms) and read its result in the same turn; a long capture round is one foreground call, not a wait.")
     if is_router(c): deny(ROUTER)
     closing_bar(c)
     if hand and re.search(r"\bgit\b[^|;&]*\bcommit\b", c):
