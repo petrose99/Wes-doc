@@ -96,10 +96,16 @@ export function ConfirmDialog({ open, title, description, confirmLabel = "Confir
       if (event.shiftKey && (active === first || !container.contains(active))) { event.preventDefault(); last.focus() }
       else if (!event.shiftKey && active === last) { event.preventDefault(); first.focus() }
     }
-    window.addEventListener("keydown", onKey)
+    // #327: a dialog opened *by* an Escape keypress (QueueScreen's pane guard) mounts this
+    // effect while that same native keydown is still bubbling — document is behind window in
+    // the propagation path, so attaching straight away caught the tail of the opener's own
+    // keystroke and closed the dialog it had just opened. One tick's delay puts the listener
+    // in place only for the *next* keydown, matching a bare click-to-open dialog unaffected.
+    const timer = window.setTimeout(() => window.addEventListener("keydown", onKey))
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = "hidden"
     return () => {
+      window.clearTimeout(timer)
       window.removeEventListener("keydown", onKey)
       document.body.style.overflow = previousOverflow
       if (openerRef.current instanceof HTMLElement) openerRef.current.focus()
