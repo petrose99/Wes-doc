@@ -64,6 +64,7 @@ export default async function AccountPage({ params }: { params: Promise<{ worksp
     <Panel title="Also in this company" note="The rest of what this company holds.">
       <ul className="divide-y divide-hairline-soft">
         {[
+          { label: "Search", href: `/workspaces/${workspaceId}/search` },
           { label: "Purchase Orders", href: `/workspaces/${workspaceId}/purchase-orders` },
           { label: "Receipts", href: `/workspaces/${workspaceId}/receipts` },
           { label: "Bank Statements", href: `/workspaces/${workspaceId}/bank-statements` },
