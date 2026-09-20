@@ -9,8 +9,10 @@ import { formatPaymentDate, formatPaymentMoney } from "@/components/payments/for
 import { splitBatchName, splitIntoBatches } from "@/lib/payments/batch-split"
 import { ELIGIBILITY_COPY } from "@/lib/payments/eligibility"
 import { payerAccountLabel } from "@/lib/payments/payer-account-label"
+import { describeBatchCounts } from "@/lib/payments/batch-counts"
 import { withOrigin } from "@/lib/navigation/origin"
-import type { BillPayBillRow as BillPayRow } from "@/models/bill-pay"
+import { rowId, rowPayeeName, rowAmount, rowCurrency, rowPayFrom, CLAIM_ELIGIBILITY_COPY, type BillPayRow, type BillPayBillRow, type BillPayClaimRow } from "@/models/bill-pay"
+import type { PayerAccountRow } from "@/models/payer-accounts"
 import type { CreateBatchesResult } from "@/models/payment-batches"
 
 /** #229 Q1/Q4 (#251): the Create batch dialog — the batch's only draft. A real Dialog (the
@@ -18,10 +20,13 @@ import type { CreateBatchesResult } from "@/models/payment-batches"
  * supplier with a per-line Remove, a footer of Bills · Total · Pay From, and the split rule
  * said out loud before anything is written. After the server confirms, the same dialog becomes
  * the receipt: which rows went into which batch and which were left out and why. */
-export function CreateBatchDialog({ open, onClose, rows, suggestedName, fallbackCurrency, batchesHref, origin, onCreate, onCreated }: {
+export function CreateBatchDialog({ open, onClose, rows, defaultPayerAccount, suggestedName, fallbackCurrency, batchesHref, origin, onCreate, onCreated }: {
   open: boolean
   onClose: () => void
   rows: BillPayRow[]
+  /** The claim branch has no Pay From of its own — a claim reimbursement pays from the
+   * workspace's default account (§4's `rowPayFrom`). */
+  defaultPayerAccount: PayerAccountRow | null
   suggestedName: string
   fallbackCurrency: string
   batchesHref: string
@@ -37,15 +42,18 @@ export function CreateBatchDialog({ open, onClose, rows, suggestedName, fallback
   const [error, setError] = useState<string | null>(null)
   const [receipt, setReceipt] = useState<CreateBatchesResult | null>(null)
 
-  const kept = rows.filter((row) => !removed.has(row.bill.documentId))
+  const kept = rows.filter((row) => !removed.has(rowId(row)))
   const eligible = kept.filter((row) => row.eligibility.eligible)
   const ineligible = kept.filter((row) => !row.eligibility.eligible)
   // The React Compiler memoizes these; manual useMemo over a filtered array only fights it.
-  const groups = splitIntoBatches(eligible.map((row) => ({ documentId: row.bill.documentId, payFromAccountId: row.payFrom?.id ?? null, currencyCode: (row.bill.currencyCode ?? fallbackCurrency).toUpperCase(), row })))
-  const total = eligible.reduce((sum, row) => sum + Math.round((row.amountToPay ?? 0) * 100), 0) / 100
-  const supplierMap = new Map<string, BillPayRow[]>()
-  for (const row of eligible) { const key = row.bill.supplier ?? "Unknown supplier"; supplierMap.set(key, [...(supplierMap.get(key) ?? []), row]) }
+  const groups = splitIntoBatches(eligible.map((row) => ({ payFromAccountId: rowPayFrom(row, defaultPayerAccount)?.id ?? null, currencyCode: (rowCurrency(row) ?? fallbackCurrency).toUpperCase(), row })))
+  const total = eligible.reduce((sum, row) => sum + Math.round((rowAmount(row) ?? 0) * 100), 0) / 100
+  const billRows = eligible.filter((row): row is BillPayBillRow => row.kind === "bill")
+  const claimRows = eligible.filter((row): row is BillPayClaimRow => row.kind === "claim")
+  const supplierMap = new Map<string, BillPayBillRow[]>()
+  for (const row of billRows) { const key = row.bill.supplier ?? "Unknown supplier"; supplierMap.set(key, [...(supplierMap.get(key) ?? []), row]) }
   const bySupplier = [...supplierMap.entries()].sort((a, b) => a[0].localeCompare(b[0]))
+  const claimsTotal = claimRows.reduce((sum, row) => sum + Math.round((row.claim.total ?? 0) * 100), 0) / 100
   const money = (value: number, currency: string | null) => formatPaymentMoney(value, currency, fallbackCurrency)
 
   const close = () => { if (busy) return; onClose(); setRemoved(new Set()); setError(null); setReceipt(null); setName(suggestedName); setComment("") }
@@ -53,7 +61,7 @@ export function CreateBatchDialog({ open, onClose, rows, suggestedName, fallback
     if (eligible.length === 0) { setError("Nothing eligible is left in this selection."); return }
     setBusy(true); setError(null)
     try {
-      const result = await onCreate({ documentIds: eligible.map((row) => row.bill.documentId), name: name.trim() || null, comment: comment.trim() || null })
+      const result = await onCreate({ documentIds: eligible.map((row) => rowId(row)), name: name.trim() || null, comment: comment.trim() || null })
       if (!result.success || !result.data) { setError(result.error ?? "Couldn't create the batch."); return }
       setReceipt(result.data)
       onCreated()
@@ -71,7 +79,7 @@ export function CreateBatchDialog({ open, onClose, rows, suggestedName, fallback
           <ul className="divide-y divide-slate-100 border-y border-slate-200">
             {receipt.batches.map((batch) => <li key={batch.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-sm">
               <Link href={withOrigin(`${batchesHref}/${batch.id}`, origin)} className="font-medium text-emerald-800 underline-offset-2 hover:underline">{batch.name}</Link>
-              <span className="text-slate-600">{batch.billCount} bill{batch.billCount === 1 ? "" : "s"}</span>
+              <span className="text-slate-600">{describeBatchCounts(batch.billCount, batch.claimCount)}</span>
               <span className="tabular-nums text-slate-900">{money(batch.total, batch.currencyCode)}</span>
               <span className="text-slate-600">Pay From {batch.payFromLabel}</span>
             </li>)}
@@ -117,7 +125,7 @@ export function CreateBatchDialog({ open, onClose, rows, suggestedName, fallback
         </div>
 
         {groups.length > 1 && <p role="status" className="border-l-2 border-slate-300 py-1 pl-3 text-sm text-slate-700">
-          One batch pays from one account in one currency, so this selection becomes <span className="font-medium text-slate-900">{groups.length} batches</span>: {groups.map((group, index) => `${splitBatchName(name.trim() || suggestedName, groups.length, group.currencyCode, index)} (${group.lines.length} bill${group.lines.length === 1 ? "" : "s"} · ${group.currencyCode} · ${payerAccountLabel(group.lines[0].row.payFrom)})`).join("; ")}.
+          One batch pays from one account in one currency, so this selection becomes <span className="font-medium text-slate-900">{groups.length} batches</span>: {groups.map((group, index) => `${splitBatchName(name.trim() || suggestedName, groups.length, group.currencyCode, index)} (${group.lines.length} line${group.lines.length === 1 ? "" : "s"} · ${group.currencyCode} · ${payerAccountLabel(rowPayFrom(group.lines[0].row, defaultPayerAccount))})`).join("; ")}.
         </p>}
 
         {bySupplier.length > 0 && <div className="border-t border-slate-200 pt-1">
@@ -145,12 +153,34 @@ export function CreateBatchDialog({ open, onClose, rows, suggestedName, fallback
           </table>
         </div>}
 
+        {claimRows.length > 0 && <div className="border-t border-slate-200 pt-1">
+          <table className="w-full text-sm">
+            <thead className="text-left text-xs font-medium uppercase tracking-wide text-slate-600">
+              <tr><th scope="col" className="px-3 py-2">Claimant</th><th scope="col" className="px-3 py-2">Approved</th><th scope="col" className="px-3 py-2 text-right">Amount</th><th scope="col" className="px-3 py-2"><span className="sr-only">Remove</span></th></tr>
+            </thead>
+            <tbody className="border-t border-slate-100">
+              <tr className="bg-slate-50"><th scope="rowgroup" colSpan={4} className="px-3 py-1.5 text-left text-xs font-semibold text-slate-800">Reimbursements <span className="font-normal text-slate-600">· {claimRows.length} claim{claimRows.length === 1 ? "" : "s"} · {money(claimsTotal, claimRows[0]?.claim.currencyCode ?? null)}</span></th></tr>
+              {claimRows.map((row) => <tr key={row.claim.id} className="border-t border-slate-100">
+                <td className="px-3 py-2 text-slate-800">{rowPayeeName(row) ?? "Unknown claimant"}</td>
+                <td className="px-3 py-2 tabular-nums text-slate-700">{formatPaymentDate(row.claim.resolvedAt)}</td>
+                <td className="px-3 py-2 text-right tabular-nums text-slate-900">{money(rowAmount(row) ?? 0, row.claim.currencyCode)}</td>
+                <td className="px-2 py-1 text-right">
+                  <button type="button" onClick={() => setRemoved((prev) => new Set(prev).add(row.claim.id))} aria-label={`Remove ${rowPayeeName(row) ?? "claim"} from this batch`}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600">
+                    <X className="h-4 w-4" aria-hidden />
+                  </button>
+                </td>
+              </tr>)}
+            </tbody>
+          </table>
+        </div>}
+
         {ineligible.length > 0 && <section>
           <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-amber-700">Left out ({ineligible.length})</h3>
           <ul className="divide-y divide-slate-100 border-y border-slate-200">
-            {ineligible.map((row) => <li key={row.bill.documentId} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm">
-              <span className="text-slate-800">{row.bill.supplier ?? "Unknown supplier"}{row.bill.invoiceNumber ? ` · ${row.bill.invoiceNumber}` : ""}</span>
-              <span className="text-slate-600">{row.eligibility.eligible ? "" : row.eligibility.reason === "scheduled" && row.scheduledBatch ? <Link href={withOrigin(`${batchesHref}/${row.scheduledBatch.id}`, origin)} className="text-emerald-800 underline-offset-2 hover:underline">Already in {row.scheduledBatch.name ?? "a batch"}</Link> : ELIGIBILITY_COPY[row.eligibility.reason]}</span>
+            {ineligible.map((row) => <li key={rowId(row)} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm">
+              <span className="text-slate-800">{rowPayeeName(row) ?? "Unknown supplier"}{row.kind === "bill" && row.bill.invoiceNumber ? ` · ${row.bill.invoiceNumber}` : ""}</span>
+              <span className="text-slate-600">{row.scheduledBatch ? <Link href={withOrigin(`${batchesHref}/${row.scheduledBatch.id}`, origin)} className="text-emerald-800 underline-offset-2 hover:underline">Already in {row.scheduledBatch.name ?? "a batch"}</Link> : row.kind === "bill" && !row.eligibility.eligible ? ELIGIBILITY_COPY[row.eligibility.reason] : row.kind === "claim" && !row.eligibility.eligible ? CLAIM_ELIGIBILITY_COPY[row.eligibility.reason] : ""}</span>
             </li>)}
           </ul>
         </section>}
@@ -158,9 +188,9 @@ export function CreateBatchDialog({ open, onClose, rows, suggestedName, fallback
         {error && <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>}
       </div>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t px-5 py-3 text-sm">
-        <span className="text-slate-700"><span className="font-semibold tabular-nums text-slate-900">{eligible.length}</span> bill{eligible.length === 1 ? "" : "s"}</span>
-        <span className="text-slate-700">Total <span className="font-semibold tabular-nums text-slate-900">{groups.length <= 1 ? money(total, eligible[0]?.bill.currencyCode ?? null) : groups.map((g) => money(g.lines.reduce((s, l) => s + Math.round((l.row.amountToPay ?? 0) * 100), 0) / 100, g.currencyCode)).join(" + ")}</span></span>
-        <span className="text-slate-700">Pay From <span className="font-medium text-slate-900">{groups.length <= 1 ? payerAccountLabel(eligible[0]?.payFrom ?? null) : `${groups.length} accounts`}</span></span>
+        <span className="text-slate-700"><span className="font-semibold tabular-nums text-slate-900">{describeBatchCounts(billRows.length, claimRows.length)}</span></span>
+        <span className="text-slate-700">Total <span className="font-semibold tabular-nums text-slate-900">{groups.length <= 1 ? money(total, eligible[0] ? rowCurrency(eligible[0]) : null) : groups.map((g) => money(g.lines.reduce((s, l) => s + Math.round((rowAmount(l.row) ?? 0) * 100), 0) / 100, g.currencyCode)).join(" + ")}</span></span>
+        <span className="text-slate-700">Pay From <span className="font-medium text-slate-900">{groups.length <= 1 ? payerAccountLabel(eligible[0] ? rowPayFrom(eligible[0], defaultPayerAccount) : null) : `${groups.length} accounts`}</span></span>
         <span className="ml-auto flex gap-2">
           <Button type="button" size="sm" variant="outline" disabled={busy} onClick={close}>Cancel</Button>
           <Button type="submit" size="sm" disabled={busy || eligible.length === 0}>

@@ -169,9 +169,7 @@ export function BillPayQueue({ workspaceId, basePath, rows, summary, payerAccoun
       loadDetail={loadDetail}
       bulkActions={({ selectedIds }) => {
         const chosen = selectedRows(selectedIds)
-        // #331: batching claim rows isn't wired yet — only a bill row counts toward "batchable"
-        // so Create batch (n) undercounts claims with no separate code path (spec §2).
-        const eligible = chosen.filter((row) => row.kind === "bill" && row.eligibility.eligible).length
+        const eligible = chosen.filter((row) => row.eligibility.eligible).length
         const payable = chosen.filter((row) => row.kind === "bill" && rowScheduled(row) === false).length
         const hint = eligible === 0
           ? (payerAccounts.length === 0 ? "Add a payer account first." : "Nothing selected can be batched — each row says why.")
@@ -196,6 +194,7 @@ export function BillPayQueue({ workspaceId, basePath, rows, summary, payerAccoun
             batch/paid action here — only the "own claim" pointer to fix it; a left-workspace
             claimant has nobody left to fix it from this pane, so no pointer at all. */}
         {isOwner && row.paidState === "unpaid" && row.eligibility.eligible && <Button type="button" className="lg:h-8 lg:text-xs" variant="outline" onClick={() => setMarkingClaimPaid(row)}>Mark as paid…</Button>}
+        {row.paidState === "unpaid" && row.eligibility.eligible && <Button type="button" className="lg:h-8 lg:text-xs" onClick={() => setBatching([row.claim.id])}><Layers className="h-3.5 w-3.5" aria-hidden />Create batch</Button>}
         {!row.eligibility.eligible && row.eligibility.reason === "needs_bank_details" && row.submitter?.id === currentUserId && <Button asChild className="lg:h-8 lg:text-xs" variant="outline"><Link className="py-1.5" href={withOrigin(`/workspaces/${workspaceId}/account`, origin)}><Landmark className="h-3.5 w-3.5" aria-hidden />Add bank details</Link></Button>}
         {!row.eligibility.eligible && row.eligibility.reason === "needs_bank_details" && row.submitter?.id !== currentUserId && isOwner && <Button asChild className="lg:h-8 lg:text-xs" variant="outline"><Link className="py-1.5" href={withOrigin(`/workspaces/${workspaceId}/admin/users`, origin)}><Landmark className="h-3.5 w-3.5" aria-hidden />Add bank details</Link></Button>}
       </> : <>
@@ -216,7 +215,8 @@ export function BillPayQueue({ workspaceId, basePath, rows, summary, payerAccoun
         </PaneMenuItem>
       </>} />
 
-    <CreateBatchDialog open={batching !== null} onClose={() => setBatching(null)} rows={batching ? selectedRows(batching).filter((row): row is BillPayBillRow => row.kind === "bill") : []}
+    <CreateBatchDialog open={batching !== null} onClose={() => setBatching(null)} rows={batching ? selectedRows(batching) : []}
+      defaultPayerAccount={payerAccounts.find((a) => a.isDefault) ?? payerAccounts[0] ?? null}
       suggestedName={suggestedBatchName} fallbackCurrency={fallbackCurrency} batchesHref={batchesHref} origin={origin}
       onCreate={(input) => createPaymentBatchesAction(workspaceId, input)}
       onCreated={() => router.refresh()} />
@@ -269,7 +269,7 @@ export function BillPayQueue({ workspaceId, basePath, rows, summary, payerAccoun
       }} />
 
     {/* #331: the claim-row analogs of the invoice Mark as paid / Remove payment records dialogs
-        above — one row at a time from the pane, since claim batching isn't wired yet (spec §3). */}
+        above — one row at a time from the pane; claim batching goes through CreateBatchDialog. */}
     <MarkPaidDialog open={markingClaimPaid !== null} onClose={() => setMarkingClaimPaid(null)}
       title={`Mark ${markingClaimPaid ? rowPayeeName(markingClaimPaid) ?? "this claim" : "this claim"} as paid`}
       description="Records a payment on DocuBite's side for the claim's total. Reversal is “Remove payment records…” on the claim, with a reason."
