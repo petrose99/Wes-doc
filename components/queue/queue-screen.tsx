@@ -1,7 +1,7 @@
 "use client"
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react"
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent as ReactDragEvent, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react"
 import { ArrowUpDown, Download, MoreHorizontal, Search, ShieldAlert, ShieldCheck } from "lucide-react"
 import { toast } from "sonner"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -109,6 +109,14 @@ export type QueueScreenProps<T> = {
   /** #285/#286: an Admin queue's one primary button (Invite a user, Add a company), rendered at the
    * right end of row 1 before `stat`. Absent on the document queues. */
   primaryAction?: ReactNode
+  /** #266: a typed intake queue's "Add ‹type›" button — rendered after `stat`, before the ⋯ menu
+   * (Vic's ⊕ slot), distinct from `primaryAction` (Admin's slot, before `stat`). `hidden` `<md`
+   * is the caller's job (the button itself carries that class), not this shell's. */
+  addAction?: ReactNode
+  /** #266: wires the list region (`#queue-list`) as a drop target that renders only while a drag
+   * carries files (`dragenter`/`dragleave`/`drop`), `md`+ only — no permanent drop box. `onFiles`
+   * receives the dropped files; the caller (the Add-type button's wiring) owns what happens next. */
+  dropZone?: { type: string; onFiles: (files: FileList) => void }
   /** #285/#286: Override Mode has no meaning on an Admin list (no soft checks); `false` hides the
    * menu item and the banner. The provider stays mounted so the pane's consumers keep working. */
   overrideMode?: boolean
@@ -196,7 +204,7 @@ const INTERACTIVE = "a, button, input, select, textarea, label, [role=button], [
 
 function QueueScreenInner<T>({
   title, basePath, rows, rowId, detailIdFor, rowName, paneStatus, fullHref, archivedToast, leading, columns: rawColumns, fieldTable = null, selectable = false, sortOptions = [], facets = [],
-  views, viewsPhone, stat, primaryAction, overrideMode: overrideModeEnabled = true, search, band, connectionBand, menu, onExportAll, bulkActions, empty, workspaceDocumentCount = 0, loadDetail, paneActions, paneMenu, initialSelectedId = null, sortParam = "sort", cards, phoneReadOnly = false,
+  views, viewsPhone, stat, primaryAction, addAction, dropZone, overrideMode: overrideModeEnabled = true, search, band, connectionBand, menu, onExportAll, bulkActions, empty, workspaceDocumentCount = 0, loadDetail, paneActions, paneMenu, initialSelectedId = null, sortParam = "sort", cards, phoneReadOnly = false,
   filterRows, pinned = null, initialMissing, onOpenChange, origin = null, onControls,
 }: QueueScreenProps<T>) {
   const router = useRouter()
@@ -214,6 +222,28 @@ function QueueScreenInner<T>({
     onOpenChange?.(openId)
   }, [openId, onOpenChange])
   const [menuOpen, setMenuOpen] = useState(false)
+  // #266: the drop-to-add frame — only while a drag is carrying files, md+ only (dropZone is the
+  // caller's opt-in). dragDepth counts enter/leave pairs so a drag over a child element (a row)
+  // doesn't flicker the frame off — the classic dragenter/dragleave-on-children bug.
+  const [dragOver, setDragOver] = useState(false)
+  const dragDepth = useRef(0)
+  const onDropZoneDragEnter = dropZone ? (event: ReactDragEvent) => {
+    if (!event.dataTransfer.types.includes("Files")) return
+    event.preventDefault()
+    dragDepth.current += 1
+    setDragOver(true)
+  } : undefined
+  const onDropZoneDragOver = dropZone ? (event: ReactDragEvent) => { if (event.dataTransfer.types.includes("Files")) event.preventDefault() } : undefined
+  const onDropZoneDragLeave = dropZone ? () => {
+    dragDepth.current = Math.max(0, dragDepth.current - 1)
+    if (dragDepth.current === 0) setDragOver(false)
+  } : undefined
+  const onDropZoneDrop = dropZone ? (event: ReactDragEvent) => {
+    event.preventDefault()
+    dragDepth.current = 0
+    setDragOver(false)
+    if (event.dataTransfer.files.length) dropZone.onFiles(event.dataTransfer.files)
+  } : undefined
   const [filterOpen, setFilterOpen] = useState(false)
   const [exporting, setExporting] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -531,6 +561,7 @@ function QueueScreenInner<T>({
       <div className="ml-auto flex items-center gap-2">
         {primaryAction}
         {stat}
+        {addAction}
         <Popover open={menuOpen} onOpenChange={setMenuOpen}>
           <PopoverTrigger asChild>
             <button type="button" aria-label="Queue options" className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600">
@@ -585,7 +616,14 @@ function QueueScreenInner<T>({
     </div>}
 
     <div className="flex min-h-0 flex-1 md:overflow-hidden">
-      <div id="queue-list" className={`min-w-0 flex-1 md:overflow-auto ${openId ? "lg:shadow-[inset_-1px_0_0_0_rgb(226_232_240)]" : ""}`}>
+      <div id="queue-list" className={`relative min-w-0 flex-1 md:overflow-auto ${openId ? "lg:shadow-[inset_-1px_0_0_0_rgb(226_232_240)]" : ""}`}
+        {...(dropZone ? { onDragEnter: onDropZoneDragEnter, onDragOver: onDropZoneDragOver, onDragLeave: onDropZoneDragLeave, onDrop: onDropZoneDrop } : {})}>
+        {/* #266: the drop-to-add frame — only while a drag is carrying files, md+ only (no
+            permanent drop box). 120ms fade; instant under reduced motion (no transition class
+            added there — see craft-floor Motion). */}
+        {dropZone && dragOver && <div aria-hidden className="pointer-events-none absolute inset-2 z-10 hidden items-center justify-center rounded-xl border-2 border-dashed border-emerald-400 bg-emerald-500/[0.04] text-sm font-semibold text-emerald-700 motion-safe:transition-opacity motion-safe:duration-[120ms] md:flex">
+          Drop to add {dropZone.type}
+        </div>}
         {phoneReadOnly && <p className={`px-4 py-2 text-[13px] text-slate-600 ${below ? below.hideAbove : "lg:hidden"}`}>Full view on desktop — this list is read-only on a phone.</p>}
         {sortedRows.length === 0
           ? <QueueEmpty
