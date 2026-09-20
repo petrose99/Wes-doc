@@ -7,8 +7,8 @@ import { errorMessage, NO_ACCESS, requireMember } from "@/app/(app)/workspaces/[
 import { saveBillPayPreference, setPayFromOnRows } from "@/models/bill-pay"
 import { validateAmountToPay } from "@/lib/payments/eligibility"
 import {
-  approvePaymentBatch, createPaymentBatches, getPaymentBatch, markInvoicesPaid, markPaymentBatchPaid, rejectPaymentBatch, removePaymentRecord, removePaymentRecordsForDocument, unmarkPaymentBatchPaid,
-  type CreateBatchesResult, type MarkPaidResult,
+  approvePaymentBatch, createPaymentBatches, getPaymentBatch, markClaimsPaid, markInvoicesPaid, markPaymentBatchPaid, rejectPaymentBatch, removePaymentRecord, removePaymentRecordsForClaim, removePaymentRecordsForDocument, unmarkPaymentBatchPaid,
+  type CreateBatchesResult, type MarkClaimsPaidResult, type MarkPaidResult,
 } from "@/models/payment-batches"
 import { PaymentBatchDetail } from "@/components/payments/batch-detail"
 
@@ -85,6 +85,34 @@ export async function markInvoicesPaidAction(workspaceId: string, input: { docum
     revalidatePayments(workspaceId)
     return { success: true, data: result }
   } catch (error) { return { success: false, error: message(error, "Couldn't record the payment") } }
+}
+
+/** #331: the claim-row analog of markInvoicesPaidAction — same owner-only, same-day guard. */
+export async function markClaimsPaidAction(workspaceId: string, input: { claimIds: string[]; paidOn: string; reference: string | null }): Promise<ActionState<MarkClaimsPaidResult>> {
+  const user = await getCurrentUser()
+  if (!(await requireMember(workspaceId, user.id, ["owner"]))) return { success: false, error: MESSAGES.owner_only }
+  const paidOn = new Date(input.paidOn)
+  if (Number.isNaN(paidOn.getTime())) return { success: false, error: "Enter the date the payment was made." }
+  if (paidOn.getTime() > Date.now() + 24 * 60 * 60 * 1000) return { success: false, error: "The paid date can't be in the future." }
+  try {
+    const result = await markClaimsPaid({ workspaceId, actorId: user.id, claimIds: input.claimIds, paidOn, reference: input.reference })
+    revalidatePayments(workspaceId)
+    return { success: true, data: result }
+  } catch (error) { return { success: false, error: message(error, "Couldn't record the payment") } }
+}
+
+/** #331: the claim-row analog of removePaymentRecordsForDocumentAction. */
+export async function removePaymentRecordsForClaimAction(workspaceId: string, claimId: string, formData: FormData): Promise<ActionState<{ removed: number; batchHeld: number }>> {
+  const user = await getCurrentUser()
+  if (!(await requireMember(workspaceId, user.id, ["owner"]))) return { success: false, error: MESSAGES.owner_only }
+  const reason = String(formData.get("reason") || "").trim()
+  if (!reason) return { success: false, error: MESSAGES.reason_required }
+  try {
+    const result = await removePaymentRecordsForClaim({ workspaceId, actorId: user.id, claimId, reason })
+    revalidatePayments(workspaceId)
+    if (result.removed === 0) return { success: false, error: "These payments were recorded by a batch — remove them from the batch on Payment Batches." }
+    return { success: true, data: result }
+  } catch (error) { return { success: false, error: message(error, "Couldn't remove the payment records") } }
 }
 
 export async function approvePaymentBatchAction(workspaceId: string, batchId: string): Promise<ActionState<null>> {

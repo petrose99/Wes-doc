@@ -23,8 +23,10 @@ import { payerAccountLabel } from "@/lib/payments/payer-account-label"
 import { withOrigin } from "@/lib/navigation/origin"
 import { useOriginHere } from "@/components/documents/po-compare"
 import { getQueueDetailAction } from "@/app/(app)/workspaces/[workspaceId]/queue-actions"
-import { createPaymentBatchesAction, markInvoicesPaidAction, removePaymentRecordsForDocumentAction, setAmountToPayAction, setPayFromAction } from "@/app/(app)/workspaces/[workspaceId]/(queue)/payments/actions"
-import { CLAIM_ELIGIBILITY_COPY, type BillPayBillRow, type BillPayRow } from "@/models/bill-pay"
+import { getExpenseClaimDetailAction } from "@/app/(app)/workspaces/[workspaceId]/expense-claim-actions"
+import { ExpenseClaimDetail } from "@/components/queue/expense-claim-queue"
+import { createPaymentBatchesAction, markClaimsPaidAction, markInvoicesPaidAction, removePaymentRecordsForClaimAction, removePaymentRecordsForDocumentAction, setAmountToPayAction, setPayFromAction } from "@/app/(app)/workspaces/[workspaceId]/(queue)/payments/actions"
+import { CLAIM_ELIGIBILITY_COPY, type BillPayBillRow, type BillPayClaimRow, type BillPayRow } from "@/models/bill-pay"
 import type { BillsSummary } from "@/models/bills"
 import type { PayerAccountRow } from "@/models/payer-accounts"
 
@@ -84,13 +86,24 @@ export function BillPayQueue({ workspaceId, basePath, rows, summary, payerAccoun
   const [markingPaid, setMarkingPaid] = useState<string[] | null>(null)
   const [settingPayFrom, setSettingPayFrom] = useState<string[] | null>(null)
   const [removingRecords, setRemovingRecords] = useState<BillPayBillRow | null>(null)
+  const [markingClaimPaid, setMarkingClaimPaid] = useState<BillPayClaimRow | null>(null)
+  const [removingClaimRecords, setRemovingClaimRecords] = useState<BillPayClaimRow | null>(null)
   const rowsById = useMemo(() => new Map(rows.map((row) => [rowId(row), row])), [rows])
   const money = (value: number, currency: string | null) => formatPaymentMoney(value, currency, fallbackCurrency)
   const origin = useOriginHere()
   const settingsHref = withOrigin(`/workspaces/${workspaceId}/admin/configuration/payments`, origin)
   const [paidReceipt, setPaidReceipt] = useState<{ recorded: Array<{ documentId: string; amount: number }>; leftOut: Array<{ documentId: string; reason: string }>; rows: Map<string, BillPayBillRow> } | null>(null)
-  // Stable identity: the pane refetches whenever `loadDetail` changes.
-  const loadDetail = useCallback((documentId: string) => getQueueDetailAction(workspaceId, documentId), [workspaceId])
+  // Stable identity: the pane refetches whenever `loadDetail` changes. A claim row's id is the
+  // claim's own id (never a documentId) — route it to the same claim-detail loader the Expense
+  // claims queue uses, read-only, instead of the per-document pane (#331 spec §3).
+  const loadDetail = useCallback(async (id: string) => {
+    const row = rowsById.get(id)
+    if (row?.kind === "claim") {
+      const result = await getExpenseClaimDetailAction(workspaceId, id)
+      return result.success && result.data ? <ExpenseClaimDetail workspaceId={workspaceId} facts={result.data} /> : null
+    }
+    return getQueueDetailAction(workspaceId, id)
+  }, [workspaceId, rowsById])
   const batchesHref = `/workspaces/${workspaceId}/payments/batches`
 
   const columns: QueueColumn<BillPayRow>[] = [
@@ -182,7 +195,11 @@ export function BillPayQueue({ workspaceId, basePath, rows, summary, payerAccoun
           {hint && <span className="text-xs text-slate-600">{hint}</span>}
         </>
       }}
-      paneActions={(row) => row.kind !== "bill" ? <></> /* #331: claim pane actions land on step 3 */ : <>
+      paneActions={(row) => row.kind !== "bill" ? <>
+        {row.paidState === "scheduled" && row.scheduledBatch && <Button asChild className="lg:h-8 lg:text-xs" variant="outline"><Link className="py-1.5" href={withOrigin(`${batchesHref}/${row.scheduledBatch.id}`, origin)}>Open batch {row.scheduledBatch.name ?? ""}</Link></Button>}
+        {isOwner && row.paidState === "paid" && <Button type="button" className="lg:h-8 lg:text-xs" variant="outline" onClick={() => setRemovingClaimRecords(row)}>Remove payment records…</Button>}
+        {isOwner && row.paidState === "unpaid" && <Button type="button" className="lg:h-8 lg:text-xs" variant="outline" onClick={() => setMarkingClaimPaid(row)}>Mark as paid…</Button>}
+      </> : <>
         {!row.eligibility.eligible && row.eligibility.reason === "needs_bank_details" && <Button asChild className="lg:h-8 lg:text-xs" variant="outline"><Link className="py-1.5" href={`${settingsHref}#supplier-${row.bill.supplierId ?? ""}`}><Landmark className="h-3.5 w-3.5" aria-hidden />Add bank details</Link></Button>}
         {row.bill.paidState.state === "scheduled" && row.scheduledBatch && <Button asChild className="lg:h-8 lg:text-xs" variant="outline"><Link className="py-1.5" href={withOrigin(`${batchesHref}/${row.scheduledBatch.id}`, origin)}>Open batch {row.scheduledBatch.name ?? ""}</Link></Button>}
         {isOwner && row.bill.paidState.source === "recorded" && <Button type="button" className="lg:h-8 lg:text-xs" variant="outline" onClick={() => setRemovingRecords(row)}>Remove payment records…</Button>}
@@ -190,7 +207,11 @@ export function BillPayQueue({ workspaceId, basePath, rows, summary, payerAccoun
         {payerAccounts.length > 0 && row.bill.paidState.state !== "scheduled" && <Button type="button" className="lg:h-8 lg:text-xs" variant="outline" onClick={() => setSettingPayFrom([row.bill.documentId])}><Wallet className="h-3.5 w-3.5" aria-hidden />Set Pay From…</Button>}
         {row.eligibility.eligible && <Button type="button" className="lg:h-8 lg:text-xs" onClick={() => setBatching([row.bill.documentId])}><Layers className="h-3.5 w-3.5" aria-hidden />Create batch</Button>}
       </>}
-      paneMenu={(row) => row.kind !== "bill" ? <></> /* #331: "Open the claim" lands on step 3 */ : <>
+      paneMenu={(row) => row.kind !== "bill" ? <>
+        <PaneMenuItem onClick={() => router.push(withOrigin(`/workspaces/${workspaceId}/approvals/expense-claims?claim=${row.claim.id}`, window.location.pathname + window.location.search))}>
+          <ExternalLink className="mr-2 h-4 w-4 text-slate-500" aria-hidden />Open on Expense claims
+        </PaneMenuItem>
+      </> : <>
         <PaneMenuItem onClick={() => router.push(withOrigin(`/workspaces/${workspaceId}/invoices/${row.bill.documentId}`, window.location.pathname + window.location.search))}>
           <ExternalLink className="mr-2 h-4 w-4 text-slate-500" aria-hidden />Open on Invoices
         </PaneMenuItem>
@@ -247,6 +268,38 @@ export function BillPayQueue({ workspaceId, basePath, rows, summary, payerAccoun
         if (result.success) { toast.success(`Pay From set on ${result.data?.updated ?? 0} invoice${result.data?.updated === 1 ? "" : "s"}`); router.refresh() }
         return result
       }} />
+
+    {/* #331: the claim-row analogs of the invoice Mark as paid / Remove payment records dialogs
+        above — one row at a time from the pane, since claim batching isn't wired yet (spec §3). */}
+    <MarkPaidDialog open={markingClaimPaid !== null} onClose={() => setMarkingClaimPaid(null)}
+      title={`Mark ${markingClaimPaid ? rowPayeeName(markingClaimPaid) ?? "this claim" : "this claim"} as paid`}
+      description="Records a payment on DocuBite's side for the claim's total. Reversal is “Remove payment records…” on the claim, with a reason."
+      submitLabel="Record payment"
+      recap={markingClaimPaid && <div className="flex items-center justify-between gap-2 border-y border-slate-200 px-3 py-2 text-sm">
+        <span className="min-w-0 truncate text-slate-800">{rowPayeeName(markingClaimPaid) ?? "Unknown claimant"}</span>
+        <span className="shrink-0 tabular-nums text-slate-900">{markingClaimPaid.claim.total !== null ? money(markingClaimPaid.claim.total, markingClaimPaid.claim.currencyCode) : "—"}</span>
+      </div>}
+      onSubmit={async (input) => {
+        if (!markingClaimPaid) return { success: false, error: "No claim selected" }
+        const result = await markClaimsPaidAction(workspaceId, { claimIds: [markingClaimPaid.claim.id], ...input })
+        if (!result.success || !result.data) return result
+        if (result.data.recorded.length === 0) return { success: false, error: result.data.leftOut[0]?.reason ?? "Couldn't record the payment" }
+        toast.success(`Payment recorded — ${rowPayeeName(markingClaimPaid) ?? "the claim"} reads Paid`)
+        router.refresh()
+        return result
+      }} />
+
+    <ReasonDialog open={removingClaimRecords !== null} onClose={() => setRemovingClaimRecords(null)}
+      action={async (formData) => {
+        if (!removingClaimRecords) return { success: false, error: "No claim selected" }
+        const result = await removePaymentRecordsForClaimAction(workspaceId, removingClaimRecords.claim.id, formData)
+        if (result.success) { toast.success(`Payment records removed — ${rowPayeeName(removingClaimRecords) ?? "the claim"} reads Unpaid again`); router.refresh() }
+        return result
+      }}
+      title={`Remove the payment records on ${removingClaimRecords ? rowPayeeName(removingClaimRecords) ?? "this claim" : "this claim"}`}
+      description={`${removingClaimRecords && removingClaimRecords.claim.total !== null ? money(removingClaimRecords.claim.total, removingClaimRecords.claim.currencyCode) : ""} recorded as paid by hand comes off; the claim reads Unpaid again. The reason is kept on the audit trail.`}
+      submitLabel="Remove payment records"
+      placeholder="Why were these payments recorded in error?" />
   </>
 }
 
