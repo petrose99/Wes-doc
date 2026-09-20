@@ -24,7 +24,7 @@ Server actions in `app/(app)/workspaces/[workspaceId]/actions.ts` (owner-only vi
 - Chained shell (`&&`, `;`, `$(…)`) is blocked for sub-agents: multi-step work goes in a `.mjs`/`.py` file.
 
 ## Detector residue (report, do not chase)
-App-wide on every state: workspace-switcher avatar palette ×2, Inter as `overused-font`, dev overlay `layout-transition` + `dark-glow` on `body` — five per state. Admin adds `text-overflow` on the expanded rail's truncated workspace name (shell, 1440) and, with the account menu open, `text-occlusion` on rail labels under the popover. With the switcher popover open over a queue page at 1440, the underlying queue shell's own heading sizes (`h1#queue-title` `components/queue/queue-screen.tsx:489` at `text-lg`, `h2` `components/queue/detail-pane.tsx:99` at `text-sm`) trip `flat-type-hierarchy` — pre-existing app-wide scale on the queue shell, not introduced by the switcher/dashboard/picker (#287); a fix belongs to a queue-shell typography ticket, not here.
+App-wide on every state: workspace-switcher avatar palette ×2, Inter as `overused-font`, dev overlay `layout-transition` + `dark-glow` on `body` — five per state. Admin adds `text-overflow` on the expanded rail's truncated workspace name (shell, 1440) and, with the account menu open, `text-occlusion` on rail labels under the popover. With the switcher popover open over a queue page at 1440, the underlying queue shell's own heading sizes (`h1#queue-title` `components/queue/queue-screen.tsx:489` at `text-lg`, `h2` `components/queue/detail-pane.tsx:99` at `text-sm`) trip `flat-type-hierarchy` — pre-existing app-wide scale on the queue shell, not introduced by the switcher/dashboard/picker (#287); a fix belongs to a queue-shell typography ticket, not here. #342 widened the `text-overflow` residue: every `truncate`-class span/div in the shell (nav-item labels, the account-name in the account menu, the switcher's workspace name) is by design wider than its `overflow-hidden` box — that is what `truncate`+ellipsis means, the detector's scrollWidth-vs-clientWidth check false-positives on all of them, not just the switcher name; the visible render always shows a correct ellipsis (verified by screenshot, not just detector count). The Activity page (`app/(app)/workspaces/[workspaceId]/(chrome)/activity/page.tsx`, pre-existing, `645e989`) trips `em-dash-overuse` in its own body content — unrelated to #342's nav-location change, a fix belongs to an Activity-page ticket.
 
 As regexes, for `gate.mjs --residue-file docs/agents/areas/admin.md` and the round script's `residue` option (matched against `<type> <selector> <detail>`):
 
@@ -33,9 +33,10 @@ ai-color-palette.*Cyan gradient background
 overused-font
 layout-transition.*transition: height
 dark-glow.*#ffba00
-text-overflow.*(workspace|rail)
+text-overflow.*truncate
 text-occlusion.*rail
 flat-type-hierarchy.*h2 14px, body 16px, h1 18px
+em-dash-overuse.*em-dashes in body text
 ```
 
 ## Dashboard + grouped switcher (#287)

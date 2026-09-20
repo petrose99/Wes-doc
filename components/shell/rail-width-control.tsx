@@ -4,25 +4,16 @@ import { useEffect, useId, useState } from "react"
 import { NativeSelect } from "@/components/ui/native-select"
 import { useOnlineStatus } from "@/lib/client/use-online-status"
 import { getRailWidthAction, setRailWidthAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
+import { type RailWidth, isRailWidth, toRailWidth, RAIL_WIDTH_LABEL } from "@/lib/rail-width"
 
 /** #342 spec §4 — the three-state rail-width control (icons only / full labels / auto),
  * replacing the old localStorage pin. Two homes, like Approval emails: the Account page field
  * (`RailWidthControl`, full state machine) and a compact inline select in the account-menu
- * (`RailWidthMenuSelect`) — no dialog, a select has no destructive consequence to confirm. */
+ * (`RailWidthMenuSelect`) — no dialog, a select has no destructive consequence to confirm.
+ * `RailWidth`/`isRailWidth`/`toRailWidth` moved to lib/rail-width.ts — see that file's comment. */
 
-export type RailWidth = "icons" | "labels" | "auto"
-export const RAIL_WIDTH_LABEL: Record<RailWidth, string> = { icons: "Icons only", labels: "Full labels", auto: "Auto" }
+export { type RailWidth, isRailWidth, toRailWidth, RAIL_WIDTH_LABEL } from "@/lib/rail-width"
 export const RAIL_WIDTH_SAVE_ERROR = "Couldn't save this. Check your connection and try again."
-
-export function isRailWidth(value: string): value is RailWidth {
-  return value === "icons" || value === "labels" || value === "auto"
-}
-
-/** `User.railWidth` is a plain String column (schema.prisma), not a Prisma enum — normalize
- * whatever it holds to a known state rather than trust it at every read site. */
-export function toRailWidth(value: string): RailWidth {
-  return isRailWidth(value) ? value : "auto"
-}
 
 function useRailWidthSave(workspaceId: string, initial: RailWidth, onSaved?: (value: RailWidth) => void) {
   const [value, setValue] = useState<RailWidth>(initial)
