@@ -3,7 +3,7 @@
 import { Component, useCallback, useContext, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react"
 import { ArrowLeft, ChevronDown, ChevronUp, MoreHorizontal, X } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { DeleteDocumentDialog, DocumentMenuDeleteItem, DocumentMenuTopItems, OpenInNewTabMenuItem, PaneDocumentContext, PaneDocumentProvider } from "@/components/queue/document-actions-menu"
+import { DeleteDocumentDialog, DocumentMenuDeleteItem, DocumentMenuTopItems, MoveDocumentDialog, MoveDocumentMenuItem, OpenInNewTabMenuItem, PaneDocumentContext, PaneDocumentProvider } from "@/components/queue/document-actions-menu"
 import { usePhoneLane } from "@/lib/client/use-phone-lane"
 
 export const DETAIL_PANE_ID = "queue-detail-pane"
@@ -141,6 +141,7 @@ function PaneMenu({ open, onOpenChange, fullHref, menu, onDeleted }: {
   const hasDoc = !!ctx?.doc
   const contentRef = useRef<HTMLDivElement>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [moveOpen, setMoveOpen] = useState(false)
   if (!fullHref && !menu && !hasDoc) return null
 
   const items = () => Array.from(contentRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])
@@ -170,6 +171,7 @@ function PaneMenu({ open, onOpenChange, fullHref, menu, onDeleted }: {
         onClick={(event) => { if ((event.target as HTMLElement).closest("[data-menu-close]")) onOpenChange(false) }}>
         {fullHref && <OpenInNewTabMenuItem href={fullHref} />}
         <DocumentMenuTopItems closeMenu={() => onOpenChange(false)} />
+        <MoveDocumentMenuItem onRequestMove={() => setMoveOpen(true)} />
         {(menu || hasDoc) && (fullHref || hasDoc) && <div role="separator" className="my-1 h-px bg-slate-200" />}
         {menu}
         <DocumentMenuDeleteItem onRequestDelete={() => setDeleteOpen(true)} />
@@ -181,6 +183,9 @@ function PaneMenu({ open, onOpenChange, fullHref, menu, onDeleted }: {
     {deleteOpen && ctx?.doc && <DeleteDocumentDialog workspaceId={ctx.doc.workspaceId} fileId={ctx.doc.fileId} documentId={ctx.doc.documentId} filename={ctx.doc.filename}
       onOpenChange={setDeleteOpen}
       onDeleted={() => { ctx.onMutated?.("removed"); onDeleted?.() }} />}
+    {moveOpen && ctx?.doc && <MoveDocumentDialog workspaceId={ctx.doc.workspaceId} documentId={ctx.doc.documentId} filename={ctx.doc.filename} currentType={ctx.doc.docType}
+      onOpenChange={setMoveOpen}
+      onMoved={() => ctx.onMutated?.("removed")} />}
   </>
 }
 
