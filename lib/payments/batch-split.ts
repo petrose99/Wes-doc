@@ -4,7 +4,6 @@
  * the dialog calls it, so both agree on the split. */
 
 export type BatchLineInput = {
-  documentId: string
   payFromAccountId: string | null
   currencyCode: string
 }
