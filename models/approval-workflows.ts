@@ -75,6 +75,40 @@ export async function replaceApprovalWorkflowStages(input: { workspaceId: string
   return getApprovalWorkflow(input.workspaceId, workflow.id)
 }
 
+/** #328/#288: the narrower, order-preserving sibling of replaceApprovalWorkflowStages — patches an
+ * existing stage's name/requireOwner/approverIds/minAmount **by id**, never touching `stageIndex`
+ * or the stage count. This is exactly the case engine.ts's `findCurrentStage` comment flags as
+ * unsafe ("callers must not assume `.find` succeeds since a workflow's stages could in theory be
+ * edited out from under an in-flight task") made safe: the id set is required to match exactly, so
+ * a task's `currentStageIndex` always still resolves to a real stage afterward. No schema change
+ * needed — decideReviewTaskStage already reads these fields live at decision time. */
+export async function updateApprovalWorkflowFields(input: {
+  workspaceId: string
+  workflowId: string
+  name?: string
+  stages: { id: string; name: string; requireOwner?: boolean; approverIds?: string[]; minAmount?: number | null }[]
+}) {
+  if (!input.stages.length) throw new Error("workflow_needs_at_least_one_stage")
+  const workflow = await prisma.approvalWorkflow.findFirst({
+    where: { id: input.workflowId, workspaceId: input.workspaceId },
+    select: { id: true, stages: { select: { id: true } } },
+  })
+  if (!workflow) throw new Error("approval_workflow_not_found")
+  const existingIds = new Set(workflow.stages.map((s) => s.id))
+  const patchIds = new Set(input.stages.map((s) => s.id))
+  if (existingIds.size !== patchIds.size || [...existingIds].some((id) => !patchIds.has(id))) {
+    throw new Error("workflow_stage_set_changed")
+  }
+  await prisma.$transaction([
+    ...(input.name !== undefined ? [prisma.approvalWorkflow.update({ where: { id: workflow.id }, data: { name: input.name } })] : []),
+    ...input.stages.map((stage) => prisma.approvalWorkflowStage.update({
+      where: { id: stage.id },
+      data: { name: stage.name, requireOwner: stage.requireOwner ?? false, approverIds: stage.approverIds ?? [], minAmount: stage.minAmount ?? null },
+    })),
+  ])
+  return getApprovalWorkflow(input.workspaceId, workflow.id)
+}
+
 /** #236: "Start Approval" on an invoice — the Invoices bulk-action bar's `Approval ▾ → Start`.
  * Most documents have no ReviewTask at all until something flags them for review (decision #1's
  * five workflow-less call sites); an invoice a person wants to start an Approval on manually may

@@ -1,7 +1,7 @@
 "use client"
 
 import { Empty, Panel, Pill } from "@/components/automation/automation-ui"
-import { ApprovalWorkflowForm, type ApprovalFlowDraft, type ApprovalFormMember } from "@/components/workspace/approval-workflow-form"
+import { ApprovalWorkflowForm, EditFlowForm, type ApprovalFlowDraft, type ApprovalFormMember } from "@/components/workspace/approval-workflow-form"
 import { ApprovalWorkflowRowControls } from "@/components/workspace/approval-workflow-row"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { useCallback, useState } from "react"
@@ -30,6 +30,9 @@ export function ApprovalFlowsEditor({ workspaceId, flows, members, defaultFlowId
   const [draft, setDraft] = useState<ApprovalFlowDraft | null>(null)
   const [typed, setTyped] = useState(false)
   const [replaceWith, setReplaceWith] = useState<ApprovalFlowDraft | null>(null)
+  // #328: only one row's Edit mode is ever open at once, so an owner never loses track of which
+  // row holds unsaved changes — opening Edit on a different row closes whichever was open.
+  const [editingId, setEditingId] = useState<string | null>(null)
   const onTypedChange = useCallback((next: boolean) => setTyped(next), [])
   const memberNameById = new Map(members.map((m) => [m.id, m.name || m.email]))
 
@@ -42,35 +45,42 @@ export function ApprovalFlowsEditor({ workspaceId, flows, members, defaultFlowId
   const duplicate = (flow: FlowSummary) => (typed ? setReplaceWith(toDraft(flow)) : setDraft(toDraft(flow)))
 
   return <>
-    <Panel title="Flows" note={`${flows.length} flow${flows.length === 1 ? "" : "s"} in this workspace. Activate, Deactivate and Delete apply at once; the default flow above waits for Save. A flow's stages are fixed once it exists — to change them, duplicate it, edit the copy and delete the original.`}>
+    <Panel title="Flows" note={`${flows.length} flow${flows.length === 1 ? "" : "s"} in this workspace. Activate, Deactivate and Delete apply at once; the default flow above waits for Save. Stage names, approvers and thresholds can be edited in place and take effect on every task's next decision. Adding, removing or reordering stages still means duplicating the flow.`}>
       {!flows.length
         ? <Empty title="No flows yet">Until one exists, an approval started from the Invoices bulk bar is a single decision by an owner.</Empty>
         : <div className="divide-y divide-hairline-soft">
             {flows.map((flow) => (
               <div key={flow.id} className="py-4 first:pt-0">
-                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-                  <span className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-semibold text-slate-900">{flow.name}</span>
-                    {defaultFlowId === flow.id && <Pill state={flow.active ? "auto" : "waiting"}>{flow.active ? "Default" : "Default, but inactive"}</Pill>}
-                  </span>
-                  {owner
-                    ? <ApprovalWorkflowRowControls workspaceId={workspaceId} workflowId={flow.id} workflowName={flow.name} active={flow.active} isDefault={defaultFlowId === flow.id} onDuplicate={() => duplicate(flow)} />
-                    : <Pill state={flow.active ? "auto" : "idle"}>{flow.active ? "Active" : "Inactive"}</Pill>}
-                </div>
-                <ol className="mt-2.5 space-y-1.5">
-                  {flow.stages.map((stage, index) => (
-                    <li key={stage.id} className="flex flex-wrap items-center gap-1.5 text-[13px]">
-                      <span className="tabular-nums text-slate-400">{index + 1}.</span>
-                      <span className="font-medium text-slate-800">{stage.name}</span>
-                      {stage.approverIds.length > 0
-                        ? <Pill state="auto">{stage.approverIds.map((id) => memberNameById.get(id) ?? id.slice(0, 8)).join(", ")}</Pill>
-                        : stage.requireOwner
-                          ? <Pill state="idle">Owner only</Pill>
-                          : <Pill state="idle">Any member</Pill>}
-                      {formatThreshold[stage.id] && <Pill state="waiting">≥ {formatThreshold[stage.id]}</Pill>}
-                    </li>
-                  ))}
-                </ol>
+                {editingId === flow.id
+                  ? <EditFlowForm workspaceId={workspaceId} flow={flow} members={members} onDone={() => setEditingId(null)} />
+                  : <>
+                      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+                        <span className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm font-semibold text-slate-900">{flow.name}</span>
+                          {defaultFlowId === flow.id && <Pill state={flow.active ? "auto" : "waiting"}>{flow.active ? "Default" : "Default, but inactive"}</Pill>}
+                        </span>
+                        {owner
+                          ? <span className="flex flex-wrap items-center gap-3">
+                              <button type="button" onClick={() => setEditingId(flow.id)} className="shrink-0 text-[13px] font-medium text-slate-600 underline underline-offset-4 hover:text-slate-900">Edit</button>
+                              <ApprovalWorkflowRowControls workspaceId={workspaceId} workflowId={flow.id} workflowName={flow.name} active={flow.active} isDefault={defaultFlowId === flow.id} onDuplicate={() => duplicate(flow)} />
+                            </span>
+                          : <Pill state={flow.active ? "auto" : "idle"}>{flow.active ? "Active" : "Inactive"}</Pill>}
+                      </div>
+                      <ol className="mt-2.5 space-y-1.5">
+                        {flow.stages.map((stage, index) => (
+                          <li key={stage.id} className="flex flex-wrap items-center gap-1.5 text-[13px]">
+                            <span className="tabular-nums text-slate-400">{index + 1}.</span>
+                            <span className="font-medium text-slate-800">{stage.name}</span>
+                            {stage.approverIds.length > 0
+                              ? <Pill state="auto">{stage.approverIds.map((id) => memberNameById.get(id) ?? id.slice(0, 8)).join(", ")}</Pill>
+                              : stage.requireOwner
+                                ? <Pill state="idle">Owner only</Pill>
+                                : <Pill state="idle">Any member</Pill>}
+                            {formatThreshold[stage.id] && <Pill state="waiting">≥ {formatThreshold[stage.id]}</Pill>}
+                          </li>
+                        ))}
+                      </ol>
+                    </>}
               </div>
             ))}
           </div>}

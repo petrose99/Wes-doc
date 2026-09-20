@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useId, useMemo, useRef, useState } from "react"
-import { createApprovalWorkflowAction } from "@/app/(app)/workspaces/[workspaceId]/approval-actions"
+import { createApprovalWorkflowAction, updateApprovalWorkflowAction } from "@/app/(app)/workspaces/[workspaceId]/approval-actions"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -12,6 +12,9 @@ export type ApprovalFormMember = { id: string; name: string; email: string; role
 
 type StageRow = {
   key: number
+  /** #328: set only for a row seeded from an existing ApprovalWorkflowStage (EditFlowForm) — the
+   * create form's rows never carry one, since they don't exist yet. */
+  id?: string
   name: string
   requireOwner: boolean
   approverIds: string[]
@@ -34,17 +37,22 @@ const APPROVER_SEARCH_THRESHOLD = 5
  * workspace that only cares about role-gating never has to look at either. Matches the rest of
  * the Automation section's rule-not-card language — a border-t and a label, not a bordered box
  * inside a bordered box. */
-function StageEditor({ index, count, stage, members, onChange, onRemove, onMove, canRemove, nameError, thresholdError }: {
+function StageEditor({ index, count, stage, members, onChange, onRemove, onMove, canRemove, nameError, thresholdError, locked }: {
   index: number
   count: number
   stage: StageRow
   members: ApprovalFormMember[]
   onChange: (patch: Partial<StageRow>) => void
-  onRemove: () => void
-  onMove: (direction: -1 | 1) => void
-  canRemove: boolean
+  onRemove?: () => void
+  onMove?: (direction: -1 | 1) => void
+  canRemove?: boolean
   nameError: boolean
   thresholdError: boolean
+  /** #328/#288: stage order and count are fixed once a flow exists — a locked StageEditor (the
+   * edit-in-place path) never renders the move/remove controls at all. Not disabled: there is no
+   * "sometimes possible" here, so hiding is honest where disabling would imply otherwise. Name and
+   * the approvers/threshold disclosure stay fully editable. */
+  locked?: boolean
 }) {
   const nameId = useId()
   const thresholdId = useId()
@@ -79,12 +87,15 @@ function StageEditor({ index, count, stage, members, onChange, onRemove, onMove,
           className={nameError ? "border-red-400 focus-visible:ring-red-400" : undefined}
         />
       </div>
-      {/* Order is the flow: a stage that lands in the wrong place is moved, not deleted and retyped. */}
-      <button type="button" disabled={index === 0} onClick={() => onMove(-1)} aria-label={`Move stage ${index + 1} up`} className="shrink-0 text-[13px] font-medium text-slate-500 hover:text-slate-900 disabled:opacity-40">↑</button>
-      <button type="button" disabled={index === count - 1} onClick={() => onMove(1)} aria-label={`Move stage ${index + 1} down`} className="shrink-0 text-[13px] font-medium text-slate-500 hover:text-slate-900 disabled:opacity-40">↓</button>
-      <button type="button" disabled={!canRemove} onClick={onRemove} className="shrink-0 text-[13px] font-medium text-slate-500 hover:text-red-700 disabled:opacity-40">
-        Remove
-      </button>
+      {/* Order is the flow: a stage that lands in the wrong place is moved, not deleted and retyped.
+        * Locked (edit-in-place, #328): none of this renders — structure is fixed once a flow exists. */}
+      {!locked && <>
+        <button type="button" disabled={index === 0} onClick={() => onMove?.(-1)} aria-label={`Move stage ${index + 1} up`} className="shrink-0 text-[13px] font-medium text-slate-500 hover:text-slate-900 disabled:opacity-40">↑</button>
+        <button type="button" disabled={index === count - 1} onClick={() => onMove?.(1)} aria-label={`Move stage ${index + 1} down`} className="shrink-0 text-[13px] font-medium text-slate-500 hover:text-slate-900 disabled:opacity-40">↓</button>
+        <button type="button" disabled={!canRemove} onClick={onRemove} className="shrink-0 text-[13px] font-medium text-slate-500 hover:text-red-700 disabled:opacity-40">
+          Remove
+        </button>
+      </>}
     </div>
     {nameError && <p className="mt-1 pl-7 text-xs text-red-600">Every stage needs a name.</p>}
 
@@ -288,6 +299,110 @@ export function ApprovalWorkflowForm({ workspaceId, members, draft, onTypedChang
       {error && <span role="alert" className="text-xs text-red-700">{error}</span>}
       {/* Success is said where the reader is, and the flow itself appears in the list above. */}
       {created && !error && <span role="status" className="text-xs font-medium text-emerald-800">&ldquo;{created}&rdquo; is in the list above.</span>}
+    </div>
+  </div>
+}
+
+export type EditableFlow = {
+  id: string
+  name: string
+  stages: { id: string; name: string; requireOwner: boolean; approverIds: string[]; minAmount: number | null }[]
+}
+
+const toEditRows = (flow: EditableFlow): StageRow[] => flow.stages.map((stage) => ({
+  key: nextKey++,
+  id: stage.id,
+  name: stage.name,
+  requireOwner: stage.requireOwner,
+  approverIds: stage.approverIds,
+  minAmount: stage.minAmount === null ? "" : String(stage.minAmount),
+}))
+
+/** #328/#288: the in-place edit surface for an existing flow — same row (`ApprovalFlowsEditor`
+ * swaps this in for the read view), same `StageEditor` as the create form, but `locked` (no
+ * add/remove/reorder) and seeded from the flow's existing rows rather than starting empty. Saving
+ * patches by stage id (updateApprovalWorkflowAction); Cancel just discards the draft and returns to
+ * the read view — no confirm, see spec.md's rationale (the server value is untouched, unlike
+ * Duplicate replacing a from-scratch draft that has no saved copy at all). */
+export function EditFlowForm({ workspaceId, flow, members, onDone }: {
+  workspaceId: string
+  flow: EditableFlow
+  members: ApprovalFormMember[]
+  onDone: () => void
+}) {
+  const router = useRouter()
+  const nameId = useId()
+  const nameRef = useRef<HTMLInputElement>(null)
+  const [pending, setPending] = useState(false)
+  const [name, setName] = useState(flow.name)
+  const [stages, setStages] = useState<StageRow[]>(() => toEditRows(flow))
+  const [showErrors, setShowErrors] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Entering edit mode moves focus to the name field, mirroring ApprovalWorkflowForm's own
+  // draft-arrival focus so the two "a form just appeared" moments feel the same.
+  useEffect(() => { nameRef.current?.focus(); nameRef.current?.select() }, [])
+
+  const updateStage = (index: number, patch: Partial<StageRow>) => setStages((previous) => previous.map((stage, i) => (i === index ? { ...stage, ...patch } : stage)))
+
+  const blankStageIndexes = new Set(stages.map((s, i) => (s.name.trim() ? -1 : i)).filter((i) => i >= 0))
+  const badThresholdIndexes = new Set(stages.map((s, i) => (s.minAmount.trim() === "" || (Number.isFinite(Number(s.minAmount)) && Number(s.minAmount) >= 0) ? -1 : i)).filter((i) => i >= 0))
+  const formInvalid = !name.trim() || blankStageIndexes.size > 0 || badThresholdIndexes.size > 0
+
+  const save = async () => {
+    if (formInvalid) {
+      setShowErrors(true)
+      window.requestAnimationFrame(() => document.querySelector<HTMLElement>("[aria-invalid=true]")?.focus())
+      return
+    }
+    setPending(true); setError(null)
+    try {
+      const formData = new FormData()
+      formData.set("name", name)
+      formData.set("stageCount", String(stages.length))
+      stages.forEach((stage, index) => {
+        formData.set(`stageId_${index}`, stage.id ?? "")
+        formData.set(`stageName_${index}`, stage.name)
+        if (stage.requireOwner) formData.set(`stageRequireOwner_${index}`, "on")
+        for (const id of stage.approverIds) formData.append(`stageApproverIds_${index}`, id)
+        if (stage.minAmount.trim()) formData.set(`stageMinAmount_${index}`, stage.minAmount.trim())
+      })
+      const result = await updateApprovalWorkflowAction(workspaceId, flow.id, formData)
+      if (!result.success) { setError(`Couldn't save — ${result.error || "the server didn't say why"}. What you typed is still here.`); return }
+      router.refresh()
+      onDone()
+    } catch {
+      setError("Couldn't reach the server. What you typed is still here.")
+    } finally { setPending(false) }
+  }
+
+  return <div className="border-t border-hairline-soft pt-3">
+    <div>
+      <Label htmlFor={nameId} className="text-[13px]">Flow name</Label>
+      <Input ref={nameRef} id={nameId} value={name} onChange={(e) => setName(e.target.value)} className="mt-1.5" aria-invalid={(showErrors && !name.trim()) || undefined} />
+      {showErrors && !name.trim() && <p className="mt-1 text-xs text-red-600">Name the flow.</p>}
+    </div>
+
+    <div className="mt-4">
+      {stages.map((stage, index) => (
+        <StageEditor
+          key={stage.key}
+          index={index}
+          count={stages.length}
+          stage={stage}
+          members={members}
+          onChange={(patch) => updateStage(index, patch)}
+          nameError={showErrors && blankStageIndexes.has(index)}
+          thresholdError={showErrors && badThresholdIndexes.has(index)}
+          locked
+        />
+      ))}
+    </div>
+
+    <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-hairline pt-4">
+      <Button onClick={() => void save()} disabled={pending}>{pending ? "Saving…" : "Save changes"}</Button>
+      <button type="button" onClick={onDone} disabled={pending} className="text-[13px] font-medium text-slate-600 hover:text-slate-900 disabled:opacity-40">Cancel</button>
+      {error && <span role="alert" className="text-xs text-red-700">{error}</span>}
     </div>
   </div>
 }
