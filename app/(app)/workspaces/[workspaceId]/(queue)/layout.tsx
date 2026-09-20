@@ -2,13 +2,16 @@ import { getCurrentUser } from "@/lib/auth"
 import { requireWorkspaceRole } from "@/models/workspaces"
 import { DocumentDetailPage } from "@/app/(app)/workspaces/[workspaceId]/documents/[documentId]/page"
 import { PaymentBatchDetail } from "@/components/payments/batch-detail"
+import { ExpenseClaimDetail } from "@/components/queue/expense-claim-queue"
 
 /** The Detail pane's content arrives from a server action (`getQueueDetailAction`) as JSX. The
  * RSC bundler only lists a client component in a route's client manifest when a server component
  * on that route's graph imports it — an action module's own imports don't count — so this layout
  * pulls the document detail page (and with it SplitPane, MatchPanel, FxConversionBadge, …) into
- * every Queue screen's graph. Referenced, never rendered here. */
-const CLIENT_MANIFEST_ANCHORS = [DocumentDetailPage, PaymentBatchDetail]
+ * every Queue screen's graph. Referenced, never rendered here. #331: Bill Pay's claim rows route
+ * to `getExpenseClaimDetailAction` → `ExpenseClaimDetail`, a second JSX-returning action — same
+ * anchor requirement. */
+const CLIENT_MANIFEST_ANCHORS = [DocumentDetailPage, PaymentBatchDetail, ExpenseClaimDetail]
 
 /** #225: the Queue screens (Invoices, Purchase Orders, Receipts, Bank Statements, Exceptions)
  * opt out of the (chrome) group's `max-w-4xl` reading column — that column is right for

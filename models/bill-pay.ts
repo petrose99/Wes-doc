@@ -34,14 +34,11 @@ export type BillPayBillRow = {
   scheduledBatch: { id: string; name: string | null; status: string } | null
 }
 
-export type ClaimEligibilityReason = "needs_bank_details" | "left_workspace" | "needs_currency"
-export type ClaimEligibility = { eligible: true } | { eligible: false; reason: ClaimEligibilityReason }
-
-export const CLAIM_ELIGIBILITY_COPY: Record<ClaimEligibilityReason, string> = {
-  needs_bank_details: "Needs bank details",
-  left_workspace: "No longer a member",
-  needs_currency: "Needs a currency",
-}
+// #331: defined in lib/payments/eligibility.ts (client-safe, no `lib/db` import) so
+// bill-pay-queue.tsx can read the copy without pulling Prisma into the browser bundle.
+export type { ClaimEligibilityReason, ClaimEligibility } from "@/lib/payments/eligibility"
+export { CLAIM_ELIGIBILITY_COPY } from "@/lib/payments/eligibility"
+import type { ClaimEligibilityReason, ClaimEligibility } from "@/lib/payments/eligibility"
 
 /** #295: a reimbursement claim on the same queue as bills — no terms, no discount, no aging (its
  * Due is the approval date, not a countdown). Eligible once approved with a frozen total, a

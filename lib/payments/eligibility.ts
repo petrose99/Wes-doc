@@ -38,6 +38,21 @@ export const ELIGIBILITY_COPY: Record<BatchEligibilityReason, string> = {
   no_payer_account: "No payer account yet",
 }
 
+/** #331: an approved reimbursement claim's own eligibility for a batch — no supplier/payer
+ * account/amount checks (those don't apply to a claim row), just the claimant's own bank details,
+ * membership and currency. Kept in this client-safe module (no `lib/db` in its import graph)
+ * beside `ELIGIBILITY_COPY` so `bill-pay-queue.tsx` (a client component) can import the copy
+ * without pulling Prisma into the browser bundle — `models/bill-pay.ts` re-exports both for its
+ * own (server-only) callers. */
+export type ClaimEligibilityReason = "needs_bank_details" | "left_workspace" | "needs_currency"
+export type ClaimEligibility = { eligible: true } | { eligible: false; reason: ClaimEligibilityReason }
+
+export const CLAIM_ELIGIBILITY_COPY: Record<ClaimEligibilityReason, string> = {
+  needs_bank_details: "Needs bank details",
+  left_workspace: "No longer a member",
+  needs_currency: "Needs a currency",
+}
+
 /** `0 < amount ≤ due`, in cents so 0.1 + 0.2 never bites. Returns the reason it is not, or null. */
 export function validateAmountToPay(amount: number, due: number): string | null {
   if (!Number.isFinite(amount)) return "Enter an amount."
