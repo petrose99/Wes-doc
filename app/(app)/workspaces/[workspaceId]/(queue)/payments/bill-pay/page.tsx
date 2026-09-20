@@ -44,6 +44,7 @@ export async function BillPayQueuePage({ params, searchParams, selectedDocumentI
     fallbackCurrency={workspace?.baseCurrency ?? "ZAR"}
     suggestedBatchName={suggestBatchName(now, recentBatches.map((b) => b.name).filter((n): n is string => !!n))}
     isOwner={membership.role === "owner"}
+    currentUserId={user.id}
     initialSelectedId={selectedDocumentId} />
 }
 

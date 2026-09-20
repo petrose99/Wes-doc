@@ -70,7 +70,7 @@ const SORTS: SortOption<BillPayRow>[] = [
   { key: "supplier", label: "Payee A–Z", compare: (a, b) => (rowPayeeName(a) ?? "￿").localeCompare(rowPayeeName(b) ?? "￿") },
 ]
 
-export function BillPayQueue({ workspaceId, basePath, rows, summary, payerAccounts, fallbackCurrency, suggestedBatchName, isOwner, initialSelectedId }: {
+export function BillPayQueue({ workspaceId, basePath, rows, summary, payerAccounts, fallbackCurrency, suggestedBatchName, isOwner, currentUserId, initialSelectedId }: {
   workspaceId: string
   basePath: string
   rows: BillPayRow[]
@@ -79,6 +79,7 @@ export function BillPayQueue({ workspaceId, basePath, rows, summary, payerAccoun
   fallbackCurrency: string
   suggestedBatchName: string
   isOwner: boolean
+  currentUserId: string
   initialSelectedId?: string | null
 }) {
   const router = useRouter()
@@ -198,7 +199,12 @@ export function BillPayQueue({ workspaceId, basePath, rows, summary, payerAccoun
       paneActions={(row) => row.kind !== "bill" ? <>
         {row.paidState === "scheduled" && row.scheduledBatch && <Button asChild className="lg:h-8 lg:text-xs" variant="outline"><Link className="py-1.5" href={withOrigin(`${batchesHref}/${row.scheduledBatch.id}`, origin)}>Open batch {row.scheduledBatch.name ?? ""}</Link></Button>}
         {isOwner && row.paidState === "paid" && <Button type="button" className="lg:h-8 lg:text-xs" variant="outline" onClick={() => setRemovingClaimRecords(row)}>Remove payment records…</Button>}
-        {isOwner && row.paidState === "unpaid" && <Button type="button" className="lg:h-8 lg:text-xs" variant="outline" onClick={() => setMarkingClaimPaid(row)}>Mark as paid…</Button>}
+        {/* #331 fortify 1/2: an ineligible claim (needs bank details / claimant left) gets no
+            batch/paid action here — only the "own claim" pointer to fix it; a left-workspace
+            claimant has nobody left to fix it from this pane, so no pointer at all. */}
+        {isOwner && row.paidState === "unpaid" && row.eligibility.eligible && <Button type="button" className="lg:h-8 lg:text-xs" variant="outline" onClick={() => setMarkingClaimPaid(row)}>Mark as paid…</Button>}
+        {!row.eligibility.eligible && row.eligibility.reason === "needs_bank_details" && row.submitter?.id === currentUserId && <Button asChild className="lg:h-8 lg:text-xs" variant="outline"><Link className="py-1.5" href={withOrigin(`/workspaces/${workspaceId}/account`, origin)}><Landmark className="h-3.5 w-3.5" aria-hidden />Add bank details</Link></Button>}
+        {!row.eligibility.eligible && row.eligibility.reason === "needs_bank_details" && row.submitter?.id !== currentUserId && isOwner && <Button asChild className="lg:h-8 lg:text-xs" variant="outline"><Link className="py-1.5" href={withOrigin(`/workspaces/${workspaceId}/admin/users`, origin)}><Landmark className="h-3.5 w-3.5" aria-hidden />Add bank details</Link></Button>}
       </> : <>
         {!row.eligibility.eligible && row.eligibility.reason === "needs_bank_details" && <Button asChild className="lg:h-8 lg:text-xs" variant="outline"><Link className="py-1.5" href={`${settingsHref}#supplier-${row.bill.supplierId ?? ""}`}><Landmark className="h-3.5 w-3.5" aria-hidden />Add bank details</Link></Button>}
         {row.bill.paidState.state === "scheduled" && row.scheduledBatch && <Button asChild className="lg:h-8 lg:text-xs" variant="outline"><Link className="py-1.5" href={withOrigin(`${batchesHref}/${row.scheduledBatch.id}`, origin)}>Open batch {row.scheduledBatch.name ?? ""}</Link></Button>}
