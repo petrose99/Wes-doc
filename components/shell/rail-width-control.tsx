@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useId, useState } from "react"
+import { useRouter } from "next/navigation"
 import { NativeSelect } from "@/components/ui/native-select"
 import { useOnlineStatus } from "@/lib/client/use-online-status"
 import { getRailWidthAction, setRailWidthAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
@@ -20,6 +21,7 @@ function useRailWidthSave(workspaceId: string, initial: RailWidth, onSaved?: (va
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const online = useOnlineStatus()
+  const router = useRouter()
   useEffect(() => { setValue(initial) }, [initial])
 
   const change = async (next: RailWidth) => {
@@ -33,6 +35,9 @@ function useRailWidthSave(workspaceId: string, initial: RailWidth, onSaved?: (va
       if (!result.success || !result.data) throw new Error(result.error || "save_failed")
       setValue(result.data.railWidth)
       onSaved?.(result.data.railWidth)
+      // #342 B2: Sidebar reads `user.railWidth` from the server layout prop with no client
+      // mirror — refresh so the rail on *this* page reflects the save immediately.
+      router.refresh()
     } catch {
       setValue(previous)
       setError(RAIL_WIDTH_SAVE_ERROR)
