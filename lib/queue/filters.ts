@@ -2,6 +2,23 @@
  * phone lane's Filter button label ("Filter · 2") and the Filter sheet all share — one function,
  * never three counts (B3). Pure, so it is testable without a DOM. */
 
+import { PROCESSING_STATES, PROCESSING_STATE_LABELS } from "@/lib/documents/processing-state"
+
+/** #270 §1: the one Status facet shape — "Open" (the five processing states) and a "Closed"
+ * section (archived rows, spec §4's word — never "Archive"/"Done"). Built generically on Search
+ * so #344 only wires the five typed queues to this same function rather than each hand-rolling
+ * its own Open/Closed split (B4). */
+export function statusFacet(): { param: string; label: string; sections: Array<{ label: string; options: Array<{ value: string; label: string }> }> } {
+  return {
+    param: "status",
+    label: "Status",
+    sections: [
+      { label: "Open", options: PROCESSING_STATES.map((value) => ({ value, label: PROCESSING_STATE_LABELS[value] })) },
+      { label: "Closed", options: [{ value: "archived", label: "Closed" }] },
+    ],
+  }
+}
+
 export type FilterableFacet = {
   param: string
   options?: Array<{ value: string }>
