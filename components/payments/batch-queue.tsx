@@ -18,6 +18,7 @@ import { DiscountCountdownBadge } from "@/components/documents/countdown-badge"
 import { formatPaymentDate, formatPaymentDateTime, formatPaymentMoney } from "@/components/payments/format"
 import { resolveCountdown } from "@/lib/documents/countdown"
 import { BATCH_VIEW_LABEL, type BatchView } from "@/lib/payments/batch-status"
+import { describeBatchCounts } from "@/lib/payments/batch-counts"
 import { approvePaymentBatchAction, getPaymentBatchDetailAction, markPaymentBatchPaidAction, rejectPaymentBatchAction, unmarkPaymentBatchPaidAction } from "@/app/(app)/workspaces/[workspaceId]/(queue)/payments/actions"
 import type { PaymentBatchRow } from "@/models/payment-batches"
 
@@ -97,7 +98,7 @@ export function PaymentBatchQueue({ workspaceId, basePath, rows: serverRows, fal
         </span>
       },
     },
-    { key: "bills", label: "Bills", className: "whitespace-nowrap text-right tabular-nums text-slate-700", render: (batch) => batch.billCount },
+    { key: "bills", label: "Lines", className: "whitespace-nowrap text-right tabular-nums text-slate-700", render: (batch) => describeBatchCounts(batch.billCount, batch.claimCount) },
     { key: "total", label: "Total", narrow: true, className: "whitespace-nowrap text-right tabular-nums text-slate-900", render: (batch) => money(batch.total, batch.currencyCode) },
     { key: "currency", label: "Currency", className: "whitespace-nowrap text-slate-700", render: (batch) => batch.currencyCode },
     { key: "payFrom", label: "Pay From", className: "whitespace-nowrap text-slate-700", render: (batch) => batch.payFromLabel },
@@ -122,7 +123,7 @@ export function PaymentBatchQueue({ workspaceId, basePath, rows: serverRows, fal
       basePath={basePath}
       rows={rows}
       rowId={(batch) => batch.id}
-      rowName={(batch) => ({ title: batch.name, suffix: `${BATCH_VIEW_LABEL[batch.view]} · ${batch.billCount} bill${batch.billCount === 1 ? "" : "s"} · ${money(batch.total, batch.currencyCode)}` })}
+      rowName={(batch) => ({ title: batch.name, suffix: `${BATCH_VIEW_LABEL[batch.view]} · ${describeBatchCounts(batch.billCount, batch.claimCount)} · ${money(batch.total, batch.currencyCode)}` })}
       columns={columns}
       sortOptions={SORTS}
       facets={BATCH_FACETS}
@@ -163,7 +164,7 @@ export function PaymentBatchQueue({ workspaceId, basePath, rows: serverRows, fal
       confirmLabel={busy ? "Approving…" : "Approve batch"}
       onConfirm={() => void approve()} onCancel={() => { if (!busy) setApproving(null) }}>
       {approving && <dl className="space-y-1 text-sm text-slate-700">
-        <div className="flex gap-2"><dt className="w-24 shrink-0 font-medium text-slate-800">Batch</dt><dd>{approving.billCount} bill{approving.billCount === 1 ? "" : "s"} · <span className="font-semibold tabular-nums text-slate-900">{money(approving.total, approving.currencyCode)}</span> · Pay From {approving.payFromLabel}</dd></div>
+        <div className="flex gap-2"><dt className="w-24 shrink-0 font-medium text-slate-800">Batch</dt><dd>{describeBatchCounts(approving.billCount, approving.claimCount)} · <span className="font-semibold tabular-nums text-slate-900">{money(approving.total, approving.currencyCode)}</span> · Pay From {approving.payFromLabel}</dd></div>
         <div className="flex gap-2"><dt className="w-24 shrink-0 font-medium text-slate-800">Submitted</dt><dd>{approving.submittedBy?.name ?? "—"} · {formatPaymentDateTime(approving.createdAt)}</dd></div>
         {approving.submittedBy?.id === currentUserId && <div className="rounded bg-amber-50 px-2 py-1 text-xs text-amber-800">You submitted this batch. Approving it yourself is recorded on the audit trail; you can still reject it until it is marked paid.</div>}
         {approving.discountExpiresInDays !== null && <div className="rounded bg-purple-50 px-2 py-1 text-xs text-purple-800">A discount in this batch expires {approving.discountExpiresInDays === 0 ? "today" : `in ${approving.discountExpiresInDays} day${approving.discountExpiresInDays === 1 ? "" : "s"}`}; the file pays the discounted amount.</div>}
@@ -201,7 +202,7 @@ export function PaymentBatchQueue({ workspaceId, basePath, rows: serverRows, fal
       description="Records a payment for every invoice in the batch. The ledger isn't changed; the invoices read “Paid (recorded)” until it confirms."
       submitLabel="Mark batch as paid"
       recap={markingPaid && <div className="space-y-2">
-        <p className="border-y border-slate-200 py-2 text-sm text-slate-700">{markingPaid.billCount} bill{markingPaid.billCount === 1 ? "" : "s"} · <span className="font-semibold tabular-nums text-slate-900">{money(markingPaid.total, markingPaid.currencyCode)}</span> · Pay From {markingPaid.payFromLabel}</p>
+        <p className="border-y border-slate-200 py-2 text-sm text-slate-700">{describeBatchCounts(markingPaid.billCount, markingPaid.claimCount)} · <span className="font-semibold tabular-nums text-slate-900">{money(markingPaid.total, markingPaid.currencyCode)}</span> · Pay From {markingPaid.payFromLabel}</p>
         {!markingPaid.exportedAt && <p role="alert" className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">The payment file hasn&apos;t been downloaded yet — nobody has taken this batch to the bank from here. Mark it paid only if the payment was made another way.</p>}
         <p className="text-xs text-slate-600">Reversal is “Remove payment records…” on the batch, with a reason.</p>
       </div>}

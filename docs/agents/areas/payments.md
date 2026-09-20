@@ -51,6 +51,24 @@ for the row subtitle, one function. Ineligible prints `CLAIM_ELIGIBILITY_COPY[re
 e.g. "Needs bank details") instead of "Ready to pay" (emerald) — fixes a self-contradiction
 (status line vs. CTA) only visible once the seed-approval-event fix below made the line render.
 
+## #347: mixed bill/claim batching
+`createPaymentBatches` (`models/payment-batches.ts`) now takes the full `BillPayRow` union —
+one batch can hold both `PaymentRunItem`s. `getPaymentBatch` splits `BatchLine`s into `suppliers`
+(bill-only, grouped by payee, unchanged from #251) and a `reimbursements` group appended *after*
+every supplier group, never interleaved — the claim cluster is always last. `PaymentBatchRow`
+carries `billCount` (doc-only, narrowed) and `claimCount`; `lib/payments/batch-counts.ts`'
+`describeBatchCounts(billCount, claimCount)` is the one string for "how many lines, of which
+kind" — read by the batch queue's Lines column (renamed from "Bills"), row summary, both confirm
+dialogs' recap, the pane header, and the create-batch dialog's receipt/footer. A bill-only batch
+renders byte-identical to the pre-#347 "n bills" text; a claim gets its own noun only once one is
+present. Claims have no per-row Pay From override (`BillPayClaimRow` has no `payFrom`, #331) —
+`create-batch-dialog.tsx`'s `defaultPayerAccount` prop is the only account a claim line can pay
+from, disclosed on the batch, not the queue row. Claim line dates use "Approved"
+(`formatPaymentDate(line.approvedAt)`), never "Due" — claims have no deadline (#331 precedent).
+Capture recipe: extend `round296.mjs` with a states arg for "mixed batch open" / "claim-only
+batch open" (claim-only: suppliers list renders nothing, no empty "This batch holds no lines"
+message — that's reserved for a truly empty batch).
+
 ## Detector residue (report, do not chase)
 App-wide four (`ai-color-palette`, `overused-font`, `layout-transition`, `dark-glow`), plus a
 pre-existing (shipped by #251, unmodified by #296, just newly reachable via the Approved-origin
