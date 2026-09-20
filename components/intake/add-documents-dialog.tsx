@@ -118,7 +118,11 @@ export const AddDocumentsDialog = forwardRef<AddDocumentsDialogHandle, {
     }
     if (settledIds.length) onUploaded(settledIds)
     setSending(false)
-    if (rowsRef.current.every((row) => row.status === "done")) setDone(succeeded)
+    // rowsRef.current is stale here: the setRows above hasn't flushed through a render yet, so
+    // it still reports this batch's rows by their pre-upload status. Judge this batch from what
+    // we just observed (succeeded vs toSend) and only defer to the ref for rows outside it.
+    const otherRows = rowsRef.current.filter((row) => !toSend.some((sent) => sent.localId === row.localId))
+    if (succeeded.length === toSend.length && otherRows.every((row) => row.status === "done")) setDone(succeeded)
   }
 
   function reset() {
