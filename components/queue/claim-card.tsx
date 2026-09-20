@@ -16,6 +16,7 @@ import type { DocumentClaimFacts } from "@/lib/claims/facts"
 import { CLAIM_STATUS_LABELS, ELIGIBILITY_REASON_TEXT } from "@/lib/claims/labels"
 import { useOnlineStatus } from "@/lib/client/use-online-status"
 import { formatMoney } from "@/lib/money"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { createContext, useContext, useEffect, useState } from "react"
 import { toast } from "sonner"
@@ -162,7 +163,9 @@ export function ClaimSection({ workspaceId, documentId, facts, eligibility, read
       {facts.isMine && facts.canDecide && <><dt className="text-slate-600">Note</dt><dd className="text-slate-800">Your own claim</dd></>}
     </dl>
 
-    {facts.status === "approved" && facts.approval && <p className="text-sm text-emerald-800" role="status">Approved {formatDate(facts.approval.at)} by {facts.approval.by}</p>}
+    {facts.status === "approved" && facts.approval && facts.paidState === "paid" && facts.paidAt && <p className="text-sm text-emerald-800" role="status">In an approved claim · Paid {formatDate(facts.paidAt)}</p>}
+    {facts.status === "approved" && facts.approval && facts.paidState === "scheduled" && <p className="text-sm text-emerald-800" role="status">Approved {formatDate(facts.approval.at)} by {facts.approval.by} · Scheduled · <Link href={`/workspaces/${workspaceId}/payments/batches/${facts.scheduledBatch?.id ?? ""}`} className="underline underline-offset-2">{facts.scheduledBatch?.name ?? "batch"}</Link></p>}
+    {facts.status === "approved" && facts.approval && facts.paidState === "unpaid" && <p className="text-sm text-emerald-800" role="status">Approved {formatDate(facts.approval.at)} by {facts.approval.by} · Ready to pay</p>}
     {facts.status === "rejected" && facts.rejection && <p className="text-sm text-red-800" role="status">Rejected {formatDate(facts.rejection.at)} by {facts.rejection.by}{facts.rejection.reason ? `: ${facts.rejection.reason}` : ""}</p>}
     {facts.deletedReceiptCount > 0 && <p className="text-xs text-slate-600">{facts.deletedReceiptCount} receipt{facts.deletedReceiptCount === 1 ? " was" : "s were"} deleted after submission. The amount is as submitted.</p>}
     {facts.status === "draft" && !draftEditable && <p className="text-sm text-slate-600">{facts.claimant.name}&rsquo;s draft — only they or an owner can change it.</p>}
@@ -185,6 +188,8 @@ export function ClaimSection({ workspaceId, documentId, facts, eligibility, read
     {error && confirm === null && <p role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>}
 
     {facts.timelineApproval && <ApprovalTimeline decisions={facts.decisions} pendingStages={facts.pendingStages} approval={facts.timelineApproval} />}
+    {!facts.timelineApproval && facts.status === "approved" && facts.decisions.length > 0 &&
+      <ApprovalTimeline decisions={facts.decisions} pendingStages={[]} paid={facts.paidState === "paid" && facts.paidAt ? { at: facts.paidAt, by: facts.paidBy } : null} />}
 
     {confirmProps && <ConfirmDialog open title={confirmProps.title} description={confirmProps.description} confirmLabel={confirmProps.confirmLabel} destructive={confirmProps.destructive} busy={busy}
       onConfirm={() => void confirmProps.onConfirm()} onCancel={() => { if (!busy) { setConfirm(null); setError(null) } }}>

@@ -46,6 +46,8 @@ export type DocumentClaimFacts = {
   paidState: "paid" | "scheduled" | "unpaid"
   paidAt: string | null
   paidBy: string | null
+  /** Only set when `paidState === "scheduled"` — same shape as `BillPayClaimRow.scheduledBatch`. */
+  scheduledBatch: { id: string; name: string | null } | null
   deletedReceiptCount: number
   receipts: ClaimReceipt[]
   decisions: ClaimDecision[]

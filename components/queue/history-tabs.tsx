@@ -85,7 +85,7 @@ function relativeTime(iso: string): string {
  * decided, the stage it waits on (ringed, "Waiting on you" / "Waiting on ‹name›"), and the
  * stages not reached yet. Falls back to the decisions + pending stages alone (#218's data) when
  * the loader supplied no `facts.approval` — the standalone route, or a document with no run. */
-export function ApprovalTimeline({ decisions, pendingStages, approval, state, reviewed, touchless, queueTitle, cancelledReason }: {
+export function ApprovalTimeline({ decisions, pendingStages, approval, state, reviewed, touchless, queueTitle, cancelledReason, paid }: {
   decisions: DocumentHistory["stageDecisions"]
   pendingStages: DocumentHistory["pendingStages"]
   approval?: ApprovalDetailFacts["approval"]
@@ -98,6 +98,9 @@ export function ApprovalTimeline({ decisions, pendingStages, approval, state, re
   /** "Invoices" / "Receipts" — only Invoices' bulk bar has *Start approval*. */
   queueTitle?: string
   cancelledReason?: string | null
+  /** #331: one more synthetic entry once an approved claim is paid — same list, not a second
+   * timeline. */
+  paid?: { at: string; by: string | null } | null
 }) {
   if (!approval && decisions.length === 0 && pendingStages.length === 0) {
     if (state === "cancelled") {
@@ -188,6 +191,13 @@ export function ApprovalTimeline({ decisions, pendingStages, approval, state, re
         </div>
       </li>
     })}
+    {paid && <li className="relative flex gap-3 pb-4">
+      <PersonMark name={paid.by ?? "DocuBite"} tone="done" />
+      <div className="min-w-0 pt-1">
+        <p className="text-sm text-slate-800"><span className="font-medium">{paid.by ?? "DocuBite"}</span> marked it paid</p>
+        <p className="text-xs text-slate-500"><time dateTime={paid.at}>{relativeTime(paid.at)}</time></p>
+      </div>
+    </li>}
   </ol>
 }
 

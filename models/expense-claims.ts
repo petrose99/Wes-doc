@@ -544,6 +544,7 @@ async function buildClaimFacts(claim: LoadedClaim, actor: ApprovalActor): Promis
     paidState: paidFacts?.paidState ?? "unpaid",
     paidAt: paidFacts?.paidAt?.toISOString() ?? null,
     paidBy: paidFacts?.paidBy ?? null,
+    scheduledBatch: paidFacts?.scheduledBatch ? { id: paidFacts.scheduledBatch.id, name: paidFacts.scheduledBatch.name } : null,
     deletedReceiptCount: auditItemCount !== null ? Math.max(0, auditItemCount - receipts.length) : 0,
     receipts,
     decisions,

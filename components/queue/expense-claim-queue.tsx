@@ -134,9 +134,9 @@ export function ExpenseClaimQueue({ workspaceId, basePath, rows, invoiceCount, p
     const amount = row.total !== null ? formatMoney(row.total, row.currencyCode) : "the amount claimed"
     const who = claimantName(row)
     const own = row.claimant?.id === currentUserId ? "You are approving your own claim. " : ""
-    if (!row.hasWorkflow) return `${own}Records that ${who} is owed ${amount}. Receipts stay as they are.`
+    if (!row.hasWorkflow) return `${own}Records that ${who} is owed ${amount}. Receipts stay as they are. Approved claims are ready in Bill Pay.`
     if (row.nextStageName) return `${own}Approving moves it to ${row.nextStageName}.`
-    return `${own}Completes the Approval: ${who} is owed ${amount}.`
+    return `${own}Completes the Approval: ${who} is owed ${amount}. Approved claims are ready in Bill Pay.`
   }
 
   return <>
