@@ -140,6 +140,7 @@ function PaneMenu({ open, onOpenChange, fullHref, menu, onDeleted }: {
   const ctx = useContext(PaneDocumentContext)
   const hasDoc = !!ctx?.doc
   const contentRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [moveOpen, setMoveOpen] = useState(false)
   if (!fullHref && !menu && !hasDoc) return null
@@ -162,7 +163,7 @@ function PaneMenu({ open, onOpenChange, fullHref, menu, onDeleted }: {
   return <>
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>
-        <button type="button" aria-label="More actions" title="More actions" aria-haspopup="menu" aria-expanded={open} className={iconButton}>
+        <button ref={triggerRef} type="button" aria-label="More actions" title="More actions" aria-haspopup="menu" aria-expanded={open} className={iconButton}>
           <MoreHorizontal className="h-4 w-4" aria-hidden />
         </button>
       </PopoverTrigger>
@@ -181,10 +182,10 @@ function PaneMenu({ open, onOpenChange, fullHref, menu, onDeleted }: {
         closes, which happens on the same click that requests this dialog (#259 close-phase fix —
         the dialog previously never rendered because its state died with the menu). */}
     {deleteOpen && ctx?.doc && <DeleteDocumentDialog workspaceId={ctx.doc.workspaceId} fileId={ctx.doc.fileId} documentId={ctx.doc.documentId} filename={ctx.doc.filename}
-      onOpenChange={setDeleteOpen}
+      onOpenChange={setDeleteOpen} restoreFocusTo={triggerRef.current}
       onDeleted={() => { ctx.onMutated?.("removed"); onDeleted?.() }} />}
     {moveOpen && ctx?.doc && <MoveDocumentDialog workspaceId={ctx.doc.workspaceId} documentId={ctx.doc.documentId} filename={ctx.doc.filename} currentType={ctx.doc.docType}
-      onOpenChange={setMoveOpen}
+      onOpenChange={setMoveOpen} restoreFocusTo={triggerRef.current}
       onMoved={() => ctx.onMutated?.("removed")} />}
   </>
 }

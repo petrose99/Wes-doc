@@ -13,7 +13,7 @@ import { createPortal } from "react-dom"
  * optional input (the stage-reject note) must keep that field in the tab cycle. */
 const FOCUSABLE = "a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex=\"-1\"])"
 
-export function ConfirmDialog({ open, title, description, confirmLabel = "Confirm", destructive = false, busy = false, onConfirm, onCancel, children, confirmDisabled = false }: {
+export function ConfirmDialog({ open, title, description, confirmLabel = "Confirm", destructive = false, busy = false, onConfirm, onCancel, children, confirmDisabled = false, restoreFocusTo }: {
   open: boolean
   title: string
   description?: string
@@ -29,9 +29,16 @@ export function ConfirmDialog({ open, title, description, confirmLabel = "Confir
   /** #286: the action can no longer proceed (a precondition failed at submit) — Cancel only,
    * with the reason rendered by the caller in `children`. */
   confirmDisabled?: boolean
+  /** Explicit opener to restore focus to on close, for callers whose trigger is unmounted
+   * before this dialog mounts (a popover menu item that closes its menu on the same click that
+   * requests the dialog, #297) — `document.activeElement` at mount time is unreliable there
+   * (the popover's own focus-restore hasn't necessarily settled yet, so the guess can be body).
+   * Falls back to the activeElement guess when omitted, unchanged for every other caller. */
+  restoreFocusTo?: HTMLElement | null
 }) {
   const contentRef = useRef<HTMLDivElement>(null)
   const openerRef = useRef<Element | null>(null)
+  const openerCapturedRef = useRef(false)
   const busyRef = useRef(busy)
   const onCancelRef = useRef(onCancel)
   // Per-instance ids so two ConfirmDialogs mounted concurrently (bulk approve + stage-reject,
@@ -43,8 +50,17 @@ export function ConfirmDialog({ open, title, description, confirmLabel = "Confir
   useEffect(() => { onCancelRef.current = onCancel }, [onCancel])
 
   useEffect(() => {
-    if (!open) return
-    openerRef.current = typeof document !== "undefined" ? document.activeElement : null
+    if (!open) { openerCapturedRef.current = false; return }
+    // Captured once per open, not on every re-run of this effect — it also re-fires whenever
+    // `children` gets a new identity (any state change inside the dialog: picking a radio,
+    // expanding a disclosure, a submit error appearing), which would otherwise overwrite the
+    // real opener with whatever's focused inside the dialog at that moment and, on close, try
+    // to refocus a node that's about to unmount with it → body (#297: Esc after choosing a
+    // Move target left focus on body).
+    if (!openerCapturedRef.current) {
+      openerRef.current = restoreFocusTo ?? (typeof document !== "undefined" ? document.activeElement : null)
+      openerCapturedRef.current = true
+    }
     // Initial focus always moves here, after the opener is read — never via `autoFocus`, which React
     // applies before this effect runs and so made a mounted-open dialog record its own button as the
     // opener (#273: Esc returned focus to a detached node → body). With extra content present (the

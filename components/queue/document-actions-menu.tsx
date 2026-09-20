@@ -154,7 +154,7 @@ export function DocumentMenuDeleteItem({ onRequestDelete }: { onRequestDelete: (
  * ⋯ menu and any future bulk caller share one implementation (#259 B1/B4). Handles S13's two
  * branches: a document already deleted by someone else closes quietly; any other error leaves the
  * dialog open with its own error line so the operator can retry without losing the confirm state. */
-export function DeleteDocumentDialog({ workspaceId, fileId, documentId, filename, onOpenChange, onDeleted }: {
+export function DeleteDocumentDialog({ workspaceId, fileId, documentId, filename, onOpenChange, onDeleted, restoreFocusTo }: {
   workspaceId: string
   fileId: string
   documentId: string
@@ -162,6 +162,9 @@ export function DeleteDocumentDialog({ workspaceId, fileId, documentId, filename
   onOpenChange: (open: boolean) => void
   /** Called once the delete has actually succeeded — the caller closes the pane / refreshes. */
   onDeleted: () => void
+  /** See `ConfirmDialog`'s doc — the trigger button, since this mounts after the popover
+   * menu that opened it has already unmounted (#297). */
+  restoreFocusTo?: HTMLElement | null
 }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -197,6 +200,7 @@ export function DeleteDocumentDialog({ workspaceId, fileId, documentId, filename
     open
     destructive
     busy={busy}
+    restoreFocusTo={restoreFocusTo}
     title="Delete this document?"
     description={`${filename} and every row extracted from it will be removed, along with the stored source file. This cannot be undone.`}
     confirmLabel={busy ? "Deleting…" : "Delete"}
@@ -231,12 +235,15 @@ export function MoveDocumentMenuItem({ onRequestMove }: { onRequestMove: () => v
  * menu is the one caller today and any future one shares it (B1/B4). `currentType` unset means
  * "no current queue to exclude" — Library moving a secondary/untyped document into a typed queue
  * (§5) — so all three typed targets plus every "Other types" option are offered. */
-export function MoveDocumentDialog({ workspaceId, documentId, filename, currentType, onOpenChange, onMoved }: {
+export function MoveDocumentDialog({ workspaceId, documentId, filename, currentType, onOpenChange, onMoved, restoreFocusTo }: {
   workspaceId: string
   documentId: string
   filename: string
   currentType?: DocType
   onOpenChange: (open: boolean) => void
+  /** See `ConfirmDialog`'s doc — the trigger button, since this mounts after the popover
+   * menu that opened it has already unmounted (#297). */
+  restoreFocusTo?: HTMLElement | null
   /** Called once the move has actually succeeded — the caller drops the row / refreshes. */
   onMoved: () => void
 }) {
@@ -306,6 +313,7 @@ export function MoveDocumentDialog({ workspaceId, documentId, filename, currentT
   return <ConfirmDialog
     open
     busy={busy}
+    restoreFocusTo={restoreFocusTo}
     title="Move to another queue?"
     description={consequence ?? "Choose a queue to move this document to."}
     confirmLabel={targetLabel ? `Move to ${targetLabel}` : "Move"}
