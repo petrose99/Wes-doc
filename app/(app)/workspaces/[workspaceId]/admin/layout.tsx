@@ -36,6 +36,12 @@ export default async function AdminLayout({ children, params }: { children: Reac
       { href: paths.users, label: "Users" },
     ] },
     { caption: context.workspace.name, items: [
+      // #342 §3: Activity and Health Checks moved off the rail's bottom group into Admin's own
+      // nav — both workspace-scoped, so this group, and status/monitoring read before
+      // configuring, so first in it. data-health's module tier is "always" (unconditional for
+      // every finance workspace), matching Companies/Users below — added unconditionally too.
+      { href: `/workspaces/${workspaceId}/activity`, label: "Activity" },
+      { href: `/workspaces/${workspaceId}/health`, label: "Health Checks" },
       { href: paths.configuration, label: "Configuration", children: [
         { href: paths.fields, label: "Fields" },
         ...(hasTouchless ? [{ href: paths.autonomy, label: "Autonomy" }, { href: paths.checks, label: "Checks" }, { href: paths.report, label: "Report" }] : []),

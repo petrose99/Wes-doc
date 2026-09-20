@@ -179,7 +179,7 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
     // Hubdoc both name this surface Archive). Route stays /library — same label-over-URL stance
     // as Controls (/automation) and Finance's /accounting redirect.
     { href: `${base}/library`, label: "Archive", icon: Library, exact: false, tourTarget: "library" as const },
-    { href: adminPaths(workspaceId).configuration, label: "Admin", icon: Settings, exact: false },
+    { href: adminPaths(workspaceId).configuration, label: "Admin", icon: Settings, exact: false, alwaysLabelled: true as const },
   ]
 
   // Sum across primary badges tells us whether the TODAY label is a promise or a reward. When the
@@ -219,21 +219,25 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
   // dialog is the source of truth, this is a hint). Only the eight destinations the shortcut
   // listener actually registers get one.
   const SHORTCUT_KEY_BY_LABEL: Record<string, string> = { Invoices: "i", "Purchase Orders": "p", Receipts: "r", "Bank Statements": "b", Exceptions: "e", Approvals: "a", Payments: "y", Accounting: "c", Admin: "d" }
-  const navLink = (item: { href: string; label: string; icon: typeof Files; exact: boolean; badge?: number; tourTarget?: string }) => {
+  const navLink = (item: { href: string; label: string; icon: typeof Files; exact: boolean; badge?: number; tourTarget?: string; alwaysLabelled?: boolean }) => {
     const active = isActive(item)
     const shortcutKey = SHORTCUT_KEY_BY_LABEL[item.label]
-    const tooltip = compact ? (shortcutKey ? `${item.label} · g ${shortcutKey}` : item.label) : undefined
+    const tooltip = compact && !item.alwaysLabelled ? (shortcutKey ? `${item.label} · g ${shortcutKey}` : item.label) : undefined
+    // #342 §3: Admin's row is always labelled, even in the collapsed rail — its label sets the
+    // rail's collapsed minimum width (w-16), so it renders one step down the type scale
+    // (text-[13px]) to fit that width; every other row keeps text-sm and hides under labelClass.
+    const rowLabelClass = item.alwaysLabelled ? "" : labelClass
     return <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined} title={tooltip}
       {...(item.tourTarget ? { "data-tour-target": item.tourTarget } : {})}
-      className={`relative flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 ${active ? "bg-white text-emerald-800 shadow-sm ring-1 ring-emerald-700/10" : "text-slate-600 hover:bg-slate-300/40 hover:text-slate-900"}`}>
+      className={`relative flex items-center gap-2.5 rounded-md px-2.5 py-1.5 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 ${item.alwaysLabelled ? "text-[13px]" : "text-sm"} ${active ? "bg-white text-emerald-800 shadow-sm ring-1 ring-emerald-700/10" : "text-slate-600 hover:bg-slate-300/40 hover:text-slate-900"}`}>
       {active && <span className="absolute left-0 top-2 bottom-2 w-[3px] rounded-full bg-emerald-700" />}
       <span className="relative shrink-0">
         <item.icon className="h-4 w-4" />
-        {compact && item.badge != null && <span aria-hidden className="absolute -right-2 -top-1.5 flex h-[15px] min-w-[15px] items-center justify-center rounded-full bg-indigo-600 px-0.5 text-[10px] font-bold text-white tabular-nums group-hover/rail:hidden group-focus-within/rail:hidden group-has-[[aria-expanded=true]]/rail:hidden">{item.badge > 99 ? "99+" : item.badge}</span>}
+        {compact && !item.alwaysLabelled && item.badge != null && <span aria-hidden className="absolute -right-2 -top-1.5 flex h-[15px] min-w-[15px] items-center justify-center rounded-full bg-indigo-600 px-0.5 text-[10px] font-bold text-white tabular-nums group-hover/rail:hidden group-focus-within/rail:hidden group-has-[[aria-expanded=true]]/rail:hidden">{item.badge > 99 ? "99+" : item.badge}</span>}
       </span>
-      <span className={`truncate ${labelClass}`}>{item.label}</span>
-      {item.badge != null && <span className={`ml-auto flex h-[19px] min-w-[19px] items-center justify-center rounded-full bg-indigo-600 px-1 text-[11px] font-bold text-white tabular-nums transition-[background-color] duration-200 ${labelClass}`}>{item.badge > 99 ? "99+" : item.badge}</span>}
-      {compact && item.badge != null && <span className="sr-only">{item.badge} waiting</span>}
+      <span className={`truncate ${rowLabelClass}`}>{item.label}</span>
+      {item.badge != null && <span className={`ml-auto flex h-[19px] min-w-[19px] items-center justify-center rounded-full bg-indigo-600 px-1 text-[11px] font-bold text-white tabular-nums transition-[background-color] duration-200 ${rowLabelClass}`}>{item.badge > 99 ? "99+" : item.badge}</span>}
+      {compact && !item.alwaysLabelled && item.badge != null && <span className="sr-only">{item.badge} waiting</span>}
     </Link>
   }
 
@@ -243,8 +247,8 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
 
   // Compact: the aside holds a 56px slot in the flow; the panel inside it widens over the
   // content on hover/focus so the queue never reflows while the operator glances at a label.
-  return <aside className={`group/rail relative hidden shrink-0 md:flex ${compact ? "w-14" : "w-[236px]"}`}>
-  <div className={`flex flex-col gap-0.5 border-r border-slate-200 bg-slate-100 py-3.5 transition-shadow duration-150 ease-out ${compact ? "absolute inset-y-0 left-0 z-30 w-14 overflow-hidden px-2 group-hover/rail:w-[236px] group-hover/rail:px-3 group-hover/rail:shadow-[8px_0_24px_-16px_rgba(15,23,42,0.35)] group-focus-within/rail:w-[236px] group-focus-within/rail:px-3 group-focus-within/rail:shadow-[8px_0_24px_-16px_rgba(15,23,42,0.35)] group-has-[[aria-expanded=true]]/rail:w-[236px] group-has-[[aria-expanded=true]]/rail:px-3 group-has-[[aria-expanded=true]]/rail:shadow-[8px_0_24px_-16px_rgba(15,23,42,0.35)]" : "w-full px-3"}`}>
+  return <aside className={`group/rail relative hidden shrink-0 md:flex ${compact ? "w-16" : "w-[236px]"}`}>
+  <div className={`flex flex-col gap-0.5 border-r border-slate-200 bg-slate-100 py-3.5 transition-shadow duration-150 ease-out ${compact ? "absolute inset-y-0 left-0 z-30 w-16 overflow-hidden px-2 group-hover/rail:w-[236px] group-hover/rail:px-3 group-hover/rail:shadow-[8px_0_24px_-16px_rgba(15,23,42,0.35)] group-focus-within/rail:w-[236px] group-focus-within/rail:px-3 group-focus-within/rail:shadow-[8px_0_24px_-16px_rgba(15,23,42,0.35)] group-has-[[aria-expanded=true]]/rail:w-[236px] group-has-[[aria-expanded=true]]/rail:px-3 group-has-[[aria-expanded=true]]/rail:shadow-[8px_0_24px_-16px_rgba(15,23,42,0.35)]" : "w-full px-3"}`}>
     <Link href={home} className="flex items-center gap-2 px-1.5 py-1" aria-label="DocuBite home">
       <BiteMark className="h-7 w-7 shrink-0" />
       <span className={`truncate text-sm font-bold font-display text-slate-900 ${labelClass}`}>DocuBite</span>
