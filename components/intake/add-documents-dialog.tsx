@@ -183,7 +183,10 @@ export const AddDocumentsDialog = forwardRef<AddDocumentsDialogHandle, {
       {done
         ? <button type="button" className="ml-auto rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800" onClick={() => { reset(); onClose() }}>Done</button>
         : <>
-          <button type="button" disabled={locked} className="rounded-md px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50" onClick={() => { reset(); onClose() }}>Cancel</button>
+          <div className="flex items-center gap-3">
+            <button type="button" disabled={locked} className="rounded-md px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50" onClick={() => { reset(); onClose() }}>Cancel</button>
+            {locked && <span className="text-xs text-slate-500">Uploading — hang tight, this won&apos;t take long.</span>}
+          </div>
           <button type="button" disabled={locked || !nStaged && !rows.some((row) => row.status === "failed")} onClick={() => void uploadAll()}
             className="rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:pointer-events-none disabled:opacity-50">
             {sending ? "Adding…" : `Add ${rows.length}`}

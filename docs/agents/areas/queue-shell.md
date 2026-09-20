@@ -24,7 +24,10 @@ Read this before touching `components/queue/queue-screen.tsx` or any `*-queue.ts
 - Tests: `npx vitest run components/queue lib/queue components/typed-destinations` (30 tests, ~11 s).
 
 ## Detector residue (report, do not chase)
-App-wide five on every state (workspace-avatar palette ×2, Inter overused-font, dev-overlay `layout-transition` + `dark-glow`); `em-dash-overuse` on Receipts@1440 = the "—" empty-cell placeholder; 390 tab walks wrap past `nextjs-portal → body` at document end on short queues (dev overlay, not a trap). Dev-only console warning "unique key" on the Invoices list, both widths, unlocated (#261).
+App-wide five on every state (workspace-avatar palette ×2, Inter overused-font, dev-overlay `layout-transition` + `dark-glow`); `em-dash-overuse` on Receipts@1440 = the "—" empty-cell placeholder; 390 tab walks wrap past `nextjs-portal → body` at document end on short queues (dev overlay, not a trap). Dev-only console warning "unique key" on the Invoices list, both widths, unlocated (#261). `low-contrast … white on #0b8f66` on every state (#266): the compiled Tailwind CSS bundle still carries this utility class (from `file-hub-upload-button.tsx`/`install-prompt.tsx`, neither rendered on any queue page), and the in-page detector reads it out of the stylesheet rather than off a rendered element — the shipped Add-‹type› button (`components/intake/add-type-button.tsx`) uses `#087a54`/`#047857` (5.34:1, passes AA); regex `low-contrast.*#0b8f66` is in `residue.txt`.
+
+## Add-‹type› button (#266)
+`components/intake/add-type-button.tsx` — the one "Add ‹type›" entry point per queue, `md:inline-flex`/`hidden` <md (phone path is the dialog's email section via first-use empty state only). Fill is `linear-gradient(180deg,#087a54,#047857)`, not the `#0b8f66` top stop the original spec line named — deliberately darkened for AA contrast; don't revert to the spec literal.
 
 ## Conventions the bar checks
 - Every mutation refreshes row + pane (`onMutated`); every ⚠ action confirms with its consequence.
