@@ -67,6 +67,16 @@ def closing_bar(c):
         if re.search(rf"#{t}\s+(filed|opened|spawned|created)", subj): continue
         files |= set(sh("git", "diff-tree", "--no-commit-id", "--name-only", "-r", sha).split())
     ui = sorted(f for f in files if re.match(r"^(app|components)/.*\.(tsx|css)$", f))
+    code = sorted(f for f in files if re.match(r"^(app|components|lib|models|worker|ai)/.*\.(ts|tsx)$", f))
+    # Type-check gate: every close since 2026-09-19 wrote "20 pre-existing tsc
+    # errors, out of scope" — true per ticket, and the baseline stayed red for
+    # a day. A ticket whose commits touched TypeScript closes only on a clean
+    # `tsc --noEmit` (~40s; the hook's timeout allows it).
+    if code:
+        r = subprocess.run(["npx", "tsc", "--noEmit", "--pretty", "false"], capture_output=True, text=True, cwd=root)
+        if r.returncode != 0:
+            errs = [l for l in r.stdout.splitlines() if "error TS" in l]
+            deny(f"TYPE-CHECK: `tsc --noEmit` reports {len(errs)} error(s); ticket #{t} touched TypeScript ({', '.join(code[:4])}{' …' if len(code) > 4 else ''}) and closes only on a clean tree — even errors another ticket left: fix them or hand off with the list. First errors:\n" + "\n".join(errs[:8]))
     if not ui: return
     rep = os.path.join(root, "docs", "wayfinder-reports", m, f"{t}.md")
     line = ""

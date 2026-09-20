@@ -50,7 +50,9 @@ The one thing you may not decide: **removing a feature** — record it as
 - **The bar is a gate:** a ticket that changed `app/` or `components/`
   closes only when the report's `scores:` line carries integer
   `close-critique ≥ 30` and `close-evaluate ≥ 80` from real reader runs;
-  the hook refuses `gh issue close` otherwise. `n/a` is not a score.
+  the hook refuses `gh issue close` otherwise. `n/a` is not a score. A
+  ticket that touched TypeScript also closes only on a clean `tsc --noEmit`
+  — errors another ticket left are yours to fix or to hand off with.
 - Not reachable this session: leave the ticket open with
   `Autopilot: continue —`, hand-off current, tree committed.
 
