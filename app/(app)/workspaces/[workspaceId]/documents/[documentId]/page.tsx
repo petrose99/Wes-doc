@@ -15,7 +15,7 @@ import { DocumentMatchesPanel } from "@/components/matching/document-matches-pan
 import { listDocumentMatchesForDocument } from "@/models/document-matches-query"
 import { PoConsumptionPanel } from "@/components/matching/po-consumption-panel"
 import type { LineItemsPoProps } from "@/components/pipeline/document-detail/line-items-section"
-import { resolveDocType } from "@/lib/doc-types"
+import { isDocType, resolveDocType } from "@/lib/doc-types"
 import { describeMoveIneligibility } from "@/lib/reclassify"
 import { summarizeInvoicePoLinks, summarizePoConsumption, type PoConsumption } from "@/models/po-matching"
 import { getCurrentUser } from "@/lib/auth"
@@ -179,6 +179,10 @@ export async function DocumentDetailPage({ params, searchParams, embedded = fals
   // #228 / #250: an invoice's Purchase Order link — View PO row, Purchase Orders chip, Match
   // manually — and a PO's consumption (Ordered / Invoiced / Remaining, Matched invoices).
   const docType = resolveDocType(document)
+  // #297 §5: Move's currentType exclusion needs the *raw* type, not resolveDocType's
+  // template-code fallback — a Library document that only resolves to "receipt" via a legacy
+  // template code has no real "current queue" to exclude (spec §5 "currentType unset").
+  const moveCurrentType = document.docType && isDocType(document.docType) ? document.docType : undefined
   let po: LineItemsPoProps | null = null
   let poConsumption: PoConsumption | null = null
   if (docType === "invoice") {
@@ -291,6 +295,7 @@ export async function DocumentDetailPage({ params, searchParams, embedded = fals
   const splitPane = <SplitPane
     workspaceId={workspaceId}
     queueDocType={docType}
+    moveCurrentType={moveCurrentType}
     source={{ documentId: document.id, filename: document.filename, mimeType: document.mimeType }}
     fields={fields}
     data={data}

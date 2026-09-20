@@ -184,7 +184,7 @@ function PaneMenu({ open, onOpenChange, fullHref, menu, onDeleted }: {
     {deleteOpen && ctx?.doc && <DeleteDocumentDialog workspaceId={ctx.doc.workspaceId} fileId={ctx.doc.fileId} documentId={ctx.doc.documentId} filename={ctx.doc.filename}
       onOpenChange={setDeleteOpen} restoreFocusTo={triggerRef.current}
       onDeleted={() => { ctx.onMutated?.("removed"); onDeleted?.() }} />}
-    {moveOpen && ctx?.doc && <MoveDocumentDialog workspaceId={ctx.doc.workspaceId} documentId={ctx.doc.documentId} filename={ctx.doc.filename} currentType={ctx.doc.docType}
+    {moveOpen && ctx?.doc && <MoveDocumentDialog workspaceId={ctx.doc.workspaceId} documentId={ctx.doc.documentId} filename={ctx.doc.filename} currentType={ctx.doc.currentType}
       onOpenChange={setMoveOpen} restoreFocusTo={triggerRef.current}
       onMoved={() => ctx.onMutated?.("removed")} />}
   </>

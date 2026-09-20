@@ -32,6 +32,12 @@ export type RegisteredDocument = {
    * assembly is wired (step 5); the Move item stays hidden without `docType`, same as any other
    * item here does without its document. */
   docType?: DocType
+  /** #297 §5: the type to exclude from Move's target list — the document's *raw* `docType`
+   * column, undefined when it has none (a Library document that only resolves a display type via
+   * `resolveDocType`'s legacy-template fallback has no real "current queue" to exclude). Distinct
+   * from `docType` above, which drives the Direction row and menu-item visibility off the
+   * resolved type. */
+  currentType?: DocType
   moveDisabledReason?: string | null
   reviewLink?: { href: string; label: string } | null
   /** #258: who decided this document's approval, once the pane's detail load knows — upgrades
@@ -327,7 +333,7 @@ export function MoveDocumentDialog({ workspaceId, documentId, filename, currentT
         Other types {otherExpanded ? "▾" : "▸"}
       </button>
       {otherExpanded && <div className="space-y-1 border-l-2 border-slate-100 pl-3">
-        <p className="text-xs text-slate-500">Found in Search only.</p>
+        <p className="py-1 text-xs text-slate-500">Found in Search only.</p>
         {otherOptions.map(radio)}
       </div>}
     </div>

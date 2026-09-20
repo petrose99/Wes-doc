@@ -38,7 +38,7 @@ export function SplitPane({
   workspaceId, source, fields, data, fieldConfidence, provenanceFields, provenanceItems, initialTarget, conflictingLabels, missingRequiredFields,
   saveReview, documentType: initialDocumentType, note: initialNote, auditEvents,
   header, canPush, pushCard, canCreateRule, defaultSupplier, matchKind, bankMatches, documentMatches, rationales, checks, fxBadge, stageIndicator,
-  institutions, institutionId, institutionName, history, po = null, initialTab, state, queueTitle, queueDocType, moveDisabledReason,
+  institutions, institutionId, institutionName, history, po = null, initialTab, state, queueTitle, queueDocType, moveCurrentType, moveDisabledReason,
 }: {
   workspaceId: string
   source: SourceDocument
@@ -104,6 +104,9 @@ export function SplitPane({
    * question — Invoice/Receipt show it, Purchase Order shows it locked, everything else shows
    * none. Distinct from the `documentType`/category prop below. */
   queueDocType: DocType
+  /** #297 §5: the raw type to exclude from Move's target list — undefined for a Library document
+   * whose `queueDocType` is only a `resolveDocType` template-fallback guess, not a real queue. */
+  moveCurrentType?: DocType
 }) {
   const [tab, setTab] = useState<Tab>(initialTab ?? "details")
   const [target, setTarget] = useState<ProvenanceTarget | null>(initialTarget)
@@ -148,7 +151,7 @@ export function SplitPane({
   useRegisterDocumentActions({
     workspaceId, documentId: header.documentId, fileId: header.fileId, filename: header.filename,
     flagged: header.flagged, archived: header.archived, cancelled: header.cancelled, cancelledReason: header.cancelledReason, reviewLink: header.reviewLink,
-    docType: queueDocType, moveDisabledReason: moveDisabledReason ?? null,
+    docType: queueDocType, currentType: moveCurrentType, moveDisabledReason: moveDisabledReason ?? null,
     decision,
   })
 
