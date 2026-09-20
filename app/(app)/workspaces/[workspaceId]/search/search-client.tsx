@@ -43,9 +43,14 @@ const FACETS: Facet[] = [TYPE_FACET, STATUS_FACET]
  * Supplier is the shell's built-in `search` slot (own URL param, own header box) rather than a new
  * facet kind — the shared `Facet` type has no free-text option (spec §1 "else a supplier
  * extraParam"). Date range is out of this step — no `dateFrom`/`dateTo` UI yet, kept server-ready. */
-export function SearchPageClient({ workspaceId, initialQuery }: {
+export function SearchPageClient({ workspaceId, initialQuery, initialGone = false }: {
   workspaceId: string
   initialQuery: string
+  /** #270 close: set when the page arrived via `?gone=<id>` (the standalone document route's
+   * redirect for a row deleted/moved between list render and click) — spec §3 "Result gone since
+   * listing" wants the same missing-row notice typed queues show for #268, not a reset to the
+   * empty-query state. */
+  initialGone?: boolean
 }) {
   const [query, setQuery] = useState(initialQuery)
   const [rows, setRows] = useState<SearchRow[]>([])
@@ -156,6 +161,7 @@ export function SearchPageClient({ workspaceId, initialQuery }: {
       search={{ param: "supplier", label: "Supplier" }}
       extraFilterParams={["q"]}
       loadingRows={searching && slow}
+      initialMissing={initialGone ? { text: "This document is no longer available." } : undefined}
       views={
         <div className="flex w-full max-w-xl flex-1 items-center gap-1.5">
           <span className="inline-flex h-9 min-w-0 flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 shadow-sm focus-within:border-emerald-300 focus-within:ring-2 focus-within:ring-emerald-100">
@@ -203,6 +209,10 @@ export function SearchPageClient({ workspaceId, initialQuery }: {
           </p>,
         },
         filteredTitle: query.trim() ? `Nothing matches "${query.trim()}".` : undefined,
+        // #270 close spec §4: zero-results copy is the title + the two clear buttons, nothing
+        // else — `queue-empty.tsx`'s default `filteredBody` ("Clear a filter to widen the
+        // queue.") is a queue-shaped sentence Search never asked for and isn't in the copy table.
+        filteredBody: "",
         filteredAction: <div className="flex items-center justify-center gap-2">
           <button type="button" onClick={clearSearch} className={CLEAR_BUTTON}>Clear search</button>
           <button type="button" onClick={clearFacetFilters} className={CLEAR_BUTTON}>Clear filters</button>

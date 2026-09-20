@@ -27,3 +27,19 @@
     scoreboard: 134 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
 --- #270: phase build done → measure next in 124s
 === [6/50] #270 — Build Search on the queue shell and the Closed facet on every typed queue; retire the Archive destination  [haiku · low · phase: measure]
+    #270 context at exit: 75001 tokens, 13 min; loaded 18501 before the first action
+    cleaned up session pid 4079170 (pgid ?); free: 5855 MB
+On branch codex/post-login-ux-implementation
+Your branch is ahead of 'origin/codex/post-login-ux-implementation' by 409 commits.
+  (use "git push" to publish your local commits)
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   docs/wayfinder-reports/226/detached-20260920T143746Z.out
+
+no changes added to commit (use "git add" and/or "git commit -a")
+    scoreboard: 135 sessions → /home/ubuntu/Dev/Wes-doc/docs/wayfinder-reports/226/scoreboard.md
+--- #270: phase measure done → close next in 790s
+=== [7/50] #270 — Build Search on the queue shell and the Closed facet on every typed queue; retire the Archive destination  [sonnet · low · phase: close]
+    #270 crossed the hand-off line (111173 tokens ≥ 110000) — asked to hand off; hard stop at 140000

@@ -28,7 +28,7 @@ export function QueueEmpty({ state, firstUse, done, filteredTitle, filteredBody,
   if (state === "filtered") {
     return <section aria-labelledby="queue-empty-title" className="mx-auto max-w-md px-6 py-16 text-center max-md:py-12">
       <h2 id="queue-empty-title" tabIndex={-1} className="text-sm font-medium text-slate-800 focus:outline-none">{filteredTitle ?? "Nothing matches these filters."}</h2>
-      <p className="mt-1 text-sm text-slate-600">{filteredBody ?? (hiddenByFilters > 0 ? `${hiddenByFilters} ${hiddenByFilters === 1 ? "row is" : "rows are"} hidden by the filters.` : "Clear a filter to widen the queue.")}</p>
+      {(filteredBody ?? (hiddenByFilters > 0 ? `${hiddenByFilters} ${hiddenByFilters === 1 ? "row is" : "rows are"} hidden by the filters.` : "Clear a filter to widen the queue.")) && <p className="mt-1 text-sm text-slate-600">{filteredBody ?? (hiddenByFilters > 0 ? `${hiddenByFilters} ${hiddenByFilters === 1 ? "row is" : "rows are"} hidden by the filters.` : "Clear a filter to widen the queue.")}</p>}
       <div className="mt-3 text-sm">{filteredAction ?? <button type="button" onClick={onClearFilters}
         className="inline-flex h-11 items-center rounded-md border border-slate-300 bg-white px-4 py-2 font-medium text-slate-800 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-1 md:h-8 md:px-3 md:py-1 md:text-xs">Clear filters</button>}</div>
     </section>
