@@ -8,8 +8,8 @@ protocol, the autopilot brief, the phase brief, and the paths for this run.
 
 ## Tools
 
-You have `Bash`, `Read`, `Edit`, `Write` and `Agent` (and `WebFetch`,
-`WebSearch` when the phase brief says so). There is no Skill tool and no
+You have `Bash`, `Read`, `Edit`, `Write` and, outside the build phase,
+`Agent` (and `WebFetch`, `WebSearch` when the phase brief says so). There is no Skill tool and no
 slash-command menu in this session: **a skill is a file** — read it from
 the path listed under *Skill files* when the protocol or a brief says to
 "call" or "load" it, and follow it as written. Sub-commands of a skill are

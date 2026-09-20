@@ -385,7 +385,12 @@ while [ "$n" -lt "$MAX" ]; do
   # ticket then re-writes only the tail (~1–2K) instead of everything after
   # the first differing byte (~20K on #287's phase change, 2026-09-19).
   { if [ "${PROMPT_MODE:-slash}" = bare ]; then cat "$AP/core.md"; printf '\n\n---\n\n'; fi
-    if [ "${PROMPT_MODE:-slash}" = system ] || [ "${PROMPT_MODE:-slash}" = bare ]; then printf '# Wayfinder protocol (the /wayfinder skill, loaded by the driver)\n\n'; awk 'f{print} /^---$/{c++; if(c==2)f=1}' "$ROOT/.claude/skills/wayfinder/SKILL.md"; printf '\n\n(ARGUMENTS — the map and ticket — are given under "This run" at the end of this prompt.)\n\n---\n\n'; fi
+    # Load diet (2026-09-20): a phased session (spec/build/measure/close) gets
+    # the 2K protocol digest, not the 12K skill body — it charts nothing.
+    if [ "${PROMPT_MODE:-slash}" = system ] || [ "${PROMPT_MODE:-slash}" = bare ]; then
+      if [ -n "$PHASE" ] && [ -f "$AP/protocol-phased.md" ]; then cat "$AP/protocol-phased.md"; printf '\n\n---\n\n'
+      else printf '# Wayfinder protocol (the /wayfinder skill, loaded by the driver)\n\n'; awk 'f{print} /^---$/{c++; if(c==2)f=1}' "$ROOT/.claude/skills/wayfinder/SKILL.md"; printf '\n\n(ARGUMENTS — the map and ticket — are given under "This run" at the end of this prompt.)\n\n---\n\n'; fi
+    fi
     cat "$BRIEF"
     [ "${PROMPT_MODE:-slash}" = bare ] && skill_table
     [ -f "$PHASE_BRIEF" ] && { printf '\n\n'; cat "$PHASE_BRIEF"; }
@@ -413,6 +418,7 @@ while [ "$n" -lt "$MAX" ]; do
     SESSION_PROMPT="Work Wayfinder map #$MAP, ticket #$T, per the Wayfinder protocol and autopilot brief in your system prompt. Begin by claiming the ticket: run gh issue edit $T --add-assignee @me"
     SESSION_TOOLS="${SESSION_TOOL_SET:-Bash,Read,Edit,Write,Agent}"
     [ -z "$PHASE" ] && SESSION_TOOLS="$SESSION_TOOLS,WebFetch,WebSearch"   # research / decision tickets may need the web
+    [ "$PHASE" = build ] && SESSION_TOOLS="${SESSION_TOOLS/,Agent/}"      # build steps grep; the readers/critic live in spec, measure, close
     # --exclude-dynamic-system-prompt-sections keeps cwd/env/git-status out
     # of the system prompt so its prefix is identical from session to session.
     SYSFLAG="--system-prompt-file"; BAREFLAGS=(--disable-slash-commands --exclude-dynamic-system-prompt-sections)

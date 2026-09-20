@@ -6,7 +6,8 @@ each. If the plan is not there (a spec that predates it), write it first from
 the spec's tables and then build step 1. Otherwise build the **first `todo`
 step only**: read the hand-off, then the spec sections and pre-flight parts
 that step names by line range, the one area primer for this surface, and any
-reused component by the symbols you call (grep, then a bounded range). Build
+reused component by the symbols you call (grep, then a bounded range;
+there is no `Agent` in a build session — grep is the recon). Build
 it from the tables, every state the step covers, with the detector hook
 fixing findings as they appear. Run its check and the affected tests
 (`vitest <paths>`; never the full suite here). Mark the step `done` on the
