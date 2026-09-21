@@ -2,11 +2,13 @@
 
 import { createContext, useContext, useEffect, useId, useState, type KeyboardEvent } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { ArrowRightLeft, ExternalLink, Flag, Loader2, Trash2 } from "lucide-react"
+import { ArrowRightLeft, ExternalLink, Flag, Loader2, Send, Trash2 } from "lucide-react"
 import { PaneMenuItem } from "@/components/queue/detail-pane"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
+import { Input } from "@/components/ui/input"
 import { archiveDocumentsAction, flagDocumentsAction } from "@/app/(app)/workspaces/[workspaceId]/pipeline-actions"
 import { deleteDocumentsAction, reclassifyDocumentAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
+import { createReviewTaskAction } from "@/app/(app)/workspaces/[workspaceId]/review-actions"
 import { DOC_TYPE_SPECS, type DocType } from "@/lib/doc-types"
 import { documentDestinationPath } from "@/lib/typed-destinations"
 import { withOrigin } from "@/lib/navigation/origin"
@@ -338,6 +340,64 @@ export function MoveDocumentDialog({ workspaceId, documentId, filename, currentT
       </div>}
     </div>
     {error && <p role="alert" id={errorId} className="mt-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>}
+  </ConfirmDialog>
+}
+
+/** #360 §5: same open-after-menu-closes shape as `MoveDocumentMenuItem`/`DocumentMenuDeleteItem` —
+ * absent once `doc.reviewLink` is set (that case already shows "Open review task" above, in
+ * `DocumentMenuTopItems`). */
+export function SendForReviewMenuItem({ onRequestSend }: { onRequestSend: () => void }) {
+  const ctx = useContext(PaneDocumentContext)
+  const doc = ctx?.doc
+  if (!doc || doc.reviewLink) return null
+
+  return <PaneMenuItem onClick={() => window.requestAnimationFrame(onRequestSend)}>
+    <span className="inline-flex items-center gap-2"><Send className="h-4 w-4" aria-hidden />Send for review</span>
+  </PaneMenuItem>
+}
+
+/** Replaces `CreateReviewTaskButton`'s inline form (#360 §5) with the shared `ConfirmDialog` shell,
+ * same extraction shape as `DeleteDocumentDialog`/`MoveDocumentDialog`. On success
+ * `createReviewTaskAction` already navigates to the new review task, so the dialog closes as a side
+ * effect of that navigation — no separate close-then-navigate race. On failure the typed detail is
+ * kept (state lives here, not reset) so the operator doesn't retype it. */
+export function SendForReviewDialog({ workspaceId, documentId, onOpenChange, restoreFocusTo }: {
+  workspaceId: string
+  documentId: string
+  onOpenChange: (open: boolean) => void
+  restoreFocusTo?: React.RefObject<HTMLElement | null>
+}) {
+  const router = useRouter()
+  const [detail, setDetail] = useState("")
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const submit = async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      const result = await createReviewTaskAction(workspaceId, documentId, detail)
+      if (!result.success || !result.data) { setError(result.error || "Could not create a review task"); return }
+      toast.success("Sent for review")
+      router.push(`/workspaces/${workspaceId}/review/${result.data.id}`)
+    } catch {
+      setError("Could not reach the server")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return <ConfirmDialog
+    open
+    busy={busy}
+    restoreFocusTo={restoreFocusTo}
+    title="Send for review"
+    description="A teammate will see this in the review inbox."
+    confirmLabel="Send"
+    onConfirm={() => void submit()}
+    onCancel={() => onOpenChange(false)}>
+    <Input value={detail} onChange={(event) => setDetail(event.target.value)} placeholder="Why does this need review? (optional)" disabled={busy} autoFocus />
+    {error && <p role="alert" className="mt-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>}
   </ConfirmDialog>
 }
 

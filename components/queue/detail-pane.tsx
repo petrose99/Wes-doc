@@ -3,7 +3,7 @@
 import { Component, useCallback, useContext, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react"
 import { ArrowLeft, ChevronDown, ChevronUp, MoreHorizontal, X } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { DeleteDocumentDialog, DocumentMenuDeleteItem, DocumentMenuTopItems, MoveDocumentDialog, MoveDocumentMenuItem, OpenInNewTabMenuItem, PaneDocumentContext, PaneDocumentProvider } from "@/components/queue/document-actions-menu"
+import { DeleteDocumentDialog, DocumentMenuDeleteItem, DocumentMenuTopItems, MoveDocumentDialog, MoveDocumentMenuItem, OpenInNewTabMenuItem, PaneDocumentContext, PaneDocumentProvider, SendForReviewDialog, SendForReviewMenuItem } from "@/components/queue/document-actions-menu"
 import { usePhoneLane } from "@/lib/client/use-phone-lane"
 
 export const DETAIL_PANE_ID = "queue-detail-pane"
@@ -143,6 +143,7 @@ function PaneMenu({ open, onOpenChange, fullHref, menu, onDeleted }: {
   const triggerRef = useRef<HTMLButtonElement>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [moveOpen, setMoveOpen] = useState(false)
+  const [sendForReviewOpen, setSendForReviewOpen] = useState(false)
   if (!fullHref && !menu && !hasDoc) return null
 
   const items = () => Array.from(contentRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])
@@ -173,6 +174,7 @@ function PaneMenu({ open, onOpenChange, fullHref, menu, onDeleted }: {
         {fullHref && <OpenInNewTabMenuItem href={fullHref} />}
         <DocumentMenuTopItems closeMenu={() => onOpenChange(false)} />
         <MoveDocumentMenuItem onRequestMove={() => setMoveOpen(true)} />
+        <SendForReviewMenuItem onRequestSend={() => setSendForReviewOpen(true)} />
         {(menu || hasDoc) && (fullHref || hasDoc) && <div role="separator" className="my-1 h-px bg-slate-200" />}
         {menu}
         <DocumentMenuDeleteItem onRequestDelete={() => setDeleteOpen(true)} />
@@ -187,6 +189,8 @@ function PaneMenu({ open, onOpenChange, fullHref, menu, onDeleted }: {
     {moveOpen && ctx?.doc && <MoveDocumentDialog workspaceId={ctx.doc.workspaceId} documentId={ctx.doc.documentId} filename={ctx.doc.filename} currentType={ctx.doc.currentType}
       onOpenChange={setMoveOpen} restoreFocusTo={triggerRef}
       onMoved={() => ctx.onMutated?.("removed")} />}
+    {sendForReviewOpen && ctx?.doc && <SendForReviewDialog workspaceId={ctx.doc.workspaceId} documentId={ctx.doc.documentId}
+      onOpenChange={setSendForReviewOpen} restoreFocusTo={triggerRef} />}
   </>
 }
 

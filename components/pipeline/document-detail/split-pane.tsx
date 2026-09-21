@@ -1,7 +1,5 @@
 "use client"
 
-import { AutomationRuleForm } from "@/components/workspace/automation-rule-form"
-import { CreateReviewTaskButton } from "@/components/documents/create-review-task-button"
 import { FieldRow } from "@/components/pipeline/document-detail/field-row"
 import { LineItemsSection, type LineItemsPoProps } from "@/components/pipeline/document-detail/line-items-section"
 import { checkAppliesToField, type FieldCheck } from "@/components/pipeline/document-detail/check-types"
@@ -17,7 +15,6 @@ import { InstitutionAssert } from "@/components/pipeline/document-detail/institu
 import { StatementDriftBanner } from "@/components/pipeline/document-detail/statement-drift-banner"
 import { ApprovalTab, AuditLog, ChecksTab, type DocumentHistory } from "@/components/queue/history-tabs"
 import { usePhoneLane } from "@/lib/client/use-phone-lane"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { SourceViewer, type ProvenanceTarget, type SourceDocument } from "@/components/viewer/source-preview"
 import type { DocumentFieldDefinition } from "@/lib/document-templates"
 import type { Ref } from "@/lib/provenance"
@@ -47,7 +44,7 @@ const SOURCE_KEY = "dp.source"
 export function SplitPane({
   workspaceId, source, fields, data, fieldConfidence, provenanceFields, provenanceItems, initialTarget, conflictingLabels, missingRequiredFields,
   saveReview, documentType: initialDocumentType, note: initialNote, auditEvents,
-  header, canPush, pushCard, canCreateRule, defaultSupplier, matchKind, bankMatches, documentMatches, rationales, checks, fxBadge, stageIndicator,
+  header, canPush, pushCard, matchKind, bankMatches, documentMatches, rationales, checks, fxBadge, stageIndicator,
   institutions, institutionId, institutionName, history, po = null, initialTab, state, queueTitle, queueDocType, moveCurrentType, moveDisabledReason,
 }: {
   workspaceId: string
@@ -75,8 +72,6 @@ export function SplitPane({
   moveDisabledReason?: string | null
   canPush: boolean
   pushCard: ReactNode
-  canCreateRule: boolean
-  defaultSupplier: string
   matchKind: "bank" | "supplier_statement" | null
   bankMatches: ReactNode
   documentMatches?: ReactNode
@@ -275,21 +270,28 @@ export function SplitPane({
           Split/Details/Source choice. */}
       <div className={`flex min-h-0 flex-col overflow-hidden border-slate-200 ${sourceShown ? "h-[38vh]" : "h-auto"} shrink-0 border-b lg:h-auto lg:shrink lg:border-b-0 lg:border-r lg:[flex-basis:var(--split-pct)] ${dragging ? "" : "motion-safe:transition-[flex-basis] motion-safe:duration-200"}`}
         style={{ ["--split-pct" as string]: `${splitPct}%` }}>
-        <div className="flex min-h-9 shrink-0 items-center gap-2 border-b border-slate-100 px-3 py-1 text-[13px]">
+        {/* #257 spec 3.5: on the phone the source is a strip the approver can expand when the
+            decision needs a look at the page — collapsed, the tabs get the height. Desktop (≥lg)
+            drops this strip entirely (#360 §4); Open file becomes the floating icon button below. */}
+        <div className="flex min-h-9 shrink-0 items-center gap-2 border-b border-slate-100 px-3 py-1 text-[13px] lg:hidden">
           <span className="min-w-0 flex-1 break-all font-medium leading-snug text-slate-700">{header.filename}</span>
           <a href={fileHref} target="_blank" rel="noopener noreferrer" title="Open the source file in a new tab"
             className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600">
             <ExternalLink className="h-3.5 w-3.5" aria-hidden />Open file
           </a>
-          {/* #257 spec 3.5: on the phone the source is a strip the approver can expand when the
-              decision needs a look at the page — collapsed, the tabs get the height. */}
           <button type="button" onClick={toggleSource} aria-expanded={sourceShown} aria-controls={`${source.documentId}-source`}
-            className="inline-flex h-9 shrink-0 items-center gap-1 rounded-md px-2 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 lg:hidden">
+            className="inline-flex h-9 shrink-0 items-center gap-1 rounded-md px-2 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600">
             {sourceShown ? <ChevronUp className="h-3.5 w-3.5" aria-hidden /> : <ChevronDown className="h-3.5 w-3.5" aria-hidden />}
             {sourceShown ? "Hide source" : "Show source"}
           </button>
         </div>
-        <div id={`${source.documentId}-source`} className={sourceShown ? "contents" : "hidden lg:contents"}><SourceViewer source={source} target={target} /></div>
+        <div className="relative min-h-0 flex-1">
+          <a href={fileHref} target="_blank" rel="noopener noreferrer" aria-label="Open file in a new tab" title="Open file in a new tab"
+            className="absolute right-2 top-2 z-10 hidden h-9 w-9 items-center justify-center rounded-full bg-white/90 text-slate-600 shadow-sm backdrop-blur hover:bg-white hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 lg:flex">
+            <ExternalLink className="h-4 w-4" aria-hidden />
+          </a>
+          <div id={`${source.documentId}-source`} className={sourceShown ? "contents" : "hidden lg:contents"}><SourceViewer source={source} target={target} /></div>
+        </div>
       </div>
 
       {/* Resize grip (#360 Section 3, ≥lg only — the phone lane keeps its stacked layout unchanged,
@@ -369,15 +371,8 @@ export function SplitPane({
             {fxBadge && <div className="pt-2">{fxBadge}</div>}
             {canPush && <div className="pt-2">{pushCard}</div>}
 
-            {canCreateRule && <Card className="border-slate-200 shadow-sm">
-              <CardHeader><CardTitle>Create a rule from this document</CardTitle><CardDescription>Matches this supplier automatically on future documents.</CardDescription></CardHeader>
-              <CardContent><AutomationRuleForm workspaceId={workspaceId} defaultSupplier={defaultSupplier} /></CardContent>
-            </Card>}
-
             {matchKind && bankMatches}
             {documentMatches}
-
-            {!header.reviewLink && <CreateReviewTaskButton workspaceId={workspaceId} documentId={header.documentId} />}
           </div>}
 
           {tab === "note" && <div {...panelProps("note")} className={`mx-auto space-y-3 p-6`}>

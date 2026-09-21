@@ -163,7 +163,6 @@ export async function DocumentDetailPage({ params, searchParams, embedded = fals
   const saveReview = async (formData: FormData) => { "use server"; return saveDocumentReviewAction(workspaceId, documentId, formData, { stay: true }) }
   const supplierValue = data.vendor ?? data.merchant
   const supplier = typeof supplierValue === "string" ? supplierValue.trim() : ""
-  const canCreateRule = capabilities.has("supplier-rules") && membership.role === "owner" && supplier.length > 0
 
   const reviewQueueEnabled = capabilities.has("review-queue")
   const openReviewTask = reviewQueueEnabled ? await getOpenReviewTaskForDocument(workspaceId, documentId) : null
@@ -333,8 +332,6 @@ export async function DocumentDetailPage({ params, searchParams, embedded = fals
       fxRateAt={document.fxRateAt ? document.fxRateAt.toISOString().slice(0, 10) : null}
       fxRateSource={document.fxRateSource}
     />}
-    canCreateRule={canCreateRule}
-    defaultSupplier={supplier}
     rationales={rationales}
     checks={checks}
     matchKind={matchKind}
