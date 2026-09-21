@@ -44,6 +44,9 @@ const BILLING_MESSAGES: Record<string, string> = {
   inbound_email_disabled_for_clinical: "Inbound email intake isn't available for a healthcare company.",
   pattern_invalid: "Enter a full email address (name@domain.com) or a domain (@domain.com).",
   allowed_sender_not_found: "That sender no longer exists.",
+  // #374: WhatsApp allowed-sender validation (models/inbound-whatsapp.ts addAllowedSender).
+  phone_number_invalid: "Enter a full phone number with country code, like +266 6123 4567.",
+  label_required: "Enter a name for this sender.",
   // Dext-parity Phase 3 WP3.1/WP3.2: approval workflows.
   approval_workflow_not_found: "That approval workflow no longer exists.",
   workflow_needs_at_least_one_stage: "Add at least one stage.",
