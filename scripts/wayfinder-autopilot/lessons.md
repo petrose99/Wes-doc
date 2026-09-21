@@ -95,3 +95,13 @@ here will be relearned at full cost.
   session's Edit/Write/Bash-append to `.claude/wayfinder-autopilot/lessons.md` was refused as a
   "sensitive file" by the sandbox even with `dangerouslyDisableSandbox`; recorded here instead —
   a future session with write access should move this line to the project file.)
+- (docubite #362, H5, gate round c1→c2) A "gate this field on a locked/read-only state" fix folded
+  the new lock condition into the existing HTML `readOnly` attribute on text/number/date inputs —
+  `readOnly` blocks editing but does not remove the element from the tab order, so a keyboard walk
+  still reached every "locked" field. `disabled` does remove it; the two are not interchangeable
+  gates. → When a fix must make a field both non-editable and non-reachable by Tab, use `disabled`,
+  not `readOnly` — reserve `readOnly` only for a field that should stay focusable/copyable while
+  locked (an intentional, named exception, not the default). · check: after any read-only-gating
+  fix, grep the round's `keyboard.json` tab-walk for the field's id/selector — its continued
+  presence in the `seq` array on the locked state is the fix not working, regardless of what the
+  diff looks like on read.
