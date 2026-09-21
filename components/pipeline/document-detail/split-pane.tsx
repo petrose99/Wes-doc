@@ -16,13 +16,14 @@ import { StatementDriftBanner } from "@/components/pipeline/document-detail/stat
 import { ApprovalTab, AuditLog, ChecksTab, type DocumentHistory } from "@/components/queue/history-tabs"
 import { usePhoneLane } from "@/lib/client/use-phone-lane"
 import { SourceViewer, type ProvenanceTarget, type SourceDocument } from "@/components/viewer/source-preview"
+import { PaneResizeGrip, usePaneResize } from "@/components/queue/pane-resize-grip"
 import type { DocumentFieldDefinition } from "@/lib/document-templates"
 import type { Ref } from "@/lib/provenance"
 import type { FieldRationale } from "@/lib/rationale"
 import type { ProcessingState } from "@/lib/documents/processing-state"
 import type { DocType } from "@/lib/doc-types"
 import { CheckCircle2, ChevronDown, ChevronUp, ExternalLink, Loader2 } from "lucide-react"
-import { useActionState, useContext, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react"
+import { useActionState, useContext, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react"
 import { toast } from "sonner"
 
 type Tab = "details" | "note" | "activity" | "approval" | "checks"
@@ -31,13 +32,6 @@ type Tab = "details" | "note" | "activity" | "approval" | "checks"
  * `"split"`/`"details-only"`/`"source-only"` string from a still-open tab is tolerated by
  * `parseSplitPct` below (falls back to the default on a non-numeric/out-of-bounds read). */
 const LAYOUT_KEY = "pane-layout"
-const SPLIT_MIN = 35
-const SPLIT_MAX = 65
-const SPLIT_DEFAULT = 52
-function parseSplitPct(raw: string | null): number {
-  const n = raw === null ? NaN : Number(raw)
-  return Number.isFinite(n) && n >= SPLIT_MIN && n <= SPLIT_MAX ? n : SPLIT_DEFAULT
-}
 /** #257 spec 3.5: whether the phone lane's source strip is expanded; remembered for the session. */
 const SOURCE_KEY = "dp.source"
 
@@ -119,53 +113,14 @@ export function SplitPane({
   const [savingNote, setSavingNote] = useState(false)
   // The layout choice persists for the session so moving ↑/↓ through a queue keeps the panels
   // where the operator put them; read after mount so server and first client render agree.
-  const [splitPct, setSplitPct] = useState(SPLIT_DEFAULT)
-  const [dragging, setDragging] = useState(false)
+  const resize = usePaneResize(LAYOUT_KEY)
+  const { splitPct, dragging, rowRef } = resize
   const [sourceShown, setSourceShown] = useState(true)
   const phone = usePhoneLane()
-  const rowRef = useRef<HTMLDivElement | null>(null)
   useEffect(() => {
-    setSplitPct(parseSplitPct(window.sessionStorage.getItem(LAYOUT_KEY)))
     if (window.sessionStorage.getItem(SOURCE_KEY) === "hidden") setSourceShown(false)
   }, [])
   const toggleSource = () => setSourceShown((prev) => { window.sessionStorage.setItem(SOURCE_KEY, prev ? "hidden" : "shown"); return !prev })
-  const commitSplit = (pct: number) => {
-    const clamped = Math.min(SPLIT_MAX, Math.max(SPLIT_MIN, pct))
-    setSplitPct(clamped)
-    return clamped
-  }
-  // B2: write once per gesture (pointerup), not on every pointermove — `current` here is a plain
-  // closure-local variable (not a React ref), so tracking it during drag is a normal event-handler
-  // side effect, not a render-time ref read.
-  const onGripPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    event.preventDefault()
-    const row = rowRef.current
-    if (!row) return
-    setDragging(true)
-    let current = splitPct
-    const move = (moveEvent: PointerEvent) => {
-      const rect = row.getBoundingClientRect()
-      current = commitSplit(((moveEvent.clientX - rect.left) / rect.width) * 100)
-    }
-    const up = () => {
-      setDragging(false)
-      window.sessionStorage.setItem(LAYOUT_KEY, String(current))
-      window.removeEventListener("pointermove", move)
-      window.removeEventListener("pointerup", up)
-    }
-    window.addEventListener("pointermove", move)
-    window.addEventListener("pointerup", up)
-  }
-  const onGripKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    const next = event.key === "ArrowLeft" ? splitPct - 2
-      : event.key === "ArrowRight" ? splitPct + 2
-      : event.key === "Home" ? SPLIT_MIN
-      : event.key === "End" ? SPLIT_MAX
-      : null
-    if (next === null) return
-    event.preventDefault()
-    window.sessionStorage.setItem(LAYOUT_KEY, String(commitSplit(next)))
-  }
   const fileHref = `/api/documents/${source.documentId}/source`
 
   // Hand the frame around us the document, so its ⋯ carries Archive · Flag · Delete… (#259). The
@@ -296,12 +251,7 @@ export function SplitPane({
 
       {/* Resize grip (#360 Section 3, ≥lg only — the phone lane keeps its stacked layout unchanged,
           B5/WCAG 2.5.7: Home/End/Arrow keys resize without requiring the drag). */}
-      <div role="separator" aria-orientation="vertical" aria-label="Resize document viewer"
-        aria-valuenow={Math.round(splitPct)} aria-valuemin={SPLIT_MIN} aria-valuemax={SPLIT_MAX}
-        tabIndex={0} onPointerDown={onGripPointerDown} onKeyDown={onGripKeyDown}
-        className={`hidden w-1.5 shrink-0 cursor-col-resize items-center justify-center bg-slate-100 hover:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 lg:flex ${dragging ? "bg-emerald-100" : ""}`}>
-        <span className="pointer-events-none text-[10px] leading-none text-slate-400" aria-hidden>⫶</span>
-      </div>
+      <PaneResizeGrip state={resize} />
 
       {/* Details panel */}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
