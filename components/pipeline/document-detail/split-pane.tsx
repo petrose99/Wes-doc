@@ -7,7 +7,8 @@ import { parseLiveCheckValues, rebuildLiveChecks } from "@/components/pipeline/d
 import { StageIndicator, type StageStep } from "@/components/pipeline/document-detail/stage-indicator"
 import { useFieldNav } from "@/components/pipeline/document-detail/use-field-nav"
 import { updateDocumentNoteAction } from "@/app/(app)/workspaces/[workspaceId]/pipeline-actions"
-import { PaneDocumentContext, useRegisterDocumentActions } from "@/components/queue/document-actions-menu"
+import { PaneDocumentContext, useRegisterDocumentActions, type RegisteredDocument } from "@/components/queue/document-actions-menu"
+import { BillHistoryDisclosure, BillPane, BillStatusTrack, type BillPaneProviderLink } from "@/components/pipeline/document-detail/bill-pane"
 import { escalateCheckAction, type SaveReviewResult } from "@/app/(app)/workspaces/[workspaceId]/actions"
 import type { ActionState } from "@/lib/actions"
 import { useRouter } from "next/navigation"
@@ -21,6 +22,7 @@ import type { DocumentFieldDefinition } from "@/lib/document-templates"
 import type { Ref } from "@/lib/provenance"
 import type { FieldRationale } from "@/lib/rationale"
 import type { ProcessingState } from "@/lib/documents/processing-state"
+import type { ProcessingFact } from "@/lib/documents/processing-fact"
 import type { DocType } from "@/lib/doc-types"
 import { CheckCircle2, ChevronDown, ChevronUp, ExternalLink, Loader2 } from "lucide-react"
 import { useActionState, useContext, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react"
@@ -351,8 +353,10 @@ export function SplitPane({
 }
 
 /** A4: the inner form that owns the field-nav state. Split out of SplitPane so the hook can
- * derive its ordering directly from formFields without SplitPane touching field-nav internals. */
-function FieldNavForm({ saveReview, formFields, data, fieldConfidence, provenanceFields, provenanceItems, summaryFields, rationales, checks, workspaceId, documentId, setTarget, po }: {
+ * derive its ordering directly from formFields without SplitPane touching field-nav internals.
+ * Exported for #361's `BillSplitPane` (Invoices' Bill shell), which reuses this field-editing
+ * form unchanged inside its own composition. */
+export function FieldNavForm({ saveReview, formFields, data, fieldConfidence, provenanceFields, provenanceItems, summaryFields, rationales, checks, workspaceId, documentId, setTarget, po, submitId = "save-review-submit" }: {
   saveReview: (formData: FormData) => Promise<ActionState<SaveReviewResult | null>>
   formFields: DocumentFieldDefinition[]
   data: Record<string, unknown>
@@ -366,6 +370,10 @@ function FieldNavForm({ saveReview, formFields, data, fieldConfidence, provenanc
   documentId: string
   setTarget: (target: ProvenanceTarget) => void
   po: LineItemsPoProps | null
+  /** #361: `BillSplitPane` also renders `BillFooterActions`' Approve/Post button carrying
+   * `#save-review-submit` (#258's reload-focus contract) — this form's own Save review button
+   * needs a different id there so the two don't collide. `undefined` renders no id. */
+  submitId?: string
 }) {
   const navItems = formFields.map((field) => ({ key: field.key, confidence: fieldConfidence[field.key] ?? null, type: field.type }))
   const nav = useFieldNav(navItems)
@@ -422,9 +430,96 @@ function FieldNavForm({ saveReview, formFields, data, fieldConfidence, provenanc
           checks={liveChecks.filter((check) => checkAppliesToField(check, field.key))} onEscalate={onEscalate}
           registerNav={nav.registerField} isCurrent={nav.currentKey === field.key} isCompleted={nav.completedKeys.has(field.key)} />)}
     <div className="flex items-center gap-3 border-t border-slate-100 pt-3">
-      <button type="submit" id="save-review-submit" aria-busy={saving || undefined} className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40">
+      <button type="submit" id={submitId} aria-busy={saving || undefined} className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40">
         {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <CheckCircle2 className="h-4 w-4" aria-hidden />}{saving ? "Saving…" : "Save review"}
       </button>
     </div>
   </form>
+}
+
+/** #361 step 5: the Invoices queue's detail content — `BillPane`'s shell (drag-grip split,
+ * header, status track, footer verb) around the same field-editing form this file already
+ * builds, minus the retired five-tab strip (Details/Note/Activity/Approval/Checks folds into
+ * `BillStatusTrack` + `BillHistoryDisclosure`, spec §4/§6). Its own component (not a branch
+ * inside `SplitPane`) so it owns exactly one `useRegisterDocumentActions` call — `BillPane`
+ * already calls it once internally. Receipts/PO Mismatches/Bank Statements/Bill Pay keep
+ * `SplitPane` untouched (#363/#365 move those later). */
+export function BillSplitPane({
+  workspaceId, source, fields, data, fieldConfidence, provenanceFields, provenanceItems, initialTarget, conflictingLabels, missingRequiredFields,
+  saveReview, note, auditEvents, header, rationales, checks, fxBadge, documentMatches, po = null,
+  providerLink, state, fact, ledger, openCheckCodes, paidAt, blockedByCheck, escalated, approvalStatus, rejectedByActor, openReviewTaskId,
+}: {
+  workspaceId: string
+  source: SourceDocument
+  fields: DocumentFieldDefinition[]
+  data: Record<string, unknown>
+  fieldConfidence: Record<string, number>
+  provenanceFields: Record<string, Ref>
+  provenanceItems: Record<string, (Ref | null)[]>
+  initialTarget: ProvenanceTarget | null
+  conflictingLabels: string[]
+  missingRequiredFields: string[]
+  saveReview: (formData: FormData) => Promise<ActionState<SaveReviewResult | null>>
+  note: string
+  auditEvents: Array<{ id: string; label: string; createdAt: string; actorName: string | null }>
+  header: { filename: string; documentId: string; fileId: string; flagged: boolean; archived: boolean; cancelled: boolean; cancelledReason: string | null; reviewLink: { href: string; label: string } | null }
+  rationales?: Record<string, FieldRationale>
+  checks?: FieldCheck[]
+  fxBadge?: ReactNode
+  documentMatches?: ReactNode
+  po?: LineItemsPoProps | null
+  /** #355 Q2: null when no provider is connected or the document has no ledger line yet — no
+   * pushed-record external URL exists in the schema yet to build one from (ponytail: renders
+   * nothing until a later ticket adds that field, same as an unconnected workspace). */
+  providerLink: BillPaneProviderLink
+  state: ProcessingState
+  fact: ProcessingFact
+  ledger?: string | null
+  openCheckCodes: string[]
+  paidAt: Date | null
+  blockedByCheck: boolean
+  escalated: boolean
+  approvalStatus: "not_started" | "in_progress" | "approved" | "rejected" | "cancelled"
+  rejectedByActor: string | null
+  openReviewTaskId: string | null
+}) {
+  const [target, setTarget] = useState<ProvenanceTarget | null>(initialTarget)
+  const router = useRouter()
+  const fileHref = `/api/documents/${source.documentId}/source`
+
+  const arrayIndex = fields.findIndex((field) => field.type === "array")
+  let summaryStart = arrayIndex
+  while (summaryStart > 0 && fields[summaryStart - 1].type === "number") summaryStart--
+  const summaryFields = arrayIndex > -1 ? fields.slice(summaryStart, arrayIndex) : []
+  const summaryKeys = new Set(summaryFields.map((field) => field.key))
+  const formFields = fields.filter((field) => !summaryKeys.has(field.key))
+
+  const document: RegisteredDocument = {
+    workspaceId, documentId: header.documentId, fileId: header.fileId, filename: header.filename,
+    flagged: header.flagged, archived: header.archived, cancelled: header.cancelled, cancelledReason: header.cancelledReason,
+    reviewLink: header.reviewLink,
+  }
+
+  return <BillPane document={document} providerLink={providerLink} fileHref={fileHref}
+    viewer={<SourceViewer source={source} target={target} />}
+    form={<div className="space-y-4 p-4">
+      <BillStatusTrack workspaceId={workspaceId} openReviewTaskId={openReviewTaskId} state={state} fact={fact} ledger={ledger}
+        openCheckCodes={openCheckCodes} cancelledReason={header.cancelledReason} paidAt={paidAt} blockedByCheck={blockedByCheck}
+        escalated={escalated} approvalStatus={approvalStatus} rejectedByActor={rejectedByActor} onDone={() => router.refresh()} />
+
+      {(missingRequiredFields.length > 0 || conflictingLabels.length > 0) && <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm text-indigo-700">
+        {missingRequiredFields.length > 0 && <p>Missing required fields: <strong>{missingRequiredFields.join(", ")}</strong></p>}
+        {conflictingLabels.length > 0 && <p>Pages disagreed on: <strong>{conflictingLabels.join(", ")}</strong> — please confirm against the source.</p>}
+      </div>}
+
+      <FieldNavForm saveReview={saveReview} formFields={formFields} data={data} fieldConfidence={fieldConfidence}
+        provenanceFields={provenanceFields} provenanceItems={provenanceItems} summaryFields={summaryFields}
+        rationales={rationales ?? null} checks={checks ?? []} workspaceId={workspaceId} documentId={header.documentId}
+        setTarget={setTarget} po={po} submitId={undefined} />
+
+      {fxBadge && <div>{fxBadge}</div>}
+      {documentMatches}
+
+      <BillHistoryDisclosure workspaceId={workspaceId} documentId={header.documentId} note={note} auditEvents={auditEvents} />
+    </div>} />
 }

@@ -11,7 +11,8 @@ import { AddTypeButton, type AddTypeButtonHandle } from "@/components/intake/add
 import type { SheetTemplate } from "@/components/extract/types"
 import type { FieldTable } from "@/lib/configuration/field-table"
 import { PaneMenuItem } from "@/components/queue/detail-pane"
-import { DocumentBulkActions, DocumentPaneActions } from "@/components/queue/document-actions"
+import { DocumentBulkActions } from "@/components/queue/document-actions"
+import { BillFooterActions } from "@/components/pipeline/document-detail/bill-pane"
 import { formatDate, formatMoney, StatePills, TitleCell } from "@/components/queue/row-cells"
 import { StatusLine } from "@/components/queue/status-line"
 import { processingFact } from "@/lib/documents/processing-fact"
@@ -327,8 +328,15 @@ export function InvoiceQueue({ workspaceId, basePath, bills, minConfidencePercen
             <Send className="h-3.5 w-3.5" aria-hidden />Post
           </Button>
         </>} />}
-      paneActions={(bill, { refresh }) => <DocumentPaneActions workspaceId={workspaceId} documentId={bill.documentId} noun="invoice"
-        status={bill.status} openReviewTaskId={bill.openReviewTaskId} cancelled={!!bill.cancelledAt} onDone={refresh} />}
+      // #361 step 5: the Bill footer's one verb (Approve/Post/nothing) replaces the retired
+      // Approve/Reject pane actions — Approve when the bill isn't cancelled, isn't sitting in an
+      // approval review task already reviewed away, and hasn't stalled at queued/failed; else Post
+      // when `postEligible`; else read-only (nothing renders, per BillFooterActions).
+      paneActions={(bill, { refresh }) => <BillFooterActions workspaceId={workspaceId} documentId={bill.documentId}
+        connectionId={connectionId}
+        mode={!bill.cancelledAt && !(bill.status === "reviewed" && !bill.openReviewTaskId) && bill.status !== "queued" && bill.status !== "failed"
+          ? "approve" : postEligible(bill) ? "post" : "read-only"}
+        openReviewTaskId={bill.openReviewTaskId} blocked={bill.blockedByCheck} onDone={refresh} />}
       paneMenu={(bill) => {
         const info = cancelInfo(bill)
         const reason = postIneligibleReason(bill)

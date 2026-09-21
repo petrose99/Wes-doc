@@ -1,5 +1,16 @@
+import { basename, dirname, resolve } from "node:path"
 import { withSentryConfig } from "@sentry/nextjs"
 import type { NextConfig } from "next"
+
+// #361: an autopilot *-lanes/<map>-<ticket> worktree symlinks node_modules back to the main
+// checkout (scripts/wayfinder-autopilot/README.md's LANE_LINKS) — pinning root to the worktree
+// itself then makes Turbopack refuse that symlink as "points out of the filesystem root"
+// (FATAL, dev server never listens on :3000). Pinning one level higher, the lanes' own parent
+// directory, keeps both the worktree and the symlink's real target underneath root while still
+// pre-empting the multiple-lockfiles warning below. A checkout that isn't a `*-lanes` worktree
+// (the normal clone) is unaffected — root stays its own directory, same as before.
+const here = import.meta.dirname
+const turbopackRoot = basename(dirname(here)).endsWith("-lanes") ? resolve(here, "../..") : here
 
 const nextConfig: NextConfig = {
   // Pins Turbopack's workspace root to this checkout, silencing (and pre-empting) the
@@ -9,7 +20,7 @@ const nextConfig: NextConfig = {
   // any specific observed bug — the one dev-server mismatch found in this session traced to a
   // different cause (the terminal tool's cwd, not Turbopack) — but Next's own docs are explicit
   // that an ambiguous root changes what gets resolved, so pinning it is worth doing regardless.
-  turbopack: { root: import.meta.dirname },
+  turbopack: { root: turbopackRoot },
   // Dev-only: lets HMR/dev-overlay requests through when the dev server is viewed via a tunnel
   // hostname rather than localhost. Comma-separated; ignored by `next start`.
   allowedDevOrigins: (process.env.DEV_ALLOWED_ORIGINS ?? "").split(",").map((s) => s.trim()).filter(Boolean),

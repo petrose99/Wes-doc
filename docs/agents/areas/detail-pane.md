@@ -84,10 +84,25 @@ actually-clipped content. Also pre-existing, confirmed shell chrome (#297): `tex
 pane-title `h2.min-w-0.flex-1.truncate` at 390 and on the Library type-line
 `span.block.truncate.text-sm.font-medium.text-slate-800` at both widths, and `undersized-ui-text`
 ("10.5px functional text") on the Library pane's count badge — none introduced by #297's
-Direction-row/Move-dialog work, all present before it and outside its diff.
+Direction-row/Move-dialog work, all present before it and outside its diff. #361 adds two more,
+both unidentified/unlocated after a targeted live-DOM scan (`low-contrast` "#90a1b9 on #f8fafc" and
+`first-viewport-column-overflow` on `div.flex.min-h-0.flex-1.flex-col.overflow-hidden.lg:flex-row`)
+— both only fire on a fallback capture state (seed doc not in the expected status), may be a
+transient/mid-animation detector read; re-capture before chasing further.
+
+## Seed data is mutable across sessions
+A round that captures a status-gated dialog (e.g. reject-confirm) depends on a seed document
+staying in that exact status — it can drift (get approved/rejected by an earlier round) and leave
+later sessions unable to reproduce the state at all (#361: `rejectDoc` had no open review task left,
+0 of 33 invoices reject-eligible). Re-query eligibility immediately before the capture, don't assume
+a fixture holds across sessions.
 
 ## Conventions the bar checks
-One `←`/`×` per breakpoint, never both (see Primitives). Every destructive `PaneMenuItem` opens a
+One `←`/`×` per breakpoint, never both (see Primitives) — **known regression (#367, found on #361):**
+at 390px `PaneFrame`'s Close (`hidden lg:inline-flex`) computes `display: flex` despite the `hidden`
+class, so both render simultaneously; reproduces on every queue (confirmed on `/exceptions/<id>`,
+untouched by #361). Fix lives on #367, not on whatever ticket next captures this state — don't
+re-diagnose it, cite #367. Every destructive `PaneMenuItem` opens a
 `ConfirmDialog` naming the concrete consequence, and that dialog must survive the menu closing (see
 the Contract above — test it, don't assume it from the code alone; #259's first close-phase capture
 round never actually got the dialog to render and treated the gap as "just needs recapture" before
