@@ -10,6 +10,7 @@
 #   scripts/wayfinder-autopilot/stop.sh <map>
 set -uo pipefail
 MAP="${1:?usage: stop.sh <map>}"
+AP="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"; cd "$ROOT"
 REPO="${WAYFINDER_REPO:-$(gh repo view --json nameWithOwner --jq .nameWithOwner)}"
 ME="$(gh api user --jq .login)"
@@ -33,12 +34,18 @@ for p in $(pgrep -f "claude -p (/wayfinder $MAP |Work Wayfinder map #$MAP,)" 2>/
 done
 sleep 3
 
-# 3. keep the work, hand off, release
+# 3. keep the work, hand off, release. A ticket worked in a lane (run.sh
+# LANE_MODE=worktree) is committed in its lane and the branch pushed; the
+# checkout here is untouched.
+LANES_DIR="${WAYFINDER_LANES_DIR:-${LANES_DIR:-$(dirname "$ROOT")/$(basename "$ROOT")-lanes}}"
 for t in $(echo "$TICKETS" | tr ' ' '\n' | sort -u); do
   [ -z "$t" ] && continue
-  if [ -n "$(git status --porcelain -- . ':!.scratch' ':!.impeccable/live' ":!docs/wayfinder-reports/$MAP/logs" 2>/dev/null)" ]; then
-    "$(dirname "$0")/wip-add.sh" "$OUT/logs/pre-untracked.txt" && git commit -q -m "wip(autopilot): #$t stopped by the owner; continued on the next run" && echo "committed WIP for #$t"
+  tree="$ROOT"; pre="$OUT/logs/pre-untracked.txt"
+  [ -e "$LANES_DIR/$MAP-$t/.git" ] && { tree="$LANES_DIR/$MAP-$t"; pre="$OUT/logs/pre-untracked-$t.txt"; }
+  if [ -n "$(git -C "$tree" status --porcelain -- . ':!.scratch' ':!.impeccable/live' ":!docs/wayfinder-reports/$MAP/logs" 2>/dev/null)" ]; then
+    ( cd "$tree" && "$AP/wip-add.sh" "$pre" && git commit -q -m "wip(autopilot): #$t stopped by the owner; continued on the next run" ) && echo "committed WIP for #$t in $tree"
   fi
+  [ "$tree" != "$ROOT" ] && git -C "$tree" push -q -u origin "wf/$MAP-$t" 2>/dev/null && echo "pushed wf/$MAP-$t"
   gh issue comment "$t" --repo "$REPO" --body "Autopilot: continue — stopped by the owner. Work so far is committed as WIP on the branch. Next session: read \`docs/wayfinder-reports/$MAP/$t.handoff.md\` and the last commits, continue from the milestone it names." >/dev/null 2>&1 && echo "posted hand-off on #$t"
   gh issue edit "$t" --repo "$REPO" --remove-assignee "$ME" >/dev/null 2>&1 && echo "released claim on #$t"
   printf '| %s | [#%s](https://github.com/%s/issues/%s) | stopped by the owner — continues on the next run | – | – |\n' "$(TZ=Africa/Johannesburg date +%Y-%m-%dT%H:%M:%S%z)" "$t" "$REPO" "$t" >> "$OUT/run-log.md"

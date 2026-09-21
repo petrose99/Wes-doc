@@ -50,3 +50,10 @@ SESSION_MAX_TOKENS=110000
 # session is cheaper than two that overlap.
 SESSION_MAX_TOKENS_SPEC=150000
 export WAYFINDER_HANDOFF_MAX_LINES=80
+# Lanes (2026-09-21): every ticket in its own worktree + branch wf/<map>-<ticket>
+# under ../Wes-doc-lanes/, so this checkout is free for the owner while Bite
+# runs. Draft PR from the first session; on close the PR is marked ready and
+# merged into the integration branch here, then pushed (auto). Set
+# LANE_MERGE=review to leave PRs for a human and hold dependent tickets.
+LANE_MODE=worktree
+LANE_MERGE=auto

@@ -68,6 +68,7 @@ pgdata
 
 # autopilot session artefacts (local only)
 .impeccable/live/
+.impeccable/live
 .scratch/
 docs/wayfinder-reports/*/logs/
 

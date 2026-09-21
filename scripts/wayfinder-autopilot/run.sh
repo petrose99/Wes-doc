@@ -4,6 +4,15 @@
 #
 #   scripts/wayfinder-autopilot/run.sh <map-number> [--max N] [--ticket N] [--dry-run]
 #
+# Lanes (LANE_MODE=worktree in the project config): every ticket is worked in
+# its own git worktree on branch wf/<map>-<ticket>, so the checkout the driver
+# runs from is never touched by a session. The first session's WIP is pushed
+# as a draft PR against the branch the driver started on; when the ticket
+# closes the PR is marked ready and, with LANE_MERGE=auto, merged into that
+# branch locally and pushed (GitHub records the PR as merged). LANE_MERGE=
+# review leaves the PR open for a human and holds back any ticket whose
+# blocker has not landed. See README.md §Lanes.
+#
 # Each session runs under scripts/wayfinder-autopilot/brief.md, which tells the
 # agent to answer its own grilling questions with the ➡️ recommendation and to
 # write docs/wayfinder-reports/<map>/<ticket>.md. Logs land in
@@ -96,7 +105,9 @@ frontier() {
     if [[ "$(title "$n")" =~ ^(Owner sign-off|Sign off|Sign-off) ]]; then SKIP[$n]=1; continue; fi
     open_blockers="$(gh api graphql -f query="{ repository(owner:\"${REPO%/*}\",name:\"${REPO#*/}\") { issue(number:$n) { blockedBy(first:50){ nodes{ state } } } } }" \
       --jq '[.data.repository.issue.blockedBy.nodes[] | select(.state=="OPEN")] | length')"
-    [ "$open_blockers" = "0" ] && echo "$n"
+    [ "$open_blockers" = "0" ] || continue
+    blockers_landed "$n" || { echo "    #$n held: a blocker's PR is not merged yet (LANE_MERGE=review)" >&2; continue; }
+    echo "$n"
   done
 }
 
@@ -114,12 +125,12 @@ cleanup_session() {
   for p in $(pgrep -u "$(id -u)" -f 'next dev|next-server|chrome|chromium|playwright|impeccable (live|serve)|detect\.js' 2>/dev/null); do
     [ "$p" = "$$" ] && continue
     # ps etimes = seconds since start; only kill things younger than the session
-    case "$(readlink "/proc/$p/cwd" 2>/dev/null)/" in "$ROOT/"*) ;; *) continue ;; esac   # not ours (owner's viewing server in a worktree)
+    case "$(readlink "/proc/$p/cwd" 2>/dev/null)/" in "$ROOT/"*|"$LANES_DIR/"*) ;; *) continue ;; esac   # not ours (owner's viewing server in a worktree)
     if [ "$(ps -o etimes= -p "$p" 2>/dev/null | tr -d ' ')" -le "$(( $(date +%s) - since ))" ] 2>/dev/null; then kill -TERM "$p" 2>/dev/null || true; fi
   done
   sleep 3
   for p in $(pgrep -u "$(id -u)" -f 'next dev|next-server|chrome|chromium|playwright|impeccable (live|serve)|detect\.js' 2>/dev/null); do
-    case "$(readlink "/proc/$p/cwd" 2>/dev/null)/" in "$ROOT/"*) ;; *) continue ;; esac
+    case "$(readlink "/proc/$p/cwd" 2>/dev/null)/" in "$ROOT/"*|"$LANES_DIR/"*) ;; *) continue ;; esac
     if [ "$(ps -o etimes= -p "$p" 2>/dev/null | tr -d ' ')" -le "$(( $(date +%s) - since ))" ] 2>/dev/null; then kill -KILL "$p" 2>/dev/null || true; fi
   done
   sync; echo "    cleaned up session pid $pid (pgid ${pgid:-?}); free: $(free -m | awk '/Mem:/{print $7" MB"}')"
@@ -135,6 +146,88 @@ MODEL_CHEAP="${WAYFINDER_MODEL_CHEAP:-}"
 CONFIG="${WAYFINDER_CONFIG:-$ROOT/.claude/wayfinder-autopilot/config.sh}"   # WAYFINDER_CONFIG=<file> swaps the provider/model ladder
 [ -f "$CONFIG" ] && . "$CONFIG"
 MODEL_CHEAP="${MODEL_CHEAP:-$MODEL_STRONG}"
+# Lanes. tree (default): sessions work in this checkout, on its branch, as
+# before. worktree: one worktree + branch per ticket under LANES_DIR
+# (default: a sibling folder <repo>-lanes/), node_modules, .env and the live
+# helpers symlinked in from this checkout, the ticket's reports and hand-off
+# committed on the lane branch. The integration branch is whatever branch
+# this checkout is on when the driver starts; lanes branch from its local
+# tip (it may be ahead of origin) and land back onto it.
+LANE_MODE="${WAYFINDER_LANE_MODE:-${LANE_MODE:-tree}}"
+LANE_MERGE="${WAYFINDER_LANE_MERGE:-${LANE_MERGE:-auto}}"       # auto | review
+LANES_DIR="${WAYFINDER_LANES_DIR:-${LANES_DIR:-$(dirname "$ROOT")/$(basename "$ROOT")-lanes}}"
+LANE_LINKS="${LANE_LINKS:-node_modules .env .impeccable/live .claude/settings.local.json}"
+BASE_BRANCH="$(git -C "$ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo HEAD)"
+[ "$LANE_MODE" = worktree ] && mkdir -p "$LANES_DIR"
+lane_dir()    { echo "$LANES_DIR/$MAP-$1"; }
+lane_branch() { echo "wf/$MAP-$1"; }
+lane_root() {   # $1 ticket → where this ticket's tree lives (its lane if it has one, else this checkout)
+  if [ "$LANE_MODE" = worktree ] && [ -e "$(lane_dir "$1")/.git" ]; then lane_dir "$1"; else echo "$ROOT"; fi
+}
+handoff_of() { echo "$(lane_root "$1")/docs/wayfinder-reports/$MAP/$1.handoff.md"; }
+report_of()  { echo "$(lane_root "$1")/docs/wayfinder-reports/$MAP/$1.md"; }
+untracked_of() {   # the owner's untracked files in that tree, never swept into a WIP commit
+  if [ "$(lane_root "$1")" = "$ROOT" ]; then echo "$PRE_UNTRACKED"; else echo "$LOGS/pre-untracked-$1.txt"; fi
+}
+lane_open() {   # $1 ticket → creates the lane if lane mode; prints the session's working dir
+  [ "$LANE_MODE" = worktree ] || { echo "$ROOT"; return; }
+  local wt br p
+  wt="$(lane_dir "$1")"; br="$(lane_branch "$1")"
+  if [ ! -e "$wt/.git" ]; then
+    if git -C "$ROOT" show-ref --verify -q "refs/heads/$br"; then
+      git -C "$ROOT" worktree add -q "$wt" "$br" >&2
+    else
+      git -C "$ROOT" worktree add -q -b "$br" "$wt" "$BASE_BRANCH" >&2
+    fi
+    for p in $LANE_LINKS; do
+      [ -e "$ROOT/$p" ] && [ ! -e "$wt/$p" ] && { mkdir -p "$(dirname "$wt/$p")"; ln -s "$ROOT/$p" "$wt/$p"; }
+    done
+    ( cd "$wt" && git ls-files --others --exclude-standard --directory ) > "$LOGS/pre-untracked-$1.txt"
+    echo "    lane $wt on $br (from $BASE_BRANCH)" >&2
+  fi
+  mkdir -p "$wt/docs/wayfinder-reports/$MAP"
+  echo "$wt"
+}
+lane_publish() {   # $1 ticket, $2 title → push the lane branch; open a draft PR the first time
+  [ "$LANE_MODE" = worktree ] || return 0
+  local wt br pr
+  wt="$(lane_dir "$1")"; br="$(lane_branch "$1")"
+  [ -e "$wt/.git" ] || return 0
+  [ "$(git -C "$wt" rev-list --count "$BASE_BRANCH..$br" 2>/dev/null || echo 0)" -gt 0 ] || return 0
+  git -C "$wt" push -q -u origin "$br" 2>/dev/null || { echo "    (push of $br failed — PR not opened; the lane keeps the work)"; return 0; }
+  pr="$(gh pr list --repo "$REPO" --head "$br" --state all --json number --jq '.[0].number' 2>/dev/null)"
+  if [ -z "$pr" ]; then
+    pr="$(gh pr create --repo "$REPO" --head "$br" --base "$BASE_BRANCH" --draft --title "#$1 $2" \
+      --body "Autopilot lane for #$1 on map #$MAP. Report and hand-off: \`docs/wayfinder-reports/$MAP/$1.md\`, \`$1.handoff.md\`. Draft while the ticket is open; ready when it closes at the bar." 2>/dev/null | grep -o '[0-9]*$')"
+    [ -n "$pr" ] && echo "    draft PR #$pr for #$1 ($br → $BASE_BRANCH)"
+  fi
+}
+lane_land() {   # $1 ticket, $2 title → the ticket closed: PR ready; auto: merge into the integration branch, push, remove the lane
+  [ "$LANE_MODE" = worktree ] || return 0
+  local wt br pr
+  wt="$(lane_dir "$1")"; br="$(lane_branch "$1")"
+  [ -e "$wt/.git" ] || return 0
+  lane_publish "$1" "$2"
+  pr="$(gh pr list --repo "$REPO" --head "$br" --state open --json number --jq '.[0].number' 2>/dev/null)"
+  [ -n "$pr" ] && gh pr ready "$pr" --repo "$REPO" >/dev/null 2>&1 && echo "    PR #$pr ready for review"
+  [ "$LANE_MERGE" = auto ] || { echo "    LANE_MERGE=review — #$1 waits on PR #${pr:-?}; tickets it blocks are held until it merges"; return 0; }
+  if git -C "$ROOT" merge -q --no-ff -m "land(#$1): $2${pr:+ (PR #$pr)}" "$br" 2>/dev/null; then
+    git -C "$ROOT" push -q origin "$BASE_BRANCH" 2>/dev/null || echo "    (push of $BASE_BRANCH failed — landed locally; push when you can)"
+    git -C "$ROOT" worktree remove --force "$wt" 2>/dev/null && git -C "$ROOT" branch -q -d "$br" 2>/dev/null
+    echo "    landed #$1 on $BASE_BRANCH${pr:+ (PR #$pr merged)}; lane removed"
+  else
+    git -C "$ROOT" merge --abort 2>/dev/null || true
+    echo "    could not land #$1: merging $br into $BASE_BRANCH conflicts with this checkout — PR #${pr:-?} left open, lane kept at $wt"
+  fi
+}
+blockers_landed() {   # $1 ticket → (review mode) no closed blocker still has an open lane PR
+  [ "$LANE_MODE" = worktree ] && [ "$LANE_MERGE" = review ] || return 0
+  local b
+  for b in $(gh api graphql -f query="{ repository(owner:\"${REPO%/*}\",name:\"${REPO#*/}\") { issue(number:$1) { blockedBy(first:50){ nodes{ number } } } } }" --jq '.data.repository.issue.blockedBy.nodes[].number' 2>/dev/null); do
+    [ -n "$(gh pr list --repo "$REPO" --head "$(lane_branch "$b")" --state open --json number --jq '.[0].number' 2>/dev/null)" ] && return 1
+  done
+  return 0
+}
 MODEL_MEASURE="${WAYFINDER_MODEL_MEASURE:-${MODEL_MEASURE:-}}"   # optional: the measure phase's first session (plumbing only)
 # EFFORT (optional, per-project or WAYFINDER_EFFORT): pinned per session with
 # --effort so the autopilot never inherits whatever the user's own /model
@@ -150,11 +243,11 @@ EFFORT="${WAYFINDER_EFFORT:-${EFFORT:-}}"
 # only *consecutive sessions that made no progress* (no new commit, no
 # hand-off change); a session that moved the work resets the count.
 wip_handoff() {   # $1 ticket, $2 reason
-  ( cd "$ROOT" && "$AP/wip-add.sh" "$PRE_UNTRACKED" && git commit -q -m "wip(autopilot): #$1 $2; continued in the next session" ) || echo "    (WIP commit for #$1 did not happen — see above)"
+  ( cd "$(lane_root "$1")" && "$AP/wip-add.sh" "$(untracked_of "$1")" && git commit -q -m "wip(autopilot): #$1 $2; continued in the next session" ) || echo "    (WIP commit for #$1 did not happen — see above)"
   gh issue comment "$1" --repo "$REPO" --body "Autopilot: continue — $2. Work so far is committed as WIP on the branch. Next session: read \`docs/wayfinder-reports/$MAP/$1.handoff.md\` and the last commits, continue from the milestone it names, do the build in this session (no background build agent — a session that ends its turn waiting on one exits and takes it down), keep the hand-off file current, and close at the bar. If the previous session left a question for the owner, answer it under the standing delegation and continue. Do not narrow the ticket to fit a session: the whole scope ships, over as many sessions as it takes." >/dev/null 2>&1 || true
 }
 progress_mark() {   # a fingerprint of "did this session move the work": HEAD + hand-off file
-  ( cd "$ROOT" && git rev-parse HEAD 2>/dev/null; git hash-object "$OUT/$1.handoff.md" 2>/dev/null ) | tr '\n' ' '
+  ( cd "$(lane_root "$1")" && git rev-parse HEAD 2>/dev/null; git hash-object "$(handoff_of "$1")" 2>/dev/null ) | tr '\n' ' '
 }
 # MODEL_EXEC_FIRST (optional, per-project): execution tickets start on this
 # model; a ticket left "Autopilot: partial —" is retried on MODEL_STRONG.
@@ -181,7 +274,7 @@ phase_rank() { case "$1" in spec) echo 1;; build) echo 2;; measure) echo 3;; clo
 phase_of() {   # $1 ticket → "" (single session) | spec | build | close
   local labels; labels="$(gh api "repos/$REPO/issues/$1" --jq '[.labels[].name]|join(",")')"
   [[ "$labels" == *wayfinder:task* ]] && [[ "$(title "$1")" =~ $PHASED_TITLE_RE ]] || { echo ""; return; }
-  local h="$OUT/$1.handoff.md" m=spec f=spec
+  local h m=spec f=spec; h="$(handoff_of "$1")"
   if [ -f "$h" ] && grep -q '^milestone: measured' "$h"; then m=close
   elif [ -f "$h" ] && grep -q '^milestone: build-done' "$h"; then m=measure
   elif [ -f "$h" ] && grep -q '^milestone: spec-done' "$h"; then m=build; fi
@@ -258,7 +351,7 @@ model_for() {   # $1 ticket, $2 attempt number (1-based), $3 phase
   fi
   # A continuation (a hand-off file exists from an earlier session) always runs
   # on the strong model: the cheap first pass has had its turn.
-  [ -f "$OUT/$1.handoff.md" ] && { echo "$MODEL_STRONG"; return; }
+  [ -f "$(handoff_of "$1")" ] && { echo "$MODEL_STRONG"; return; }
   if [[ "$labels" == *wayfinder:research* ]] || [[ "$title" =~ [Pp]olish|[Bb]ring\ .*\ to\ the\ (autopilot\ )?bar ]]; then
     echo "$MODEL_CHEAP"
   elif [[ "$labels" == *wayfinder:task* ]] && [ -n "${MODEL_EXEC_FIRST:-}" ] && [ "$attempt" = 1 ]; then
@@ -284,6 +377,8 @@ while [ "$n" -lt "$MAX" ]; do
   fi
   n=$((n+1))
   TT="$(title "$T")"
+  if [ "$DRY" = 1 ]; then WT="$ROOT"; else WT="$(lane_open "$T")"; fi
+  TOUT="$WT/docs/wayfinder-reports/$MAP"; HANDOFF="$TOUT/$T.handoff.md"
   PHASE="$(phase_of "$T")"
   MODEL="$(model_for "$T" $(( ${ATTEMPTS[$T]:-0} + 1 )) "$PHASE")"
   # Per-phase effort (config: EFFORT_SPEC / EFFORT_BUILD / EFFORT_MEASURE /
@@ -311,7 +406,7 @@ while [ "$n" -lt "$MAX" ]; do
   # (a worktree copy on another port, behind a tunnel) is not ours to kill.
   for p in $(pgrep -u "$(id -u)" -f 'next dev|next-server|chrome|chromium|playwright' 2>/dev/null); do
     [ "$p" = "$$" ] && continue
-    case "$(readlink "/proc/$p/cwd" 2>/dev/null)/" in "$ROOT/"*) kill -TERM "$p" 2>/dev/null || true ;; esac
+    case "$(readlink "/proc/$p/cwd" 2>/dev/null)/" in "$ROOT/"*|"$LANES_DIR/"*) kill -TERM "$p" 2>/dev/null || true ;; esac
   done
   sleep 2
   START=$(TZ=Africa/Johannesburg date +%Y-%m-%dT%H:%M:%S%z); S0=$(date +%s)
@@ -324,7 +419,7 @@ while [ "$n" -lt "$MAX" ]; do
   # appended to a per-run copy, since the CLI takes only one system-prompt file.
   RUN_BRIEF="$LOGS/brief-$T.md"
   MARK0="$(progress_mark "$T")"
-  CONT=""; [ -f "$OUT/$T.handoff.md" ] && CONT="**This is a continuation session.** A previous session worked this ticket and did not close it. Read the hand-off file first and continue from the milestone it names; do not restart, re-spec or re-measure what it records as done."
+  CONT=""; [ -f "$HANDOFF" ] && CONT="**This is a continuation session.** A previous session worked this ticket and did not close it. Read the hand-off file first and continue from the milestone it names; do not restart, re-spec or re-measure what it records as done."
   [ -n "$PHASE" ] && CONT="$CONT
 
 **Hand-off file rule:** when you rewrite the hand-off, keep every \`milestone:\` line already in it and add yours below. The driver reads the phase off those lines; a dropped line re-runs a finished phase."
@@ -352,7 +447,7 @@ while [ "$n" -lt "$MAX" ]; do
   # system prompt (--system-prompt-file), the slash-command menu is off and
   # skills are read as files from the list appended here; the tool set is
   # SESSION_TOOL_SET. Measured on sonnet: 43.4K → 18.4K before the
-  # autopilot text. Hooks (the token guard, ponytail) still run.
+  # autopilot text. Hooks (the token guard, the context guard) still run.
   skill_file() {   # $1 name (specify | product:product-requirements | grilling …) → path or ""
     local n="$1" base="${1#*:}" plug="${1%%:*}" f
     [ "$plug" = "$n" ] && plug=""
@@ -394,7 +489,7 @@ while [ "$n" -lt "$MAX" ]; do
     cat "$BRIEF"
     [ "${PROMPT_MODE:-slash}" = bare ] && skill_table
     [ -f "$PHASE_BRIEF" ] && { printf '\n\n'; cat "$PHASE_BRIEF"; }
-    printf '\n\n## This run\n\nARGUMENTS: %s %s (map #%s, ticket #%s)\n\n- Repository: `%s` (branch `%s`)\n- Generic lessons (every project): `%s`\n- Project lessons (this repo): `%s`\n- Report: `%s/%s.md`\n- Hand-off file (keep it current at every milestone): `%s/%s.handoff.md`\n- Scratch folder for captures and the filled preflight: `%s/scratch-%s/`\n- Report template: `%s/report.md` · project rules: `%s/CLAUDE.md`, `%s/CONTEXT.md`\n\n%s\n' "$MAP" "$T" "$MAP" "$T" "$ROOT" "$(git -C "$ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null)" "$GENERIC_LESSONS" "$PROJECT_LESSONS" "$OUT" "$T" "$OUT" "$T" "$LOGS" "$T" "$AP" "$ROOT" "$ROOT" "$CONT"; } > "$RUN_BRIEF"
+    printf '\n\n## This run\n\nARGUMENTS: %s %s (map #%s, ticket #%s)\n\n- Repository: `%s` (branch `%s`)\n- Generic lessons (every project): `%s`\n- Project lessons (this repo): `%s`\n- Report: `%s/%s.md`\n- Hand-off file (keep it current at every milestone): `%s/%s.handoff.md`\n- Scratch folder for captures and the filled preflight: `%s/scratch-%s/`\n- Report template: `%s/report.md` · project rules: `%s/CLAUDE.md`, `%s/CONTEXT.md`\n\n%s\n' "$MAP" "$T" "$MAP" "$T" "$WT" "$(git -C "$WT" rev-parse --abbrev-ref HEAD 2>/dev/null)" "$GENERIC_LESSONS" "$PROJECT_LESSONS" "$TOUT" "$T" "$TOUT" "$T" "$LOGS" "$T" "$AP" "$WT" "$WT" "$CONT"; } > "$RUN_BRIEF"
   # Memory: the whole session (claude + dev server + headless browser + node
   # workers) runs inside one cgroup scope with a hard ceiling, so the kernel
   # reclaims/kills inside the scope instead of the box-wide earlyoom shooting
@@ -458,10 +553,9 @@ while [ "$n" -lt "$MAX" ]; do
     fi
   fi
   while :; do
-  ( cd "$ROOT" && NODE_OPTIONS="${WAYFINDER_NODE_OPTIONS:---max-old-space-size=3072}" \
-    WAYFINDER_CTX_FILE="$CTXF" WAYFINDER_HANDOFF_FILE="$OUT/$T.handoff.md" WAYFINDER_TICKET="$T" WAYFINDER_MAP="$MAP" WAYFINDER_PHASE="${PHASE:-single}" \
+  ( cd "$WT" && NODE_OPTIONS="${WAYFINDER_NODE_OPTIONS:---max-old-space-size=3072}" \
+    WAYFINDER_CTX_FILE="$CTXF" WAYFINDER_HANDOFF_FILE="$HANDOFF" WAYFINDER_TICKET="$T" WAYFINDER_MAP="$MAP" WAYFINDER_PHASE="${PHASE:-single}" \
     WAYFINDER_READ_MAX_LINES="${WAYFINDER_READ_MAX_LINES:-${READ_MAX_LINES:-220}}" WAYFINDER_READ_PNG_MAX="${WAYFINDER_READ_PNG_MAX:-${READ_PNG_MAX:-10}}" \
-    PONYTAIL_DEFAULT_MODE="${PONYTAIL_MODE:-full}" PONYTAIL_SUBAGENT_MATCHER="${PONYTAIL_SUBAGENT_MATCHER:-^\$}" \
     WAYFINDER_HANDOFF_ALLOWANCE_K="$(( ${WAYFINDER_HANDOFF_ALLOWANCE:-30000} / 1000 ))" \
     setsid "${SCOPE[@]}" claude -p "$SESSION_PROMPT_CUR" \
       "$SYSFLAG" "$RUN_BRIEF" "${BAREFLAGS[@]}" \
@@ -613,7 +707,7 @@ PY
   elif [ -n "$PHASE" ] && [ "$(phase_of "$T")" != "$PHASE" ]; then
     # The phase's exit milestone is on the hand-off: same ticket, next phase,
     # fresh context. Keep the claim; commit anything the session left.
-    ( cd "$ROOT" && "$AP/wip-add.sh" "$PRE_UNTRACKED" && git commit -q -m "wip(autopilot): #$T $PHASE phase done" ) || true
+    ( cd "$WT" && "$AP/wip-add.sh" "$(untracked_of "$T")" && git commit -q -m "wip(autopilot): #$T $PHASE phase done" ) || true
     ATTEMPTS[$T]=0; NEXT_T="$T"
     echo "$(phase_of "$T")" > "$OUT/$T.phase"
     OUTCOME="phase $PHASE done → $(phase_of "$T") next"
@@ -639,14 +733,17 @@ PY
     # release the claim so the retry (or a human) can take it
     gh issue edit "$T" --repo "$REPO" --remove-assignee "$ME" >/dev/null 2>&1 || true
   fi
-  case "${PHASE:-single}" in build|measure) ;; *) [ -f "$OUT/$T.md" ] || OUTCOME="$OUTCOME, no report" ;; esac
-  if [ "$(state "$T")" != "closed" ] && { [ ! -f "$OUT/$T.handoff.md" ] || [ "$(stat -c %Y "$OUT/$T.handoff.md")" -lt "$S0" ]; }; then OUTCOME="$OUTCOME, hand-off not updated"; fi
-  HL=$(wc -l < "$OUT/$T.handoff.md" 2>/dev/null || echo 0); [ "${HL:-0}" -gt "${WAYFINDER_HANDOFF_MAX_LINES:-120}" ] && OUTCOME="$OUTCOME, hand-off $HL lines (limit ${WAYFINDER_HANDOFF_MAX_LINES:-120})"
+  case "${PHASE:-single}" in build|measure) ;; *) [ -f "$TOUT/$T.md" ] || OUTCOME="$OUTCOME, no report" ;; esac
+  if [ "$(state "$T")" != "closed" ] && { [ ! -f "$HANDOFF" ] || [ "$(stat -c %Y "$HANDOFF")" -lt "$S0" ]; }; then OUTCOME="$OUTCOME, hand-off not updated"; fi
+  HL=$(wc -l < "$HANDOFF" 2>/dev/null || echo 0); [ "${HL:-0}" -gt "${WAYFINDER_HANDOFF_MAX_LINES:-120}" ] && OUTCOME="$OUTCOME, hand-off $HL lines (limit ${WAYFINDER_HANDOFF_MAX_LINES:-120})"
   # Duration cell also carries the load: tokens on the first turn before any
   # work (brief + skill + CLAUDE.md + hand-off). Compare it across sessions
   # to see what a brief or hand-off change bought.
   printf '| %s | [#%s](https://github.com/%s/issues/%s) %s | %s (%s) | %dm%02ds · load %dK | [log](logs/%s) |\n' \
     "$START" "$T" "$REPO" "$T" "$TT" "$OUTCOME" "${MODEL:-default}" $((DUR/60)) $((DUR%60)) $((LOAD/1000)) "$(basename "$LOG")" >> "$RUNLOG"
+  # Lanes: the branch is pushed after every session (draft PR from the first
+  # one, so the team can see the work in flight); a closed ticket lands.
+  if [ "$OUTCOME" = resolved ]; then lane_land "$T" "$TT"; else lane_publish "$T" "$TT"; fi
   # Cost beside the score, every session: turns × context is the bill.
   python3 "$(dirname "$0")/scoreboard.py" "$MAP" "$ROOT" 2>/dev/null | sed 's/^/    /' || true
   echo "--- #$T: $OUTCOME in ${DUR}s"
