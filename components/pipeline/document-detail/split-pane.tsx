@@ -447,10 +447,13 @@ export function FieldNavForm({ saveReview, formFields, data, fieldConfidence, pr
       if (field.type === "array") return <Fragment key={field.key}>
         <LineItemsSection field={field} value={data[field.key]} fieldKey={field.key} summaryFields={field.key === "line_items" ? summaryFields : []} fieldValues={data} provenanceFields={provenanceFields} provenanceItems={provenanceItems[field.key] ?? []} onFocusSource={setTarget}
           checks={liveChecks.filter((check) => check.fields.some((f) => f === field.key || f.startsWith(`${field.key}[`)))} onEscalate={onEscalate} po={field.key === "line_items" ? po : null} billMode={billMode} readOnly={billMode && billReadOnly} />
-        {billMode && invoiceDateField && dueDateField && <DatesRow invoiceDateField={invoiceDateField} invoiceDateValue={typeof data[invoiceDateField.key] === "string" ? data[invoiceDateField.key] as string : null}
+        {/* #362: `other_charges` is also `type: "array"` (lib/domains/finance.ts) — gate to
+          the `line_items` field so DatesRow/PaymentDetailsLink render once, not once per
+          array field. */}
+        {billMode && field.key === "line_items" && invoiceDateField && dueDateField && <DatesRow invoiceDateField={invoiceDateField} invoiceDateValue={typeof data[invoiceDateField.key] === "string" ? data[invoiceDateField.key] as string : null}
           dueDateField={dueDateField} dueDateValue={typeof data[dueDateField.key] === "string" ? data[dueDateField.key] as string : null}
           paymentTermsDays={supplierPaymentTermsDays} readOnly={billReadOnly} />}
-        {billMode && <PaymentDetailsLink workspaceId={workspaceId} documentId={documentId} bankAccountFact={supplierBankAccountFact} />}
+        {billMode && field.key === "line_items" && <PaymentDetailsLink workspaceId={workspaceId} documentId={documentId} bankAccountFact={supplierBankAccountFact} />}
       </Fragment>
       return <FieldRow key={field.key} field={field} value={data[field.key]} confidence={fieldConfidence[field.key] ?? null} ref={provenanceFields[field.key] ?? null} onFocusSource={setTarget} rationale={rationales?.[field.key] ?? null}
         checks={liveChecks.filter((check) => checkAppliesToField(check, field.key))} onEscalate={onEscalate}
@@ -532,7 +535,14 @@ export function BillSplitPane({
     reviewLink: header.reviewLink,
   }
 
-  return <BillPane document={document} providerLink={providerLink} fileHref={fileHref}
+  // #362: `BillReadOnlyContext`'s value — Cancelled, Paid (a synced payment status) or Touchless
+  // (sent automatically, never reviewed). Nothing was providing this before, which left every
+  // consumer's `useBillReadOnly()` reading the context's `false` default even on a paid/cancelled
+  // document (caught live: a read-only-pane tab walk landed on `input#vendor`).
+  const billReadOnly = header.cancelled || state === "touchless" || paidAt !== null
+
+  return <BillReadOnlyContext.Provider value={billReadOnly}>
+  <BillPane document={document} providerLink={providerLink} fileHref={fileHref}
     viewer={<SourceViewer source={source} target={target} />}
     form={<div className="space-y-4 p-4">
       <BillStatusTrack workspaceId={workspaceId} openReviewTaskId={openReviewTaskId} state={state} fact={fact} ledger={ledger}
@@ -558,4 +568,5 @@ export function BillSplitPane({
 
       <BillHistoryDisclosure workspaceId={workspaceId} documentId={header.documentId} note={note} auditEvents={auditEvents} />
     </div>} />
+  </BillReadOnlyContext.Provider>
 }
