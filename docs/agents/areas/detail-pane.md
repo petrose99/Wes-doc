@@ -66,9 +66,9 @@ along with the stored source file. This cannot be undone." — never soften this
 
 ## Seed, dev server, capture
 Same as [approvals](approvals.md): dev workspace `af91555d-7450-4b21-a8ac-73db092617c8`,
-`DEV_AUTH_BYPASS=true`, `npm run dev` (:3000), `~/.impeccable/bin/0.1.5/impeccable live-server
---background` (:8400, spawn via `node` `spawn(..., {detached:true})` — a plain shell `&` gets killed
-with the parent). Capture with the shared runner:
+`DEV_AUTH_BYPASS=true`, `node .impeccable/live/dev.mjs start <ws>` (dev server :3000 and the
+detector live-server :8400 together, waits for both; `dev.mjs stop` at the end — a plain shell `&`
+gets killed with the parent). Capture with the shared runner:
 `scripts/wayfinder-autopilot/capture-round.mjs` (`round({out, base}, async ({width, state, keyboard}) => ...)`)
 — write one `.mjs` per round in the ticket's scratch folder, tile with `contact-sheet.mjs`. To
 exercise a destructive-action confirm dialog, wait ≥2s after opening the pane before opening the ⋯

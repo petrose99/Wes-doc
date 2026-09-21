@@ -42,19 +42,23 @@ they show is fixed in place.
 gate as a single step ran 66 minutes and crossed the hand-off line; as
 three it fits. The plan ends with:
 
-- `step: G1 — round script` — servers up **only** the way the area
-  primer's *Seed, dev server, capture* lines say (`node
-  .impeccable/live/dev.mjs start|stop|status`, `node
-  .impeccable/live/livesrv257.mjs`, the seed script it names) — never
-  `npm run dev`, `nohup`, `setsid` or a background call, the hook refuses
-  them and #270's G1 lost 20 turns finding this out; write the
+- `step: G1 — round script` — servers up with **one** call, `node
+  .impeccable/live/dev.mjs start <ws>` (dev server :3000 + the :8400
+  in-page detector, waits for both, preps the workspace), then the seed
+  script the area primer names; `dev.mjs stop` at the end. Never `npm run
+  dev`, `nohup`, `setsid`, a background call, `impeccable live-server` or
+  a livesrv/start-live-server script — the hook refuses them (#270's G1
+  lost 20 turns, #266's G2 two sessions, finding this out). Write the
   ticket's round script on `scripts/wayfinder-autopilot/capture-round.mjs`:
-  every state at **both 1440 and 390**, detector JSON, and a keyboard probe
-  for every Part B focus/keyboard contract (a B line is ticked only by a
-  probe that exercised it, never from the spec text). **Every probe records
-  its own verdict**: `keyboard("name", { ok: <bool>, reason, seq })` — the
-  script compares what the walk reached against what the contract says,
-  so the gate can fail it without a reader. Copy the area primer's
+  `roundArgs()` for its arguments, every state at **both 1440 and 390**,
+  detector JSON, and a probe for every Part B focus/keyboard contract (a B
+  line is ticked only by a probe that exercised it, never from the spec
+  text). **Probes use only the shared helpers on `s`** — `focusIs`,
+  `visible`, `hidden`, `count(sel, within)`, `dialog()`, `waitFor`,
+  `tabWalk`, `press`, `uniqueFile` for any upload fixture — and record
+  their own verdict with `s.probe("name", ok, reason)`; the hook refuses a
+  round script with hand-rolled probe code. The round fails fast if a
+  server is down, so a `detector-error` on every state is never a finding. Copy the area primer's
   *Detector residue* lines to `<scratch>/residue.txt` and pass the same
   regex to the round's `residue` option. Run it once to prove it executes
   end to end; do not start fixing what it shows. Stop the servers; `done`;

@@ -27,9 +27,55 @@
 // residue (regex of detector noise to exclude from realCount) · chromium (pass
 // Playwright's chromium when it cannot be resolved from the working directory)
 // · navTimeout 120000 · settle 500 (ms after each action before a screenshot).
-import { writeFileSync, mkdirSync } from "node:fs"
-import { resolve } from "node:path"
+//
+// Before the browser opens, round() checks that `base` and `detectUrl` answer
+// and throws naming `node .impeccable/live/dev.mjs start <ws>` if not — a
+// missing live-server used to surface as `detector-error` on every state,
+// read as real findings (#266 G2).
+//
+// Probes (on `s`, all shared — a round script never re-implements them; #266
+// lost a session to its own `focused()` string compare and an unscoped `li`):
+//   s.focusIs(/pattern/)            → { ok, focused }
+//   s.visible(locator, ms?)         → true|false, waits up to ms (default 5000)
+//   s.hidden(locator, ms?)          → true|false
+//   s.count(selector, within?)      → number, scoped to `within` locator when given
+//   s.dialog()                      → page.getByRole("dialog") (scope other locators to it)
+//   s.waitFor(() => cond, ms?)      → true|false; polls a page-side predicate
+//   s.probe(name, ok, detail?)      → records a keyboard/behaviour probe {state, ok, reason}
+//   s.uniqueFile(path)              → copy of a fixture with a unique trailer,
+//                                     so a re-run never trips the sha256 dedup guard
+// `roundArgs()` parses `--out <dir>` / `--only <substr>` / `--width <n>` and a
+// positional out dir, so a script called either way lands in the right folder.
+import { writeFileSync, mkdirSync, copyFileSync, appendFileSync } from "node:fs"
+import { resolve, basename, extname } from "node:path"
 import { createRequire } from "node:module"
+import { randomBytes } from "node:crypto"
+
+export function roundArgs(argv = process.argv.slice(2)) {
+  const a = { out: null, only: null, widths: null }
+  for (let i = 0; i < argv.length; i++) {
+    const v = argv[i]
+    if (v === "--out") a.out = argv[++i]
+    else if (v.startsWith("--out=")) a.out = v.slice(6)
+    else if (v === "--only") a.only = argv[++i]
+    else if (v.startsWith("--only=")) a.only = v.slice(7)
+    else if (v === "--width") a.widths = [Number(argv[++i])]
+    else if (v.startsWith("--width=")) a.widths = [Number(v.slice(8))]
+    else if (v.startsWith("--")) throw new Error(`roundArgs(): unknown flag ${v}`)
+    else if (!a.out) a.out = v
+  }
+  if (!a.out) throw new Error("roundArgs(): pass the output dir (`shots-r1` or `--out shots-r1`)")
+  return a
+}
+
+async function preflight(base, detectUrl) {
+  const check = async (url, what) => {
+    try { const r = await fetch(url, { redirect: "manual", signal: AbortSignal.timeout(15000) }); if (r.status < 500) return }
+    catch {}
+    throw new Error(`round(): ${what} is not answering at ${url} — run \`node .impeccable/live/dev.mjs start <ws>\` (brings up :3000 and the :8400 live-server, waits for both) before the round`)
+  }
+  await check(base, "the dev server"); await check(detectUrl, "the impeccable live-server (in-page detector)")
+}
 
 const DEFAULT_RESIDUE = /workspace-switcher|avatar|overused-font|nextjs-portal|next-dev|dev-overlay/i
 
@@ -45,8 +91,11 @@ export async function round(opts, body) {
     residue = DEFAULT_RESIDUE, navTimeout = 120000, settle = 500, only = null,
   } = opts
   if (!out || !base) throw new Error("round(): `out` and `base` are required")
+  if (/^--/.test(out)) throw new Error(`round(): out dir is "${out}" — the script passed a flag as the positional arg; use roundArgs()`)
+  await preflight(base, detectUrl)
   const OUT = resolve(out)
   mkdirSync(OUT, { recursive: true })
+  mkdirSync(`${OUT}/fixtures`, { recursive: true })
   const chromium = await loadChromium(opts.chromium)
   const states = []
   const keyboardLog = []
@@ -107,6 +156,19 @@ export async function round(opts, body) {
           console.log(`${label}@${width}: ${findings.length} findings (${real.length} non-residue)${note ? " " + note : ""}`)
         },
         focused: () => focusedOf(page),
+        async focusIs(re) { const focused = await focusedOf(page); return { ok: re.test(focused), focused } },
+        async visible(loc, ms = 5000) { try { await loc.first().waitFor({ state: "visible", timeout: ms }); return true } catch { return false } },
+        async hidden(loc, ms = 5000) { try { await loc.first().waitFor({ state: "hidden", timeout: ms }); return true } catch { return false } },
+        count: (selector, within) => (within ?? page).locator(selector).count(),
+        dialog: () => page.getByRole("dialog"),
+        async waitFor(fn, ms = 8000) { try { await page.waitForFunction(fn, null, { timeout: ms }); return true } catch { return false } },
+        probe(pname, ok, detail = "") { keyboard(`${name}-${pname}`, { ok: !!ok, reason: ok ? "" : String(detail), width }) },
+        uniqueFile(src) {
+          const dst = `${OUT}/fixtures/${basename(src, extname(src))}-${randomBytes(4).toString("hex")}${extname(src)}`
+          copyFileSync(src, dst)
+          appendFileSync(dst, `\n%% round fixture ${randomBytes(8).toString("hex")}\n`)
+          return dst
+        },
         async tabWalk(n = 20, key = "Tab") { const seq = []; for (let i = 0; i < n; i++) { await page.keyboard.press(key); seq.push(await focusedOf(page)) } return seq },
         async press(key) { await page.keyboard.press(key); return focusedOf(page) },
         offline: (on = true) => ctx.setOffline(on),

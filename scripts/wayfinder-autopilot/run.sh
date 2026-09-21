@@ -426,7 +426,7 @@ while [ "$n" -lt "$MAX" ]; do
   # appended to a per-run copy, since the CLI takes only one system-prompt file.
   RUN_BRIEF="$LOGS/brief-$T.md"
   MARK0="$(progress_mark "$T")"
-  CONT=""; [ -f "$HANDOFF" ] && CONT="**This is a continuation session.** A previous session worked this ticket and did not close it. Read the hand-off file first and continue from the milestone it names; do not restart, re-spec or re-measure what it records as done."
+  CONT=""; [ -f "$HANDOFF" ] && CONT="**This is a continuation session.** A previous session worked this ticket and did not close it. Read the hand-off file first and continue from the milestone it names; do not restart, re-spec or re-measure what it records as done. If it ends with a \`## Driver trace\`, the previous session stopped without updating the file: resume from the trace's commits and last tool calls, then delete that section when you rewrite the hand-off."
   [ -n "$PHASE" ] && CONT="$CONT
 
 **Hand-off file rule:** when you rewrite the hand-off, keep every \`milestone:\` line already in it and add yours below. The driver reads the phase off those lines; a dropped line re-runs a finished phase."
@@ -742,7 +742,16 @@ PY
     gh issue edit "$T" --repo "$REPO" --remove-assignee "$ME" >/dev/null 2>&1 || true
   fi
   case "${PHASE:-single}" in build|measure) ;; *) [ -f "$TOUT/$T.md" ] || OUTCOME="$OUTCOME, no report" ;; esac
-  if [ "$(state "$T")" != "closed" ] && { [ ! -f "$HANDOFF" ] || [ "$(stat -c %Y "$HANDOFF")" -lt "$S0" ]; }; then OUTCOME="$OUTCOME, hand-off not updated"; fi
+  # A session that ended without touching the hand-off (cap mid-step, plain
+  # exit) gets a `## Driver trace` written by the driver from its log —
+  # commits, last tool calls, last words — so the next session resumes from
+  # where it actually stopped instead of the last milestone (#266 redid a
+  # 32M-token session this way).
+  if [ "$(state "$T")" != "closed" ] && { [ ! -f "$HANDOFF" ] || [ "$(stat -c %Y "$HANDOFF")" -lt "$S0" ]; }; then
+    python3 "$AP/handoff-trace.py" "$LOG" "$HANDOFF" "$WT" "$S0" "${CAPPED:-exited rc=$RC}" 2>&1 | sed 's/^/    /'
+    ( cd "$WT" && git add -- "$HANDOFF" 2>/dev/null && git commit -q -m "wip(autopilot): #$T driver trace on the hand-off" ) || true
+    OUTCOME="$OUTCOME, hand-off not updated (driver trace written)"
+  fi
   HL=$(wc -l < "$HANDOFF" 2>/dev/null || echo 0); [ "${HL:-0}" -gt "${WAYFINDER_HANDOFF_MAX_LINES:-120}" ] && OUTCOME="$OUTCOME, hand-off $HL lines (limit ${WAYFINDER_HANDOFF_MAX_LINES:-120})"
   # Duration cell also carries the load: tokens on the first turn before any
   # work (brief + skill + CLAUDE.md + hand-off). Compare it across sessions

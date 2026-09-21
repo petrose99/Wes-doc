@@ -17,8 +17,7 @@ Read this before touching `components/queue/queue-screen.tsx` or any `*-queue.ts
 - Phone tab bar `MobileTabBar` sits before `#main` in the workspace layout (DOM order = tab order).
 
 ## Seed, dev server, capture
-- Dev server: `node .impeccable/live/dev.mjs start|stop|status` (heap-capped); devdb :55433 (`docker start docubite-devdb` after a reboot); workspace `af91555d-7450-4b21-a8ac-73db092617c8`; seed `npx tsx --env-file .env .impeccable/live/seed257b.ts` (idempotent).
-- Live-server for the in-page detector: `node .impeccable/live/livesrv257.mjs` (prints pid + port 8400); kill the pid at the end.
+- Servers: `node .impeccable/live/dev.mjs start af91555d-7450-4b21-a8ac-73db092617c8` brings up the heap-capped dev server (:3000) and the in-page detector live-server (:8400), waits for both and preps the workspace; `dev.mjs stop` stops both; `status` shows the ports. devdb :55433 (`docker start docubite-devdb` after a reboot); seed `npx tsx --env-file .env .impeccable/live/seed257b.ts` (idempotent).
 - Rounds: `docs/wayfinder-reports/226/logs/scratch-257/pw/round261-r2.mjs` on `scripts/wayfinder-autopilot/capture-round.mjs`; contact sheet via `contact-sheet261.mjs`. Warm routes first with `.impeccable/live/probe252.mjs <paths>` (h1 counts there are SSR totals, not filtered counts).
 - Zero-row filter queries (client-side filtering, so probe with `probe-empty261.mjs`): invoices `aging=90%2B`, purchase-orders/bank-statements `status=failed`, receipts `status=cancelled`; Exceptions and Approvals have none in the seed — extend the seed before probing their filtered-empty.
 - Tests: `npx vitest run components/queue lib/queue components/typed-destinations` (30 tests, ~11 s).

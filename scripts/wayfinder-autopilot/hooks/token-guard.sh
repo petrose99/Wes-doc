@@ -28,6 +28,8 @@ def deny(reason):
           "permissionDecision": "deny", "permissionDecisionReason": reason}})); sys.exit(0)
 ROUTER = "AUTOPILOT: the `intent` router is not loaded here — the phase brief is the router (15K tokens per load, paid on every later turn). Read the named skill's file instead (the *Skill files* list in the system prompt): specify, fortify, articulate, include for a spec; evaluate, journey, organize, strategize where the brief names them. Project context comes from CONTEXT.md and the map's Notes."
 MENU = "AUTOPILOT: impeccable's routing menu is not needed — the phase brief names the sub-command; read its reference file directly (reference/shape.md, layout.md, typeset.md, clarify.md at spec; polish.md, critique.md, audit.md, adapt.md at close)."
+DEVSRV = "DEV SERVER: one command brings up everything a round needs — `node .impeccable/live/dev.mjs start <ws>` starts the heap-capped Next dev server on :3000 AND the impeccable live-server on :8400 (the in-page detector), waits until both answer, and preps the workspace (jurisdiction etc.). `dev.mjs stop` stops both; `status` shows the ports. Never start either by hand: `npm run dev`, nohup, setsid, disown, trailing `&`, `impeccable live-server` and per-ticket livesrv/start-live-server scripts all die with the turn, hang it, or are denied by the sandbox."
+ROUND = "ROUND SCRIPT: a ticket's round script only lists states and the clicks between them — it imports `round`/`roundArgs` from scripts/wayfinder-autopilot/capture-round.mjs and uses the shared probes on `s` (focusIs, visible, hidden, count(selector, within), dialog, waitFor, probe, uniqueFile, tabWalk, press). Own probe code (document.activeElement reads, hand-rolled focus/visible/count helpers, argv parsing) is where #266 lost two sessions to harness bugs; the shared ones are tested. See the header of capture-round.mjs."
 def is_router(p): return "skills/intent/SKILL.md" in p or "skills/intent/intent/SKILL.md" in p
 def spec_done():
     try: return "milestone: spec-done" in open(hand).read()
@@ -114,7 +116,12 @@ if tool == "Bash":
     if re.search(r"\bnode\s+\S*(round-\d+\.mjs|capture-round\.mjs)\b", c) and int(inp.get("timeout") or 0) < 300000:
         deny("CAPTURE ROUND: pass the Bash tool's `timeout` parameter (600000) on this call so the round runs as one foreground call and returns its output in the same turn. Without it the harness backgrounds the run at 2 minutes and every turn spent polling the task file is wasted.")
     if re.search(r"(npm run dev|next dev|pnpm dev|yarn dev)\b", c) or re.search(r"\b(nohup|setsid|disown)\b", c) or re.search(r"&\s*$", c.strip()):
-        deny("DEV SERVER: start and stop it only through the area primer's recipe — `node .impeccable/live/dev.mjs start|stop|status` (heap-capped, pid-filed) and `node .impeccable/live/livesrv257.mjs` for the in-page detector (kill its pid at the end). `npm run dev`, nohup, setsid, disown and trailing `&` all die with the turn or hang it.")
+        deny(DEVSRV)
+    # The live-server, the launcher binary and the per-ticket start scripts
+    # (#266's start-live-server.mjs, livesrv257.mjs): `dev.mjs start` brings
+    # the detector up with the dev server and waits for both.
+    if re.search(r"impeccable\s+live-server|livesrv\d*\.mjs|start-live-server|\.impeccable/bin/", c):
+        deny(DEVSRV)
     closing_bar(c)
     if hand and re.search(r"\bgit\b[^|;&]*\bcommit\b", c):
         n = handoff_lines()
@@ -156,6 +163,15 @@ if tool in ("Write", "Edit") and hand and os.path.abspath(inp.get("file_path", "
             n = handoff_lines(cur.replace(o, r) if inp.get("replace_all") else cur.replace(o, r, 1))
         except Exception: n = 0
     if n > hmax: deny(too_long(n))
+    sys.exit(0)
+if tool in ("Write", "Edit") and re.search(r"round[-\w]*\.mjs$", inp.get("file_path", "")):
+    body = inp.get("content", "") if tool == "Write" else inp.get("new_string", "")
+    whole = body
+    if tool == "Edit":
+        try: whole = open(inp["file_path"]).read().replace(inp.get("old_string", ""), body, 1)
+        except Exception: whole = body
+    if "capture-round.mjs" not in whole: deny(ROUND)
+    if re.search(r"document\.activeElement|process\.argv\[\d\]|async function (focus|visible|count|probe)\w*\(|const (focus|visible|count|probe)\w* = (async )?\(", body): deny(ROUND)
     sys.exit(0)
 if tool == "Skill":
     s = (inp.get("skill") or "").strip(); a = (inp.get("args") or "").strip()

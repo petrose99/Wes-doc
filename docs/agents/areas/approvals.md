@@ -37,7 +37,7 @@ Shipped by #236 (Approvals landing: Invoice approvals · PO mismatches), #257 (p
 ## Seed, dev server, capture
 - Dev workspace `af91555d-7450-4b21-a8ac-73db092617c8`, `DEV_AUTH_BYPASS=true`, devdb `docubite-devdb` on `127.0.0.1:55433`.
 - Seed: `.impeccable/live/seed257b.ts` (ready rows for the dev owner), `paid257b.ts` (mark `paymentStatus=paid` so Approve is enabled), `state257.ts` prints what the owner sees. Run with `npx tsx --env-file .env`.
-- Dev server `node .impeccable/live/dev.mjs start|stop` (:3000; if Turbopack panics, `rm -rf .next/dev .next/cache`); in-page detector server `node .impeccable/live/livesrv257.mjs` (:8400). Stop both before `tsc`/`eslint`/vitest/`next build` (`docs/wayfinder-reports/226/logs/scratch-257/stop-servers.mjs`).
+- Servers `node .impeccable/live/dev.mjs start <ws>|stop` (dev server :3000 and the in-page detector :8400 together; if Turbopack panics, `rm -rf .next/dev .next/cache`). Stop both (`dev.mjs stop`) before `tsc`/`eslint`/vitest/`next build` (`docs/wayfinder-reports/226/logs/scratch-257/stop-servers.mjs`).
 - Capture harness `docs/wayfinder-reports/226/logs/scratch-257/pw/round.mjs <round> [--decide-row "NW-5490"]` — 20 states × 1440/390, `detector.json`, `keyboard.json`; probes `probe-back.mjs`, `probe-type.mjs`, `probe-detect.mjs`; `contact-sheet.mjs --cols 5`. The `[documentId]` route cold-compiles ~45 s — 90 s screenshot timeout.
 
 ## Detector residue (report, do not chase)

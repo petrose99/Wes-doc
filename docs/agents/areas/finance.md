@@ -42,8 +42,8 @@ text-overflow.*span\.block\.truncate\.text-sm\.font-medium\.text-slate-800
 
 ## Seed, dev server, capture
 - Same dev workspace/DB/server recipe as Admin (`docs/agents/areas/admin.md`) — `DEV_AUTH_BYPASS`,
-  `.impeccable/live/dev.mjs start|stop`, `.impeccable/live/livesrv257.mjs` for the in-page
-  detector. Stop the dev server before `tsc`/`eslint`/full suite/`next build`.
+  `node .impeccable/live/dev.mjs start <ws>|stop` (dev server and the in-page detector
+  together). Stop both before `tsc`/`eslint`/full suite/`next build`.
 - Capture round: `docs/wayfinder-reports/226/logs/scratch-281/round-281.mjs <tag>` (uses shared
   `capture-round.mjs`), gated with `scripts/wayfinder-autopilot/gate.mjs <shots> --baseline
   <prior> --residue-file residue.txt`.
