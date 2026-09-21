@@ -38,6 +38,11 @@ inside each queue's standalone `[documentId]?full=1` route.
   the trigger has settled), not at the caller's render time. Passing `.current` directly is a
   `react-hooks/refs` ESLint **error** ("Cannot access ref value during render"), not just a lint
   nit — it also silently breaks the `document.activeElement` fallback race the prop exists to fix.
+- `components/queue/pane-resize-grip.tsx` `PaneResizeGrip`/`usePaneResize` (#360): the shared
+  desktop drag-to-resize divider between the queue list and the detail pane — replaces the old
+  layout-control radiogroup. Visible at rest (`border-x`, glyph), not just on hover/focus/drag —
+  a bare hover-only affordance is a P1 (evaluate) on a draggable control. Reuse this for any future
+  two-pane split (#362/#364/#365) rather than a bespoke divider.
 - `components/queue/split-pane.tsx` `SplitPane`: source strip toggle (`sessionStorage["dp.source"]`),
   layout-control radiogroup, tab strip (Details · Note · Approval · Audit · Checks — order per
   queue), `useRegisterDocumentActions` (calls `PaneDocumentContext.setDoc`).
