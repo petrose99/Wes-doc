@@ -38,6 +38,7 @@ import { getOpenReviewTaskForDocument } from "@/models/review-tasks"
 import { listWorkspaceInstitutions } from "@/models/institutions"
 import { listWorkspaceIntegrationConnections, listWorkspaceIntegrationPushes } from "@/models/integrations"
 import { getDocumentPaymentStatuses } from "@/models/ledger-payments"
+import { getSupplierSummaryForDocument } from "@/models/supplier-summary"
 import { requireWorkspaceRole } from "@/models/workspaces"
 import { documentDestinationPath } from "@/lib/typed-destinations"
 import { notFound, redirect } from "next/navigation"
@@ -368,7 +369,12 @@ export async function DocumentDetailPage({ params, searchParams, embedded = fals
   // scoped to `embedded` only (full mode has no decision footer per #259, so it keeps the
   // original shell). `providerLink` stays null (#355 Q2): no pushed-record external URL field
   // exists on `IntegrationPush`/`BillRow` yet for a later ticket to fill in.
-  if (embedded && queueTitle === "Invoices") return <BillSplitPane
+  if (embedded && queueTitle === "Invoices") {
+    // #362 §1: scoped to this branch only — the extra query would run on every document-page
+    // render otherwise, and no other queue's `BillSplitPane` usage has a supplier concept yet.
+    const supplierSummary = await getSupplierSummaryForDocument(workspaceId, supplier || null, templateCode || null)
+    return <BillSplitPane
+    supplierSummary={supplierSummary}
     workspaceId={workspaceId} source={{ documentId: document.id, filename: document.filename, mimeType: document.mimeType }}
     fields={fields} data={data} fieldConfidence={fieldConfidence}
     provenanceFields={provenance?.fields ?? {}} provenanceItems={provenance?.items ?? {}}
@@ -407,6 +413,7 @@ export async function DocumentDetailPage({ params, searchParams, embedded = fals
     rejectedByActor={processing?.rejectedBy ?? null}
     openReviewTaskId={openReviewTask?.id ?? null}
   />
+  }
   if (embedded) return splitPane
 
   // #259 full mode = read + secondary actions: the same header and ⋯ as the pane (minus *Open in

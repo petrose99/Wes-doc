@@ -1,20 +1,24 @@
 "use client"
 
-import { createContext, type ReactNode, useContext, useState } from "react"
+import { createContext, type ReactNode, useContext, useMemo, useState } from "react"
 import { CheckCircle2, ChevronDown, ExternalLink, XCircle, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { useRegisterDocumentActions, type RegisteredDocument } from "@/components/queue/document-actions-menu"
 import { PaneResizeGrip, usePaneResize } from "@/components/queue/pane-resize-grip"
 import { StatusLine } from "@/components/queue/status-line"
-import { formatDate } from "@/components/queue/row-cells"
+import { formatDate, formatMoney } from "@/components/queue/row-cells"
 import { AuditLog } from "@/components/queue/history-tabs"
 import { Button } from "@/components/ui/button"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
+import { Panel, Pill } from "@/components/automation/automation-ui"
 import { updateReviewTaskStatusAction } from "@/app/(app)/workspaces/[workspaceId]/review-actions"
 import { moveDocumentsToStageAction, updateDocumentNoteAction } from "@/app/(app)/workspaces/[workspaceId]/pipeline-actions"
 import { postSelectedDocumentsAction } from "@/app/(app)/workspaces/[workspaceId]/post-selected-documents-actions"
 import type { ProcessingState } from "@/lib/documents/processing-state"
 import type { ProcessingFact } from "@/lib/documents/processing-fact"
+import type { SupplierSummary } from "@/models/supplier-summary"
+import { inferDueDate } from "@/lib/bills/due-date"
+import type { ConfiguredFieldDefinition } from "@/lib/configuration/field-table"
 
 /** #361 step 4: whether the surrounding form renders read-only — derived once (from the footer
  * mode, #355 Q5) and read from context so #362's deeply-nested field/line-item components don't
@@ -272,4 +276,114 @@ export function BillHistoryDisclosure({ workspaceId, documentId, note: initialNo
       </div>
     </div>
   </details>
+}
+
+/** #362 §1: "why is this document's supplier auto-approvable, and what does its recent history
+ * look like" without leaving the pane — the two Admin › Suppliers facts (trust standing, payment
+ * terms) that change how a reviewer reads *this* document, plus a capped recent-invoices list.
+ * `summary` is fetched once at pane load (server component) — B6: not re-polled while the pane is
+ * open, same load-time-snapshot class as every other section here. */
+export function SupplierCard({ summary, workspaceId }: { summary: SupplierSummary; workspaceId: string }) {
+  if (!summary.matched) return <Panel title="Supplier" level="h3">
+    <p className="text-sm text-slate-600">No supplier matched — the document doesn&apos;t identify one</p>
+  </Panel>
+
+  return <Panel title={summary.name} level="h3">
+    <div className="flex items-center justify-between gap-4">
+      <Pill state={summary.trust.state}>{summary.trust.label}</Pill>
+      <span className="text-sm tabular-nums text-slate-600">{summary.paymentTerms}</span>
+    </div>
+    <details className="group mt-3 rounded-lg border border-slate-200">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-sm font-medium text-slate-700 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 [&::-webkit-details-marker]:hidden">
+        Recent invoices ({summary.recentInvoices.length})
+        <ChevronDown className="h-4 w-4 shrink-0 text-slate-500 transition-transform duration-200 group-open:rotate-180" aria-hidden />
+      </summary>
+      <div className="space-y-2 border-t border-slate-200 px-3 py-3">
+        {summary.recentInvoices.length === 0
+          ? <p className="text-sm text-slate-600">No other invoices from this supplier yet.</p>
+          : <table className="w-full text-sm">
+            <tbody className="divide-y divide-hairline-soft">
+              {summary.recentInvoices.map((row) => <tr key={row.documentId}>
+                <td className="py-1.5 pr-2 text-slate-600">{row.date ?? "—"}</td>
+                <td className="py-1.5 pr-2 text-slate-900">{row.number ?? "—"}</td>
+                <td className="py-1.5 pr-2 text-right tabular-nums text-slate-600">{row.amount !== null ? formatMoney(row.amount, row.currency) : "—"}</td>
+                <td className="py-1.5 text-right"><span className="inline-flex items-center rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-600">{row.statusLabel}</span></td>
+              </tr>)}
+            </tbody>
+          </table>}
+        <a href={`/workspaces/${workspaceId}/admin/suppliers`} className="inline-block text-sm font-medium text-emerald-700 hover:text-emerald-800 hover:underline">View all in Admin › Suppliers</a>
+      </div>
+    </details>
+  </Panel>
+}
+
+function toIsoDate(d: Date): string {
+  return d.toISOString().slice(0, 10)
+}
+
+const DATE_INPUT_CLASS = "h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 shadow-sm transition-colors focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100 read-only:bg-slate-50 read-only:text-slate-600 disabled:bg-slate-50 disabled:text-slate-600"
+
+/** #362 §3: one compact row — Invoice date · Due date · Posting date — directly under the
+ * line-item table (not a card, #355 Q8's ≤1.5-screen budget). Invoice date reuses the same
+ * `<input type="date">` markup `FieldRow` renders for a `type: "date"` field (B4, no new
+ * date-cell component); Due date is the *same* input when the resolved supplier has no payment
+ * terms (a plain override, autosaved like any field, per #355 — no separate toggle), or a
+ * read-only span + "from payment terms" caption, backed by a hidden input so the computed value
+ * still submits, when it does — recomputed from Invoice date on every keystroke (B2, same tick,
+ * pure `inferDueDate`, no round trip). Posting date (Bill Pay rows only) isn't reachable from
+ * this ticket's only caller (Invoices) yet — `postingDate` stays unset until a Bill Pay caller
+ * (#363/#365) passes it; the row renders the two Invoices cells only until then. */
+export function DatesRow({ invoiceDateField, invoiceDateValue, dueDateField, dueDateValue, paymentTermsDays, readOnly, postingDate }: {
+  invoiceDateField: ConfiguredFieldDefinition
+  invoiceDateValue: string | null
+  dueDateField: ConfiguredFieldDefinition
+  dueDateValue: string | null
+  /** Null when the resolved supplier has no term set (`SupplierSummary.paymentTermsDays`) or
+   * no supplier matched at all — both read as "plain editable Due date". */
+  paymentTermsDays: number | null
+  readOnly: boolean
+  postingDate?: { label: string; value: string | null } | null
+}) {
+  const [invoiceDate, setInvoiceDate] = useState(invoiceDateValue ?? "")
+  const computedDue = useMemo(() => {
+    if (paymentTermsDays === null || paymentTermsDays < 0 || !invoiceDate) return null
+    return inferDueDate({ extractedDueDate: null, documentDate: new Date(invoiceDate), supplierPaymentTermsDays: paymentTermsDays })
+  }, [invoiceDate, paymentTermsDays])
+
+  return <div className="flex flex-wrap items-end gap-4">
+    <div className="min-w-32 flex-1">
+      <label htmlFor={invoiceDateField.key} className="mb-1 block text-xs font-medium text-slate-500">{invoiceDateField.label}</label>
+      <input id={invoiceDateField.key} name={invoiceDateField.key} type="date" defaultValue={invoiceDateValue ?? ""}
+        disabled={readOnly} onChange={(event) => setInvoiceDate(event.target.value)} className={DATE_INPUT_CLASS} />
+    </div>
+    <div className="min-w-32 flex-1">
+      <label htmlFor={dueDateField.key} className="mb-1 block text-xs font-medium text-slate-500">{dueDateField.label}</label>
+      {computedDue ? <>
+        <input type="hidden" name={dueDateField.key} value={toIsoDate(computedDue)} />
+        <p id={dueDateField.key} className="flex h-9 items-center rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-600">{formatDate(computedDue)}</p>
+        <p className="mt-1 text-xs text-slate-500">from payment terms</p>
+      </> : <input id={dueDateField.key} name={dueDateField.key} type="date" defaultValue={dueDateValue ?? ""} disabled={readOnly} className={DATE_INPUT_CLASS} />}
+    </div>
+    {postingDate && <div className="min-w-32 flex-1">
+      <label htmlFor="posting_date" className="mb-1 block text-xs font-medium text-slate-500">{postingDate.label}</label>
+      <input id="posting_date" name="posting_date" type="date" defaultValue={postingDate.value ?? ""} disabled={readOnly} className={DATE_INPUT_CLASS} />
+    </div>}
+  </div>
+}
+
+/** #362 §4: one line below `DatesRow`, link-styled (matches the disclosure/link language
+ * `SupplierCard`'s "View all in Admin › Suppliers" already uses), never a second amount/date
+ * form (#355 Q9). Subtitle mask (`Account ····{last4}`) and the absent-account wording ("Needs
+ * bank details") are reused verbatim from `components/settings/payments-settings.tsx` — not a
+ * new mask, not a paraphrase (B3). Renders regardless of provider-connection state (#355 Q2 —
+ * only the header's `Open in ‹provider›` link, #361, is provider-gated). */
+export function PaymentDetailsLink({ workspaceId, documentId, bankAccountFact }: {
+  workspaceId: string
+  documentId: string
+  bankAccountFact: string | null
+}) {
+  return <a href={`/workspaces/${workspaceId}/payments/bill-pay/${documentId}`} className="inline-block">
+    <span className="block text-sm font-medium text-emerald-700 hover:text-emerald-800 hover:underline">Payment Details</span>
+    <span className="block text-xs text-slate-500">{bankAccountFact ? `Account ····${bankAccountFact.slice(-4)}` : "Needs bank details"}</span>
+  </a>
 }

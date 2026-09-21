@@ -55,6 +55,20 @@ inside each queue's standalone `[documentId]?full=1` route.
 - `components/queue/queue-screen.tsx`: `rowName`/`paneStatus`/`fullHref`/`onMutated` props feed the
   frame; callers migrated to this shape (invoices, payments/batches, receipts, purchase-orders,
   approvals/invoices, approvals/po-mismatches, exceptions, library).
+- `components/pipeline/document-detail/bill-pane.tsx` `SupplierCard` (#362): the bill-only
+  supplier-trust/payment-terms/recent-invoices `Panel`, unmatched state renders "No supplier
+  matched — the document doesn't identify one" and nothing else — no fixture in this repo's dev
+  seed resolves to a matched supplier, so the matched branch (trust pill, disclosure, recent
+  invoices) is untested by any capture round; a future ticket touching this needs a matched-
+  supplier seed fixture first.
+- `BillReadOnlyContext` (`split-pane.tsx`, consumed by `field-row.tsx`, `line-items-section.tsx`;
+  defaults `false` outside a `Bill` provider): the one gate for "this bill is Paid/Cancelled/
+  Touchless, no field may be editable or Tab-reachable." Text/number/date `<input>`s get
+  `disabled={billReadOnly}` **separate from** the admin-configured `readOnly` prop (which keeps
+  its own HTML `readOnly` — focusable/copyable, #252's intentional exception); checkbox/`<select>`
+  get `disabled={readOnly || billReadOnly}`. Never fold a new "locked" condition into an existing
+  `readOnly` var for an input that must also leave the tab order — `readOnly` doesn't remove tab
+  stops, `disabled` does (see generic lessons #362).
 
 ## Data and actions
 No model of its own — reads whatever `RegisteredDocument` the queue's `SplitPane` registers
@@ -89,6 +103,10 @@ both unidentified/unlocated after a targeted live-DOM scan (`low-contrast` "#90a
 `first-viewport-column-overflow` on `div.flex.min-h-0.flex-1.flex-col.overflow-hidden.lg:flex-row`)
 — both only fire on a fallback capture state (seed doc not in the expected status), may be a
 transient/mid-animation detector read; re-capture before chasing further.
+Cross-pane visual grouping (#362, H1/H9, not a detector finding): `provenance-pdf.tsx`'s "Could
+not render this PDF. Open it directly." and `SupplierCard`'s unmatched-state text can land close
+together in a stacked capture with no rule between them — two different components, two different
+tickets' ownership; a real fix needs a layout decision at the pane level, not a one-file patch.
 
 ## Seed data is mutable across sessions
 A round that captures a status-gated dialog (e.g. reject-confirm) depends on a seed document

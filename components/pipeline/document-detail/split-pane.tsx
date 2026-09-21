@@ -8,7 +8,8 @@ import { StageIndicator, type StageStep } from "@/components/pipeline/document-d
 import { useFieldNav } from "@/components/pipeline/document-detail/use-field-nav"
 import { updateDocumentNoteAction } from "@/app/(app)/workspaces/[workspaceId]/pipeline-actions"
 import { PaneDocumentContext, useRegisterDocumentActions, type RegisteredDocument } from "@/components/queue/document-actions-menu"
-import { BillHistoryDisclosure, BillPane, BillStatusTrack, type BillPaneProviderLink } from "@/components/pipeline/document-detail/bill-pane"
+import { BillHistoryDisclosure, BillPane, BillReadOnlyContext, BillStatusTrack, DatesRow, PaymentDetailsLink, SupplierCard, useBillReadOnly, type BillPaneProviderLink } from "@/components/pipeline/document-detail/bill-pane"
+import type { SupplierSummary } from "@/models/supplier-summary"
 import { escalateCheckAction, type SaveReviewResult } from "@/app/(app)/workspaces/[workspaceId]/actions"
 import type { ActionState } from "@/lib/actions"
 import { useRouter } from "next/navigation"
@@ -25,7 +26,7 @@ import type { ProcessingState } from "@/lib/documents/processing-state"
 import type { ProcessingFact } from "@/lib/documents/processing-fact"
 import type { DocType } from "@/lib/doc-types"
 import { CheckCircle2, ChevronDown, ChevronUp, ExternalLink, Loader2 } from "lucide-react"
-import { useActionState, useContext, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react"
+import { Fragment, useActionState, useContext, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react"
 import { toast } from "sonner"
 
 type Tab = "details" | "note" | "activity" | "approval" | "checks"
@@ -356,7 +357,7 @@ export function SplitPane({
  * derive its ordering directly from formFields without SplitPane touching field-nav internals.
  * Exported for #361's `BillSplitPane` (Invoices' Bill shell), which reuses this field-editing
  * form unchanged inside its own composition. */
-export function FieldNavForm({ saveReview, formFields, data, fieldConfidence, provenanceFields, provenanceItems, summaryFields, rationales, checks, workspaceId, documentId, setTarget, po, submitId = "save-review-submit" }: {
+export function FieldNavForm({ saveReview, formFields, data, fieldConfidence, provenanceFields, provenanceItems, summaryFields, rationales, checks, workspaceId, documentId, setTarget, po, submitId = "save-review-submit", billMode = false, supplierPaymentTermsDays = null, supplierBankAccountFact = null }: {
   saveReview: (formData: FormData) => Promise<ActionState<SaveReviewResult | null>>
   formFields: DocumentFieldDefinition[]
   data: Record<string, unknown>
@@ -374,7 +375,22 @@ export function FieldNavForm({ saveReview, formFields, data, fieldConfidence, pr
    * `#save-review-submit` (#258's reload-focus contract) — this form's own Save review button
    * needs a different id there so the two don't collide. `undefined` renders no id. */
   submitId?: string
+  /** #362 §2: `BillSplitPane` only — passed straight through to `LineItemsSection`. */
+  billMode?: boolean
+  /** #362 §3: the resolved supplier's raw net-days (`SupplierSummary.paymentTermsDays`) — null
+   * when unmatched or the supplier has no term set, which is also `DatesRow`'s "plain editable
+   * Due date" signal. `BillSplitPane` only. */
+  supplierPaymentTermsDays?: number | null
+  /** #362 §4: the resolved supplier's `SupplierSummary.bankAccountFact` — null when unmatched or
+   * the supplier has no bank fact on file, which is also `PaymentDetailsLink`'s "Needs bank
+   * details" signal. `BillSplitPane` only. */
+  supplierBankAccountFact?: string | null
 }) {
+  // #362 §3: located by key, not position — invoice templates key the invoice date `issue_date`
+  // (falling back to the generic `date` key other templates use); `due_date` is shared.
+  const invoiceDateField = billMode ? formFields.find((field) => field.key === "issue_date" || field.key === "date") ?? null : null
+  const dueDateField = billMode ? formFields.find((field) => field.key === "due_date") ?? null : null
+  const billReadOnly = useBillReadOnly()
   const navItems = formFields.map((field) => ({ key: field.key, confidence: fieldConfidence[field.key] ?? null, type: field.type }))
   const nav = useFieldNav(navItems)
   const formRef = useRef<HTMLFormElement>(null)
@@ -423,12 +439,33 @@ export function FieldNavForm({ saveReview, formFields, data, fieldConfidence, pr
       <span><span className="font-semibold">{nav.suspectsRemaining}</span> of {nav.totalSuspects} low-confidence fields to review — Enter confirms and moves to the next.</span>
       <button type="button" className="rounded-md border border-amber-300 bg-white px-2 py-0.5 font-medium text-amber-800 hover:bg-amber-100" onClick={() => nav.focusNext()}>Next suspect</button>
     </div>}
-    {formFields.map((field) => field.type === "array"
-      ? <LineItemsSection key={field.key} field={field} value={data[field.key]} fieldKey={field.key} summaryFields={field.key === "line_items" ? summaryFields : []} fieldValues={data} provenanceFields={provenanceFields} provenanceItems={provenanceItems[field.key] ?? []} onFocusSource={setTarget}
-          checks={liveChecks.filter((check) => check.fields.some((f) => f === field.key || f.startsWith(`${field.key}[`)))} onEscalate={onEscalate} po={field.key === "line_items" ? po : null} />
-      : <FieldRow key={field.key} field={field} value={data[field.key]} confidence={fieldConfidence[field.key] ?? null} ref={provenanceFields[field.key] ?? null} onFocusSource={setTarget} rationale={rationales?.[field.key] ?? null}
-          checks={liveChecks.filter((check) => checkAppliesToField(check, field.key))} onEscalate={onEscalate}
-          registerNav={nav.registerField} isCurrent={nav.currentKey === field.key} isCompleted={nav.completedKeys.has(field.key)} />)}
+    {formFields.map((field) => {
+      // #362 §3: in bill mode, Invoice date and Due date move out of the plain field list into
+      // `DatesRow`, rendered directly under the line-item table — they don't get a second
+      // `FieldRow` here.
+      if (billMode && (field.key === invoiceDateField?.key || field.key === dueDateField?.key)) return null
+      if (field.type === "array") return <Fragment key={field.key}>
+        <LineItemsSection field={field} value={data[field.key]} fieldKey={field.key} summaryFields={field.key === "line_items" ? summaryFields : []} fieldValues={data} provenanceFields={provenanceFields} provenanceItems={provenanceItems[field.key] ?? []} onFocusSource={setTarget}
+          checks={liveChecks.filter((check) => check.fields.some((f) => f === field.key || f.startsWith(`${field.key}[`)))} onEscalate={onEscalate} po={field.key === "line_items" ? po : null}
+          // #362 §2: this ticket's chip columns/footer-total/Add-row are specced for the
+          // `line_items` table only — `other_charges` (also `type: "array"`) is out of scope
+          // (no ticket contract for it) and keeps its pre-existing plain rendering. The lock,
+          // though, is not scoped that way (close c3): a Cancelled/Paid/Touchless bill's
+          // `other_charges` rows were still editable and tab-reachable — `readOnly` gates on
+          // `billMode` alone, independent of which array field this is.
+          billMode={billMode && field.key === "line_items"} readOnly={billMode && billReadOnly} />
+        {/* #362: `other_charges` is also `type: "array"` (lib/domains/finance.ts) — gate to
+          the `line_items` field so DatesRow/PaymentDetailsLink render once, not once per
+          array field. */}
+        {billMode && field.key === "line_items" && invoiceDateField && dueDateField && <DatesRow invoiceDateField={invoiceDateField} invoiceDateValue={typeof data[invoiceDateField.key] === "string" ? data[invoiceDateField.key] as string : null}
+          dueDateField={dueDateField} dueDateValue={typeof data[dueDateField.key] === "string" ? data[dueDateField.key] as string : null}
+          paymentTermsDays={supplierPaymentTermsDays} readOnly={billReadOnly} />}
+        {billMode && field.key === "line_items" && <PaymentDetailsLink workspaceId={workspaceId} documentId={documentId} bankAccountFact={supplierBankAccountFact} />}
+      </Fragment>
+      return <FieldRow key={field.key} field={field} value={data[field.key]} confidence={fieldConfidence[field.key] ?? null} ref={provenanceFields[field.key] ?? null} onFocusSource={setTarget} rationale={rationales?.[field.key] ?? null}
+        checks={liveChecks.filter((check) => checkAppliesToField(check, field.key))} onEscalate={onEscalate}
+        registerNav={nav.registerField} isCurrent={nav.currentKey === field.key} isCompleted={nav.completedKeys.has(field.key)} />
+    })}
     <div className="flex items-center gap-3 border-t border-slate-100 pt-3">
       <button type="submit" id={submitId} aria-busy={saving || undefined} className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40">
         {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <CheckCircle2 className="h-4 w-4" aria-hidden />}{saving ? "Saving…" : "Save review"}
@@ -448,6 +485,7 @@ export function BillSplitPane({
   workspaceId, source, fields, data, fieldConfidence, provenanceFields, provenanceItems, initialTarget, conflictingLabels, missingRequiredFields,
   saveReview, note, auditEvents, header, rationales, checks, fxBadge, documentMatches, po = null,
   providerLink, state, fact, ledger, openCheckCodes, paidAt, blockedByCheck, escalated, approvalStatus, rejectedByActor, openReviewTaskId,
+  supplierSummary,
 }: {
   workspaceId: string
   source: SourceDocument
@@ -482,6 +520,10 @@ export function BillSplitPane({
   approvalStatus: "not_started" | "in_progress" | "approved" | "rejected" | "cancelled"
   rejectedByActor: string | null
   openReviewTaskId: string | null
+  /** #362 §1: fetched once at pane load by the caller (server component) — `null` when the
+   * queue calling this pane isn't Invoices' supplier-scoped flow (kept optional so any other
+   * future `BillSplitPane` caller doesn't have to thread a query it has no supplier for). */
+  supplierSummary?: SupplierSummary | null
 }) {
   const [target, setTarget] = useState<ProvenanceTarget | null>(initialTarget)
   const router = useRouter()
@@ -500,7 +542,14 @@ export function BillSplitPane({
     reviewLink: header.reviewLink,
   }
 
-  return <BillPane document={document} providerLink={providerLink} fileHref={fileHref}
+  // #362: `BillReadOnlyContext`'s value — Cancelled, Paid (a synced payment status) or Touchless
+  // (sent automatically, never reviewed). Nothing was providing this before, which left every
+  // consumer's `useBillReadOnly()` reading the context's `false` default even on a paid/cancelled
+  // document (caught live: a read-only-pane tab walk landed on `input#vendor`).
+  const billReadOnly = header.cancelled || state === "touchless" || paidAt !== null
+
+  return <BillReadOnlyContext.Provider value={billReadOnly}>
+  <BillPane document={document} providerLink={providerLink} fileHref={fileHref}
     viewer={<SourceViewer source={source} target={target} />}
     form={<div className="space-y-4 p-4">
       <BillStatusTrack workspaceId={workspaceId} openReviewTaskId={openReviewTaskId} state={state} fact={fact} ledger={ledger}
@@ -512,14 +561,19 @@ export function BillSplitPane({
         {conflictingLabels.length > 0 && <p>Pages disagreed on: <strong>{conflictingLabels.join(", ")}</strong> — please confirm against the source.</p>}
       </div>}
 
+      {supplierSummary && <SupplierCard summary={supplierSummary} workspaceId={workspaceId} />}
+
       <FieldNavForm saveReview={saveReview} formFields={formFields} data={data} fieldConfidence={fieldConfidence}
         provenanceFields={provenanceFields} provenanceItems={provenanceItems} summaryFields={summaryFields}
         rationales={rationales ?? null} checks={checks ?? []} workspaceId={workspaceId} documentId={header.documentId}
-        setTarget={setTarget} po={po} submitId={undefined} />
+        setTarget={setTarget} po={po} submitId={undefined} billMode
+        supplierPaymentTermsDays={supplierSummary?.matched ? supplierSummary.paymentTermsDays : null}
+        supplierBankAccountFact={supplierSummary?.matched ? supplierSummary.bankAccountFact : null} />
 
       {fxBadge && <div>{fxBadge}</div>}
       {documentMatches}
 
       <BillHistoryDisclosure workspaceId={workspaceId} documentId={header.documentId} note={note} auditEvents={auditEvents} />
     </div>} />
+  </BillReadOnlyContext.Provider>
 }
