@@ -77,6 +77,16 @@ def closing_bar(c):
         if r.returncode != 0:
             errs = [l for l in r.stdout.splitlines() if "error TS" in l]
             deny(f"TYPE-CHECK: `tsc --noEmit` reports {len(errs)} error(s); ticket #{t} touched TypeScript ({', '.join(code[:4])}{' …' if len(code) > 4 else ''}) and closes only on a clean tree — even errors another ticket left: fix them or hand off with the list. First errors:\n" + "\n".join(errs[:8]))
+    # Infra gate (lanes, 2026-09-21): #361 widened `turbopack.root` in
+    # next.config.ts to get round a lane defect and would have landed it. A
+    # ticket closes only while the project's infra files match the integration
+    # branch the driver started on — a change there is a ticket of its own.
+    base = os.environ.get("WAYFINDER_BASE_BRANCH", "")
+    if base:
+        infra = [f for f in sh("git", "diff", "--name-only", base, "--", "next.config.ts", "tsconfig.json", "package.json", "package-lock.json", "prisma/schema.prisma", ".claude/settings.json").split()
+                 if not re.search(r"\b(schema|migration|dependency|package|config)\b", os.environ.get("WAYFINDER_TICKET_TITLE", ""), re.I)]
+        if infra:
+            deny(f"INFRA GATE: ticket #{t} leaves {', '.join(infra)} different from `{base}`. Those files change only on a ticket about them; a workaround for the lane (a symlinked node_modules, a dev-server quirk) is a driver bug — report it in the resolution comment, restore the file (`git checkout {base} -- {' '.join(infra)}`, commit), then close.")
     if not ui: return
     rep = os.path.join(root, "docs", "wayfinder-reports", m, f"{t}.md")
     line = ""
