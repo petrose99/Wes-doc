@@ -52,6 +52,9 @@ export type ReceiptRow = {
   /** #258: when the document arrived — the Status line's fallback for "In review · received
    * ‹date›" on a document with no ReviewTask at all yet. */
   receivedAt: Date | null
+  /** #374: the intake channel + sender identity for the row's attribution chip and the Sender
+   * filter, derived from Document.sourceEmail/sourceWhatsapp. Null for upload/camera/zip/api. */
+  intake: { channel: "email" | "whatsapp"; sender: string } | null
 }
 
 /** Loads receipts for a workspace. Bounded (up to `limit`, default 500), same reasoning as
@@ -68,6 +71,8 @@ export async function listWorkspaceReceipts(input: {
   claimFilter?: "unclaimed" | "draft" | "submitted" | "approved" | "rejected"
   /** #201's "Touchless" system saved view: rows that went out with no human review. */
   onlyTouchless?: boolean
+  /** #374: the Sender filter chip — which intake channel the document arrived through. */
+  senderFilter?: "email" | "whatsapp"
 }): Promise<{ receipts: ReceiptRow[] }> {
   const limit = input.limit ?? 500
 
@@ -76,9 +81,12 @@ export async function listWorkspaceReceipts(input: {
       workspaceId: input.workspaceId,
       status: { notIn: ["received", "queued", "processing", "failed"] },
       template: { code: { in: ["receipt", "expense_receipt"] } },
+      ...(input.senderFilter === "email" ? { sourceEmail: { not: null } } : {}),
+      ...(input.senderFilter === "whatsapp" ? { sourceWhatsapp: { not: null } } : {}),
     },
     select: {
       id: true, filename: true, status: true, reviewedAt: true, reviewedData: true, confidence: true, receivedAt: true,
+      sourceEmail: true, sourceWhatsapp: true,
       template: { select: { code: true } },
     },
     orderBy: { receivedAt: "desc" },
@@ -166,6 +174,7 @@ export async function listWorkspaceReceipts(input: {
       claimStatus: (claim?.status as ReceiptRow["claimStatus"]) ?? null,
       reviewTaskOpenedAt,
       openReviewTaskId: reviewTaskOpenedAt ? latestTask!.id : null,
+      intake: doc.sourceWhatsapp ? { channel: "whatsapp", sender: doc.sourceWhatsapp } : doc.sourceEmail ? { channel: "email", sender: doc.sourceEmail } : null,
       fieldConfidence: (doc.confidence as Record<string, unknown> | null)?.fieldConfidence as Record<string, number> ?? {},
       touchless: touchlessDocIds.has(doc.id),
       escalated: escalatedDocIds.has(doc.id),

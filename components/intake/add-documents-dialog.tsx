@@ -54,11 +54,13 @@ export const AddDocumentsDialog = forwardRef<AddDocumentsDialogHandle, {
   initialType: string
   /** Server-computed per #264's first-use state; omitted (section not rendered) when null. */
   inboundAddress: string | null
+  /** #374: the deployment's WhatsApp number, rendered beside `inboundAddress` when the channel is on. */
+  whatsappNumber?: string | null
   /** Hands the settled document ids to the caller's own `useExtractionProgress` instance so the
    * existing toast-per-terminal-transition behavior keeps firing after this dialog closes — same
    * "survives close" pattern as `FileHubUploadButton` (spec interaction logic, B4). */
   onUploaded: (documentIds: string[]) => void
-}>(function AddDocumentsDialog({ open, onClose, workspaceId, fileId, templates, initialType, inboundAddress, onUploaded }, ref) {
+}>(function AddDocumentsDialog({ open, onClose, workspaceId, fileId, templates, initialType, inboundAddress, whatsappNumber = null, onUploaded }, ref) {
   const [type, setType] = useState(initialType)
   const [rows, setRows] = useState<Row[]>([])
   const [rejections, setRejections] = useState<string[]>([])
@@ -177,6 +179,7 @@ export const AddDocumentsDialog = forwardRef<AddDocumentsDialogHandle, {
         </>}
 
         {inboundAddress && <InboundAddressLine address={inboundAddress} />}
+        {whatsappNumber && <InboundAddressLine address={whatsappNumber} channel="whatsapp" />}
       </>}
     </div>
     <div className="flex items-center justify-between border-t px-5 py-3">

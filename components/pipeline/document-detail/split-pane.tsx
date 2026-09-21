@@ -337,7 +337,7 @@ export function SplitPane({
           </div>}
 
           {tab === "activity" && <div {...panelProps("activity")} className={`mx-auto p-6`}>
-            <AuditLog events={history?.auditEvents ?? auditEvents} />
+            <AuditLog events={history?.auditEvents ?? auditEvents} intake={history?.intake} />
           </div>}
 
           {tab === "approval" && history && <div {...panelProps("approval")} className={`mx-auto p-4 lg:p-6`}>

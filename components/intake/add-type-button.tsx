@@ -22,7 +22,10 @@ export const AddTypeButton = forwardRef<AddTypeButtonHandle, {
   type: string
   /** Server-computed per #264's first-use state; omitted (dialog's email section not rendered) when null. */
   inboundAddress: string | null
-}>(function AddTypeButton({ workspaceId, fileId, templates, type, inboundAddress }, ref) {
+  /** #374: the deployment's WhatsApp number, shown beside `inboundAddress`; omitted the same way
+   * when the channel is off. */
+  whatsappNumber?: string | null
+}>(function AddTypeButton({ workspaceId, fileId, templates, type, inboundAddress, whatsappNumber = null }, ref) {
   const [open, setOpen] = useState(false)
   const dialogRef = useRef<AddDocumentsDialogHandle>(null)
   const { statuses, track } = useExtractionProgress(workspaceId, [], undefined, false)
@@ -44,6 +47,6 @@ export const AddTypeButton = forwardRef<AddTypeButtonHandle, {
     </button>
     <AddDocumentsDialog ref={dialogRef} open={open} onClose={() => setOpen(false)}
       workspaceId={workspaceId} fileId={fileId} templates={templates} initialType={type}
-      inboundAddress={inboundAddress} onUploaded={track} />
+      inboundAddress={inboundAddress} whatsappNumber={whatsappNumber} onUploaded={track} />
   </>
 })
