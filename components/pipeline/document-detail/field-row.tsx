@@ -51,8 +51,8 @@ export function FieldRow({ field, value, confidence, ref: provenanceRef, onFocus
   if (isArray) {
     return <div className="pt-2">
       {field.itemFields?.length
-        ? <LineItemsEditor fieldKey={field.key} itemFields={field.itemFields} initialRows={Array.isArray(value) ? value as Array<Record<string, unknown>> : []} checks={checks} onEscalate={onEscalate} />
-        : <textarea id={field.key} name={field.key} defaultValue={Array.isArray(value) ? JSON.stringify(value) : ""} placeholder="JSON array" className="min-h-24 w-full rounded-lg border border-slate-200 bg-slate-50/50 px-3 py-2 font-mono text-sm" />}
+        ? <LineItemsEditor fieldKey={field.key} itemFields={field.itemFields} initialRows={Array.isArray(value) ? value as Array<Record<string, unknown>> : []} checks={checks} onEscalate={onEscalate} readOnly={billReadOnly} />
+        : <textarea id={field.key} name={field.key} defaultValue={Array.isArray(value) ? JSON.stringify(value) : ""} placeholder="JSON array" readOnly={billReadOnly} title={billReadOnly ? billLockedTitle : undefined} className="min-h-24 w-full rounded-lg border border-slate-200 bg-slate-50/50 px-3 py-2 font-mono text-sm read-only:bg-slate-100 read-only:text-slate-600" />}
     </div>
   }
 

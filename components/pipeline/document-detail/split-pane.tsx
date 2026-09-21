@@ -449,8 +449,11 @@ export function FieldNavForm({ saveReview, formFields, data, fieldConfidence, pr
           checks={liveChecks.filter((check) => check.fields.some((f) => f === field.key || f.startsWith(`${field.key}[`)))} onEscalate={onEscalate} po={field.key === "line_items" ? po : null}
           // #362 §2: this ticket's chip columns/footer-total/Add-row are specced for the
           // `line_items` table only — `other_charges` (also `type: "array"`) is out of scope
-          // (no ticket contract for it) and keeps its pre-existing plain rendering.
-          billMode={billMode && field.key === "line_items"} readOnly={billMode && field.key === "line_items" && billReadOnly} />
+          // (no ticket contract for it) and keeps its pre-existing plain rendering. The lock,
+          // though, is not scoped that way (close c3): a Cancelled/Paid/Touchless bill's
+          // `other_charges` rows were still editable and tab-reachable — `readOnly` gates on
+          // `billMode` alone, independent of which array field this is.
+          billMode={billMode && field.key === "line_items"} readOnly={billMode && billReadOnly} />
         {/* #362: `other_charges` is also `type: "array"` (lib/domains/finance.ts) — gate to
           the `line_items` field so DatesRow/PaymentDetailsLink render once, not once per
           array field. */}
