@@ -24,8 +24,10 @@ itself. Otherwise stop: the next step is the next session's. Never start a
 step past 55K, never start a gate step after a numbered one.
 
 **Ponytail's ladder governs the code, the spec governs the scope.** The
-session starts with the ponytail ruleset (YAGNI, reuse before write, one
-line before ten). Climb it for every piece of code: the shell primitives and
+ruleset is these three rungs, nothing else is injected: YAGNI (build only
+what the spec names), reuse before write (a primer primitive before a new
+helper, a new helper before a new file), one line before ten. Climb it for
+every piece of code: the shell primitives and
 helpers the area primer names are rung 2, never rewritten. What it may never
 cut is the "explicitly requested" set: every state in the spec's tables,
 every Part B contract, the craft floor, accessibility. A state the spec

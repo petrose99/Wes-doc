@@ -27,7 +27,7 @@
   "enabledPlugins": {
     "product@headcount": true,
     "marketing@headcount": true,
-    "ponytail@ponytail": true
+    "ponytail@ponytail": false
   },
   "extraKnownMarketplaces": {
     "headcount": {

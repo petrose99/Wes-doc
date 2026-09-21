@@ -8,7 +8,7 @@ re-reads the whole context, so a long session is quadratic.
 
 usage: scoreboard.py <map> [repo-root]   → writes docs/wayfinder-reports/<map>/scoreboard.md
 """
-import glob, json, os, re, sys
+import glob, json, os, re, subprocess, sys
 MAP = sys.argv[1]; ROOT = sys.argv[2] if len(sys.argv) > 2 else os.getcwd()
 OUT = os.path.join(ROOT, "docs/wayfinder-reports", MAP)
 
@@ -35,6 +35,24 @@ def scores(ticket):
     m = re.search(r"^scores:\s*(.+)$", open(p, errors="replace").read(), re.M)
     return dict(re.findall(r"([a-z-]+)=(\d+)", m.group(1))) if m else {}
 
+PRODUCT = ["app", "components", "lib", "models"]
+def diff(ticket):
+    """Product diff for the ticket: lines added, removed, files created across
+    every commit whose subject names #ticket. The one number the minimalism
+    rules in the build brief can move; scores cannot show it."""
+    try:
+        shas = subprocess.run(["git", "log", "--format=%h", "-F", "--grep", f"#{ticket}"], cwd=ROOT, capture_output=True, text=True).stdout.split()
+        if not shas: return "·"
+        add = rem = new = 0
+        for sha in shas:
+            for ln in subprocess.run(["git", "show", "--numstat", "--diff-filter=AM", "--format=", sha, "--"] + PRODUCT, cwd=ROOT, capture_output=True, text=True).stdout.splitlines():
+                a, r, _ = ln.split("\t", 2)
+                if a.isdigit(): add += int(a); rem += int(r)
+            new += len(subprocess.run(["git", "show", "--name-only", "--diff-filter=A", "--format=", sha, "--"] + PRODUCT, cwd=ROOT, capture_output=True, text=True).stdout.split())
+        return f"+{add} −{rem} / {new} new"
+    except Exception:
+        return "·"
+
 runlog = {}
 rl = os.path.join(OUT, "run-log.md")
 if os.path.exists(rl):
@@ -42,7 +60,7 @@ if os.path.exists(rl):
         m = re.search(r"\| \[#(\d+)\].*?\| ([^|]*?)(?: \(([^()|]*)\))? \| (\d+m\d+s) \| \[log\]\(logs/(\S+)\)", ln)
         if m: runlog[m.group(5)] = (m.group(2), m.group(3) or "default", m.group(4))
 
-rows = []
+rows = []; diffs = {}
 for f in sorted(glob.glob(os.path.join(OUT, "logs", "*.jsonl"))):
     base = os.path.basename(f); t = re.search(r"-(\d+)\.jsonl$", base).group(1)
     turns, tools, imgs, agents, ctx, out = cost(f)
@@ -50,11 +68,12 @@ for f in sorted(glob.glob(os.path.join(OUT, "logs", "*.jsonl"))):
     outcome, model, dur = runlog.get(base, ("?", "?", "?"))
     s = scores(t)
     g = lambda k: s.get(k, "·")
-    rows.append(f"| #{t} | {base[:15]} | {model} | {outcome[:28]} | {g('predicted-critique')} | {g('first-critique')} | {g('close-critique')} | {g('first-evaluate')} | {g('close-evaluate')} | {turns} | {ctx/1e6:.0f}M | {out/1e3:.0f}K | {imgs} | {agents} | {dur} |")
+    if t not in diffs: diffs[t] = diff(t)
+    rows.append(f"| #{t} | {base[:15]} | {model} | {outcome[:28]} | {g('predicted-critique')} | {g('first-critique')} | {g('close-critique')} | {g('first-evaluate')} | {g('close-evaluate')} | {diffs[t]} | {turns} | {ctx/1e6:.0f}M | {out/1e3:.0f}K | {imgs} | {agents} | {dur} |")
 
 hdr = ["# Scoreboard — map #" + MAP, "",
-       "First-pass scores are the KPI (the pre-build getting better); close scores are reached by the fix batch. Cost = turns × context. `·` = the report carries no `scores:` line (decision ticket, or a session before the line existed).", "",
-       "| Ticket | Session | Model | Outcome | Pred. critique | First critique | Close critique | First evaluate | Close evaluate | Turns | Context in | Output | Images | Agents | Time |",
-       "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+       "First-pass scores are the KPI (the pre-build getting better); close scores are reached by the fix batch. Cost = turns × context. Diff = product lines (app, components, lib, models) across the commits naming the ticket, and files created — the number the build brief's minimalism rules are meant to move. `·` = the report carries no `scores:` line (decision ticket, or a session before the line existed) or no commit names the ticket.", "",
+       "| Ticket | Session | Model | Outcome | Pred. critique | First critique | Close critique | First evaluate | Close evaluate | Diff | Turns | Context in | Output | Images | Agents | Time |",
+       "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
 open(os.path.join(OUT, "scoreboard.md"), "w").write("\n".join(hdr + rows) + "\n")
 print(f"scoreboard: {len(rows)} sessions → {os.path.join(OUT, 'scoreboard.md')}")
