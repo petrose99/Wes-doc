@@ -26,6 +26,10 @@ type WhatsAppWebhookChange = { value?: { messages?: WhatsAppMessage[] } }
 type WhatsAppWebhookEntry = { changes?: WhatsAppWebhookChange[] }
 type WhatsAppWebhookPayload = { entry?: WhatsAppWebhookEntry[] }
 
+// #372 fortify: DocuBite's own ceiling on one sender's album, not a Meta platform limit (#373)
+// confirmed no such limit exists. Kept small and local — nothing else in the codebase reads it.
+const MAX_MESSAGES_PER_BATCH = 20
+
 export async function GET(request: Request): Promise<Response> {
   if (!config.whatsapp.enabled) return new Response("not_configured", { status: 503 })
   const url = new URL(request.url)
@@ -52,11 +56,20 @@ async function replyIfEnabled(to: string, body: string): Promise<void> {
   await sendWhatsAppText(to, body)
 }
 
-async function handleMessage(message: WhatsAppMessage): Promise<void> {
+// #372 fortify: one outcome per message, WITHOUT sending a reply — POST groups messages by sender
+// (an album arrives as several messages in one webhook delivery) and decides the reply per group,
+// not per message, so an 8-photo album gets one "Got it — 8 receipts…" instead of eight.
+type MessageOutcome =
+  | { kind: "already_processed" | "healthcare" }
+  | { kind: "unknown" | "ambiguous" | "jurisdiction_missing" | "duplicate_only" | "storage_full" | "no_document" }
+  | { kind: "no_media"; mediaType: "text" | "unsupported" }
+  | { kind: "ingested"; accepted: number; label: string; isMember: boolean }
+
+async function handleMessage(message: WhatsAppMessage): Promise<MessageOutcome> {
   // Idempotency: Meta may redeliver the same message on a slow/failed ack. A message this route
   // has already recorded an intake row for must never be ingested twice.
   const existing = await prisma.whatsAppIntake.findUnique({ where: { waMessageId: message.id }, select: { id: true } })
-  if (existing) return
+  if (existing) return { kind: "already_processed" }
 
   const matches = await resolveWorkspacesByPhoneNumber(message.from)
 
@@ -64,8 +77,7 @@ async function handleMessage(message: WhatsAppMessage): Promise<void> {
     await prisma.whatsAppIntake.create({
       data: { waMessageId: message.id, fromNumber: message.from, workspaceId: null, outcome: "sender_unknown", attachmentCount: 0, acceptedCount: 0, rejectedCount: 0 },
     }).catch(() => {})
-    await replyIfEnabled(message.from, "This number isn't linked to a DocuBite workspace yet — ask your admin to add it.")
-    return
+    return { kind: "unknown" }
   }
 
   if (matches.length > 1) {
@@ -76,30 +88,32 @@ async function handleMessage(message: WhatsAppMessage): Promise<void> {
     await prisma.whatsAppIntake.create({
       data: { waMessageId: message.id, fromNumber: message.from, workspaceId: null, outcome: "sender_ambiguous", attachmentCount: 0, acceptedCount: 0, rejectedCount: 0 },
     }).catch(() => {})
-    await replyIfEnabled(message.from, "This number is linked to more than one company — ask your admin to confirm which one before sending again.")
-    return
+    return { kind: "ambiguous" }
   }
 
   const [match] = matches
   if (match.workspace.industry === "healthcare") {
     // Same clinical refusal as inbound email — see models/inbound-email.ts's note.
-    return
+    return { kind: "healthcare" }
   }
 
   try {
     await requireWorkspaceJurisdiction(match.workspaceId)
   } catch (error) {
-    if (error instanceof JurisdictionRequiredError) return
-    throw error
+    if (!(error instanceof JurisdictionRequiredError)) throw error
+    await prisma.whatsAppIntake.create({
+      data: { waMessageId: message.id, fromNumber: message.from, workspaceId: match.workspaceId, outcome: "jurisdiction_missing", attachmentCount: 0, acceptedCount: 0, rejectedCount: 0 },
+    }).catch(() => {})
+    return { kind: "jurisdiction_missing" }
   }
 
   const media = extractMedia(message)
   if (!media) {
+    const mediaType: "text" | "unsupported" = message.type === "text" ? "text" : "unsupported"
     await prisma.whatsAppIntake.create({
       data: { waMessageId: message.id, fromNumber: message.from, workspaceId: match.workspaceId, outcome: "no_document", attachmentCount: 0, acceptedCount: 0, rejectedCount: 0 },
     }).catch(() => {})
-    await replyIfEnabled(message.from, "Send the receipt as a photo or PDF and it'll be added.")
-    return
+    return { kind: "no_media", mediaType }
   }
 
   const isMember = Boolean(match.linkedMemberId)
@@ -108,15 +122,19 @@ async function handleMessage(message: WhatsAppMessage): Promise<void> {
     media: [{ mediaId: media.mediaId, mimeType: media.mimeType, filename: media.filename }],
   })
 
-  if (result.accepted > 0) {
-    const who = isMember ? result.label : `‹${result.label}›`
-    const ack = isMember
-      ? `Got it — ${result.accepted} receipt${result.accepted === 1 ? "" : "s"} added for ${who}. Reading it now; if anything's unclear we'll say so here.`
-      : `Got it — ${result.accepted} receipt${result.accepted === 1 ? "" : "s"} added to ${who}.`
-    await replyIfEnabled(message.from, ack)
-  } else {
-    await replyIfEnabled(message.from, "Couldn't read this slip — send one photo of the whole slip, flat and well lit, and it'll replace this one.")
-  }
+  if (result.outcome === "ingested") return { kind: "ingested", accepted: result.accepted, label: result.label, isMember }
+  if (result.outcome === "duplicate_only") return { kind: "duplicate_only" }
+  if (result.outcome === "storage_full") return { kind: "storage_full" }
+  return { kind: "no_document" }
+}
+
+const REPLY_LINES: Partial<Record<MessageOutcome["kind"], string>> = {
+  unknown: "This number isn't linked to a DocuBite workspace yet — ask your admin to add it.",
+  ambiguous: "This number is linked to more than one company — ask your admin to confirm which one before sending again.",
+  jurisdiction_missing: "Couldn't add this — the workspace isn't set up yet. Your admin has been notified.",
+  duplicate_only: "Looks like you already sent this one — kept the first.",
+  storage_full: "Couldn't add this — the workspace is full. Your admin has been notified.",
+  no_document: "Couldn't read this slip — send one photo of the whole slip, flat and well lit, and it'll replace this one.",
 }
 
 export async function POST(request: Request): Promise<Response> {
@@ -130,15 +148,59 @@ export async function POST(request: Request): Promise<Response> {
   const payload = JSON.parse(rawBody) as WhatsAppWebhookPayload
   const messages = (payload.entry ?? []).flatMap((entry) => entry.changes ?? []).flatMap((change) => change.value?.messages ?? [])
 
-  // Meta expects a fast 200 regardless of per-message outcome — a slow/failed response here
-  // triggers Meta's own retry-with-backoff, which would otherwise pile up. Failures are recorded
-  // per message (WhatsAppIntake rows / audit events), never surfaced as a webhook-level error.
+  // #372 fortify — album of N images: Meta delivers each image of one album as its own message,
+  // usually in the same webhook POST. Grouping by sender before replying turns that into one ack
+  // with a count instead of N separate pings.
+  const bySender = new Map<string, WhatsAppMessage[]>()
   for (const message of messages) {
-    try {
-      await handleMessage(message)
-    } catch (error) {
-      console.error("[inbound-whatsapp] failed to process message:", error instanceof Error ? error.message : error)
+    const group = bySender.get(message.from) ?? []
+    group.push(message)
+    bySender.set(message.from, group)
+  }
+
+  for (const [from, group] of bySender) {
+    // #372 fortify — burst cap: DocuBite's own ceiling (#373: no such limit from Meta), not a
+    // duplicate check — messages past the cap are left unprocessed rather than ingested, so
+    // Meta's own redelivery-on-timeout can still pick them up later if the sender doesn't resend.
+    const capped = group.slice(0, MAX_MESSAGES_PER_BATCH)
+    const overCap = group.length > MAX_MESSAGES_PER_BATCH
+
+    let ingestedTotal = 0
+    let ingestedLabel = ""
+    let ingestedIsMember = false
+    const otherLines = new Set<string>()
+
+    for (const message of capped) {
+      try {
+        const outcome = await handleMessage(message)
+        if (outcome.kind === "ingested") {
+          ingestedTotal += outcome.accepted
+          ingestedLabel = outcome.label
+          ingestedIsMember = outcome.isMember
+        } else if (outcome.kind === "no_media") {
+          otherLines.add(outcome.mediaType === "text"
+            ? "Send the receipt as a photo or PDF and it'll be added."
+            : "Only photos and PDFs can be added here.")
+        } else {
+          const line = REPLY_LINES[outcome.kind]
+          if (line) otherLines.add(line)
+        }
+      } catch (error) {
+        console.error("[inbound-whatsapp] failed to process message:", error instanceof Error ? error.message : error)
+      }
     }
+
+    for (const line of otherLines) await replyIfEnabled(from, line)
+
+    if (ingestedTotal > 0) {
+      const who = ingestedIsMember ? ingestedLabel : `‹${ingestedLabel}›`
+      const ack = ingestedIsMember
+        ? `Got it — ${ingestedTotal} receipt${ingestedTotal === 1 ? "" : "s"} added for ${who}. Reading it now; if anything's unclear we'll say so here.`
+        : `Got it — ${ingestedTotal} receipt${ingestedTotal === 1 ? "" : "s"} added to ${who}.`
+      await replyIfEnabled(from, ack)
+    }
+
+    if (overCap) await replyIfEnabled(from, `Added ${ingestedTotal}; send the rest in a moment.`)
   }
 
   return Response.json({ received: messages.length })

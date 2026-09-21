@@ -101,7 +101,10 @@ export type InboundWhatsAppInput = {
 }
 
 export type InboundWhatsAppResult = {
-  outcome: "ingested" | "no_document"
+  // #372 fortify states: "duplicate_only" (every attachment matched an existing hash — "kept the
+  // first") and "storage_full" (the workspace's free-trial cap rejected every attachment) each get
+  // their own reply line, distinct from the generic "couldn't read" of no_document.
+  outcome: "ingested" | "no_document" | "duplicate_only" | "storage_full"
   accepted: number
   rejected: number
   duplicated: number
@@ -134,6 +137,7 @@ export async function processInboundWhatsApp(workspaceId: string, senderLabel: s
   let accepted = 0
   let rejected = 0
   let duplicated = 0
+  let storageFull = false
   for (const media of input.media) {
     const downloaded = await downloadWhatsAppMedia(media.mediaId)
     if (!downloaded || !downloaded.buffer.length || !isSupportedDocumentBuffer(downloaded.buffer, downloaded.mimeType)) { rejected++; continue }
@@ -143,15 +147,29 @@ export async function processInboundWhatsApp(workspaceId: string, senderLabel: s
     })
     if (outcome.outcome === "accepted") accepted++
     else if (outcome.outcome === "duplicate") duplicated++
-    else rejected++
+    else {
+      rejected++
+      if (outcome.errorCode === "free_trial_storage_exceeded") storageFull = true
+    }
   }
 
-  const outcome = accepted > 0 ? "ingested" : "no_document"
+  // #372 fortify: ingested wins whenever at least one attachment landed; a batch that is entirely
+  // duplicates or entirely blocked by the storage cap gets its own reply rather than the generic
+  // "couldn't read" line, since neither is a legibility problem with the photo.
+  const outcome = accepted > 0 ? "ingested" : storageFull ? "storage_full" : duplicated > 0 ? "duplicate_only" : "no_document"
   await recordIntake(outcome, { accepted, rejected })
-  if (accepted === 0 && duplicated === 0) {
+  if (outcome === "no_document") {
     await recordSystemAudit({
       workspaceId, type: "inbound_whatsapp.no_document",
       detail: { from: input.fromNumber, attachmentCount: input.media.length, rejected },
+    })
+  } else if (outcome === "storage_full") {
+    // The reply already tells the sender; this is what makes the Admin › Intake banner possible —
+    // the admin is "notified" by the next visit to that screen, never by an email DocuBite sends
+    // (nothing is initiated from DocuBite's side, per #372).
+    await recordSystemAudit({
+      workspaceId, type: "inbound_whatsapp.storage_full",
+      detail: { from: input.fromNumber, attachmentCount: input.media.length },
     })
   }
   return { outcome, accepted, rejected, duplicated, label: senderLabel, isMember }

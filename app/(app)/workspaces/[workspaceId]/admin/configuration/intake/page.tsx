@@ -38,7 +38,10 @@ const dateTime = new Intl.DateTimeFormat("en-ZA", { dateStyle: "medium", timeSty
 /// links the number.
 const WHATSAPP_OUTCOMES: Record<string, { label: string; hint: string; className: string }> = {
   ingested: { label: "Added", hint: "Extracted into Receipts", className: "bg-emerald-50 text-emerald-800" },
-  no_document: { label: "Nothing to extract", hint: "The photo or file couldn't be read", className: "bg-amber-50 text-amber-800" },
+  no_document: { label: "Nothing to extract", hint: "The photo or file couldn't be read, or wasn't a photo or PDF", className: "bg-amber-50 text-amber-800" },
+  duplicate_only: { label: "Already had it", hint: "The same photo was received before, so nothing new was created", className: "bg-slate-100 text-slate-700" },
+  storage_full: { label: "Workspace full", hint: "The free-trial storage cap rejected this message", className: "bg-red-50 text-red-800" },
+  jurisdiction_missing: { label: "Not set up yet", hint: "The workspace has no jurisdiction set, so nothing could be filed", className: "bg-red-50 text-red-800" },
 }
 
 function WhatsAppOutcome({ outcome, acceptedCount }: { outcome: string; acceptedCount: number }) {
@@ -116,6 +119,11 @@ export default async function IntakePage({ params }: { params: Promise<{ workspa
 
     {config.whatsapp.enabled && config.whatsapp.businessNumber && <>
       <Panel title="WhatsApp intake" note="Inbound only — nothing is ever sent from DocuBite. A client or employee photographs a receipt and sends it to this number; it arrives in Receipts the same way an upload does.">
+        {whatsappIntakes.some((intake) => intake.outcome === "storage_full") && (
+          <p className="mb-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">
+            The workspace is full — messages sent to this number are being turned away. Free up space or upgrade to keep receiving them.
+          </p>
+        )}
         <ShareWhatsAppNumber number={config.whatsapp.businessNumber} companyName={context.workspace.name} />
       </Panel>
 
