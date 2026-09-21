@@ -16,6 +16,9 @@ export default defineConfig({
       // #258: the queue shell's status vocabulary is asserted at the rendered-markup level
       // (react-dom/server, no DOM) so a hand-written status word fails here, not in a critique.
       "components/queue/**/*.test.tsx",
+      // #361 (map #353): the Bill takeover shell's own components follow the same rendered-markup
+      // pattern (react-dom/server, no DOM) as components/queue above.
+      "components/pipeline/document-detail/**/*.test.tsx",
     ],
     // SECRETS_ENCRYPTION_KEY is a fixed test-only key (never used outside vitest) so tests that
     // round-trip lib/secret-crypto.ts (webhook secrets, integration OAuth tokens) don't each need
