@@ -16,6 +16,12 @@ function LedgerAccountChip({ label }: { label: string | null }) {
   return <span className="inline-flex max-w-full items-center truncate rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-600">{label ?? "—"}</span>
 }
 
+// #362 §5: Class/Customer:Job columns reuse `LedgerAccountChip` directly (same inert-span
+// treatment, B4 — no fork). Gated on a provider capability check that doesn't exist in the
+// codebase yet (grepped: no class/job tracking capability under `lib/modules/capabilities.ts` or
+// `lib/integrations/*`) — ponytail: ceiling is "these columns never render until that capability
+// lands"; upgrade path is passing the real flag as `classJob` once it's wired, no change here.
+
 type PoLineMatchState = "matched" | "suggested" | "none"
 const PO_LINE_MATCH_LABEL: Record<PoLineMatchState, string> = { matched: "Matched", suggested: "Suggested", none: "No match" }
 /** #362 §2: the per-row PO-match placeholder chip — three states named by the spec, only "none"
@@ -86,7 +92,7 @@ function useWide(ref: React.RefObject<HTMLDivElement | null>) {
  * With `poCompare` (View PO on, #228), the quantity / unit price / description cells grow a
  * second line — the PO's value with an `=` / `≠` glyph at the right — and a PO line column
  * carries each line's status. */
-export function LineItemsEditor({ fieldKey, itemFields, initialRows, provenanceItems, onFocusSource, checks = [], onEscalate, poCompare = null, bill = null }: {
+export function LineItemsEditor({ fieldKey, itemFields, initialRows, provenanceItems, onFocusSource, checks = [], onEscalate, poCompare = null, bill = null, classJob = false, readOnly = false }: {
   fieldKey: string
   itemFields: DocumentItemFieldDefinition[]
   initialRows: Array<Record<string, unknown>>
@@ -98,6 +104,13 @@ export function LineItemsEditor({ fieldKey, itemFields, initialRows, provenanceI
   /** #362 §2: Bill-only — adds the read-only Account/PO-match chip columns and the footer total
    * with the extracted-total mismatch check. `null` for every other caller (unchanged today). */
   bill?: BillLineItemsTotals | null
+  /** #362 §5: renders the two read-only Class/Customer:Job chip columns. `false` for every
+   * caller today — no provider capability check exists yet to turn it on (see the comment above
+   * `LedgerAccountChip`'s Class/Job usage). */
+  classJob?: boolean
+  /** #362: `BillReadOnlyContext` (Cancelled/Paid/Touchless) — every editable cell and the
+   * Add/remove-row controls become non-interactive; reuses the existing context, no second flag. */
+  readOnly?: boolean
 }) {
   const [rows, setRows] = useState<Row[]>(() => {
     const seed = initialRows.length ? initialRows : [{}]
@@ -160,11 +173,11 @@ export function LineItemsEditor({ fieldKey, itemFields, initialRows, provenanceI
     return <>
       {item.type === "boolean" ? (
         <label className="flex h-full items-center justify-center gap-1.5 px-2 py-1.5 text-xs text-slate-600">
-          <input id={inputId} name={name} type="checkbox" aria-describedby={cellChecks.length ? checkDescriptionId : undefined} className="h-3.5 w-3.5 accent-emerald-600" value="true" defaultChecked={raw === true} />
+          <input id={inputId} name={name} type="checkbox" disabled={readOnly} aria-describedby={cellChecks.length ? checkDescriptionId : undefined} className="h-3.5 w-3.5 accent-emerald-600" value="true" defaultChecked={raw === true} />
         </label>
       ) : item.type === "enum" ? (
         <div className="relative flex items-center">
-          <select ref={(element) => { if (element) cellRefs.current.set(cellId, element); else cellRefs.current.delete(cellId) }} id={inputId} name={name} aria-describedby={cellChecks.length ? checkDescriptionId : undefined} defaultValue={typeof raw === "string" ? raw : ""} className={`${cellInputClass} appearance-none ${cellChecks.length ? "pr-8" : ""}`}>
+          <select ref={(element) => { if (element) cellRefs.current.set(cellId, element); else cellRefs.current.delete(cellId) }} id={inputId} name={name} disabled={readOnly} aria-describedby={cellChecks.length ? checkDescriptionId : undefined} defaultValue={typeof raw === "string" ? raw : ""} className={`${cellInputClass} appearance-none ${cellChecks.length ? "pr-8" : ""}`}>
             <option value="">—</option>
             {item.options?.map((option) => <option key={option} value={option}>{option}</option>)}
           </select>
@@ -172,7 +185,7 @@ export function LineItemsEditor({ fieldKey, itemFields, initialRows, provenanceI
         </div>
       ) : (
         <div className="relative flex items-center">
-          <input ref={(element) => { if (element) cellRefs.current.set(cellId, element); else cellRefs.current.delete(cellId) }} id={inputId} name={name} type={item.type === "number" ? "number" : item.type === "date" ? "date" : "text"} step={item.type === "number" ? "any" : undefined}
+          <input ref={(element) => { if (element) cellRefs.current.set(cellId, element); else cellRefs.current.delete(cellId) }} id={inputId} name={name} type={item.type === "number" ? "number" : item.type === "date" ? "date" : "text"} step={item.type === "number" ? "any" : undefined} disabled={readOnly}
             aria-describedby={[cellChecks.length ? checkDescriptionId : null, compareStatus && compareStatus !== "not_compared" ? compareDescriptionId : null].filter(Boolean).join(" ") || undefined}
             className={`${cellInputClass} ${item.type === "number" ? "text-right tabular-nums" : ""} ${cellChecks.length && !poCompare ? "pr-8" : ""}`}
             defaultValue={typeof raw === "string" || typeof raw === "number" ? String(raw) : ""}
@@ -203,7 +216,7 @@ export function LineItemsEditor({ fieldKey, itemFields, initialRows, provenanceI
       const changed = pending !== undefined && pending !== (line?.poLineIndex ?? null)
       return <label className="block">
         <span className="mb-0.5 block text-[11px] font-medium text-slate-500 lg:hidden">PO line</span>
-        <select aria-label={`PO line for line ${index + 1}`} value={pending === undefined ? (line?.poLineIndex ?? "") : (pending ?? "")}
+        <select aria-label={`PO line for line ${index + 1}`} value={pending === undefined ? (line?.poLineIndex ?? "") : (pending ?? "")} disabled={readOnly}
           onChange={(event) => poCompare.matchManually!.onAssign(index, event.target.value === "" ? null : Number(event.target.value))}
           className={`min-h-8 w-full max-w-[14rem] rounded-md border bg-white px-2 py-1 text-xs text-slate-800 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100 ${changed ? "border-amber-400 bg-amber-50/60" : "border-slate-300"}`}>
           <option value="">No PO line</option>
@@ -227,7 +240,7 @@ export function LineItemsEditor({ fieldKey, itemFields, initialRows, provenanceI
           <Crosshair className="h-3.5 w-3.5" />
         </button>
       )}
-      <button type="button" aria-label="Remove row" title="Remove row" disabled={rows.length <= 1}
+      <button type="button" aria-label="Remove row" title="Remove row" disabled={readOnly || rows.length <= 1}
         className="rounded p-1 text-slate-500 hover:bg-red-50 hover:text-red-700 disabled:pointer-events-none disabled:opacity-0"
         onClick={() => removeRow(row.id)}>
         <Trash2 className="h-3.5 w-3.5" />
@@ -235,8 +248,8 @@ export function LineItemsEditor({ fieldKey, itemFields, initialRows, provenanceI
     </div>
   }
 
-  const addRowButton = <button type="button" onClick={addRow}
-    className={`flex w-full items-center gap-1.5 border-t border-slate-200 bg-slate-50/50 px-2.5 py-1.5 text-xs font-medium text-slate-500 hover:bg-emerald-50 hover:text-emerald-700 ${bill ? "" : "rounded-b-lg"}`}>
+  const addRowButton = <button type="button" onClick={addRow} disabled={readOnly}
+    className={`flex w-full items-center gap-1.5 border-t border-slate-200 bg-slate-50/50 px-2.5 py-1.5 text-xs font-medium text-slate-500 hover:bg-emerald-50 hover:text-emerald-700 disabled:pointer-events-none disabled:opacity-40 ${bill ? "" : "rounded-b-lg"}`}>
     <Plus className="h-3.5 w-3.5" />Add row
   </button>
 
@@ -278,6 +291,12 @@ export function LineItemsEditor({ fieldKey, itemFields, initialRows, provenanceI
               <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">PO match</span>
               <PoLineMatchChip state="none" />
             </div>}
+            {bill && classJob && <div className="flex flex-wrap items-center gap-1.5 px-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Class</span>
+              <LedgerAccountChip label={null} />
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Customer:Job</span>
+              <LedgerAccountChip label={null} />
+            </div>}
             <div className="flex items-center justify-between gap-2 px-2">
               {renderPoLine(index, line)}
               {rowActions(row, index)}
@@ -296,6 +315,8 @@ export function LineItemsEditor({ fieldKey, itemFields, initialRows, provenanceI
         {columns.map((item) => <col key={item.key} className={item.key === "description" ? "" : item.type === "number" ? "w-[7rem]" : "w-[8rem]"} />)}
         {bill && <col className="w-[7rem]" />}
         {bill && <col className="w-[7rem]" />}
+        {bill && classJob && <col className="w-[7rem]" />}
+        {bill && classJob && <col className="w-[7rem]" />}
         {poCompare && <col className="w-[8.5rem]" />}
         <col className="w-8" />
       </colgroup>
@@ -306,6 +327,8 @@ export function LineItemsEditor({ fieldKey, itemFields, initialRows, provenanceI
           </th>)}
           {bill && <th scope="col" className="border-b border-slate-200 px-2 py-1.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Account</th>}
           {bill && <th scope="col" className="border-b border-slate-200 px-2 py-1.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">PO match</th>}
+          {bill && classJob && <th scope="col" className="border-b border-slate-200 px-2 py-1.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Class</th>}
+          {bill && classJob && <th scope="col" className="border-b border-slate-200 px-2 py-1.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Customer:Job</th>}
           {poCompare && <th scope="col" className="border-b border-slate-200 px-2 py-1.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">PO line</th>}
           <th scope="col" className="rounded-tr-lg border-b border-slate-200" aria-label="Row actions" />
         </tr>
@@ -317,6 +340,8 @@ export function LineItemsEditor({ fieldKey, itemFields, initialRows, provenanceI
             {columns.map((item) => <td key={item.key} className="border-b border-slate-100 p-0 align-top">{renderCell(row, index, item, line)}</td>)}
             {bill && <td className="border-b border-slate-100 px-2 py-1.5 align-top"><LedgerAccountChip label={null} /></td>}
             {bill && <td className="border-b border-slate-100 px-2 py-1.5 align-top"><PoLineMatchChip state="none" /></td>}
+            {bill && classJob && <td className="border-b border-slate-100 px-2 py-1.5 align-top"><LedgerAccountChip label={null} /></td>}
+            {bill && classJob && <td className="border-b border-slate-100 px-2 py-1.5 align-top"><LedgerAccountChip label={null} /></td>}
             {poCompare && <td className="border-b border-slate-100 px-2 py-1.5 align-top">{renderPoLine(index, line)}</td>}
             <td className="border-b border-slate-100 px-1 text-center align-top">{rowActions(row, index)}</td>
           </tr>

@@ -446,7 +446,7 @@ export function FieldNavForm({ saveReview, formFields, data, fieldConfidence, pr
       if (billMode && (field.key === invoiceDateField?.key || field.key === dueDateField?.key)) return null
       if (field.type === "array") return <Fragment key={field.key}>
         <LineItemsSection field={field} value={data[field.key]} fieldKey={field.key} summaryFields={field.key === "line_items" ? summaryFields : []} fieldValues={data} provenanceFields={provenanceFields} provenanceItems={provenanceItems[field.key] ?? []} onFocusSource={setTarget}
-          checks={liveChecks.filter((check) => check.fields.some((f) => f === field.key || f.startsWith(`${field.key}[`)))} onEscalate={onEscalate} po={field.key === "line_items" ? po : null} billMode={billMode} />
+          checks={liveChecks.filter((check) => check.fields.some((f) => f === field.key || f.startsWith(`${field.key}[`)))} onEscalate={onEscalate} po={field.key === "line_items" ? po : null} billMode={billMode} readOnly={billMode && billReadOnly} />
         {billMode && invoiceDateField && dueDateField && <DatesRow invoiceDateField={invoiceDateField} invoiceDateValue={typeof data[invoiceDateField.key] === "string" ? data[invoiceDateField.key] as string : null}
           dueDateField={dueDateField} dueDateValue={typeof data[dueDateField.key] === "string" ? data[dueDateField.key] as string : null}
           paymentTermsDays={supplierPaymentTermsDays} readOnly={billReadOnly} />}

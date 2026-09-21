@@ -72,7 +72,7 @@ function TotalField({ field, value, ref: provenanceRef, onFocusSource, compare }
   </div>
 }
 
-export function LineItemsSection({ field, value, fieldKey, summaryFields, fieldValues, provenanceFields, provenanceItems, onFocusSource, checks = [], onEscalate, po = null, billMode = false }: {
+export function LineItemsSection({ field, value, fieldKey, summaryFields, fieldValues, provenanceFields, provenanceItems, onFocusSource, checks = [], onEscalate, po = null, billMode = false, readOnly = false }: {
   field: DocumentFieldDefinition
   value: unknown
   fieldKey: string
@@ -87,6 +87,8 @@ export function LineItemsSection({ field, value, fieldKey, summaryFields, fieldV
   /** #362 §2: `BillSplitPane` only — enables the Account/PO-match chip columns and the
    * extracted-total mismatch footer on `LineItemsEditor`. */
   billMode?: boolean
+  /** #362: `BillReadOnlyContext` passthrough to `LineItemsEditor`. */
+  readOnly?: boolean
 }) {
   const [summary, setSummary] = useState<InvoicePoSummary | null>(po?.summary ?? null)
   // View PO opens by itself when there is something red to see — the count on the chip is the
@@ -162,7 +164,7 @@ export function LineItemsSection({ field, value, fieldKey, summaryFields, fieldV
       onDone={() => { setMatchManually(false); setPendingAssignments({}) }}
       onDiscard={() => { setMatchManually(false); setPendingAssignments({}) }} />}
     {field.itemFields?.length
-      ? <LineItemsEditor fieldKey={fieldKey} itemFields={field.itemFields} initialRows={Array.isArray(value) ? value as Array<Record<string, unknown>> : []} provenanceItems={provenanceItems} onFocusSource={onFocusSource} checks={checks} onEscalate={onEscalate} poCompare={compare} bill={bill} />
+      ? <LineItemsEditor fieldKey={fieldKey} itemFields={field.itemFields} initialRows={Array.isArray(value) ? value as Array<Record<string, unknown>> : []} provenanceItems={provenanceItems} onFocusSource={onFocusSource} checks={checks} onEscalate={onEscalate} poCompare={compare} bill={bill} readOnly={readOnly} />
       : <textarea id={fieldKey} name={fieldKey} defaultValue={Array.isArray(value) ? JSON.stringify(value) : ""} placeholder="JSON array" className="min-h-24 w-full rounded-lg border border-slate-200 bg-slate-50/50 px-3 py-2 font-mono text-sm" />}
     {summaryFields.length > 0 && <div className="flex flex-wrap items-start justify-end gap-4 rounded-lg border border-slate-100 bg-slate-50/80 px-4 py-2.5">
       {summaryFields.map((summaryField) => <TotalField key={summaryField.key} field={summaryField} value={fieldValues[summaryField.key]} ref={provenanceFields[summaryField.key] ?? null} onFocusSource={onFocusSource}
