@@ -1,16 +1,17 @@
 "use client"
 
 import { createContext, type ReactNode, useContext, useState } from "react"
-import { CheckCircle2, ExternalLink, XCircle, Loader2 } from "lucide-react"
+import { CheckCircle2, ChevronDown, ExternalLink, XCircle, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { useRegisterDocumentActions, type RegisteredDocument } from "@/components/queue/document-actions-menu"
 import { PaneResizeGrip, usePaneResize } from "@/components/queue/pane-resize-grip"
 import { StatusLine } from "@/components/queue/status-line"
 import { formatDate } from "@/components/queue/row-cells"
+import { AuditLog } from "@/components/queue/history-tabs"
 import { Button } from "@/components/ui/button"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { updateReviewTaskStatusAction } from "@/app/(app)/workspaces/[workspaceId]/review-actions"
-import { moveDocumentsToStageAction } from "@/app/(app)/workspaces/[workspaceId]/pipeline-actions"
+import { moveDocumentsToStageAction, updateDocumentNoteAction } from "@/app/(app)/workspaces/[workspaceId]/pipeline-actions"
 import { postSelectedDocumentsAction } from "@/app/(app)/workspaces/[workspaceId]/post-selected-documents-actions"
 import type { ProcessingState } from "@/lib/documents/processing-state"
 import type { ProcessingFact } from "@/lib/documents/processing-fact"
@@ -219,4 +220,56 @@ export function BillFooterActions({ workspaceId, documentId, connectionId, mode,
     {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />}
     {mode === "approve" ? (busy ? "Approving…" : "Approve") : (busy ? "Posting…" : "Post")}
   </Button>
+}
+
+/** #361 step 5 (spec §6): Audit + Note, folded into one collapsed-by-default disclosure so the
+ * status track (above) carries the state a glance needs and this detail stays a click away rather
+ * than a permanent tab. No shared disclosure primitive exists for this area — `components/ui/
+ * accordion.tsx` is the marketing FAQ's single-item, `question`-labelled component (border-y
+ * divider framing, font-display heading) and doesn't fit a compact form-column section — so this
+ * is a local native `<details>`, the same reasoning that built that one. Owns its own note-edit
+ * state (same shape as `SplitPane`'s retired Note tab) rather than threading it through `BillPane`
+ * `form`'s caller. */
+export function BillHistoryDisclosure({ workspaceId, documentId, note: initialNote, auditEvents }: {
+  workspaceId: string
+  documentId: string
+  note: string
+  auditEvents: Array<{ id: string; label: string; createdAt: string; actorName: string | null }>
+}) {
+  const [note, setNote] = useState(initialNote)
+  const [savingNote, setSavingNote] = useState(false)
+
+  const saveNote = async () => {
+    setSavingNote(true)
+    try {
+      const result = await updateDocumentNoteAction(workspaceId, documentId, note)
+      if (!result.success) { toast.error(result.error || "Could not save the note"); return }
+      toast.success("Note saved")
+    } catch {
+      toast.error("Could not reach the server")
+    } finally {
+      setSavingNote(false)
+    }
+  }
+
+  return <details className="group rounded-lg border border-slate-200">
+    <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-sm font-medium text-slate-700 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 [&::-webkit-details-marker]:hidden">
+      History
+      <ChevronDown className="h-4 w-4 shrink-0 text-slate-500 transition-transform duration-200 group-open:rotate-180" aria-hidden />
+    </summary>
+    <div className="space-y-4 border-t border-slate-200 px-3 py-3">
+      <div>
+        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Audit</h3>
+        <AuditLog events={auditEvents} />
+      </div>
+      <div className="space-y-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Note</h3>
+        <textarea className="min-h-32 w-full rounded-lg border border-slate-200 bg-slate-50/50 px-3 py-2 text-sm transition-colors focus:border-emerald-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100" placeholder="A note only your team sees — not sent anywhere, not part of the extracted data."
+          value={note} onChange={(event) => setNote(event.target.value)} />
+        <button type="button" disabled={savingNote} className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-800 disabled:opacity-40" onClick={() => void saveNote()}>
+          {savingNote && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />}Save note
+        </button>
+      </div>
+    </div>
+  </details>
 }
