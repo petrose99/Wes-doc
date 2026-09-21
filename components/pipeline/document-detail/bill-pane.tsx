@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, type ReactNode, useContext, useState } from "react"
+import { createContext, type ReactNode, useContext, useMemo, useState } from "react"
 import { CheckCircle2, ChevronDown, ExternalLink, XCircle, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { useRegisterDocumentActions, type RegisteredDocument } from "@/components/queue/document-actions-menu"
@@ -17,6 +17,8 @@ import { postSelectedDocumentsAction } from "@/app/(app)/workspaces/[workspaceId
 import type { ProcessingState } from "@/lib/documents/processing-state"
 import type { ProcessingFact } from "@/lib/documents/processing-fact"
 import type { SupplierSummary } from "@/models/supplier-summary"
+import { inferDueDate } from "@/lib/bills/due-date"
+import type { ConfiguredFieldDefinition } from "@/lib/configuration/field-table"
 
 /** #361 step 4: whether the surrounding form renders read-only — derived once (from the footer
  * mode, #355 Q5) and read from context so #362's deeply-nested field/line-item components don't
@@ -313,4 +315,58 @@ export function SupplierCard({ summary, workspaceId }: { summary: SupplierSummar
       </div>
     </details>
   </Panel>
+}
+
+function toIsoDate(d: Date): string {
+  return d.toISOString().slice(0, 10)
+}
+
+const DATE_INPUT_CLASS = "h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 shadow-sm transition-colors focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100 read-only:bg-slate-50 read-only:text-slate-600 disabled:bg-slate-50 disabled:text-slate-600"
+
+/** #362 §3: one compact row — Invoice date · Due date · Posting date — directly under the
+ * line-item table (not a card, #355 Q8's ≤1.5-screen budget). Invoice date reuses the same
+ * `<input type="date">` markup `FieldRow` renders for a `type: "date"` field (B4, no new
+ * date-cell component); Due date is the *same* input when the resolved supplier has no payment
+ * terms (a plain override, autosaved like any field, per #355 — no separate toggle), or a
+ * read-only span + "from payment terms" caption, backed by a hidden input so the computed value
+ * still submits, when it does — recomputed from Invoice date on every keystroke (B2, same tick,
+ * pure `inferDueDate`, no round trip). Posting date (Bill Pay rows only) isn't reachable from
+ * this ticket's only caller (Invoices) yet — `postingDate` stays unset until a Bill Pay caller
+ * (#363/#365) passes it; the row renders the two Invoices cells only until then. */
+export function DatesRow({ invoiceDateField, invoiceDateValue, dueDateField, dueDateValue, paymentTermsDays, readOnly, postingDate }: {
+  invoiceDateField: ConfiguredFieldDefinition
+  invoiceDateValue: string | null
+  dueDateField: ConfiguredFieldDefinition
+  dueDateValue: string | null
+  /** Null when the resolved supplier has no term set (`SupplierSummary.paymentTermsDays`) or
+   * no supplier matched at all — both read as "plain editable Due date". */
+  paymentTermsDays: number | null
+  readOnly: boolean
+  postingDate?: { label: string; value: string | null } | null
+}) {
+  const [invoiceDate, setInvoiceDate] = useState(invoiceDateValue ?? "")
+  const computedDue = useMemo(() => {
+    if (paymentTermsDays === null || paymentTermsDays < 0 || !invoiceDate) return null
+    return inferDueDate({ extractedDueDate: null, documentDate: new Date(invoiceDate), supplierPaymentTermsDays: paymentTermsDays })
+  }, [invoiceDate, paymentTermsDays])
+
+  return <div className="flex flex-wrap items-end gap-4">
+    <div className="min-w-32 flex-1">
+      <label htmlFor={invoiceDateField.key} className="mb-1 block text-xs font-medium text-slate-500">{invoiceDateField.label}</label>
+      <input id={invoiceDateField.key} name={invoiceDateField.key} type="date" defaultValue={invoiceDateValue ?? ""}
+        disabled={readOnly} onChange={(event) => setInvoiceDate(event.target.value)} className={DATE_INPUT_CLASS} />
+    </div>
+    <div className="min-w-32 flex-1">
+      <label htmlFor={dueDateField.key} className="mb-1 block text-xs font-medium text-slate-500">{dueDateField.label}</label>
+      {computedDue ? <>
+        <input type="hidden" name={dueDateField.key} value={toIsoDate(computedDue)} />
+        <p id={dueDateField.key} className="flex h-9 items-center rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-600">{formatDate(computedDue)}</p>
+        <p className="mt-1 text-xs text-slate-500">from payment terms</p>
+      </> : <input id={dueDateField.key} name={dueDateField.key} type="date" defaultValue={dueDateValue ?? ""} disabled={readOnly} className={DATE_INPUT_CLASS} />}
+    </div>
+    {postingDate && <div className="min-w-32 flex-1">
+      <label htmlFor="posting_date" className="mb-1 block text-xs font-medium text-slate-500">{postingDate.label}</label>
+      <input id="posting_date" name="posting_date" type="date" defaultValue={postingDate.value ?? ""} disabled={readOnly} className={DATE_INPUT_CLASS} />
+    </div>}
+  </div>
 }

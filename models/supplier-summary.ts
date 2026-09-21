@@ -32,6 +32,10 @@ export type SupplierSummary =
       name: string
       trust: SupplierTrustStanding
       paymentTerms: string
+      /** #362 §3: raw net-days behind `paymentTerms`'s formatted string — the dates row's Due
+       * date computation needs the number, not the label. Null when the supplier has no term set
+       * (same signal `formatTerms` reads as "No terms set"). */
+      paymentTermsDays: number | null
       bankAccountFact: string | null
       recentInvoices: RecentInvoiceRow[]
     }
@@ -95,7 +99,7 @@ export async function getSupplierSummaryForDocument(
     ? await loadRecentInvoices(workspaceId, templateCode, resolution.canonicalName, aliases.map((a: { aliasNormalized: string }) => a.aliasNormalized))
     : []
 
-  return { matched: true, supplierId: supplier.id, name: supplier.canonicalName, trust, paymentTerms, bankAccountFact, recentInvoices }
+  return { matched: true, supplierId: supplier.id, name: supplier.canonicalName, trust, paymentTerms, paymentTermsDays: supplier.paymentTermsDays, bankAccountFact, recentInvoices }
 }
 
 async function loadRecentInvoices(
