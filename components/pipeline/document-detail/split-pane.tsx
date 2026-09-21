@@ -8,7 +8,8 @@ import { StageIndicator, type StageStep } from "@/components/pipeline/document-d
 import { useFieldNav } from "@/components/pipeline/document-detail/use-field-nav"
 import { updateDocumentNoteAction } from "@/app/(app)/workspaces/[workspaceId]/pipeline-actions"
 import { PaneDocumentContext, useRegisterDocumentActions, type RegisteredDocument } from "@/components/queue/document-actions-menu"
-import { BillHistoryDisclosure, BillPane, BillStatusTrack, type BillPaneProviderLink } from "@/components/pipeline/document-detail/bill-pane"
+import { BillHistoryDisclosure, BillPane, BillStatusTrack, SupplierCard, type BillPaneProviderLink } from "@/components/pipeline/document-detail/bill-pane"
+import type { SupplierSummary } from "@/models/supplier-summary"
 import { escalateCheckAction, type SaveReviewResult } from "@/app/(app)/workspaces/[workspaceId]/actions"
 import type { ActionState } from "@/lib/actions"
 import { useRouter } from "next/navigation"
@@ -448,6 +449,7 @@ export function BillSplitPane({
   workspaceId, source, fields, data, fieldConfidence, provenanceFields, provenanceItems, initialTarget, conflictingLabels, missingRequiredFields,
   saveReview, note, auditEvents, header, rationales, checks, fxBadge, documentMatches, po = null,
   providerLink, state, fact, ledger, openCheckCodes, paidAt, blockedByCheck, escalated, approvalStatus, rejectedByActor, openReviewTaskId,
+  supplierSummary,
 }: {
   workspaceId: string
   source: SourceDocument
@@ -482,6 +484,10 @@ export function BillSplitPane({
   approvalStatus: "not_started" | "in_progress" | "approved" | "rejected" | "cancelled"
   rejectedByActor: string | null
   openReviewTaskId: string | null
+  /** #362 §1: fetched once at pane load by the caller (server component) — `null` when the
+   * queue calling this pane isn't Invoices' supplier-scoped flow (kept optional so any other
+   * future `BillSplitPane` caller doesn't have to thread a query it has no supplier for). */
+  supplierSummary?: SupplierSummary | null
 }) {
   const [target, setTarget] = useState<ProvenanceTarget | null>(initialTarget)
   const router = useRouter()
@@ -511,6 +517,8 @@ export function BillSplitPane({
         {missingRequiredFields.length > 0 && <p>Missing required fields: <strong>{missingRequiredFields.join(", ")}</strong></p>}
         {conflictingLabels.length > 0 && <p>Pages disagreed on: <strong>{conflictingLabels.join(", ")}</strong> — please confirm against the source.</p>}
       </div>}
+
+      {supplierSummary && <SupplierCard summary={supplierSummary} workspaceId={workspaceId} />}
 
       <FieldNavForm saveReview={saveReview} formFields={formFields} data={data} fieldConfidence={fieldConfidence}
         provenanceFields={provenanceFields} provenanceItems={provenanceItems} summaryFields={summaryFields}

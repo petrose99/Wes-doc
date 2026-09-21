@@ -6,15 +6,17 @@ import { toast } from "sonner"
 import { useRegisterDocumentActions, type RegisteredDocument } from "@/components/queue/document-actions-menu"
 import { PaneResizeGrip, usePaneResize } from "@/components/queue/pane-resize-grip"
 import { StatusLine } from "@/components/queue/status-line"
-import { formatDate } from "@/components/queue/row-cells"
+import { formatDate, formatMoney } from "@/components/queue/row-cells"
 import { AuditLog } from "@/components/queue/history-tabs"
 import { Button } from "@/components/ui/button"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
+import { Panel, Pill } from "@/components/automation/automation-ui"
 import { updateReviewTaskStatusAction } from "@/app/(app)/workspaces/[workspaceId]/review-actions"
 import { moveDocumentsToStageAction, updateDocumentNoteAction } from "@/app/(app)/workspaces/[workspaceId]/pipeline-actions"
 import { postSelectedDocumentsAction } from "@/app/(app)/workspaces/[workspaceId]/post-selected-documents-actions"
 import type { ProcessingState } from "@/lib/documents/processing-state"
 import type { ProcessingFact } from "@/lib/documents/processing-fact"
+import type { SupplierSummary } from "@/models/supplier-summary"
 
 /** #361 step 4: whether the surrounding form renders read-only — derived once (from the footer
  * mode, #355 Q5) and read from context so #362's deeply-nested field/line-item components don't
@@ -272,4 +274,43 @@ export function BillHistoryDisclosure({ workspaceId, documentId, note: initialNo
       </div>
     </div>
   </details>
+}
+
+/** #362 §1: "why is this document's supplier auto-approvable, and what does its recent history
+ * look like" without leaving the pane — the two Admin › Suppliers facts (trust standing, payment
+ * terms) that change how a reviewer reads *this* document, plus a capped recent-invoices list.
+ * `summary` is fetched once at pane load (server component) — B6: not re-polled while the pane is
+ * open, same load-time-snapshot class as every other section here. */
+export function SupplierCard({ summary, workspaceId }: { summary: SupplierSummary; workspaceId: string }) {
+  if (!summary.matched) return <Panel title="Supplier" level="h3">
+    <p className="text-sm text-slate-600">No supplier matched — the document doesn&apos;t identify one</p>
+  </Panel>
+
+  return <Panel title={summary.name} level="h3">
+    <div className="flex items-center justify-between gap-4">
+      <Pill state={summary.trust.state}>{summary.trust.label}</Pill>
+      <span className="text-sm tabular-nums text-slate-600">{summary.paymentTerms}</span>
+    </div>
+    <details className="group mt-3 rounded-lg border border-slate-200">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-sm font-medium text-slate-700 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 [&::-webkit-details-marker]:hidden">
+        Recent invoices ({summary.recentInvoices.length})
+        <ChevronDown className="h-4 w-4 shrink-0 text-slate-500 transition-transform duration-200 group-open:rotate-180" aria-hidden />
+      </summary>
+      <div className="space-y-2 border-t border-slate-200 px-3 py-3">
+        {summary.recentInvoices.length === 0
+          ? <p className="text-sm text-slate-600">No other invoices from this supplier yet.</p>
+          : <table className="w-full text-sm">
+            <tbody className="divide-y divide-hairline-soft">
+              {summary.recentInvoices.map((row) => <tr key={row.documentId}>
+                <td className="py-1.5 pr-2 text-slate-600">{row.date ?? "—"}</td>
+                <td className="py-1.5 pr-2 text-slate-900">{row.number ?? "—"}</td>
+                <td className="py-1.5 pr-2 text-right tabular-nums text-slate-600">{row.amount !== null ? formatMoney(row.amount, row.currency) : "—"}</td>
+                <td className="py-1.5 text-right"><span className="inline-flex items-center rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-600">{row.statusLabel}</span></td>
+              </tr>)}
+            </tbody>
+          </table>}
+        <a href={`/workspaces/${workspaceId}/admin/suppliers`} className="inline-block text-sm font-medium text-emerald-700 hover:text-emerald-800 hover:underline">View all in Admin › Suppliers</a>
+      </div>
+    </details>
+  </Panel>
 }
