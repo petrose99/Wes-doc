@@ -264,7 +264,7 @@ export function BillHistoryDisclosure({ workspaceId, documentId, note: initialNo
       </div>
       <div className="space-y-2">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Note</h3>
-        <textarea className="min-h-32 w-full rounded-lg border border-slate-200 bg-slate-50/50 px-3 py-2 text-sm transition-colors focus:border-emerald-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100" placeholder="A note only your team sees — not sent anywhere, not part of the extracted data."
+        <textarea className="min-h-32 w-full rounded-lg border border-slate-200 bg-slate-50/50 px-3 py-2 text-sm text-slate-900 transition-colors placeholder:text-slate-500 focus:border-emerald-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100" placeholder="A note only your team sees — not sent anywhere, not part of the extracted data."
           value={note} onChange={(event) => setNote(event.target.value)} />
         <button type="button" disabled={savingNote} className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-800 disabled:opacity-40" onClick={() => void saveNote()}>
           {savingNote && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />}Save note
