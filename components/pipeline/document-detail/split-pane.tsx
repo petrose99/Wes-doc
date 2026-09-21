@@ -8,7 +8,7 @@ import { StageIndicator, type StageStep } from "@/components/pipeline/document-d
 import { useFieldNav } from "@/components/pipeline/document-detail/use-field-nav"
 import { updateDocumentNoteAction } from "@/app/(app)/workspaces/[workspaceId]/pipeline-actions"
 import { PaneDocumentContext, useRegisterDocumentActions, type RegisteredDocument } from "@/components/queue/document-actions-menu"
-import { BillHistoryDisclosure, BillPane, BillStatusTrack, DatesRow, PaymentDetailsLink, SupplierCard, useBillReadOnly, type BillPaneProviderLink } from "@/components/pipeline/document-detail/bill-pane"
+import { BillHistoryDisclosure, BillPane, BillReadOnlyContext, BillStatusTrack, DatesRow, PaymentDetailsLink, SupplierCard, useBillReadOnly, type BillPaneProviderLink } from "@/components/pipeline/document-detail/bill-pane"
 import type { SupplierSummary } from "@/models/supplier-summary"
 import { escalateCheckAction, type SaveReviewResult } from "@/app/(app)/workspaces/[workspaceId]/actions"
 import type { ActionState } from "@/lib/actions"
