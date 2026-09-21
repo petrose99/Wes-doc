@@ -22,6 +22,9 @@ import { useContext } from "react"
  * from #198's left-side panel, which this replaces. */
 export type DocumentHistory = {
   auditEvents: Array<{ id: string; label: string; createdAt: string; actorName: string | null }>
+  /** #374: the intake channel + sender, for the Activity tab's audit line — null for upload/
+   * camera/zip/api sources, which carry no sender identity to show. */
+  intake?: { channel: "email" | "whatsapp"; sender: string } | null
   stageDecisions: Array<{ id: string; stageIndex: number; stageName: string; decision: "approve" | "reject"; note: string | null; actorName: string; actorAvatar?: string | null; decidedAt: string }>
   pendingStages: Array<{ stageIndex: number; stageName: string }>
   /** #257 S6/S7: who started the approval and who it waits on, the supplier's record, a near
@@ -273,14 +276,20 @@ export function ApprovalTab({ workspaceId, documentId, history, state, queueTitl
   </div>
 }
 
-export function AuditLog({ events }: { events: DocumentHistory["auditEvents"] }) {
-  if (events.length === 0) return <p className="text-sm text-slate-500">No activity recorded yet.</p>
-  return <ol className="divide-y divide-slate-100">
-    {events.map((event) => <li key={event.id} className="flex items-baseline justify-between gap-3 py-2">
-      <span className="text-sm text-slate-700">{event.label}</span>
-      <span className="shrink-0 text-xs tabular-nums text-slate-500">{event.actorName ?? "System"} · {new Date(event.createdAt).toLocaleString()}</span>
-    </li>)}
-  </ol>
+export function AuditLog({ events, intake = null }: { events: DocumentHistory["auditEvents"]; intake?: DocumentHistory["intake"] }) {
+  return <>
+    {intake && <p className="mb-3 border-b border-slate-100 pb-3 text-sm text-slate-600">
+      Received via {intake.channel === "whatsapp" ? "WhatsApp" : "email"} from <span className="font-medium text-slate-800">{intake.sender}</span>
+    </p>}
+    {events.length === 0
+      ? <p className="text-sm text-slate-500">No activity recorded yet.</p>
+      : <ol className="divide-y divide-slate-100">
+        {events.map((event) => <li key={event.id} className="flex items-baseline justify-between gap-3 py-2">
+          <span className="text-sm text-slate-700">{event.label}</span>
+          <span className="shrink-0 text-xs tabular-nums text-slate-500">{event.actorName ?? "System"} · {new Date(event.createdAt).toLocaleString()}</span>
+        </li>)}
+      </ol>}
+  </>
 }
 
 const GATE_TYPE_LABEL: Record<string, string> = {

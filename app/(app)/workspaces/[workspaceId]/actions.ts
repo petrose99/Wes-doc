@@ -246,7 +246,7 @@ export async function getSelectionAuditPanelDataAction(workspaceId: string, docu
   const user = await getCurrentUser()
   const membership = await requireMember(workspaceId, user.id)
   if (!membership) return null
-  const [auditEvents, stageDecisions, gates, stageState, escalations, facts, claimsEnabled, processing, ledgerRetryTask] = await Promise.all([
+  const [auditEvents, stageDecisions, gates, stageState, escalations, facts, claimsEnabled, processing, ledgerRetryTask, sourceDocument] = await Promise.all([
     listDocumentAuditEvents(workspaceId, documentId),
     listDocumentStageDecisions(workspaceId, documentId),
     listOpenGatesForDocument(workspaceId, documentId),
@@ -261,7 +261,14 @@ export async function getSelectionAuditPanelDataAction(workspaceId: string, docu
     getProcessingStateInput(workspaceId, documentId).catch(() => null),
     // #281 spec.md §7: the Checks tab's ledger-push Retry — null when no push has failed.
     getOpenLedgerRetryTask(workspaceId, documentId).catch(() => null),
+    // #374: the intake channel + sender for the Activity tab's audit line — only email/WhatsApp
+    // carry a sender identity; every other source (upload, camera, zip, api) has none to show.
+    getWorkspaceDocument(workspaceId, documentId).catch(() => null),
   ])
+  const intake: { channel: "email" | "whatsapp"; sender: string } | null =
+    sourceDocument?.sourceWhatsapp ? { channel: "whatsapp", sender: sourceDocument.sourceWhatsapp } :
+    sourceDocument?.sourceEmail ? { channel: "email", sender: sourceDocument.sourceEmail } :
+    null
   // #218: a stage only reads as "Pending" while its task is still open/in_review (stageState is
   // null once resolved or workflow-less) and it hasn't already produced a review_task_stage_decided
   // event — decidedIndexes covers the (rare but possible) case of a stage re-decided after a
@@ -273,6 +280,7 @@ export async function getSelectionAuditPanelDataAction(workspaceId: string, docu
   const claimView = claimsEnabled ? await getDocumentClaimFacts(workspaceId, documentId, { userId: user.id, role: membership.role as WorkspaceRole }).catch(() => null) : null
   return {
     facts,
+    intake,
     claimsEnabled,
     claim: claimView?.claim ?? null,
     claimEligibility: claimView?.claimEligibility ?? null,

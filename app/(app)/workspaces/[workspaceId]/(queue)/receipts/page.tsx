@@ -21,7 +21,7 @@ import config from "@/lib/config"
 
 export const dynamic = "force-dynamic"
 
-export type ReceiptSearchParams = { mode?: string; status?: string; claim?: string; touchless?: string; view?: string; sort?: string }
+export type ReceiptSearchParams = { mode?: string; status?: string; claim?: string; touchless?: string; sender?: string; view?: string; sort?: string }
 
 /** #212's Receipts on the Queue screen (#225). #273: expense claims live in place — the bulk bar
  * and the pane's ⋯ add receipts to a claim, the Approval tab holds it; `?mode=claims` is closed. */
@@ -32,7 +32,7 @@ export async function ReceiptsQueuePage({ params, searchParams, selectedDocument
 }) {
   const { workspaceId } = await params
   const query = await searchParams
-  const { mode, status, claim, touchless, view: selectedViewId } = query
+  const { mode, status, claim, touchless, sender, view: selectedViewId } = query
   if (mode === "claims") notFound()
 
   const user = await getCurrentUser()
@@ -42,11 +42,13 @@ export async function ReceiptsQueuePage({ params, searchParams, selectedDocument
   const statusFilter = status === "cancelled" || status === "needs_attention" || status === "in_review" || status === "touchless" || status === "approved" ? status : undefined
   // #273: Unclaimed + the four claim statuses; the old "claimed" value no longer matches.
   const claimFilter = claim === "unclaimed" || claim === "draft" || claim === "submitted" || claim === "approved" || claim === "rejected" ? claim : undefined
+  // #374: the Sender filter chip — which intake channel the document arrived through.
+  const senderFilter = sender === "email" || sender === "whatsapp" ? sender : undefined
   const capabilities = await getWorkspaceCapabilities(workspaceId)
   const claimsEnabled = capabilities.has("expense-approvals")
   const onlyTouchless = touchless === "1"
   const [{ receipts }, minConfidencePercent, savedViews, matchRate, fieldTable, workspaceDocumentCount, todayOutcome, connectionId, connectionBandStatus, inboundToken, intakeUpload] = await Promise.all([
-    listWorkspaceReceipts({ workspaceId, statusFilter, claimFilter, onlyTouchless }),
+    listWorkspaceReceipts({ workspaceId, statusFilter, claimFilter, onlyTouchless, senderFilter }),
     getMinConfidencePercent(workspaceId),
     listSavedViews({ workspaceId, viewKey: "receipts", userId: user.id }),
     getDocumentMatchRateStats(workspaceId, "receipt", ["invoice_to_receipt", "po_to_receipt"]),
@@ -62,9 +64,12 @@ export async function ReceiptsQueuePage({ params, searchParams, selectedDocument
     getIntakeUpload(workspaceId, user.id),
   ])
   const inboundAddress = config.inboundEmail.enabled && inboundToken ? `${inboundToken}@${config.inboundEmail.domain}` : null
+  // #374: the deployment's WhatsApp Business number, shown beside the inbound address wherever it
+  // shows — one number for the whole deployment, so there is no per-workspace token to resolve.
+  const whatsappNumber = config.whatsapp.enabled && config.whatsapp.businessNumber ? config.whatsapp.businessNumber : null
   const currentViewFilters: Record<string, string> = {
     ...(statusFilter ? { status: statusFilter } : {}), ...(claimFilter ? { claim: claimFilter } : {}),
-    ...(onlyTouchless ? { touchless: "1" } : {}),
+    ...(onlyTouchless ? { touchless: "1" } : {}), ...(senderFilter ? { sender: senderFilter } : {}),
   }
 
   const arrival = await queueArrival(workspaceId, { searchParams: query as Record<string, string | string[] | undefined>, queuePath: "receipts", selectedId: selectedDocumentId, rowIds: receipts.map((receipt) => receipt.documentId) })
@@ -81,6 +86,7 @@ export async function ReceiptsQueuePage({ params, searchParams, selectedDocument
     workspaceDocumentCount={workspaceDocumentCount}
     todayOutcome={todayOutcome}
     inboundAddress={inboundAddress}
+    whatsappNumber={whatsappNumber}
     fileId={intakeUpload.fileId}
     templates={intakeUpload.templates}
     connectionId={connectionId}

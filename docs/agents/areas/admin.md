@@ -106,5 +106,19 @@ Accounting (`keyboard-shortcuts.tsx` `SHORTCUT_DESTINATIONS`); legacy `/accounti
 `truncate`-class nav-item label and the wordmark, not just the switcher name — same false-positive
 cause (ellipsis-by-design), confirmed by screenshot on every state.
 
+## WhatsApp intake (#372/#374)
+`admin/configuration/intake/page.tsx` gained a "WhatsApp intake" + "Recent WhatsApp messages" +
+"Allowed senders" panel set beside the existing email-intake ones, gated on
+`config.whatsapp.enabled && config.whatsapp.businessNumber`. `components/settings/whatsapp-settings.tsx`
+(`ShareWhatsAppNumber`, `AddWhatsAppSenderForm`, `RemoveWhatsAppSenderButton`) mirrors the email
+allowed-senders pattern. Outcomes (`WHATSAPP_OUTCOMES` on the page) mirror `INTAKE_OUTCOMES`;
+`models/inbound-whatsapp.ts`'s `addAllowedSender` validates phone format
+(`/^\+\d{7,15}$/`, throws `phone_number_invalid`) and label (`label_required`) — both now map to
+plain-language copy in `action-helpers.ts`'s `BILLING_MESSAGES` (#374 close; they fell through to
+the raw-code fallback before). `components/ui/sonner.tsx`'s toast `error` variant got a
+`red-800`/`red-700` contrast override (#374), matching #251's `success` fix — sonner's
+`richColors` variants need fixing individually; a new `toast.error()` call is not automatically
+covered by an existing `success` fix.
+
 ## Conventions the bar checks
 Vocabulary: "company" in Admin copy (not "workspace"); one term per concept, one casing. Keys: Tab order reaches the save bar, Escape closes menus and returns focus, Ctrl+S saves, tablists use arrow keys. States per form: loading frame, empty ("Add a …" with the consequence), error with the values kept ("Couldn't save — … Your changes are still here." with Reload on stale), read-only band for members. Below `md`: `PhoneNote` + company caption from the layout, tables scroll horizontally with the header not clipping.
