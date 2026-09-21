@@ -156,7 +156,11 @@ MODEL_CHEAP="${MODEL_CHEAP:-$MODEL_STRONG}"
 LANE_MODE="${WAYFINDER_LANE_MODE:-${LANE_MODE:-tree}}"
 LANE_MERGE="${WAYFINDER_LANE_MERGE:-${LANE_MERGE:-auto}}"       # auto | review
 LANES_DIR="${WAYFINDER_LANES_DIR:-${LANES_DIR:-$(dirname "$ROOT")/$(basename "$ROOT")-lanes}}"
-LANE_LINKS="${LANE_LINKS:-node_modules .env .impeccable/live .claude/settings.local.json}"
+# node_modules is hard-linked (cp -al, ~4 s for 110K files, no extra disk), not
+# symlinked: Turbopack refuses a node_modules symlink that points outside the
+# project root ("Symlink [project]/node_modules is invalid", #361, 2026-09-21).
+LANE_CLONES="${LANE_CLONES:-node_modules}"
+LANE_LINKS="${LANE_LINKS:-.env .impeccable/live .claude/settings.local.json}"
 BASE_BRANCH="$(git -C "$ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo HEAD)"
 [ "$LANE_MODE" = worktree ] && mkdir -p "$LANES_DIR"
 lane_dir()    { echo "$LANES_DIR/$MAP-$1"; }
@@ -179,6 +183,9 @@ lane_open() {   # $1 ticket → creates the lane if lane mode; prints the sessio
     else
       git -C "$ROOT" worktree add -q -b "$br" "$wt" "$BASE_BRANCH" >&2
     fi
+    for p in $LANE_CLONES; do
+      [ -e "$ROOT/$p" ] && [ ! -e "$wt/$p" ] && { cp -al "$ROOT/$p" "$wt/$p" 2>/dev/null || cp -a "$ROOT/$p" "$wt/$p"; }
+    done
     for p in $LANE_LINKS; do
       [ -e "$ROOT/$p" ] && [ ! -e "$wt/$p" ] && { mkdir -p "$(dirname "$wt/$p")"; ln -s "$ROOT/$p" "$wt/$p"; }
     done
