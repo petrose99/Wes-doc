@@ -10,7 +10,7 @@ import { StageIndicator, type StageStep } from "@/components/pipeline/document-d
 import { useFieldNav } from "@/components/pipeline/document-detail/use-field-nav"
 import { updateDocumentNoteAction } from "@/app/(app)/workspaces/[workspaceId]/pipeline-actions"
 import { PaneDocumentContext, useRegisterDocumentActions } from "@/components/queue/document-actions-menu"
-import { escalateCheckAction, setDocumentTypeAction, type SaveReviewResult } from "@/app/(app)/workspaces/[workspaceId]/actions"
+import { escalateCheckAction, type SaveReviewResult } from "@/app/(app)/workspaces/[workspaceId]/actions"
 import type { ActionState } from "@/lib/actions"
 import { useRouter } from "next/navigation"
 import { InstitutionAssert } from "@/components/pipeline/document-detail/institution-assert"
@@ -23,7 +23,7 @@ import type { DocumentFieldDefinition } from "@/lib/document-templates"
 import type { Ref } from "@/lib/provenance"
 import type { FieldRationale } from "@/lib/rationale"
 import type { ProcessingState } from "@/lib/documents/processing-state"
-import { DOC_TYPE_SPECS, directionLockedFor, hasDirectionField, isCategoryConfirmed, type DocType } from "@/lib/doc-types"
+import type { DocType } from "@/lib/doc-types"
 import { CheckCircle2, ChevronDown, ChevronUp, ExternalLink, Loader2 } from "lucide-react"
 import { useActionState, useContext, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react"
 import { toast } from "sonner"
@@ -317,7 +317,6 @@ export function SplitPane({
             <fieldset disabled={fieldsReadOnly} className="min-w-0">
               <FieldNavForm
                 saveReview={saveReview}
-                queueDocType={queueDocType}
                 formFields={formFields}
                 data={data}
                 fieldConfidence={fieldConfidence}
@@ -374,9 +373,8 @@ export function SplitPane({
 
 /** A4: the inner form that owns the field-nav state. Split out of SplitPane so the hook can
  * derive its ordering directly from formFields without SplitPane touching field-nav internals. */
-function FieldNavForm({ saveReview, queueDocType, formFields, data, fieldConfidence, provenanceFields, provenanceItems, summaryFields, rationales, checks, workspaceId, documentId, setTarget, po }: {
+function FieldNavForm({ saveReview, formFields, data, fieldConfidence, provenanceFields, provenanceItems, summaryFields, rationales, checks, workspaceId, documentId, setTarget, po }: {
   saveReview: (formData: FormData) => Promise<ActionState<SaveReviewResult | null>>
-  queueDocType: DocType
   formFields: DocumentFieldDefinition[]
   data: Record<string, unknown>
   fieldConfidence: Record<string, number>
@@ -394,41 +392,6 @@ function FieldNavForm({ saveReview, queueDocType, formFields, data, fieldConfide
   const nav = useFieldNav(navItems)
   const formRef = useRef<HTMLFormElement>(null)
   const [liveChecks, setLiveChecks] = useState(checks)
-  // #297: the Direction row (Payable/Receivable), where it exists for this queue type. Locked to
-  // Payable for Purchase Order (directionLockedFor). Defaults from the type's defaultCategory —
-  // already what's stored — so the row merely displays what classification asserted, pre-checked.
-  const showDirection = hasDirectionField(queueDocType)
-  const directionLocked = directionLockedFor(queueDocType)
-  const storedDirection = typeof data.documentType === "string" ? data.documentType : null
-  const [direction, setDirection] = useState<"expense" | "sale">(
-    directionLocked ? "expense" : (storedDirection === "expense" || storedDirection === "sale" ? storedDirection : DOC_TYPE_SPECS[queueDocType].defaultCategory === "sale" ? "sale" : "expense"))
-  const [savingDirection, setSavingDirection] = useState(false)
-  const [categoryConfirmed, setCategoryConfirmed] = useState(isCategoryConfirmed(data))
-  const selectDirection = async (value: "expense" | "sale") => {
-    const previous = direction
-    setSavingDirection(true)
-    setDirection(value)
-    try {
-      const result = await setDocumentTypeAction(workspaceId, documentId, value)
-      if (!result.success) { toast.error(result.error || "Could not save direction"); setDirection(previous); return }
-      setCategoryConfirmed(true)
-    } catch {
-      toast.error("Could not reach the server")
-      setDirection(previous)
-    } finally {
-      setSavingDirection(false)
-    }
-  }
-  const onDirectionKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (directionLocked || (event.key !== "ArrowDown" && event.key !== "ArrowUp" && event.key !== "ArrowLeft" && event.key !== "ArrowRight")) return
-    const items = Array.from(event.currentTarget.querySelectorAll<HTMLElement>("[role=radio]"))
-    const index = items.indexOf(document.activeElement as HTMLElement)
-    if (index < 0) return
-    event.preventDefault()
-    const next = items[(index + (event.key === "ArrowDown" || event.key === "ArrowRight" ? 1 : -1) + items.length) % items.length]
-    next.focus()
-    next.click()
-  }
   // #258 (B2): Save review is the one in-pane mutation that changes the processing state. The
   // action returns instead of redirecting; success toasts the outcome and asks the queue to
   // refresh (`onMutated` → `QueueScreen.refresh()`), so the row pill, glyph, Status line, stepper
@@ -473,20 +436,6 @@ function FieldNavForm({ saveReview, queueDocType, formFields, data, fieldConfide
       <span><span className="font-semibold">{nav.suspectsRemaining}</span> of {nav.totalSuspects} low-confidence fields to review — Enter confirms and moves to the next.</span>
       <button type="button" className="rounded-md border border-amber-300 bg-white px-2 py-0.5 font-medium text-amber-800 hover:bg-amber-100" onClick={() => nav.focusNext()}>Next suspect</button>
     </div>}
-    {showDirection && <div className="space-y-1 border-b border-slate-100 pb-3">
-      <p className="text-sm font-medium text-slate-800">Direction</p>
-      <div role="radiogroup" aria-label="Direction" onKeyDown={onDirectionKeyDown} className="flex gap-1.5">
-        {(["expense", "sale"] as const).map((value) => {
-          const checked = direction === value
-          return <button key={value} type="button" role="radio" aria-checked={checked} tabIndex={directionLocked ? -1 : checked ? 0 : -1}
-            disabled={directionLocked || savingDirection} onClick={() => void selectDirection(value)}
-            className={`rounded border px-2.5 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 disabled:cursor-not-allowed disabled:opacity-60 ${checked ? "border-emerald-700 bg-emerald-50 font-medium text-emerald-800" : "border-slate-300 text-slate-600 hover:bg-slate-50"}`}>
-            {value === "expense" ? "Payable" : "Receivable"}
-          </button>
-        })}
-      </div>
-      {directionLocked && <p className="text-xs text-slate-500">Purchase orders are always payable.</p>}
-    </div>}
     {formFields.map((field) => field.type === "array"
       ? <LineItemsSection key={field.key} field={field} value={data[field.key]} fieldKey={field.key} summaryFields={summaryFields} fieldValues={data} provenanceFields={provenanceFields} provenanceItems={provenanceItems[field.key] ?? []} onFocusSource={setTarget}
           checks={liveChecks.filter((check) => check.fields.some((f) => f === field.key || f.startsWith(`${field.key}[`)))} onEscalate={onEscalate} po={field.key === "line_items" ? po : null} />
@@ -494,10 +443,9 @@ function FieldNavForm({ saveReview, queueDocType, formFields, data, fieldConfide
           checks={liveChecks.filter((check) => checkAppliesToField(check, field.key))} onEscalate={onEscalate}
           registerNav={nav.registerField} isCurrent={nav.currentKey === field.key} isCompleted={nav.completedKeys.has(field.key)} />)}
     <div className="flex items-center gap-3 border-t border-slate-100 pt-3">
-      <button type="submit" id="save-review-submit" disabled={showDirection && !directionLocked && !categoryConfirmed} aria-busy={saving || undefined} className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40" title={showDirection && !directionLocked && !categoryConfirmed ? "Confirm the Direction first" : undefined}>
+      <button type="submit" id="save-review-submit" aria-busy={saving || undefined} className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40">
         {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <CheckCircle2 className="h-4 w-4" aria-hidden />}{saving ? "Saving…" : "Save review"}
       </button>
-      {showDirection && !directionLocked && !categoryConfirmed && <span className="text-xs text-amber-600">Confirm the Direction first</span>}
     </div>
   </form>
 }

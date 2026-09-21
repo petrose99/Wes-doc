@@ -3,7 +3,7 @@ import { track } from "@/lib/analytics"
 import { auditEventData, getRequestAuditContext, recordDocumentAudit } from "@/lib/audit"
 import { SUPPLIER_FIELD_BY_TEMPLATE } from "@/lib/automation/rules"
 import config from "@/lib/config"
-import { isPushableDocument, PaidStatus, type DocType } from "@/lib/doc-types"
+import { hasDirectionField, isPushableDocument, PaidStatus, resolveDocType, type DocType } from "@/lib/doc-types"
 import { findMissingRequiredFields, parseTemplateFields, validateDocumentValues } from "@/lib/document-templates"
 import { deleteDocumentSource, documentBlocksKey, documentStorageKey, putDocumentSource } from "@/lib/document-storage"
 import { projectDocumentFields } from "@/lib/field-projection"
@@ -481,6 +481,13 @@ export async function updateDocumentReview(input: { workspaceId: string; documen
   const coding = (document.codingData as Record<string, unknown> | null) ?? {}
   const hasDocumentType = coding.documentType === "expense" || coding.documentType === "sale" || coding.documentType === "bank_statement"
   if (!hasDocumentType) missing.push("document_type")
+  // #360: Direction is retired — there is no separate confirm step left before Save review, so
+  // Save review itself is now the one human act that confirms the category for invoice/receipt/PO
+  // (`hasDirectionField`), the same way `setDocumentTypeAction` used to. Without this, a document
+  // the classifier wasn't confident about (`categoryConfirmed` never set true) would stay
+  // unpushable forever (`isCategoryConfirmed`, read by readiness/autopublish/integration push).
+  const newlyConfirmedCategory = hasDirectionField(resolveDocType(document)) && coding.categoryConfirmed !== true
+  const nextCoding = newlyConfirmedCategory ? { ...coding, categoryConfirmed: true } : null
   // Re-project the structured spine from the values a human signed off on. Source is "manual"
   // because these are now reviewed values, but the per-field scores are carried over from the
   // extraction rather than being reset to 1: a bulk "mark reviewed" does not mean somebody read
@@ -489,7 +496,7 @@ export async function updateDocumentReview(input: { workspaceId: string; documen
   const rows = projectDocumentFields({ fields, values: reviewedData, confidence: priorConfidence, provenance: document.provenance as DocumentProvenance | null, source: "manual" })
   let webhookQueued = false
   const result = await prisma.$transaction(async (tx) => {
-    const updated = await tx.document.update({ where: { id: document.id }, data: { reviewedData: reviewedData as Prisma.InputJsonValue, searchText: searchableText(reviewedData, document.filename), confidence: { missingRequiredFields: missing, manuallyReviewed: true } as Prisma.InputJsonValue, reviewedAt: new Date(), status: missing.length ? "needs_review" : "reviewed" } })
+    const updated = await tx.document.update({ where: { id: document.id }, data: { reviewedData: reviewedData as Prisma.InputJsonValue, searchText: searchableText(reviewedData, document.filename), confidence: { missingRequiredFields: missing, manuallyReviewed: true } as Prisma.InputJsonValue, reviewedAt: new Date(), status: missing.length ? "needs_review" : "reviewed", ...(nextCoding ? { codingData: nextCoding as Prisma.InputJsonValue } : {}) } })
     await recordDocumentAudit({ workspaceId: input.workspaceId, documentId: document.id, actorId: input.actorId, type: "document_reviewed" }, tx)
     await replaceDocumentFieldValues({ workspaceId: input.workspaceId, documentId: document.id, fileId: document.fileId, templateCode: document.template?.code ?? null, rows }, tx)
     const emitted = await emitWorkspaceEvent(tx, {
