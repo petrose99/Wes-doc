@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type RefObject } from "react"
+import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from "react"
 
 /** #360 Section 3: a continuous viewer/form split, replacing the old three-state Split/Details/
  * Source radiogroup. Shared here (not inline in a single caller) so #362/#364/#365 (Bill/Receipt/PO
@@ -72,8 +72,8 @@ export function PaneResizeGrip({ state }: { state: ReturnType<typeof usePaneResi
     <div role="separator" aria-orientation="vertical" aria-label="Resize document viewer"
       aria-valuenow={Math.round(splitPct)} aria-valuemin={min} aria-valuemax={max}
       tabIndex={0} onPointerDown={onGripPointerDown} onKeyDown={onGripKeyDown}
-      className={`hidden w-1.5 shrink-0 cursor-col-resize items-center justify-center bg-slate-100 hover:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 lg:flex ${dragging ? "bg-emerald-100" : ""}`}>
-      <span className="pointer-events-none text-[10px] leading-none text-slate-400" aria-hidden>⫶</span>
+      className={`hidden w-3 shrink-0 cursor-col-resize items-center justify-center border-x border-slate-200 bg-slate-100 hover:border-emerald-300 hover:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 lg:flex ${dragging ? "border-emerald-400 bg-emerald-100" : ""}`}>
+      <span className="pointer-events-none text-xs leading-none text-slate-500" aria-hidden>⫶</span>
     </div>
   )
 }
