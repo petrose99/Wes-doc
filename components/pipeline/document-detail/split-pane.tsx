@@ -8,7 +8,7 @@ import { StageIndicator, type StageStep } from "@/components/pipeline/document-d
 import { useFieldNav } from "@/components/pipeline/document-detail/use-field-nav"
 import { updateDocumentNoteAction } from "@/app/(app)/workspaces/[workspaceId]/pipeline-actions"
 import { PaneDocumentContext, useRegisterDocumentActions, type RegisteredDocument } from "@/components/queue/document-actions-menu"
-import { BillHistoryDisclosure, BillPane, BillStatusTrack, DatesRow, SupplierCard, useBillReadOnly, type BillPaneProviderLink } from "@/components/pipeline/document-detail/bill-pane"
+import { BillHistoryDisclosure, BillPane, BillStatusTrack, DatesRow, PaymentDetailsLink, SupplierCard, useBillReadOnly, type BillPaneProviderLink } from "@/components/pipeline/document-detail/bill-pane"
 import type { SupplierSummary } from "@/models/supplier-summary"
 import { escalateCheckAction, type SaveReviewResult } from "@/app/(app)/workspaces/[workspaceId]/actions"
 import type { ActionState } from "@/lib/actions"
@@ -357,7 +357,7 @@ export function SplitPane({
  * derive its ordering directly from formFields without SplitPane touching field-nav internals.
  * Exported for #361's `BillSplitPane` (Invoices' Bill shell), which reuses this field-editing
  * form unchanged inside its own composition. */
-export function FieldNavForm({ saveReview, formFields, data, fieldConfidence, provenanceFields, provenanceItems, summaryFields, rationales, checks, workspaceId, documentId, setTarget, po, submitId = "save-review-submit", billMode = false, supplierPaymentTermsDays = null }: {
+export function FieldNavForm({ saveReview, formFields, data, fieldConfidence, provenanceFields, provenanceItems, summaryFields, rationales, checks, workspaceId, documentId, setTarget, po, submitId = "save-review-submit", billMode = false, supplierPaymentTermsDays = null, supplierBankAccountFact = null }: {
   saveReview: (formData: FormData) => Promise<ActionState<SaveReviewResult | null>>
   formFields: DocumentFieldDefinition[]
   data: Record<string, unknown>
@@ -381,6 +381,10 @@ export function FieldNavForm({ saveReview, formFields, data, fieldConfidence, pr
    * when unmatched or the supplier has no term set, which is also `DatesRow`'s "plain editable
    * Due date" signal. `BillSplitPane` only. */
   supplierPaymentTermsDays?: number | null
+  /** #362 §4: the resolved supplier's `SupplierSummary.bankAccountFact` — null when unmatched or
+   * the supplier has no bank fact on file, which is also `PaymentDetailsLink`'s "Needs bank
+   * details" signal. `BillSplitPane` only. */
+  supplierBankAccountFact?: string | null
 }) {
   // #362 §3: located by key, not position — invoice templates key the invoice date `issue_date`
   // (falling back to the generic `date` key other templates use); `due_date` is shared.
@@ -446,7 +450,7 @@ export function FieldNavForm({ saveReview, formFields, data, fieldConfidence, pr
         {billMode && invoiceDateField && dueDateField && <DatesRow invoiceDateField={invoiceDateField} invoiceDateValue={typeof data[invoiceDateField.key] === "string" ? data[invoiceDateField.key] as string : null}
           dueDateField={dueDateField} dueDateValue={typeof data[dueDateField.key] === "string" ? data[dueDateField.key] as string : null}
           paymentTermsDays={supplierPaymentTermsDays} readOnly={billReadOnly} />}
-
+        {billMode && <PaymentDetailsLink workspaceId={workspaceId} documentId={documentId} bankAccountFact={supplierBankAccountFact} />}
       </Fragment>
       return <FieldRow key={field.key} field={field} value={data[field.key]} confidence={fieldConfidence[field.key] ?? null} ref={provenanceFields[field.key] ?? null} onFocusSource={setTarget} rationale={rationales?.[field.key] ?? null}
         checks={liveChecks.filter((check) => checkAppliesToField(check, field.key))} onEscalate={onEscalate}
@@ -546,7 +550,8 @@ export function BillSplitPane({
         provenanceFields={provenanceFields} provenanceItems={provenanceItems} summaryFields={summaryFields}
         rationales={rationales ?? null} checks={checks ?? []} workspaceId={workspaceId} documentId={header.documentId}
         setTarget={setTarget} po={po} submitId={undefined} billMode
-        supplierPaymentTermsDays={supplierSummary?.matched ? supplierSummary.paymentTermsDays : null} />
+        supplierPaymentTermsDays={supplierSummary?.matched ? supplierSummary.paymentTermsDays : null}
+        supplierBankAccountFact={supplierSummary?.matched ? supplierSummary.bankAccountFact : null} />
 
       {fxBadge && <div>{fxBadge}</div>}
       {documentMatches}

@@ -370,3 +370,20 @@ export function DatesRow({ invoiceDateField, invoiceDateValue, dueDateField, due
     </div>}
   </div>
 }
+
+/** #362 §4: one line below `DatesRow`, link-styled (matches the disclosure/link language
+ * `SupplierCard`'s "View all in Admin › Suppliers" already uses), never a second amount/date
+ * form (#355 Q9). Subtitle mask (`Account ····{last4}`) and the absent-account wording ("Needs
+ * bank details") are reused verbatim from `components/settings/payments-settings.tsx` — not a
+ * new mask, not a paraphrase (B3). Renders regardless of provider-connection state (#355 Q2 —
+ * only the header's `Open in ‹provider›` link, #361, is provider-gated). */
+export function PaymentDetailsLink({ workspaceId, documentId, bankAccountFact }: {
+  workspaceId: string
+  documentId: string
+  bankAccountFact: string | null
+}) {
+  return <a href={`/workspaces/${workspaceId}/payments/bill-pay/${documentId}`} className="inline-block">
+    <span className="block text-sm font-medium text-emerald-700 hover:text-emerald-800 hover:underline">Payment Details</span>
+    <span className="block text-xs text-slate-500">{bankAccountFact ? `Account ····${bankAccountFact.slice(-4)}` : "Needs bank details"}</span>
+  </a>
+}
