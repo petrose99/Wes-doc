@@ -25,12 +25,22 @@ import type { FieldRationale } from "@/lib/rationale"
 import type { ProcessingState } from "@/lib/documents/processing-state"
 import type { DocType } from "@/lib/doc-types"
 import { CheckCircle2, ChevronDown, ChevronUp, ExternalLink, Loader2 } from "lucide-react"
-import { useActionState, useContext, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react"
+import { useActionState, useContext, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react"
 import { toast } from "sonner"
 
 type Tab = "details" | "note" | "activity" | "approval" | "checks"
-type PanelLayout = "split" | "source-only" | "details-only"
+/** #360 Section 3: the viewer/form split, a continuous percentage (viewer width), not the old
+ * three-state Split/Details/Source radiogroup. Same sessionStorage key, new shape — an old
+ * `"split"`/`"details-only"`/`"source-only"` string from a still-open tab is tolerated by
+ * `parseSplitPct` below (falls back to the default on a non-numeric/out-of-bounds read). */
 const LAYOUT_KEY = "pane-layout"
+const SPLIT_MIN = 35
+const SPLIT_MAX = 65
+const SPLIT_DEFAULT = 52
+function parseSplitPct(raw: string | null): number {
+  const n = raw === null ? NaN : Number(raw)
+  return Number.isFinite(n) && n >= SPLIT_MIN && n <= SPLIT_MAX ? n : SPLIT_DEFAULT
+}
 /** #257 spec 3.5: whether the phone lane's source strip is expanded; remembered for the session. */
 const SOURCE_KEY = "dp.source"
 
@@ -114,27 +124,52 @@ export function SplitPane({
   const [savingNote, setSavingNote] = useState(false)
   // The layout choice persists for the session so moving ↑/↓ through a queue keeps the panels
   // where the operator put them; read after mount so server and first client render agree.
-  const [layout, setLayout] = useState<PanelLayout>("split")
+  const [splitPct, setSplitPct] = useState(SPLIT_DEFAULT)
+  const [dragging, setDragging] = useState(false)
   const [sourceShown, setSourceShown] = useState(true)
   const phone = usePhoneLane()
+  const rowRef = useRef<HTMLDivElement | null>(null)
   useEffect(() => {
-    const saved = window.sessionStorage.getItem(LAYOUT_KEY)
-    if (saved === "split" || saved === "source-only" || saved === "details-only") setLayout(saved)
+    setSplitPct(parseSplitPct(window.sessionStorage.getItem(LAYOUT_KEY)))
     if (window.sessionStorage.getItem(SOURCE_KEY) === "hidden") setSourceShown(false)
   }, [])
-  const selectLayout = (value: PanelLayout) => { setLayout(value); window.sessionStorage.setItem(LAYOUT_KEY, value) }
   const toggleSource = () => setSourceShown((prev) => { window.sessionStorage.setItem(SOURCE_KEY, prev ? "hidden" : "shown"); return !prev })
-  const onLayoutKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    const order: PanelLayout[] = ["split", "details-only", "source-only"]
-    const index = order.indexOf(layout)
-    const next = event.key === "ArrowRight" || event.key === "ArrowDown" ? order[(index + 1) % order.length]
-      : event.key === "ArrowLeft" || event.key === "ArrowUp" ? order[(index + order.length - 1) % order.length]
-      : null
-    if (!next) return
+  const commitSplit = (pct: number) => {
+    const clamped = Math.min(SPLIT_MAX, Math.max(SPLIT_MIN, pct))
+    setSplitPct(clamped)
+    return clamped
+  }
+  // B2: write once per gesture (pointerup), not on every pointermove — `current` here is a plain
+  // closure-local variable (not a React ref), so tracking it during drag is a normal event-handler
+  // side effect, not a render-time ref read.
+  const onGripPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     event.preventDefault()
-    selectLayout(next)
-    ;(event.currentTarget.querySelector(`[role="radio"][aria-checked="true"]`) as HTMLElement | null)?.focus()
-    window.requestAnimationFrame(() => (event.currentTarget?.querySelector(`[role="radio"][aria-checked="true"]`) as HTMLElement | null)?.focus())
+    const row = rowRef.current
+    if (!row) return
+    setDragging(true)
+    let current = splitPct
+    const move = (moveEvent: PointerEvent) => {
+      const rect = row.getBoundingClientRect()
+      current = commitSplit(((moveEvent.clientX - rect.left) / rect.width) * 100)
+    }
+    const up = () => {
+      setDragging(false)
+      window.sessionStorage.setItem(LAYOUT_KEY, String(current))
+      window.removeEventListener("pointermove", move)
+      window.removeEventListener("pointerup", up)
+    }
+    window.addEventListener("pointermove", move)
+    window.addEventListener("pointerup", up)
+  }
+  const onGripKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    const next = event.key === "ArrowLeft" ? splitPct - 2
+      : event.key === "ArrowRight" ? splitPct + 2
+      : event.key === "Home" ? SPLIT_MIN
+      : event.key === "End" ? SPLIT_MAX
+      : null
+    if (next === null) return
+    event.preventDefault()
+    window.sessionStorage.setItem(LAYOUT_KEY, String(commitSplit(next)))
   }
   const fileHref = `/api/documents/${source.documentId}/source`
 
@@ -205,12 +240,6 @@ export function SplitPane({
     tabs[next].click()
   }
 
-  const layoutOption = (value: PanelLayout, label: string) => <button type="button" key={value} role="radio" aria-checked={layout === value} tabIndex={layout === value ? 0 : -1}
-    onClick={() => selectLayout(value)}
-    className={`h-7 rounded-[5px] px-2.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 ${layout === value ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"}`}>
-    {label}
-  </button>
-
   // #236: "extracted fields are read-only while a stage is pending" (decision #6) — derived from
   // the same `history.pendingStages` the Approval tab already renders, so it applies wherever a
   // workflow is mid-run, with no new prop for a caller to remember to pass. Full mode (#259)
@@ -240,11 +269,12 @@ export function SplitPane({
 
     {/* Main content area. Below `lg` (the pane is a full-screen sheet there) the source stacks
         above the fields at a fixed height so both stay reachable without a second sheet. */}
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
-      {/* Source panel. The strip at its top is where the file lives now — filename, Open file, and
-          the layout control — and it stays rendered in Details layout (the panel collapses to the
-          strip) so the way back to Split is always in view. */}
-      <div className={`flex min-h-0 flex-col overflow-hidden border-slate-200 motion-safe:transition-[flex-basis] motion-safe:duration-200 ${layout === "details-only" ? "shrink-0 border-b lg:basis-auto lg:border-b-0 lg:border-r" : `${sourceShown ? "h-[38vh]" : "h-auto"} shrink-0 border-b lg:h-auto lg:shrink lg:border-b-0 lg:border-r`} ${layout === "source-only" ? "flex-1" : layout === "split" ? "lg:basis-[52%]" : ""}`}>
+    <div ref={rowRef} className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
+      {/* Source panel. The strip at its top carries the filename and Open file; width at ≥lg is a
+          continuous percentage of the row, set by the grip below (#360 Section 3), not a discrete
+          Split/Details/Source choice. */}
+      <div className={`flex min-h-0 flex-col overflow-hidden border-slate-200 ${sourceShown ? "h-[38vh]" : "h-auto"} shrink-0 border-b lg:h-auto lg:shrink lg:border-b-0 lg:border-r lg:[flex-basis:var(--split-pct)] ${dragging ? "" : "motion-safe:transition-[flex-basis] motion-safe:duration-200"}`}
+        style={{ ["--split-pct" as string]: `${splitPct}%` }}>
         <div className="flex min-h-9 shrink-0 items-center gap-2 border-b border-slate-100 px-3 py-1 text-[13px]">
           <span className="min-w-0 flex-1 break-all font-medium leading-snug text-slate-700">{header.filename}</span>
           <a href={fileHref} target="_blank" rel="noopener noreferrer" title="Open the source file in a new tab"
@@ -253,22 +283,26 @@ export function SplitPane({
           </a>
           {/* #257 spec 3.5: on the phone the source is a strip the approver can expand when the
               decision needs a look at the page — collapsed, the tabs get the height. */}
-          {layout !== "details-only" && <button type="button" onClick={toggleSource} aria-expanded={sourceShown} aria-controls={`${source.documentId}-source`}
+          <button type="button" onClick={toggleSource} aria-expanded={sourceShown} aria-controls={`${source.documentId}-source`}
             className="inline-flex h-9 shrink-0 items-center gap-1 rounded-md px-2 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 lg:hidden">
             {sourceShown ? <ChevronUp className="h-3.5 w-3.5" aria-hidden /> : <ChevronDown className="h-3.5 w-3.5" aria-hidden />}
             {sourceShown ? "Hide source" : "Show source"}
-          </button>}
-          <div role="radiogroup" aria-label="Pane layout" onKeyDown={onLayoutKeyDown} className="hidden shrink-0 items-center gap-0.5 rounded-md bg-slate-100 p-0.5 lg:flex">
-            {layoutOption("split", "Split")}
-            {layoutOption("details-only", "Details")}
-            {layoutOption("source-only", "Source")}
-          </div>
+          </button>
         </div>
-        {layout !== "details-only" && <div id={`${source.documentId}-source`} className={sourceShown ? "contents" : "hidden lg:contents"}><SourceViewer source={source} target={target} /></div>}
+        <div id={`${source.documentId}-source`} className={sourceShown ? "contents" : "hidden lg:contents"}><SourceViewer source={source} target={target} /></div>
+      </div>
+
+      {/* Resize grip (#360 Section 3, ≥lg only — the phone lane keeps its stacked layout unchanged,
+          B5/WCAG 2.5.7: Home/End/Arrow keys resize without requiring the drag). */}
+      <div role="separator" aria-orientation="vertical" aria-label="Resize document viewer"
+        aria-valuenow={Math.round(splitPct)} aria-valuemin={SPLIT_MIN} aria-valuemax={SPLIT_MAX}
+        tabIndex={0} onPointerDown={onGripPointerDown} onKeyDown={onGripKeyDown}
+        className={`hidden w-1.5 shrink-0 cursor-col-resize items-center justify-center bg-slate-100 hover:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 lg:flex ${dragging ? "bg-emerald-100" : ""}`}>
+        <span className="pointer-events-none text-[10px] leading-none text-slate-400" aria-hidden>⫶</span>
       </div>
 
       {/* Details panel */}
-      {layout !== "source-only" && <div className={`flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden motion-safe:transition-[flex-basis] motion-safe:duration-200 ${layout === "split" ? "lg:flex-none lg:basis-[48%]" : ""}`}>
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <div className="flex items-center shadow-[inset_0_-1px_0_0_theme(colors.slate.100)]">
           <div className="flex gap-0.5 overflow-x-auto px-3 pt-1" role="tablist" aria-label="Document detail" onKeyDown={onTabKeyDown}>
             {history && phone
@@ -294,7 +328,7 @@ export function SplitPane({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
-          {tab === "details" && <div {...panelProps("details")} className={`mx-auto space-y-4 p-4 ${layout === "details-only" ? "max-w-2xl" : ""}`}>
+          {tab === "details" && <div {...panelProps("details")} className={`mx-auto space-y-4 p-4`}>
             {/* #217: a bank statement needs an asserted Institution before the layout-drift
                 check (#207) has anything to compare against. */}
             {initialDocumentType === "bank_statement" && <InstitutionAssert
@@ -346,7 +380,7 @@ export function SplitPane({
             {!header.reviewLink && <CreateReviewTaskButton workspaceId={workspaceId} documentId={header.documentId} />}
           </div>}
 
-          {tab === "note" && <div {...panelProps("note")} className={`mx-auto space-y-3 p-6 ${layout === "details-only" ? "max-w-2xl" : ""}`}>
+          {tab === "note" && <div {...panelProps("note")} className={`mx-auto space-y-3 p-6`}>
             <textarea className="min-h-48 w-full rounded-lg border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm transition-colors focus:border-emerald-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100" placeholder="A note only your team sees — not sent anywhere, not part of the extracted data."
               value={note} onChange={(event) => setNote(event.target.value)} />
             <button type="button" disabled={savingNote} className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-800 disabled:opacity-40" onClick={() => void saveNote()}>
@@ -354,19 +388,19 @@ export function SplitPane({
             </button>
           </div>}
 
-          {tab === "activity" && <div {...panelProps("activity")} className={`mx-auto p-6 ${layout === "details-only" ? "max-w-2xl" : ""}`}>
+          {tab === "activity" && <div {...panelProps("activity")} className={`mx-auto p-6`}>
             <AuditLog events={history?.auditEvents ?? auditEvents} />
           </div>}
 
-          {tab === "approval" && history && <div {...panelProps("approval")} className={`mx-auto p-4 lg:p-6 ${layout === "details-only" ? "max-w-2xl" : ""}`}>
+          {tab === "approval" && history && <div {...panelProps("approval")} className={`mx-auto p-4 lg:p-6`}>
             <ApprovalTab workspaceId={workspaceId} documentId={header.documentId} history={history} state={state} queueTitle={queueTitle} cancelledReason={header.cancelledReason} />
           </div>}
 
-          {tab === "checks" && history && <div {...panelProps("checks")} className={`mx-auto p-6 ${layout === "details-only" ? "max-w-2xl" : ""}`}>
+          {tab === "checks" && history && <div {...panelProps("checks")} className={`mx-auto p-6`}>
             <ChecksTab workspaceId={workspaceId} documentId={header.documentId} gates={history.gates} escalations={history.escalations} ledgerRetry={history.ledgerRetry} />
           </div>}
         </div>
-      </div>}
+      </div>
     </div>
   </div>
 }
