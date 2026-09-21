@@ -260,6 +260,10 @@ const envSchema = z.object({
   WHATSAPP_PHONE_NUMBER_ID: z.string().optional(),
   // A permanent access token for the Graph API calls above (System User token in production).
   WHATSAPP_ACCESS_TOKEN: z.string().optional(),
+  // The human-facing E.164 number shown wherever the operator sets out to add a document
+  // (Admin › Configuration › Intake's Share-this-number, the Add dialog) — distinct from
+  // WHATSAPP_PHONE_NUMBER_ID, which is Meta's internal id for the same number.
+  WHATSAPP_BUSINESS_NUMBER: z.string().optional(),
   // FX conversion (lib/fx/rates.ts). Every rate goes through Frankfurter's free, no-auth wrapper
   // around the ECB reference feed — no key needed and it covers historical rates back to 1999,
   // which is what most documents actually need. FASTRATES_API_KEY is optional and, when set, is
@@ -427,6 +431,7 @@ const config = {
     verifyToken: env.WHATSAPP_VERIFY_TOKEN || "",
     phoneNumberId: env.WHATSAPP_PHONE_NUMBER_ID || "",
     accessToken: env.WHATSAPP_ACCESS_TOKEN || "",
+    businessNumber: env.WHATSAPP_BUSINESS_NUMBER || "",
   },
   // Agnostic dictation (lib/dictation). Off by default and fail-safe by design: with it off, or on
   // any router/extraction failure, a dictation with no pre-selected template still gets the general
