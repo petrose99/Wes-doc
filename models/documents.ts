@@ -89,6 +89,9 @@ export async function createDocumentFromBuffer(input: {
   /** The sender's address for an emailed-in document, or null for every other channel. See
    * lib/ingestion.ts's note on the same field. */
   sourceEmail?: string | null
+  /** The sender's WhatsApp number for a WhatsApp-in document, or null for every other channel.
+   * Same shape and purpose as sourceEmail. */
+  sourceWhatsapp?: string | null
 }) {
   validateDocumentInput(input.buffer, input.mimeType)
   // Scoped by fileId as well as workspaceId: worksheet codes are only unique within a file, so
@@ -126,6 +129,7 @@ export async function createDocumentFromBuffer(input: {
       const document = await tx.document.create({ data: {
         id, workspaceId: input.workspaceId, fileId: input.fileId, templateId: template.id, templateVersionId: version.id,
         source: documentSourceFor(input.mimeType, input.source), sourceEmail: input.sourceEmail || null,
+        sourceWhatsapp: input.sourceWhatsapp || null,
         status: "queued", filename: cleanFilename(input.filename), mimeType: input.mimeType, sizeBytes: input.buffer.length,
         sha256, storageKey, receivedAt, pageRange: input.pageRange?.trim() || null, uploadBatchId: input.uploadBatchId || null,
         fieldSnapshot: version.fields as Prisma.InputJsonValue, searchText: cleanFilename(input.filename),

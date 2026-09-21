@@ -33,12 +33,16 @@ The storage-and-extraction primitive underlying every typed destination. Every I
 _Avoid_: Using "Document" as a destination name; unclassified/pending-classification states
 
 **Intake**:
-How a Document enters a workspace: added from the typed queue it belongs to, emailed to the workspace's inbound address, or sent by API. Adding from a queue asserts that queue's type; the four typed intake destinations are the only queues that add. The phone does not add documents.
+How a Document enters a workspace: added from the typed queue it belongs to, emailed to the workspace's inbound address, sent by WhatsApp to the deployment's WhatsApp number, or sent by API. Adding from a queue asserts that queue's type; email and WhatsApp intake default to Receipts and can be re-typed on the queue as today (Move to another queue). Logged-in phone capture (Arc C, #372) is deferred, evidence-gated on WhatsApp's 30-day channel share — until it ships, the phone does not add documents itself.
 _Avoid_: Upload (as a user-facing verb), import, pipeline
 
 **Inbound address**:
-The workspace's own email address for intake. Shown wherever the operator sets out to add a document — the Add dialog and the first-use Empty queue — and under Admin › Configuration for who may send to it. Only exists on a deployment where email intake is switched on.
+The workspace's own email address for intake. Shown wherever the operator sets out to add a document — the Add dialog and the first-use Empty queue — and under Admin › Configuration › Intake for who may send to it. Only exists on a deployment where email intake is switched on.
 _Avoid_: Forwarding address, mailbox
+
+**WhatsApp intake** (#372):
+A second intake channel beside the inbound address: one WhatsApp Business number per deployment, inbound only — nothing is ever initiated from DocuBite's side. The firm links each sender's number to a workspace under Admin › Configuration › Intake (beside allowed email senders), the way allowed senders map email addresses. An unlinked number gets one reply saying so; a linked sender gets one reply per message acknowledging what was added or why it wasn't. Received documents default to Receipts. Rows carry a channel + sender attribution chip (*via WhatsApp · ‹name›*), shown on the queue row and the Detail pane's audit trail.
+_Avoid_: Chatbot, WhatsApp bot (there is no conversation, only intake + one acknowledgement)
 
 **Invoice**:
 The typed destination for a bill received from a supplier. Absorbs the former Documents/Bills surface; aging is a filter chip and a saved view here, and paying an approved invoice happens on Bill Pay, not on this queue.

@@ -9,7 +9,7 @@ import { gateRegistry } from "@/lib/gates"
 import { createDocumentFromBuffer, documentHash, type DocumentSource } from "@/models/documents"
 import type { IngestionItem } from "@/prisma/client"
 
-export type IngestionSource = "upload" | "camera" | "email" | "zip" | "api"
+export type IngestionSource = "upload" | "camera" | "email" | "zip" | "api" | "whatsapp"
 
 export type IngestionResult =
   | { outcome: "duplicate"; item: IngestionItem }
@@ -47,6 +47,9 @@ export async function createIngestionItem(input: {
   /** The sender's address, for source: "email" only — stored on Document.sourceEmail so a
    * terminal failure can name who sent it in when notifying the workspace. */
   sourceEmail?: string | null
+  /** The sender's WhatsApp number, for source: "whatsapp" only — stored on
+   * Document.sourceWhatsapp. Same shape as sourceEmail. */
+  sourceWhatsapp?: string | null
 }): Promise<IngestionResult> {
   // #49 short-circuit: every intake channel funnels through here, so refusing an inbound bill on a
   // workspace with no jurisdictionCode is one check, not four. The upload/API/email callers catch
@@ -85,7 +88,7 @@ export async function createIngestionItem(input: {
   // Document.source only distinguishes "upload" from "dictation" (models/documents.ts) — every
   // other intake channel is an upload as far as the Document row is concerned. IngestionItem is
   // what remembers which channel it actually arrived through.
-  const documentSource: DocumentSource = input.source === "camera" || input.source === "email" || input.source === "zip" || input.source === "api" ? "upload" : input.source
+  const documentSource: DocumentSource = input.source === "camera" || input.source === "email" || input.source === "zip" || input.source === "api" || input.source === "whatsapp" ? "upload" : input.source
 
   try {
     const result = await createDocumentFromBuffer({
@@ -94,6 +97,7 @@ export async function createIngestionItem(input: {
       pageRange: input.pageRange, uploadBatchId: input.uploadBatchId,
       worksheetAutoAssigned: input.worksheetAutoAssigned,
       sourceEmail: input.source === "email" ? input.sourceEmail : null,
+      sourceWhatsapp: input.source === "whatsapp" ? input.sourceWhatsapp : null,
     })
     const item = await upsertItem({ documentId: result.document.id, malwareStatus: "clean", status: result.duplicate ? "duplicate" : "extracting", errorCode: null })
     if (!result.duplicate) await track("document_uploaded", { fileId: input.fileId, documentId: result.document.id, source: input.source }, { workspaceId: input.workspaceId })

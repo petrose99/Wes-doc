@@ -72,6 +72,7 @@ model User {
   createdAutomationRules            AutomationRule[]            @relation("AutomationRuleCreator")
   requestedWorkspaceModules         WorkspaceModule[]           @relation("ModuleRequester")
   createdInboundEmailAllowedSenders InboundEmailAllowedSender[] @relation("InboundEmailAllowedSenderCreator")
+  createdWhatsAppAllowedSenders     WhatsAppAllowedSender[]     @relation("WhatsAppAllowedSenderCreator")
   decidedBankMatches                BankMatch[]                 @relation("BankMatchDecider")
   createdApprovalWorkflows          ApprovalWorkflow[]          @relation("ApprovalWorkflowCreator")
   submittedExpenseClaims            ExpenseClaim[]              @relation("ExpenseClaimSubmitter")
@@ -221,6 +222,7 @@ model Workspace {
   checkResults               DocumentCheckResult[]
   modules                    WorkspaceModule[]
   inboundEmailAllowedSenders InboundEmailAllowedSender[]
+  whatsappAllowedSenders     WhatsAppAllowedSender[]
   fieldCorrections           FieldCorrection[]
   codingCorrections          CodingCorrection[]
   accountingEntities         AccountingEntity[]
@@ -255,6 +257,7 @@ model Workspace {
   suppliers                  Supplier[]
   supplierAliases            SupplierAlias[]
   inboundEmailIntakes        InboundEmailIntake[]
+  whatsappIntakes            WhatsAppIntake[]
   bankMatchMemory            BankMatchMemory[]
   goldenDocuments            GoldenDocument[]
   reviewerActivity           ReviewerActivity[]
@@ -283,6 +286,7 @@ model WorkspaceMember {
   createdAt         DateTime  @default(now()) @map("created_at")
   workspace         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  whatsappAllowedSenders WhatsAppAllowedSender[] @relation("WhatsAppAllowedSenderMember")
 
   @@unique([workspaceId, userId])
   @@index([userId])
@@ -564,6 +568,9 @@ model Document {
   /// be reported back to the workspace ("a document emailed by X couldn't be processed") without
   /// joining back through the intake log by timing. Null for every other intake channel.
   sourceEmail             String?                  @map("source_email")
+  /// The sender's WhatsApp number, set only when source is "whatsapp" — same shape and purpose
+  /// as sourceEmail, carried forward from WhatsAppIntake. Null for every other intake channel.
+  sourceWhatsapp          String?                  @map("source_whatsapp")
   status                  String                   @default("received")
   filename                String
   mimeType                String                   @map("mime_type")
@@ -2048,6 +2055,30 @@ model InboundEmailAllowedSender {
   @@map("inbound_email_allowed_senders")
 }
 
+/// #372: routes one deployment-wide WhatsApp Business number to a workspace by sender phone
+/// number, the way InboundEmailAllowedSender's pattern routes a mailbox to one — except here the
+/// allowlist row IS the routing table (there is no per-workspace token to check first).
+/// `phoneNumber` is E.164 (e.g. "+26612345678"). `linkedMemberId` set means the sender is a
+/// workspace member (Arc A, "employee" — the ack names the person and the receipt auto-drafts
+/// into their expense claim); null means an unauthenticated client of the firm (Arc B — the ack
+/// names the company, no claim). `label` is the name shown in the Allowed senders table even when
+/// there is no member to read a name from (a firm's client).
+model WhatsAppAllowedSender {
+  id             String        @id @default(uuid()) @db.Uuid
+  workspaceId    String        @map("workspace_id") @db.Uuid
+  phoneNumber    String        @map("phone_number")
+  label          String
+  linkedMemberId String?       @map("linked_member_id") @db.Uuid
+  createdById    String?       @map("created_by_id") @db.Uuid
+  createdAt      DateTime      @default(now()) @map("created_at")
+  workspace      Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  linkedMember   WorkspaceMember? @relation("WhatsAppAllowedSenderMember", fields: [linkedMemberId], references: [id], onDelete: SetNull)
+  createdBy      User?         @relation("WhatsAppAllowedSenderCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([workspaceId, phoneNumber])
+  @@map("whatsapp_allowed_senders")
+}
+
 /// WP1.3: the few-shot correction memory — every time a reviewer overrides an extracted value, the
 /// (wrong, corrected) pair is remembered per (workspace, template, field) and fed back into future
 /// extraction prompts as format guidance (lib/document-templates.ts's buildDocumentPrompt). A repeat
@@ -2771,6 +2802,29 @@ model InboundEmailIntake {
   @@index([workspaceId, createdAt])
   @@index([workspaceId, outcome])
   @@map("inbound_email_intakes")
+}
+
+/// #372: one row per inbound WhatsApp message processed, mirroring InboundEmailIntake. `outcome`
+/// is "ingested", "no_document" (unsupported media / unreadable image), "sender_unknown" (number
+/// not linked to any workspace — workspaceId is null), or "sender_ambiguous" (number linked to
+/// more than one workspace, no workspace picked yet). `waMessageId` is Meta's message id, kept for
+/// idempotency against webhook retries (Meta may redeliver the same message).
+model WhatsAppIntake {
+  id              String     @id @default(uuid()) @db.Uuid
+  workspaceId     String?    @map("workspace_id") @db.Uuid
+  waMessageId     String     @unique @map("wa_message_id")
+  fromNumber      String     @map("from_number")
+  caption         String?
+  attachmentCount Int        @default(0) @map("attachment_count")
+  acceptedCount   Int        @default(0) @map("accepted_count")
+  rejectedCount   Int        @default(0) @map("rejected_count")
+  outcome         String
+  createdAt       DateTime   @default(now()) @map("created_at")
+  workspace       Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, createdAt])
+  @@index([workspaceId, outcome])
+  @@map("whatsapp_intakes")
 }
 
 /// A3.7 bank-match memory. When a reviewer confirms a bank line -> document (or supplier +

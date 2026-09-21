@@ -247,6 +247,19 @@ const envSchema = z.object({
   // The domain inbound addresses are issued under — "<token>@" + this. Informational (shown
   // nowhere yet, since the feature is dark), read once a workspace's address needs displaying.
   EMAIL_INBOUND_DOMAIN: z.string().default("inbound.docubite.com"),
+  // WhatsApp intake (#372/#374). One WhatsApp Business Cloud API number per deployment, routed to
+  // a workspace by WhatsAppAllowedSender.phoneNumber rather than a per-workspace token — see
+  // models/inbound-whatsapp.ts. Fail-closed the same way as EMAIL_INBOUND_SECRET: unset until a
+  // number is actually provisioned, not a placeholder to leave blank in production.
+  WHATSAPP_APP_SECRET: z.string().optional(),
+  // Meta's webhook subscription verification handshake (the GET challenge) — a shared secret you
+  // choose when configuring the webhook in Meta's App Dashboard, distinct from WHATSAPP_APP_SECRET.
+  WHATSAPP_VERIFY_TOKEN: z.string().optional(),
+  // The Cloud API phone_number_id (not the phone number itself) used for outbound Graph API calls
+  // (fetching media, sending the acknowledgement).
+  WHATSAPP_PHONE_NUMBER_ID: z.string().optional(),
+  // A permanent access token for the Graph API calls above (System User token in production).
+  WHATSAPP_ACCESS_TOKEN: z.string().optional(),
   // FX conversion (lib/fx/rates.ts). Every rate goes through Frankfurter's free, no-auth wrapper
   // around the ECB reference feed — no key needed and it covers historical rates back to 1999,
   // which is what most documents actually need. FASTRATES_API_KEY is optional and, when set, is
@@ -407,6 +420,14 @@ const config = {
   // shape as embeddings/integrations elsewhere in this file. Off by default in every environment,
   // including production, until DNS/a provider is actually provisioned for it.
   inboundEmail: { enabled: Boolean(env.EMAIL_INBOUND_SECRET), secret: env.EMAIL_INBOUND_SECRET || "", domain: env.EMAIL_INBOUND_DOMAIN },
+  // #372/#374: same "unset secret = feature dark" convention as inboundEmail above.
+  whatsapp: {
+    enabled: Boolean(env.WHATSAPP_APP_SECRET && env.WHATSAPP_VERIFY_TOKEN && env.WHATSAPP_PHONE_NUMBER_ID && env.WHATSAPP_ACCESS_TOKEN),
+    appSecret: env.WHATSAPP_APP_SECRET || "",
+    verifyToken: env.WHATSAPP_VERIFY_TOKEN || "",
+    phoneNumberId: env.WHATSAPP_PHONE_NUMBER_ID || "",
+    accessToken: env.WHATSAPP_ACCESS_TOKEN || "",
+  },
   // Agnostic dictation (lib/dictation). Off by default and fail-safe by design: with it off, or on
   // any router/extraction failure, a dictation with no pre-selected template still gets the general
   // handler's default format — never a forced route, never a blocked recording.
