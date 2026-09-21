@@ -1,5 +1,5 @@
 import { getSelectionAuditPanelDataAction, saveDocumentReviewAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
-import { SplitPane } from "@/components/pipeline/document-detail/split-pane"
+import { SplitPane, BillSplitPane } from "@/components/pipeline/document-detail/split-pane"
 import { PaneFrame } from "@/components/queue/detail-pane"
 import { StatusLine } from "@/components/queue/status-line"
 import { LEDGER_FACT_LABELS, PROCESSING_STATE_LABELS, processingState } from "@/lib/documents/processing-state"
@@ -236,6 +236,9 @@ export async function DocumentDetailPage({ params, searchParams, embedded = fals
     return ps === "paid" || ps === "reconciled"
   })()
   const confirmedPaid = document.paymentStatus === "paid"
+  // #258: the one ledger word — "Posted" once any push succeeded, else "Paid" once the ledger or
+  // a confirm-paid says so. Shared by full mode's Status line and (embedded, Invoices) BillPane's.
+  const ledger = succeededPushCount > 0 ? "posted" : confirmedPaid || ledgerPaid ? "paid" : null
   const readinessStatus = (document as unknown as { readinessStatus: string | null }).readinessStatus
   const readinessDetail = (document as unknown as { readinessDetail: unknown }).readinessDetail
   const readinessBlockers = Array.isArray(readinessDetail)
@@ -361,6 +364,49 @@ export async function DocumentDetailPage({ params, searchParams, embedded = fals
     state={state ?? undefined}
     queueTitle={queueTitle}
   />
+  // #361 step 5: Invoices' Detail pane is the Bill takeover shell, not the five-tab `SplitPane` —
+  // scoped to `embedded` only (full mode has no decision footer per #259, so it keeps the
+  // original shell). `providerLink` stays null (#355 Q2): no pushed-record external URL field
+  // exists on `IntegrationPush`/`BillRow` yet for a later ticket to fill in.
+  if (embedded && queueTitle === "Invoices") return <BillSplitPane
+    workspaceId={workspaceId} source={{ documentId: document.id, filename: document.filename, mimeType: document.mimeType }}
+    fields={fields} data={data} fieldConfidence={fieldConfidence}
+    provenanceFields={provenance?.fields ?? {}} provenanceItems={provenance?.items ?? {}}
+    initialTarget={initialTarget} conflictingLabels={conflictingLabels}
+    missingRequiredFields={confidence?.missingRequiredFields ?? []}
+    saveReview={saveReview} note={document.note ?? ""}
+    auditEvents={auditEvents.map((event) => ({ ...event, createdAt: event.createdAt.toISOString() }))}
+    header={{
+      filename: document.filename, documentId: document.id, fileId: document.fileId,
+      flagged: document.flaggedAt !== null, archived: document.archivedAt !== null,
+      cancelled: document.cancelledAt !== null, cancelledReason: document.cancelledReason ?? null,
+      reviewLink: reviewQueueEnabled && openReviewTask ? { href: `/workspaces/${workspaceId}/approvals/invoices/${documentId}`, label: openReviewTask.status === "in_review" ? "In review" : "Open — view review task" } : null,
+    }}
+    rationales={rationales} checks={checks} fxBadge={<FxConversionBadge
+      docCurrency={typeof data.currency_code === "string" ? data.currency_code.toUpperCase() : null}
+      docTotal={typeof data.total === "number" ? data.total : (typeof data.total === "string" ? Number(data.total) : null)}
+      baseCurrency={membership.workspace.baseCurrency}
+      baseCurrencyTotal={document.baseCurrencyTotal !== null ? Number(document.baseCurrencyTotal) : null}
+      fxRate={document.fxRate !== null ? Number(document.fxRate) : null}
+      fxRateAt={document.fxRateAt ? document.fxRateAt.toISOString().slice(0, 10) : null}
+      fxRateSource={document.fxRateSource}
+    />}
+    documentMatches={poConsumption
+      ? <PoConsumptionPanel workspaceId={workspaceId} consumption={poConsumption} origin={`/workspaces/${workspaceId}/purchase-orders/${documentId}`} />
+      : documentMatches.length && docType !== "invoice" ? <DocumentMatchesPanel workspaceId={workspaceId} matches={documentMatches} /> : null}
+    po={po}
+    providerLink={null}
+    state={state ?? "in_review"}
+    fact={processingFact({ ...(processing ?? { approvalStatus: "not_started", blockedByCheck: false, escalated: false, touchless: false, status: document.status, cancelledReason: document.cancelledReason ?? null, reviewTaskOpenedAt: null, receivedAt: document.receivedAt, openCheckCodes: [] }), now: new Date() })}
+    ledger={ledger}
+    openCheckCodes={processing?.openCheckCodes ?? []}
+    paidAt={paymentStatuses.get(documentId)?.syncedAt ?? null}
+    blockedByCheck={processing?.blockedByCheck ?? false}
+    escalated={processing?.escalated ?? false}
+    approvalStatus={processing?.approvalStatus ?? "not_started"}
+    rejectedByActor={processing?.rejectedBy ?? null}
+    openReviewTaskId={openReviewTask?.id ?? null}
+  />
   if (embedded) return splitPane
 
   // #259 full mode = read + secondary actions: the same header and ⋯ as the pane (minus *Open in
@@ -372,7 +418,6 @@ export async function DocumentDetailPage({ params, searchParams, embedded = fals
     : { title: document.filename, suffix: invoiceNumber || null }
   // #258: the Status line in full mode is server-rendered with the actor already known — the
   // same `StatusLine` the pane shows, fed by the same `processingFact`.
-  const ledger = succeededPushCount > 0 ? "posted" : confirmedPaid || ledgerPaid ? "paid" : null
   const status = processing && state
     ? <StatusLine state={state} fact={processingFact({ ...processing, now: new Date() })} ledger={ledger} openCheckCodes={processing.openCheckCodes} cancelledReason={processing.cancelledReason} />
     : undefined
