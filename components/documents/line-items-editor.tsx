@@ -5,9 +5,32 @@ import type { Ref } from "@/lib/provenance"
 import type { LineMatch } from "@/lib/matching/line-match"
 import { CheckGlyph, RationalePopover } from "@/components/pipeline/document-detail/rationale-popover"
 import type { FieldCheck } from "@/components/pipeline/document-detail/check-types"
-import { Breakdown, breakdownFor, formatQuantity, LineStatusPill, MatchGlyph, type BreakdownCell } from "@/components/documents/po-compare"
+import { Breakdown, breakdownFor, formatAmount, formatQuantity, LineStatusPill, MatchGlyph, type BreakdownCell } from "@/components/documents/po-compare"
 import { Crosshair, Plus, Trash2 } from "lucide-react"
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
+
+/** #362 §2: the read-only ledger-account chip — always "—" until #356 wires a derived/coded
+ * account onto the line. A plain `<span>`, never a button: clicking it is #356's job, and B1
+ * forbids shipping a dead control before that lands. */
+function LedgerAccountChip({ label }: { label: string | null }) {
+  return <span className="inline-flex max-w-full items-center truncate rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-600">{label ?? "—"}</span>
+}
+
+type PoLineMatchState = "matched" | "suggested" | "none"
+const PO_LINE_MATCH_LABEL: Record<PoLineMatchState, string> = { matched: "Matched", suggested: "Suggested", none: "No match" }
+/** #362 §2: the per-row PO-match placeholder chip — three states named by the spec, only "none"
+ * reachable from this ticket's callers (no per-line PO-match data is wired here; #356 wires it).
+ * Reuses `PoChip`'s colour vocabulary (emerald = matched, dashed = suggested) as a plain
+ * non-interactive span. */
+function PoLineMatchChip({ state }: { state: PoLineMatchState }) {
+  const cls = state === "matched" ? "border-emerald-200 bg-emerald-50 text-emerald-900" : state === "suggested" ? "border-dashed border-slate-400 bg-white text-slate-700" : "border-slate-200 bg-slate-50 text-slate-500"
+  return <span className={`inline-flex max-w-full items-center truncate rounded-md border px-2 py-1 text-xs font-medium ${cls}`}>{PO_LINE_MATCH_LABEL[state]}</span>
+}
+
+/** #362 §2: the Bill-only footer — a pure function of the `amount` column already in memory
+ * (B2: no round trip), checked against the document's own extracted total. Optional so every
+ * other `LineItemsEditor` caller (Receipts, generic FieldRow) is unaffected. */
+export type BillLineItemsTotals = { extractedTotal: number | null; currency: string | null }
 
 type Row = { id: number; values: Record<string, unknown> }
 
@@ -63,7 +86,7 @@ function useWide(ref: React.RefObject<HTMLDivElement | null>) {
  * With `poCompare` (View PO on, #228), the quantity / unit price / description cells grow a
  * second line — the PO's value with an `=` / `≠` glyph at the right — and a PO line column
  * carries each line's status. */
-export function LineItemsEditor({ fieldKey, itemFields, initialRows, provenanceItems, onFocusSource, checks = [], onEscalate, poCompare = null }: {
+export function LineItemsEditor({ fieldKey, itemFields, initialRows, provenanceItems, onFocusSource, checks = [], onEscalate, poCompare = null, bill = null }: {
   fieldKey: string
   itemFields: DocumentItemFieldDefinition[]
   initialRows: Array<Record<string, unknown>>
@@ -72,6 +95,9 @@ export function LineItemsEditor({ fieldKey, itemFields, initialRows, provenanceI
   checks?: FieldCheck[]
   onEscalate?: (check: FieldCheck) => void
   poCompare?: PoCompareProps | null
+  /** #362 §2: Bill-only — adds the read-only Account/PO-match chip columns and the footer total
+   * with the extracted-total mismatch check. `null` for every other caller (unchanged today). */
+  bill?: BillLineItemsTotals | null
 }) {
   const [rows, setRows] = useState<Row[]>(() => {
     const seed = initialRows.length ? initialRows : [{}]
@@ -89,8 +115,22 @@ export function LineItemsEditor({ fieldKey, itemFields, initialRows, provenanceI
     : itemFields
   const lineByRow = new Map((poCompare?.lines ?? []).map((line) => [line.rowIndex, line]))
 
+  // #362 §2 (B2): the footer total is a pure function of the `amount` column already in memory —
+  // a state map keyed by row id (not a ref read during render) so an edit recomputes it same-tick
+  // through React's own render, no round trip.
+  const parseAmount = (raw: unknown) => {
+    const n = typeof raw === "string" ? Number(raw) : typeof raw === "number" ? raw : NaN
+    return Number.isFinite(n) ? n : 0
+  }
+  const [amounts, setAmounts] = useState<Record<number, number>>(() => Object.fromEntries(rows.map((row) => [row.id, parseAmount(row.values.amount)])))
+  const footerTotal = bill ? Object.values(amounts).reduce((sum, n) => sum + n, 0) : null
+  const mismatch = bill && bill.extractedTotal !== null && footerTotal !== null && Math.abs(footerTotal - bill.extractedTotal) > 0.005
+
   const addRow = () => setRows((current) => [...current, { id: (current.at(-1)?.id ?? -1) + 1, values: {} }])
-  const removeRow = (id: number) => setRows((current) => (current.length > 1 ? current.filter((row) => row.id !== id) : current))
+  const removeRow = (id: number) => {
+    setRows((current) => (current.length > 1 ? current.filter((row) => row.id !== id) : current))
+    if (bill) setAmounts((current) => { const next = { ...current }; delete next[id]; return next })
+  }
 
   const poValueFor = (line: LineMatch, cell: CompareCell): string => {
     if (cell === "quantity") return formatQuantity(line.quantity.po)
@@ -135,7 +175,8 @@ export function LineItemsEditor({ fieldKey, itemFields, initialRows, provenanceI
           <input ref={(element) => { if (element) cellRefs.current.set(cellId, element); else cellRefs.current.delete(cellId) }} id={inputId} name={name} type={item.type === "number" ? "number" : item.type === "date" ? "date" : "text"} step={item.type === "number" ? "any" : undefined}
             aria-describedby={[cellChecks.length ? checkDescriptionId : null, compareStatus && compareStatus !== "not_compared" ? compareDescriptionId : null].filter(Boolean).join(" ") || undefined}
             className={`${cellInputClass} ${item.type === "number" ? "text-right tabular-nums" : ""} ${cellChecks.length && !poCompare ? "pr-8" : ""}`}
-            defaultValue={typeof raw === "string" || typeof raw === "number" ? String(raw) : ""} />
+            defaultValue={typeof raw === "string" || typeof raw === "number" ? String(raw) : ""}
+            onChange={bill && item.key === "amount" ? (event) => setAmounts((current) => ({ ...current, [row.id]: parseAmount(event.target.value) })) : undefined} />
           {!poCompare && glyph}
         </div>
       )}
@@ -195,9 +236,21 @@ export function LineItemsEditor({ fieldKey, itemFields, initialRows, provenanceI
   }
 
   const addRowButton = <button type="button" onClick={addRow}
-    className="flex w-full items-center gap-1.5 rounded-b-lg border-t border-slate-200 bg-slate-50/50 px-2.5 py-1.5 text-xs font-medium text-slate-500 hover:bg-emerald-50 hover:text-emerald-700">
+    className={`flex w-full items-center gap-1.5 border-t border-slate-200 bg-slate-50/50 px-2.5 py-1.5 text-xs font-medium text-slate-500 hover:bg-emerald-50 hover:text-emerald-700 ${bill ? "" : "rounded-b-lg"}`}>
     <Plus className="h-3.5 w-3.5" />Add row
   </button>
+
+  // #362 §2: the mismatch sentence names both totals, reusing TotalField's variance-sentence
+  // pattern against the *extracted* total (the sibling comparison to the one it already runs
+  // against the PO total).
+  const billFooter = bill && <div className={`flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-b-lg border-t px-2.5 py-1.5 text-xs ${mismatch ? "border-amber-300 bg-amber-50" : "border-slate-200 bg-slate-50/50"}`}>
+    <span className={mismatch ? "text-amber-900" : "text-slate-500"}>
+      {mismatch
+        ? `Line items total ${formatAmount(footerTotal, bill.currency)} — the extracted total was ${formatAmount(bill.extractedTotal, bill.currency)}. Check for a missing or duplicated line.`
+        : "Line items total"}
+    </span>
+    <span className="tabular-nums font-medium text-slate-700">{formatAmount(footerTotal, bill.currency)}</span>
+  </div>
 
   // No overflow-hidden on the frame: the check popover and the hidden descriptions live inside
   // the cells, and a ring draws the frame so the table sits flush with no border to inset from.
@@ -219,6 +272,12 @@ export function LineItemsEditor({ fieldKey, itemFields, initialRows, provenanceI
                 {renderCell(row, index, item, line)}
               </div>)}
             </div>
+            {bill && <div className="flex flex-wrap items-center gap-1.5 px-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Account</span>
+              <LedgerAccountChip label={null} />
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">PO match</span>
+              <PoLineMatchChip state="none" />
+            </div>}
             <div className="flex items-center justify-between gap-2 px-2">
               {renderPoLine(index, line)}
               {rowActions(row, index)}
@@ -227,6 +286,7 @@ export function LineItemsEditor({ fieldKey, itemFields, initialRows, provenanceI
         })}
       </ul>
       {addRowButton}
+      {billFooter}
     </div>
   }
 
@@ -234,6 +294,8 @@ export function LineItemsEditor({ fieldKey, itemFields, initialRows, provenanceI
     <table className="w-full table-fixed border-collapse text-sm">
       <colgroup>
         {columns.map((item) => <col key={item.key} className={item.key === "description" ? "" : item.type === "number" ? "w-[7rem]" : "w-[8rem]"} />)}
+        {bill && <col className="w-[7rem]" />}
+        {bill && <col className="w-[7rem]" />}
         {poCompare && <col className="w-[8.5rem]" />}
         <col className="w-8" />
       </colgroup>
@@ -242,6 +304,8 @@ export function LineItemsEditor({ fieldKey, itemFields, initialRows, provenanceI
           {columns.map((item, columnIndex) => <th key={item.key} scope="col" className={`border-b border-slate-200 px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500 ${item.type === "number" ? "text-right" : "text-left"} ${columnIndex === 0 ? "rounded-tl-lg" : ""}`}>
             {item.label}{item.required ? " *" : ""}
           </th>)}
+          {bill && <th scope="col" className="border-b border-slate-200 px-2 py-1.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Account</th>}
+          {bill && <th scope="col" className="border-b border-slate-200 px-2 py-1.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">PO match</th>}
           {poCompare && <th scope="col" className="border-b border-slate-200 px-2 py-1.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">PO line</th>}
           <th scope="col" className="rounded-tr-lg border-b border-slate-200" aria-label="Row actions" />
         </tr>
@@ -251,6 +315,8 @@ export function LineItemsEditor({ fieldKey, itemFields, initialRows, provenanceI
           const line = lineByRow.get(index) ?? null
           return <tr key={row.id} className="group even:bg-slate-50/50 hover:bg-emerald-50/40">
             {columns.map((item) => <td key={item.key} className="border-b border-slate-100 p-0 align-top">{renderCell(row, index, item, line)}</td>)}
+            {bill && <td className="border-b border-slate-100 px-2 py-1.5 align-top"><LedgerAccountChip label={null} /></td>}
+            {bill && <td className="border-b border-slate-100 px-2 py-1.5 align-top"><PoLineMatchChip state="none" /></td>}
             {poCompare && <td className="border-b border-slate-100 px-2 py-1.5 align-top">{renderPoLine(index, line)}</td>}
             <td className="border-b border-slate-100 px-1 text-center align-top">{rowActions(row, index)}</td>
           </tr>
@@ -258,5 +324,6 @@ export function LineItemsEditor({ fieldKey, itemFields, initialRows, provenanceI
       </tbody>
     </table>
     {addRowButton}
+    {billFooter}
   </div>
 }

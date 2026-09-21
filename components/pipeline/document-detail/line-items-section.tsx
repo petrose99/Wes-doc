@@ -72,7 +72,7 @@ function TotalField({ field, value, ref: provenanceRef, onFocusSource, compare }
   </div>
 }
 
-export function LineItemsSection({ field, value, fieldKey, summaryFields, fieldValues, provenanceFields, provenanceItems, onFocusSource, checks = [], onEscalate, po = null }: {
+export function LineItemsSection({ field, value, fieldKey, summaryFields, fieldValues, provenanceFields, provenanceItems, onFocusSource, checks = [], onEscalate, po = null, billMode = false }: {
   field: DocumentFieldDefinition
   value: unknown
   fieldKey: string
@@ -84,6 +84,9 @@ export function LineItemsSection({ field, value, fieldKey, summaryFields, fieldV
   checks?: FieldCheck[]
   onEscalate?: (check: FieldCheck) => void
   po?: LineItemsPoProps | null
+  /** #362 §2: `BillSplitPane` only — enables the Account/PO-match chip columns and the
+   * extracted-total mismatch footer on `LineItemsEditor`. */
+  billMode?: boolean
 }) {
   const [summary, setSummary] = useState<InvoicePoSummary | null>(po?.summary ?? null)
   // View PO opens by itself when there is something red to see — the count on the chip is the
@@ -115,6 +118,11 @@ export function LineItemsSection({ field, value, fieldKey, summaryFields, fieldV
   } : null
 
   const toggleId = `${fieldKey}-view-po`
+  const totalField = summaryFields.find((item) => item.key === "total") ?? null
+  const rawTotal = totalField ? fieldValues[totalField.key] : null
+  const parsedTotal = typeof rawTotal === "number" ? rawTotal : typeof rawTotal === "string" && rawTotal !== "" ? Number(rawTotal) : null
+  const extractedTotal = parsedTotal !== null && Number.isFinite(parsedTotal) ? parsedTotal : null
+  const bill = billMode ? { extractedTotal, currency: po?.currency ?? null } : null
 
   return <div ref={sectionRef} className="scroll-mt-3 space-y-2">
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-1">
@@ -154,7 +162,7 @@ export function LineItemsSection({ field, value, fieldKey, summaryFields, fieldV
       onDone={() => { setMatchManually(false); setPendingAssignments({}) }}
       onDiscard={() => { setMatchManually(false); setPendingAssignments({}) }} />}
     {field.itemFields?.length
-      ? <LineItemsEditor fieldKey={fieldKey} itemFields={field.itemFields} initialRows={Array.isArray(value) ? value as Array<Record<string, unknown>> : []} provenanceItems={provenanceItems} onFocusSource={onFocusSource} checks={checks} onEscalate={onEscalate} poCompare={compare} />
+      ? <LineItemsEditor fieldKey={fieldKey} itemFields={field.itemFields} initialRows={Array.isArray(value) ? value as Array<Record<string, unknown>> : []} provenanceItems={provenanceItems} onFocusSource={onFocusSource} checks={checks} onEscalate={onEscalate} poCompare={compare} bill={bill} />
       : <textarea id={fieldKey} name={fieldKey} defaultValue={Array.isArray(value) ? JSON.stringify(value) : ""} placeholder="JSON array" className="min-h-24 w-full rounded-lg border border-slate-200 bg-slate-50/50 px-3 py-2 font-mono text-sm" />}
     {summaryFields.length > 0 && <div className="flex flex-wrap items-start justify-end gap-4 rounded-lg border border-slate-100 bg-slate-50/80 px-4 py-2.5">
       {summaryFields.map((summaryField) => <TotalField key={summaryField.key} field={summaryField} value={fieldValues[summaryField.key]} ref={provenanceFields[summaryField.key] ?? null} onFocusSource={onFocusSource}

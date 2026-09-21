@@ -357,7 +357,7 @@ export function SplitPane({
  * derive its ordering directly from formFields without SplitPane touching field-nav internals.
  * Exported for #361's `BillSplitPane` (Invoices' Bill shell), which reuses this field-editing
  * form unchanged inside its own composition. */
-export function FieldNavForm({ saveReview, formFields, data, fieldConfidence, provenanceFields, provenanceItems, summaryFields, rationales, checks, workspaceId, documentId, setTarget, po, submitId = "save-review-submit" }: {
+export function FieldNavForm({ saveReview, formFields, data, fieldConfidence, provenanceFields, provenanceItems, summaryFields, rationales, checks, workspaceId, documentId, setTarget, po, submitId = "save-review-submit", billMode = false }: {
   saveReview: (formData: FormData) => Promise<ActionState<SaveReviewResult | null>>
   formFields: DocumentFieldDefinition[]
   data: Record<string, unknown>
@@ -375,6 +375,8 @@ export function FieldNavForm({ saveReview, formFields, data, fieldConfidence, pr
    * `#save-review-submit` (#258's reload-focus contract) — this form's own Save review button
    * needs a different id there so the two don't collide. `undefined` renders no id. */
   submitId?: string
+  /** #362 §2: `BillSplitPane` only — passed straight through to `LineItemsSection`. */
+  billMode?: boolean
 }) {
   const navItems = formFields.map((field) => ({ key: field.key, confidence: fieldConfidence[field.key] ?? null, type: field.type }))
   const nav = useFieldNav(navItems)
@@ -426,7 +428,7 @@ export function FieldNavForm({ saveReview, formFields, data, fieldConfidence, pr
     </div>}
     {formFields.map((field) => field.type === "array"
       ? <LineItemsSection key={field.key} field={field} value={data[field.key]} fieldKey={field.key} summaryFields={field.key === "line_items" ? summaryFields : []} fieldValues={data} provenanceFields={provenanceFields} provenanceItems={provenanceItems[field.key] ?? []} onFocusSource={setTarget}
-          checks={liveChecks.filter((check) => check.fields.some((f) => f === field.key || f.startsWith(`${field.key}[`)))} onEscalate={onEscalate} po={field.key === "line_items" ? po : null} />
+          checks={liveChecks.filter((check) => check.fields.some((f) => f === field.key || f.startsWith(`${field.key}[`)))} onEscalate={onEscalate} po={field.key === "line_items" ? po : null} billMode={billMode} />
       : <FieldRow key={field.key} field={field} value={data[field.key]} confidence={fieldConfidence[field.key] ?? null} ref={provenanceFields[field.key] ?? null} onFocusSource={setTarget} rationale={rationales?.[field.key] ?? null}
           checks={liveChecks.filter((check) => checkAppliesToField(check, field.key))} onEscalate={onEscalate}
           registerNav={nav.registerField} isCurrent={nav.currentKey === field.key} isCompleted={nav.completedKeys.has(field.key)} />)}
@@ -523,7 +525,7 @@ export function BillSplitPane({
       <FieldNavForm saveReview={saveReview} formFields={formFields} data={data} fieldConfidence={fieldConfidence}
         provenanceFields={provenanceFields} provenanceItems={provenanceItems} summaryFields={summaryFields}
         rationales={rationales ?? null} checks={checks ?? []} workspaceId={workspaceId} documentId={header.documentId}
-        setTarget={setTarget} po={po} submitId={undefined} />
+        setTarget={setTarget} po={po} submitId={undefined} billMode />
 
       {fxBadge && <div>{fxBadge}</div>}
       {documentMatches}
