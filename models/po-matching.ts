@@ -26,6 +26,9 @@ export type PoLink = {
   kind: PoLinkKind
   confidence: number
   lineAssignments: Record<string, number | null> | null
+  /** invoicedAmount / poTotal as a percent, null when the PO has no total. Populated by
+   * `summarizeInvoicedByPo` — see `PoMatchCombobox`'s row secondary line (#363). */
+  invoicedPercent: number | null
 }
 
 export type InvoicePoSummary = {
@@ -78,7 +81,39 @@ function toLink(row: MatchRow, invoiceData: Record<string, unknown>): PoLink {
     poSupplier: asString(po.supplier) ?? asString(po.vendor), poTotal: asNumber(po.total),
     kind: poLinkKind({ status: row.status, invoicePoNumber: invoicePoNumber(invoiceData), poNumber }),
     confidence: row.confidence, lineAssignments: parseLineAssignments(row.lineAssignments),
+    invoicedPercent: null,
   }
+}
+
+/** Per-PO invoiced amount/percent for the PO match combobox's row secondary line (#363). Mirrors
+ * `summarizePoConsumption`'s math (line ~333) but stays standalone — `summarizePoConsumption`
+ * itself calls `summarizeInvoicePoLinks`, so calling it back from here would recurse. */
+async function summarizeInvoicedByPo(workspaceId: string, poIds: string[]): Promise<Map<string, { invoicedAmount: number; invoicedPercent: number | null }>> {
+  const out = new Map<string, { invoicedAmount: number; invoicedPercent: number | null }>()
+  const ids = [...new Set(poIds)]
+  if (!ids.length) return out
+  const [pos, matches] = await Promise.all([
+    prisma.document.findMany({ where: { workspaceId, id: { in: ids } }, select: { id: true, reviewedData: true, rawExtraction: true } }),
+    prisma.documentMatch.findMany({
+      where: { workspaceId, matchType: "po_to_invoice", sourceId: { in: ids }, status: { not: REJECTED_MATCH_STATUS } },
+      select: { sourceId: true, status: true, confidence: true, target: { select: { reviewedData: true, rawExtraction: true } } },
+    }),
+  ])
+  const poByDoc = new Map(pos.map((po) => [po.id, values(po)]))
+  for (const po of pos) {
+    const data = poByDoc.get(po.id) ?? {}
+    const poNumber = asString(data.po_number)
+    let invoicedAmount = 0
+    for (const match of matches.filter((candidate) => candidate.sourceId === po.id)) {
+      const invData = values(match.target)
+      const kind = poLinkKind({ status: match.status, invoicePoNumber: invoicePoNumber(invData), poNumber })
+      if (!isComparedLink(kind)) continue // suggested or superseded — not consuming
+      invoicedAmount += asNumber(invData.total) ?? asNumber(invData.amount) ?? 0
+    }
+    const total = asNumber(data.total)
+    out.set(po.id, { invoicedAmount, invoicedPercent: total ? Math.round((invoicedAmount / total) * 100) : null })
+  }
+  return out
 }
 
 /** The compared PO for an invoice, or null. Shared by the check wiring and the gate so both
@@ -114,9 +149,12 @@ export async function summarizeInvoicePoLinks(workspaceId: string, invoiceIds: s
   const tolerance = config?.matchTolerance && typeof config.matchTolerance === "object" && !Array.isArray(config.matchTolerance) ? (config.matchTolerance as { percent?: number }) : null
   const priceTolerancePercent = Math.round(((tolerance?.percent ?? 0.02) * 100) * 100) / 100
 
+  const invoicedByPo = await summarizeInvoicedByPo(workspaceId, matches.map((match) => match.sourceId))
+
   for (const invoice of invoices) {
     const data = values(invoice)
     const links = rankPoLinks((matchesByDoc.get(invoice.id) ?? []).map((row) => toLink(row, data)))
+    for (const candidate of links) candidate.invoicedPercent = invoicedByPo.get(candidate.poDocumentId)?.invoicedPercent ?? null
     const link = links.find((candidate) => isComparedLink(candidate.kind)) ?? null
     const suggestions = links.filter((candidate) => candidate.kind === "suggested")
     // "PO removed" only when a link the invoice itself cited was rejected; a rejected suggestion
@@ -140,7 +178,7 @@ export async function summarizeInvoicePoLinks(workspaceId: string, invoiceIds: s
   return out
 }
 
-export type PoCandidate = { documentId: string; poNumber: string | null; supplier: string | null; total: number | null; sameSupplier: boolean }
+export type PoCandidate = { documentId: string; poNumber: string | null; supplier: string | null; total: number | null; sameSupplier: boolean; invoicedPercent: number | null }
 
 const CANDIDATE_PAGE = 50
 
@@ -163,11 +201,14 @@ export async function listPoCandidates(workspaceId: string, invoiceId: string, q
     .map((po): PoCandidate => {
       const v = values(po)
       const poSupplier = asString(v.supplier) ?? asString(v.vendor)
-      return { documentId: po.id, poNumber: asString(v.po_number), supplier: poSupplier, total: asNumber(v.total), sameSupplier: !!supplier && !!poSupplier && poSupplier.toLowerCase() === supplier }
+      return { documentId: po.id, poNumber: asString(v.po_number), supplier: poSupplier, total: asNumber(v.total), sameSupplier: !!supplier && !!poSupplier && poSupplier.toLowerCase() === supplier, invoicedPercent: null }
     })
     .filter((po) => !needle || [po.poNumber, po.supplier].some((text) => text?.toLowerCase().includes(needle)))
     .sort((a, b) => Number(b.sameSupplier) - Number(a.sameSupplier))
-  return { candidates: all.slice(0, CANDIDATE_PAGE), truncated: all.length > CANDIDATE_PAGE, total: all.length }
+  const page = all.slice(0, CANDIDATE_PAGE)
+  const invoicedByPo = await summarizeInvoicedByPo(workspaceId, page.map((po) => po.documentId))
+  for (const po of page) po.invoicedPercent = invoicedByPo.get(po.documentId)?.invoicedPercent ?? null
+  return { candidates: page, truncated: all.length > CANDIDATE_PAGE, total: all.length }
 }
 
 // --------------------------------------------------------------------------------------------
