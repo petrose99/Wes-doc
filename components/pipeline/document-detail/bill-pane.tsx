@@ -1,7 +1,8 @@
 "use client"
 
-import { type ReactNode, useState } from "react"
-import { ExternalLink, XCircle, Loader2 } from "lucide-react"
+import { createContext, type ReactNode, useContext, useState } from "react"
+import { CheckCircle2, ExternalLink, XCircle, Loader2 } from "lucide-react"
+import { toast } from "sonner"
 import { useRegisterDocumentActions, type RegisteredDocument } from "@/components/queue/document-actions-menu"
 import { PaneResizeGrip, usePaneResize } from "@/components/queue/pane-resize-grip"
 import { StatusLine } from "@/components/queue/status-line"
@@ -9,8 +10,20 @@ import { formatDate } from "@/components/queue/row-cells"
 import { Button } from "@/components/ui/button"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { updateReviewTaskStatusAction } from "@/app/(app)/workspaces/[workspaceId]/review-actions"
+import { moveDocumentsToStageAction } from "@/app/(app)/workspaces/[workspaceId]/pipeline-actions"
+import { postSelectedDocumentsAction } from "@/app/(app)/workspaces/[workspaceId]/post-selected-documents-actions"
 import type { ProcessingState } from "@/lib/documents/processing-state"
 import type { ProcessingFact } from "@/lib/documents/processing-fact"
+
+/** #361 step 4: whether the surrounding form renders read-only — derived once (from the footer
+ * mode, #355 Q5) and read from context so #362's deeply-nested field/line-item components don't
+ * need it prop-drilled through `BillPane`'s `form: ReactNode` slot. The caller (step 5, Invoices
+ * wiring) provides it alongside the footer; defaults to editable so a component rendered without
+ * the provider (a test, a stray reuse) fails open rather than silently locking a form. */
+export const BillReadOnlyContext = createContext(false)
+export function useBillReadOnly(): boolean {
+  return useContext(BillReadOnlyContext)
+}
 
 const SPLIT_KEY = "bill-pane-split"
 
@@ -135,4 +148,75 @@ export function BillStatusTrack({ workspaceId, openReviewTaskId, state, fact, le
       onConfirm={() => void reject()}
       onCancel={() => setConfirmingReject(false)} />
   </div>
+}
+
+/** #361 step 4 (#355 Q5): the one footer verb `PaneFrame`'s sticky `actions` slot renders for a
+ * Bill pane — never two buttons (Reject already lives in the Approval block above, #354's
+ * unplug). `"read-only"` renders nothing (Touchless/Cancelled/Paid: the fact sentence alone
+ * carries the state, per the fortify table) so the caller's `actions={mode === "read-only" ?
+ * undefined : <BillFooterActions .../>}` naturally drops `PaneFrame`'s footer. The primary
+ * button keeps `#save-review-submit`'s id across every mode (#258's reload-focus contract reads
+ * that id back after a content reload, regardless of which verb currently owns the slot).
+ *
+ * `"resolve"` (opened from Exceptions) is not a case here: `ExceptionQueue` already supplies its
+ * own `paneActions` (Start review / Resolve-with-reason popover, unchanged) — this component
+ * never renders for that surface. */
+export function BillFooterActions({ workspaceId, documentId, connectionId, mode, openReviewTaskId, blocked, onDone }: {
+  workspaceId: string
+  documentId: string
+  mode: "approve" | "post" | "read-only"
+  /** Post's ledger target (#281) — null when no connection is active; Post still renders,
+   * disabled, per the queue's own "never hide the button" rule for the bulk Post bar. */
+  connectionId: string | null
+  openReviewTaskId: string | null
+  /** Approve only (#355 Q5): open checks or an unconfirmed category keep it disabled — the
+   * reason itself is `BillStatusTrack`'s blocking line above, never repeated as a tooltip here. */
+  blocked: boolean
+  onDone: () => void
+}): ReactNode {
+  const [busy, setBusy] = useState(false)
+  if (mode === "read-only") return null
+
+  const approve = async () => {
+    setBusy(true)
+    try {
+      const result = openReviewTaskId
+        ? await updateReviewTaskStatusAction(workspaceId, openReviewTaskId, "approved")
+        : await moveDocumentsToStageAction(workspaceId, [documentId], "approved")
+      if (!result.success) { toast.error(result.error || "Could not approve this bill"); return }
+      if (!openReviewTaskId && ((result as { data?: { heldBack?: number } }).data?.heldBack ?? 0) > 0) {
+        toast.warning("Not approved yet. Fill in the missing required fields and pick a document type first.")
+      } else {
+        toast.success("Approved")
+      }
+      onDone()
+    } catch {
+      toast.error("Could not reach the server")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const post = async () => {
+    if (!connectionId) return
+    setBusy(true)
+    try {
+      const result = await postSelectedDocumentsAction(workspaceId, connectionId, [documentId])
+      if (!result.success) { toast.error(result.error || "Could not post this bill"); return }
+      const outcome = result.data?.results[0]
+      if (outcome?.status === "succeeded" || outcome?.status === "queued") toast.success(outcome.status === "queued" ? "Posting…" : "Posted")
+      else toast.error(outcome?.error || "Could not post this bill")
+      onDone()
+    } catch {
+      toast.error("Could not reach the server")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const disabled = busy || (mode === "approve" && blocked) || (mode === "post" && !connectionId)
+  return <Button type="button" id="save-review-submit" size="sm" disabled={disabled} aria-busy={busy || undefined} onClick={() => void (mode === "approve" ? approve() : post())}>
+    {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />}
+    {mode === "approve" ? (busy ? "Approving…" : "Approve") : (busy ? "Posting…" : "Post")}
+  </Button>
 }
