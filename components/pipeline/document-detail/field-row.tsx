@@ -2,6 +2,7 @@
 
 import { LineItemsEditor } from "@/components/documents/line-items-editor"
 import { CheckGlyph, RationalePopover, SOURCE_BADGE } from "@/components/pipeline/document-detail/rationale-popover"
+import { useBillReadOnly } from "@/components/pipeline/document-detail/bill-pane"
 import type { FieldCheck } from "@/components/pipeline/document-detail/check-types"
 import type { ConfiguredFieldDefinition } from "@/lib/configuration/field-table"
 import type { FieldRationale } from "@/lib/rationale"
@@ -30,8 +31,19 @@ export function FieldRow({ field, value, confidence, ref: provenanceRef, onFocus
 }) {
   const lowConfidence = typeof confidence === "number" && confidence < LOW_CONFIDENCE
   const isArray = field.type === "array"
+  // #362 close: `useBillReadOnly()` defaults to `false` outside a `BillReadOnlyContext.Provider`
+  // (non-bill callers unaffected). Every other cell in the Bill sections gates on it (B4) with
+  // `disabled` (removed from the tab order) — this generic field list (vendor, address, etc.)
+  // didn't gate on it at all, leaving a Paid/Cancelled/Touchless document's legacy fields
+  // keyboard-focusable and editable (evaluate P0, keyboard.json `bill-readonly-tab-walk`).
+  // Kept as its own flag rather than folded into `readOnly` below: the admin-configured
+  // `field.readOnly` (#252) intentionally keeps the field focusable (HTML `readOnly`, not
+  // `disabled`) so a reviewer can still tab to and read the value — the Bill-lock case must
+  // remove it from the tab order the same way the sibling line-item/date cells do.
+  const billReadOnly = useBillReadOnly()
   const readOnly = field.readOnly === true
   const readOnlyTitle = "Not editable — set under Admin › Configuration › Fields"
+  const billLockedTitle = "Not editable — this document is locked"
   const [showPopover, setShowPopover] = useState(false)
   const inputRef = useRef<HTMLInputElement | HTMLSelectElement>(null)
   const checkDescriptionId = `${field.key}-check-description`
@@ -82,9 +94,9 @@ export function FieldRow({ field, value, confidence, ref: provenanceRef, onFocus
     {showPopover && (rationale || checks.length > 0) && <RationalePopover rationale={rationale} mismatchChecks={checks} onClose={() => setShowPopover(false)} onFix={() => inputRef.current?.focus()} onEscalate={onEscalate} />}
 
     {field.type === "boolean" ? (
-      <label className="flex items-center gap-2 px-1 pb-1 text-sm text-slate-700"><input ref={inputRef as React.RefObject<HTMLInputElement>} id={field.key} name={field.key} type="checkbox" aria-describedby={checks.length ? checkDescriptionId : undefined} className="h-4 w-4 rounded accent-emerald-600" value="true" defaultChecked={value === true} disabled={readOnly} />Yes</label>
+      <label className="flex items-center gap-2 px-1 pb-1 text-sm text-slate-700"><input ref={inputRef as React.RefObject<HTMLInputElement>} id={field.key} name={field.key} type="checkbox" aria-describedby={checks.length ? checkDescriptionId : undefined} className="h-4 w-4 rounded accent-emerald-600" value="true" defaultChecked={value === true} disabled={readOnly || billReadOnly} title={billReadOnly && !readOnly ? billLockedTitle : undefined} />Yes</label>
     ) : field.type === "enum" ? (
-      <select ref={inputRef as React.RefObject<HTMLSelectElement>} id={field.key} name={field.key} aria-describedby={checks.length ? checkDescriptionId : undefined} defaultValue={typeof value === "string" ? value : ""} disabled={readOnly} title={readOnly ? readOnlyTitle : undefined} className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 transition-colors focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100 disabled:bg-slate-50 disabled:text-slate-600">
+      <select ref={inputRef as React.RefObject<HTMLSelectElement>} id={field.key} name={field.key} aria-describedby={checks.length ? checkDescriptionId : undefined} defaultValue={typeof value === "string" ? value : ""} disabled={readOnly || billReadOnly} title={readOnly ? readOnlyTitle : billReadOnly ? billLockedTitle : undefined} className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 transition-colors focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100 disabled:bg-slate-50 disabled:text-slate-600">
         <option value="">Select a value</option>
         {field.options?.map((option) => <option key={option} value={option}>{option}</option>)}
       </select>
@@ -93,8 +105,8 @@ export function FieldRow({ field, value, confidence, ref: provenanceRef, onFocus
         type={field.type === "number" ? "number" : field.type === "date" ? "date" : "text"}
         step={field.type === "number" ? "any" : undefined}
         defaultValue={typeof value === "string" || typeof value === "number" ? String(value) : ""}
-        readOnly={readOnly} aria-readonly={readOnly || undefined} title={readOnly ? readOnlyTitle : undefined}
-        className={`h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 shadow-sm transition-colors placeholder:text-slate-300 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100 read-only:bg-slate-50 read-only:text-slate-600 ${field.type === "number" ? "tabular-nums" : ""}`} />
+        readOnly={readOnly} disabled={billReadOnly} aria-readonly={readOnly || undefined} title={readOnly ? readOnlyTitle : billReadOnly ? billLockedTitle : undefined}
+        className={`h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 shadow-sm transition-colors placeholder:text-slate-300 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100 read-only:bg-slate-50 read-only:text-slate-600 disabled:bg-slate-50 disabled:text-slate-600 ${field.type === "number" ? "tabular-nums" : ""}`} />
     )}
   </div>
 }

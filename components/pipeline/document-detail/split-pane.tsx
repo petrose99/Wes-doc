@@ -446,7 +446,11 @@ export function FieldNavForm({ saveReview, formFields, data, fieldConfidence, pr
       if (billMode && (field.key === invoiceDateField?.key || field.key === dueDateField?.key)) return null
       if (field.type === "array") return <Fragment key={field.key}>
         <LineItemsSection field={field} value={data[field.key]} fieldKey={field.key} summaryFields={field.key === "line_items" ? summaryFields : []} fieldValues={data} provenanceFields={provenanceFields} provenanceItems={provenanceItems[field.key] ?? []} onFocusSource={setTarget}
-          checks={liveChecks.filter((check) => check.fields.some((f) => f === field.key || f.startsWith(`${field.key}[`)))} onEscalate={onEscalate} po={field.key === "line_items" ? po : null} billMode={billMode} readOnly={billMode && billReadOnly} />
+          checks={liveChecks.filter((check) => check.fields.some((f) => f === field.key || f.startsWith(`${field.key}[`)))} onEscalate={onEscalate} po={field.key === "line_items" ? po : null}
+          // #362 §2: this ticket's chip columns/footer-total/Add-row are specced for the
+          // `line_items` table only — `other_charges` (also `type: "array"`) is out of scope
+          // (no ticket contract for it) and keeps its pre-existing plain rendering.
+          billMode={billMode && field.key === "line_items"} readOnly={billMode && field.key === "line_items" && billReadOnly} />
         {/* #362: `other_charges` is also `type: "array"` (lib/domains/finance.ts) — gate to
           the `line_items` field so DatesRow/PaymentDetailsLink render once, not once per
           array field. */}

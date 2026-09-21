@@ -166,7 +166,13 @@ export function LineItemsSection({ field, value, fieldKey, summaryFields, fieldV
     {field.itemFields?.length
       ? <LineItemsEditor fieldKey={fieldKey} itemFields={field.itemFields} initialRows={Array.isArray(value) ? value as Array<Record<string, unknown>> : []} provenanceItems={provenanceItems} onFocusSource={onFocusSource} checks={checks} onEscalate={onEscalate} poCompare={compare} bill={bill} readOnly={readOnly} />
       : <textarea id={fieldKey} name={fieldKey} defaultValue={Array.isArray(value) ? JSON.stringify(value) : ""} placeholder="JSON array" className="min-h-24 w-full rounded-lg border border-slate-200 bg-slate-50/50 px-3 py-2 font-mono text-sm" />}
-    {summaryFields.length > 0 && <div className="flex flex-wrap items-start justify-end gap-4 rounded-lg border border-slate-100 bg-slate-50/80 px-4 py-2.5">
+    {/* #362 B8/spec §2: in Bill mode the editor's own footer (`billFooter` in
+      `line-items-editor.tsx`) already carries the one total + extracted-total mismatch check —
+      this legacy summaryFields block (Subtotal/Tax total/Shipping/Total) is #354/#360's
+      "duplicate totals" unplug; rendering it alongside the new footer reintroduces exactly that
+      anti-pattern, so it is suppressed in Bill mode. Non-bill callers (today's `FieldNavForm`
+      elsewhere) are unchanged. */}
+    {!billMode && summaryFields.length > 0 && <div className="flex flex-wrap items-start justify-end gap-4 rounded-lg border border-slate-100 bg-slate-50/80 px-4 py-2.5">
       {summaryFields.map((summaryField) => <TotalField key={summaryField.key} field={summaryField} value={fieldValues[summaryField.key]} ref={provenanceFields[summaryField.key] ?? null} onFocusSource={onFocusSource}
         compare={compare && summary && summaryField.key === "total" ? { summary, currency: po?.currency ?? null } : null} />)}
     </div>}
