@@ -10,8 +10,9 @@ MODEL_STRONG="sonnet"       # grilling, spec, decisions; also the escalation aft
 MODEL_CHEAP="sonnet"        # research tickets and polish passes
 MODEL_EXEC_FIRST="sonnet"   # build/close phases while sessions progress
 MODEL_MEASURE="haiku"       # measure phase, first session: plumbing only, raw scores, no triage
-MODEL_UNBLOCK="opus"        # the push model: one step in a stalled session, then hand back
-UNBLOCK_MAX=2               # pushes per session
+MODEL_UNBLOCK=""            # push disabled (owner, 2026-09-22): no mid-session model switch —
+                             # a stalled session only gets same-model nudges (SESSION_NUDGES), never a push
+UNBLOCK_MAX=0                # pushes per session
 SESSION_NUDGES=1            # same-model "continue with a tool call" before a push
 EFFORT="low"                # every autopilot session, whichever model; independent of ~/.claude/settings.json
 # Per phase (override EFFORT). Output is <1% of the bill (map #226: 0–5K out
