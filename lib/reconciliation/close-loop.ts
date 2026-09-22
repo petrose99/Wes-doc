@@ -1,6 +1,6 @@
 /** Phase 5: reconciliation loop closure.
  *
- * When a bank match is accepted, three things happen — atomically enough that they either all
+ * When a bank match is accepted, two things happen — atomically enough that they either all
  * land or none do:
  *   1. The matched invoice/receipt/expense-receipt Document gets `paymentStatus: "paid"`, so
  *      the pipeline UI knows it's done. This was the missing signal: previously an accepted
@@ -11,29 +11,23 @@
  *      The `reconciledSource` field is checked by lib/health/sync.ts so a subsequent ledger
  *      sync never clobbers this row back to `false` — the loop stays closed until DocuBite
  *      itself un-accepts the match.
- *   3. When the connection is Bigcapital (DocuBite's internal ledger — see ADR-001), a
- *      matching cashflow transaction is enqueued into Bigcapital so the payment is a
- *      first-class ledger record, not just a Prisma-side flag.
  *
- * External providers (QuickBooks, Xero) receive only steps 1 and 2 for now — a follow-up phase
- * can add their own payment-create endpoints behind the same close-loop entry point.
+ * A follow-up phase can add a provider's own payment-create endpoint behind this same
+ * close-loop entry point.
  *
  * Never throws past the caller — same convention as every other post-decision side effect. */
 import { prisma } from "@/lib/db"
-import { getValidAccessToken } from "@/lib/integration-token-refresh"
-import * as bigcapital from "@/lib/integrations/bigcapital/client"
 
 export type CloseLoopResult = {
   documentUpdated: boolean
   ledgerReconciled: boolean
-  paymentPosted: boolean
 }
 
 export async function onBankMatchAccepted(input: {
   workspaceId: string
   matchId: string
 }): Promise<CloseLoopResult> {
-  const result: CloseLoopResult = { documentUpdated: false, ledgerReconciled: false, paymentPosted: false }
+  const result: CloseLoopResult = { documentUpdated: false, ledgerReconciled: false }
   try {
     const match = await prisma.bankMatch.findFirst({
       where: { id: input.matchId, workspaceId: input.workspaceId, status: "accepted" },
@@ -53,8 +47,7 @@ export async function onBankMatchAccepted(input: {
 
     // Step 2: find the mirrored LedgerTransaction via the most recent successful IntegrationPush
     // for this document. There is at most one (@@unique on [documentId, connectionId]) per
-    // connection; if the workspace has multiple connections we reconcile every one — the
-    // Bigcapital row is the authoritative internal record, plus a mirrored row per external.
+    // connection; if the workspace has multiple connections we reconcile every one.
     const pushes = await prisma.integrationPush.findMany({
       where: {
         workspaceId: input.workspaceId,
@@ -62,7 +55,7 @@ export async function onBankMatchAccepted(input: {
         status: "succeeded",
         externalBillId: { not: null },
       },
-      select: { externalBillId: true, connectionId: true, connection: { select: { provider: true } } },
+      select: { externalBillId: true, connectionId: true },
     })
 
     for (const push of pushes) {
@@ -82,21 +75,6 @@ export async function onBankMatchAccepted(input: {
           data: { reconciled: true, reconciledSource: "docubite" },
         }).then(() => { result.ledgerReconciled = true }).catch((e) => {
           console.error("[close-loop] failed to set LedgerTransaction reconciled:", e instanceof Error ? e.message : e)
-        })
-      }
-
-      // Step 3: Bigcapital-only — post the payment as a cashflow transaction. The idempotency
-      // key on IntegrationPush already prevents duplicate BILLS from being posted; the payment
-      // itself is a separate ledger event, so we key it off (bankMatchId) as our own dedup.
-      if (push.connection.provider === "bigcapital") {
-        await postBigcapitalPayment({
-          workspaceId: input.workspaceId,
-          connectionId: push.connectionId,
-          matchId: match.id,
-          matchedDocumentId: match.matchedDocumentId,
-          statementLineId: match.statementLineId,
-        }).then((posted) => { if (posted) result.paymentPosted = true }).catch((e) => {
-          console.error("[close-loop] failed to post Bigcapital payment:", e instanceof Error ? e.message : e)
         })
       }
     }
@@ -160,65 +138,4 @@ export async function onBankMatchUnaccepted(input: {
   } catch (error) {
     console.error("[close-loop] onBankMatchUnaccepted failed:", error instanceof Error ? error.message : error)
   }
-}
-
-async function postBigcapitalPayment(input: {
-  workspaceId: string
-  connectionId: string
-  matchId: string
-  matchedDocumentId: string
-  statementLineId: string | null
-}): Promise<boolean> {
-  const connection = await prisma.integrationConnection.findFirst({
-    where: { id: input.connectionId, workspaceId: input.workspaceId },
-    select: { externalTenantId: true, defaultExpenseAccountId: true },
-  })
-  if (!connection?.externalTenantId) return false
-
-  // Pull the line's amount and date. Prefer the durable StatementLine (Phase 2), fall back to
-  // the matched document's own extraction when no line has been projected.
-  let amount: number | null = null
-  let date: string | null = null
-  let description = "DocuBite reconciled payment"
-  if (input.statementLineId) {
-    const line = await prisma.statementLine.findFirst({
-      where: { id: input.statementLineId, workspaceId: input.workspaceId },
-      select: { amount: true, txnDate: true, description: true },
-    })
-    if (line) {
-      if (line.amount != null) {
-        const asNumber = typeof line.amount === "number" ? line.amount : Number(line.amount.toString())
-        if (Number.isFinite(asNumber)) amount = Math.abs(asNumber)
-      }
-      date = line.txnDate ? line.txnDate.toISOString().slice(0, 10) : null
-      if (line.description) description = line.description
-    }
-  }
-  if (amount == null || !date) return false
-
-  if (!connection.defaultExpenseAccountId) return false
-  const creditAccountId = Number(connection.defaultExpenseAccountId)
-  if (!Number.isFinite(creditAccountId)) return false
-
-  const apiKey = await getValidAccessToken(input.connectionId)
-
-  // Pick a cashflow (bank/cash) account. The first bank-type row from listCashflowAccounts is
-  // the safe default; a workspace with several bank accounts should pick one explicitly, but
-  // for now the first one is better than no reconciliation record at all.
-  const cashflowAccounts = await bigcapital.listCashflowAccounts(apiKey, connection.externalTenantId).catch(() => [])
-  const bankAccount = cashflowAccounts.find((a) => /bank|cash/i.test(a.accountType)) ?? cashflowAccounts[0]
-  if (!bankAccount) return false
-  const cashflowAccountId = Number(bankAccount.id)
-  if (!Number.isFinite(cashflowAccountId)) return false
-
-  await bigcapital.createCashflowTransaction(apiKey, connection.externalTenantId, {
-    date,
-    amount,
-    cashflow_account_id: cashflowAccountId,
-    credit_account_id: creditAccountId,
-    transaction_type: "other_expense",
-    description,
-    reference_no: `bankmatch:${input.matchId}`,
-  })
-  return true
 }

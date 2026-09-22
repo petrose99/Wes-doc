@@ -93,17 +93,12 @@ export const WORKSPACE_SCOPED_MODELS = new Set([
   // #252: Admin › Configuration › Fields overlay.
   "WorkspaceFieldConfig",
   // #255: scope-guard sweep — the remaining workspaceId-carrying models, guarded rather than
-  // documented-out. IntegrationProvisionJob's global claim (models/bigcapital.ts's
-  // claimNextProvisionJob) already wraps in unscoped(), the same WebhookDelivery/IntegrationPush
-  // precedent above.
+  // documented-out.
   "FieldSuggestion",
   "DocumentSheetPlacement",
   "AuditEvent",
   "Gate",
   "WarnCheck",
-  "BigcapitalAccount",
-  "BigcapitalMemberAccount",
-  "IntegrationProvisionJob",
   "HealthCheckResult",
   "HealthScore",
   "HealthScoreConfig",

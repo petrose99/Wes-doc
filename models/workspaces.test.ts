@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 vi.mock("@/lib/db", () => ({ prisma: {} }))
 vi.mock("@/prisma/client", () => ({ Prisma: {}, PrismaClient: vi.fn() }))
-vi.mock("@/models/bigcapital-members", () => ({ provisionMemberAccount: vi.fn().mockResolvedValue(undefined) }))
 vi.mock("@/models/files", () => ({ createFile: vi.fn(), deleteFiles: vi.fn() }))
 vi.mock("@/lib/document-storage", () => ({ deleteDocumentSource: vi.fn() }))
 vi.mock("@/lib/audit-archive", () => ({ archiveWorkspaceAuditEvents: vi.fn().mockResolvedValue({ archived: 0 }) }))

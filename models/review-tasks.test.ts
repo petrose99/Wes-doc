@@ -270,7 +270,7 @@ describe("payment status gate on approval", () => {
     })
 
     it("WP-AP2: bypasses the gate when a pending or succeeded IntegrationPush already exists", async () => {
-      // A ledger sync is in flight / has landed — QuickBooks/Xero/Bigcapital will fill in
+      // A ledger sync is in flight / has landed — QuickBooks/Xero will fill in
       // paymentStatus authoritatively, so asking the reviewer to guess is friction with no signal.
       db.reviewTask = { findFirst: vi.fn().mockResolvedValue({ id: "t1", documentId: "d1", status: "open", document: invoiceUnconfirmed }), update: vi.fn().mockReturnValue("update") }
       db.documentAuditEvent = { create: vi.fn().mockReturnValue("audit") }

@@ -77,8 +77,7 @@ const envSchema = z.object({
   // "https://<account-id>.r2.cloudflarestorage.com". Setting it changes two things in
   // lib/document-storage.ts — requests go path-style, and the SSE-KMS header is dropped, since KMS
   // is an AWS service that R2 rejects outright and R2 encrypts at rest with nothing to ask for.
-  // (Note the deliberately different name from S3_ENDPOINT in the compose files: that one belongs
-  // to bigcapital-server and points at its MinIO. Two unrelated things, two names.)
+  // (Note the deliberately different name from S3_ENDPOINT in the compose files, which is unrelated.)
   //
   // STORAGE_REGION is "auto" for R2, which signs against that rather than a geographic region.
   //
@@ -226,19 +225,6 @@ const envSchema = z.object({
   QUICKBOOKS_ENVIRONMENT: z.enum(["sandbox", "production"]).default("sandbox"),
   XERO_CLIENT_ID: z.string().optional(),
   XERO_CLIENT_SECRET: z.string().optional(),
-  // Bigcapital: no OAuth client — every workspace gets an auto-provisioned, isolated organization on
-  // a self-hosted (or hosted) Bigcapital instance, authenticated with a per-org API key instead of a
-  // redirect flow. Defaults to a local self-hosted instance so dev/staging work with zero setup;
-  // production points this at the real deployment.
-  BIGCAPITAL_API_BASE: z.string().url().default("http://localhost:4000"),
-  BIGCAPITAL_WEBAPP_URL: z.string().url().default("http://localhost:4001"),
-  // A deliberate second gate ON TOP OF the master encryption key. Unlike QuickBooks/Xero (each
-  // needing its own client id/secret before it turns on), a bare SECRETS_ENCRYPTION_KEY says
-  // nothing about wanting Bigcapital specifically — plenty of deployments will set it only for
-  // webhooks/API keys. Without this flag, every one of those would silently start signing up real
-  // Bigcapital accounts and provisioning organizations for every new workspace, with no way to opt
-  // out short of disabling the whole integrations surface. Off by default.
-  BIGCAPITAL_ENABLED: z.enum(["true", "false"]).default("false"),
   // Inbound email intake (WP13). Shipped dark on purpose: built and tested against recorded
   // provider fixtures, but with no inbound DNS/provider (Postmark inbound, SES) provisioned yet.
   // The route refuses everything with no secret configured — the same fail-closed shape as
@@ -461,15 +447,6 @@ const config = {
       enabled: Boolean(env.SECRETS_ENCRYPTION_KEY && env.XERO_CLIENT_ID && env.XERO_CLIENT_SECRET),
       clientId: env.XERO_CLIENT_ID || "",
       clientSecret: env.XERO_CLIENT_SECRET || "",
-    },
-    // Bigcapital: no OAuth client id/secret — every workspace gets an auto-provisioned, isolated
-    // organization instead, authenticated with a per-org API key. `enabled` requires BOTH the
-    // master encryption key AND an explicit BIGCAPITAL_ENABLED=true — see that var's comment above
-    // for why the encryption key alone isn't a safe enough signal for this one.
-    bigcapital: {
-      enabled: Boolean(env.SECRETS_ENCRYPTION_KEY) && env.BIGCAPITAL_ENABLED === "true",
-      apiBase: env.BIGCAPITAL_API_BASE.replace(/\/+$/, ""),
-      webappUrl: env.BIGCAPITAL_WEBAPP_URL.replace(/\/+$/, ""),
     },
   },
 } as const
