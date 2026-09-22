@@ -34,7 +34,7 @@ scripts/wayfinder-autopilot/stop.sh <map>                     # stop cleanly: ru
 Watch: `tail -f docs/wayfinder-reports/<map>/detached.out`.
 Stop: `kill <driver pid>` (current ticket finishes, nothing new starts).
 
-Path-based design gate: the spec phase marks every plan step `kind: surface|backend` from the files it touches (`app/**`/`components/**` rendering files → surface); only surface steps owe the Intent/Impeccable pass and the detector, and `token-guard.sh` refuses an Edit/Write of a rendering file until `craft-floor.md` has been read in that session. Backend paths are never gated.
+Path-based design gate: the spec phase marks every plan step `kind: surface|backend` from the files it touches (`app/**`/`components/**` rendering files → surface); only surface steps owe the Intent/Impeccable pass and the detector, and `token-guard.sh` refuses an Edit/Write of a rendering file until `craft-floor.md` has been read in that session. Backend paths are never design-gated; they carry the backend floor instead (`CODING_STANDARDS.md`): seams + red-first tests per step, `simplify`, `/code-review` at close. The hook refuses a commit of `lib/`/`models/`/`worker/` logic without a `.test.ts` (escape `no-test: <reason>`) and a close without `review: P0=0 P1=0` on the report.
 
 Phased builds: a "Build …" task ticket runs as four fresh sessions — spec → build → measure → close — read off `milestone:` lines in the hand-off (`spec-done`, `build-done`, `measured`); the driver keeps a high-water mark in `<ticket>.phase` so a phase never moves backwards.
 

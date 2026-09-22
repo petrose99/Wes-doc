@@ -10,8 +10,15 @@ first — name and files per step — and mark each step's kind:
   the detector at measure.
 - `kind: backend` — everything else (`lib/`, `models/`, `prisma/`, `worker/`,
   `scripts/`, `app/api/**` routes, actions files). No Intent or Impeccable
-  reads, no craft floor, no detector: read the code it touches, build it,
-  run its check.
+  reads, no craft floor, no detector. It owes the **backend pass** instead:
+  read `CODING_STANDARDS.md` (the backend floor) once; name the step's
+  **seams** on its plan line — the public functions or routes under test
+  and the test file each gets (`tdd`'s pre-agreed seams; a deletion says
+  `seams: none (deletion)`); if the step adds a module or moves a boundary,
+  read `codebase-design` once and write the interface (invariants, error
+  modes, idempotency) into the plan; if the boundary is hard to reverse,
+  surprising later and a real trade-off (the Nango boundary is), the step
+  includes an ADR under `docs/adr/` (`domain-modeling`).
 
 The pre-build pass (items 1–4) is owed **only if at least one step is
 `surface`**, and scoped to those steps' states and copy. A ticket whose
@@ -82,7 +89,8 @@ properly, not skimmed:
 5. **Write the build plan onto the hand-off** as the last act of this phase:
    ordered `step: N — ‹name› — kind: surface|backend — todo` lines, one
    per surface/state group (or per backend module group), each naming the
-   spec lines it comes from, the files it touches and its check; the three gate steps last (`G1 — round script`, `G2 — r0 and
+   spec lines it comes from, the files it touches and its check (a backend
+   step's check is its seams' tests: `seams: <fn> → <file>.test.ts, …`); the three gate steps last (`G1 — round script`, `G2 — r0 and
    fixes`, `G3 — build-done`, as `phases/build.md` defines them). The build
    sessions run one step each from this plan.
 6. **Size the ticket to the phases, now — before any code.** The four-phase

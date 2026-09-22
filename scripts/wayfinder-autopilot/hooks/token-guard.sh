@@ -20,6 +20,11 @@
 #      has read craft-floor.md (Read, or Bash cat/sed of it). Backend paths
 #      (lib/, models/, prisma/, worker/, app/api/**, *actions.ts) are never
 #      gated — the files decide what a step owes, not the ticket's title.
+#   7. Backend floor (CODING_STANDARDS.md): a `git commit` whose staged diff
+#      changes lib/, models/ or worker/ logic (.ts, not tests) without a
+#      .test.ts in the same commit is refused unless the subject carries
+#      `no-test: <reason>`; `gh issue close` on a ticket whose commits touched
+#      backend code is refused without `review: P0=0 P1=0` on the report.
 [ -n "${WAYFINDER_CTX_FILE:-}" ] || exit 0
 IN="$(cat)"
 python3 - "$IN" <<'PY'
@@ -101,6 +106,18 @@ def closing_bar(c):
         if r.returncode != 0:
             errs = [l for l in r.stdout.splitlines() if "error TS" in l]
             deny(f"TYPE-CHECK: `tsc --noEmit` reports {len(errs)} error(s); ticket #{t} touched TypeScript ({', '.join(code[:4])}{' …' if len(code) > 4 else ''}) and closes only on a clean tree — even errors another ticket left: fix them or hand off with the list. First errors:\n" + "\n".join(errs[:8]))
+    # Review gate (CODING_STANDARDS.md, 2026-09-22): a ticket whose commits
+    # touched backend logic closes only once /code-review ran and its P0/P1
+    # count is zero on the report's `scores:` line.
+    backend = sorted(f for f in files if re.match(r"^(lib|models|worker|prisma)/.*\.(ts|prisma|sql)$", f) and not f.endswith(".test.ts"))
+    if backend:
+        rep = os.path.join(root, "docs", "wayfinder-reports", m, f"{t}.md")
+        line = ""
+        try: line = next((l for l in open(rep) if l.startswith("scores:")), "")
+        except Exception: pass
+        rv = re.search(r"review:\s*P0=(\d+)\s+P1=(\d+)", line)
+        if not rv or rv.group(1) != "0" or rv.group(2) != "0":
+            deny(f"REVIEW GATE: ticket #{t} touched backend code ({', '.join(backend[:4])}{' …' if len(backend) > 4 else ''}) and closes only after the `code-review` skill ran against `{base or 'the base branch'}` with every P0 and P1 fixed: the report {rep} needs `review: P0=0 P1=0 findings=<path>` on its `scores:` line. Found: {line.strip() or 'no scores: line'}.")
     # Infra gate (lanes, 2026-09-21): #361 widened `turbopack.root` in
     # next.config.ts to get round a lane defect and would have landed it. A
     # ticket closes only while the project's infra files match the integration
@@ -146,6 +163,16 @@ if tool == "Bash":
     if re.search(r"impeccable\s+live-server|livesrv\d*\.mjs|start-live-server|\.impeccable/bin/", c):
         deny(DEVSRV)
     closing_bar(c)
+    if re.search(r"\bgit\b[^|;&]*\bcommit\b", c) and not re.search(r"no-test:", c):
+        try: staged = subprocess.run(["git", "diff", "--cached", "--name-only"], capture_output=True, text=True).stdout.split()
+        except Exception: staged = []
+        if not staged and re.search(r"\s-a\b|--all\b", c):
+            try: staged = subprocess.run(["git", "diff", "--name-only"], capture_output=True, text=True).stdout.split()
+            except Exception: staged = []
+        logic = [f for f in staged if re.match(r"^(lib|models|worker)/.*\.ts$", f) and not f.endswith(".test.ts")]
+        tests = [f for f in staged if f.endswith((".test.ts", ".test.tsx"))]
+        if logic and not tests:
+            deny(f"TESTS TRAVEL WITH CODE (CODING_STANDARDS.md §12): this commit changes {', '.join(logic[:4])}{' …' if len(logic) > 4 else ''} and no .test.ts. Write the seam's test red first and stage it with the change; for a pure deletion or a mechanical rename put `no-test: <reason>` in the commit subject.")
     if hand and re.search(r"\bgit\b[^|;&]*\bcommit\b", c):
         n = handoff_lines()
         if n > hmax: deny(too_long(n))
