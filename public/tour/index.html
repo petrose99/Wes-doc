@@ -246,6 +246,7 @@
     if (n >= steps.length || started.has(n)) return false;
     started.add(n); shots[n].src = srcOf(steps[n]); return true;
   }
+  const prioritise = (n) => shots.forEach((im, k) => { im.fetchPriority = k === n ? "high" : "low"; });
   function pump() {
     const n = steps.findIndex((_, k) => !started.has(k));
     if (n < 0) return;
@@ -291,15 +292,19 @@
     if (end) return;
     const s = steps[i];
     const next = shots[i];
-    fetchShot(i);
+    prioritise(i); fetchShot(i);
     if (!next.classList.contains("on")) {
       // Every screenshot is already in the DOM: switching is a class toggle, not a load. The
       // outgoing shot stays underneath until the incoming one has decoded, so the frame is
       // never blank; a token guards against a slow load finishing after a later step was chosen.
       const token = ++loadToken;
-      const prev = shots.find((im) => im.classList.contains("on"));
+      // Keep whatever is actually on screen underneath — the last *decoded* shot, which on a
+      // slow link is not always the last *selected* one (stepping twice while a shot is still
+      // downloading left the frame blank).
+      const ready = (im) => im.complete && im.naturalWidth > 0;
+      const prev = shots.find((im) => im.classList.contains("on") && ready(im)) || shots.find((im) => im.classList.contains("was") && ready(im));
       shots.forEach((im) => im.classList.remove("on", "was"));
-      if (prev) prev.classList.add("was");
+      if (prev && prev !== next) prev.classList.add("was");
       next.classList.add("on");
       const settle = () => { if (token === loadToken && prev) prev.classList.remove("was"); };
       if (next.complete && next.naturalWidth) settle();
