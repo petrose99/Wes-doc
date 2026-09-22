@@ -126,8 +126,12 @@ The one mark beside a row's processing state that says where the document stands
 _Avoid_: ledger status, sync status, integration state
 
 **Accounting**:
-The connected accounting provider's own page: whether the workspace is connected, when it last synced, its default account, and the way into the ledger. It holds no rows and no work — posting happens on the queues, paying in Bill Pay. Reached directly from the rail's Accounting item, inside Admin › Integrations.
-_Avoid_: Finance (retired name), the ledger (that is what Accounting opens), push list
+The connected accounting provider's own page: which ledger this company is on (QuickBooks, Xero or Sage Accounting), whether the Ledger connection is healthy, when it last synced, its default account and the guessed category mappings, and the way into the ledger. It holds no rows and no work — posting happens on the queues, paying in Bill Pay. Reached directly from the rail's Accounting item, inside Admin › Integrations. DocuBite hosts no ledger of its own (Bigcapital retired, owner, 2026-09-22).
+_Avoid_: Finance (retired name), the ledger (that is what Accounting opens), push list, in-house ledger
+
+**Ledger connection**:
+The one link between a Company and its accounting provider, made by an Owner from the Accounting page and never more than one per company. It is Connected, Needs reconnecting (the provider stopped honouring it — posts wait, nothing is marked on rows, Owners are told once), or absent (no ledger: posting is offered nowhere and the queue says why once). Switching providers is a disconnect then a connect; disconnecting never un-posts anything. How the connection is held (the OAuth vault behind it) is never named on a screen.
+_Avoid_: Integration (as the user-facing noun), OAuth, token, Nango, sync (for the connection itself)
 
 **Bill Pay**:
 The queue of approved, unpaid invoices and approved, unpaid Expense claims from which payment batches are created. An invoice reaches it only once its processing state is Approved, a claim once it is approved; a row that cannot be paid yet (no bank details for its Payee) stays visible with the reason. A claim row has no terms, no discount, no countdown and no partial payment: its amount is the frozen claim total. A row held by a pending or approved payment batch reads *Scheduled* — still on the queue, not batchable again until the batch is rejected or paid. Amount to pay defaults to the discounted total inside an open discount window, else what is still due; an operator may set a smaller amount (a partial payment) per row.
