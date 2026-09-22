@@ -258,12 +258,16 @@ export async function getActiveIntegrationConnectionId(workspaceId: string): Pro
 
 export type LedgerBandStatus = "disconnected" | "needs_reauth" | "no_default_account"
 
-/** #281 spec.md §6: the cause behind the queue-scoped connection-failure band — null when a
- * connection is active and has a default account (band hidden), or when integrations are off (no
- * connection is ever expected, so nothing to say). Most-recent connection by `createdAt` mirrors
- * `getActiveIntegrationConnectionId`'s own "the" connection — one workspace, one ledger. */
+/** #281 spec.md §6, widened by #380: the cause behind the queue-scoped connection-failure band —
+ * null only when a connection is active and has a default account (band hidden). Integrations
+ * being off no longer suppresses the band: with Bigcapital removed and no ledger connect flow
+ * built yet (a later ticket), "no ledger" is the default state every workspace is in, and the
+ * glossary's rule ("posting is offered nowhere while no ledger is connected; the queue says why
+ * once, above the rows") applies regardless of whether the integrations feature is configured.
+ * Most-recent connection by `createdAt` mirrors `getActiveIntegrationConnectionId`'s own "the"
+ * connection — one workspace, one ledger. */
 export async function getLedgerConnectionBandStatus(workspaceId: string): Promise<LedgerBandStatus | null> {
-  if (!config.integrations.enabled) return null
+  if (!config.integrations.enabled) return "disconnected"
   const connection = await prisma.integrationConnection.findFirst({
     where: { workspaceId }, orderBy: { createdAt: "desc" }, select: { status: true, defaultExpenseAccountId: true },
   })
