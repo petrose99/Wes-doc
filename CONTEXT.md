@@ -126,7 +126,7 @@ The one mark beside a row's processing state that says where the document stands
 _Avoid_: ledger status, sync status, integration state
 
 **Accounting**:
-The connected accounting provider's own page: which ledger this company is on (QuickBooks, Xero or Sage Accounting), whether the Ledger connection is healthy, when it last synced, its default account and the guessed category mappings, and the way into the ledger. It holds no rows and no work — posting happens on the queues, paying in Bill Pay. Reached directly from the rail's Accounting item, inside Admin › Integrations. DocuBite hosts no ledger of its own (Bigcapital retired, owner, 2026-09-22).
+The connected accounting provider's own page: which ledger this company is on (QuickBooks, Xero or Sage Accounting), whether the Ledger connection is healthy, when it last synced, its default account and the guessed category mappings, and the way into the ledger. It holds no rows and no work — posting happens on the queues, paying in Bill Pay. Reached directly from the rail's Accounting item, inside Admin › Integrations. DocuBite hosts no ledger of its own (the in-house ledger was retired, owner, 2026-09-22).
 _Avoid_: Finance (retired name), the ledger (that is what Accounting opens), push list, in-house ledger
 
 **Ledger connection**:

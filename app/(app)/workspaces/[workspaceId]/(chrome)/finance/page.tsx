@@ -6,11 +6,11 @@ import { requireWorkspaceRole } from "@/models/workspaces"
 /** Finance is the workspace's ledger surface — a first-class destination alongside Documents and
  * Worksheets, not a side "Accounting" utility. Route moved from /accounting; old URL redirects here.
  *
- * #380: the in-house Bigcapital ledger (the only provider this page ever drove) is gone — the
- * owner ruled its data demo-only. Connecting an external ledger (QuickBooks, Xero) from here lands
- * in a later ticket; until then this page is the glossary's definition of Accounting and nothing
- * more: says once that no ledger is connected, and offers a Connect button that is the only thing
- * on the page — disabled, with the reason. */
+ * The in-house ledger this page used to drive is gone — the owner ruled its data demo-only.
+ * Connecting an external ledger (QuickBooks, Xero) from here lands in a later ticket; until then
+ * this page is the glossary's definition of Accounting and nothing more: says once that no ledger
+ * is connected, and offers a Connect button that is the only thing on the page — disabled, with
+ * the reason. */
 export default async function FinancePage({ params }: { params: Promise<{ workspaceId: string }> }) {
   const { workspaceId } = await params
   const user = await getCurrentUser()

@@ -40,6 +40,8 @@ describe("syncLedgerTransactions", () => {
       findMany: vi.fn().mockResolvedValue([]),
     }
     db.$transaction = vi.fn(async (ops: unknown[]) => { transactions.push(ops); return [] })
+    vi.mocked(xero.listBills).mockResolvedValue([])
+    vi.mocked(xero.listBankTransactions).mockResolvedValue([])
     return transactions
   }
 
@@ -80,6 +82,7 @@ describe("syncDueLedgerConnections", () => {
     }
     db.$transaction = vi.fn().mockResolvedValue([])
     vi.mocked(xero.listBills).mockImplementation(listBills)
+    vi.mocked(xero.listBankTransactions).mockResolvedValue([])
   }
 
   it("holds a failed connection off instead of retrying it on the next tick", async () => {
@@ -117,8 +120,8 @@ describe("syncDueLedgerConnections", () => {
     await expect(syncDueLedgerConnections()).resolves.toBe(1)
 
     // A failure straight after a success is attempt 1 again, not attempt 3 — so it waits 5 minutes,
-    // not 20.
-    vi.setSystemTime(Date.now() + 2 * 60 * 60 * 1000)
+    // not 20. Past the 24h post-success hold (LEDGER_SYNC_STALE_MS) so the connection is due again.
+    vi.setSystemTime(Date.now() + 25 * 60 * 60 * 1000)
     listBills.mockRejectedValue(new Error("http_429"))
     await syncDueLedgerConnections()
     vi.setSystemTime(Date.now() + 6 * 60 * 1000)

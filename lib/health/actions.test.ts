@@ -63,7 +63,7 @@ describe("executeVoidDuplicate", () => {
   it("calls the provider's voidBill and resolves the finding on a real execution", async () => {
     const result = await executeVoidDuplicate({ workspaceId: "ws1", findingId: "f1", actorId: "u1", dryRun: false })
     expect(result.ok).toBe(true)
-    expect(xero.voidBill).toHaveBeenCalledWith("token-123", "org1", "e2")
+    expect(xero.voidBill).toHaveBeenCalledWith("org1", "token-123", "e2")
     expect(db.ledgerTransaction.update).toHaveBeenCalledWith({ where: { id: "lt2" }, data: { active: false } })
     expect(resolveHealthFinding).toHaveBeenCalledWith({ workspaceId: "ws1", findingId: "f1", actorId: "u1", action: "void_duplicate" })
     expect(recordDocumentAudit).toHaveBeenCalledWith(expect.objectContaining({ type: "health_remediation_void_duplicate", outcome: "success" }))
