@@ -1,0 +1,628 @@
+{
+ "slug": "stampli-vs-vicai",
+ "label": "Stampli vs Vic.ai",
+ "url": "https://www.stampli.com/stampli-vs-vic-ai/",
+ "accessed": "2026-09-19T12:22:36.930Z",
+ "views": {
+  "390": {
+   "status": 200,
+   "shot": "/home/ubuntu/Dev/Wes-doc/docs/research/benchmark-captures/stampli/stampli-vs-vicai-390.png",
+   "initialMotion": {
+    "opacityZeroEls": 0,
+    "animations": {},
+    "transitionEls": 417,
+    "total": 1428
+   },
+   "errors": [
+    "overlaysHidden=0"
+   ],
+   "title": "Compare Stampli vs. Vic.ai for AP Automation",
+   "h1": "Stampli vs. Vic.ai",
+   "subhead": null,
+   "headings": [
+    {
+     "tag": "H1",
+     "text": "Stampli vs. Vic.ai",
+     "top": 172
+    },
+    {
+     "tag": "H3",
+     "text": "Companies big and small trust Stampli with $90 billion in AP spend...and counting",
+     "top": 1550
+    },
+    {
+     "tag": "H3",
+     "text": "Why choose Stampli instead of Vic.ai for Procurement & AP automation?",
+     "top": 2112
+    },
+    {
+     "tag": "H3",
+     "text": "What should you ask Vic.ai about?",
+     "top": 3710
+    },
+    {
+     "tag": "H3",
+     "text": "Stampli is built for the way YOU run AP",
+     "top": 5029
+    },
+    {
+     "tag": "H3",
+     "text": "Least disruption",
+     "top": 5271
+    },
+    {
+     "tag": "H3",
+     "text": "Ensure control & compliance",
+     "top": 5487
+    },
+    {
+     "tag": "H3",
+     "text": "Most control",
+     "top": 5726
+    },
+    {
+     "tag": "H3",
+     "text": "Smartest AI",
+     "top": 5969
+    },
+    {
+     "tag": "H3",
+     "text": "Fastest to value",
+     "top": 6158
+    },
+    {
+     "tag": "H3",
+     "text": "What do Stampli customers appreciate most?",
+     "top": 6368
+    },
+    {
+     "tag": "H3",
+     "text": "Stampli vs. Vic.ai for Procurement & AP automation",
+     "top": 9691
+    },
+    {
+     "tag": "H3",
+     "text": "Stampli",
+     "top": 10944
+    },
+    {
+     "tag": "H3",
+     "text": "Products",
+     "top": 11001
+    },
+    {
+     "tag": "H3",
+     "text": "Accounting Systems",
+     "top": 11058
+    },
+    {
+     "tag": "H3",
+     "text": "Industries",
+     "top": 11115
+    },
+    {
+     "tag": "H3",
+     "text": "Role",
+     "top": 11164
+    },
+    {
+     "tag": "H3",
+     "text": "Resources",
+     "top": 11229
+    },
+    {
+     "tag": "H3",
+     "text": "Contact",
+     "top": 11286
+    }
+   ],
+   "sections": [
+    {
+     "top": 1550,
+     "height": 482,
+     "heading": "Companies big and small trust Stampli with $90 billion in AP spend...and counting",
+     "imgs": 6,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 81,
+     "snippet": "Companies big and small trust Stampli with $90 billion in AP spend...and counting"
+    },
+    {
+     "top": 4979,
+     "height": 1389,
+     "heading": "Stampli is built for the way YOU run AP",
+     "imgs": 1,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 408,
+     "snippet": "Stampli is built for the way YOU run AP Least disruption No need to rework the ERP or change your AP processes Ensure control & compliance Fully configurable and auditable payment workflows Most control One place for all"
+    },
+    {
+     "top": 7049,
+     "height": 2578,
+     "heading": "",
+     "imgs": 7,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 0,
+     "snippet": ""
+    }
+   ],
+   "navLinks": [],
+   "heroCtas": [
+    {
+     "text": "Let's Talk",
+     "tag": "A",
+     "href": "https://www.stampli.com/contact"
+    }
+   ],
+   "bigImgs": [
+    {
+     "w": 311,
+     "h": 350,
+     "alt": "Top 50 Accounting and Finance Products Award",
+     "src": "https://www.stampli.com/wp-content/uploads/2024/03/Top-50-AccountsFinance.png",
+     "top": 7049
+    },
+    {
+     "w": 311,
+     "h": 350,
+     "alt": "Top Procure-to-Pay Software Company",
+     "src": "https://www.stampli.com/wp-content/uploads/2026/01/G2_2025_Top10Procure_241x271_2x_NoShadow.webp",
+     "top": 7447
+    },
+    {
+     "w": 311,
+     "h": 350,
+     "alt": "Top 100 Global Softare Companies Award",
+     "src": "https://www.stampli.com/wp-content/uploads/2024/03/Top-100-Global-Softare-Companies.png",
+     "top": 7845
+    },
+    {
+     "w": 311,
+     "h": 350,
+     "alt": "AP Automation Leader Award",
+     "src": "https://www.stampli.com/wp-content/uploads/2024/03/2024-Leader-AP-Automation.png",
+     "top": 8242
+    },
+    {
+     "w": 311,
+     "h": 350,
+     "alt": "2025 Capterra Shortlist Award for Accounts Payable",
+     "src": "https://www.stampli.com/wp-content/uploads/2024/06/Capterra.png",
+     "top": 8617
+    },
+    {
+     "w": 311,
+     "h": 350,
+     "alt": "2025 GetApp Category Leaders Award for Accounts Payable",
+     "src": "https://www.stampli.com/wp-content/uploads/2024/06/GetApp.png",
+     "top": 9015
+    },
+    {
+     "w": 311,
+     "h": 215,
+     "alt": "Software Advice AP Front Runner 2025",
+     "src": "https://www.stampli.com/wp-content/uploads/2026/01/Group-216.svg",
+     "top": 9412
+    }
+   ],
+   "imgCount": 25,
+   "logoish": 6,
+   "videos": [],
+   "canvases": 0,
+   "lotties": 0,
+   "iframes": [
+    "",
+    "",
+    "",
+    "about:blank",
+    "about:blank",
+    "",
+    ""
+   ],
+   "fonts": [
+    [
+     "lato",
+     367
+    ],
+    [
+     "Lato",
+     84
+    ],
+    [
+     "Aeonik",
+     58
+    ],
+    [
+     "Oswald",
+     23
+    ],
+    [
+     "oswald",
+     1
+    ]
+   ],
+   "sectionBgs": [
+    [
+     "rgb(255, 255, 255)",
+     1
+    ]
+   ],
+   "buttonBgs": [
+    [
+     "rgb(232, 242, 254)",
+     1
+    ],
+    [
+     "rgb(0, 174, 239)",
+     1
+    ]
+   ],
+   "type": {
+    "h1": {
+     "family": "Oswald, sans-serif",
+     "size": "50px",
+     "weight": "400",
+     "lineHeight": "50px",
+     "letterSpacing": "-2px",
+     "color": "rgb(30, 60, 116)"
+    },
+    "h2": null,
+    "body": {
+     "family": "lato, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, \"Noto Sans\", sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+     "size": "16px",
+     "color": "rgb(106, 105, 134)",
+     "bg": "rgba(0, 0, 0, 0)"
+    }
+   },
+   "motionAfterScroll": {
+    "animations": {},
+    "opacityZeroEls": 1,
+    "transitionEls": 417,
+    "stickyFixedEls": 9
+   },
+   "libs": {
+    "gsap": false,
+    "framer": false,
+    "webflow": false,
+    "lottie": false,
+    "splide_swiper": true,
+    "rive": false,
+    "nextjs": false,
+    "wordpress": true,
+    "hubspot": true
+   },
+   "wordCount": 810,
+   "scrollHeight": 11884,
+   "bodyText": "STAMPLI VS. VIC.AI Stampli vs. Vic.ai The key differences between Stampli versus Vic.ai Stampli is built by AP experts for AP first. If you’re considering Vic.ai, ask yourself if you are willing to bet your financial accuracy on a “touchless” system that processes invoices without human oversight. Let's Talk Stampli vs. Vic.ai G2 Satisfaction Scores → 99 Stampli 39 Vic.ai Market Segment Mid-Market SMB Market Presence 72 36 Ease of Use 95% 94% Quality of Support 96% 93% Meets Requirements 92% 91% The G2 scores in this chart are from the AP Automation category officially released for Winter 2026. Companies big and small trust Stampli with $90 billion in AP spend...and counting Why choose Stampli instead of Vic.ai for Procurement & AP automation? Stampli keeps you in control Vic.ai aims for “autonomous” processing that bypasses human review, increasing the risk of incorrect coding or fraud. Stampli’s AI doesn’t need a human backstop Vic.ai requires a long implementation phase to ingest and process historical data. The system is ineffective until it has “learned” your patterns over time. Stampli ensures total audit readiness Vic.ai’s decision logic is opaque. If the AI miscodes an expense, you cannot see why it happened, leaving you without answers during an audit. Stampli resolves the complex exceptions Vic.ai struggles when invoices don’t match a standard pattern, dumping the work back on you. What should you ask Vic.ai about? If you’re comparing Stampli versus Vic.ai, here are a few questions you should ask Vic.ai. Does the AI require a \"Historical Data\" upload before we can start? Is the goal \"Autonomy\" or \"Verification\"? Does \"Autonomy\" reduce risk, or just hide it? How real-time is the PO and Receiving data? Does the integration support our custom ERP fields? How do you handle invoices that require clarification or exception resolution? Stampli is built for the way YOU run AP Least disruption No need to rework the ERP or change your AP processes Ensure control & compliance Fully configurable and auditable payment workflows Most control One place for all your communication, documentation and workflows Smartest AI Billy assists you across the entire invoice lifecycle Fastest to value Deploys in weeks, not months, with minimal user training What do Stampli customers appreciate most? “Stampli allows for us to more accurately project cash flow, which helps us provide drastically better financial guidance to our owners.” AMANDA BROWN Controller, Wenspok Companies Stampli provided an easy-to-use interface and smart AI that others couldn’t measure up to. The overall customer experience was also much more positive in comparison. ALYSSA A. Senior Accountant “Many AP automation companies have started in the payments industry and gradually expanded to AP, but Stampli started in AP. I like that Stampli was AP first.” CURTIS ASH CFO, Avid Acceptance “I’d say Stampli displaces $150K to $200K in labor expenses annually, while providing more accuracy and reducing human error.” ANTHONY FERNANDES Financial Controller, Alden Renewables “Stampli allows for us to more accurately project cash flow, which helps us provide drastically better financial guidance to our owners.” AMANDA BROWN Controller, Wenspok Companies Stampli provided an easy-to-use interface and smart AI that others couldn’t measure up to. The overall customer experience was also much more positive in comparison. ALYSSA A. Senior Accountant Stampli vs. Vic.ai for Procurement & AP automation Want to see the differences for yourself? Connect with our team for a demo based on your specific ERP environment. Company HQ location* Alabama Alaska Arizona Arkansas California Colorado Connecticut Delaware Florida Georgia Hawaii Idaho Illinois Indiana Iowa Kansas Kentucky Louisiana Maine Maryland Massachusetts Michigan Minnesota Mississippi Missouri Montana Nebraska Nevada New Hampshire New Jersey New Mexico New York North Carolina North Dakota Ohio Oklahoma Oregon Pennsylvania Rhode Island South Carolina South Dakota Tennessee Texas Utah Vermont Virginia Washington Washington DC West Virginia Wisconsin Wyoming Other Number of employees* 1-99 100 - 299 300-499 500-1999 2,000 to 4,999 5,000 to 9,999 10,000 or more What ERP system are you currently using?* Acumatica DealerTrack IFS Bolo IFS Cloud ERP Infinity ERP MatrixCare Microsoft Dynamics 365 Business Central Microsoft Dynamics Finance & Operations Microsoft Dynamics GP MIP Fund Netsuite Oracle Fusion Other Quickbooks Desktop Quickbooks Online Sage 100 Sage 100 Contractor Sage 300 CRE Sage Intacct Sage Intacct Construction Sage Intacct Real Estate SAP (Version Unknown) SAP ECC SAP R/3 SAP S4 HANA SAP S4 Hana Private Cloud SAP S4 Hana Public Cloud Stampli is typically a strong fit for teams at 300+ monthly invoice volume. Do you process at least 300 invoices per month? Yes No By submitting your information, you acknowledge that your data will be handled in accordance with Stampli’s Terms of Service and Privacy Policy, and you authorize Stampli to send you updates about Stampli products, services, and events. Stampli Products Accounting Systems Industries Role Resources Contact © 2026 Stampli, All rights reserved. Your Privacy Choices Policy Center Terms of Service Privacy Licenses"
+  },
+  "1440": {
+   "status": 200,
+   "shot": "/home/ubuntu/Dev/Wes-doc/docs/research/benchmark-captures/stampli/stampli-vs-vicai-1440.png",
+   "initialMotion": {
+    "opacityZeroEls": 0,
+    "animations": {},
+    "transitionEls": 412,
+    "total": 1442
+   },
+   "errors": [
+    "overlaysHidden=0"
+   ],
+   "title": "Compare Stampli vs. Vic.ai for AP Automation",
+   "h1": "Stampli vs. Vic.ai",
+   "subhead": null,
+   "headings": [
+    {
+     "tag": "H1",
+     "text": "Stampli vs. Vic.ai",
+     "top": 293
+    },
+    {
+     "tag": "H3",
+     "text": "Companies big and small trust Stampli with $90 billion in AP spend...and counting",
+     "top": 932
+    },
+    {
+     "tag": "H3",
+     "text": "Why choose Stampli instead of Vic.ai for Procurement & AP automation?",
+     "top": 1420
+    },
+    {
+     "tag": "H3",
+     "text": "What should you ask Vic.ai about?",
+     "top": 1968
+    },
+    {
+     "tag": "H3",
+     "text": "Stampli is built for the way YOU run AP",
+     "top": 2641
+    },
+    {
+     "tag": "H3",
+     "text": "Least disruption",
+     "top": 2859
+    },
+    {
+     "tag": "H3",
+     "text": "Ensure control & compliance",
+     "top": 2859
+    },
+    {
+     "tag": "H3",
+     "text": "Most control",
+     "top": 2859
+    },
+    {
+     "tag": "H3",
+     "text": "Smartest AI",
+     "top": 2859
+    },
+    {
+     "tag": "H3",
+     "text": "Fastest to value",
+     "top": 2859
+    },
+    {
+     "tag": "H3",
+     "text": "What do Stampli customers appreciate most?",
+     "top": 3126
+    },
+    {
+     "tag": "H3",
+     "text": "Stampli vs. Vic.ai for Procurement & AP automation",
+     "top": 4429
+    },
+    {
+     "tag": "H3",
+     "text": "Stampli",
+     "top": 5451
+    },
+    {
+     "tag": "H3",
+     "text": "Products",
+     "top": 5451
+    },
+    {
+     "tag": "H3",
+     "text": "Accounting Systems",
+     "top": 5451
+    },
+    {
+     "tag": "H3",
+     "text": "Industries",
+     "top": 5451
+    },
+    {
+     "tag": "H3",
+     "text": "Role",
+     "top": 5755
+    },
+    {
+     "tag": "H3",
+     "text": "Resources",
+     "top": 5451
+    },
+    {
+     "tag": "H3",
+     "text": "Contact",
+     "top": 5451
+    }
+   ],
+   "sections": [
+    {
+     "top": 932,
+     "height": 212,
+     "heading": "Companies big and small trust Stampli with $90 billion in AP spend...and counting",
+     "imgs": 6,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 81,
+     "snippet": "Companies big and small trust Stampli with $90 billion in AP spend...and counting"
+    },
+    {
+     "top": 2641,
+     "height": 405,
+     "heading": "Stampli is built for the way YOU run AP",
+     "imgs": 1,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 408,
+     "snippet": "Stampli is built for the way YOU run AP Least disruption No need to rework the ERP or change your AP processes Ensure control & compliance Fully configurable and auditable payment workflows Most control One place for all"
+    },
+    {
+     "top": 3707,
+     "height": 594,
+     "heading": "",
+     "imgs": 7,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 0,
+     "snippet": ""
+    },
+    {
+     "top": 5451,
+     "height": 176,
+     "heading": "Stampli",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 49,
+     "snippet": "Stampli About Us Careers Customer Support Contact"
+    },
+    {
+     "top": 5451,
+     "height": 336,
+     "heading": "Products",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 150,
+     "snippet": "Products Procure-to-Pay Procurement Vendor Management Accounts Payable Payments Expense Management Stampli Deep Finance ERP Integrations Contact Sales"
+    },
+    {
+     "top": 5451,
+     "height": 588,
+     "heading": "Accounting Systems",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 304,
+     "snippet": "Accounting Systems Acumatica Dealertrack DMS Microsoft Dynamics 365 Business Central Microsoft Dynamics 365 Finance Microsoft Dynamics Great Plains Oracle Fusion Cloud ERP Oracle NetSuite Sage 100 Sage Intacct Sage Intac"
+    },
+    {
+     "top": 5755,
+     "height": 164,
+     "heading": "Role",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 38,
+     "snippet": "Role CFO Controller AP Teams Approvers"
+    },
+    {
+     "top": 5451,
+     "height": 528,
+     "heading": "Resources",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 278,
+     "snippet": "Resources Become a Partner Refer Stampli Resources Library Blog Newsletter Stampli G2 Report Stampli Reviews & Awards Customer Stories AI Information What is Accounts Payable What is Invoice Processing What are B2B Payme"
+    },
+    {
+     "top": 5451,
+     "height": 140,
+     "heading": "Contact",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 80,
+     "snippet": "Contact sales@stampli.com 800 California Street, Floor 2 Mountain View, CA 94041"
+    }
+   ],
+   "navLinks": [
+    "Products",
+    "Integrations",
+    "Customers",
+    "Resources",
+    "Partners",
+    "Customer login",
+    "Contact sales"
+   ],
+   "heroCtas": [
+    {
+     "text": "Let's Talk",
+     "tag": "A",
+     "href": "https://www.stampli.com/contact"
+    }
+   ],
+   "bigImgs": [],
+   "imgCount": 26,
+   "logoish": 7,
+   "videos": [],
+   "canvases": 0,
+   "lotties": 0,
+   "iframes": [
+    "",
+    "",
+    "",
+    "about:blank",
+    "about:blank",
+    "",
+    ""
+   ],
+   "fonts": [
+    [
+     "lato",
+     382
+    ],
+    [
+     "Aeonik",
+     205
+    ],
+    [
+     "Lato",
+     90
+    ],
+    [
+     "Oswald",
+     23
+    ],
+    [
+     "oswald",
+     1
+    ]
+   ],
+   "sectionBgs": [
+    [
+     "rgb(255, 255, 255)",
+     1
+    ]
+   ],
+   "buttonBgs": [
+    [
+     "rgb(232, 242, 254)",
+     1
+    ],
+    [
+     "rgb(0, 136, 247)",
+     1
+    ],
+    [
+     "rgb(0, 174, 239)",
+     1
+    ]
+   ],
+   "type": {
+    "h1": {
+     "family": "Oswald, sans-serif",
+     "size": "72px",
+     "weight": "400",
+     "lineHeight": "72px",
+     "letterSpacing": "-2px",
+     "color": "rgb(30, 60, 116)"
+    },
+    "h2": null,
+    "body": {
+     "family": "lato, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, \"Noto Sans\", sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+     "size": "16px",
+     "color": "rgb(106, 105, 134)",
+     "bg": "rgba(0, 0, 0, 0)"
+    }
+   },
+   "motionAfterScroll": {
+    "animations": {},
+    "opacityZeroEls": 1,
+    "transitionEls": 412,
+    "stickyFixedEls": 9
+   },
+   "libs": {
+    "gsap": false,
+    "framer": false,
+    "webflow": false,
+    "lottie": false,
+    "splide_swiper": true,
+    "rive": false,
+    "nextjs": false,
+    "wordpress": true,
+    "hubspot": true
+   },
+   "wordCount": 1008,
+   "scrollHeight": 6477,
+   "bodyText": "Products Integrations Customers Resources Partners Customer login Contact sales STAMPLI VS. VIC.AI Stampli vs. Vic.ai The key differences between Stampli versus Vic.ai Stampli is built by AP experts for AP first. If you’re considering Vic.ai, ask yourself if you are willing to bet your financial accuracy on a “touchless” system that processes invoices without human oversight. Let's Talk Stampli vs. Vic.ai G2 Satisfaction Scores → 99 Stampli 39 Vic.ai Market Segment Mid-Market SMB Market Presence 72 36 Ease of Use 95% 94% Quality of Support 96% 93% Meets Requirements 92% 91% The G2 scores in this chart are from the AP Automation category officially released for Winter 2026. Companies big and small trust Stampli with $90 billion in AP spend...and counting Why choose Stampli instead of Vic.ai for Procurement & AP automation? Stampli keeps you in control Vic.ai aims for “autonomous” processing that bypasses human review, increasing the risk of incorrect coding or fraud. Stampli’s AI doesn’t need a human backstop Vic.ai requires a long implementation phase to ingest and process historical data. The system is ineffective until it has “learned” your patterns over time. Stampli ensures total audit readiness Vic.ai’s decision logic is opaque. If the AI miscodes an expense, you cannot see why it happened, leaving you without answers during an audit. Stampli resolves the complex exceptions Vic.ai struggles when invoices don’t match a standard pattern, dumping the work back on you. What should you ask Vic.ai about? If you’re comparing Stampli versus Vic.ai, here are a few questions you should ask Vic.ai. Does the AI require a \"Historical Data\" upload before we can start? Is the goal \"Autonomy\" or \"Verification\"? Does \"Autonomy\" reduce risk, or just hide it? How real-time is the PO and Receiving data? Does the integration support our custom ERP fields? How do you handle invoices that require clarification or exception resolution? Stampli is built for the way YOU run AP Least disruption No need to rework the ERP or change your AP processes Ensure control & compliance Fully configurable and auditable payment workflows Most control One place for all your communication, documentation and workflows Smartest AI Billy assists you across the entire invoice lifecycle Fastest to value Deploys in weeks, not months, with minimal user training What do Stampli customers appreciate most? “I’d say Stampli displaces $150K to $200K in labor expenses annually, while providing more accuracy and reducing human error.” ANTHONY FERNANDES Financial Controller, Alden Renewables “Stampli allows for us to more accurately project cash flow, which helps us provide drastically better financial guidance to our owners.” AMANDA BROWN Controller, Wenspok Companies Stampli provided an easy-to-use interface and smart AI that others couldn’t measure up to. The overall customer experience was also much more positive in comparison. ALYSSA A. Senior Accountant “Many AP automation companies have started in the payments industry and gradually expanded to AP, but Stampli started in AP. I like that Stampli was AP first.” CURTIS ASH CFO, Avid Acceptance “I’d say Stampli displaces $150K to $200K in labor expenses annually, while providing more accuracy and reducing human error.” ANTHONY FERNANDES Financial Controller, Alden Renewables “Stampli allows for us to more accurately project cash flow, which helps us provide drastically better financial guidance to our owners.” AMANDA BROWN Controller, Wenspok Companies Stampli provided an easy-to-use interface and smart AI that others couldn’t measure up to. The overall customer experience was also much more positive in comparison. ALYSSA A. Senior Accountant “Many AP automation companies have started in the payments industry and gradually expanded to AP, but Stampli started in AP. I like that Stampli was AP first.” CURTIS ASH CFO, Avid Acceptance Stampli vs. Vic.ai for Procurement & AP automation Want to see the differences for yourself? Connect with our team for a demo based on your specific ERP environment. Company HQ location* Alabama Alaska Arizona Arkansas California Colorado Connecticut Delaware Florida Georgia Hawaii Idaho Illinois Indiana Iowa Kansas Kentucky Louisiana Maine Maryland Massachusetts Michigan Minnesota Mississippi Missouri Montana Nebraska Nevada New Hampshire New Jersey New Mexico New York North Carolina North Dakota Ohio Oklahoma Oregon Pennsylvania Rhode Island South Carolina South Dakota Tennessee Texas Utah Vermont Virginia Washington Washington DC West Virginia Wisconsin Wyoming Other Number of employees* 1-99 100 - 299 300-499 500-1999 2,000 to 4,999 5,000 to 9,999 10,000 or more What ERP system are you currently using?* Acumatica DealerTrack IFS Bolo IFS Cloud ERP Infinity ERP MatrixCare Microsoft Dynamics 365 Business Central Microsoft Dynamics Finance & Operations Microsoft Dynamics GP MIP Fund Netsuite Oracle Fusion Other Quickbooks Desktop Quickbooks Online Sage 100 Sage 100 Contractor Sage 300 CRE Sage Intacct Sage Intacct Construction Sage Intacct Real Estate SAP (Version Unknown) SAP ECC SAP R/3 SAP S4 HANA SAP S4 Hana Private Cloud SAP S4 Hana Public Cloud Stampli is typically a strong fit for teams at 300+ monthly invoice volume. Do you process at least 300 invoices per month? Yes No By submitting your information, you acknowledge that your data will be handled in accordance with Stampli’s Terms of Service and Privacy Policy, and you authorize Stampli to send you updates about Stampli products, services, and events. Stampli About Us Careers Customer Support Contact Products Procure-to-Pay Procurement Vendor Management Accounts Payable Payments Expense Management Stampli Deep Finance ERP Integrations Contact Sales Accounting Systems Acumatica Dealertrack DMS Microsoft Dynamics 365 Business Central Microsoft Dynamics 365 Finance Microsoft Dynamics Great Plains Oracle Fusion Cloud ERP Oracle NetSuite Sage 100 Sage Intacct Sage Intacct Construction QuickBooks Desktop QuickBooks Online SAP ECC SAP S/4HANA All Systems Industries Automotive Construction Health Care Manufacturing Oil, Gas, & Energy Professional Services Transportation & Logistics All Industries Role CFO Controller AP Teams Approvers Resources Become a Partner Refer Stampli Resources Library Blog Newsletter Stampli G2 Report Stampli Reviews & Awards Customer Stories AI Information What is Accounts Payable What is Invoice Processing What are B2B Payments What are ACH Payments AP Automation Invoice Management Contact sales@stampli.com 800 California Street, Floor 2 Mountain View, CA 94041 © 2026 Stampli, All rights reserved. Your Privacy Choices Policy Center Terms of Service Privacy Licenses"
+  }
+ }
+}

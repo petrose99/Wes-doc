@@ -26,7 +26,7 @@ export async function listPlaceableDocumentsAction(
 
   const [docs, placedIds] = await Promise.all([
     listWorkspaceDocuments(workspaceId, { stage: "approved" }),
-    listPlacedDocumentIds(fileId),
+    listPlacedDocumentIds(workspaceId, fileId),
   ])
 
   const placedSet = new Set(placedIds)

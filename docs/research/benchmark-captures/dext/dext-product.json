@@ -1,0 +1,690 @@
+{
+ "slug": "dext-product",
+ "label": "Dext capture receipts and invoices",
+ "url": "https://dext.com/en/business/product/capture-receipts-and-invoices",
+ "accessed": "2026-09-19T12:18:19.886Z",
+ "views": {
+  "390": {
+   "status": 200,
+   "shot": "/home/ubuntu/Dev/Wes-doc/docs/research/benchmark-captures/dext/dext-product-390.png",
+   "initialMotion": {
+    "opacityZeroEls": 0,
+    "animations": {
+     "slider-ticker-scroll 40s infinite": 2,
+     "pulsar 2s 5": 1,
+     "fadein 0.35s 1": 7
+    },
+    "transitionEls": 105,
+    "total": 2683
+   },
+   "errors": [
+    "overlaysHidden=2"
+   ],
+   "title": "Capture Receipts & Invoices | Invoicing Software Small Business | Dext",
+   "h1": "Receipt and invoice capture software for small businesses",
+   "subhead": null,
+   "headings": [
+    {
+     "tag": "H1",
+     "text": "Receipt and invoice capture software for small businesses",
+     "top": 92
+    },
+    {
+     "tag": "H3",
+     "text": "Multiple ways to",
+     "top": 1353
+    },
+    {
+     "tag": "H2",
+     "text": "collect what you need",
+     "top": 1398
+    },
+    {
+     "tag": "H2",
+     "text": "See Dext in action",
+     "top": 2251
+    },
+    {
+     "tag": "H2",
+     "text": "Dext's receipt and invoice capture software makes life effortlessly paper-free",
+     "top": 2739
+    },
+    {
+     "tag": "H2",
+     "text": "Plans to suit your business",
+     "top": 5689
+    },
+    {
+     "tag": "H2",
+     "text": "Our support service is at your disposal",
+     "top": 7629
+    },
+    {
+     "tag": "H2",
+     "text": "Receipt and invoice capture FAQs",
+     "top": 8317
+    },
+    {
+     "tag": "H2",
+     "text": "Try Dext yourself with our 14-day free trial",
+     "top": 8780
+    }
+   ],
+   "sections": [
+    {
+     "top": 60,
+     "height": 9728,
+     "heading": "Receipt and invoice capture software for small businesses",
+     "imgs": 41,
+     "svgs": 174,
+     "videos": 0,
+     "ctas": [
+      "Start a free trial",
+      "Start a free trial",
+      "View pricing plans",
+      "Start a free trial",
+      "See receipt scanner app",
+      "Start a free trial"
+     ],
+     "textLen": 7169,
+     "snippet": "Start a free trial Receipt and invoice capture software for small businesses Easily capture receipts and invoices any way you like – mobile app, email, or drag-and-drop, and our powerful AI instantly extracts every detai"
+    },
+    {
+     "top": 60,
+     "height": 784,
+     "heading": "",
+     "imgs": 0,
+     "svgs": 7,
+     "videos": 0,
+     "ctas": [
+      "For Businesses",
+      "For Accountants & Bookkeepers",
+      "Pricing",
+      "Resources",
+      "Start a free trial",
+      "Log in"
+     ],
+     "textLen": 95,
+     "snippet": "For Businesses For Accountants & Bookkeepers Pricing Resources Start a free trial Log in Retour"
+    },
+    {
+     "top": 0,
+     "height": 844,
+     "heading": "",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 0,
+     "snippet": ""
+    }
+   ],
+   "navLinks": [
+    "Start a free trial"
+   ],
+   "heroCtas": [
+    {
+     "text": "Start a free trial",
+     "tag": "A",
+     "href": "https://app.dext.com/signups"
+    },
+    {
+     "text": "View pricing plans",
+     "tag": "A",
+     "href": "/business/pricing"
+    },
+    {
+     "text": "For Businesses",
+     "tag": "BUTTON",
+     "href": null
+    },
+    {
+     "text": "For Accountants & Bookkeepers",
+     "tag": "BUTTON",
+     "href": null
+    },
+    {
+     "text": "Pricing",
+     "tag": "BUTTON",
+     "href": null
+    },
+    {
+     "text": "Resources",
+     "tag": "BUTTON",
+     "href": null
+    },
+    {
+     "text": "Start a free trial",
+     "tag": "A",
+     "href": "https://app.dext.com/en/signups"
+    },
+    {
+     "text": "Log in",
+     "tag": "A",
+     "href": "https://app.dext.com/login/"
+    },
+    {
+     "text": "Retour",
+     "tag": "BUTTON",
+     "href": null
+    }
+   ],
+   "bigImgs": [
+    {
+     "w": 335,
+     "h": 301,
+     "alt": "",
+     "src": "https://assets.dext.com/api/v1/image/assets%2F1b6ae8870b9341c0bb10634cd51cea2b%2F4403be9019854510ad092b1eb501a2c7",
+     "top": 547
+    },
+    {
+     "w": 335,
+     "h": 192,
+     "alt": "",
+     "src": "https://assets.dext.com/api/v1/image/assets%2F1b6ae8870b9341c0bb10634cd51cea2b%2F23efae5533f446e0b59fb89712673bb8?format=webp",
+     "top": 2415
+    },
+    {
+     "w": 301,
+     "h": 271,
+     "alt": "",
+     "src": "https://assets.dext.com/api/v1/image/assets%2F1b6ae8870b9341c0bb10634cd51cea2b%2F97af3e1dac214e8aa758d4a26c5483ff",
+     "top": 2977
+    },
+    {
+     "w": 301,
+     "h": 271,
+     "alt": "",
+     "src": "https://assets.dext.com/api/v1/image/assets%2F1b6ae8870b9341c0bb10634cd51cea2b%2Fe9ed20e91c6d4cd7b5eac962bd6e0639",
+     "top": 3644
+    },
+    {
+     "w": 301,
+     "h": 271,
+     "alt": "",
+     "src": "https://assets.dext.com/api/v1/image/assets%2F1b6ae8870b9341c0bb10634cd51cea2b%2F9c3d2fced911428a96b3ee6c361ecbcf",
+     "top": 4354
+    },
+    {
+     "w": 301,
+     "h": 271,
+     "alt": "",
+     "src": "https://assets.dext.com/api/v1/image/assets%2F1b6ae8870b9341c0bb10634cd51cea2b%2Ff5cb16b1a3f547df8ba96c75025db42b",
+     "top": 5021
+    }
+   ],
+   "imgCount": 31,
+   "logoish": 0,
+   "videos": [],
+   "canvases": 1,
+   "lotties": 0,
+   "iframes": [
+    "https://widget.trustpilot.com/trustboxes/53aa8807dec7e10d38f59f32/index.html?templateId=53aa8807dec7e10d38f59f32&busines",
+    "https://widget.trustpilot.com/trustboxes/53aa8807dec7e10d38f59f32/index.html?templateId=53aa8807dec7e10d38f59f32&busines",
+    "https://widget.trustpilot.com/trustboxes/53aa8807dec7e10d38f59f32/index.html?templateId=53aa8807dec7e10d38f59f32&busines",
+    "https://widget.trustpilot.com/trustboxes/53aa8807dec7e10d38f59f32/index.html?templateId=53aa8807dec7e10d38f59f32&busines",
+    "https://app-eu1.hubspot.com/conversations-visitor/1614934/threads/utk/f96cbd162ee543eea51934d8bcdeb49b?uuid=bf742457180d"
+   ],
+   "fonts": [
+    [
+     "Roboto",
+     1426
+    ],
+    [
+     "Inter",
+     67
+    ]
+   ],
+   "sectionBgs": [
+    [
+     "rgb(255, 255, 255)",
+     1
+    ],
+    [
+     "rgb(255, 205, 179)",
+     1
+    ]
+   ],
+   "buttonBgs": [
+    [
+     "rgb(12, 35, 64)",
+     11
+    ],
+    [
+     "rgb(195, 203, 213)",
+     7
+    ],
+    [
+     "rgb(255, 90, 1)",
+     1
+    ],
+    [
+     "rgb(0, 0, 0)",
+     1
+    ]
+   ],
+   "type": {
+    "h1": {
+     "family": "Inter, \"Inter Fallback\"",
+     "size": "32px",
+     "weight": "900",
+     "lineHeight": "36.8px",
+     "letterSpacing": "-0.96px",
+     "color": "rgb(0, 0, 0)"
+    },
+    "h2": {
+     "family": "Inter, \"Inter Fallback\"",
+     "size": "30px",
+     "weight": "900"
+    },
+    "body": {
+     "family": "\"Times New Roman\"",
+     "size": "16px",
+     "color": "rgb(0, 0, 0)",
+     "bg": "rgba(0, 0, 0, 0)"
+    }
+   },
+   "motionAfterScroll": {
+    "animations": {
+     "slider-ticker-scroll 40s infinite": 2,
+     "enlargeSlRipple 1.5s infinite": 1,
+     "pulsar 2s 5": 1
+    },
+    "opacityZeroEls": 1,
+    "transitionEls": 120,
+    "stickyFixedEls": 11
+   },
+   "libs": {
+    "gsap": false,
+    "framer": false,
+    "webflow": false,
+    "lottie": false,
+    "splide_swiper": true,
+    "rive": false,
+    "nextjs": true,
+    "wordpress": false,
+    "hubspot": true
+   },
+   "wordCount": 1243,
+   "scrollHeight": 9788,
+   "bodyText": "Start a free trial Receipt and invoice capture software for small businesses Easily capture receipts and invoices any way you like – mobile app, email, or drag-and-drop, and our powerful AI instantly extracts every detail with 99.9% accuracy. Fewer errors, less admin, and real-time visibility across your books. Start a free trial View pricing plans No credit card required. 4.4 based on 580+ reviews 4.8 based on 1110+ reviews 4.8 based on 91110+ ratings 4.8 based on 12880+ reviews 4.6 based on 380+ reviews 4.4 based on 580+ reviews 4.8 based on 1110+ reviews 4.8 based on 91110+ ratings 4.8 based on 12880+ reviews 4.6 based on 380+ reviews 4.4 based on 580+ reviews 4.8 based on 1110+ reviews 4.8 based on 91110+ ratings 4.8 based on 12880+ reviews 4.6 based on 380+ reviews 4.4 based on 580+ reviews 4.8 based on 1110+ reviews 4.8 based on 91110+ ratings 4.8 based on 12880+ reviews 4.6 based on 380+ reviews G2 Regional Leader Spring 2026 G2 Momentum Leader Summer 2026 Best Expense Software 2025 Small Business App of the Year Winner 2024 • UK • US Best Accounting Cloud-Based Software 2023 G2 Regional Leader Spring 2026 G2 Momentum Leader Summer 2026 Best Expense Software 2025 Small Business App of the Year Winner 2024 • UK • US Best Accounting Cloud-Based Software 2023 G2 Regional Leader Spring 2026 G2 Momentum Leader Summer 2026 Best Expense Software 2025 Small Business App of the Year Winner 2024 • UK • US Best Accounting Cloud-Based Software 2023 G2 Regional Leader Spring 2026 G2 Momentum Leader Summer 2026 Best Expense Software 2025 Small Business App of the Year Winner 2024 • UK • US Best Accounting Cloud-Based Software 2023 Multiple ways to collect what you need Mobile Upload Invoice fetch Email Mobile You can quickly and easily scan receipts and invoices with our mobile bookkeeping app. Snap a photo and press submit. Dext then extracts the data you need automatically. No more crumpled paper and lost receipts. Start a free trial See receipt scanner app See Dext in action Learn how Dext works with all the applications and services you know and love. Watch the product tour. Start a free trial Dext's receipt and invoice capture software makes life effortlessly paper-free Upload receipts and invoices your way Stop chasing invoices or entering data manually. No more piles of receipts or the stress of losing them. Dext captures and organises every document in seconds, ready for your accounting software. Scan, upload, or forward by email. However you work, Dext fits in. Start a free trial View pricing Extract data line by line with unmatched accuracy Manually splitting out line items wastes time and invites mistakes. Dext’s AI captures every detail, from supplier and date to tax and total, with 99.9% accuracy. No guesswork. No manual entry. Just complete, audit-ready data you can trust. Start free trial Line item extraction Automatically categorise transactions Dext’s AI-powered automation remembers how you categorise suppliers, payments, and tax codes — then applies those rules automatically. It even detects duplicates and learns over time for greater accuracy. Rest easy, knowing every transaction is handled right, every time. Start a free trial View pricing Stay in control with complete visibility anytime, every time Because every receipt, invoice, and document is securely captured in Dext, you always have an accurate, up-to-date view of your business numbers – all in one place and ready when you need it. No chasing files. No missing data. No last-minute surprises at tax time. Start a free trial Plans to suit your business All pricing plans cover the accounting essentials, with room to grow. 🌍 Rest of the World 🇪🇺 European Union 🇬🇧 United Kingdom 🇺🇸 USA 🇦🇺 APAC 🇨🇦 Canada 🇿🇦 South Africa 🇮🇪 Ireland Monthly Annual Up to 20% cheaper with an annual subscription $25.21 Per Month USD, Excludes VAT , $302.50 billed annually 250 Documents Per Month 5 Users Drag slider to increase allowance Start a free trial Free credits included 10 Sheets of Bank Statement Extraction ? 5 Documents with Line item Extraction ? 5 Supplier Statement Extraction ? Looking to set up more than 5 business entities on Dext? Get in touch with us to discuss bespoke pricing options → Start a free trial “It’s changed my life. Dext is so simple to use. I am up to date all the time now” Franky W, UK “As a small business owner, Dext makes my accounting life so much easier. No more laborious inputting of data, just simply scan receipts on my phone and they are all automatically organised. Expenses used to be a pain in the neck, now I hardly have to think about them!” Tony Gray, UK “I'm not an accounting guy but this program is so user friendly that I now process all my invoices. My bookkeeper has all the stuff processed.” George Yiannoulis “My accountant uses this service and rather than bringing them a pile of bills, I need only drop them on Dext. Makes my life more simple! ” Hawkes “The software efficiently extracts important information from invoices, bank statements, and other documents, saving time compared to manual data entry. Great software!!!” Pritchard Chitowa “Works like a charm, it’s easy to use and connects with our accounting package seamlessly. I can’t think how this was possible in the past.” Greg S. “Dext is brilliant! It is so easy and quick to use. The process at the end of year runs are much quicker and is very smooth. ” D Matthews “It’s changed my life. Dext is so simple to use. I am up to date all the time now” Franky W, UK “As a small business owner, Dext makes my accounting life so much easier. No more laborious inputting of data, just simply scan receipts on my phone and they are all automatically organised. Expenses used to be a pain in the neck, now I hardly have to think about them!” Tony Gray, UK “I'm not an accounting guy but this program is so user friendly that I now process all my invoices. My bookkeeper has all the stuff processed.” George Yiannoulis “My accountant uses this service and rather than bringing them a pile of bills, I need only drop them on Dext. Makes my life more simple! ” Hawkes 1 2 3 4 5 6 7 Our support service is at your disposal Our support service answers your technical questions by chat or email and offers you valuable advice to support your digital transition. customer satisfaction rating (NPS) 48 hours median time to first response + 250 tutorials available on our Help Centre Receipt and invoice capture FAQs How to extract invoice data? How do we capture invoice data? Can AI do my invoices? Which invoice capture software is best? How to get started with Dext Invoice Capture? How accurate is Dext’s OCR? Is my data secure and compliant? Try Dext yourself with our 14-day free trial Discover why over 700,000 customers worldwide use Dext to make more time for business and what they do best. Start a free trial View pricing Products Sectors Resources Support 🌍 Rest of the World 🇦🇺 APAC 🇨🇦 Canada 🇬🇧 United Kingdom 🇺🇸 USA 🇫🇷 France 🇨🇦 French Canada 🇿🇦 South Africa Trust Center Terms and conditions Cookie Policy Website use Diversity statement Privacy policy Modern slavery statement Dext © Copyright 2026 For Businesses For Accountants & Bookkeepers Pricing Resources Start a free trial Log in Retour"
+  },
+  "1440": {
+   "status": 200,
+   "shot": "/home/ubuntu/Dev/Wes-doc/docs/research/benchmark-captures/dext/dext-product-1440.png",
+   "initialMotion": {
+    "opacityZeroEls": 0,
+    "animations": {
+     "slider-ticker-scroll 40s infinite": 2,
+     "pulsar 2s 5": 1,
+     "fadein 0.35s 1": 7
+    },
+    "transitionEls": 105,
+    "total": 2683
+   },
+   "errors": [
+    "overlaysHidden=1"
+   ],
+   "title": "Capture Receipts & Invoices | Invoicing Software Small Business | Dext",
+   "h1": "Receipt and invoice capture software for small businesses",
+   "subhead": null,
+   "headings": [
+    {
+     "tag": "H1",
+     "text": "Receipt and invoice capture software for small businesses",
+     "top": 144
+    },
+    {
+     "tag": "H3",
+     "text": "Multiple ways to",
+     "top": 1311
+    },
+    {
+     "tag": "H2",
+     "text": "collect what you need",
+     "top": 1374
+    },
+    {
+     "tag": "H2",
+     "text": "See Dext in action",
+     "top": 2216
+    },
+    {
+     "tag": "H2",
+     "text": "Dext's receipt and invoice capture software makes life effortlessly paper-free",
+     "top": 3184
+    },
+    {
+     "tag": "H2",
+     "text": "Plans to suit your business",
+     "top": 5616
+    },
+    {
+     "tag": "H2",
+     "text": "Join thousands of businesses already on Dext",
+     "top": 6510
+    },
+    {
+     "tag": "H2",
+     "text": "Our support service is at your disposal",
+     "top": 8028
+    },
+    {
+     "tag": "H2",
+     "text": "Receipt and invoice capture FAQs",
+     "top": 8574
+    },
+    {
+     "tag": "H2",
+     "text": "Try Dext yourself with our 14-day free trial",
+     "top": 9070
+    }
+   ],
+   "sections": [
+    {
+     "top": 88,
+     "height": 9883,
+     "heading": "Receipt and invoice capture software for small businesses",
+     "imgs": 41,
+     "svgs": 174,
+     "videos": 0,
+     "ctas": [
+      "Start a free trial",
+      "Log in",
+      "Start a free trial",
+      "View pricing plans",
+      "Start a free trial",
+      "See receipt scanner app"
+     ],
+     "textLen": 9918,
+     "snippet": "For Businesses For Accountants & Bookkeepers Pricing Resources Start a free trial Log in Receipt and invoice capture software for small businesses Easily capture receipts and invoices any way you like – mobile app, email"
+    },
+    {
+     "top": 804,
+     "height": 96,
+     "heading": "",
+     "imgs": 0,
+     "svgs": 1,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 0,
+     "snippet": ""
+    }
+   ],
+   "navLinks": [
+    "Start a free trial",
+    "Log in"
+   ],
+   "heroCtas": [
+    {
+     "text": "Start a free trial",
+     "tag": "A",
+     "href": "https://app.dext.com/signups"
+    },
+    {
+     "text": "View pricing plans",
+     "tag": "A",
+     "href": "/business/pricing"
+    },
+    {
+     "text": "4.4 based on 580+ reviews",
+     "tag": "A",
+     "href": "https://quickbooks.intuit.com/app/apps/appdetails/dext_enhanced_version/"
+    },
+    {
+     "text": "4.8 based on 1110+ reviews",
+     "tag": "A",
+     "href": "https://apps.xero.com/app/dext-prepare?sort=ratingDesc#overview"
+    },
+    {
+     "text": "Trustpilot",
+     "tag": "A",
+     "href": "https://www.trustpilot.com/review/dext.com"
+    },
+    {
+     "text": "4.8 based on 91110+ ratings",
+     "tag": "A",
+     "href": "https://apps.apple.com/us/app/dext-expense-tracker/id418327708"
+    },
+    {
+     "text": "4.8 based on 12880+ reviews",
+     "tag": "A",
+     "href": "https://play.google.com/store/apps/details?id=com.receiptbank.android"
+    },
+    {
+     "text": "4.6 based on 380+ reviews",
+     "tag": "A",
+     "href": "https://www.g2.com/products/dext/reviews?utm_source=rewards-medal"
+    },
+    {
+     "text": "4.4 based on 580+ reviews",
+     "tag": "A",
+     "href": "https://quickbooks.intuit.com/app/apps/appdetails/dext_enhanced_version/"
+    },
+    {
+     "text": "4.8 based on 1110+ reviews",
+     "tag": "A",
+     "href": "https://apps.xero.com/app/dext-prepare?sort=ratingDesc#overview"
+    },
+    {
+     "text": "Trustpilot",
+     "tag": "A",
+     "href": "https://www.trustpilot.com/review/dext.com"
+    },
+    {
+     "text": "4.8 based on 91110+ ratings",
+     "tag": "A",
+     "href": "https://apps.apple.com/us/app/dext-expense-tracker/id418327708"
+    },
+    {
+     "text": "4.8 based on 12880+ reviews",
+     "tag": "A",
+     "href": "https://play.google.com/store/apps/details?id=com.receiptbank.android"
+    },
+    {
+     "text": "4.6 based on 380+ reviews",
+     "tag": "A",
+     "href": "https://www.g2.com/products/dext/reviews?utm_source=rewards-medal"
+    },
+    {
+     "text": "4.4 based on 580+ reviews",
+     "tag": "A",
+     "href": "https://quickbooks.intuit.com/app/apps/appdetails/dext_enhanced_version/"
+    },
+    {
+     "text": "4.8 based on 1110+ reviews",
+     "tag": "A",
+     "href": "https://apps.xero.com/app/dext-prepare?sort=ratingDesc#overview"
+    },
+    {
+     "text": "Trustpilot",
+     "tag": "A",
+     "href": "https://www.trustpilot.com/review/dext.com"
+    },
+    {
+     "text": "4.8 based on 91110+ ratings",
+     "tag": "A",
+     "href": "https://apps.apple.com/us/app/dext-expense-tracker/id418327708"
+    },
+    {
+     "text": "4.8 based on 12880+ reviews",
+     "tag": "A",
+     "href": "https://play.google.com/store/apps/details?id=com.receiptbank.android"
+    },
+    {
+     "text": "4.6 based on 380+ reviews",
+     "tag": "A",
+     "href": "https://www.g2.com/products/dext/reviews?utm_source=rewards-medal"
+    },
+    {
+     "text": "4.4 based on 580+ reviews",
+     "tag": "A",
+     "href": "https://quickbooks.intuit.com/app/apps/appdetails/dext_enhanced_version/"
+    },
+    {
+     "text": "4.8 based on 1110+ reviews",
+     "tag": "A",
+     "href": "https://apps.xero.com/app/dext-prepare?sort=ratingDesc#overview"
+    },
+    {
+     "text": "Trustpilot",
+     "tag": "A",
+     "href": "https://www.trustpilot.com/review/dext.com"
+    },
+    {
+     "text": "4.8 based on 91110+ ratings",
+     "tag": "A",
+     "href": "https://apps.apple.com/us/app/dext-expense-tracker/id418327708"
+    },
+    {
+     "text": "4.8 based on 12880+ reviews",
+     "tag": "A",
+     "href": "https://play.google.com/store/apps/details?id=com.receiptbank.android"
+    },
+    {
+     "text": "4.6 based on 380+ reviews",
+     "tag": "A",
+     "href": "https://www.g2.com/products/dext/reviews?utm_source=rewards-medal"
+    }
+   ],
+   "bigImgs": [
+    {
+     "w": 590,
+     "h": 531,
+     "alt": "",
+     "src": "https://assets.dext.com/api/v1/image/assets%2F1b6ae8870b9341c0bb10634cd51cea2b%2F4403be9019854510ad092b1eb501a2c7",
+     "top": 144
+    },
+    {
+     "w": 435,
+     "h": 523,
+     "alt": "",
+     "src": "https://assets.dext.com/api/v1/image/assets%2F1b6ae8870b9341c0bb10634cd51cea2b%2Ff8d923089e1e4ba7bd3d567492cfc4c3?format=webp",
+     "top": 1579
+    },
+    {
+     "w": 1180,
+     "h": 677,
+     "alt": "",
+     "src": "https://assets.dext.com/api/v1/image/assets%2F1b6ae8870b9341c0bb10634cd51cea2b%2F23efae5533f446e0b59fb89712673bb8?format=webp",
+     "top": 2360
+    },
+    {
+     "w": 488,
+     "h": 439,
+     "alt": "",
+     "src": "https://assets.dext.com/api/v1/image/assets%2F1b6ae8870b9341c0bb10634cd51cea2b%2F97af3e1dac214e8aa758d4a26c5483ff",
+     "top": 3401
+    },
+    {
+     "w": 499,
+     "h": 449,
+     "alt": "",
+     "src": "https://assets.dext.com/api/v1/image/assets%2F1b6ae8870b9341c0bb10634cd51cea2b%2Fe9ed20e91c6d4cd7b5eac962bd6e0639",
+     "top": 3952
+    },
+    {
+     "w": 504,
+     "h": 454,
+     "alt": "",
+     "src": "https://assets.dext.com/api/v1/image/assets%2F1b6ae8870b9341c0bb10634cd51cea2b%2F9c3d2fced911428a96b3ee6c361ecbcf",
+     "top": 4513
+    },
+    {
+     "w": 499,
+     "h": 449,
+     "alt": "",
+     "src": "https://assets.dext.com/api/v1/image/assets%2F1b6ae8870b9341c0bb10634cd51cea2b%2Ff5cb16b1a3f547df8ba96c75025db42b",
+     "top": 5079
+    }
+   ],
+   "imgCount": 32,
+   "logoish": 0,
+   "videos": [],
+   "canvases": 1,
+   "lotties": 0,
+   "iframes": [
+    "https://app-eu1.hubspot.com/conversations-visitor/1614934/threads/utk/8be8b0d0cab147fda756f7413a91986f?uuid=0b22927bba4f"
+   ],
+   "fonts": [
+    [
+     "Roboto",
+     1648
+    ],
+    [
+     "Inter",
+     78
+    ]
+   ],
+   "sectionBgs": [
+    [
+     "rgb(255, 255, 255)",
+     1
+    ],
+    [
+     "rgb(255, 205, 179)",
+     1
+    ]
+   ],
+   "buttonBgs": [
+    [
+     "rgb(12, 35, 64)",
+     11
+    ],
+    [
+     "rgb(195, 203, 213)",
+     7
+    ],
+    [
+     "rgb(255, 90, 1)",
+     1
+    ]
+   ],
+   "type": {
+    "h1": {
+     "family": "Inter, \"Inter Fallback\"",
+     "size": "60px",
+     "weight": "900",
+     "lineHeight": "69px",
+     "letterSpacing": "-1.8px",
+     "color": "rgb(0, 0, 0)"
+    },
+    "h2": {
+     "family": "Inter, \"Inter Fallback\"",
+     "size": "46px",
+     "weight": "900"
+    },
+    "body": {
+     "family": "\"Times New Roman\"",
+     "size": "16px",
+     "color": "rgb(0, 0, 0)",
+     "bg": "rgba(0, 0, 0, 0)"
+    }
+   },
+   "motionAfterScroll": {
+    "animations": {
+     "slider-ticker-scroll 40s infinite": 2,
+     "enlargeSlRipple 1.5s infinite": 1,
+     "pulsar 2s 5": 1
+    },
+    "opacityZeroEls": 0,
+    "transitionEls": 120,
+    "stickyFixedEls": 4
+   },
+   "libs": {
+    "gsap": false,
+    "framer": false,
+    "webflow": false,
+    "lottie": false,
+    "splide_swiper": true,
+    "rive": false,
+    "nextjs": true,
+    "wordpress": false,
+    "hubspot": true
+   },
+   "wordCount": 1674,
+   "scrollHeight": 9971,
+   "bodyText": "For Businesses For Accountants & Bookkeepers Pricing Resources Start a free trial Log in Receipt and invoice capture software for small businesses Easily capture receipts and invoices any way you like – mobile app, email, or drag-and-drop, and our powerful AI instantly extracts every detail with 99.9% accuracy. Fewer errors, less admin, and real-time visibility across your books. Start a free trial View pricing plans No credit card required. 4.4 based on 580+ reviews 4.8 based on 1110+ reviews Trustpilot 4.8 based on 91110+ ratings 4.8 based on 12880+ reviews 4.6 based on 380+ reviews 4.4 based on 580+ reviews 4.8 based on 1110+ reviews Trustpilot 4.8 based on 91110+ ratings 4.8 based on 12880+ reviews 4.6 based on 380+ reviews 4.4 based on 580+ reviews 4.8 based on 1110+ reviews Trustpilot 4.8 based on 91110+ ratings 4.8 based on 12880+ reviews 4.6 based on 380+ reviews 4.4 based on 580+ reviews 4.8 based on 1110+ reviews Trustpilot 4.8 based on 91110+ ratings 4.8 based on 12880+ reviews 4.6 based on 380+ reviews G2 Regional Leader Spring 2026 G2 Momentum Leader Summer 2026 Best Expense Software 2025 Small Business App of the Year Winner 2024 • UK • US Best Accounting Cloud-Based Software 2023 G2 Regional Leader Spring 2026 G2 Momentum Leader Summer 2026 Best Expense Software 2025 Small Business App of the Year Winner 2024 • UK • US Best Accounting Cloud-Based Software 2023 G2 Regional Leader Spring 2026 G2 Momentum Leader Summer 2026 Best Expense Software 2025 Small Business App of the Year Winner 2024 • UK • US Best Accounting Cloud-Based Software 2023 G2 Regional Leader Spring 2026 G2 Momentum Leader Summer 2026 Best Expense Software 2025 Small Business App of the Year Winner 2024 • UK • US Best Accounting Cloud-Based Software 2023 Multiple ways to collect what you need Mobile Upload Invoice fetch Email Mobile You can quickly and easily scan receipts and invoices with our mobile bookkeeping app. Snap a photo and press submit. Dext then extracts the data you need automatically. No more crumpled paper and lost receipts. Start a free trial See receipt scanner app See Dext in action Learn how Dext works with all the applications and services you know and love. Watch the product tour. Start a free trial Dext's receipt and invoice capture software makes life effortlessly paper-free Upload receipts and invoices your way Stop chasing invoices or entering data manually. No more piles of receipts or the stress of losing them. Dext captures and organises every document in seconds, ready for your accounting software. Scan, upload, or forward by email. However you work, Dext fits in. Start a free trial View pricing Extract data line by line with unmatched accuracy Manually splitting out line items wastes time and invites mistakes. Dext’s AI captures every detail, from supplier and date to tax and total, with 99.9% accuracy. No guesswork. No manual entry. Just complete, audit-ready data you can trust. Start free trial Line item extraction Automatically categorise transactions Dext’s AI-powered automation remembers how you categorise suppliers, payments, and tax codes — then applies those rules automatically. It even detects duplicates and learns over time for greater accuracy. Rest easy, knowing every transaction is handled right, every time. Start a free trial View pricing Stay in control with complete visibility anytime, every time Because every receipt, invoice, and document is securely captured in Dext, you always have an accurate, up-to-date view of your business numbers – all in one place and ready when you need it. No chasing files. No missing data. No last-minute surprises at tax time. Start a free trial Plans to suit your business All pricing plans cover the accounting essentials, with room to grow. 🌍 Rest of the World 🇪🇺 European Union 🇬🇧 United Kingdom 🇺🇸 USA 🇦🇺 APAC 🇨🇦 Canada 🇿🇦 South Africa 🇮🇪 Ireland Monthly Annual Up to 20% cheaper with an annual subscription $25.21 Per Month USD, Excludes VAT , $302.50 billed annually 250 Documents Per Month 5 Users Drag slider to increase allowance Start a free trial Free credits included 10 Sheets of Bank Statement Extraction ? 5 Documents with Line item Extraction ? 5 Supplier Statement Extraction ? Looking to set up more than 5 business entities on Dext? Get in touch with us to discuss bespoke pricing options → Join thousands of businesses already on Dext Over 12,000 accounting and bookkeeping firms and 700,000 businesses automate their bookkeeping with Dext. Less admin. More of the work they actually enjoy. 700k Businesses globally 12k+ Accounting and bookkeeping firms 320m+ Business documents processed annually Start a free trial CUSTOMER TESTIMONIAL “I don’t even check if it scanned because I trust that Dext does it, one hundred percent, on point, every single time.” Toby Stewart — BrightShift Learn more DEXT BY NUMBERS 99% Market-leading accuracy means you can trust your data. “I'm not an accounting guy but this program is so user friendly that I now process all my invoices. My bookkeeper has all the stuff processed.” George Yiannoulis “My accountant uses this service and rather than bringing them a pile of bills, I need only drop them on Dext. Makes my life more simple! ” Hawkes “The software efficiently extracts important information from invoices, bank statements, and other documents, saving time compared to manual data entry. Great software!!!” Pritchard Chitowa “Works like a charm, it’s easy to use and connects with our accounting package seamlessly. I can’t think how this was possible in the past.” Greg S. “Dext is brilliant! It is so easy and quick to use. The process at the end of year runs are much quicker and is very smooth. ” D Matthews “It’s changed my life. Dext is so simple to use. I am up to date all the time now” Franky W, UK “As a small business owner, Dext makes my accounting life so much easier. No more laborious inputting of data, just simply scan receipts on my phone and they are all automatically organised. Expenses used to be a pain in the neck, now I hardly have to think about them!” Tony Gray, UK “I'm not an accounting guy but this program is so user friendly that I now process all my invoices. My bookkeeper has all the stuff processed.” George Yiannoulis “My accountant uses this service and rather than bringing them a pile of bills, I need only drop them on Dext. Makes my life more simple! ” Hawkes “The software efficiently extracts important information from invoices, bank statements, and other documents, saving time compared to manual data entry. Great software!!!” Pritchard Chitowa “Works like a charm, it’s easy to use and connects with our accounting package seamlessly. I can’t think how this was possible in the past.” Greg S. “Dext is brilliant! It is so easy and quick to use. The process at the end of year runs are much quicker and is very smooth. ” D Matthews “It’s changed my life. Dext is so simple to use. I am up to date all the time now” Franky W, UK “As a small business owner, Dext makes my accounting life so much easier. No more laborious inputting of data, just simply scan receipts on my phone and they are all automatically organised. Expenses used to be a pain in the neck, now I hardly have to think about them!” Tony Gray, UK “I'm not an accounting guy but this program is so user friendly that I now process all my invoices. My bookkeeper has all the stuff processed.” George Yiannoulis “My accountant uses this service and rather than bringing them a pile of bills, I need only drop them on Dext. Makes my life more simple! ” Hawkes “The software efficiently extracts important information from invoices, bank statements, and other documents, saving time compared to manual data entry. Great software!!!” Pritchard Chitowa “Works like a charm, it’s easy to use and connects with our accounting package seamlessly. I can’t think how this was possible in the past.” Greg S. “Dext is brilliant! It is so easy and quick to use. The process at the end of year runs are much quicker and is very smooth. ” D Matthews “It’s changed my life. Dext is so simple to use. I am up to date all the time now” Franky W, UK “As a small business owner, Dext makes my accounting life so much easier. No more laborious inputting of data, just simply scan receipts on my phone and they are all automatically organised. Expenses used to be a pain in the neck, now I hardly have to think about them!” Tony Gray, UK 1 2 3 4 5 6 7 Our support service is at your disposal Our support service answers your technical questions by chat or email and offers you valuable advice to support your digital transition. customer satisfaction rating (NPS) 48 hours median time to first response + 250 tutorials available on our Help Centre Receipt and invoice capture FAQs How to extract invoice data? How do we capture invoice data? Can AI do my invoices? Which invoice capture software is best? How to get started with Dext Invoice Capture? How accurate is Dext’s OCR? Is my data secure and compliant? Try Dext yourself with our 14-day free trial Discover why over 700,000 customers worldwide use Dext to make more time for business and what they do best. Start a free trial View pricing Products Receipt & Invoice capture Expense management software Accounting software integrations Expense & Receipt scanner app Payments Sectors Multi-Entity Businesses & Franchises Dext for business Construction Hospitality and Wellness Professional services Resources Blog Events & Webinars New features and product updates The new Dext (formerly Receipt Bank) Customer Stories Affiliates Support Help Centre Our Company News Contact Us Careers Diversity Security 🌍 Rest of the World 🇦🇺 APAC 🇨🇦 Canada 🇬🇧 United Kingdom 🇺🇸 USA 🇫🇷 France 🇨🇦 French Canada 🇿🇦 South Africa Trust Center Terms and conditions Cookie Policy Website use Diversity statement Privacy policy Modern slavery statement Dext © Copyright 2026"
+  }
+ }
+}

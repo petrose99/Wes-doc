@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 vi.mock("@/lib/db", () => ({ prisma: {} }))
 
-const { assignReviewTask, bulkUpdateReviewTaskStatus, createReviewTask, decideReviewTaskStage, parseReviewTaskStatus, updateReviewTaskStatus } = await import("@/models/review-tasks")
+const { assignReviewTask, bulkUpdateReviewTaskStatus, cancelApprovalOnDocument, createReviewTask, decideReviewTaskStage, getActiveWorkflowStageState, parseReviewTaskStatus, sendReviewTaskBackForReview, updateReviewTaskStatus } = await import("@/models/review-tasks")
 const { prisma } = await import("@/lib/db")
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -15,6 +15,9 @@ beforeEach(() => {
   // WP-AP2: default "no push exists" so the payment-status gate still fires under existing
   // tests unless a specific test overrides it to simulate a ledger sync in flight.
   db.integrationPush = { findFirst: vi.fn().mockResolvedValue(null), findMany: vi.fn().mockResolvedValue([]) }
+  // #253: no default flow unless a test sets one — the shipped behaviour (approvals start by hand).
+  db.workspace = { findUnique: vi.fn().mockResolvedValue({ defaultApprovalWorkflow: null }) }
+  db.gate = { findMany: vi.fn().mockResolvedValue([]) }
 })
 
 describe("parseReviewTaskStatus", () => {
@@ -45,6 +48,47 @@ describe("createReviewTask", () => {
       data: expect.objectContaining({ workspaceId: "w1", documentId: "d1", reason: "manual", detail: "looks off" }),
     }))
     expect(db.$transaction).toHaveBeenCalledWith(["create-task", "audit"])
+  })
+
+  // #253: the default flow auto-starts at task creation unless something says no.
+  it("auto-starts the workspace's default flow when it is active and nothing blocks the document", async () => {
+    db.document = { findFirst: vi.fn().mockResolvedValue({ id: "d1" }) }
+    db.reviewTask = { create: vi.fn().mockReturnValue("create-task") }
+    db.documentAuditEvent = { create: vi.fn().mockReturnValue("audit") }
+    db.workspace = { findUnique: vi.fn().mockResolvedValue({ defaultApprovalWorkflow: { id: "wf-default", name: "Two-step", active: true } }) }
+
+    await createReviewTask({ workspaceId: "w1", documentId: "d1", createdById: "u1" })
+
+    expect(db.reviewTask.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ workflowId: "wf-default", currentStageIndex: 0, status: "in_review" }),
+    }))
+    expect(db.documentAuditEvent.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ type: "review_task_workflow_auto_started", actorId: null }),
+    }))
+  })
+
+  it("does not auto-start an inactive default, or one the document's open hard gate blocks", async () => {
+    db.document = { findFirst: vi.fn().mockResolvedValue({ id: "d1" }) }
+    db.reviewTask = { create: vi.fn().mockReturnValue("create-task") }
+    db.documentAuditEvent = { create: vi.fn().mockReturnValue("audit") }
+    db.workspace = { findUnique: vi.fn().mockResolvedValue({ defaultApprovalWorkflow: { id: "wf-default", name: "Two-step", active: false } }) }
+    await createReviewTask({ workspaceId: "w1", documentId: "d1", createdById: "u1" })
+    expect(db.reviewTask.create.mock.calls[0][0].data.workflowId).toBeUndefined()
+
+    db.workspace = { findUnique: vi.fn().mockResolvedValue({ defaultApprovalWorkflow: { id: "wf-default", name: "Two-step", active: true } }) }
+    db.gate = { findMany: vi.fn().mockResolvedValue([{ documentId: "d1" }]) }
+    await createReviewTask({ workspaceId: "w1", documentId: "d1", createdById: "u1" })
+    expect(db.reviewTask.create.mock.calls[1][0].data.workflowId).toBeUndefined()
+  })
+
+  it("keeps an explicit workflowId over the default, with no auto-start event", async () => {
+    db.document = { findFirst: vi.fn().mockResolvedValue({ id: "d1" }) }
+    db.reviewTask = { create: vi.fn().mockReturnValue("create-task") }
+    db.documentAuditEvent = { create: vi.fn().mockReturnValue("audit") }
+    db.workspace = { findUnique: vi.fn().mockResolvedValue({ defaultApprovalWorkflow: { id: "wf-default", name: "Two-step", active: true } }) }
+    await createReviewTask({ workspaceId: "w1", documentId: "d1", createdById: "u1", workflowId: "wf-explicit" })
+    expect(db.reviewTask.create.mock.calls[0][0].data.workflowId).toBe("wf-explicit")
+    expect(db.documentAuditEvent.create).toHaveBeenCalledTimes(1)
   })
 
   it("starts at stage 0 and status in_review when a workflowId is given", async () => {
@@ -113,7 +157,7 @@ describe("decideReviewTaskStage", () => {
 
     await decideReviewTaskStage({ workspaceId: "w1", taskId: "t1", decision: "approve", actorId: "u1", actorRole: "member" })
 
-    expect(db.reviewTask.update).toHaveBeenCalledWith({ where: { id: "t1" }, data: { status: "in_review", currentStageIndex: 1, resolvedAt: null } })
+    expect(db.reviewTask.update).toHaveBeenCalledWith({ where: { id: "t1" }, data: { status: "in_review", currentStageIndex: 1, resolvedAt: null, stageReachedAt: expect.any(Date) } })
   })
 
   it("resolves as approved once the last stage clears", async () => {
@@ -335,5 +379,76 @@ describe("payment status gate on approval", () => {
       expect(result).toEqual({ updated: 0, blockedTaskIds: ["t1"], documentIds: [] })
       expect(db.$transaction).not.toHaveBeenCalled()
     })
+  })
+})
+
+describe("sendReviewTaskBackForReview", () => {
+  it("refuses a task with no workflow attached", async () => {
+    db.reviewTask = { findFirst: vi.fn().mockResolvedValue({ id: "t1", documentId: "d1", workflowId: null, currentStageIndex: null, status: "in_review" }) }
+    await expect(sendReviewTaskBackForReview({ workspaceId: "w1", taskId: "t1", actorId: "u1", reason: "wrong supplier" })).rejects.toThrow("review_task_has_no_workflow")
+  })
+
+  it("refuses a task that isn't currently in_review", async () => {
+    db.reviewTask = { findFirst: vi.fn().mockResolvedValue({ id: "t1", documentId: "d1", workflowId: "wf1", currentStageIndex: 0, status: "approved" }) }
+    await expect(sendReviewTaskBackForReview({ workspaceId: "w1", taskId: "t1", actorId: "u1", reason: "wrong supplier" })).rejects.toThrow("review_task_not_in_review")
+  })
+
+  it("requires a non-empty reason", async () => {
+    db.reviewTask = { findFirst: vi.fn().mockResolvedValue({ id: "t1", documentId: "d1", workflowId: "wf1", currentStageIndex: 1, status: "in_review" }) }
+    await expect(sendReviewTaskBackForReview({ workspaceId: "w1", taskId: "t1", actorId: "u1", reason: "   " })).rejects.toThrow("reason_required")
+  })
+
+  it("clears the workflow and reopens the task with a reason on the audit trail", async () => {
+    db.reviewTask = { findFirst: vi.fn().mockResolvedValue({ id: "t1", documentId: "d1", workflowId: "wf1", currentStageIndex: 1, status: "in_review" }), update: vi.fn().mockReturnValue("update") }
+    db.documentAuditEvent = { create: vi.fn().mockReturnValue("audit") }
+
+    await sendReviewTaskBackForReview({ workspaceId: "w1", taskId: "t1", actorId: "u1", reason: "wrong supplier" })
+
+    expect(db.reviewTask.update).toHaveBeenCalledWith({ where: { id: "t1" }, data: { status: "open", workflowId: null, currentStageIndex: null, stageReachedAt: null, resolvedAt: null } })
+    expect(db.documentAuditEvent.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ type: "review_task_sent_back", detail: { reason: "wrong supplier" } }) }))
+  })
+})
+
+describe("cancelApprovalOnDocument", () => {
+  it("refuses once a stage has already advanced", async () => {
+    db.reviewTask = { findFirst: vi.fn().mockResolvedValue({ id: "t1", documentId: "d1", workflowId: "wf1", currentStageIndex: 1, status: "in_review" }) }
+    await expect(cancelApprovalOnDocument({ workspaceId: "w1", taskId: "t1", actorId: "u1" })).rejects.toThrow("approval_already_advanced")
+  })
+
+  it("refuses a task with no workflow attached", async () => {
+    db.reviewTask = { findFirst: vi.fn().mockResolvedValue({ id: "t1", documentId: "d1", workflowId: null, currentStageIndex: null, status: "in_review" }) }
+    await expect(cancelApprovalOnDocument({ workspaceId: "w1", taskId: "t1", actorId: "u1" })).rejects.toThrow("review_task_has_no_workflow")
+  })
+
+  it("clears the workflow while still at stage 0, no reason required", async () => {
+    db.reviewTask = { findFirst: vi.fn().mockResolvedValue({ id: "t1", documentId: "d1", workflowId: "wf1", currentStageIndex: 0, status: "in_review" }), update: vi.fn().mockReturnValue("update") }
+    db.documentAuditEvent = { create: vi.fn().mockReturnValue("audit") }
+
+    await cancelApprovalOnDocument({ workspaceId: "w1", taskId: "t1", actorId: "u1" })
+
+    expect(db.reviewTask.update).toHaveBeenCalledWith({ where: { id: "t1" }, data: { status: "open", workflowId: null, currentStageIndex: null, resolvedAt: null } })
+  })
+})
+
+describe("getActiveWorkflowStageState", () => {
+  it("returns null when the document has no active workflow task", async () => {
+    db.reviewTask = { findFirst: vi.fn().mockResolvedValue(null) }
+    expect(await getActiveWorkflowStageState("w1", "d1")).toBeNull()
+  })
+
+  it("returns the stage list and current index for an in-review workflow task", async () => {
+    db.reviewTask = {
+      findFirst: vi.fn().mockResolvedValue({
+        currentStageIndex: 1,
+        workflow: { stages: [{ stageIndex: 0, name: "First pass" }, { stageIndex: 1, name: "Manager" }, { stageIndex: 2, name: "Owner" }] },
+      }),
+    }
+    expect(await getActiveWorkflowStageState("w1", "d1")).toEqual({
+      currentStageIndex: 1,
+      stages: [{ stageIndex: 0, name: "First pass" }, { stageIndex: 1, name: "Manager" }, { stageIndex: 2, name: "Owner" }],
+    })
+    expect(db.reviewTask.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: { workspaceId: "w1", documentId: "d1", workflowId: { not: null }, status: { in: ["open", "in_review"] } },
+    }))
   })
 })

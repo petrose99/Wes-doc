@@ -1,0 +1,740 @@
+{
+ "slug": "stampli-product",
+ "label": "Stampli Accounts Payable",
+ "url": "https://www.stampli.com/accounts-payable/",
+ "accessed": "2026-09-19T12:20:43.302Z",
+ "views": {
+  "390": {
+   "status": 200,
+   "shot": "/home/ubuntu/Dev/Wes-doc/docs/research/benchmark-captures/stampli/stampli-product-390.png",
+   "initialMotion": {
+    "opacityZeroEls": 0,
+    "animations": {
+     "mmfadeIn 0.3s 1": 1,
+     "mmslideIn 0.3s 1": 1
+    },
+    "transitionEls": 300,
+    "total": 1096
+   },
+   "errors": [
+    "overlaysHidden=0"
+   ],
+   "title": "AP Automation Software Built for Accounts Payable Teams",
+   "h1": "Stampli for Accounts Payable Teams",
+   "subhead": "Powerful AP Automation software for powerful Accounts Payable Teams. Automate the repetitive, manual processes so you can focus on what’s more impactful.",
+   "headings": [
+    {
+     "tag": "H1",
+     "text": "Stampli for Accounts Payable Teams",
+     "top": 148
+    },
+    {
+     "tag": "H2",
+     "text": "All the ways Stampli flexes to AP Team Requirements",
+     "top": 623
+    },
+    {
+     "tag": "H2",
+     "text": "Key Capabilities of AP Automation for Accounts Payable Teams",
+     "top": 2307
+    },
+    {
+     "tag": "H3",
+     "text": "Easy-to-use",
+     "top": 2591
+    },
+    {
+     "tag": "H3",
+     "text": "Remote Access",
+     "top": 2867
+    },
+    {
+     "tag": "H3",
+     "text": "Faster Approvals",
+     "top": 3143
+    },
+    {
+     "tag": "H3",
+     "text": "Award-winning support by AP Experts",
+     "top": 3443
+    },
+    {
+     "tag": "H2",
+     "text": "Connect with your ERP, Accounting, or Financial System",
+     "top": 3729
+    },
+    {
+     "tag": "H3",
+     "text": "AP Automation for Oracle NetSuite",
+     "top": 4033
+    },
+    {
+     "tag": "H3",
+     "text": "AP Automation for QuickBooks Desktop",
+     "top": 4341
+    },
+    {
+     "tag": "H3",
+     "text": "AP Automation for Microsoft Dynamics 365 Finance",
+     "top": 4649
+    },
+    {
+     "tag": "H3",
+     "text": "AP Automation for Sage Intacct",
+     "top": 4981
+    },
+    {
+     "tag": "H2",
+     "text": "Success Stories",
+     "top": 5972
+    },
+    {
+     "tag": "H3",
+     "text": "Renova Energy Reduces Invoice Processing Time by 50%",
+     "top": 6315
+    },
+    {
+     "tag": "H3",
+     "text": "Ready to take the next step?",
+     "top": 6736
+    },
+    {
+     "tag": "H3",
+     "text": "Stampli",
+     "top": 7201
+    },
+    {
+     "tag": "H3",
+     "text": "Products",
+     "top": 7258
+    },
+    {
+     "tag": "H3",
+     "text": "Accounting Systems",
+     "top": 7315
+    },
+    {
+     "tag": "H3",
+     "text": "Industries",
+     "top": 7372
+    },
+    {
+     "tag": "H3",
+     "text": "Role",
+     "top": 7421
+    },
+    {
+     "tag": "H3",
+     "text": "Resources",
+     "top": 7486
+    },
+    {
+     "tag": "H3",
+     "text": "Contact",
+     "top": 7543
+    }
+   ],
+   "sections": [
+    {
+     "top": 535,
+     "height": 1450,
+     "heading": "All the ways Stampli flexes to AP Team Requirements",
+     "imgs": 1,
+     "svgs": 1,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 1417,
+     "snippet": "#1 RATED AP AUTOMATION SOFTWARE All the ways Stampli flexes to AP Team Requirements Manually processing vendor invoices, chasing approvals, hunting for the right information, and handling vendor inquiries can become very"
+    },
+    {
+     "top": 1985,
+     "height": 274,
+     "heading": "",
+     "imgs": 6,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 0,
+     "snippet": ""
+    },
+    {
+     "top": 2259,
+     "height": 1374,
+     "heading": "Key Capabilities of AP Automation for Accounts Payable Teams",
+     "imgs": 4,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 731,
+     "snippet": "Key Capabilities of AP Automation for Accounts Payable Teams Easy-to-use Intuitive interface that all users from AP to approvers to management can easily take action without learning or re-learning the interface. Remote "
+    },
+    {
+     "top": 3633,
+     "height": 1662,
+     "heading": "Connect with your ERP, Accounting, or Financial System",
+     "imgs": 4,
+     "svgs": 5,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 488,
+     "snippet": "Connect with your ERP, Accounting, or Financial System AP Automation for Oracle NetSuite Connect to Oracle NetSuite in weeks, not months. AP Automation for QuickBooks Desktop Connect to Quickbooks Desktop in weeks, not m"
+    },
+    {
+     "top": 5295,
+     "height": 593,
+     "heading": "",
+     "imgs": 2,
+     "svgs": 1,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 265,
+     "snippet": "By automating vendor bill processing with Stampli, my job has become much more pleasant. Everything now comes to me rather than me having to go to different people directly. And everything is accurate and trackable. ANDR"
+    },
+    {
+     "top": 5920,
+     "height": 631,
+     "heading": "Success Stories",
+     "imgs": 1,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [
+      "View Full Story"
+     ],
+     "textLen": 282,
+     "snippet": "Success Stories CASE STUDY Renova Energy Reduces Invoice Processing Time by 50% Renova Energy is an employee-owned company that delivers practical, sustainable solar energy production and battery storage to residential a"
+    }
+   ],
+   "navLinks": [],
+   "heroCtas": [
+    {
+     "text": "‹ WHY STAMPLI",
+     "tag": "A",
+     "href": "/ap-automation"
+    },
+    {
+     "text": "Contact Us",
+     "tag": "A",
+     "href": "https://www.stampli.com/contact/"
+    }
+   ],
+   "bigImgs": [
+    {
+     "w": 358,
+     "h": 295,
+     "alt": "Stampli AP Automation Software for Accounts Payable Teams",
+     "src": "https://www.stampli.com/wp-content/uploads/2020/10/Stampli-AP-Automation-Software-for-Accounts-Payable-Teams-768x632.png",
+     "top": 1651
+    },
+    {
+     "w": 358,
+     "h": 201,
+     "alt": "Renova Energy Case Study Preview",
+     "src": "https://www.stampli.com/wp-content/uploads/2023/10/2x_-844-x474-7-768x431.png",
+     "top": 6062
+    }
+   ],
+   "imgCount": 29,
+   "logoish": 7,
+   "videos": [],
+   "canvases": 0,
+   "lotties": 0,
+   "iframes": [
+    "",
+    "",
+    "",
+    "about:blank",
+    "about:blank",
+    "https://4646231.hs-sites.com/hs-web-interactive-4646231-191024504635?utk=2bef677b6f7a78c709b893de471456de&parentPageUrl=",
+    "",
+    ""
+   ],
+   "fonts": [
+    [
+     "lato",
+     171
+    ],
+    [
+     "Aeonik",
+     58
+    ],
+    [
+     "oswald",
+     13
+    ]
+   ],
+   "sectionBgs": [
+    [
+     "rgb(255, 255, 255)",
+     5
+    ],
+    [
+     "rgb(238, 246, 252)",
+     1
+    ],
+    [
+     "rgb(30, 60, 116)",
+     1
+    ]
+   ],
+   "buttonBgs": [
+    [
+     "rgb(0, 174, 239)",
+     4
+    ],
+    [
+     "rgb(232, 242, 254)",
+     1
+    ]
+   ],
+   "type": {
+    "h1": {
+     "family": "oswald, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, \"Noto Sans\", sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+     "size": "48px",
+     "weight": "400",
+     "lineHeight": "56.4px",
+     "letterSpacing": "normal",
+     "color": "rgba(0, 0, 0, 0)"
+    },
+    "h2": {
+     "family": "oswald, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, \"Noto Sans\", sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+     "size": "34px",
+     "weight": "400"
+    },
+    "body": {
+     "family": "lato, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, \"Noto Sans\", sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+     "size": "16px",
+     "color": "rgb(106, 105, 134)",
+     "bg": "rgba(0, 0, 0, 0)"
+    }
+   },
+   "motionAfterScroll": {
+    "animations": {
+     "mmfadeIn 0.3s 1": 1,
+     "mmslideIn 0.3s 1": 1
+    },
+    "opacityZeroEls": 1,
+    "transitionEls": 301,
+    "stickyFixedEls": 11
+   },
+   "libs": {
+    "gsap": false,
+    "framer": false,
+    "webflow": false,
+    "lottie": false,
+    "splide_swiper": false,
+    "rive": false,
+    "nextjs": false,
+    "wordpress": true,
+    "hubspot": true
+   },
+   "wordCount": 558,
+   "scrollHeight": 8141,
+   "bodyText": "‹ WHY STAMPLI Stampli for Accounts Payable Teams Powerful AP Automation software for powerful Accounts Payable Teams. Automate the repetitive, manual processes so you can focus on what’s more impactful. Contact Us #1 RATED AP AUTOMATION SOFTWARE All the ways Stampli flexes to AP Team Requirements Manually processing vendor invoices, chasing approvals, hunting for the right information, and handling vendor inquiries can become very time-consuming and tedious for AP teams. In addition to payment delays, manual AP processes come with the additional hurdles of fixing data entry errors and missing duplicate or fraudulent invoices. AP teams need the right tools to make the right decisions, this is where Stampli comes in. With Stampli, invoices and bills are automatically captured into the platform and immediately available for processing, duplicate invoices are flagged, and approval reminders and notifications are automatic. Stampli learns your accounting process, so GL-codes and approvers are suggested based on past actions. Stampli easily integrates with your ERP or financial system, so all the information you need to do your job is available inside of Stampli, including past invoices, purchase orders or vendor documentation. With built-in communications on top of the invoice, approvers can ask or answer questions to get to a faster decision. Stampli’s Vendor Portal can reduce the amount of vendor inquiries by providing self-serve options for your vendors. The more you automate with Stampli, the more you can focus on your vendor relationships, discounts and more value-added projects. See our customer stories Key Capabilities of AP Automation for Accounts Payable Teams Easy-to-use Intuitive interface that all users from AP to approvers to management can easily take action without learning or re-learning the interface. Remote Access Stampli is cloud-based, so AP teams and approvers can work from any location, on any device, at any time to process and approve invoices. Faster Approvals Say goodbye to long, untrackable email threads. Stakeholders conversations happen inside Stampli, on top of the invoice with an auditable log and communication tools to make the decision easy for approvers. Award-winning support by AP Experts Our customer success team is made up of AP professionals, they’ve been in your shoes and are here to help. Connect with your ERP, Accounting, or Financial System AP Automation for Oracle NetSuite Connect to Oracle NetSuite in weeks, not months. AP Automation for QuickBooks Desktop Connect to Quickbooks Desktop in weeks, not months. AP Automation for Microsoft Dynamics 365 Finance Stampli plugs into F&O’s native tables and dimensions to automate your entire invoice-to-pay cycle AP Automation for Sage Intacct Stampli is an Intacct Recommended Solution for AP Automation. See all integrations By automating vendor bill processing with Stampli, my job has become much more pleasant. Everything now comes to me rather than me having to go to different people directly. And everything is accurate and trackable. ANDREA MONTEIRO ACCOUNTING MANAGER, RENOVA ENERGY Success Stories CASE STUDY Renova Energy Reduces Invoice Processing Time by 50% Renova Energy is an employee-owned company that delivers practical, sustainable solar energy production and battery storage to residential and commercial customers. As the company grew,… View Full Story Explore More Accounts Payable Topics Ready to take the next step? Tell us what you’re looking to solve. Contact Sales Stampli Products Accounting Systems Industries Role Resources Contact © 2026 Stampli, All rights reserved. Your Privacy Choices Policy Center Terms of Service Privacy Licenses"
+  },
+  "1440": {
+   "status": 200,
+   "shot": "/home/ubuntu/Dev/Wes-doc/docs/research/benchmark-captures/stampli/stampli-product-1440.png",
+   "initialMotion": {
+    "opacityZeroEls": 0,
+    "animations": {
+     "mmfadeIn 0.3s 1": 1,
+     "mmslideIn 0.3s 1": 1
+    },
+    "transitionEls": 293,
+    "total": 1097
+   },
+   "errors": [
+    "overlaysHidden=0"
+   ],
+   "title": "AP Automation Software Built for Accounts Payable Teams",
+   "h1": "Stampli for Accounts Payable Teams",
+   "subhead": "Powerful AP Automation software for powerful Accounts Payable Teams. Automate the repetitive, manual processes so you can focus on what’s more impactful.",
+   "headings": [
+    {
+     "tag": "H1",
+     "text": "Stampli for Accounts Payable Teams",
+     "top": 172
+    },
+    {
+     "tag": "H2",
+     "text": "All the ways Stampli flexes to AP Team Requirements",
+     "top": 523
+    },
+    {
+     "tag": "H2",
+     "text": "Key Capabilities of AP Automation for Accounts Payable Teams",
+     "top": 1424
+    },
+    {
+     "tag": "H3",
+     "text": "Easy-to-use",
+     "top": 1654
+    },
+    {
+     "tag": "H3",
+     "text": "Remote Access",
+     "top": 1654
+    },
+    {
+     "tag": "H3",
+     "text": "Faster Approvals",
+     "top": 1654
+    },
+    {
+     "tag": "H3",
+     "text": "Award-winning support by AP Experts",
+     "top": 1654
+    },
+    {
+     "tag": "H2",
+     "text": "Connect with your ERP, Accounting, or Financial System",
+     "top": 2060
+    },
+    {
+     "tag": "H3",
+     "text": "AP Automation for Oracle NetSuite",
+     "top": 2311
+    },
+    {
+     "tag": "H3",
+     "text": "AP Automation for QuickBooks Desktop",
+     "top": 2311
+    },
+    {
+     "tag": "H3",
+     "text": "AP Automation for Microsoft Dynamics 365 Finance",
+     "top": 2311
+    },
+    {
+     "tag": "H3",
+     "text": "AP Automation for Sage Intacct",
+     "top": 2311
+    },
+    {
+     "tag": "H2",
+     "text": "Success Stories",
+     "top": 3295
+    },
+    {
+     "tag": "H3",
+     "text": "Renova Energy Reduces Invoice Processing Time by 50%",
+     "top": 3485
+    },
+    {
+     "tag": "H3",
+     "text": "Ready to take the next step?",
+     "top": 4070
+    },
+    {
+     "tag": "H3",
+     "text": "Stampli",
+     "top": 4595
+    },
+    {
+     "tag": "H3",
+     "text": "Products",
+     "top": 4595
+    },
+    {
+     "tag": "H3",
+     "text": "Accounting Systems",
+     "top": 4595
+    },
+    {
+     "tag": "H3",
+     "text": "Industries",
+     "top": 4595
+    },
+    {
+     "tag": "H3",
+     "text": "Role",
+     "top": 4899
+    },
+    {
+     "tag": "H3",
+     "text": "Resources",
+     "top": 4595
+    },
+    {
+     "tag": "H3",
+     "text": "Contact",
+     "top": 4595
+    }
+   ],
+   "sections": [
+    {
+     "top": 436,
+     "height": 816,
+     "heading": "All the ways Stampli flexes to AP Team Requirements",
+     "imgs": 1,
+     "svgs": 1,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 1417,
+     "snippet": "#1 RATED AP AUTOMATION SOFTWARE All the ways Stampli flexes to AP Team Requirements Manually processing vendor invoices, chasing approvals, hunting for the right information, and handling vendor inquiries can become very"
+    },
+    {
+     "top": 1252,
+     "height": 116,
+     "heading": "",
+     "imgs": 6,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 0,
+     "snippet": ""
+    },
+    {
+     "top": 1368,
+     "height": 596,
+     "heading": "Key Capabilities of AP Automation for Accounts Payable Teams",
+     "imgs": 4,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 731,
+     "snippet": "Key Capabilities of AP Automation for Accounts Payable Teams Easy-to-use Intuitive interface that all users from AP to approvers to management can easily take action without learning or re-learning the interface. Remote "
+    },
+    {
+     "top": 1964,
+     "height": 724,
+     "heading": "Connect with your ERP, Accounting, or Financial System",
+     "imgs": 4,
+     "svgs": 5,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 488,
+     "snippet": "Connect with your ERP, Accounting, or Financial System AP Automation for Oracle NetSuite Connect to Oracle NetSuite in weeks, not months. AP Automation for QuickBooks Desktop Connect to Quickbooks Desktop in weeks, not m"
+    },
+    {
+     "top": 2689,
+     "height": 522,
+     "heading": "",
+     "imgs": 2,
+     "svgs": 1,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 265,
+     "snippet": "By automating vendor bill processing with Stampli, my job has become much more pleasant. Everything now comes to me rather than me having to go to different people directly. And everything is accurate and trackable. ANDR"
+    },
+    {
+     "top": 3243,
+     "height": 610,
+     "heading": "Success Stories",
+     "imgs": 1,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [
+      "View Full Story"
+     ],
+     "textLen": 282,
+     "snippet": "Success Stories CASE STUDY Renova Energy Reduces Invoice Processing Time by 50% Renova Energy is an employee-owned company that delivers practical, sustainable solar energy production and battery storage to residential a"
+    },
+    {
+     "top": 4595,
+     "height": 176,
+     "heading": "Stampli",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 49,
+     "snippet": "Stampli About Us Careers Customer Support Contact"
+    },
+    {
+     "top": 4595,
+     "height": 336,
+     "heading": "Products",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 150,
+     "snippet": "Products Procure-to-Pay Procurement Vendor Management Accounts Payable Payments Expense Management Stampli Deep Finance ERP Integrations Contact Sales"
+    },
+    {
+     "top": 4595,
+     "height": 588,
+     "heading": "Accounting Systems",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 304,
+     "snippet": "Accounting Systems Acumatica Dealertrack DMS Microsoft Dynamics 365 Business Central Microsoft Dynamics 365 Finance Microsoft Dynamics Great Plains Oracle Fusion Cloud ERP Oracle NetSuite Sage 100 Sage Intacct Sage Intac"
+    },
+    {
+     "top": 4899,
+     "height": 164,
+     "heading": "Role",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 38,
+     "snippet": "Role CFO Controller AP Teams Approvers"
+    },
+    {
+     "top": 4595,
+     "height": 528,
+     "heading": "Resources",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 278,
+     "snippet": "Resources Become a Partner Refer Stampli Resources Library Blog Newsletter Stampli G2 Report Stampli Reviews & Awards Customer Stories AI Information What is Accounts Payable What is Invoice Processing What are B2B Payme"
+    },
+    {
+     "top": 4595,
+     "height": 140,
+     "heading": "Contact",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 80,
+     "snippet": "Contact sales@stampli.com 800 California Street, Floor 2 Mountain View, CA 94041"
+    }
+   ],
+   "navLinks": [
+    "Products",
+    "Integrations",
+    "Customers",
+    "Resources",
+    "Partners",
+    "Customer login",
+    "Contact sales"
+   ],
+   "heroCtas": [
+    {
+     "text": "WHY STAMPLI",
+     "tag": "A",
+     "href": "/ap-automation"
+    },
+    {
+     "text": "Contact Us",
+     "tag": "A",
+     "href": "https://www.stampli.com/contact/"
+    }
+   ],
+   "bigImgs": [
+    {
+     "w": 652,
+     "h": 537,
+     "alt": "Stampli AP Automation Software for Accounts Payable Teams",
+     "src": "https://www.stampli.com/wp-content/uploads/2020/10/Stampli-AP-Automation-Software-for-Accounts-Payable-Teams-1024x843.png",
+     "top": 380
+    },
+    {
+     "w": 664,
+     "h": 374,
+     "alt": "Renova Energy Case Study Preview",
+     "src": "https://www.stampli.com/wp-content/uploads/2023/10/2x_-844-x474-7.png",
+     "top": 3399
+    }
+   ],
+   "imgCount": 30,
+   "logoish": 8,
+   "videos": [],
+   "canvases": 0,
+   "lotties": 0,
+   "iframes": [
+    "",
+    "",
+    "",
+    "about:blank",
+    "about:blank",
+    "https://4646231.hs-sites.com/hs-web-interactive-4646231-191024504635?utk=f7919eb49ead4605614cbbd0349cc31c&parentPageUrl=",
+    "",
+    ""
+   ],
+   "fonts": [
+    [
+     "Aeonik",
+     205
+    ],
+    [
+     "lato",
+     189
+    ],
+    [
+     "oswald",
+     13
+    ]
+   ],
+   "sectionBgs": [
+    [
+     "rgb(255, 255, 255)",
+     5
+    ],
+    [
+     "rgb(238, 246, 252)",
+     1
+    ],
+    [
+     "rgb(30, 60, 116)",
+     1
+    ]
+   ],
+   "buttonBgs": [
+    [
+     "rgb(0, 174, 239)",
+     4
+    ],
+    [
+     "rgb(232, 242, 254)",
+     1
+    ],
+    [
+     "rgb(0, 136, 247)",
+     1
+    ]
+   ],
+   "type": {
+    "h1": {
+     "family": "oswald, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, \"Noto Sans\", sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+     "size": "80px",
+     "weight": "400",
+     "lineHeight": "88px",
+     "letterSpacing": "normal",
+     "color": "rgba(0, 0, 0, 0)"
+    },
+    "h2": {
+     "family": "oswald, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, \"Noto Sans\", sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+     "size": "48px",
+     "weight": "400"
+    },
+    "body": {
+     "family": "lato, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, \"Noto Sans\", sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+     "size": "16px",
+     "color": "rgb(106, 105, 134)",
+     "bg": "rgba(0, 0, 0, 0)"
+    }
+   },
+   "motionAfterScroll": {
+    "animations": {
+     "mmfadeIn 0.3s 1": 1,
+     "mmslideIn 0.3s 1": 1
+    },
+    "opacityZeroEls": 1,
+    "transitionEls": 294,
+    "stickyFixedEls": 11
+   },
+   "libs": {
+    "gsap": false,
+    "framer": false,
+    "webflow": false,
+    "lottie": false,
+    "splide_swiper": false,
+    "rive": false,
+    "nextjs": false,
+    "wordpress": true,
+    "hubspot": true
+   },
+   "wordCount": 704,
+   "scrollHeight": 5621,
+   "bodyText": "Products Integrations Customers Resources Partners Customer login Contact sales WHY STAMPLI › STAMPLI FOR ACCOUNTS PAYABLE TEAMS Stampli for Accounts Payable Teams Powerful AP Automation software for powerful Accounts Payable Teams. Automate the repetitive, manual processes so you can focus on what’s more impactful. Contact Us #1 RATED AP AUTOMATION SOFTWARE All the ways Stampli flexes to AP Team Requirements Manually processing vendor invoices, chasing approvals, hunting for the right information, and handling vendor inquiries can become very time-consuming and tedious for AP teams. In addition to payment delays, manual AP processes come with the additional hurdles of fixing data entry errors and missing duplicate or fraudulent invoices. AP teams need the right tools to make the right decisions, this is where Stampli comes in. With Stampli, invoices and bills are automatically captured into the platform and immediately available for processing, duplicate invoices are flagged, and approval reminders and notifications are automatic. Stampli learns your accounting process, so GL-codes and approvers are suggested based on past actions. Stampli easily integrates with your ERP or financial system, so all the information you need to do your job is available inside of Stampli, including past invoices, purchase orders or vendor documentation. With built-in communications on top of the invoice, approvers can ask or answer questions to get to a faster decision. Stampli’s Vendor Portal can reduce the amount of vendor inquiries by providing self-serve options for your vendors. The more you automate with Stampli, the more you can focus on your vendor relationships, discounts and more value-added projects. See our customer stories Key Capabilities of AP Automation for Accounts Payable Teams Easy-to-use Intuitive interface that all users from AP to approvers to management can easily take action without learning or re-learning the interface. Remote Access Stampli is cloud-based, so AP teams and approvers can work from any location, on any device, at any time to process and approve invoices. Faster Approvals Say goodbye to long, untrackable email threads. Stakeholders conversations happen inside Stampli, on top of the invoice with an auditable log and communication tools to make the decision easy for approvers. Award-winning support by AP Experts Our customer success team is made up of AP professionals, they’ve been in your shoes and are here to help. Connect with your ERP, Accounting, or Financial System AP Automation for Oracle NetSuite Connect to Oracle NetSuite in weeks, not months. AP Automation for QuickBooks Desktop Connect to Quickbooks Desktop in weeks, not months. AP Automation for Microsoft Dynamics 365 Finance Stampli plugs into F&O’s native tables and dimensions to automate your entire invoice-to-pay cycle AP Automation for Sage Intacct Stampli is an Intacct Recommended Solution for AP Automation. See all integrations By automating vendor bill processing with Stampli, my job has become much more pleasant. Everything now comes to me rather than me having to go to different people directly. And everything is accurate and trackable. ANDREA MONTEIRO ACCOUNTING MANAGER, RENOVA ENERGY Success Stories CASE STUDY Renova Energy Reduces Invoice Processing Time by 50% Renova Energy is an employee-owned company that delivers practical, sustainable solar energy production and battery storage to residential and commercial customers. As the company grew,… View Full Story Explore More Accounts Payable Topics Ready to take the next step? Tell us what you’re looking to solve. Contact Sales Stampli About Us Careers Customer Support Contact Products Procure-to-Pay Procurement Vendor Management Accounts Payable Payments Expense Management Stampli Deep Finance ERP Integrations Contact Sales Accounting Systems Acumatica Dealertrack DMS Microsoft Dynamics 365 Business Central Microsoft Dynamics 365 Finance Microsoft Dynamics Great Plains Oracle Fusion Cloud ERP Oracle NetSuite Sage 100 Sage Intacct Sage Intacct Construction QuickBooks Desktop QuickBooks Online SAP ECC SAP S/4HANA All Systems Industries Automotive Construction Health Care Manufacturing Oil, Gas, & Energy Professional Services Transportation & Logistics All Industries Role CFO Controller AP Teams Approvers Resources Become a Partner Refer Stampli Resources Library Blog Newsletter Stampli G2 Report Stampli Reviews & Awards Customer Stories AI Information What is Accounts Payable What is Invoice Processing What are B2B Payments What are ACH Payments AP Automation Invoice Management Contact sales@stampli.com 800 California Street, Floor 2 Mountain View, CA 94041 © 2026 Stampli, All rights reserved. Your Privacy Choices Policy Center Terms of Service Privacy Licenses"
+  }
+ }
+}

@@ -12,6 +12,7 @@ import {
   updateWarnCheckAction,
 } from "@/app/(app)/workspaces/[workspaceId]/automation/warn-checks/actions"
 import { Button } from "@/components/ui/button"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -42,27 +43,41 @@ export type WarnCheckRow = {
 export function WarnChecksAdmin({
   workspaceId,
   initial,
+  readOnly = false,
 }: {
   workspaceId: string
   initial: WarnCheckRow[]
+  /** #231 Q19: a member sees the checks and cannot change them. */
+  readOnly?: boolean
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState<WarnCheckRow | null>(null)
 
   const refresh = () => startTransition(() => router.refresh())
+
+  const confirmDelete = () => {
+    if (!deleting) return
+    startTransition(async () => {
+      const result = await deleteWarnCheckAction({ workspaceId, id: deleting.id })
+      if ("error" in result) toast.error(result.error)
+      else refresh()
+      setDeleting(null)
+    })
+  }
 
   return (
     <div className="space-y-10">
       <section>
-        <h2 className="font-display text-lg font-semibold text-slate-900">Rules</h2>
+        <h2 className="border-b border-hairline pb-2.5 text-[15px] font-semibold text-slate-900">Your checks</h2>
         {initial.length === 0 ? (
           <p className="mt-3 max-w-[54ch] text-sm text-slate-600">
-            No warn checks yet. Add one below to hold matching bills in the exception queue with
-            your own wording — they never block, and they never post.
+            No checks yet. Add one below to hold matching invoices in Exceptions with your own
+            wording — a check never blocks a document and never posts one.
           </p>
         ) : (
-          <ul className="mt-4 divide-y divide-[#e6ebf1] border-y border-[#e6ebf1]">
+          <ul className="mt-4 divide-y divide-hairline border-y border-hairline">
             {initial.map((row) =>
               editingId === row.id ? (
                 <li key={row.id} className="py-4">
@@ -89,7 +104,7 @@ export function WarnChecksAdmin({
                     <code className="mt-1 block font-mono text-xs text-slate-700 break-all">{row.whenExpr}</code>
                     <p className="mt-1 text-xs text-slate-600">{row.message}</p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  {readOnly ? <span className="text-xs text-slate-500">{row.enabled ? "On" : "Off"}</span> : <div className="flex items-center gap-2">
                     <Button
                       type="button"
                       variant="outline"
@@ -122,18 +137,11 @@ export function WarnChecksAdmin({
                       variant="outline"
                       size="sm"
                       disabled={pending}
-                      onClick={() => {
-                        if (!confirm(`Delete "${row.name}"? Past firings stay in history.`)) return
-                        startTransition(async () => {
-                          const result = await deleteWarnCheckAction({ workspaceId, id: row.id })
-                          if ("error" in result) toast.error(result.error)
-                          else refresh()
-                        })
-                      }}
+                      onClick={() => setDeleting(row)}
                     >
                       Delete
                     </Button>
-                  </div>
+                  </div>}
                 </li>
               ),
             )}
@@ -141,28 +149,27 @@ export function WarnChecksAdmin({
         )}
       </section>
 
-      <section>
-        <h2 className="font-display text-lg font-semibold text-slate-900">Add a warn check</h2>
-        <p className="mt-2 max-w-[64ch] text-sm text-slate-600">
-          Predicates use a small expression language over the fields below. The dry-run tries
-          the rule against the last 20 invoices so you can see what would have fired before
-          turning it on.
+      {!readOnly && <section>
+        <h2 className="border-b border-hairline pb-2.5 text-[15px] font-semibold text-slate-900">Add a check</h2>
+        <p className="mt-3 max-w-[64ch] text-[13px] leading-relaxed text-slate-600">
+          When is a short condition over the fields listed under it. Try it first: the dry run
+          shows which of the last 20 invoices would have been held, before the check is on.
         </p>
         <div className="mt-4">
           <WarnCheckForm workspaceId={workspaceId} mode="create" onSaved={refresh} />
         </div>
-      </section>
+      </section>}
 
       <section>
-        <h2 className="font-display text-lg font-semibold text-slate-900">Reference</h2>
-        <p className="mt-2 max-w-[64ch] text-sm text-slate-600">
-          Variables (available in every rule):
+        <h2 className="border-b border-hairline pb-2.5 text-[15px] font-semibold text-slate-900">Fields you can test</h2>
+        <p className="mt-3 max-w-[64ch] text-[13px] leading-relaxed text-slate-600">
+          Every check can use these fields:
         </p>
         <ul className="mt-2 grid grid-cols-1 gap-1 text-xs sm:grid-cols-2 md:grid-cols-3">
           {Object.entries(WARN_CHECK_VARIABLES).map(([name, type]) => (
             <li key={name} className="font-mono text-slate-700">
               {name}
-              <span className="text-slate-400"> : {type}</span>
+              <span className="text-slate-500">: {type === "number" ? "a number" : type === "boolean" ? "yes or no" : "text"}</span>
             </li>
           ))}
         </ul>
@@ -173,11 +180,21 @@ export function WarnChecksAdmin({
           <code className="font-mono">contains</code> <code className="font-mono">and</code>{" "}
           <code className="font-mono">or</code> <code className="font-mono">not</code>.
           Numbers, single- or double-quoted strings, <code className="font-mono">true</code>,{" "}
-          <code className="font-mono">false</code>, and parentheses. No arithmetic, no regex, no
-          arbitrary code — a rule that needs it belongs alongside the built-in gates in
-          <code className="font-mono">lib/gates/</code>.
+          <code className="font-mono">false</code>, and parentheses. No arithmetic and no
+          patterns — a rule that needs more than this is a built-in check, not a warn check.
         </p>
       </section>
+
+      <ConfirmDialog
+        open={deleting !== null}
+        destructive
+        busy={pending}
+        title={deleting ? `Delete "${deleting.name}"?` : ""}
+        description="Past firings stay in the exception history. This cannot be undone."
+        confirmLabel={pending ? "Deleting…" : "Delete"}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleting(null)}
+      />
     </div>
   )
 }
@@ -256,12 +273,12 @@ function WarnCheckForm({
           id={`${mode}-name`}
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Large bill from an unknown vendor"
+          placeholder="Large invoice from an unknown supplier"
           maxLength={120}
         />
       </div>
       <div>
-        <Label htmlFor={`${mode}-when`} className="text-sm">Predicate</Label>
+        <Label htmlFor={`${mode}-when`} className="text-sm">When</Label>
         <Textarea
           id={`${mode}-when`}
           value={whenExpr}
@@ -280,13 +297,13 @@ function WarnCheckForm({
           id={`${mode}-message`}
           value={message}
           onChange={(e) => setMessage(e.target.value)}
-          placeholder="Verify this vendor before publishing."
+          placeholder="Verify this supplier before publishing."
           maxLength={1024}
         />
       </div>
 
       {dryRun && (
-        <div className="rounded border border-[#e6ebf1] p-3 text-xs">
+        <div className="rounded border border-hairline p-3 text-xs">
           <p className="mb-2 text-slate-600">
             Dry-run against the last {dryRun.length} invoice{dryRun.length === 1 ? "" : "s"}:{" "}
             <span className="font-medium text-slate-900">
@@ -331,7 +348,7 @@ function WarnCheckForm({
 
       <div className="flex flex-wrap gap-2">
         <Button type="button" onClick={submit} disabled={pending || !name || !whenExpr || !message}>
-          {mode === "create" ? "Add warn check" : "Save"}
+          {mode === "create" ? "Add check" : "Save"}
         </Button>
         <Button
           type="button"

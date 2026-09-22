@@ -1,31 +1,29 @@
 "use client"
 
-import { Landmark, ListChecks, Table2, type LucideIcon } from "lucide-react"
+import { ClipboardCheck, Landmark, Receipt, type LucideIcon } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
 /** The workspace pulse card. Rendered inside the sidebar in place of the compact icon strip when a
  * person is inside a sheet or a document detail — a room they used to enter with the door closing
- * behind them. The pulse card is the mini-map: three rows, one per primary destination, each
+ * behind them. The pulse card is the mini-map: typed intake rows plus the main outcome surfaces, each
  * carrying the same "something is waiting on you" count the full rail's badges do.
  *
  * The point is not just reachability (the compact icon strip already did that); the point is that
  * the workspace's living state stays visible. If two documents just landed in review while you were
- * inside a worksheet, the Documents row goes from muted to lit without you leaving the sheet.
+ * inside a document, the Invoices row goes from muted to lit without you leaving it.
  *
  * Row weight (muted vs lit) is the signal, not the count text alone — a screen at a glance still
  * reads "nothing waiting" or "three surfaces want you" without parsing numbers. Zero rows stay
  * present but muted so the workspace shape is constant; only urgency varies.
  *
  * Finance row is only rendered when the ledger integration is enabled deployment-wide. When it
- * isn't, the pulse card is a two-row shape and does not leave a placeholder — the workspace
+ * isn't, the pulse card omits Finance rather than leaving a placeholder — the workspace
  * genuinely does not have a Finance surface in that deployment. */
-export function WorkspacePulse({ workspaceId, documentsCount, worksheetsCount, financeCount, accountingEnabled }: {
+export function WorkspacePulse({ workspaceId, documentsCount, financeCount, accountingEnabled }: {
   workspaceId: string
   /** pipelineCounts.review — documents waiting for a person to sign off on the extracted fields. */
   documentsCount: number
-  /** countReviewedUnplaced — approved documents that haven't landed in a worksheet yet. */
-  worksheetsCount: number
   /** pipelineCounts.approved — documents past review, not yet pushed to the ledger. Only meaningful
    * when accountingEnabled; ignored otherwise. */
   financeCount: number
@@ -35,22 +33,25 @@ export function WorkspacePulse({ workspaceId, documentsCount, worksheetsCount, f
   const base = `/workspaces/${workspaceId}`
 
   const rows: { href: string; label: string; icon: LucideIcon; count: number; matches: string[] }[] = [
-    { href: `${base}/pipeline`, label: "Documents", icon: ListChecks, count: documentsCount, matches: [`${base}/pipeline`, `${base}/documents`, `${base}/review`, `${base}/bills`] },
-    { href: `${base}/worksheets`, label: "Worksheets", icon: Table2, count: worksheetsCount, matches: [`${base}/worksheets`, `${base}/files`] },
+    { href: `${base}/invoices`, label: "Invoices", icon: Receipt, count: documentsCount, matches: [`${base}/pipeline`, `${base}/documents`, `${base}/review`, `${base}/bills`, `${base}/invoices`] },
+    { href: `${base}/purchase-orders`, label: "Purchase Orders", icon: ClipboardCheck, count: 0, matches: [`${base}/purchase-orders`] },
+    { href: `${base}/receipts`, label: "Receipts", icon: Receipt, count: 0, matches: [`${base}/receipts`] },
+    { href: `${base}/bank-statements`, label: "Bank Statements", icon: Landmark, count: 0, matches: [`${base}/bank-statements`] },
     ...(accountingEnabled ? [{ href: `${base}/finance`, label: "Finance", icon: Landmark, count: financeCount, matches: [`${base}/finance`, `${base}/accounting`] }] : []),
   ]
 
   const total = rows.reduce((sum, row) => sum + row.count, 0)
 
   return <div className="w-full">
-    {/* Back-link out of sheet/document mode. Its own affordance so exit never depends on remembering
-        which rail entry corresponds to "back" — the way it did when the rail disappeared entirely. */}
+    {/* Back-link out of document mode, to the workspace home (the Invoices queue, #238). Its own
+        affordance so exit never depends on remembering which rail entry corresponds to "back" —
+        the way it did when the rail disappeared entirely. */}
     <Link
-      href={`${base}/worksheets`}
+      href={`${base}/invoices`}
       className="mb-2 flex items-center gap-1.5 rounded-md px-2 py-1 text-[11.5px] font-semibold uppercase tracking-[0.06em] text-slate-500 hover:bg-slate-200/50 hover:text-slate-800"
     >
       <span aria-hidden="true">←</span>
-      <span>Workspace</span>
+      <span>Company</span>
     </Link>
 
     <nav aria-label="Workspace pulse" className="rounded-lg border border-slate-200/70 bg-white/60 p-1.5 shadow-[0_1px_0_rgba(15,23,42,0.03)]">

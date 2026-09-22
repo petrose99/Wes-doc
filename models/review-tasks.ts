@@ -3,9 +3,12 @@
 // app/(app)/workspaces/[workspaceId]/review-actions.ts and do the auth.
 import { track } from "@/lib/analytics"
 import { canDecideStage, decideStage, findCurrentStage, toWorkflowStageInputs } from "@/lib/approvals/engine"
+import { resolveAutoStartWorkflowId } from "@/models/approval-defaults"
 import { isPaymentConfirmationRequired } from "@/lib/doc-types"
 import { auditEventData, getRequestAuditContext } from "@/lib/audit"
 import { prisma } from "@/lib/db"
+import { kickApprovalNoticeDrain } from "@/lib/notices/kick"
+import { notifySentBack } from "@/models/approval-notices"
 import { cache } from "react"
 
 export const REVIEW_TASK_STATUSES = ["open", "in_review", "approved", "rejected"] as const
@@ -90,6 +93,18 @@ export async function createReviewTask(input: {
 }) {
   const document = await prisma.document.findFirst({ where: { id: input.documentId, workspaceId: input.workspaceId }, select: { id: true } })
   if (!document) throw new Error("document_not_found")
+
+  // #253: the auto-start. A caller that named a workflow keeps it — an explicit choice always
+  // beats the workspace default. Otherwise the workspace's default flow starts the task on its
+  // own, unless it is inactive or the document carries an open hard gate. `autoStarted` is kept
+  // separate from `workflowId` so the audit event can say which of the two happened; a reader of
+  // the document history must be able to tell "someone started this" from "the default did".
+  const explicitWorkflowId = input.workflowId ?? null
+  const autoStartedWorkflowId = explicitWorkflowId
+    ? null
+    : await resolveAutoStartWorkflowId(input.workspaceId, input.documentId)
+  const workflowId = explicitWorkflowId ?? autoStartedWorkflowId
+
   const context = await getRequestAuditContext()
   const [task] = await prisma.$transaction([
     prisma.reviewTask.create({
@@ -97,11 +112,16 @@ export async function createReviewTask(input: {
         workspaceId: input.workspaceId, documentId: input.documentId, reason: input.reason ?? "manual",
         detail: input.detail ?? null, priority: input.priority ?? 0, dueAt: input.dueAt ?? null,
         assigneeId: input.assigneeId ?? null, createdById: input.createdById,
-        ...(input.workflowId ? { workflowId: input.workflowId, currentStageIndex: 0, status: "in_review" } : {}),
+        // stageReachedAt is the Approval notice's clock (#271): set whenever a stage is entered.
+        ...(workflowId ? { workflowId, currentStageIndex: 0, status: "in_review", stageReachedAt: new Date() } : {}),
       },
     }),
     prisma.documentAuditEvent.create({ data: auditEventData({ workspaceId: input.workspaceId, documentId: input.documentId, actorId: input.createdById, type: "review_task_created" }, context) }),
+    ...(autoStartedWorkflowId
+      ? [prisma.documentAuditEvent.create({ data: auditEventData({ workspaceId: input.workspaceId, documentId: input.documentId, actorId: null, type: "review_task_workflow_auto_started", detail: { workflowId: autoStartedWorkflowId } }, context) })]
+      : []),
   ])
+  if (workflowId) void kickApprovalNoticeDrain()
   return task
 }
 
@@ -152,6 +172,15 @@ export const listOpenReviewTasksForFile = cache(async (workspaceId: string, file
 export const getOpenReviewTaskForDocument = cache(async (workspaceId: string, documentId: string) => prisma.reviewTask.findFirst({
   where: { workspaceId, documentId, status: { in: ["open", "in_review"] } },
   select: { id: true, status: true },
+  orderBy: { createdAt: "desc" },
+}))
+
+/** #281 spec.md §7: the Checks tab's Retry action — an open `push_preflight` task means the last
+ * ledger push failed pre-flight (`lib/integration-push.ts:103-107`); its `detail` is the failure
+ * reason to show, never a bare "failed again". */
+export const getOpenLedgerRetryTask = cache(async (workspaceId: string, documentId: string) => prisma.reviewTask.findFirst({
+  where: { workspaceId, documentId, reason: "push_preflight", status: { in: ["open", "in_review"] } },
+  select: { id: true, detail: true },
   orderBy: { createdAt: "desc" },
 }))
 
@@ -220,8 +249,60 @@ export async function decideReviewTaskStage(input: { workspaceId: string; taskId
   const note = input.note?.trim() || null
   const context = await getRequestAuditContext()
   const [updated] = await prisma.$transaction([
-    prisma.reviewTask.update({ where: { id: task.id }, data: { status: nextStatus, currentStageIndex: nextStageIndex, resolvedAt, ...(note && !task.detail ? { detail: note } : {}) } }),
+    prisma.reviewTask.update({ where: { id: task.id }, data: { status: nextStatus, currentStageIndex: nextStageIndex, resolvedAt, ...(result.outcome === "advance" ? { stageReachedAt: new Date() } : {}), ...(note && !task.detail ? { detail: note } : {}) } }),
     prisma.documentAuditEvent.create({ data: auditEventData({ workspaceId: input.workspaceId, documentId: task.documentId, actorId: input.actorId, type: "review_task_stage_decided", detail: { stageIndex: currentStage.stageIndex, stageName: currentStage.name, decision: input.decision, outcome: result.outcome, ...(note ? { note } : {}) } }, context) }),
+  ])
+  if (result.outcome === "advance") void kickApprovalNoticeDrain()
+  return updated
+}
+
+/** CONTEXT.md's "Send back for review" (#236): the reversible middle path on an Approval — the
+ * current stage is not decided, the invoice returns to review with a required reason, and the
+ * run can be restarted. Distinct from `decideReviewTaskStage`'s "reject" (terminal) and from a
+ * `cancelApprovalOnDocument`-style withdrawal before any stage was decided: this can fire from
+ * any stage, decided-on-so-far or not, and always clears the workflow entirely rather than
+ * rewinding to an earlier stage index — "restarted" means a fresh Start Approval, not a resumed
+ * one, so a workspace that edited its workflow's stages in the meantime never has an orphaned
+ * mid-run task pointed at a stage list that changed under it. */
+export async function sendReviewTaskBackForReview(input: { workspaceId: string; taskId: string; actorId: string; reason: string }) {
+  const task = await prisma.reviewTask.findFirst({
+    where: { id: input.taskId, workspaceId: input.workspaceId },
+    select: { id: true, documentId: true, workflowId: true, status: true, currentStageIndex: true, createdById: true },
+  })
+  if (!task) throw new Error("review_task_not_found")
+  if (!task.workflowId || task.currentStageIndex === null) throw new Error("review_task_has_no_workflow")
+  if (task.status !== "in_review") throw new Error("review_task_not_in_review")
+  const reason = input.reason.trim()
+  if (!reason) throw new Error("reason_required")
+  const context = await getRequestAuditContext()
+  const [updated] = await prisma.$transaction([
+    prisma.reviewTask.update({ where: { id: task.id }, data: { status: "open", workflowId: null, currentStageIndex: null, stageReachedAt: null, resolvedAt: null } }),
+    prisma.documentAuditEvent.create({ data: auditEventData({ workspaceId: input.workspaceId, documentId: task.documentId, actorId: input.actorId, type: "review_task_sent_back", detail: { reason } }, context) }),
+  ])
+  // The starter hears about it directly (one mail per human act, no coalescing — spec §1.9).
+  void notifySentBack({ workspaceId: input.workspaceId, documentId: task.documentId, taskId: task.id, createdById: task.createdById, actorId: input.actorId, reason })
+  return updated
+}
+
+/** CONTEXT.md's "Send back for review" `_Avoid_` line distinguishes this from "cancel (that
+ * withdraws a run before any stage is decided)" — decision #7's bulk "Start / Cancel" pair on the
+ * Invoices bulk-action bar. Cancel only ever undoes an approval that hasn't had a single stage
+ * decided yet (still sitting at stage 0, nothing on the audit trail): once a stage has cleared,
+ * the run has real history and the only way back is Send back (with a reason) or a terminal
+ * Reject, never a silent Cancel. No reason required, matching Start's own low-ceremony shape. */
+export async function cancelApprovalOnDocument(input: { workspaceId: string; taskId: string; actorId: string }) {
+  const task = await prisma.reviewTask.findFirst({
+    where: { id: input.taskId, workspaceId: input.workspaceId },
+    select: { id: true, documentId: true, workflowId: true, status: true, currentStageIndex: true },
+  })
+  if (!task) throw new Error("review_task_not_found")
+  if (!task.workflowId || task.currentStageIndex === null) throw new Error("review_task_has_no_workflow")
+  if (task.status !== "in_review") throw new Error("review_task_not_in_review")
+  if (task.currentStageIndex !== 0) throw new Error("approval_already_advanced")
+  const context = await getRequestAuditContext()
+  const [updated] = await prisma.$transaction([
+    prisma.reviewTask.update({ where: { id: task.id }, data: { status: "open", workflowId: null, currentStageIndex: null, resolvedAt: null } }),
+    prisma.documentAuditEvent.create({ data: auditEventData({ workspaceId: input.workspaceId, documentId: task.documentId, actorId: input.actorId, type: "review_task_approval_cancelled" }, context) }),
   ])
   return updated
 }
@@ -254,6 +335,26 @@ export async function bulkUpdateReviewTaskStatus(input: { workspaceId: string; t
     ...approvable.map((task) => prisma.documentAuditEvent.create({ data: auditEventData({ workspaceId: input.workspaceId, documentId: task.documentId, actorId: input.actorId, type: "review_task_status_changed", detail: { from: task.status, to: input.status, bulk: true } }, context) })),
   ])
   return { updated: approvable.length, blockedTaskIds, documentIds: approvable.map((task) => task.documentId) }
+}
+
+/** #218: the workflow's full stage list plus where the task currently sits, for the Approval tab's
+ * pending-stage rows. Only an active (open/in_review) task has stages left to decide — a settled
+ * task's ApprovalStepChain is already fully explained by listDocumentStageDecisions, so this
+ * returns null once the document's workflow task is resolved (or it never had one). Deliberately
+ * the raw workflow stage list, not applicableStages()-filtered: decideReviewTaskStage itself
+ * doesn't apply the amount threshold either (see its own toWorkflowStageInputs call above), so
+ * showing anything narrower here would claim a precision the decision path doesn't have yet. */
+export async function getActiveWorkflowStageState(workspaceId: string, documentId: string) {
+  const task = await prisma.reviewTask.findFirst({
+    where: { workspaceId, documentId, workflowId: { not: null }, status: { in: ["open", "in_review"] } },
+    select: {
+      currentStageIndex: true,
+      workflow: { select: { stages: { orderBy: { stageIndex: "asc" }, select: { stageIndex: true, name: true } } } },
+    },
+    orderBy: { createdAt: "desc" },
+  })
+  if (!task || !task.workflow || task.currentStageIndex === null) return null
+  return { currentStageIndex: task.currentStageIndex, stages: task.workflow.stages }
 }
 
 /** Assignment is its own audit event, distinct from a status change — "who is responsible" and

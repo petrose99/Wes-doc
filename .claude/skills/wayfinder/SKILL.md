@@ -24,51 +24,11 @@ The map is an **index**, not a store. It lists the decisions made and points at 
 
 **Where the map, its child tickets, blocking, and frontier queries physically live is tracker-specific.** The issue tracker should have been provided to you. If not, tell the user to run `/setup-matt-pocock-skills`. Consult the tracker doc's "Wayfinding operations" section for how _this_ repo expresses them. If no tracker has been provided, default to the local-markdown tracker.
 
-### The map body
+### The map body and tickets
 
-The whole map at low resolution, loaded once per session. Open tickets are **not** listed: they are open child issues, found by query.
+The map body is the whole map at low resolution, loaded once per session: `## Destination` (one or two lines), `## Notes` (domain, skills every session consults, standing preferences), `## Decisions so far` (one line per closed ticket: linked title + gist), `## Not yet specified` (fog), `## Out of scope`. Open tickets are **not** listed; they are open child issues, found by query.
 
-```markdown
-## Destination
-
-<what reaching the end of this map looks like: the spec, decision, or change this effort is finding its way to. One or two lines; every session orients to it before choosing a ticket.>
-
-## Notes
-
-<domain; skills every session should consult; standing preferences for this effort>
-
-## Decisions so far
-
-<!-- the index: one line per closed ticket, enough to judge relevance, then zoom the link for the detail the ticket holds -->
-
-- [<closed ticket title>](link): <one-line gist of the answer>
-
-## Not yet specified
-
-<!-- see "Fog of war": in-scope fog you can't ticket yet; graduates as the frontier advances -->
-
-## Out of scope
-
-<!-- see "Out of scope": work ruled beyond the destination; closed, never graduates -->
-```
-
-### Tickets
-
-Each ticket is a **child issue** of the map; the tracker's issue id is its identity. Its body is the question, sized to one 100K token agent session:
-
-```markdown
-## Question
-
-<the decision or investigation this ticket resolves>
-```
-
-Each ticket carries a `wayfinder:<type>` label, one of `research`, `prototype`, `grilling`, `task` (see [Ticket Types](#ticket-types)).
-
-A session **claims** a ticket by assigning it to the dev driving the map, **first**, before any work, so concurrent sessions skip it. That assignee _is_ the claim: an open, unassigned ticket is unclaimed.
-
-Blocking uses the tracker's **native** dependency relationship: essential because it renders the frontier _visually_ in the tracker's own UI, so the human sees what's takeable without opening the map. Only a tracker that lacks native blocking falls back to a body convention. A ticket is **unblocked** when every ticket blocking it is closed; the **frontier** is the open, unblocked, unclaimed children, the edge of the known.
-
-The answer isn't part of the body; it's recorded on resolution (see [Work through the map](#work-through-the-map)). Assets created while resolving a ticket are linked from the issue, not pasted in.
+Each ticket is a **child issue** of the map, body `## Question` (the decision or investigation it resolves, sized to one session), label `wayfinder:<type>`. A session **claims** a ticket by assigning it to itself **first**; an open, unassigned ticket is unclaimed. Blocking uses the tracker's **native** dependency; the **frontier** is the open, unblocked, unclaimed children. The answer is recorded on resolution, not in the body; assets are linked, not pasted. The exact templates are in `reference/charting.md`.
 
 ## Ticket Types
 
@@ -106,14 +66,7 @@ Two modes. Either way, **never resolve more than one ticket per session**, with 
 
 ### Chart the map
 
-User invokes with a loose idea.
-
-1. **Name the destination.** Call the Skill tool twice, for "grilling" and "domain-modeling", to pin down what this map is finding its way to: the spec, decision, or change. The destination fixes the scope, so it's settled first.
-2. **Map the frontier.** Grill again, **breadth-first** this time: fan out across the whole space rather than deep on any one thread, surfacing the open decisions and the first steps takeable now. **If this surfaces no fog** (the way to the destination is already clear, the whole journey small enough for one session), you don't need a map. Stop and ask the user how they'd like to proceed.
-3. **Create the map** (label `wayfinder:map`): Destination and Notes filled in, Decisions-so-far empty, the fog sketched into **Not yet specified**.
-4. **Create the tickets you can specify now** as child issues of the map, then wire blocking edges in a **second pass** (issues need ids before they can reference each other). Wiring sorts them into the frontier and the blocked; everything you can't yet specify stays in the fog: the **Not yet specified** section.
-5. **Fire the research subagents.** For each `research` ticket you just created, spin up a subagent that calls the Skill tool with "research" to resolve it in parallel, capturing its findings on a throwaway `research/<name>` branch with a context pointer from the ticket.
-6. Stop: charting is one session's work; it hand-resolves nothing.
+User invokes with a loose idea. Read `reference/charting.md` (the map and ticket templates and the six charting steps) and follow it. Charting is one session's work; it hand-resolves nothing.
 
 ### Work through the map
 
@@ -126,3 +79,14 @@ User invokes with a map (URL or number). A ticket is **optional**: without one, 
 5. Add newly-surfaced tickets (create-then-wire); graduate any fog the answer has made specifiable, clearing each graduated patch from **Not yet specified** so it lives only as its new ticket. If the answer reveals that a ticket (this one or another) sits beyond the destination, **rule it out of scope** rather than resolving it on the route. If the decision invalidates other parts of the map, update or delete those tickets.
 
 The user may run unblocked tickets in parallel, so expect other sessions to be editing the tracker concurrently.
+
+### Continue a ticket across sessions
+
+A ticket that outgrows one session is **continued**, never abandoned, narrowed or silently split. One session is one context; the ticket's scope is whatever it says, and it closes only when all of it is done to the bar.
+
+- **Keep a hand-off file current** at `docs/wayfinder-reports/<map>/<ticket>.handoff.md` from the first milestone on, and commit it with the work as WIP. It is written for a reader with no memory of this session: the milestones done (spec · pre-flight · data/model · surface · first measurement · fix batch · confirm), what is built and verified, where the artefacts are (spec, filled pre-flight, captures, scores), the open findings, and the exact next step. Update it at every milestone, not at the end — a session can be cut at any moment, and a current file is what makes that harmless. A driver that runs a build in phases reads the phase off machine-readable lines in this file: `milestone: spec-done`, `milestone: build-done`, `milestone: measured` (scores and triage on the file, no fixes yet).
+- **Ending short:** post `Autopilot: continue — <where it stands>` on the ticket, leave it open, commit the tree. The driver puts it back on the frontier.
+- **The hand-off carries the build plan, and a build session builds one step of it.** Ordered `step: N — ‹name› — todo|done` lines, each naming the spec lines it comes from, the files it touches and its check; the build gate is the last step. A session builds the first `todo` step, runs its check, marks it `done`, commits and stops — the next step gets a fresh context. Reading is by budget: the hand-off, then spec sections and pre-flight parts by line range for that step, one area primer, reused components by the symbols called (grep, then a bounded range), never whole files; recon goes through a foreground `Explore` agent whose answer, not the files, stays in context; the `intent`/`impeccable` routers are not reloaded — the named sub-skills and `craft-floor.md` are. A session that re-reads everything spends its budget before its first edit (#286 lost two build sessions this way).
+- **Starting a continuation:** read the hand-off file before anything else, then the last commits. Resume at the milestone it names. Do not re-spec, rebuild or re-measure what it records as done; do re-run the checks the bar requires at close.
+- **Splitting** is a scoping act, not a budget one: only at a boundary the map would recognise as its own ticket, with the child carrying the whole remainder and blocked on this one. Never to make this session's close look complete.
+- **Never delegate the build to a background agent and end the turn waiting.** A driven session exits the moment a turn ends without a tool call, and everything it spawned dies with it. Subagents are for bounded reads that return in one foreground call.

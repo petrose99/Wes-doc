@@ -15,7 +15,7 @@ export function SpendByCategoryChart({ workspaceId, rows, formatMoney }: {
     return <section className="space-y-2">
       <h2 className="text-lg font-semibold text-slate-900">Spend by category</h2>
       <p className="rounded border border-dashed p-6 text-center text-sm text-slate-500">
-        No categorized spend yet. <Link href={`/workspaces/${workspaceId}/settings/rules`} className="font-medium text-emerald-700 hover:underline">Set up supplier rules</Link> to auto-code documents by account.
+        No categorized spend yet. <Link href={`/workspaces/${workspaceId}/admin/suppliers`} className="font-medium text-emerald-700 hover:underline">Set up supplier rules</Link> to auto-code documents by account.
       </p>
     </section>
   }

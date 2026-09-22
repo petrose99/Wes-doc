@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The Companies page</title><link rel="stylesheet" href="../assets/course.css"></head>
+<body><main>
+<p class="kicker">Lesson 2 · about 7 minutes</p>
+<h1>The Companies page</h1>
+<p class="lede">Admin › Companies is the list of drawers in your cabinet. It looks different depending on which drawer you are standing in when you open it. This lesson is the three looks, and the one action it refuses.</p>
+
+<h2>Three looks, decided by where you are</h2>
+<p>The page reads the company you are currently in (the URL's <code>/workspaces/[id]/…</code>) and picks one of three states (<code>admin/companies/page.tsx</code>, lines 24–31):</p>
+<table>
+<tr><th>You are in…</th><th>You see</th><th>Why</th></tr>
+<tr><td>your <b>Personal</b> workspace</td><td>a first-use screen: <b>Create a company</b></td><td>Personal is never in an organization, so there is nothing to list; the only sensible next step is to start a company.</td></tr>
+<tr><td>a company that is <b>not yet in an organization</b></td><td>a first-use screen: <b>Name your organization</b></td><td>One company alone does not need a cabinet. The moment you name one, this company becomes its first member and you its first Organization admin.</td></tr>
+<tr><td>a company <b>inside an organization</b></td><td>the real list: every company in that organization <em>you belong to</em>, one row each, a pane per row</td><td>This is the working state.</td></tr>
+</table>
+<div class="note">Rows only for companies you belong to. If the organization has more, a small line under the list says "<b>3 more in Acme you're not a member of</b>" (<code>companies-queue.tsx</code> line 265). That is the Lesson 1 rule made visible: the organization knows the drawers exist, but you don't get to open them.</div>
+
+<h2>What you can do (Owners only)</h2>
+<ul>
+<li><b>Add a company</b> — creates a new company straight into this organization.</li>
+<li><b>Move a company into Acme</b> — picks from companies you <em>own</em> that are not in any organization yet, and pulls one in. You must own both sides.</li>
+<li><b>Remove from Acme</b> (in a row's ⋯ menu) — takes the company out of the organization. The company keeps existing, it just stands alone again.</li>
+</ul>
+<p>A Reviewer or Member sees the list and the panes but none of these buttons.</p>
+
+<h2>The one refusal</h2>
+<p class="big">You cannot remove the company you are standing in.</p>
+<p>The menu item is disabled with the hint "<b>Switch to another company to remove this one.</b>" — and the server refuses it too (<code>companies/actions.ts</code> line 172, error <code>is_current</code>). Reason: removing your current company would pull the floor out from under the page you are on. The product glossary makes that caption the <em>only</em> place the rule is stated; no other screen offers the action.</p>
+
+<h2>Look at it</h2>
+<p>On the tunnel URL: open Admin › Companies from a company that is in an organization. Open a row's ⋯ menu — if it is the company you are in, Remove is greyed with the hint.</p>
+
+<h2>Check yourself</h2>
+<p>Answer from memory before clicking. Score: <span data-quiz-score>0 / 0</span></p>
+<div class="quiz" data-quiz>
+<div class="q"><p class="stem">You open Admin › Companies from your Personal workspace. What is on the page?</p>
+<button data-why="Personal is never in an organization; there is nothing to list, so it offers to create a company." data-a="1">Create a company</button>
+<button data-why="That is the look for a company not yet in an organization.">Name your organization</button>
+<button data-why="Personal cannot be inside an organization, so there is no list.">A list of companies</button>
+</div>
+<div class="q"><p class="stem">The organization has 6 companies; you belong to 4. How many rows?</p>
+<button data-why="Rows only for companies you belong to; the other two appear as a count line." data-a="1">Four rows shown</button>
+<button data-why="Belonging to the organization does not list its companies for you.">Six rows shown</button>
+<button data-why="You are in four of them, so four rows.">No rows shown</button>
+</div>
+<div class="q"><p class="stem">To move a company into the organization, what must you be?</p>
+<button data-why="Owner of the company you are in and of the one you are moving in." data-a="1">Owner of both</button>
+<button data-why="The org flag grants nothing here; Move checks company ownership on both sides.">Organization admin</button>
+<button data-why="Reviewer sees the list but has no Add, Move or Remove.">Reviewer of one</button>
+</div>
+<div class="q"><p class="stem">What happens when you try to remove the company you are standing in?</p>
+<button data-why="Both client and server refuse; the hint says to switch first." data-a="1">Refused, switch first</button>
+<button data-why="It never asks; the item is disabled before you get that far.">Confirm then removed</button>
+<button data-why="Removing from an organization never deletes a company.">Company gets deleted</button>
+</div>
+</div>
+
+<h2>Read next</h2>
+<p>Primary source: the ticket report <a href="../../../wayfinder-reports/226/285.md">#285</a> (the "What I did" and "Decisions recorded" sections), and the <b>Organization</b> entry in <a href="../../../../CONTEXT.md">CONTEXT.md</a>. The <a href="../reference/glossary.html">glossary card</a> has the words.</p>
+<p class="next">Next lesson: <b>Users</b> — one list of people across all your companies, and why an invite asks about companies one at a time. Ask the teacher anything unclear first.</p>
+<footer>Lesson 2 of the <a href="../MISSION.md">bite-admin-build</a> course · 2026-09-19</footer>
+</main><script src="../assets/quiz.js"></script></body></html>

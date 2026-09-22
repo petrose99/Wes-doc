@@ -15,7 +15,7 @@ const EVENT_SCHEMAS = {
    * from lib/ingestion.ts's createIngestionItem, which is the one place that knows the real intake
    * channel — Document.source itself only ever says "upload" or "dictation" (models/documents.ts),
    * collapsing camera/zip/email/api into "upload" at the database level. */
-  document_uploaded: z.object({ fileId: uuid, documentId: uuid, source: z.enum(["upload", "dictation", "camera", "zip", "email", "api"]) }).strict(),
+  document_uploaded: z.object({ fileId: uuid, documentId: uuid, source: z.enum(["upload", "dictation", "camera", "zip", "email", "api", "whatsapp"]) }).strict(),
   /** Written once extraction finishes, success or failure — the pair this + document_uploaded
    * gives is time-to-first-extraction. */
   document_extraction_completed: z.object({ documentId: uuid, templateCode: z.string().max(80), status: z.enum(["success", "failed"]), durationMs: z.number().int().nonnegative() }).strict(),

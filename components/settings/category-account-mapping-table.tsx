@@ -2,7 +2,6 @@
 
 import { upsertMappingAction, deleteMappingAction } from "@/app/(app)/workspaces/[workspaceId]/(chrome)/settings/accounting-mapping/actions"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type { CategoryAccountMappingRow } from "@/models/category-account-mappings"
 import { Plus, Trash2 } from "lucide-react"
 import { useRouter } from "next/navigation"
@@ -49,15 +48,11 @@ export function CategoryAccountMappingTable({ workspaceId, connectionId, mapping
   const accountLabel = (externalId: string) => accountOptions.find((o) => o.value === externalId)?.label ?? externalId
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Category → Account mappings</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <div className="space-y-4">
         {mappings.length > 0 && (
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b text-left text-muted-foreground">
+              <tr className="border-b border-hairline text-left text-slate-600">
                 <th className="pb-2 font-medium">Category</th>
                 <th className="pb-2 font-medium">Type</th>
                 <th className="pb-2 font-medium">Account</th>
@@ -66,14 +61,14 @@ export function CategoryAccountMappingTable({ workspaceId, connectionId, mapping
             </thead>
             <tbody>
               {mappings.map((m) => (
-                <tr key={m.id} className="border-b last:border-0">
+                <tr key={m.id} className="border-b border-hairline-soft last:border-0">
                   <td className="py-2">{m.category}</td>
                   <td className="py-2 capitalize">{m.kind}</td>
                   <td className="py-2">{accountLabel(m.accountExternalId)}</td>
                   {isOwner && (
                     <td className="py-2">
-                      <button type="button" disabled={pending} onClick={() => remove(m.id)}
-                        className="rounded p-1 text-slate-500 transition-colors hover:bg-red-50 hover:text-red-700">
+                      <button type="button" disabled={pending} onClick={() => remove(m.id)} aria-label={`Remove mapping for ${m.category}`}
+                        className="rounded p-1 text-slate-600 transition-colors hover:bg-red-50 hover:text-red-800">
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </td>
@@ -84,7 +79,7 @@ export function CategoryAccountMappingTable({ workspaceId, connectionId, mapping
           </table>
         )}
 
-        {mappings.length === 0 && <p className="text-sm text-muted-foreground">No mappings configured yet. Categories will use the default expense account.</p>}
+        {mappings.length === 0 && <p className="text-sm text-slate-600">No mappings configured yet. Categories will use the default expense account.</p>}
 
         {isOwner && (
           <div className="flex flex-wrap items-end gap-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3">
@@ -117,7 +112,6 @@ export function CategoryAccountMappingTable({ workspaceId, connectionId, mapping
             </Button>
           </div>
         )}
-      </CardContent>
-    </Card>
+    </div>
   )
 }

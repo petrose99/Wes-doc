@@ -4,6 +4,11 @@
 import { track } from "@/lib/analytics"
 import { recordSystemAudit } from "@/lib/audit"
 import { checkInvoiceArithmetic } from "@/lib/checks/arithmetic"
+import { checkLineItemArithmetic } from "@/lib/checks/line-item-arithmetic"
+import { checkPoLineConsumption, type PoLineConsumptionInput } from "@/lib/checks/po-line-consumption"
+import { parseLineAssignments } from "@/lib/matching/line-match"
+import { isComparedLink, poLinkKind, rankPoLinks, REJECTED_MATCH_STATUS } from "@/lib/matching/po-link"
+import { deriveStatementLayout, evaluateStatementDrift, type StatementLayout } from "@/lib/checks/statement-layout-drift"
 import { checkAmountAnomaly } from "@/lib/checks/amount-anomaly"
 import { checkBankDetails } from "@/lib/checks/bank-details"
 import { checkPdfForensics, readPdfForensicSignals } from "@/lib/checks/pdf-forensics"
@@ -56,7 +61,7 @@ export async function runDeterministicChecks(input: { workspaceId: string; docum
   try {
     const document = await prisma.document.findFirst({
       where: { id: input.documentId, workspaceId: input.workspaceId },
-      select: { id: true, templateId: true, reviewedData: true, mimeType: true, ocrText: true, docType: true, template: { select: { code: true } } },
+      select: { id: true, templateId: true, reviewedData: true, mimeType: true, ocrText: true, docType: true, institutionId: true, template: { select: { code: true } } },
     })
     if (!document) return
     const docType = resolveDocType(document)
@@ -66,7 +71,14 @@ export async function runDeterministicChecks(input: { workspaceId: string; docum
     const values = (document.reviewedData ?? {}) as Record<string, unknown>
     const get = (key: keyof CheckFieldMap) => (map[key] ? values[map[key] as string] : undefined)
     const currencyCode = asString(get("currency"))
-    const lineItems = Array.isArray(get("lineItems")) ? (get("lineItems") as unknown[]).map((item) => ({ amount: asNumber((item as Record<string, unknown> | null)?.amount) })) : []
+    const lineItems = Array.isArray(get("lineItems")) ? (get("lineItems") as unknown[]).map((item) => {
+      const row = item as Record<string, unknown> | null
+      return {
+        quantity: asNumber(row?.quantity),
+        unitPrice: asNumber(row?.unit_price),
+        amount: asNumber(row?.amount),
+      }
+    }) : []
 
     const results: CheckResult[] = []
 
@@ -74,6 +86,15 @@ export async function runDeterministicChecks(input: { workspaceId: string; docum
       const otherCharges = Array.isArray(get("otherCharges")) ? (get("otherCharges") as unknown[]).map((item) => ({ amount: asNumber((item as Record<string, unknown> | null)?.amount) })) : []
       const arithmetic = checkInvoiceArithmetic({ currencyCode, subtotal: asNumber(get("subtotal")), taxTotal: asNumber(get("taxTotal")), shippingTotal: asNumber(get("shippingTotal")), otherCharges, total: asNumber(get("total")), lineItems })
       if (arithmetic) results.push(arithmetic)
+      const lineArithmetic = checkLineItemArithmetic({ currencyCode, lineItems })
+      if (lineArithmetic) results.push(lineArithmetic)
+    }
+
+    // #206: cumulative PO/invoice line-consumption, only meaningful once this invoice is matched
+    // to a PO (lib/matching engine's po_to_invoice edge).
+    if (map.lineItems) {
+      const poConsumption = await checkPoLineConsumptionAgainstMatchedPo(input.workspaceId, document.id, map.lineItems, values)
+      if (poConsumption) results.push(poConsumption)
     }
 
     if (map.openingBalance && map.closingBalance) {
@@ -87,6 +108,15 @@ export async function runDeterministicChecks(input: { workspaceId: string; docum
       }) : []
       const balance = checkStatementBalance({ currencyCode, openingBalance: asNumber(get("openingBalance")), closingBalance: asNumber(get("closingBalance")), transactions, accounts })
       if (balance) results.push(balance)
+
+      // #207: layout drift, only meaningful once a person has asserted an institution for this
+      // statement. First statement for a newly-asserted institution has nothing to diff
+      // against — this call learns the layout instead of judging it.
+      if (document.institutionId) {
+        const rawTransactions = Array.isArray(get("transactions")) ? (get("transactions") as unknown[]).filter((row): row is Record<string, unknown> => typeof row === "object" && row !== null) : []
+        const drift = await checkStatementDriftAgainstInstitution(input.workspaceId, document.institutionId, rawTransactions)
+        if (drift) results.push(drift)
+      }
     }
 
     const taxProfile = map.taxTotal || map.supplierVatNumber ? await getTaxProfile(input.workspaceId) : null
@@ -139,7 +169,10 @@ export async function runDeterministicChecks(input: { workspaceId: string; docum
       // A2.3: infer credit-note-ness deterministically — negative total OR the template's own
       // documentType is a credit note. Consumers already know the sign; nothing else changes.
       const isCreditNote = totalValue !== null && totalValue < 0
-      const identity: DocumentIdentity = { documentId: document.id, supplier: asString(get("supplier")), invoiceNumber: asString(get("invoiceNumber")), total: totalValue, currencyCode, isCreditNote }
+      const identity: DocumentIdentity = {
+        documentId: document.id, supplier: asString(get("supplier")), invoiceNumber: asString(get("invoiceNumber")), total: totalValue, currencyCode, isCreditNote,
+        fieldKeys: { supplier: map.supplier, invoiceNumber: map.invoiceNumber, total: map.total },
+      }
       results.push(...(await checkDuplicates(input.workspaceId, document.templateId, identity, map)))
       const resubmission = await checkSuspiciousResubmission(input.workspaceId, document.id, identity)
       if (resubmission) results.push(resubmission)
@@ -174,10 +207,11 @@ export async function runDeterministicChecks(input: { workspaceId: string; docum
 
 async function persistCheckResult(workspaceId: string, documentId: string, result: CheckResult): Promise<void> {
   const status = result.status === "fail" && !FAIL_BY_DEFAULT.has(result.checkCode) && result.checkCode !== "duplicate" ? "warn" : result.status
+  const detail = result.detail || result.fields ? { ...(result.detail ?? {}), fields: result.fields ?? [] } : null
   await prisma.documentCheckResult.upsert({
     where: { documentId_checkCode: { documentId, checkCode: result.checkCode } },
-    create: { workspaceId, documentId, checkCode: result.checkCode, status, message: result.message, detail: (result.detail ?? null) as Prisma.InputJsonValue },
-    update: { status, message: result.message, detail: (result.detail ?? null) as Prisma.InputJsonValue },
+    create: { workspaceId, documentId, checkCode: result.checkCode, status, message: result.message, detail: detail as Prisma.InputJsonValue },
+    update: { status, message: result.message, detail: detail as Prisma.InputJsonValue },
   })
   if (status === "pass") return
 
@@ -197,6 +231,101 @@ async function persistCheckResult(workspaceId: string, documentId: string, resul
   } catch (error) {
     console.error("[checks] check.failed webhook emit failed:", error instanceof Error ? error.message : error)
   }
+}
+
+/** #207 wiring: reads the institution's saved layout, evaluates drift, and — for the first
+ * statement seen for a newly-asserted institution — learns the layout instead of judging it
+ * (there is nothing to diff against yet, per #183's inventory requirement that "not applicable"
+ * be a real, distinguishable state). Confirmed drift never auto-updates the saved layout; only a
+ * reviewer choosing "Accept as new layout" does that (that UI flow is #220's scope). */
+async function checkStatementDriftAgainstInstitution(workspaceId: string, institutionId: string, transactions: Array<Record<string, unknown>>): Promise<CheckResult | null> {
+  try {
+    const institution = await prisma.institution.findFirst({ where: { id: institutionId, workspaceId }, select: { savedLayout: true } })
+    if (!institution) return null
+    const savedLayout = institution.savedLayout as StatementLayout | null
+    const result = evaluateStatementDrift({ transactions, savedLayout })
+    if (result.kind === "not_applicable" && transactions.length) {
+      await prisma.institution.update({ where: { id: institutionId }, data: { savedLayout: deriveStatementLayout(transactions) as unknown as Prisma.InputJsonValue } })
+      return null
+    }
+    if (result.kind !== "drift") return null
+    return { checkCode: "statement_layout_drift", status: "warn", message: `This statement's layout differs from the saved layout for this institution: ${result.changes.join("; ")}`, detail: { changes: result.changes, layout: result.layout } }
+  } catch (error) {
+    console.error("[checks] statement layout drift lookup failed:", error instanceof Error ? error.message : error)
+    return null
+  }
+}
+
+/** #206 wiring: finds the PO this invoice matched to (lib/matching's po_to_invoice edge), pulls
+ * its line items plus every sibling invoice already matched to the same PO, and hands the pooled
+ * consumption to the pure checker. Skips silently when the invoice has no PO match yet — the
+ * check only makes sense once matching has run. */
+async function checkPoLineConsumptionAgainstMatchedPo(workspaceId: string, documentId: string, lineItemsKey: string, currentValues: Record<string, unknown>): Promise<CheckResult | null> {
+  try {
+    // #228 Q11: only a *compared* link counts — confirmed by hand, or the matcher's guess when
+    // the invoice cites the same PO number. A suggestion compares nothing; a rejected link is gone.
+    const candidates = await prisma.documentMatch.findMany({
+      where: { workspaceId, matchType: "po_to_invoice", targetId: documentId, status: { not: REJECTED_MATCH_STATUS } },
+      select: { id: true, sourceId: true, status: true, confidence: true, lineAssignments: true, source: { select: { reviewedData: true, rawExtraction: true } } },
+    })
+    const invoicePoNumber = asString(currentValues.po_number) ?? asString(currentValues.purchase_order_number)
+    const ranked = rankPoLinks(candidates.map((row) => {
+      const poValues = (row.source.reviewedData ?? row.source.rawExtraction ?? {}) as Record<string, unknown>
+      const poNumber = asString(poValues.po_number)
+      return { row, poValues, poNumber, confidence: row.confidence, kind: poLinkKind({ status: row.status, invoicePoNumber, poNumber }) }
+    })).filter((link) => isComparedLink(link.kind))
+    const match = ranked[0]
+    if (!match) return null
+    const poLineItems = parseLineItemsForConsumption(match.poValues[lineItemsKey])
+    if (!poLineItems.length) return null
+
+    // Only siblings that are themselves *compared* against this PO consume its lines — a merely
+    // suggested link on another invoice must not push this one over the allowance.
+    const siblingMatches = await prisma.documentMatch.findMany({ where: { workspaceId, matchType: "po_to_invoice", sourceId: match.row.sourceId, targetId: { not: documentId }, status: { not: REJECTED_MATCH_STATUS } }, select: { targetId: true, status: true } })
+    const siblingStatus = new Map(siblingMatches.map((s) => [s.targetId, s.status]))
+    const siblings = siblingMatches.length ? await prisma.document.findMany({ where: { workspaceId, id: { in: siblingMatches.map((s) => s.targetId) } }, select: { id: true, filename: true, reviewedData: true } }) : []
+
+    const invoiceLineItems: PoLineConsumptionInput["invoiceLineItems"] = parseLineItemsForConsumption(currentValues[lineItemsKey]).map((item, rowIndex) => ({ documentId, rowIndex, ...item }))
+    const siblingLabels: Record<string, string> = {}
+    for (const sibling of siblings) {
+      const values = (sibling.reviewedData ?? {}) as Record<string, unknown>
+      const siblingKind = poLinkKind({ status: siblingStatus.get(sibling.id) ?? "pending", invoicePoNumber: asString(values.po_number) ?? asString(values.purchase_order_number), poNumber: match.poNumber })
+      if (!isComparedLink(siblingKind)) continue
+      siblingLabels[sibling.id] = asString(values.invoice_number) ?? sibling.filename
+      invoiceLineItems.push(...parseLineItemsForConsumption(values[lineItemsKey]).map((item, rowIndex) => ({ documentId: sibling.id, rowIndex, ...item })))
+    }
+
+    const [workspace, config] = await Promise.all([
+      prisma.workspace.findUnique({ where: { id: workspaceId }, select: { poQuantityTolerancePercent: true } }),
+      prisma.workspaceAutomationConfig.findUnique({ where: { workspaceId }, select: { matchTolerance: true } }),
+    ])
+    // #228 Q12: the unit-price allowance is the workspace match-variance percent (stored as a
+    // fraction, 0.02 = 2 %).
+    const tolerance = config?.matchTolerance && typeof config.matchTolerance === "object" && !Array.isArray(config.matchTolerance) ? (config.matchTolerance as { percent?: number }) : null
+    const priceTolerancePercent = Math.round(((typeof tolerance?.percent === "number" ? tolerance.percent : 0.02) * 100) * 100) / 100
+    return checkPoLineConsumption({
+      poDocumentId: match.row.sourceId,
+      poNumber: match.poNumber,
+      poLineItems,
+      invoiceLineItems,
+      quantityTolerancePercent: workspace?.poQuantityTolerancePercent ?? 5,
+      priceTolerancePercent,
+      lineAssignments: parseLineAssignments(match.row.lineAssignments),
+      siblingLabels,
+      currentDocumentId: documentId,
+    })
+  } catch (error) {
+    console.error("[checks] po line consumption lookup failed:", error instanceof Error ? error.message : error)
+    return null
+  }
+}
+
+function parseLineItemsForConsumption(value: unknown): Array<{ description: string | null; quantity: number | null; unitPrice: number | null }> {
+  if (!Array.isArray(value)) return []
+  return value.map((item) => {
+    const row = item as Record<string, unknown> | null
+    return { description: asString(row?.description), quantity: asNumber(row?.quantity), unitPrice: asNumber(row?.unit_price) }
+  })
 }
 
 /** A2.2 wiring: resolves the extracted supplier through the A5 registry, compares this document's
@@ -344,7 +473,7 @@ async function checkSplitInvoicesAgainstHistory(workspaceId: string, templateId:
       .filter((v): v is number => typeof v === "number" && v > 0)
     const allThresholds = [...routingThresholds, ...budgetThresholds]
     const approvalThreshold = allThresholds.length ? Math.min(...allThresholds) : 1000
-    return checkSplitInvoices({ candidateAmount: amount, candidateDate: date, siblings: window, approvalThreshold })
+    return checkSplitInvoices({ candidateAmount: amount, candidateDate: date, siblings: window, approvalThreshold, fieldKeys: { amount: map.total, date: map.date } })
   } catch (error) {
     console.error("[checks] split-invoice lookup failed:", error instanceof Error ? error.message : error)
     return null
@@ -354,7 +483,7 @@ async function checkSplitInvoicesAgainstHistory(workspaceId: string, templateId:
 async function checkDuplicates(workspaceId: string, templateId: string | null, identity: DocumentIdentity, map: CheckFieldMap): Promise<CheckResult[]> {
   const ingestion = await prisma.ingestionItem.findFirst({ where: { workspaceId, documentId: identity.documentId }, select: { status: true } })
   if (ingestion?.status === "duplicate") {
-    return [{ checkCode: "duplicate", status: "fail", message: "This exact file was already ingested into this workspace.", detail: { exact: true } }]
+    return [{ checkCode: "duplicate", status: "fail", fields: [map.total ?? "total", map.supplier ?? "supplier", map.invoiceNumber ?? "invoice_number"], message: "This exact file was already ingested into this workspace.", detail: { exact: true } }]
   }
   if (!templateId || !map.supplier || !map.invoiceNumber || !map.total) return []
   const siblings = await prisma.document.findMany({
@@ -404,7 +533,7 @@ async function checkSuspiciousResubmission(workspaceId: string, documentId: stri
     return asString(values[candidateMap.supplier])?.trim().toLowerCase() === supplier && asString(values[candidateMap.invoiceNumber])?.trim().toLowerCase() === invoiceNumber
   })
   if (!match) return null
-  return { checkCode: "suspicious_resubmission", status: "warn", message: "Same supplier and invoice number as a document rejected in a previous review.", detail: { rejectedDocumentId: match.id } }
+  return { checkCode: "suspicious_resubmission", status: "warn", fields: [identity.fieldKeys?.supplier ?? "supplier", identity.fieldKeys?.invoiceNumber ?? "invoice_number"], message: "Same supplier and invoice number as a document rejected in a previous review.", detail: { rejectedDocumentId: match.id } }
 }
 
 async function siblingStatementPeriods(workspaceId: string, templateId: string | null, documentId: string, accountNumber: string, map: CheckFieldMap) {

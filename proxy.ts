@@ -1,3 +1,4 @@
+import { safeNextPath } from "@/lib/auth-post-sign-in"
 import { default as globalConfig } from "@/lib/config"
 import { buildCsp, generateNonce } from "@/lib/csp"
 import { updateSession } from "@/lib/supabase/middleware"
@@ -39,7 +40,12 @@ export async function proxy(request: NextRequest) {
     // login idle on its first protected request, sign-out revoking it server-side each time: a
     // permanent, self-sustaining login loop. See lib/supabase/middleware.ts's warning that every
     // caller must return its response's cookies.
-    result = NextResponse.redirect(new URL(globalConfig.auth.loginUrl, request.url))
+    // #271: carry the requested path so a deep link (an Approval notice's row link) survives the
+    // sign-in. The login page re-validates it with lib/auth-post-sign-in.ts's safeNextPath.
+    const loginUrl = new URL(globalConfig.auth.loginUrl, request.url)
+    const next = safeNextPath(request.nextUrl.pathname + request.nextUrl.search)
+    if (next) loginUrl.searchParams.set("next", next)
+    result = NextResponse.redirect(loginUrl)
     for (const cookie of response.headers.getSetCookie()) result.headers.append("set-cookie", cookie)
   }
 
@@ -55,5 +61,5 @@ export async function proxy(request: NextRequest) {
  * all, the same UX-shortcut role it played under better-auth. The platform `role` check still has
  * to happen where Prisma is reachable, which the edge runtime this file runs in is not. */
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|css|js)$).*)"],
+  matcher: ["/((?!ingest|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|css|js)$).*)"],
 }

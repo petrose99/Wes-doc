@@ -84,7 +84,7 @@ export function AddDocumentsDialog({ workspaceId, fileId, apiRef, onClose }: {
   }, [apiRef, workspaceId, fileId, selected, onClose])
 
   return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
-    <div className="flex max-h-[80vh] w-full max-w-lg flex-col rounded-2xl border border-[#e6ebf1] bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
+    <div className="flex max-h-[80vh] w-full max-w-lg flex-col rounded-2xl border border-hairline bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
       <div className="flex items-center justify-between border-b px-5 py-4">
         <h2 className="text-lg font-bold text-slate-900">Add documents to sheet</h2>
         <button onClick={onClose} className="rounded p-1 text-slate-400 hover:text-slate-600"><X className="h-4 w-4" /></button>

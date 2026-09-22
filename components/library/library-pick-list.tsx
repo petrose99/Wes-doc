@@ -207,7 +207,7 @@ export function LibraryPickList({ workspaceId, documents }: {
         </div>
       )}
 
-      <div className="divide-y rounded-xl border border-[#e6ebf1] bg-white shadow-panel">
+      <div className="divide-y rounded-xl border border-hairline bg-white shadow-panel">
         {documents.length > 1 && (
           <button onClick={toggleAll} className="flex w-full items-center gap-3 px-5 py-2.5 text-xs font-medium text-slate-500 hover:bg-slate-50">
             <input

@@ -34,8 +34,8 @@
     "@langchain/google-genai": "^2.2.0",
     "@langchain/openai": "^1.5.5",
     "@premieroctet/next-admin": "^8.4.2",
-    "@prisma/adapter-pg": "^7.8.0",
-    "@prisma/client": "^7.8.0",
+    "@prisma/adapter-pg": "^7.10.0",
+    "@prisma/client": "^7.10.0",
     "@radix-ui/react-label": "^2.1.12",
     "@radix-ui/react-popover": "^1.1.23",
     "@radix-ui/react-slot": "^1.2.0",
@@ -51,12 +51,14 @@
     "exceljs": "^4.4.0",
     "fflate": "^0.8.3",
     "lucide-react": "^1.25.0",
-    "next": "^16.2.10",
+    "next": "^16.3.5",
     "pdfjs-dist": "^5.7.284",
+    "playwright": "^1.63.0",
+    "posthog-js": "^1.434.2",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "resend": "^6.17.2",
-    "sharp": "^0.35.3",
+    "sharp": "^0.35.4",
     "sonner": "^2.0.8",
     "standardwebhooks": "^1.0.0",
     "stripe": "^18.0.0",
@@ -74,7 +76,7 @@
     "eslint": "^9.39.5",
     "eslint-config-next": "16.2.10",
     "postcss": "^8.5.20",
-    "prisma": "^7.8.0",
+    "prisma": "^7.10.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^6",
     "vitest": "^4.1.10"
@@ -86,6 +88,6 @@
     "utf7": {
       "semver": "^7.7.2"
     },
-    "sharp": "^0.35.3"
+    "sharp": "^0.35.4"
   }
 }

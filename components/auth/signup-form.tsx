@@ -4,6 +4,7 @@ import { signUpAction } from "@/app/(auth)/auth-actions"
 import { AuthField, PasswordField, SubmitButton } from "@/components/auth/fields"
 import { GoogleButton } from "@/components/auth/google-button"
 import { FormError } from "@/components/forms/error"
+import { track } from "@/lib/marketing-analytics"
 import { Input } from "@/components/ui/input"
 import { MailCheck } from "lucide-react"
 import type { Route } from "next"
@@ -50,6 +51,7 @@ export function SignupForm({ defaultEmail, redirectTo = "/workspaces", googleEna
     }
     setBusy(true)
     setError(null)
+    track("signup_started", { method: "password" })
     try {
       const result = await signUpAction({ name, email, password })
       if (!result.success) {
@@ -59,6 +61,7 @@ export function SignupForm({ defaultEmail, redirectTo = "/workspaces", googleEna
       // Supabase requires a confirmed email before it issues a session (F4) — there is no session
       // cookie yet to navigate against, unlike the sign-in and reset flows. Once they click the
       // confirmation link, /auth/callback exchanges it for a session and lands them on redirectTo.
+      track("signup_completed", { method: "password", stage: "account_created" })
       setSent(true)
     } catch {
       setError(friendlyError())
@@ -82,7 +85,7 @@ export function SignupForm({ defaultEmail, redirectTo = "/workspaces", googleEna
 
   return (
     <div className="flex flex-col gap-4">
-      {googleEnabled && <GoogleButton redirectTo={redirectTo} intent="signup" onError={(message) => setError(message || null)} />}
+      {googleEnabled && <GoogleButton redirectTo={redirectTo} intent="signup" onError={(message) => setError(message || null)} onStart={() => track("signup_started", { method: "google" })} />}
 
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
         <AuthField label="Your name">
@@ -96,7 +99,7 @@ export function SignupForm({ defaultEmail, redirectTo = "/workspaces", googleEna
         <PasswordField label="Password" name="password" value={password} onChange={setPassword} autoComplete="new-password" minLength={MIN_PASSWORD_LENGTH} />
         <p className="-mt-2 text-xs text-slate-500">At least {MIN_PASSWORD_LENGTH} characters, including a number and a special character.</p>
 
-        <SubmitButton busy={busy}>{busy ? "Creating your workspace…" : "Start free trial"}</SubmitButton>
+        <SubmitButton busy={busy}>{busy ? "Creating your account…" : "Create your account"}</SubmitButton>
 
         {error && <FormError>{error}</FormError>}
       </form>

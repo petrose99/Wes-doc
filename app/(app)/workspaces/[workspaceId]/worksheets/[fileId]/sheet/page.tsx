@@ -29,10 +29,14 @@ function parseSourceParams(query: { doc?: string; page?: string; bb?: string }):
  * uploading and extraction happen on Home/Files or the file's own hub page instead. */
 export default async function SheetPage({ params, searchParams }: {
   params: Promise<{ workspaceId: string; fileId: string }>
-  searchParams: Promise<{ doc?: string; page?: string; bb?: string; docs?: string; mode?: string }>
+  searchParams: Promise<{ doc?: string; page?: string; bb?: string; docs?: string; mode?: string; q?: string }>
 }) {
   const [{ workspaceId, fileId }, query, user] = await Promise.all([params, searchParams, getCurrentUser()])
   await requireWorkspaceRole(workspaceId, user.id)
+
+  // Wayfinder decision #113: an immersive surface restores the origin list's context — here, the
+  // worksheets list's own search filter — instead of always dropping back to the unfiltered list.
+  const backHref = query.q ? `/workspaces/${workspaceId}/worksheets?q=${encodeURIComponent(query.q)}` : undefined
 
   const file = await getWorkspaceFile(workspaceId, fileId)
   if (!file) notFound()
@@ -71,5 +75,6 @@ export default async function SheetPage({ params, searchParams }: {
     queuedIds={queued.map((document) => document.id)}
     hasRows={documentCount > 0}
     documentSearchEnabled={config.embeddings.enabled}
-    initialSource={initialSource} />
+    initialSource={initialSource}
+    backHref={backHref} />
 }

@@ -8,10 +8,9 @@ import {
 import { reextractAdaptivelyAction, reprocessDocumentAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
 import { Button } from "@/components/ui/button"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
-import { Dialog } from "@/components/ui/dialog"
+import { ListScreenBulkActionBar } from "@/components/list-screen/list-screen-shell"
 import type { PipelineStage } from "@/lib/documents/stages"
-import { CheckCircle2, Combine, Loader2, RotateCw, Sparkles, Table2, Trash2 } from "lucide-react"
-import Link from "next/link"
+import { CheckCircle2, Combine, Loader2, RotateCw, Sparkles, Trash2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { toast } from "sonner"
@@ -27,9 +26,9 @@ export function BulkActionBar({ workspaceId, stage, selectedIds, selectedFileId,
    * sync/payment, and the previous one-click path had neither confirm nor undo. The dialog reuses
    * ConfirmDialog (same focus trap, Esc, opener-restore, alertdialog semantics as Delete). */
   const [confirmingApprove, setConfirmingApprove] = useState(false)
-  const [showSheetChoice, setShowSheetChoice] = useState(false)
-
-  const sheetsHref = selectedFileId ? `/workspaces/${workspaceId}/worksheets/${selectedFileId}/sheet?docs=${selectedIds.join(",")}` : null
+  // #238: Worksheets is an unplugged surface, so the Approved stage no longer offers "Open in
+  // Worksheet". selectedFileId stays on the signature for the callers that still pass it.
+  void selectedFileId
 
   const run = async (label: string, action: () => Promise<{ success: boolean; error?: string }>) => {
     setBusy(true)
@@ -131,25 +130,13 @@ export function BulkActionBar({ workspaceId, stage, selectedIds, selectedFileId,
   const none = selectedIds.length === 0
   const dis = busy || none
 
-  return <div className="flex flex-wrap items-center gap-2 border-b bg-slate-50 px-6 py-2.5 text-sm">
-    {!none && <span className="font-medium text-slate-700">{selectedIds.length} selected</span>}
+  return <ListScreenBulkActionBar selectedCount={selectedIds.length}>
 
     {stage === "review" && <Button type="button" size="sm" disabled={dis} onClick={() => setConfirmingApprove(true)}>
       <CheckCircle2 className="h-3.5 w-3.5" />Approve
     </Button>}
 
     {stage === "approved" && <>
-      {!none && sheetsHref ? (selectedIds.length === 1
-        ? <Button asChild size="sm" variant="outline">
-            <Link href={sheetsHref}><Table2 className="h-3.5 w-3.5" />Open in Worksheet</Link>
-          </Button>
-        : <Button type="button" size="sm" variant="outline" onClick={() => setShowSheetChoice(true)}>
-            <Table2 className="h-3.5 w-3.5" />Open in Worksheet
-          </Button>
-      ) : <Button type="button" size="sm" variant="outline" disabled aria-disabled="true">
-        <Table2 className="h-3.5 w-3.5" />Open in Worksheet
-      </Button>}
-
       {selectedIds.length === 2 && <Button type="button" size="sm" variant="outline" disabled={dis}
         onClick={() => run("Merged", () => mergeDocumentsAction(workspaceId, selectedIds))}>
         <Combine className="h-3.5 w-3.5" />Merge
@@ -163,7 +150,7 @@ export function BulkActionBar({ workspaceId, stage, selectedIds, selectedFileId,
     </Button>}
 
     <Button type="button" size="sm" variant="outline" disabled={dis || selectedRows.length === 0}
-      title="Re-extract with adaptive line-item discovery — for a document whose line items came out empty or wrong under its worksheet's fixed columns"
+      title="Re-extract with adaptive line-item discovery — for a document whose line items came out empty or wrong under its template's fixed columns"
       onClick={() => void reextract()}>
       {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}Re-extract
     </Button>
@@ -193,18 +180,5 @@ export function BulkActionBar({ workspaceId, stage, selectedIds, selectedFileId,
       onConfirm={() => { setConfirmingApprove(false); void approve() }}
       onCancel={() => setConfirmingApprove(false)} />
 
-    {/* Reuses the DS <Dialog> primitive instead of a hand-rolled overlay — one modal shape in the
-        app, and the choices below are Links so <Dialog>'s built-in focus trap/restore is enough. */}
-    <Dialog
-      open={showSheetChoice && Boolean(sheetsHref)}
-      title={`Open ${selectedIds.length} documents in a worksheet`}
-      description="How would you like to view them?"
-      width="max-w-sm"
-      onClose={() => setShowSheetChoice(false)}>
-      <div className="flex flex-col gap-2 p-5">
-        <Button asChild variant="outline"><Link href={sheetsHref ? `${sheetsHref}&mode=combined` : ""} onClick={() => setShowSheetChoice(false)}>Combined into one worksheet</Link></Button>
-        <Button asChild variant="outline"><Link href={sheetsHref ? `${sheetsHref}&mode=separate` : ""} onClick={() => setShowSheetChoice(false)}>Separate worksheet per document</Link></Button>
-      </div>
-    </Dialog>
-  </div>
+  </ListScreenBulkActionBar>
 }

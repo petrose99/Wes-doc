@@ -1,0 +1,1266 @@
+[
+  {
+    "name": "invoices-list",
+    "width": 1440,
+    "note": "",
+    "findings": [
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "low-contrast",
+        "sel": "",
+        "detail": "4.1:1 (need 4.5:1) — text #ffffff on #0b8f66"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "overused-font",
+        "sel": "",
+        "detail": "Primary font: inter (100% of text)"
+      },
+      {
+        "type": "layout-transition",
+        "sel": "",
+        "detail": "transition: height"
+      },
+      {
+        "type": "dark-glow",
+        "sel": "",
+        "detail": "Zero-offset box-shadow glow (#ffba00)"
+      }
+    ],
+    "realCount": 6,
+    "shot": "/home/ubuntu/Dev/Wes-doc/shots-r6/invoices-list-1440.png",
+    "pageErrors": []
+  },
+  {
+    "name": "invoices-drop-frame",
+    "width": 1440,
+    "note": "",
+    "findings": [
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "low-contrast",
+        "sel": "",
+        "detail": "4.1:1 (need 4.5:1) — text #ffffff on #0b8f66"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "overused-font",
+        "sel": "",
+        "detail": "Primary font: inter (100% of text)"
+      },
+      {
+        "type": "layout-transition",
+        "sel": "",
+        "detail": "transition: height"
+      },
+      {
+        "type": "dark-glow",
+        "sel": "",
+        "detail": "Zero-offset box-shadow glow (#ffba00)"
+      }
+    ],
+    "realCount": 6,
+    "shot": "/home/ubuntu/Dev/Wes-doc/shots-r6/invoices-drop-frame-1440.png",
+    "pageErrors": []
+  },
+  {
+    "name": "invoices-dialog-idle",
+    "width": 1440,
+    "note": "",
+    "findings": [
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "low-contrast",
+        "sel": "",
+        "detail": "4.1:1 (need 4.5:1) — text #ffffff on #0b8f66"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "overused-font",
+        "sel": "",
+        "detail": "Primary font: inter (100% of text)"
+      },
+      {
+        "type": "layout-transition",
+        "sel": "",
+        "detail": "transition: height"
+      },
+      {
+        "type": "dark-glow",
+        "sel": "",
+        "detail": "Zero-offset box-shadow glow (#ffba00)"
+      }
+    ],
+    "realCount": 6,
+    "shot": "/home/ubuntu/Dev/Wes-doc/shots-r6/invoices-dialog-idle-1440.png",
+    "pageErrors": []
+  },
+  {
+    "name": "invoices-dialog-staged",
+    "width": 1440,
+    "note": "",
+    "findings": [
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "low-contrast",
+        "sel": "",
+        "detail": "4.1:1 (need 4.5:1) — text #ffffff on #0b8f66"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "overused-font",
+        "sel": "",
+        "detail": "Primary font: inter (100% of text)"
+      },
+      {
+        "type": "layout-transition",
+        "sel": "",
+        "detail": "transition: height"
+      },
+      {
+        "type": "dark-glow",
+        "sel": "",
+        "detail": "Zero-offset box-shadow glow (#ffba00)"
+      }
+    ],
+    "realCount": 6,
+    "shot": "/home/ubuntu/Dev/Wes-doc/shots-r6/invoices-dialog-staged-1440.png",
+    "pageErrors": []
+  },
+  {
+    "name": "invoices-dialog-refused-format",
+    "width": 1440,
+    "note": "",
+    "findings": [
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "low-contrast",
+        "sel": "",
+        "detail": "4.1:1 (need 4.5:1) — text #ffffff on #0b8f66"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "overused-font",
+        "sel": "",
+        "detail": "Primary font: inter (100% of text)"
+      },
+      {
+        "type": "layout-transition",
+        "sel": "",
+        "detail": "transition: height"
+      },
+      {
+        "type": "dark-glow",
+        "sel": "",
+        "detail": "Zero-offset box-shadow glow (#ffba00)"
+      }
+    ],
+    "realCount": 6,
+    "shot": "/home/ubuntu/Dev/Wes-doc/shots-r6/invoices-dialog-refused-format-1440.png",
+    "pageErrors": []
+  },
+  {
+    "name": "invoices-dialog-uploading",
+    "width": 1440,
+    "note": "",
+    "findings": [
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "low-contrast",
+        "sel": "",
+        "detail": "4.1:1 (need 4.5:1) — text #ffffff on #0b8f66"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "overused-font",
+        "sel": "",
+        "detail": "Primary font: inter (100% of text)"
+      },
+      {
+        "type": "layout-transition",
+        "sel": "",
+        "detail": "transition: height"
+      },
+      {
+        "type": "dark-glow",
+        "sel": "",
+        "detail": "Zero-offset box-shadow glow (#ffba00)"
+      }
+    ],
+    "realCount": 6,
+    "shot": "/home/ubuntu/Dev/Wes-doc/shots-r6/invoices-dialog-uploading-1440.png",
+    "pageErrors": []
+  },
+  {
+    "name": "invoices-dialog-done",
+    "width": 1440,
+    "note": "",
+    "findings": [
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "low-contrast",
+        "sel": "",
+        "detail": "4.1:1 (need 4.5:1) — text #ffffff on #0b8f66"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "overused-font",
+        "sel": "",
+        "detail": "Primary font: inter (100% of text)"
+      },
+      {
+        "type": "layout-transition",
+        "sel": "",
+        "detail": "transition: height"
+      },
+      {
+        "type": "dark-glow",
+        "sel": "",
+        "detail": "Zero-offset box-shadow glow (#ffba00)"
+      }
+    ],
+    "realCount": 6,
+    "shot": "/home/ubuntu/Dev/Wes-doc/shots-r6/invoices-dialog-done-1440.png",
+    "pageErrors": []
+  },
+  {
+    "name": "purchase-orders-list",
+    "width": 1440,
+    "note": "",
+    "findings": [
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "low-contrast",
+        "sel": "",
+        "detail": "4.1:1 (need 4.5:1) — text #ffffff on #0b8f66"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "overused-font",
+        "sel": "",
+        "detail": "Primary font: inter (99% of text)"
+      },
+      {
+        "type": "layout-transition",
+        "sel": "",
+        "detail": "transition: height"
+      },
+      {
+        "type": "dark-glow",
+        "sel": "",
+        "detail": "Zero-offset box-shadow glow (#ffba00)"
+      }
+    ],
+    "realCount": 6,
+    "shot": "/home/ubuntu/Dev/Wes-doc/shots-r6/purchase-orders-list-1440.png",
+    "pageErrors": []
+  },
+  {
+    "name": "purchase-orders-drop-frame",
+    "width": 1440,
+    "note": "",
+    "findings": [
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "low-contrast",
+        "sel": "",
+        "detail": "4.1:1 (need 4.5:1) — text #ffffff on #0b8f66"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "overused-font",
+        "sel": "",
+        "detail": "Primary font: inter (99% of text)"
+      },
+      {
+        "type": "layout-transition",
+        "sel": "",
+        "detail": "transition: height"
+      },
+      {
+        "type": "dark-glow",
+        "sel": "",
+        "detail": "Zero-offset box-shadow glow (#ffba00)"
+      }
+    ],
+    "realCount": 6,
+    "shot": "/home/ubuntu/Dev/Wes-doc/shots-r6/purchase-orders-drop-frame-1440.png",
+    "pageErrors": []
+  },
+  {
+    "name": "purchase-orders-dialog-idle",
+    "width": 1440,
+    "note": "",
+    "findings": [
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "low-contrast",
+        "sel": "",
+        "detail": "4.1:1 (need 4.5:1) — text #ffffff on #0b8f66"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "overused-font",
+        "sel": "",
+        "detail": "Primary font: inter (99% of text)"
+      },
+      {
+        "type": "layout-transition",
+        "sel": "",
+        "detail": "transition: height"
+      },
+      {
+        "type": "dark-glow",
+        "sel": "",
+        "detail": "Zero-offset box-shadow glow (#ffba00)"
+      }
+    ],
+    "realCount": 6,
+    "shot": "/home/ubuntu/Dev/Wes-doc/shots-r6/purchase-orders-dialog-idle-1440.png",
+    "pageErrors": []
+  },
+  {
+    "name": "purchase-orders-dialog-staged",
+    "width": 1440,
+    "note": "",
+    "findings": [
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "low-contrast",
+        "sel": "",
+        "detail": "4.1:1 (need 4.5:1) — text #ffffff on #0b8f66"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "overused-font",
+        "sel": "",
+        "detail": "Primary font: inter (99% of text)"
+      },
+      {
+        "type": "layout-transition",
+        "sel": "",
+        "detail": "transition: height"
+      },
+      {
+        "type": "dark-glow",
+        "sel": "",
+        "detail": "Zero-offset box-shadow glow (#ffba00)"
+      }
+    ],
+    "realCount": 6,
+    "shot": "/home/ubuntu/Dev/Wes-doc/shots-r6/purchase-orders-dialog-staged-1440.png",
+    "pageErrors": []
+  },
+  {
+    "name": "purchase-orders-dialog-refused-format",
+    "width": 1440,
+    "note": "",
+    "findings": [
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "low-contrast",
+        "sel": "",
+        "detail": "4.1:1 (need 4.5:1) — text #ffffff on #0b8f66"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "overused-font",
+        "sel": "",
+        "detail": "Primary font: inter (99% of text)"
+      },
+      {
+        "type": "em-dash-overuse",
+        "sel": "",
+        "detail": "8 em-dashes in body text"
+      },
+      {
+        "type": "layout-transition",
+        "sel": "",
+        "detail": "transition: height"
+      },
+      {
+        "type": "dark-glow",
+        "sel": "",
+        "detail": "Zero-offset box-shadow glow (#ffba00)"
+      }
+    ],
+    "realCount": 7,
+    "shot": "/home/ubuntu/Dev/Wes-doc/shots-r6/purchase-orders-dialog-refused-format-1440.png",
+    "pageErrors": []
+  },
+  {
+    "name": "receipts-list",
+    "width": 1440,
+    "note": "",
+    "findings": [
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "low-contrast",
+        "sel": "",
+        "detail": "4.1:1 (need 4.5:1) — text #ffffff on #0b8f66"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "overused-font",
+        "sel": "",
+        "detail": "Primary font: inter (100% of text)"
+      },
+      {
+        "type": "em-dash-overuse",
+        "sel": "",
+        "detail": "60 em-dashes in body text"
+      },
+      {
+        "type": "layout-transition",
+        "sel": "",
+        "detail": "transition: height"
+      },
+      {
+        "type": "dark-glow",
+        "sel": "",
+        "detail": "Zero-offset box-shadow glow (#ffba00)"
+      }
+    ],
+    "realCount": 7,
+    "shot": "/home/ubuntu/Dev/Wes-doc/shots-r6/receipts-list-1440.png",
+    "pageErrors": []
+  },
+  {
+    "name": "receipts-drop-frame",
+    "width": 1440,
+    "note": "",
+    "findings": [
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "low-contrast",
+        "sel": "",
+        "detail": "4.1:1 (need 4.5:1) — text #ffffff on #0b8f66"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "overused-font",
+        "sel": "",
+        "detail": "Primary font: inter (100% of text)"
+      },
+      {
+        "type": "em-dash-overuse",
+        "sel": "",
+        "detail": "60 em-dashes in body text"
+      },
+      {
+        "type": "layout-transition",
+        "sel": "",
+        "detail": "transition: height"
+      },
+      {
+        "type": "dark-glow",
+        "sel": "",
+        "detail": "Zero-offset box-shadow glow (#ffba00)"
+      }
+    ],
+    "realCount": 7,
+    "shot": "/home/ubuntu/Dev/Wes-doc/shots-r6/receipts-drop-frame-1440.png",
+    "pageErrors": []
+  },
+  {
+    "name": "receipts-dialog-idle",
+    "width": 1440,
+    "note": "",
+    "findings": [
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "low-contrast",
+        "sel": "",
+        "detail": "4.1:1 (need 4.5:1) — text #ffffff on #0b8f66"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "overused-font",
+        "sel": "",
+        "detail": "Primary font: inter (100% of text)"
+      },
+      {
+        "type": "em-dash-overuse",
+        "sel": "",
+        "detail": "60 em-dashes in body text"
+      },
+      {
+        "type": "layout-transition",
+        "sel": "",
+        "detail": "transition: height"
+      },
+      {
+        "type": "dark-glow",
+        "sel": "",
+        "detail": "Zero-offset box-shadow glow (#ffba00)"
+      }
+    ],
+    "realCount": 7,
+    "shot": "/home/ubuntu/Dev/Wes-doc/shots-r6/receipts-dialog-idle-1440.png",
+    "pageErrors": []
+  },
+  {
+    "name": "receipts-dialog-staged",
+    "width": 1440,
+    "note": "",
+    "findings": [
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "low-contrast",
+        "sel": "",
+        "detail": "4.1:1 (need 4.5:1) — text #ffffff on #0b8f66"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "overused-font",
+        "sel": "",
+        "detail": "Primary font: inter (100% of text)"
+      },
+      {
+        "type": "em-dash-overuse",
+        "sel": "",
+        "detail": "60 em-dashes in body text"
+      },
+      {
+        "type": "layout-transition",
+        "sel": "",
+        "detail": "transition: height"
+      },
+      {
+        "type": "dark-glow",
+        "sel": "",
+        "detail": "Zero-offset box-shadow glow (#ffba00)"
+      }
+    ],
+    "realCount": 7,
+    "shot": "/home/ubuntu/Dev/Wes-doc/shots-r6/receipts-dialog-staged-1440.png",
+    "pageErrors": []
+  },
+  {
+    "name": "receipts-dialog-refused-format",
+    "width": 1440,
+    "note": "",
+    "findings": [
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "low-contrast",
+        "sel": "",
+        "detail": "4.1:1 (need 4.5:1) — text #ffffff on #0b8f66"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "overused-font",
+        "sel": "",
+        "detail": "Primary font: inter (100% of text)"
+      },
+      {
+        "type": "em-dash-overuse",
+        "sel": "",
+        "detail": "61 em-dashes in body text"
+      },
+      {
+        "type": "layout-transition",
+        "sel": "",
+        "detail": "transition: height"
+      },
+      {
+        "type": "dark-glow",
+        "sel": "",
+        "detail": "Zero-offset box-shadow glow (#ffba00)"
+      }
+    ],
+    "realCount": 7,
+    "shot": "/home/ubuntu/Dev/Wes-doc/shots-r6/receipts-dialog-refused-format-1440.png",
+    "pageErrors": []
+  },
+  {
+    "name": "bank-statements-list",
+    "width": 1440,
+    "note": "",
+    "findings": [
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "low-contrast",
+        "sel": "",
+        "detail": "4.1:1 (need 4.5:1) — text #ffffff on #0b8f66"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "overused-font",
+        "sel": "",
+        "detail": "Primary font: inter (99% of text)"
+      },
+      {
+        "type": "layout-transition",
+        "sel": "",
+        "detail": "transition: height"
+      },
+      {
+        "type": "dark-glow",
+        "sel": "",
+        "detail": "Zero-offset box-shadow glow (#ffba00)"
+      }
+    ],
+    "realCount": 6,
+    "shot": "/home/ubuntu/Dev/Wes-doc/shots-r6/bank-statements-list-1440.png",
+    "pageErrors": []
+  },
+  {
+    "name": "bank-statements-drop-frame",
+    "width": 1440,
+    "note": "",
+    "findings": [
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "low-contrast",
+        "sel": "",
+        "detail": "4.1:1 (need 4.5:1) — text #ffffff on #0b8f66"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "overused-font",
+        "sel": "",
+        "detail": "Primary font: inter (99% of text)"
+      },
+      {
+        "type": "layout-transition",
+        "sel": "",
+        "detail": "transition: height"
+      },
+      {
+        "type": "dark-glow",
+        "sel": "",
+        "detail": "Zero-offset box-shadow glow (#ffba00)"
+      }
+    ],
+    "realCount": 6,
+    "shot": "/home/ubuntu/Dev/Wes-doc/shots-r6/bank-statements-drop-frame-1440.png",
+    "pageErrors": []
+  },
+  {
+    "name": "bank-statements-dialog-idle",
+    "width": 1440,
+    "note": "",
+    "findings": [
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "low-contrast",
+        "sel": "",
+        "detail": "4.1:1 (need 4.5:1) — text #ffffff on #0b8f66"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "overused-font",
+        "sel": "",
+        "detail": "Primary font: inter (99% of text)"
+      },
+      {
+        "type": "layout-transition",
+        "sel": "",
+        "detail": "transition: height"
+      },
+      {
+        "type": "dark-glow",
+        "sel": "",
+        "detail": "Zero-offset box-shadow glow (#ffba00)"
+      }
+    ],
+    "realCount": 6,
+    "shot": "/home/ubuntu/Dev/Wes-doc/shots-r6/bank-statements-dialog-idle-1440.png",
+    "pageErrors": []
+  },
+  {
+    "name": "bank-statements-dialog-staged",
+    "width": 1440,
+    "note": "",
+    "findings": [
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "low-contrast",
+        "sel": "",
+        "detail": "4.1:1 (need 4.5:1) — text #ffffff on #0b8f66"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "overused-font",
+        "sel": "",
+        "detail": "Primary font: inter (99% of text)"
+      },
+      {
+        "type": "layout-transition",
+        "sel": "",
+        "detail": "transition: height"
+      },
+      {
+        "type": "dark-glow",
+        "sel": "",
+        "detail": "Zero-offset box-shadow glow (#ffba00)"
+      }
+    ],
+    "realCount": 6,
+    "shot": "/home/ubuntu/Dev/Wes-doc/shots-r6/bank-statements-dialog-staged-1440.png",
+    "pageErrors": []
+  },
+  {
+    "name": "bank-statements-dialog-refused-format",
+    "width": 1440,
+    "note": "",
+    "findings": [
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "low-contrast",
+        "sel": "",
+        "detail": "4.1:1 (need 4.5:1) — text #ffffff on #0b8f66"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "overused-font",
+        "sel": "",
+        "detail": "Primary font: inter (99% of text)"
+      },
+      {
+        "type": "layout-transition",
+        "sel": "",
+        "detail": "transition: height"
+      },
+      {
+        "type": "dark-glow",
+        "sel": "",
+        "detail": "Zero-offset box-shadow glow (#ffba00)"
+      }
+    ],
+    "realCount": 6,
+    "shot": "/home/ubuntu/Dev/Wes-doc/shots-r6/bank-statements-dialog-refused-format-1440.png",
+    "pageErrors": []
+  },
+  {
+    "name": "pipeline-redirect",
+    "width": 1440,
+    "note": "",
+    "findings": [],
+    "realCount": 0,
+    "shot": "/home/ubuntu/Dev/Wes-doc/shots-r6/pipeline-redirect-1440.png",
+    "pageErrors": []
+  },
+  {
+    "name": "invoices-list",
+    "width": 390,
+    "note": "",
+    "findings": [
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "overused-font",
+        "sel": "",
+        "detail": "Primary font: inter (100% of text)"
+      },
+      {
+        "type": "layout-transition",
+        "sel": "",
+        "detail": "transition: height"
+      },
+      {
+        "type": "dark-glow",
+        "sel": "",
+        "detail": "Zero-offset box-shadow glow (#ffba00)"
+      }
+    ],
+    "realCount": 5,
+    "shot": "/home/ubuntu/Dev/Wes-doc/shots-r6/invoices-list-390.png",
+    "pageErrors": []
+  },
+  {
+    "name": "purchase-orders-list",
+    "width": 390,
+    "note": "",
+    "findings": [
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "overused-font",
+        "sel": "",
+        "detail": "Primary font: inter (99% of text)"
+      },
+      {
+        "type": "layout-transition",
+        "sel": "",
+        "detail": "transition: height"
+      },
+      {
+        "type": "dark-glow",
+        "sel": "",
+        "detail": "Zero-offset box-shadow glow (#ffba00)"
+      }
+    ],
+    "realCount": 5,
+    "shot": "/home/ubuntu/Dev/Wes-doc/shots-r6/purchase-orders-list-390.png",
+    "pageErrors": []
+  },
+  {
+    "name": "receipts-list",
+    "width": 390,
+    "note": "",
+    "findings": [
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "overused-font",
+        "sel": "",
+        "detail": "Primary font: inter (100% of text)"
+      },
+      {
+        "type": "layout-transition",
+        "sel": "",
+        "detail": "transition: height"
+      },
+      {
+        "type": "dark-glow",
+        "sel": "",
+        "detail": "Zero-offset box-shadow glow (#ffba00)"
+      }
+    ],
+    "realCount": 5,
+    "shot": "/home/ubuntu/Dev/Wes-doc/shots-r6/receipts-list-390.png",
+    "pageErrors": []
+  },
+  {
+    "name": "bank-statements-list",
+    "width": 390,
+    "note": "",
+    "findings": [
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "overused-font",
+        "sel": "",
+        "detail": "Primary font: inter (99% of text)"
+      },
+      {
+        "type": "layout-transition",
+        "sel": "",
+        "detail": "transition: height"
+      },
+      {
+        "type": "dark-glow",
+        "sel": "",
+        "detail": "Zero-offset box-shadow glow (#ffba00)"
+      }
+    ],
+    "realCount": 5,
+    "shot": "/home/ubuntu/Dev/Wes-doc/shots-r6/bank-statements-list-390.png",
+    "pageErrors": []
+  },
+  {
+    "name": "pipeline-redirect",
+    "width": 390,
+    "note": "",
+    "findings": [
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "overused-font",
+        "sel": "",
+        "detail": "Primary font: inter (100% of text)"
+      },
+      {
+        "type": "layout-transition",
+        "sel": "",
+        "detail": "transition: height"
+      },
+      {
+        "type": "dark-glow",
+        "sel": "",
+        "detail": "Zero-offset box-shadow glow (#ffba00)"
+      }
+    ],
+    "realCount": 5,
+    "shot": "/home/ubuntu/Dev/Wes-doc/shots-r6/pipeline-redirect-390.png",
+    "pageErrors": []
+  },
+  {
+    "name": "account-how-it-works",
+    "width": 390,
+    "note": "",
+    "findings": [
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "ai-color-palette",
+        "sel": "",
+        "detail": "Cyan gradient background"
+      },
+      {
+        "type": "overused-font",
+        "sel": "",
+        "detail": "Primary font: inter (98% of text)"
+      },
+      {
+        "type": "layout-transition",
+        "sel": "",
+        "detail": "transition: height"
+      },
+      {
+        "type": "dark-glow",
+        "sel": "",
+        "detail": "Zero-offset box-shadow glow (#ffba00)"
+      }
+    ],
+    "realCount": 4,
+    "shot": "/home/ubuntu/Dev/Wes-doc/shots-r6/account-how-it-works-390.png",
+    "pageErrors": []
+  }
+]

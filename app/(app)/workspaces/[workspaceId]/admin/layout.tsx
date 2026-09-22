@@ -1,0 +1,69 @@
+import { AdminLeaveGuard } from "@/components/admin/admin-leave-guard"
+import { AdminNav, type AdminNavGroup } from "@/components/admin/admin-nav"
+import { CompanyDetail } from "@/components/admin/company-detail"
+import { UserDetail } from "@/components/admin/user-detail"
+import { getAdminContext } from "@/lib/admin/context"
+import { adminPaths } from "@/lib/admin/paths"
+import { getWorkspacesForUser } from "@/models/workspaces"
+
+/** #285: Companies' Detail pane arrives from a server action as JSX. The RSC bundler only lists
+ * a client component in a route's client manifest when a server component on the route's graph
+ * imports it, so this layout references the pane — same trick as `(queue)/layout.tsx`. */
+const CLIENT_MANIFEST_ANCHORS = [CompanyDetail, UserDetail]
+
+/** #231 Q9/Q10/Q20 (#252): the Admin area — one rail item, one left nav with Vic's two groups,
+ * one reading column. Replaces Settings' tab strip and Controls' tabs (nothing removed: every
+ * old address 308-redirects to its section here). The rail collapses to its icon width on
+ * `/admin/*` exactly as on a queue, so the nav and the page get the work area.
+ *
+ * ORGANIZATION lists Dashboard (only at two or more companies, #231 Q16/#287), Companies and
+ * Users. Approval Flows and PO Mismatch Flows carry the pages that moved from Controls; #253
+ * fills in the rest. */
+export default async function AdminLayout({ children, params }: { children: React.ReactNode; params: Promise<{ workspaceId: string }> }) {
+  const { workspaceId } = await params
+  const context = await getAdminContext(workspaceId)
+  const paths = adminPaths(workspaceId)
+  void CLIENT_MANIFEST_ANCHORS
+  const hasTouchless = context.capabilities.has("touchless-automation")
+  const hasTax = context.capabilities.has("jurisdiction")
+  const memberships = await getWorkspacesForUser(context.user.id)
+  const companyCount = memberships.filter((membership) => membership.kind === "team").length
+
+  const groups: AdminNavGroup[] = [
+    { caption: "Organization", items: [
+      ...(companyCount >= 2 ? [{ href: paths.dashboard, label: "Dashboard" }] : []),
+      { href: paths.companies, label: "Companies" },
+      { href: paths.users, label: "Users" },
+    ] },
+    { caption: context.workspace.name, items: [
+      // #342 §3: Activity and Health Checks moved off the rail's bottom group into Admin's own
+      // nav — both workspace-scoped, so this group, and status/monitoring read before
+      // configuring, so first in it. data-health's module tier is "always" (unconditional for
+      // every finance workspace), matching Companies/Users below — added unconditionally too.
+      { href: `/workspaces/${workspaceId}/activity`, label: "Activity" },
+      { href: `/workspaces/${workspaceId}/health`, label: "Health Checks" },
+      { href: paths.configuration, label: "Configuration", children: [
+        { href: paths.fields, label: "Fields" },
+        ...(hasTouchless ? [{ href: paths.autonomy, label: "Autonomy" }, { href: paths.checks, label: "Checks" }, { href: paths.report, label: "Report" }] : []),
+        { href: paths.intake, label: "Intake" },
+        ...(hasTax ? [{ href: paths.tax, label: "Tax" }] : []),
+        { href: paths.payments, label: "Payments" },
+        { href: paths.whatsOn, label: "What's on" },
+      ] },
+      { href: paths.approvalFlows, label: "Approval Flows" },
+      { href: paths.poMismatchFlows, label: "PO Mismatch Flows" },
+      { href: paths.suppliers, label: "Suppliers" },
+      ...(context.integrationsEnabled ? [{ href: paths.integrations, label: "Integrations" }] : []),
+    ] },
+  ]
+
+  return <div className="flex min-h-0 flex-1 bg-white">
+    <AdminLeaveGuard />
+    <AdminNav groups={groups} />
+    <div className="min-w-0 flex-1">
+      {/* #257 S4: below md the company name is said once, by the shell's phone header (the
+          switcher) on every route — #252's caption here repeated it 60px under the same name. */}
+      {children}
+    </div>
+  </div>
+}

@@ -294,3 +294,31 @@ export async function kickIntegrationPushDrain(): Promise<void> {
     })
   } catch { /* swallowed: the drain drivers are the guarantee, this is only latency */ }
 }
+
+/** #281: the bulk Post button's target connection, shared by the Invoice, Receipt and Bank
+ * Statement queue pages (hoisted once a third page needed the same lookup — ladder rung 2). Null
+ * (integrations off, none configured, or none active) still lets the button render — the confirm
+ * dialog and the connection-failure band are what tell the operator why, never a hidden button. */
+export async function getActiveIntegrationConnectionId(workspaceId: string): Promise<string | null> {
+  if (!config.integrations.enabled) return null
+  const connection = await prisma.integrationConnection.findFirst({ where: { workspaceId, status: "active" }, select: { id: true } })
+  return connection?.id ?? null
+}
+
+export type LedgerBandStatus = "disconnected" | "needs_reauth" | "no_default_account"
+
+/** #281 spec.md §6: the cause behind the queue-scoped connection-failure band — null when a
+ * connection is active and has a default account (band hidden), or when integrations are off (no
+ * connection is ever expected, so nothing to say). Most-recent connection by `createdAt` mirrors
+ * `getActiveIntegrationConnectionId`'s own "the" connection — one workspace, one ledger. */
+export async function getLedgerConnectionBandStatus(workspaceId: string): Promise<LedgerBandStatus | null> {
+  if (!config.integrations.enabled) return null
+  const connection = await prisma.integrationConnection.findFirst({
+    where: { workspaceId }, orderBy: { createdAt: "desc" }, select: { status: true, defaultExpenseAccountId: true },
+  })
+  if (!connection) return "disconnected"
+  if (connection.status === "needs_reauth") return "needs_reauth"
+  if (connection.status !== "active") return "disconnected"
+  if (!connection.defaultExpenseAccountId) return "no_default_account"
+  return null
+}

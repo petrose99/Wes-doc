@@ -93,7 +93,7 @@ export async function getDocumentSourceInfoAction(workspaceId: string, documentI
   if (!(await requireMember(workspaceId, user.id))) return { success: false, error: NO_ACCESS }
 
   const document = await prisma.document.findFirst({ where: { id: documentId, workspaceId }, select: { filename: true, mimeType: true, storageKey: true } })
-  if (!document) return { success: false, error: "That document is no longer in this workspace" }
+  if (!document) return { success: false, error: "That document is no longer in this company" }
   if (!document.storageKey) return { success: false, error: "The original file for this row is no longer stored" }
 
   return { success: true, data: { filename: document.filename, mimeType: document.mimeType } }
@@ -130,7 +130,7 @@ export async function getCellProvenanceAction(
     where: { id: documentId, workspaceId },
     select: { filename: true, mimeType: true, storageKey: true, provenance: true, reviewedData: true, rawExtraction: true },
   })
-  if (!document) return { success: false, error: "That document is no longer in this workspace" }
+  if (!document) return { success: false, error: "That document is no longer in this company" }
   if (!document.storageKey) return { success: false, error: "The original file for this row is no longer stored" }
 
   const provenance = document.provenance as DocumentProvenance | null
@@ -169,7 +169,7 @@ export async function getShapeDiffAction(workspaceId: string, documentId: string
     where: { id: documentId, workspaceId },
     select: { id: true, shapeId: true, receivedAt: true, reviewedData: true, rawExtraction: true, fieldSnapshot: true, shape: { select: { name: true } } },
   })
-  if (!document) return { success: false, error: "That document is no longer in this workspace" }
+  if (!document) return { success: false, error: "That document is no longer in this company" }
   if (!document.shapeId) return { success: true, data: null }
 
   const previous = await prisma.document.findFirst({
@@ -251,7 +251,7 @@ export async function summarizeFolderReportAction(workspaceId: string, fileId: s
   if (!(await requireMember(workspaceId, user.id))) return { success: false, error: NO_ACCESS }
 
   const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId }, select: { aiEnabled: true } })
-  if (!workspace?.aiEnabled) return { success: false, error: "AI is turned off for this workspace" }
+  if (!workspace?.aiEnabled) return { success: false, error: "AI is turned off for this company" }
   const provider = config.ai.provider
   const apiKey = provider === "gemini" ? config.ai.geminiApiKey : config.ai.openaiApiKey
   const model = provider === "gemini" ? config.ai.geminiModelName : config.ai.openaiModelName
@@ -293,7 +293,7 @@ export async function evaluateAiFormulaAction(workspaceId: string, fn: string, p
   if (!isAiFormulaName(fn.toUpperCase())) return { success: false, error: `Unknown AI function ${fn}` }
 
   const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId }, select: { aiEnabled: true } })
-  if (!workspace?.aiEnabled) return { success: false, error: "AI is turned off for this workspace" }
+  if (!workspace?.aiEnabled) return { success: false, error: "AI is turned off for this company" }
 
   const provider = config.ai.provider
   const apiKey = provider === "gemini" ? config.ai.geminiApiKey : config.ai.openaiApiKey
@@ -335,7 +335,7 @@ export async function buildFormulaAction(workspaceId: string, request: string, c
   if (!request.trim()) return { success: false, error: "Describe what the formula should do" }
 
   const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId }, select: { aiEnabled: true } })
-  if (!workspace?.aiEnabled) return { success: false, error: "AI is turned off for this workspace" }
+  if (!workspace?.aiEnabled) return { success: false, error: "AI is turned off for this company" }
 
   const provider = config.ai.provider
   const apiKey = provider === "gemini" ? config.ai.geminiApiKey : config.ai.openaiApiKey

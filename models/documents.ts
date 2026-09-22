@@ -3,14 +3,13 @@ import { track } from "@/lib/analytics"
 import { auditEventData, getRequestAuditContext, recordDocumentAudit } from "@/lib/audit"
 import { SUPPLIER_FIELD_BY_TEMPLATE } from "@/lib/automation/rules"
 import config from "@/lib/config"
-import { isPushableDocument, PaidStatus, resolveDocType } from "@/lib/doc-types"
+import { hasDirectionField, isPushableDocument, PaidStatus, resolveDocType, type DocType } from "@/lib/doc-types"
 import { findMissingRequiredFields, parseTemplateFields, validateDocumentValues } from "@/lib/document-templates"
 import { deleteDocumentSource, documentBlocksKey, documentStorageKey, putDocumentSource } from "@/lib/document-storage"
 import { projectDocumentFields } from "@/lib/field-projection"
-import { LOW_CONFIDENCE, PIPELINE_STAGES, stageToStatusFilter, type PipelineStage } from "@/lib/documents/stages"
+import { LOW_CONFIDENCE, PIPELINE_STAGES, type PipelineStage } from "@/lib/documents/stages"
 import { applyFxToDocument } from "@/lib/fx/apply-to-document"
 import { normalizeBillFromDocument } from "@/lib/integration-bill-mapping"
-import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { unscoped } from "@/lib/workspace-scope"
 import type { DocumentProvenance } from "@/lib/provenance"
 import { replaceDocumentFieldValues } from "@/models/document-field-values"
@@ -18,6 +17,7 @@ import { recordCodingCorrection } from "@/models/coding-corrections"
 import { recordFieldCorrection } from "@/models/field-corrections"
 import { resetSupplierStreak } from "@/models/suppliers"
 import { listWorkspaceIntegrationPushes } from "@/models/integrations"
+import { getDocumentPaymentStatuses } from "@/models/ledger-payments"
 import { emitWorkspaceEvent } from "@/lib/webhooks"
 import { resolveDuplicateGatesAgainst } from "@/lib/gates/duplicate"
 import { kickWebhookDrain } from "@/lib/webhook-delivery"
@@ -26,6 +26,7 @@ import { Document, Prisma } from "@/prisma/client"
 import crypto from "crypto"
 import path from "path"
 import { randomUUID } from "crypto"
+import { cache } from "react"
 
 const SUPPORTED_DOCUMENT_TYPES = new Set(["application/pdf", "image/jpeg", "image/png", "image/webp", "image/heic"])
 /** "dictation" is an audio recording rather than a scan; it takes the transcribe path instead of
@@ -88,6 +89,9 @@ export async function createDocumentFromBuffer(input: {
   /** The sender's address for an emailed-in document, or null for every other channel. See
    * lib/ingestion.ts's note on the same field. */
   sourceEmail?: string | null
+  /** The sender's WhatsApp number for a WhatsApp-in document, or null for every other channel.
+   * Same shape and purpose as sourceEmail. */
+  sourceWhatsapp?: string | null
 }) {
   validateDocumentInput(input.buffer, input.mimeType)
   // Scoped by fileId as well as workspaceId: worksheet codes are only unique within a file, so
@@ -125,6 +129,7 @@ export async function createDocumentFromBuffer(input: {
       const document = await tx.document.create({ data: {
         id, workspaceId: input.workspaceId, fileId: input.fileId, templateId: template.id, templateVersionId: version.id,
         source: documentSourceFor(input.mimeType, input.source), sourceEmail: input.sourceEmail || null,
+        sourceWhatsapp: input.sourceWhatsapp || null,
         status: "queued", filename: cleanFilename(input.filename), mimeType: input.mimeType, sizeBytes: input.buffer.length,
         sha256, storageKey, receivedAt, pageRange: input.pageRange?.trim() || null, uploadBatchId: input.uploadBatchId || null,
         fieldSnapshot: version.fields as Prisma.InputJsonValue, searchText: cleanFilename(input.filename),
@@ -194,11 +199,16 @@ export function stageWhereClause(stage: PipelineStage): Prisma.DocumentWhereInpu
   }
 }
 
+/** #264: "has this workspace ever held a document" — every type, every status, including
+ * cancelled and still-processing (§2's cross-type decision, #241 d.3). Used only to pick the
+ * empty-queue state, so a plain count is enough. */
+export const countWorkspaceDocuments = cache((workspaceId: string) => prisma.document.count({ where: { workspaceId } }))
+
 /** `stage`, when given, narrows to a pipeline tab (lib/documents/stages.ts) instead of a raw
  * status. It composes with (does not replace) `status`, though callers normally pass one or the
  * other. Archive is its own axis: every stage except "archive" implicitly excludes an archived
  * document, so a document doesn't linger on "Ready" after being archived from it. */
-export async function listWorkspaceDocuments(workspaceId: string, filters: { status?: string; query?: string; templateId?: string; fileId?: string; stage?: PipelineStage; documentIds?: string[] } = {}) {
+export async function listWorkspaceDocuments(workspaceId: string, filters: { status?: string; query?: string; templateId?: string; fileId?: string; stage?: PipelineStage; documentIds?: string[]; docType?: DocType } = {}) {
   const where: Prisma.DocumentWhereInput = {
     workspaceId,
     ...(filters.fileId ? { fileId: filters.fileId } : {}),
@@ -207,6 +217,15 @@ export async function listWorkspaceDocuments(workspaceId: string, filters: { sta
     ...(filters.stage ? stageWhereClause(filters.stage) : {}),
     ...(filters.query?.trim() ? { OR: [{ searchText: { contains: filters.query.trim(), mode: "insensitive" as const } }, { ocrText: { contains: filters.query.trim(), mode: "insensitive" as const } }] } : {}),
     ...(filters.templateId ? { templateId: filters.templateId } : {}),
+    ...(filters.docType ? {
+      OR: [
+        { docType: filters.docType },
+        ...(filters.docType === "invoice" ? [{ docType: null, template: { code: { in: ["invoice", "expense"] } } }] : []),
+        ...(filters.docType === "receipt" ? [{ docType: null, template: { code: { in: ["receipt", "expense_receipt"] } } }] : []),
+        ...(filters.docType === "bank_statement" ? [{ docType: null, template: { code: "bank_statement" } }] : []),
+        ...(filters.docType === "purchase_order" ? [{ docType: null, template: { code: "purchase_order" } }] : []),
+      ],
+    } : {}),
   }
   return prisma.document.findMany({ where, include: { template: { include: { versions: { take: 1, orderBy: { createdAt: "desc" } } } }, templateVersion: true }, orderBy: { receivedAt: "desc" }, take: 100 })
 }
@@ -350,14 +369,28 @@ export type ReadyToPushDocument = {
   total: number
   currencyCode: string | null
   category: string
+  /** #249: lets a caller link the row to its typed destination instead of the nav-less
+   * `/pipeline` (see `lib/typed-destinations.ts`'s `documentDestinationPath`). */
+  docType: string | null
+}
+
+export type ReadyToPushResult = {
+  documents: ReadyToPushDocument[]
+  /** #249: how many otherwise-eligible approved documents were silently excluded for having no
+   * usable total — previously dropped with no trace, so a reader comparing this list against an
+   * "Approved" count shown elsewhere (the pipeline stage tally) saw fewer rows here with no
+   * explanation. Counted separately from the isPushableDocument/already-succeeded exclusions,
+   * which are expected and don't need surfacing. */
+  droppedCount: number
 }
 
 /** Documents on the "Ready" pipeline stage whose type is pushable to accounting and that don't
  * already have a succeeded push to `connectionId` — the Accounting page's "Ready to push" batch
  * list. A document with no usable total (normalizeBillFromDocument would refuse it, same check the
- * single-document push action already applies) is silently excluded: it can't be pushed either
- * way, so it doesn't belong on a "ready to push" list. */
-export async function listReadyToPushDocuments(workspaceId: string, connectionId: string): Promise<ReadyToPushDocument[]> {
+ * single-document push action already applies) is excluded: it can't be pushed either way, so it
+ * doesn't belong on a "ready to push" list — but the caller can still tell the reader how many
+ * were held back and why, via `droppedCount`. */
+export async function listReadyToPushDocuments(workspaceId: string, connectionId: string): Promise<ReadyToPushResult> {
   const [documents, pushes] = await Promise.all([
     listWorkspaceDocuments(workspaceId, { stage: "approved" }),
     listWorkspaceIntegrationPushes(workspaceId),
@@ -366,6 +399,7 @@ export async function listReadyToPushDocuments(workspaceId: string, connectionId
     pushes.filter((push) => push.connectionId === connectionId && push.status === "succeeded").map((push) => push.documentId)
   )
   const results: ReadyToPushDocument[] = []
+  let droppedCount = 0
   for (const doc of documents) {
     if (!isPushableDocument(doc) || succeededDocumentIds.has(doc.id)) continue
     const templateCode = doc.template?.code ?? null
@@ -374,12 +408,13 @@ export async function listReadyToPushDocuments(workspaceId: string, connectionId
       const bill = normalizeBillFromDocument({ documentId: doc.id, filename: doc.filename, templateCode, reviewedData })
       const coding = (doc.codingData as Record<string, unknown> | null) ?? {}
       const category = asScalarString(coding.account) ?? asScalarString(reviewedData.category) ?? "Uncategorized"
-      results.push({ id: doc.id, filename: doc.filename, vendorName: bill.vendorName, total: bill.total, currencyCode: bill.currencyCode, category })
+      results.push({ id: doc.id, filename: doc.filename, vendorName: bill.vendorName, total: bill.total, currencyCode: bill.currencyCode, category, docType: doc.docType ?? null })
     } catch {
       // no usable total — not push-ready
+      droppedCount += 1
     }
   }
-  return results
+  return { documents: results, droppedCount }
 }
 
 /** Which of the given documents currently have a queued/processing DocumentProcessingJob — what
@@ -450,6 +485,13 @@ export async function updateDocumentReview(input: { workspaceId: string; documen
   const coding = (document.codingData as Record<string, unknown> | null) ?? {}
   const hasDocumentType = coding.documentType === "expense" || coding.documentType === "sale" || coding.documentType === "bank_statement"
   if (!hasDocumentType) missing.push("document_type")
+  // #360: Direction is retired — there is no separate confirm step left before Save review, so
+  // Save review itself is now the one human act that confirms the category for invoice/receipt/PO
+  // (`hasDirectionField`), the same way `setDocumentTypeAction` used to. Without this, a document
+  // the classifier wasn't confident about (`categoryConfirmed` never set true) would stay
+  // unpushable forever (`isCategoryConfirmed`, read by readiness/autopublish/integration push).
+  const newlyConfirmedCategory = hasDirectionField(resolveDocType(document)) && coding.categoryConfirmed !== true
+  const nextCoding = newlyConfirmedCategory ? { ...coding, categoryConfirmed: true } : null
   // Re-project the structured spine from the values a human signed off on. Source is "manual"
   // because these are now reviewed values, but the per-field scores are carried over from the
   // extraction rather than being reset to 1: a bulk "mark reviewed" does not mean somebody read
@@ -458,7 +500,7 @@ export async function updateDocumentReview(input: { workspaceId: string; documen
   const rows = projectDocumentFields({ fields, values: reviewedData, confidence: priorConfidence, provenance: document.provenance as DocumentProvenance | null, source: "manual" })
   let webhookQueued = false
   const result = await prisma.$transaction(async (tx) => {
-    const updated = await tx.document.update({ where: { id: document.id }, data: { reviewedData: reviewedData as Prisma.InputJsonValue, searchText: searchableText(reviewedData, document.filename), confidence: { missingRequiredFields: missing, manuallyReviewed: true } as Prisma.InputJsonValue, reviewedAt: new Date(), status: missing.length ? "needs_review" : "reviewed" } })
+    const updated = await tx.document.update({ where: { id: document.id }, data: { reviewedData: reviewedData as Prisma.InputJsonValue, searchText: searchableText(reviewedData, document.filename), confidence: { missingRequiredFields: missing, manuallyReviewed: true } as Prisma.InputJsonValue, reviewedAt: new Date(), status: missing.length ? "needs_review" : "reviewed", ...(nextCoding ? { codingData: nextCoding as Prisma.InputJsonValue } : {}) } })
     await recordDocumentAudit({ workspaceId: input.workspaceId, documentId: document.id, actorId: input.actorId, type: "document_reviewed" }, tx)
     await replaceDocumentFieldValues({ workspaceId: input.workspaceId, documentId: document.id, fileId: document.fileId, templateCode: document.template?.code ?? null, rows }, tx)
     const emitted = await emitWorkspaceEvent(tx, {
@@ -852,6 +894,44 @@ export async function requeueAdaptiveExtraction(workspaceId: string, documentId:
     prisma.documentAuditEvent.create({ data: auditEventData({ workspaceId, documentId: document.id, type: "extraction_requeued" }, context) }),
   ])
   return job
+}
+
+export class DocumentCancellationBlockedError extends Error {
+  constructor(public readonly paymentStatus: string) {
+    super(`Cannot cancel a document that is already ${paymentStatus}`)
+    this.name = "DocumentCancellationBlockedError"
+  }
+}
+
+/** #220: terminal manual cancellation of an invoice. Independent of both the ReviewTask approval
+ * chain and the ledger sync, following the `overrideGate()`/`writeAuditEvent` shape elsewhere in
+ * this codebase (reason + attribution + audit event) even though this isn't a Gate. Hard-blocked
+ * once the ledger sync reports the document Synced or Paid/Reconciled (see
+ * models/ledger-payments.ts) — cancelling something the accounting provider already has a record
+ * of would leave that record dangling with nothing on this side pointing at it. Auto-resolves any
+ * still-open ReviewTask for the document, since there's nothing left to approve or reject once
+ * cancelled; "rejected" is the closest existing terminal ReviewTaskStatus (there is no dedicated
+ * "cancelled" task state). No un-cancel affordance — cancelledAt/cancelledReason/cancelledById
+ * are set once and never cleared. */
+export async function cancelDocument(input: { workspaceId: string; documentId: string; actorId: string; reason: string }): Promise<Document> {
+  const reason = input.reason.trim()
+  if (!reason) throw new Error("cancellation_reason_required")
+  const document = await prisma.document.findFirst({ where: { id: input.documentId, workspaceId: input.workspaceId }, select: { id: true, cancelledAt: true } })
+  if (!document) throw new Error("document_not_found")
+  if (document.cancelledAt) throw new Error("document_already_cancelled")
+
+  const paymentStatuses = await getDocumentPaymentStatuses(input.workspaceId, [document.id])
+  const paymentStatus = paymentStatuses.get(document.id)?.paymentStatus?.toLowerCase() ?? null
+  if (paymentStatus && ["posted", "paid", "reconciled"].includes(paymentStatus)) throw new DocumentCancellationBlockedError(paymentStatus)
+
+  const context = await getRequestAuditContext()
+  const now = new Date()
+  const [updated] = await prisma.$transaction([
+    prisma.document.update({ where: { id: document.id }, data: { cancelledAt: now, cancelledReason: reason, cancelledById: input.actorId } }),
+    prisma.reviewTask.updateMany({ where: { workspaceId: input.workspaceId, documentId: document.id, status: { in: ["open", "in_review"] } }, data: { status: "rejected", resolvedAt: now } }),
+    prisma.documentAuditEvent.create({ data: auditEventData({ workspaceId: input.workspaceId, documentId: document.id, actorId: input.actorId, type: "invoice.cancelled", detail: { reason } }, context) }),
+  ])
+  return updated
 }
 
 export function documentDataForExport(document: Pick<Document, "filename" | "status" | "receivedAt" | "reviewedData">) {

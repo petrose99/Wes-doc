@@ -1,0 +1,886 @@
+{
+ "slug": "stampli-home",
+ "label": "Stampli homepage",
+ "url": "https://www.stampli.com",
+ "accessed": "2026-09-19T12:20:43.446Z",
+ "views": {
+  "390": {
+   "status": 200,
+   "shot": "/home/ubuntu/Dev/Wes-doc/docs/research/benchmark-captures/stampli/stampli-home-390.png",
+   "initialMotion": {
+    "opacityZeroEls": 0,
+    "animations": {
+     "p2-stories-fade 0.35s 1": 1,
+     "p2-erps-scroll 60s infinite": 2
+    },
+    "transitionEls": 428,
+    "total": 1123
+   },
+   "errors": [
+    "overlaysHidden=0"
+   ],
+   "title": "Stampli | Procure-to-Pay Platform for Finance Teams",
+   "h1": "The intelligent Procure-to-Pay platform",
+   "subhead": null,
+   "headings": [
+    {
+     "tag": "H1",
+     "text": "The intelligent Procure-to-Pay platform",
+     "top": 140
+    },
+    {
+     "tag": "H3",
+     "text": "89%",
+     "top": 1170
+    },
+    {
+     "tag": "H2",
+     "text": "89% of the actual work. Yes, we measured it.",
+     "top": 818
+    },
+    {
+     "tag": "H2",
+     "text": "From “can we buy this?” to “paid.” Without changing systems mid-sentence.",
+     "top": 1477
+    },
+    {
+     "tag": "H3",
+     "text": "Procurement",
+     "top": 1618
+    },
+    {
+     "tag": "H3",
+     "text": "Accounts Payable",
+     "top": 2022
+    },
+    {
+     "tag": "H3",
+     "text": "Vendor Management",
+     "top": 2551
+    },
+    {
+     "tag": "H3",
+     "text": "Payments",
+     "top": 3030
+    },
+    {
+     "tag": "H3",
+     "text": "Expense Management",
+     "top": 3479
+    },
+    {
+     "tag": "H2",
+     "text": "Real finance leaves a paper trail. Ours looks like this.",
+     "top": 3964
+    },
+    {
+     "tag": "H3",
+     "text": "1,900+",
+     "top": 4068
+    },
+    {
+     "tag": "H3",
+     "text": "15,000",
+     "top": 4222
+    },
+    {
+     "tag": "H3",
+     "text": "400k+",
+     "top": 4376
+    },
+    {
+     "tag": "H3",
+     "text": "$400B+",
+     "top": 4530
+    },
+    {
+     "tag": "H2",
+     "text": "What stress-free finance looks like.",
+     "top": 4852
+    },
+    {
+     "tag": "H2",
+     "text": "Your ERP stays the system of record. It just gets better company.",
+     "top": 5497
+    },
+    {
+     "tag": "H2",
+     "text": "The question is not hard. Finding a week to answer it is.",
+     "top": 5987
+    },
+    {
+     "tag": "H2",
+     "text": "For Finance teams who read the footnotes",
+     "top": 6645
+    },
+    {
+     "tag": "H2",
+     "text": "Bring us your P2P process. Especially the part that never behaves in the demo.",
+     "top": 7143
+    },
+    {
+     "tag": "H3",
+     "text": "Stampli",
+     "top": 7435
+    },
+    {
+     "tag": "H3",
+     "text": "Products",
+     "top": 7492
+    },
+    {
+     "tag": "H3",
+     "text": "Accounting Systems",
+     "top": 7549
+    },
+    {
+     "tag": "H3",
+     "text": "Industries",
+     "top": 7606
+    },
+    {
+     "tag": "H3",
+     "text": "Role",
+     "top": 7655
+    },
+    {
+     "tag": "H3",
+     "text": "Resources",
+     "top": 7720
+    },
+    {
+     "tag": "H3",
+     "text": "Contact",
+     "top": 7777
+    }
+   ],
+   "sections": [
+    {
+     "top": 4788,
+     "height": 645,
+     "heading": "What stress-free finance looks like.",
+     "imgs": 5,
+     "svgs": 2,
+     "videos": 0,
+     "ctas": [
+      "See the case study"
+     ],
+     "textLen": 139,
+     "snippet": "What stress-free finance looks like. Miami DDA’s CFO, Ivonne Berrios pays vendors in days, not months thanks to Stampli. See the case study"
+    },
+    {
+     "top": 5433,
+     "height": 500,
+     "heading": "Your ERP stays the system of record. It just gets better company.",
+     "imgs": 30,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [
+      "Find your ERP"
+     ],
+     "textLen": 575,
+     "snippet": "Your ERP stays the system of record. It just gets better company. QuickBooks Online SAP ECC Microsoft Dynamics 365 BC Oracle Fusion Sage Intacct Acumatica Dealertrack QuickBooks Online SAP ECC Microsoft Dynamics 365 BC O"
+    },
+    {
+     "top": 6597,
+     "height": 766,
+     "heading": "For Finance teams who read the footnotes",
+     "imgs": 5,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [
+      "Get a demo"
+     ],
+     "textLen": 378,
+     "snippet": "For Finance teams who read the footnotes Deep Finance Get executive intelligence about your business 2026 G2 Grid® How Stampli Ranks vs. P2P Competition Blog Where employee spend meets finance control 2026 G2 Grid® How S"
+    }
+   ],
+   "navLinks": [],
+   "heroCtas": [
+    {
+     "text": "Get a demo",
+     "tag": "A",
+     "href": "/contact/"
+    },
+    {
+     "text": "See the platform",
+     "tag": "A",
+     "href": "/procure-to-pay/"
+    }
+   ],
+   "bigImgs": [
+    {
+     "w": 380,
+     "h": 269,
+     "alt": "Miami DDA customer story",
+     "src": "https://www.stampli.com/wp-content/themes/stampli/dist/images/home-stories/story-1.jpg",
+     "top": 4932
+    },
+    {
+     "w": 380,
+     "h": 269,
+     "alt": "Purple customer story",
+     "src": "https://www.stampli.com/wp-content/themes/stampli/dist/images/home-stories/story-2.jpg",
+     "top": 4932
+    },
+    {
+     "w": 380,
+     "h": 269,
+     "alt": "Wenspok Companies customer story",
+     "src": "https://www.stampli.com/wp-content/themes/stampli/dist/images/home-stories/story-3.jpg",
+     "top": 4932
+    },
+    {
+     "w": 380,
+     "h": 269,
+     "alt": "Advance Financial customer story",
+     "src": "https://www.stampli.com/wp-content/themes/stampli/dist/images/home-stories/story-4.jpg",
+     "top": 4932
+    },
+    {
+     "w": 380,
+     "h": 269,
+     "alt": "Quincy Recycle customer story",
+     "src": "https://www.stampli.com/wp-content/themes/stampli/dist/images/home-stories/story-5.jpg",
+     "top": 4932
+    },
+    {
+     "w": 343,
+     "h": 194,
+     "alt": "",
+     "src": "https://www.stampli.com/wp-content/smush-webp/2026/08/home-deep-dashboard-x2-768x434.png.webp",
+     "top": 6355
+    },
+    {
+     "w": 319,
+     "h": 181,
+     "alt": "",
+     "src": "https://www.stampli.com/wp-content/themes/stampli/dist/images/home-posts/post-1.jpg",
+     "top": 6733
+    },
+    {
+     "w": 319,
+     "h": 181,
+     "alt": "",
+     "src": "https://www.stampli.com/wp-content/themes/stampli/dist/images/home-posts/post-2.jpg",
+     "top": 6733
+    },
+    {
+     "w": 319,
+     "h": 181,
+     "alt": "",
+     "src": "https://www.stampli.com/wp-content/themes/stampli/dist/images/home-posts/post-3.jpg",
+     "top": 6733
+    },
+    {
+     "w": 319,
+     "h": 181,
+     "alt": "",
+     "src": "https://www.stampli.com/wp-content/themes/stampli/dist/images/home-posts/post-4.jpg",
+     "top": 6733
+    },
+    {
+     "w": 319,
+     "h": 181,
+     "alt": "",
+     "src": "https://www.stampli.com/wp-content/themes/stampli/dist/images/home-posts/post-5.jpg",
+     "top": 6733
+    }
+   ],
+   "imgCount": 64,
+   "logoish": 7,
+   "videos": [],
+   "canvases": 0,
+   "lotties": 0,
+   "iframes": [
+    "",
+    "",
+    "about:blank",
+    "about:blank",
+    "https://4646231.hs-sites.com/hs-web-interactive-4646231-191024504635?utk=1b6849fab04e14f4c0f6860b68548b85&parentPageUrl=",
+    "",
+    ""
+   ],
+   "fonts": [
+    [
+     "lato",
+     230
+    ],
+    [
+     "Aeonik",
+     213
+    ]
+   ],
+   "sectionBgs": [
+    [
+     "rgb(255, 255, 255)",
+     1
+    ],
+    [
+     "rgb(241, 248, 255)",
+     1
+    ],
+    [
+     "rgb(248, 251, 255)",
+     1
+    ]
+   ],
+   "buttonBgs": [
+    [
+     "rgb(234, 245, 255)",
+     30
+    ],
+    [
+     "rgb(0, 136, 247)",
+     4
+    ],
+    [
+     "rgb(192, 220, 251)",
+     4
+    ],
+    [
+     "rgb(5, 142, 255)",
+     3
+    ],
+    [
+     "rgba(255, 255, 255, 0.2)",
+     2
+    ]
+   ],
+   "type": {
+    "h1": {
+     "family": "Aeonik, Lato, sans-serif",
+     "size": "40px",
+     "weight": "500",
+     "lineHeight": "42px",
+     "letterSpacing": "-0.5px",
+     "color": "rgb(249, 251, 255)"
+    },
+    "h2": {
+     "family": "Aeonik, Lato, sans-serif",
+     "size": "24px",
+     "weight": "500"
+    },
+    "body": {
+     "family": "lato, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, \"Noto Sans\", sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+     "size": "16px",
+     "color": "rgb(106, 105, 134)",
+     "bg": "rgb(4, 114, 195)"
+    }
+   },
+   "motionAfterScroll": {
+    "animations": {
+     "p2-stories-fade 0.35s 1": 1,
+     "p2-erps-scroll 60s infinite": 2
+    },
+    "opacityZeroEls": 1,
+    "transitionEls": 429,
+    "stickyFixedEls": 10
+   },
+   "libs": {
+    "gsap": false,
+    "framer": false,
+    "webflow": false,
+    "lottie": false,
+    "splide_swiper": false,
+    "rive": false,
+    "nextjs": false,
+    "wordpress": true,
+    "hubspot": true
+   },
+   "wordCount": 435,
+   "scrollHeight": 8375,
+   "bodyText": "The intelligent Procure-to-Pay platform Every request, invoice, expense, and payment in one connected system that learns from the work and takes on more of it. Get a demo See the platform 89% Handled by Stampli AI 89% of the actual work. Yes, we measured it. Across more than 2,700 ERP-aligned fields, Stampli AI performs on average 89% of the work based on how your business codes, routes, matches, and approves. See how Stampli AI works From “can we buy this?” to “paid.” Without changing systems mid-sentence. Procurement Put controls before commitment, while finance can still impact the outcome. See Stampli Procurement Accounts Payable Stampli AI codes, matches, and routes invoices with every question and decision attached. See Stampli Accounts Payable Vendor Management Vendors submit their information and check payment status. Finance verifies sensitive changes. Self-service, not self-approval. See Stampli Vendor Management Payments Carry approval and accounting context through payment. No starting the story over at the bank. See Stampli Direct Pay Expense Management Control card spend before the swipe and reimbursements before they become month-end cleanup. See Expense Management Real finance leaves a paper trail. Ours looks like this. 1,900+ Customers using Stampli’s P2P platform 15,000 Entities represented across the customer base 400k+ Invoices processed every week $400B+ Cumulative spend processed See the platform at work What stress-free finance looks like. Miami DDA’s CFO, Ivonne Berrios pays vendors in days, not months thanks to Stampli. See the case study Your ERP stays the system of record. It just gets better company. QuickBooks Online SAP ECC Microsoft Dynamics 365 BC Oracle Fusion Sage Intacct Acumatica Dealertrack QuickBooks Online SAP ECC Microsoft Dynamics 365 BC Oracle Fusion Sage Intacct Acumatica Dealertrack Microsoft Dynamics GP Oracle NetSuite Sage 100 Dealertrack QuickBooks Desktop SAP S/4HANA Sage Intacct Construction Microsoft Dynamics 365 Finance Microsoft Dynamics GP Oracle NetSuite Sage 100 Dealertrack QuickBooks Desktop SAP S/4HANA Sage Intacct Construction Microsoft Dynamics 365 Finance Find your ERP The question is not hard. Finding a week to answer it is. Proactive intelligence about your business, delivered as consultant-grade analysis you can act on. See Deep Finance in action For Finance teams who read the footnotes Deep Finance Get executive intelligence about your business 2026 G2 Grid® How Stampli Ranks vs. P2P Competition Blog Where employee spend meets finance control 2026 G2 Grid® How Stampli Ranks vs. AP Competition Blog AI-powered finance intelligence Bring us your P2P process. Especially the part that never behaves in the demo. Get a demo Stampli Products Accounting Systems Industries Role Resources Contact © 2026 Stampli, All rights reserved. Your Privacy Choices Policy Center Terms of Service Privacy Licenses"
+  },
+  "1440": {
+   "status": 200,
+   "shot": "/home/ubuntu/Dev/Wes-doc/docs/research/benchmark-captures/stampli/stampli-home-1440.png",
+   "initialMotion": {
+    "opacityZeroEls": 0,
+    "animations": {
+     "p2-stories-fade 0.35s 1": 1,
+     "p2-erps-scroll 60s infinite": 2
+    },
+    "transitionEls": 420,
+    "total": 1122
+   },
+   "errors": [
+    "overlaysHidden=0"
+   ],
+   "title": "Stampli | Procure-to-Pay Platform for Finance Teams",
+   "h1": "The intelligent Procure-to-Pay platform",
+   "subhead": null,
+   "headings": [
+    {
+     "tag": "H1",
+     "text": "The intelligent Procure-to-Pay platform",
+     "top": 172
+    },
+    {
+     "tag": "H3",
+     "text": "89%",
+     "top": 979
+    },
+    {
+     "tag": "H2",
+     "text": "89% of the actual work. Yes, we measured it.",
+     "top": 923
+    },
+    {
+     "tag": "H2",
+     "text": "From “can we buy this?” to “paid.” Without changing systems mid-sentence.",
+     "top": 1412
+    },
+    {
+     "tag": "H3",
+     "text": "Procurement",
+     "top": 1601
+    },
+    {
+     "tag": "H3",
+     "text": "Accounts Payable",
+     "top": 1601
+    },
+    {
+     "tag": "H3",
+     "text": "Vendor Management",
+     "top": 2165
+    },
+    {
+     "tag": "H3",
+     "text": "Payments",
+     "top": 2165
+    },
+    {
+     "tag": "H3",
+     "text": "Expense Management",
+     "top": 2165
+    },
+    {
+     "tag": "H2",
+     "text": "Real finance leaves a paper trail. Ours looks like this.",
+     "top": 2788
+    },
+    {
+     "tag": "H3",
+     "text": "1,900+",
+     "top": 2976
+    },
+    {
+     "tag": "H3",
+     "text": "15,000",
+     "top": 2976
+    },
+    {
+     "tag": "H3",
+     "text": "400k+",
+     "top": 2976
+    },
+    {
+     "tag": "H3",
+     "text": "$400B+",
+     "top": 2976
+    },
+    {
+     "tag": "H2",
+     "text": "What stress-free finance looks like.",
+     "top": 3427
+    },
+    {
+     "tag": "H2",
+     "text": "Your ERP stays the system of record. It just gets better company.",
+     "top": 4244
+    },
+    {
+     "tag": "H2",
+     "text": "The question is not hard. Finding a week to answer it is.",
+     "top": 4878
+    },
+    {
+     "tag": "H2",
+     "text": "For Finance teams who read the footnotes",
+     "top": 6189
+    },
+    {
+     "tag": "H2",
+     "text": "Bring us your P2P process. Especially the part that never behaves in the demo.",
+     "top": 6839
+    },
+    {
+     "tag": "H3",
+     "text": "Stampli",
+     "top": 7286
+    },
+    {
+     "tag": "H3",
+     "text": "Products",
+     "top": 7286
+    },
+    {
+     "tag": "H3",
+     "text": "Accounting Systems",
+     "top": 7286
+    },
+    {
+     "tag": "H3",
+     "text": "Industries",
+     "top": 7286
+    },
+    {
+     "tag": "H3",
+     "text": "Role",
+     "top": 7590
+    },
+    {
+     "tag": "H3",
+     "text": "Resources",
+     "top": 7286
+    },
+    {
+     "tag": "H3",
+     "text": "Contact",
+     "top": 7286
+    }
+   ],
+   "sections": [
+    {
+     "top": 3362,
+     "height": 762,
+     "heading": "What stress-free finance looks like.",
+     "imgs": 5,
+     "svgs": 2,
+     "videos": 0,
+     "ctas": [
+      "See the case study"
+     ],
+     "textLen": 139,
+     "snippet": "What stress-free finance looks like. Miami DDA’s CFO, Ivonne Berrios pays vendors in days, not months thanks to Stampli. See the case study"
+    },
+    {
+     "top": 4124,
+     "height": 644,
+     "heading": "Your ERP stays the system of record. It just gets better company.",
+     "imgs": 30,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [
+      "Find your ERP"
+     ],
+     "textLen": 575,
+     "snippet": "Your ERP stays the system of record. It just gets better company. QuickBooks Online SAP ECC Microsoft Dynamics 365 BC Oracle Fusion Sage Intacct Acumatica Dealertrack QuickBooks Online SAP ECC Microsoft Dynamics 365 BC O"
+    },
+    {
+     "top": 6069,
+     "height": 1052,
+     "heading": "For Finance teams who read the footnotes",
+     "imgs": 5,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [
+      "Get a demo"
+     ],
+     "textLen": 378,
+     "snippet": "For Finance teams who read the footnotes Deep Finance Get executive intelligence about your business 2026 G2 Grid® How Stampli Ranks vs. P2P Competition Blog Where employee spend meets finance control 2026 G2 Grid® How S"
+    },
+    {
+     "top": 7286,
+     "height": 176,
+     "heading": "Stampli",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 49,
+     "snippet": "Stampli About Us Careers Customer Support Contact"
+    },
+    {
+     "top": 7286,
+     "height": 336,
+     "heading": "Products",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 150,
+     "snippet": "Products Procure-to-Pay Procurement Vendor Management Accounts Payable Payments Expense Management Stampli Deep Finance ERP Integrations Contact Sales"
+    },
+    {
+     "top": 7286,
+     "height": 588,
+     "heading": "Accounting Systems",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 304,
+     "snippet": "Accounting Systems Acumatica Dealertrack DMS Microsoft Dynamics 365 Business Central Microsoft Dynamics 365 Finance Microsoft Dynamics Great Plains Oracle Fusion Cloud ERP Oracle NetSuite Sage 100 Sage Intacct Sage Intac"
+    },
+    {
+     "top": 7590,
+     "height": 164,
+     "heading": "Role",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 38,
+     "snippet": "Role CFO Controller AP Teams Approvers"
+    },
+    {
+     "top": 7286,
+     "height": 528,
+     "heading": "Resources",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 278,
+     "snippet": "Resources Become a Partner Refer Stampli Resources Library Blog Newsletter Stampli G2 Report Stampli Reviews & Awards Customer Stories AI Information What is Accounts Payable What is Invoice Processing What are B2B Payme"
+    },
+    {
+     "top": 7286,
+     "height": 140,
+     "heading": "Contact",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 80,
+     "snippet": "Contact sales@stampli.com 800 California Street, Floor 2 Mountain View, CA 94041"
+    }
+   ],
+   "navLinks": [
+    "Products",
+    "Integrations",
+    "Customers",
+    "Resources",
+    "Partners",
+    "Customer login",
+    "Contact sales"
+   ],
+   "heroCtas": [
+    {
+     "text": "Get a demo",
+     "tag": "A",
+     "href": "/contact/"
+    },
+    {
+     "text": "See the platform",
+     "tag": "A",
+     "href": "/procure-to-pay/"
+    }
+   ],
+   "bigImgs": [
+    {
+     "w": 358,
+     "h": 358,
+     "alt": "",
+     "src": "https://www.stampli.com/wp-content/uploads/2026/08/home-ai-donut.svg",
+     "top": 862
+    },
+    {
+     "w": 318,
+     "h": 492,
+     "alt": "Procurement - home page - desktop",
+     "src": "https://www.stampli.com/wp-content/uploads/2026/08/Procurement-home-page-desktop.svg",
+     "top": 1607
+    },
+    {
+     "w": 725,
+     "h": 463,
+     "alt": "",
+     "src": "https://www.stampli.com/wp-content/uploads/2026/08/home-suite-ap-v2-x2.png",
+     "top": 1636
+    },
+    {
+     "w": 328,
+     "h": 195,
+     "alt": "",
+     "src": "https://www.stampli.com/wp-content/uploads/2026/08/home-suite-vm.svg",
+     "top": 2400
+    },
+    {
+     "w": 825,
+     "h": 432,
+     "alt": "Miami DDA customer story",
+     "src": "https://www.stampli.com/wp-content/themes/stampli/dist/images/home-stories/story-1.jpg",
+     "top": 3510
+    },
+    {
+     "w": 825,
+     "h": 432,
+     "alt": "Purple customer story",
+     "src": "https://www.stampli.com/wp-content/themes/stampli/dist/images/home-stories/story-2.jpg",
+     "top": 3510
+    },
+    {
+     "w": 825,
+     "h": 432,
+     "alt": "Wenspok Companies customer story",
+     "src": "https://www.stampli.com/wp-content/themes/stampli/dist/images/home-stories/story-3.jpg",
+     "top": 3510
+    },
+    {
+     "w": 825,
+     "h": 432,
+     "alt": "Advance Financial customer story",
+     "src": "https://www.stampli.com/wp-content/themes/stampli/dist/images/home-stories/story-4.jpg",
+     "top": 3510
+    },
+    {
+     "w": 825,
+     "h": 432,
+     "alt": "Quincy Recycle customer story",
+     "src": "https://www.stampli.com/wp-content/themes/stampli/dist/images/home-stories/story-5.jpg",
+     "top": 3510
+    },
+    {
+     "w": 1233,
+     "h": 697,
+     "alt": "",
+     "src": "https://www.stampli.com/wp-content/smush-webp/2026/08/home-deep-dashboard-x2-1536x868.png.webp",
+     "top": 5252
+    },
+    {
+     "w": 392,
+     "h": 223,
+     "alt": "",
+     "src": "https://www.stampli.com/wp-content/themes/stampli/dist/images/home-posts/post-1.jpg",
+     "top": 6286
+    },
+    {
+     "w": 392,
+     "h": 223,
+     "alt": "",
+     "src": "https://www.stampli.com/wp-content/themes/stampli/dist/images/home-posts/post-2.jpg",
+     "top": 6286
+    },
+    {
+     "w": 392,
+     "h": 223,
+     "alt": "",
+     "src": "https://www.stampli.com/wp-content/themes/stampli/dist/images/home-posts/post-3.jpg",
+     "top": 6286
+    },
+    {
+     "w": 392,
+     "h": 223,
+     "alt": "",
+     "src": "https://www.stampli.com/wp-content/themes/stampli/dist/images/home-posts/post-4.jpg",
+     "top": 6286
+    },
+    {
+     "w": 392,
+     "h": 223,
+     "alt": "",
+     "src": "https://www.stampli.com/wp-content/themes/stampli/dist/images/home-posts/post-5.jpg",
+     "top": 6286
+    }
+   ],
+   "imgCount": 65,
+   "logoish": 8,
+   "videos": [],
+   "canvases": 0,
+   "lotties": 0,
+   "iframes": [
+    "",
+    "",
+    "about:blank",
+    "about:blank",
+    "https://4646231.hs-sites.com/hs-web-interactive-4646231-191024504635?utk=04d15b9ded9ed8aefaa63178bbebecca&parentPageUrl=",
+    "",
+    ""
+   ],
+   "fonts": [
+    [
+     "Aeonik",
+     360
+    ],
+    [
+     "lato",
+     243
+    ]
+   ],
+   "sectionBgs": [
+    [
+     "rgb(241, 248, 255)",
+     2
+    ],
+    [
+     "rgb(248, 251, 255)",
+     1
+    ]
+   ],
+   "buttonBgs": [
+    [
+     "rgb(234, 245, 255)",
+     30
+    ],
+    [
+     "rgb(0, 136, 247)",
+     4
+    ],
+    [
+     "rgb(5, 142, 255)",
+     3
+    ],
+    [
+     "rgb(192, 220, 251)",
+     3
+    ],
+    [
+     "rgba(255, 255, 255, 0.2)",
+     2
+    ],
+    [
+     "rgb(227, 238, 251)",
+     2
+    ]
+   ],
+   "type": {
+    "h1": {
+     "family": "Aeonik, Lato, sans-serif",
+     "size": "90px",
+     "weight": "500",
+     "lineHeight": "79px",
+     "letterSpacing": "-1.5px",
+     "color": "rgb(249, 251, 255)"
+    },
+    "h2": {
+     "family": "Aeonik, Lato, sans-serif",
+     "size": "40px",
+     "weight": "500"
+    },
+    "body": {
+     "family": "lato, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, \"Noto Sans\", sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+     "size": "16px",
+     "color": "rgb(106, 105, 134)",
+     "bg": "rgb(4, 114, 195)"
+    }
+   },
+   "motionAfterScroll": {
+    "animations": {
+     "p2-stories-fade 0.35s 1": 1,
+     "p2-erps-scroll 60s infinite": 2
+    },
+    "opacityZeroEls": 1,
+    "transitionEls": 421,
+    "stickyFixedEls": 10
+   },
+   "libs": {
+    "gsap": false,
+    "framer": false,
+    "webflow": false,
+    "lottie": false,
+    "splide_swiper": false,
+    "rive": false,
+    "nextjs": false,
+    "wordpress": true,
+    "hubspot": true
+   },
+   "wordCount": 576,
+   "scrollHeight": 8312,
+   "bodyText": "Products Integrations Customers Resources Partners Customer login Contact sales The intelligent Procure-to-Pay platform Every request, invoice, expense, and payment in one connected system that learns from the work and takes on more of it. Get a demo See the platform 89% Handled by Stampli AI 89% of the actual work. Yes, we measured it. Across more than 2,700 ERP-aligned fields, Stampli AI performs on average 89% of the work based on how your business codes, routes, matches, and approves. See how Stampli AI works From “can we buy this?” to “paid.” Without changing systems mid-sentence. Procurement Put controls before commitment, while finance can still impact the outcome. See Stampli Procurement Accounts Payable Stampli AI codes, matches, and routes invoices with every question and decision attached. See Stampli Accounts Payable Vendor Management Vendors submit their information and check payment status. Finance verifies sensitive changes. Self-service, not self-approval. See Stampli Vendor Management Payments Carry approval and accounting context through payment. No starting the story over at the bank. See Stampli Direct Pay Expense Management Control card spend before the swipe and reimbursements before they become month-end cleanup. See Expense Management Real finance leaves a paper trail. Ours looks like this. 1,900+ Customers using Stampli’s P2P platform 15,000 Entities represented across the customer base 400k+ Invoices processed every week $400B+ Cumulative spend processed See the platform at work What stress-free finance looks like. Miami DDA’s CFO, Ivonne Berrios pays vendors in days, not months thanks to Stampli. See the case study Your ERP stays the system of record. It just gets better company. QuickBooks Online SAP ECC Microsoft Dynamics 365 BC Oracle Fusion Sage Intacct Acumatica Dealertrack QuickBooks Online SAP ECC Microsoft Dynamics 365 BC Oracle Fusion Sage Intacct Acumatica Dealertrack Microsoft Dynamics GP Oracle NetSuite Sage 100 Dealertrack QuickBooks Desktop SAP S/4HANA Sage Intacct Construction Microsoft Dynamics 365 Finance Microsoft Dynamics GP Oracle NetSuite Sage 100 Dealertrack QuickBooks Desktop SAP S/4HANA Sage Intacct Construction Microsoft Dynamics 365 Finance Find your ERP The question is not hard. Finding a week to answer it is. Proactive intelligence about your business, delivered as consultant-grade analysis you can act on. See Deep Finance in action For Finance teams who read the footnotes Deep Finance Get executive intelligence about your business 2026 G2 Grid® How Stampli Ranks vs. P2P Competition Blog Where employee spend meets finance control 2026 G2 Grid® How Stampli Ranks vs. AP Competition Blog AI-powered finance intelligence Bring us your P2P process. Especially the part that never behaves in the demo. Get a demo Stampli About Us Careers Customer Support Contact Products Procure-to-Pay Procurement Vendor Management Accounts Payable Payments Expense Management Stampli Deep Finance ERP Integrations Contact Sales Accounting Systems Acumatica Dealertrack DMS Microsoft Dynamics 365 Business Central Microsoft Dynamics 365 Finance Microsoft Dynamics Great Plains Oracle Fusion Cloud ERP Oracle NetSuite Sage 100 Sage Intacct Sage Intacct Construction QuickBooks Desktop QuickBooks Online SAP ECC SAP S/4HANA All Systems Industries Automotive Construction Health Care Manufacturing Oil, Gas, & Energy Professional Services Transportation & Logistics All Industries Role CFO Controller AP Teams Approvers Resources Become a Partner Refer Stampli Resources Library Blog Newsletter Stampli G2 Report Stampli Reviews & Awards Customer Stories AI Information What is Accounts Payable What is Invoice Processing What are B2B Payments What are ACH Payments AP Automation Invoice Management Contact sales@stampli.com 800 California Street, Floor 2 Mountain View, CA 94041 © 2026 Stampli, All rights reserved. Your Privacy Choices Policy Center Terms of Service Privacy Licenses"
+  }
+ }
+}

@@ -47,7 +47,7 @@ export function PinVendorHistoryButton({ workspaceId, supplier, templateCode, co
         <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
         Pinned
       </span>
-      <Link href={`/workspaces/${workspaceId}/settings/rules`} className="text-slate-500 underline underline-offset-2 hover:text-slate-800">
+      <Link href={`/workspaces/${workspaceId}/admin/suppliers`} className="text-slate-500 underline underline-offset-2 hover:text-slate-800">
         View rule
       </Link>
     </span>

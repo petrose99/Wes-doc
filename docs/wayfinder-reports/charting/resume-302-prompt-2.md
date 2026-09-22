@@ -1,0 +1,9 @@
+Every `sub_issues` and `blocked_by` call you made was refused by the permission layer with `Contains simple_expansion` — `$( … )` is not allowed in a Bash command here — so map #302 currently has **no** sub-issues and no blocking. Redo them as two plain commands each, with the number pasted literally, one command per turn, and read each result to confirm it succeeded:
+
+1. `gh api repos/petrose99/Wes-doc/issues/308 --jq .id` → note the number, e.g. 3456789012.
+2. `gh api -X POST repos/petrose99/Wes-doc/issues/302/sub_issues -F sub_issue_id=3456789012` → the response contains `"number": 308`.
+   Do this for 303, 305, 308, 309, 310, 311 (the closed 304, 306, 307 too — a closed child still belongs to the map).
+3. Blocking the same way: `gh api repos/petrose99/Wes-doc/issues/309 --jq .id`, then `gh api -X POST repos/petrose99/Wes-doc/issues/310/dependencies/blocked_by -F issue_id=<that id>`; and 311 blocked by 310. Confirm `issue_dependencies_summary.blocked_by` is 1 in the response.
+4. Check the wiring: `gh api repos/petrose99/Wes-doc/issues/302/sub_issues --jq '.[].number'` must list all nine.
+5. Then fix the map body once more (Write to `docs/wayfinder-reports/charting/map-body.md`, `gh issue edit 302 --body-file …`): **Not yet specified** must not contain anything that is already a ticket or already out of scope — of its five current lines, four are now closed tickets or live tickets; keep only what is genuinely not yet ticketable (e.g. pricing presentation, the product deep-dive pages beyond the landing page), and add to **Out of scope** one line relating this map to the open maps #157 (marketing site tells the whole product) and #142 (craft floor): this map owns conversion — message, order, proof, CTA — and those own coverage and rendering.
+6. End with the single line `map: #302 https://github.com/petrose99/Wes-doc/issues/302`.

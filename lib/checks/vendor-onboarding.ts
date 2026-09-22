@@ -88,7 +88,7 @@ export function checkVendorOnboarding(input: VendorOnboardingInput): CheckResult
   if (!flags.length) return null
   return {
     checkCode: "vendor_onboarding",
-    status: "warn",
+    status: "warn", fields: ["supplier", "payment_iban", "supplier_vat_number", "supplier_address", "supplier_email"],
     message: `New supplier "${input.supplierName ?? "unknown"}" has ${flags.length} onboarding red flag(s): ${flags.join("; ")}.`,
     detail: { flags },
   }

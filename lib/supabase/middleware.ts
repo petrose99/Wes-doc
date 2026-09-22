@@ -1,4 +1,5 @@
 import config from "@/lib/config"
+import { DEV_BYPASS_USER, isDevAuthBypass } from "@/lib/supabase/dev-bypass"
 import { createServerClient } from "@supabase/ssr"
 import { NextRequest, NextResponse } from "next/server"
 
@@ -62,6 +63,7 @@ function touchLastSeen(response: NextResponse) {
  * than quietly left valid for whoever holds the browser. */
 export async function updateSession(request: NextRequest): Promise<{ response: NextResponse; userId: string | null }> {
   let response = NextResponse.next({ request })
+  if (isDevAuthBypass()) return { response, userId: DEV_BYPASS_USER.id }
 
   const supabase = createServerClient(config.supabase.url, config.supabase.anonKey, {
     cookies: {

@@ -1,0 +1,297 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex">
+<title>DocuBite Walkthrough</title>
+<style>
+  @font-face { font-family: "Inter"; font-weight: 400; src: url("/fonts/Inter/Inter-Regular.otf") format("opentype"); font-display: swap; }
+  @font-face { font-family: "Inter"; font-weight: 500; src: url("/fonts/Inter/Inter-Medium.otf") format("opentype"); font-display: swap; }
+  @font-face { font-family: "Inter"; font-weight: 600; src: url("/fonts/Inter/Inter-SemiBold.otf") format("opentype"); font-display: swap; }
+  :root {
+    --ground: #EEF2F0;
+    --card: #FFFFFF;
+    --ink: #0F1F1A;
+    --muted: #5B6B66;
+    --line: #D6DEDA;
+    --accent: #0B7A50;
+    --accent-ink: #FFFFFF;
+    --accent-soft: #DDF2E8;
+    --ring: #34D399;
+    --dim: rgba(9, 22, 17, 0.52);
+    --shadow: 0 18px 40px -18px rgba(9, 22, 17, 0.35), 0 2px 6px rgba(9, 22, 17, 0.08);
+    --frame: #DDE4E0;
+    --focus: #0B7A50;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0E1512; --card: #17201C; --ink: #E8EEEB; --muted: #9BAAA4; --line: #26322D;
+      --accent: #2FB37E; --accent-ink: #06130D; --accent-soft: #143126; --ring: #5EEAB4;
+      --dim: rgba(0, 0, 0, 0.6); --shadow: 0 18px 40px -18px rgba(0,0,0,.7), 0 2px 6px rgba(0,0,0,.4);
+      --frame: #26322D; --focus: #5EEAB4;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0E1512; --card: #17201C; --ink: #E8EEEB; --muted: #9BAAA4; --line: #26322D;
+    --accent: #2FB37E; --accent-ink: #06130D; --accent-soft: #143126; --ring: #5EEAB4;
+    --dim: rgba(0, 0, 0, 0.6); --shadow: 0 18px 40px -18px rgba(0,0,0,.7), 0 2px 6px rgba(0,0,0,.4);
+    --frame: #26322D; --focus: #5EEAB4;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--ground); color: var(--ink);
+    font-family: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 15px; line-height: 1.5; -webkit-font-smoothing: antialiased;
+  }
+  ::selection { background: var(--accent-soft); color: var(--ink); }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  .wrap { max-width: 1240px; margin: 0 auto; padding-inline: 16px; padding-block: 16px 32px; }
+
+  header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 8px 20px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 600; letter-spacing: -0.01em; }
+  .brand svg { width: 26px; height: 26px; flex: none; }
+  .brand span { color: var(--muted); font-weight: 400; }
+  .counter { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 14px; }
+  .counter b { color: var(--ink); font-weight: 600; }
+
+  .stage { position: relative; max-width: min(100%, calc((100vh - 190px) * 1.6)); margin-inline: auto; }
+  .frame {
+    position: relative; background: var(--frame); border-radius: 12px; padding: 6px;
+    max-width: min(100%, calc((100vh - 190px) * 1.6)); margin-inline: auto;
+    box-shadow: var(--shadow); overflow: hidden;
+  }
+  .frame .chrome { display: flex; gap: 6px; padding: 4px 6px 8px; }
+  .frame .chrome i { width: 9px; height: 9px; border-radius: 50%; background: var(--line); display: block; }
+  .shot { position: relative; aspect-ratio: 1440 / 900; border-radius: 6px; overflow: hidden; background: #fff; max-width: 100%; }
+  @supports not (aspect-ratio: 1 / 1) { .shot::before { content: ""; display: block; padding-top: 62.5%; } }
+  .shot img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; opacity: 1; transition: opacity .35s ease; }
+  .shot img.swap { opacity: 0; }
+  .spot {
+    position: absolute; border-radius: 8px; pointer-events: none;
+    box-shadow: 0 0 0 2px var(--ring), 0 0 0 9999px var(--dim);
+    transition: left .55s cubic-bezier(.16,1,.3,1), top .55s cubic-bezier(.16,1,.3,1),
+                width .55s cubic-bezier(.16,1,.3,1), height .55s cubic-bezier(.16,1,.3,1), opacity .3s ease;
+  }
+  .spot::after {
+    content: ""; position: absolute; inset: -2px; border-radius: 10px;
+    box-shadow: 0 0 0 0 var(--ring); animation: pulse 2.2s ease-out infinite;
+  }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ring) 70%, transparent); } 100% { box-shadow: 0 0 0 14px transparent; } }
+  .stage.end .spot { opacity: 0; }
+
+  .card {
+    position: absolute; z-index: 2; width: min(380px, calc(100% - 24px));
+    background: var(--card); color: var(--ink); border-radius: 12px; padding: 16px 18px;
+    box-shadow: var(--shadow); border: 1px solid var(--line);
+    transition: left .55s cubic-bezier(.16,1,.3,1), top .55s cubic-bezier(.16,1,.3,1), opacity .3s ease;
+  }
+  .card h2 { margin: 0 0 6px; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; text-wrap: balance; line-height: 1.3; }
+  .card p { margin: 0; color: var(--muted); font-size: 14.5px; }
+  .card .tag { display: inline-block; margin-bottom: 8px; font-size: 11.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
+
+  .end-card {
+    position: absolute; inset: 0; z-index: 3; display: none; align-items: center; justify-content: center; padding: 24px;
+    background: var(--dim);
+  }
+  .stage.end .end-card { display: flex; }
+  .end-card .inner { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 28px 30px; max-width: 520px; box-shadow: var(--shadow); }
+  .end-card h2 { margin: 0 0 10px; font-size: 24px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.2; text-wrap: balance; }
+  .end-card p { margin: 0 0 8px; color: var(--muted); }
+  .end-card ul { margin: 12px 0 0; padding-left: 18px; color: var(--ink); font-size: 14.5px; }
+  .end-card li { margin-bottom: 4px; }
+
+  nav { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 18px; flex-wrap: wrap; }
+  .btn {
+    border: 1px solid var(--line); background: var(--card); border-radius: 8px; padding: 9px 16px; cursor: pointer;
+    font-weight: 500; display: inline-flex; align-items: center; gap: 8px; transition: background .15s ease, border-color .15s ease;
+  }
+  .btn:hover { border-color: var(--accent); }
+  .btn[disabled] { opacity: .45; cursor: default; }
+  .btn[disabled]:hover { border-color: var(--line); }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .btn.primary:hover { filter: brightness(1.06); }
+  .btn svg { width: 16px; height: 16px; }
+  .dots { display: flex; gap: 8px; align-items: center; }
+  .dots button { width: 28px; height: 28px; border: 0; background: transparent; cursor: pointer; padding: 0; display: grid; place-items: center; border-radius: 50%; }
+  .dots button i { display: block; width: 8px; height: 8px; border-radius: 50%; background: var(--line); transition: transform .2s ease, background .2s ease; }
+  .dots button[aria-current="step"] i { background: var(--accent); transform: scale(1.5); }
+  .dots button.done i { background: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+  .hint { color: var(--muted); font-size: 13px; }
+  .hint kbd { font: inherit; border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; background: var(--card); }
+
+  .mobile-card { display: none; }
+  @media (max-width: 860px) {
+    .card { display: none; }
+    .mobile-card { display: block; position: static; width: auto; margin-top: 14px; }
+    .hint { display: none; }
+    .stage, .frame { max-width: 100%; }
+    nav { display: grid; grid-template-columns: 1fr 1fr; }
+    .dots { grid-column: 1 / -1; justify-content: center; order: 2; }
+    #prev { justify-self: start; } #next { justify-self: end; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .spot, .card, .shot img, .dots button i { transition: none; }
+    .spot::after { animation: none; }
+  }
+</style>
+</head><body>
+
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 26 26" aria-hidden="true"><rect x="1" y="1" width="24" height="24" rx="6" fill="#0B7A50"/><rect x="7" y="8" width="12" height="2.2" rx="1.1" fill="#fff"/><rect x="7" y="12" width="9" height="2.2" rx="1.1" fill="#fff"/><rect x="7" y="16" width="12" height="2.2" rx="1.1" fill="#fff"/></svg>
+      DocuBite <span>· walkthrough</span>
+    </div>
+    <div class="counter" id="counter"><b>1</b> of 7</div>
+  </header>
+
+  <div class="stage" id="stage">
+    <div class="frame">
+      <div class="chrome" aria-hidden="true"><i></i><i></i><i></i></div>
+      <div class="shot">
+        <img id="shot" src="shots/01-intake.png" alt="" width="1440" height="900" decoding="async">
+        <div class="spot" id="spot"></div>
+        <div class="card" id="card" role="region" aria-live="polite">
+          <span class="tag" id="cardTag"></span>
+          <h2 id="cardTitle"></h2>
+          <p id="cardBody"></p>
+        </div>
+      </div>
+    </div>
+    <div class="end-card" id="endCard">
+      <div class="inner">
+        <h2>That's the whole month, in one place.</h2>
+        <p>Invoices arrive, are read, checked, approved, paid and closed — with every number traceable back to the page it came from.</p>
+        <ul>
+          <li>Amounts in Maloti, with Lesotho VAT rules applied at 10% and 15%.</li>
+          <li>Every extracted field sits beside the source document.</li>
+          <li>Checks explain themselves in plain language.</li>
+          <li>Month-end close with per-item sign-off and a period lock.</li>
+        </ul>
+        <p style="margin-top:16px">Want to see it with your own invoices? Reply to the message this came with and we'll set up a workspace.</p>
+      </div>
+    </div>
+    <div class="card mobile-card" role="region">
+      <span class="tag" id="mTag"></span>
+      <h2 id="mTitle"></h2>
+      <p id="mBody"></p>
+    </div>
+  </div>
+
+  <nav aria-label="Walkthrough steps">
+    <button class="btn" id="prev" type="button">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3 5 8l5 5"/></svg>
+      Back
+    </button>
+    <div class="dots" id="dots" role="list"></div>
+    <span class="hint">Use <kbd>←</kbd> <kbd>→</kbd> to move</span>
+    <button class="btn primary" id="next" type="button">
+      Next
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 3 5 5-5 5"/></svg>
+    </button>
+  </nav>
+</div>
+
+<script>
+  // Hotspots are percentages of the 1440×900 capture.
+  const steps = [
+    { img: "shots/01-intake.png", tag: "1 · Intake",
+      title: "Drop the month's invoices in.",
+      body: "Upload a batch, or forward them to the workspace's email address. Each file is typed on the way in — invoice, purchase order, receipt, bank statement.",
+      spot: { l: 35.5, t: 36.5, w: 29, h: 14 } },
+    { img: "shots/02-invoices.png", tag: "2 · Invoices queue",
+      title: "Every invoice lands in one queue, already read.",
+      body: "Supplier, number and amount are lifted off the document. A green underline means the field was read with high confidence; the state column tells you what still needs a person.",
+      spot: { l: 4.5, t: 15, w: 95.2, h: 20.5 } },
+    { img: "shots/03-review.png", tag: "3 · Review",
+      title: "Fields sit beside the source page.",
+      body: "Correct anything in place and it becomes a rule for next time. When it looks right, approve — no re-keying into a spreadsheet.",
+      spot: { l: 73.5, t: 41.5, w: 26, h: 53 } },
+    { img: "shots/04-exceptions.png", tag: "4 · Checks",
+      title: "Checks explain themselves.",
+      body: "Duplicates, line items that don't add up, missing VAT numbers — each one is a sentence, not an error code, with the invoice it belongs to.",
+      spot: { l: 20.5, t: 9.5, w: 34, h: 13.5 } },
+    { img: "shots/05-approvals.png", tag: "5 · Approvals",
+      title: "Routed to the right person, with the variance in front of them.",
+      body: "Invoice approvals, PO mismatches and expense claims each have their own queue. A PO variance shows the amount and the percentage before anyone signs.",
+      spot: { l: 4.5, t: 15.9, w: 95.2, h: 6.9 } },
+    { img: "shots/06-payments.png", tag: "6 · Bill pay",
+      title: "What's due, by age, in Maloti.",
+      body: "Open invoices are bucketed by how overdue they are. Tick the ones to pay and DocuBite builds the payment run from the account you choose.",
+      spot: { l: 4.5, t: 0.4, w: 95.2, h: 7.6 } },
+    { img: "shots/07-close.png", tag: "7 · Month-end close",
+      title: "Close the month from a checklist.",
+      body: "Bank reconciliation, AP aging, accruals and the VAT workpaper are computed for the period. Sign each item off, then lock it.",
+      spot: { l: 28.7, t: 27.5, w: 59, h: 42 } },
+  ];
+
+  const $ = (id) => document.getElementById(id);
+  const stage = $("stage"), shot = $("shot"), spot = $("spot"), card = $("card");
+  const dots = $("dots");
+  let i = 0;
+  let loadToken = 0;
+  const total = steps.length; // final "end" state is total
+
+  steps.forEach((s, n) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.setAttribute("role", "listitem"); b.setAttribute("aria-label", `Step ${n + 1}: ${s.tag.split("· ")[1]}`);
+    b.innerHTML = "<i></i>"; b.addEventListener("click", () => go(n));
+    dots.appendChild(b);
+  });
+  const endDot = document.createElement("button");
+  endDot.type = "button"; endDot.setAttribute("role", "listitem"); endDot.setAttribute("aria-label", "Summary");
+  endDot.innerHTML = "<i></i>"; endDot.addEventListener("click", () => go(total)); dots.appendChild(endDot);
+
+  function placeCard(s) {
+    const below = s.t + s.h < 58;
+    const top = below ? s.t + s.h + 2.5 : Math.max(2, s.t - 2.5);
+    const left = Math.min(Math.max(s.l, 2), 100 - 2);
+    card.style.left = left + "%";
+    card.style.top = top + "%";
+    card.style.transform = below ? "none" : "translateY(-100%)";
+    card.style.maxWidth = "calc(100% - " + left + "% - 12px)";
+  }
+
+  function render() {
+    const end = i >= total;
+    stage.classList.toggle("end", end);
+    $("counter").innerHTML = end ? "<b>Summary</b>" : `<b>${i + 1}</b> of ${total}`;
+    [...dots.children].forEach((d, n) => {
+      d.classList.toggle("done", n < i);
+      if (n === i) d.setAttribute("aria-current", "step"); else d.removeAttribute("aria-current");
+    });
+    $("prev").disabled = i === 0;
+    $("next").textContent = "";
+    $("next").insertAdjacentHTML("beforeend", end ? "Start again" : (i === total - 1 ? "Finish" : "Next") +
+      ' <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 3 5 5-5 5"/></svg>');
+    if (end) return;
+    const s = steps[i];
+    if (shot.getAttribute("src") !== s.img) {
+      // Swap directly and fade in on the element's own load event; a token guards against an
+      // earlier, slower load finishing after a later step was chosen.
+      const token = ++loadToken;
+      shot.classList.add("swap");
+      shot.src = s.img;
+      const reveal = () => { if (token === loadToken) shot.classList.remove("swap"); };
+      if (shot.complete && shot.naturalWidth) reveal();
+      else { shot.onload = reveal; shot.onerror = reveal; }
+      setTimeout(reveal, 4000); // never leave the frame blank on a stalled connection
+    }
+    shot.alt = `DocuBite screen: ${s.title}`;
+    Object.assign(spot.style, { left: s.spot.l + "%", top: s.spot.t + "%", width: s.spot.w + "%", height: s.spot.h + "%" });
+    $("cardTag").textContent = s.tag; $("cardTitle").textContent = s.title; $("cardBody").textContent = s.body;
+    $("mTag").textContent = s.tag; $("mTitle").textContent = s.title; $("mBody").textContent = s.body;
+    placeCard(s.spot);
+  }
+
+  function go(n) { i = Math.max(0, Math.min(total, n)); render(); try { localStorage.setItem("docubite-tour-step", String(i)); } catch (e) {} }
+  $("prev").addEventListener("click", () => go(i - 1));
+  $("next").addEventListener("click", () => go(i >= total ? 0 : i + 1));
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight") { e.preventDefault(); go(i >= total ? 0 : i + 1); }
+    if (e.key === "ArrowLeft") { e.preventDefault(); go(i - 1); }
+  });
+  // Preload the rest so steps don't flash.
+  steps.slice(1).forEach((s) => { const im = new Image(); im.src = s.img; });
+  render();
+</script>
+</body></html>

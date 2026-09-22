@@ -27,6 +27,7 @@
 
 import { prisma } from "@/lib/db"
 import { resolveGate } from "@/lib/gates/actions"
+import { isComparedLink, poLinkKind, rankPoLinks, REJECTED_MATCH_STATUS } from "@/lib/matching/po-link"
 import type { GateContext, GateRunner, GateVerdict } from "./types"
 import type { Prisma, PrismaClient, Gate, Document } from "@/prisma/client"
 
@@ -67,11 +68,19 @@ export type MatchVarianceDeps = {
 
 type FieldSnapshot = Record<string, unknown>
 
+function isValues(value: unknown): value is FieldSnapshot {
+  return !!value && typeof value === "object" && !Array.isArray(value)
+}
+
+/** The values the rule compares. An AP-inbound item carries them on `fieldSnapshot`; a document
+ * that came through extraction keeps its *template* there (an array of field definitions) and
+ * its values on `reviewedData` / `rawExtraction`, so those are read when the snapshot is not a
+ * value map (#250 — the gate has to fire for a real invoice, not only an ingestion item). */
 function readSnapshot(document: GateContext["document"]): FieldSnapshot {
-  const snapshot = document.fieldSnapshot
-  return snapshot && typeof snapshot === "object" && !Array.isArray(snapshot)
-    ? (snapshot as FieldSnapshot)
-    : {}
+  if (isValues(document.fieldSnapshot)) return document.fieldSnapshot
+  if (isValues(document.reviewedData)) return document.reviewedData
+  if (isValues(document.rawExtraction)) return document.rawExtraction
+  return {}
 }
 
 function readNumber(snapshot: FieldSnapshot, key: string): number | null {
@@ -180,15 +189,22 @@ export function createMatchVarianceGateRunner(deps: MatchVarianceDeps): GateRunn
  * pass-through). GRN is best-effort — a 3-way match requires both, but a bill that has PO
  * but no GRN is still a valid 2-way match. */
 async function findMatchLinksInDb(ctx: GateContext, client: PrismaLike = prisma): Promise<MatchLink | null> {
-  // po_to_invoice: source is PO, target is invoice.
-  const poMatch = await client.documentMatch.findFirst({
-    where: { workspaceId: ctx.workspaceId, targetId: ctx.documentId, matchType: "po_to_invoice" },
-    orderBy: { confidence: "desc" },
-    select: { sourceId: true, source: { select: { fieldSnapshot: true } } },
+  // po_to_invoice: source is PO, target is invoice. #228 Q11: only a *compared* link (confirmed,
+  // or the matcher's guess when the invoice cites the same PO number) anchors the gate — a
+  // suggestion the reviewer has not confirmed compares nothing, and a rejected link is gone.
+  const invoiceSnapshot = readSnapshot(ctx.document)
+  const invoicePoNumber = [invoiceSnapshot.po_number, invoiceSnapshot.purchase_order_number].find((value): value is string => typeof value === "string" && value.length > 0) ?? null
+  const poMatches = await client.documentMatch.findMany({
+    where: { workspaceId: ctx.workspaceId, targetId: ctx.documentId, matchType: "po_to_invoice", status: { not: REJECTED_MATCH_STATUS } },
+    select: { sourceId: true, status: true, confidence: true, source: { select: { fieldSnapshot: true, reviewedData: true, rawExtraction: true } } },
   })
+  const poMatch = rankPoLinks(poMatches.map((row) => {
+    const snapshot = readSnapshot(row.source as GateContext["document"])
+    const poNumber = typeof snapshot.po_number === "string" && snapshot.po_number.length ? snapshot.po_number : null
+    return { row, confidence: row.confidence, kind: poLinkKind({ status: row.status, invoicePoNumber, poNumber }) }
+  })).filter((link) => isComparedLink(link.kind))[0]?.row
   if (!poMatch) return null
-  const poSnapshot = (poMatch.source?.fieldSnapshot && typeof poMatch.source.fieldSnapshot === "object" && !Array.isArray(poMatch.source.fieldSnapshot))
-    ? (poMatch.source.fieldSnapshot as FieldSnapshot) : {}
+  const poSnapshot = readSnapshot(poMatch.source as GateContext["document"])
   const poTotalRaw = poSnapshot.total ?? poSnapshot.amount
   const poTotal = typeof poTotalRaw === "number" ? poTotalRaw
     : typeof poTotalRaw === "string" ? Number(poTotalRaw.replace(/[,\s]/g, "")) : NaN
@@ -198,13 +214,12 @@ async function findMatchLinksInDb(ctx: GateContext, client: PrismaLike = prisma)
   const grnMatch = await client.documentMatch.findFirst({
     where: { workspaceId: ctx.workspaceId, sourceId: ctx.documentId, matchType: "invoice_to_receipt" },
     orderBy: { confidence: "desc" },
-    select: { targetId: true, target: { select: { fieldSnapshot: true } } },
+    select: { targetId: true, target: { select: { fieldSnapshot: true, reviewedData: true, rawExtraction: true } } },
   })
   let grnDocumentId: string | undefined
   let grnTotal: number | undefined
   if (grnMatch) {
-    const grnSnapshot = (grnMatch.target?.fieldSnapshot && typeof grnMatch.target.fieldSnapshot === "object" && !Array.isArray(grnMatch.target.fieldSnapshot))
-      ? (grnMatch.target.fieldSnapshot as FieldSnapshot) : {}
+    const grnSnapshot = readSnapshot(grnMatch.target as GateContext["document"])
     const grnRaw = grnSnapshot.total ?? grnSnapshot.amount
     const parsed = typeof grnRaw === "number" ? grnRaw
       : typeof grnRaw === "string" ? Number(grnRaw.replace(/[,\s]/g, "")) : NaN
@@ -257,7 +272,7 @@ export async function reevaluateMatchVarianceForDocument(
 
   const doc = await client.document.findUnique({
     where: { id: input.documentId },
-    select: { id: true, workspaceId: true, docType: true, fieldSnapshot: true, receivedAt: true },
+    select: { id: true, workspaceId: true, docType: true, fieldSnapshot: true, reviewedData: true, rawExtraction: true, receivedAt: true },
   })
   if (!doc) return { outcome: "no-op" }
   const verdict = await matchVarianceGateRunner.run({

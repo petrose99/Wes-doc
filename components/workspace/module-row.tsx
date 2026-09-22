@@ -2,6 +2,7 @@
 
 import { disableModuleAction, enableModuleAction, requestModuleAction } from "@/app/(app)/workspaces/[workspaceId]/module-actions"
 import { Button } from "@/components/ui/button"
+import { Switch } from "@/components/ui/switch"
 import { useState, useTransition } from "react"
 import { toast } from "sonner"
 
@@ -26,14 +27,15 @@ export function ModuleRow({ workspaceId, moduleKey, name, description, kind, ena
   const [checked, setChecked] = useState(enabled)
   const [requested, setRequested] = useState(Boolean(requestedBy) && !enabled)
   const [pending, startTransition] = useTransition()
+  const [announce, setAnnounce] = useState("")
 
-  const toggle = () => {
+  const toggle = (next: boolean) => {
     if (!owner) return
-    const next = !checked
     setChecked(next)
     startTransition(async () => {
       const result = next ? await enableModuleAction(workspaceId, moduleKey) : await disableModuleAction(workspaceId, moduleKey)
-      if (!result.success) { setChecked(!next); toast.error(result.error || "Could not change that module") }
+      if (!result.success) { setChecked(!next); setAnnounce(`Couldn't turn ${name} ${next ? "on" : "off"} — ${result.error || "the server didn't say why"}.`) }
+      else setAnnounce(`${name} is ${next ? "on" : "off"}.`)
     })
   }
 
@@ -42,30 +44,28 @@ export function ModuleRow({ workspaceId, moduleKey, name, description, kind, ena
     startTransition(async () => {
       const result = await requestModuleAction(workspaceId, moduleKey)
       if (!result.success) { setRequested(false); toast.error(result.error || "Could not send that request") }
-      else toast.success("Request sent to the workspace owner")
+      else toast.success("Request sent to the owner")
     })
   }
 
-  return <div className="flex items-start justify-between gap-4 border-b py-3 last:border-0">
+  return <div className="flex items-start justify-between gap-4 py-3 first:pt-0">
     <div className="min-w-0">
       <div className="flex items-center gap-2">
         <span className="font-medium text-slate-900">{name}</span>
-        {kind === "optional" && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">Optional</span>}
+        {kind === "optional" && <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-700">Optional</span>}
         {requestedBy && !enabled && <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs text-indigo-800">Requested by {requestedBy.name}</span>}
       </div>
-      <p className="text-sm text-muted-foreground">{description}</p>
+      <p className="max-w-[60ch] text-[13px] text-slate-600">{description}</p>
     </div>
-    <div className="shrink-0">
+    <div className="flex shrink-0 flex-col items-end gap-1">
+      <span aria-live="polite" className={`text-xs ${announce.startsWith("Couldn't") ? "text-red-700" : "text-emerald-800"}`}>{announce}</span>
       {owner
         ? (kind === "default" || activation === "enable"
-          ? <button type="button" disabled={pending} onClick={toggle}
-              className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${checked ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-500"}`}>
-              {checked ? "On" : "Off"}
-            </button>
-          : <span className="text-xs text-slate-500">Request-only</span>)
+          ? <Switch checked={checked} onCheckedChange={toggle} label={name} busy={pending} />
+          : <span className="text-xs text-slate-600">Request-only</span>)
         : (activation === "request"
           ? <Button size="sm" variant="outline" disabled={pending || requested} onClick={request}>{requested ? "Requested" : "Request"}</Button>
-          : <span className="text-xs text-slate-500">{checked ? "Enabled" : "Disabled"}</span>)}
+          : <span className="text-xs text-slate-600">{checked ? "On" : "Off"}</span>)}
     </div>
   </div>
 }

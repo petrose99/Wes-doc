@@ -23,7 +23,7 @@ function receiptSummary(document: { reviewedData: unknown }): { merchant: string
  * claim, optionally routed through an ApprovalWorkflow (Phase 3 WP3.1/3.2) the same way a
  * ReviewTask can be. Everyone with the module can see every claim (approving someone else's claim
  * requires seeing it), but only the submitter or an owner can create/submit/delete their own. */
-export default async function ExpenseClaimsPage({ params }: { params: Promise<{ workspaceId: string }> }) {
+export async function ExpenseClaimsPage({ params }: { params: Promise<{ workspaceId: string }> }) {
   const { workspaceId } = await params
   const user = await getCurrentUser()
   const membership = await requireWorkspaceRole(workspaceId, user.id)
@@ -87,4 +87,10 @@ export default async function ExpenseClaimsPage({ params }: { params: Promise<{ 
       </CardContent>
     </Card>
   </main>
+}
+
+/** #273 S6: the standalone Expenses page is closed — claims are created on Receipts and decided
+ * on Approvals › Expense claims. `ExpenseClaimsPage` stays unreferenced pending #274's sign-off. */
+export default async function LegacyExpensesPage() {
+  notFound()
 }

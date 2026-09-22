@@ -1,32 +1,27 @@
 "use client"
 
 import { LineItemsEditor } from "@/components/documents/line-items-editor"
-import type { DocumentFieldDefinition } from "@/lib/document-templates"
+import { CheckGlyph, RationalePopover, SOURCE_BADGE } from "@/components/pipeline/document-detail/rationale-popover"
+import { useBillReadOnly } from "@/components/pipeline/document-detail/bill-pane"
+import type { FieldCheck } from "@/components/pipeline/document-detail/check-types"
+import type { ConfiguredFieldDefinition } from "@/lib/configuration/field-table"
 import type { FieldRationale } from "@/lib/rationale"
 import type { Ref } from "@/lib/provenance"
-import { BookOpen, Bot, Crosshair, Info, Pencil, Sparkles, X } from "lucide-react"
-import { useState } from "react"
+import { Crosshair, Pencil } from "lucide-react"
+import { useRef, useState } from "react"
 
 const LOW_CONFIDENCE = 0.6
 
-const SOURCE_BADGE: Record<string, { label: string; className: string; icon: typeof Sparkles }> = {
-  rule: { label: "Rule", className: "bg-blue-50 text-blue-700 border-blue-200", icon: BookOpen },
-  ai: { label: "AI", className: "bg-indigo-50 text-indigo-700 border-indigo-200", icon: Bot },
-  // Phase 3: vendor history — visually distinct from AI (green ✅ for "we're sure") vs indigo bot
-  // ("model best guess") vs rule ("a person authored this"). Same Sparkles icon as few_shot since
-  // both signal "learned from prior data" — the color separates the two.
-  history: { label: "History", className: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: Sparkles },
-  few_shot: { label: "Learned", className: "bg-purple-50 text-purple-700 border-purple-200", icon: Sparkles },
-  extraction: { label: "Extracted", className: "bg-slate-50 text-slate-600 border-slate-200", icon: Info },
-}
-
-export function FieldRow({ field, value, confidence, ref: provenanceRef, onFocusSource, rationale, registerNav, isCurrent, isCompleted }: {
-  field: DocumentFieldDefinition
+export function FieldRow({ field, value, confidence, ref: provenanceRef, onFocusSource, rationale, checks = [], onEscalate, registerNav, isCurrent, isCompleted }: {
+  /** #252: `readOnly` comes from Admin › Configuration › Fields (not editable). */
+  field: ConfiguredFieldDefinition
   value: unknown
   confidence: number | null
   ref: Ref | null
   onFocusSource: (target: { page: number; bbox: Ref["bbox"]; quote: string }) => void
   rationale?: FieldRationale | null
+  checks?: FieldCheck[]
+  onEscalate?: (check: FieldCheck) => void
   /** A4.1: registers the row's wrapper with use-field-nav so the reviewer can jump straight
    * to the lowest-confidence field. Optional so other callers of FieldRow don't have to know
    * about the navigator. */
@@ -36,13 +31,28 @@ export function FieldRow({ field, value, confidence, ref: provenanceRef, onFocus
 }) {
   const lowConfidence = typeof confidence === "number" && confidence < LOW_CONFIDENCE
   const isArray = field.type === "array"
+  // #362 close: `useBillReadOnly()` defaults to `false` outside a `BillReadOnlyContext.Provider`
+  // (non-bill callers unaffected). Every other cell in the Bill sections gates on it (B4) with
+  // `disabled` (removed from the tab order) — this generic field list (vendor, address, etc.)
+  // didn't gate on it at all, leaving a Paid/Cancelled/Touchless document's legacy fields
+  // keyboard-focusable and editable (evaluate P0, keyboard.json `bill-readonly-tab-walk`).
+  // Kept as its own flag rather than folded into `readOnly` below: the admin-configured
+  // `field.readOnly` (#252) intentionally keeps the field focusable (HTML `readOnly`, not
+  // `disabled`) so a reviewer can still tab to and read the value — the Bill-lock case must
+  // remove it from the tab order the same way the sibling line-item/date cells do.
+  const billReadOnly = useBillReadOnly()
+  const readOnly = field.readOnly === true
+  const readOnlyTitle = "Not editable — set under Admin › Configuration › Fields"
+  const billLockedTitle = "Not editable — this document is locked"
   const [showPopover, setShowPopover] = useState(false)
+  const inputRef = useRef<HTMLInputElement | HTMLSelectElement>(null)
+  const checkDescriptionId = `${field.key}-check-description`
 
   if (isArray) {
     return <div className="pt-2">
       {field.itemFields?.length
-        ? <LineItemsEditor fieldKey={field.key} itemFields={field.itemFields} initialRows={Array.isArray(value) ? value as Array<Record<string, unknown>> : []} />
-        : <textarea id={field.key} name={field.key} defaultValue={Array.isArray(value) ? JSON.stringify(value) : ""} placeholder="JSON array" className="min-h-24 w-full rounded-lg border border-slate-200 bg-slate-50/50 px-3 py-2 font-mono text-sm" />}
+        ? <LineItemsEditor fieldKey={field.key} itemFields={field.itemFields} initialRows={Array.isArray(value) ? value as Array<Record<string, unknown>> : []} checks={checks} onEscalate={onEscalate} readOnly={billReadOnly} />
+        : <textarea id={field.key} name={field.key} defaultValue={Array.isArray(value) ? JSON.stringify(value) : ""} placeholder="JSON array" readOnly={billReadOnly} title={billReadOnly ? billLockedTitle : undefined} className="min-h-24 w-full rounded-lg border border-slate-200 bg-slate-50/50 px-3 py-2 font-mono text-sm read-only:bg-slate-100 read-only:text-slate-600" />}
     </div>
   }
 
@@ -56,9 +66,11 @@ export function FieldRow({ field, value, confidence, ref: provenanceRef, onFocus
     className={`group relative rounded-lg transition-colors ${lowConfidence ? "bg-amber-50/80 ring-1 ring-amber-200" : ""} ${isCurrent ? "outline outline-2 outline-emerald-400" : ""} ${isCompleted ? "opacity-70" : ""}`}>
     <div className="flex items-center gap-2 px-1 pb-1">
       <label htmlFor={field.key} className="text-xs font-medium text-slate-500">
-        {field.label}{field.required && <span className="ml-0.5 text-red-400">*</span>}
+        {field.label}{field.required && <span className="ml-0.5 text-red-600" aria-hidden>*</span>}{field.required && <span className="sr-only"> (required)</span>}
       </label>
+      {readOnly && <span className="rounded bg-slate-100 px-1.5 py-px text-[10px] font-semibold text-slate-700" title={readOnlyTitle}>Read-only</span>}
       {lowConfidence && <span className="rounded-full bg-amber-100 px-1.5 py-px text-[10px] font-semibold text-amber-700">Low confidence</span>}
+      <CheckGlyph checks={checks} onOpen={() => setShowPopover(true)} />
       {badge && <button type="button" onClick={() => setShowPopover(!showPopover)}
         className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-px text-[10px] font-semibold transition-opacity ${badge.className}`}>
         <badge.icon className="h-2.5 w-2.5" />{badge.label}
@@ -76,68 +88,25 @@ export function FieldRow({ field, value, confidence, ref: provenanceRef, onFocus
       )}
     </div>
 
-    {showPopover && rationale && <RationalePopover rationale={rationale} onClose={() => setShowPopover(false)} />}
+    {/* hidden, not sr-only: an aria-describedby target is read even when display:none, and a
+        positioned sr-only span inside the pane's scroller reads as a clipped child to the detector. */}
+    {checks.length > 0 && <span id={checkDescriptionId} hidden>{checks.map((check) => check.stale ? `${check.message} Not rechecked after this edit.` : check.message).join(" ")}</span>}
+    {showPopover && (rationale || checks.length > 0) && <RationalePopover rationale={rationale} mismatchChecks={checks} onClose={() => setShowPopover(false)} onFix={() => inputRef.current?.focus()} onEscalate={onEscalate} />}
 
     {field.type === "boolean" ? (
-      <label className="flex items-center gap-2 px-1 pb-1 text-sm text-slate-700"><input id={field.key} name={field.key} type="checkbox" className="h-4 w-4 rounded accent-emerald-600" value="true" defaultChecked={value === true} />Yes</label>
+      <label className="flex items-center gap-2 px-1 pb-1 text-sm text-slate-700"><input ref={inputRef as React.RefObject<HTMLInputElement>} id={field.key} name={field.key} type="checkbox" aria-describedby={checks.length ? checkDescriptionId : undefined} className="h-4 w-4 rounded accent-emerald-600" value="true" defaultChecked={value === true} disabled={readOnly || billReadOnly} title={billReadOnly && !readOnly ? billLockedTitle : undefined} />Yes</label>
     ) : field.type === "enum" ? (
-      <select id={field.key} name={field.key} defaultValue={typeof value === "string" ? value : ""} className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 transition-colors focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100">
+      <select ref={inputRef as React.RefObject<HTMLSelectElement>} id={field.key} name={field.key} aria-describedby={checks.length ? checkDescriptionId : undefined} defaultValue={typeof value === "string" ? value : ""} disabled={readOnly || billReadOnly} title={readOnly ? readOnlyTitle : billReadOnly ? billLockedTitle : undefined} className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 transition-colors focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100 disabled:bg-slate-50 disabled:text-slate-600">
         <option value="">Select a value</option>
         {field.options?.map((option) => <option key={option} value={option}>{option}</option>)}
       </select>
     ) : (
-      <input id={field.key} name={field.key}
+      <input ref={inputRef as React.RefObject<HTMLInputElement>} id={field.key} name={field.key} aria-describedby={checks.length ? checkDescriptionId : undefined}
         type={field.type === "number" ? "number" : field.type === "date" ? "date" : "text"}
         step={field.type === "number" ? "any" : undefined}
         defaultValue={typeof value === "string" || typeof value === "number" ? String(value) : ""}
-        className={`h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 shadow-sm transition-colors placeholder:text-slate-300 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100 ${field.type === "number" ? "tabular-nums" : ""}`} />
+        readOnly={readOnly} disabled={billReadOnly} aria-readonly={readOnly || undefined} title={readOnly ? readOnlyTitle : billReadOnly ? billLockedTitle : undefined}
+        className={`h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 shadow-sm transition-colors placeholder:text-slate-300 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100 read-only:bg-slate-50 read-only:text-slate-600 disabled:bg-slate-50 disabled:text-slate-600 ${field.type === "number" ? "tabular-nums" : ""}`} />
     )}
-  </div>
-}
-
-function RationalePopover({ rationale, onClose }: { rationale: FieldRationale; onClose: () => void }) {
-  const badge = SOURCE_BADGE[rationale.source]!
-  const confidencePct = rationale.confidence !== null ? `${(rationale.confidence * 100).toFixed(0)}%` : null
-
-  return <div className="absolute left-0 right-0 top-full z-20 mt-1 rounded-lg border border-slate-200 bg-white p-3 shadow-lg">
-    <div className="mb-2 flex items-center justify-between">
-      <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold ${badge.className}`}>
-        <badge.icon className="h-3 w-3" />{badge.label}
-      </span>
-      <button type="button" onClick={onClose} className="rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
-        <X className="h-3.5 w-3.5" />
-      </button>
-    </div>
-
-    <dl className="space-y-1.5 text-xs">
-      {confidencePct && <div className="flex items-center gap-2">
-        <dt className="font-medium text-slate-500">Confidence</dt>
-        <dd className={`font-semibold ${rationale.confidence! >= 0.8 ? "text-emerald-700" : rationale.confidence! >= 0.6 ? "text-amber-700" : "text-red-700"}`}>{confidencePct}</dd>
-      </div>}
-
-      {rationale.source === "rule" && rationale.ruleName && <div className="flex items-center gap-2">
-        <dt className="font-medium text-slate-500">Rule</dt>
-        <dd className="text-slate-700">{rationale.ruleName}</dd>
-      </div>}
-
-      {rationale.source === "ai" && rationale.aiRationale && <div>
-        <dt className="font-medium text-slate-500">AI reasoning</dt>
-        <dd className="mt-0.5 rounded bg-indigo-50 px-2 py-1 text-slate-700">{rationale.aiRationale}</dd>
-      </div>}
-
-      {rationale.source === "few_shot" && rationale.correctionExample && <div>
-        <dt className="font-medium text-slate-500">Learned from correction</dt>
-        <dd className="mt-0.5 rounded bg-purple-50 px-2 py-1 text-slate-700">
-          <span className="line-through text-slate-400">{rationale.correctionExample.wrongValue}</span>
-          <span className="mx-1 text-slate-400">&rarr;</span>
-          <span className="font-medium">{rationale.correctionExample.correctedValue}</span>
-        </dd>
-      </div>}
-
-      {rationale.provenanceQuote && <div>
-        <dt className="font-medium text-slate-500">Source text</dt>
-        <dd className="mt-0.5 rounded bg-slate-50 px-2 py-1 italic text-slate-600">&ldquo;{rationale.provenanceQuote}&rdquo;</dd>
-      </div>}
-    </dl>
   </div>
 }

@@ -2,10 +2,16 @@
 
 import { globalSearchAction, type GlobalSearchResult } from "@/app/(app)/workspaces/[workspaceId]/search-actions"
 import type { SearchResultItem } from "@/lib/global-search"
-import { FileText, Loader2, Search, Sparkles, X } from "lucide-react"
+import { documentDestinationPath } from "@/lib/typed-destinations"
+import { FileText, Loader2, Search, X } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useCallback, useEffect, useRef, useState } from "react"
+
+// Same Tab/Shift+Tab cycle as components/ui/dialog.tsx — this panel predates that shared
+// component and has a bespoke layout (search input + results list, not a title/description
+// card), so the trap is duplicated here rather than reshaping it to fit Dialog's children slot.
+const FOCUSABLE = "a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex=\"-1\"])"
 
 export function GlobalSearch({ workspaceId }: { workspaceId: string }) {
   const [open, setOpen] = useState(false)
@@ -13,6 +19,8 @@ export function GlobalSearch({ workspaceId }: { workspaceId: string }) {
   const [result, setResult] = useState<GlobalSearchResult | null>(null)
   const [loading, setLoading] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+  const openerRef = useRef<Element | null>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const router = useRouter()
 
@@ -29,7 +37,27 @@ export function GlobalSearch({ workspaceId }: { workspaceId: string }) {
   }, [])
 
   useEffect(() => {
-    if (open) setTimeout(() => inputRef.current?.focus(), 50)
+    if (!open) return
+    openerRef.current = typeof document !== "undefined" ? document.activeElement : null
+    setTimeout(() => inputRef.current?.focus(), 50)
+
+    const onTab = (e: KeyboardEvent) => {
+      if (e.key !== "Tab") return
+      const container = panelRef.current
+      if (!container) return
+      const focusables = Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE))
+      if (focusables.length === 0) return
+      const first = focusables[0]
+      const last = focusables[focusables.length - 1]
+      const active = document.activeElement as HTMLElement | null
+      if (e.shiftKey && (active === first || !container.contains(active))) { e.preventDefault(); last.focus() }
+      else if (!e.shiftKey && active === last) { e.preventDefault(); first.focus() }
+    }
+    window.addEventListener("keydown", onTab)
+    return () => {
+      window.removeEventListener("keydown", onTab)
+      if (openerRef.current instanceof HTMLElement) openerRef.current.focus()
+    }
   }, [open])
 
   const search = useCallback((q: string) => {
@@ -74,7 +102,11 @@ export function GlobalSearch({ workspaceId }: { workspaceId: string }) {
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh] bg-black/40" onClick={close}>
       <div
-        className="flex max-h-[60vh] w-full max-w-xl flex-col rounded-2xl border border-[#e6ebf1] bg-white shadow-2xl"
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Search documents"
+        className="flex max-h-[60vh] w-full max-w-xl flex-col rounded-2xl border border-hairline bg-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-3 border-b px-4 py-3 focus-within:bg-emerald-50/40">
@@ -90,7 +122,7 @@ export function GlobalSearch({ workspaceId }: { workspaceId: string }) {
             className="flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
           />
           {loading && <Loader2 className="h-4 w-4 animate-spin text-slate-400" />}
-          <button onClick={close} className="rounded p-1 text-slate-400 hover:text-slate-600">
+          <button type="button" onClick={close} aria-label="Close search" className="rounded p-1 text-slate-400 hover:text-slate-600">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -141,16 +173,10 @@ export function GlobalSearch({ workspaceId }: { workspaceId: string }) {
               {result ? `${result.total} result${result.total === 1 ? "" : "s"}` : ""}
             </span>
             {query.trim() && (
-              <>
-                <button
-                  onClick={() => { close(); router.push(`/workspaces/${workspaceId}/search?q=${encodeURIComponent(query)}`) }}
-                  className="font-medium text-slate-500 hover:text-slate-700"
-                >See all</button>
-                <button
-                  onClick={() => { close(); router.push(`/workspaces/${workspaceId}/search?q=${encodeURIComponent(query)}&ask=1`) }}
-                  className="inline-flex items-center gap-1 font-medium text-emerald-600 hover:text-emerald-700"
-                ><Sparkles className="h-3 w-3" />Ask AI</button>
-              </>
+              <button
+                onClick={() => { close(); router.push(`/workspaces/${workspaceId}/search?q=${encodeURIComponent(query)}`) }}
+                className="font-medium text-slate-500 hover:text-slate-700"
+              >See all</button>
             )}
           </div>
           <span>
@@ -165,7 +191,7 @@ export function GlobalSearch({ workspaceId }: { workspaceId: string }) {
 function SearchDocItem({ item, workspaceId, onClick }: { item: SearchResultItem; workspaceId: string; onClick: () => void }) {
   return (
     <Link
-      href={`/workspaces/${workspaceId}/pipeline?doc=${item.documentId}`}
+      href={documentDestinationPath(`/workspaces/${workspaceId}`, { id: item.documentId, docType: item.docType })}
       onClick={onClick}
       className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-slate-50"
     >
@@ -184,9 +210,14 @@ function SearchDocItem({ item, workspaceId, onClick }: { item: SearchResultItem;
 }
 
 function SearchSnippetItem({ item, workspaceId, onClick }: { item: SearchResultItem; workspaceId: string; onClick: () => void }) {
+  // #249: this used to link to `/pipeline?doc=&page=`, but PipelinePage's searchParams
+  // (stage/q/flagged only) never read either param — the page target was already dead. The typed
+  // destination at least opens the right document; jumping straight to the matched page is #225's
+  // embedded pane not accepting searchParams at all (`getQueueDetailAction` always passes `{}`),
+  // a separate gap this ticket doesn't carry a decision to close.
   return (
     <Link
-      href={`/workspaces/${workspaceId}/pipeline?doc=${item.documentId}${item.page != null ? `&page=${item.page}` : ""}`}
+      href={documentDestinationPath(`/workspaces/${workspaceId}`, { id: item.documentId, docType: item.docType })}
       onClick={onClick}
       className="block px-4 py-2.5 transition-colors hover:bg-slate-50"
     >

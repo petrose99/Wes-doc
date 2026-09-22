@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
   try {
     await requireWorkspaceRole(state.workspaceId, state.userId, ["owner"])
   } catch {
-    return new Response("You no longer have access to this workspace", { status: 403 })
+    return new Response("You no longer have access to this company", { status: 403 })
   }
 
   const redirectUri = `${config.app.baseURL}/api/integrations/xero/callback`

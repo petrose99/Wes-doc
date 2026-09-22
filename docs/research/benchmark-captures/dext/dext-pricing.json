@@ -1,0 +1,373 @@
+{
+ "slug": "dext-pricing",
+ "label": "Dext business pricing (en)",
+ "url": "https://dext.com/en/business/pricing",
+ "accessed": "2026-09-19T12:18:20.927Z",
+ "views": {
+  "390": {
+   "status": 200,
+   "shot": "/home/ubuntu/Dev/Wes-doc/docs/research/benchmark-captures/dext/dext-pricing-390.png",
+   "initialMotion": {
+    "opacityZeroEls": 0,
+    "animations": {
+     "pulsar 2s 5": 1,
+     "fadein 0.35s 1": 9
+    },
+    "transitionEls": 65,
+    "total": 1021
+   },
+   "errors": [
+    "overlaysHidden=2"
+   ],
+   "title": "Dext Pricing | Plans for Every Business | Dext",
+   "h1": "Dext Pricing",
+   "subhead": null,
+   "headings": [
+    {
+     "tag": "H1",
+     "text": "Dext Pricing",
+     "top": 92
+    },
+    {
+     "tag": "H2",
+     "text": "With Dext, you can:",
+     "top": 4409
+    }
+   ],
+   "sections": [
+    {
+     "top": 60,
+     "height": 6937,
+     "heading": "Dext Pricing",
+     "imgs": 15,
+     "svgs": 30,
+     "videos": 0,
+     "ctas": [
+      "Start a free trial",
+      "Businesses",
+      "Accounting & bookkeeping firms",
+      "Start a free trial"
+     ],
+     "textLen": 2835,
+     "snippet": "Start a free trial Dext Pricing Businesses Accounting & bookkeeping firms 🌍 Rest of the World 🇪🇺 European Union 🇬🇧 United Kingdom 🇺🇸 USA 🇦🇺 APAC 🇨🇦 Canada 🇿🇦 South Africa 🇮🇪 Ireland Monthly Annual Up to 20"
+    },
+    {
+     "top": 60,
+     "height": 784,
+     "heading": "",
+     "imgs": 0,
+     "svgs": 7,
+     "videos": 0,
+     "ctas": [
+      "For Businesses",
+      "For Accountants & Bookkeepers",
+      "Pricing",
+      "Resources",
+      "Start a free trial",
+      "Log in"
+     ],
+     "textLen": 95,
+     "snippet": "For Businesses For Accountants & Bookkeepers Pricing Resources Start a free trial Log in Retour"
+    },
+    {
+     "top": 0,
+     "height": 844,
+     "heading": "",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 0,
+     "snippet": ""
+    }
+   ],
+   "navLinks": [
+    "Start a free trial"
+   ],
+   "heroCtas": [
+    {
+     "text": "Businesses",
+     "tag": "A",
+     "href": "/business/pricing"
+    },
+    {
+     "text": "Accounting & bookkeeping firms",
+     "tag": "A",
+     "href": "/partner/pricing"
+    },
+    {
+     "text": "Start a free trial",
+     "tag": "A",
+     "href": "https://app.dext.com/en/signups"
+    },
+    {
+     "text": "For Businesses",
+     "tag": "BUTTON",
+     "href": null
+    },
+    {
+     "text": "For Accountants & Bookkeepers",
+     "tag": "BUTTON",
+     "href": null
+    },
+    {
+     "text": "Pricing",
+     "tag": "BUTTON",
+     "href": null
+    },
+    {
+     "text": "Resources",
+     "tag": "BUTTON",
+     "href": null
+    },
+    {
+     "text": "Start a free trial",
+     "tag": "A",
+     "href": "https://app.dext.com/en/signups"
+    },
+    {
+     "text": "Log in",
+     "tag": "A",
+     "href": "https://app.dext.com/login/"
+    },
+    {
+     "text": "Retour",
+     "tag": "BUTTON",
+     "href": null
+    }
+   ],
+   "bigImgs": [],
+   "imgCount": 14,
+   "logoish": 0,
+   "videos": [],
+   "canvases": 1,
+   "lotties": 0,
+   "iframes": [
+    "https://app-eu1.hubspot.com/conversations-visitor/1614934/threads/utk/4a382ef72d0a488786f90e7e3bdae29c?uuid=47c1f830df90"
+   ],
+   "fonts": [
+    [
+     "Roboto",
+     451
+    ],
+    [
+     "Inter",
+     54
+    ]
+   ],
+   "sectionBgs": [
+    [
+     "rgb(255, 255, 255)",
+     1
+    ],
+    [
+     "rgb(255, 205, 179)",
+     1
+    ]
+   ],
+   "buttonBgs": [
+    [
+     "rgb(12, 35, 64)",
+     3
+    ],
+    [
+     "rgb(0, 0, 0)",
+     1
+    ],
+    [
+     "rgb(195, 203, 213)",
+     1
+    ]
+   ],
+   "type": {
+    "h1": {
+     "family": "Inter, \"Inter Fallback\"",
+     "size": "32px",
+     "weight": "900",
+     "lineHeight": "36.8px",
+     "letterSpacing": "-0.96px",
+     "color": "rgb(0, 0, 0)"
+    },
+    "h2": {
+     "family": "Inter, \"Inter Fallback\"",
+     "size": "30px",
+     "weight": "900"
+    },
+    "body": {
+     "family": "\"Times New Roman\"",
+     "size": "16px",
+     "color": "rgb(0, 0, 0)",
+     "bg": "rgba(0, 0, 0, 0)"
+    }
+   },
+   "motionAfterScroll": {
+    "animations": {
+     "pulsar 2s 5": 1
+    },
+    "opacityZeroEls": 1,
+    "transitionEls": 77,
+    "stickyFixedEls": 11
+   },
+   "libs": {
+    "gsap": false,
+    "framer": false,
+    "webflow": false,
+    "lottie": false,
+    "splide_swiper": false,
+    "rive": false,
+    "nextjs": true,
+    "wordpress": false,
+    "hubspot": true
+   },
+   "wordCount": 460,
+   "scrollHeight": 6997,
+   "bodyText": "Start a free trial Dext Pricing Businesses Accounting & bookkeeping firms 🌍 Rest of the World 🇪🇺 European Union 🇬🇧 United Kingdom 🇺🇸 USA 🇦🇺 APAC 🇨🇦 Canada 🇿🇦 South Africa 🇮🇪 Ireland Monthly Annual Up to 20% cheaper with an annual subscription $25.21 Per Month USD, Excludes VAT , $302.50 billed annually 250 Documents Per Month 5 Users Drag slider to increase allowance Start a free trial Free credits included 10 Sheets of Bank Statement Extraction ? 5 Documents with Line item Extraction ? 5 Supplier Statement Extraction ? Looking to set up more than 5 business entities on Dext? Get in touch with us to discuss bespoke pricing options → Add-ons AI Assist Save time by using our bookkeeping AI agent to automate the everyday bookkeeping decisions that slow you down. $10.5 per month until 31 October Commerce Lite Bring your online sales data together. Connect to up to 5 e-commerce platforms and automatically import transactions. From $7.50 per month Payments Simplify business payments. Pay invoices, payroll and expenses all from within Dext. Coming soon Vault Securely store all essential business documents in one place, Dext’s AI will organise them intelligently. Free for up to 100MB of storage. Additional storage from $4 per month Line Item Extraction Automatically extract detailed line items from receipts and invoices. From $20.50 per month Or pay-as-you-go from $0.50/document Supplier Statement Extraction Upload supplier statements and Dext checks that every invoice and credit note lines up. Gaps and duplicates get flagged before they reach your books. From $20.50 per month Or pay-as-you-go from $0.50/document Bank Statement Extraction Extract information from PDF bank statements automatically. From $13.00 per month Or pay-as-you-go from $0.32/document With Dext, you can: Snap, upload, and manage receipts and invoices on the go. Boost productivity with smart automation. No more manual data entry. Easily submit and approve expenses, all in one place. Ditch the paperwork and enjoy secure digital storage. Sync seamlessly with your accounting software. FAQs What’s included in each Dext business plan? How does Dext charge for users and documents? Is there a free trial available? Can I upgrade, downgrade, or cancel my subscription at any time? Are there discounts for annual billing? Do you offer custom pricing for large or growing businesses? What payment methods do you accept? Is Dext suitable for businesses with multiple entities or locations? What happens if I exceed my document limit? Products Sectors Resources Support 🌍 Rest of the World 🇦🇺 APAC 🇨🇦 Canada 🇬🇧 United Kingdom 🇺🇸 USA 🇫🇷 France 🇨🇦 French Canada 🇿🇦 South Africa Trust Center Terms and conditions Cookie Policy Website use Diversity statement Privacy policy Modern slavery statement Dext © Copyright 2026 For Businesses For Accountants & Bookkeepers Pricing Resources Start a free trial Log in Retour"
+  },
+  "1440": {
+   "status": 200,
+   "shot": "/home/ubuntu/Dev/Wes-doc/docs/research/benchmark-captures/dext/dext-pricing-1440.png",
+   "initialMotion": {
+    "opacityZeroEls": 0,
+    "animations": {
+     "pulsar 2s 5": 1,
+     "fadein 0.35s 1": 9
+    },
+    "transitionEls": 65,
+    "total": 1021
+   },
+   "errors": [
+    "overlaysHidden=1"
+   ],
+   "title": "Dext Pricing | Plans for Every Business | Dext",
+   "h1": "Dext Pricing",
+   "subhead": null,
+   "headings": [
+    {
+     "tag": "H1",
+     "text": "Dext Pricing",
+     "top": 144
+    },
+    {
+     "tag": "H2",
+     "text": "With Dext, you can:",
+     "top": 2377
+    }
+   ],
+   "sections": [
+    {
+     "top": 88,
+     "height": 4077,
+     "heading": "Dext Pricing",
+     "imgs": 15,
+     "svgs": 30,
+     "videos": 0,
+     "ctas": [
+      "Start a free trial",
+      "Log in",
+      "Businesses",
+      "Accounting & bookkeeping firms",
+      "Start a free trial"
+     ],
+     "textLen": 3334,
+     "snippet": "For Businesses For Accountants & Bookkeepers Pricing Resources Start a free trial Log in Dext Pricing Businesses Accounting & bookkeeping firms 🌍 Rest of the World 🇪🇺 European Union 🇬🇧 United Kingdom 🇺🇸 USA 🇦🇺 A"
+    }
+   ],
+   "navLinks": [
+    "Start a free trial",
+    "Log in"
+   ],
+   "heroCtas": [
+    {
+     "text": "Businesses",
+     "tag": "A",
+     "href": "/business/pricing"
+    },
+    {
+     "text": "Accounting & bookkeeping firms",
+     "tag": "A",
+     "href": "/partner/pricing"
+    }
+   ],
+   "bigImgs": [],
+   "imgCount": 14,
+   "logoish": 0,
+   "videos": [],
+   "canvases": 1,
+   "lotties": 0,
+   "iframes": [],
+   "fonts": [
+    [
+     "Roboto",
+     490
+    ],
+    [
+     "Inter",
+     46
+    ]
+   ],
+   "sectionBgs": [
+    [
+     "rgb(255, 255, 255)",
+     1
+    ],
+    [
+     "rgb(255, 205, 179)",
+     1
+    ]
+   ],
+   "buttonBgs": [
+    [
+     "rgb(12, 35, 64)",
+     3
+    ],
+    [
+     "rgb(195, 203, 213)",
+     1
+    ]
+   ],
+   "type": {
+    "h1": {
+     "family": "Inter, \"Inter Fallback\"",
+     "size": "60px",
+     "weight": "900",
+     "lineHeight": "69px",
+     "letterSpacing": "-1.8px",
+     "color": "rgb(0, 0, 0)"
+    },
+    "h2": {
+     "family": "Inter, \"Inter Fallback\"",
+     "size": "46px",
+     "weight": "900"
+    },
+    "body": {
+     "family": "\"Times New Roman\"",
+     "size": "16px",
+     "color": "rgb(0, 0, 0)",
+     "bg": "rgba(0, 0, 0, 0)"
+    }
+   },
+   "motionAfterScroll": {
+    "animations": {
+     "pulsar 2s 5": 1
+    },
+    "opacityZeroEls": 0,
+    "transitionEls": 76,
+    "stickyFixedEls": 3
+   },
+   "libs": {
+    "gsap": false,
+    "framer": false,
+    "webflow": false,
+    "lottie": false,
+    "splide_swiper": false,
+    "rive": false,
+    "nextjs": true,
+    "wordpress": false,
+    "hubspot": true
+   },
+   "wordCount": 512,
+   "scrollHeight": 4165,
+   "bodyText": "For Businesses For Accountants & Bookkeepers Pricing Resources Start a free trial Log in Dext Pricing Businesses Accounting & bookkeeping firms 🌍 Rest of the World 🇪🇺 European Union 🇬🇧 United Kingdom 🇺🇸 USA 🇦🇺 APAC 🇨🇦 Canada 🇿🇦 South Africa 🇮🇪 Ireland Monthly Annual Up to 20% cheaper with an annual subscription $25.21 Per Month USD, Excludes VAT , $302.50 billed annually 250 Documents Per Month 5 Users Drag slider to increase allowance Start a free trial Free credits included 10 Sheets of Bank Statement Extraction ? 5 Documents with Line item Extraction ? 5 Supplier Statement Extraction ? Looking to set up more than 5 business entities on Dext? Get in touch with us to discuss bespoke pricing options → Add-ons AI Assist Save time by using our bookkeeping AI agent to automate the everyday bookkeeping decisions that slow you down. $10.5 per month until 31 October Commerce Lite Bring your online sales data together. Connect to up to 5 e-commerce platforms and automatically import transactions. From $7.50 per month Payments Simplify business payments. Pay invoices, payroll and expenses all from within Dext. Coming soon Vault Securely store all essential business documents in one place, Dext’s AI will organise them intelligently. Free for up to 100MB of storage. Additional storage from $4 per month Line Item Extraction Automatically extract detailed line items from receipts and invoices. From $20.50 per month Or pay-as-you-go from $0.50/document Supplier Statement Extraction Upload supplier statements and Dext checks that every invoice and credit note lines up. Gaps and duplicates get flagged before they reach your books. From $20.50 per month Or pay-as-you-go from $0.50/document Bank Statement Extraction Extract information from PDF bank statements automatically. From $13.00 per month Or pay-as-you-go from $0.32/document With Dext, you can: Snap, upload, and manage receipts and invoices on the go. Boost productivity with smart automation. No more manual data entry. Easily submit and approve expenses, all in one place. Ditch the paperwork and enjoy secure digital storage. Sync seamlessly with your accounting software. FAQs What’s included in each Dext business plan? How does Dext charge for users and documents? Is there a free trial available? Can I upgrade, downgrade, or cancel my subscription at any time? Are there discounts for annual billing? Do you offer custom pricing for large or growing businesses? What payment methods do you accept? Is Dext suitable for businesses with multiple entities or locations? What happens if I exceed my document limit? Products Receipt & Invoice capture Expense management software Accounting software integrations Expense & Receipt scanner app Payments Sectors Multi-Entity Businesses & Franchises Dext for business Construction Hospitality and Wellness Professional services Resources Blog Events & Webinars New features and product updates The new Dext (formerly Receipt Bank) Customer Stories Affiliates Support Help Centre Our Company News Contact Us Careers Diversity Security 🌍 Rest of the World 🇦🇺 APAC 🇨🇦 Canada 🇬🇧 United Kingdom 🇺🇸 USA 🇫🇷 France 🇨🇦 French Canada 🇿🇦 South Africa Trust Center Terms and conditions Cookie Policy Website use Diversity statement Privacy policy Modern slavery statement Dext © Copyright 2026"
+  }
+ }
+}

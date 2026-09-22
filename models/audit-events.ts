@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db"
 import { Prisma } from "@/prisma/client"
+import { DOC_TYPE_SPECS, isDocType } from "@/lib/doc-types"
 
 /** Human-readable label for a DocumentAuditEvent.type value — the model stores only the raw
  * event string (see prisma/schema.prisma::DocumentAuditEvent), so this is the one place that
@@ -65,7 +66,16 @@ const EVENT_LABELS: Record<string, string> = {
   "ai_coding.overridden": "AI coding overridden",
 }
 
-export function auditEventLabel(type: string) {
+/** #297 (Wayfinder map #226): `document_reclassified` is the first event whose label must say
+ * *which* types — every other entry in EVENT_LABELS is static, so this one special-cases on
+ * `detail` instead of growing the map into a function-valued one for a single row. */
+export function auditEventLabel(type: string, detail?: unknown) {
+  if (type === "document_reclassified" && detail && typeof detail === "object") {
+    const { fromType, toType } = detail as { fromType?: string; toType?: string }
+    const from = fromType && isDocType(fromType) ? DOC_TYPE_SPECS[fromType].label : fromType ?? null
+    const to = toType && isDocType(toType) ? DOC_TYPE_SPECS[toType].label : toType ?? null
+    if (to) return from ? `Moved to ${to} (was ${from})` : `Moved to ${to}`
+  }
   return EVENT_LABELS[type] ?? type.replaceAll("_", " ").replace(/^./, (c) => c.toUpperCase())
 }
 
@@ -108,7 +118,7 @@ export async function listWorkspaceAuditEvents(workspaceId: string, limit = 100,
   return events.map((event) => ({
     id: event.id,
     type: event.type,
-    label: auditEventLabel(event.type),
+    label: auditEventLabel(event.type, event.detail),
     createdAt: event.createdAt,
     actorName: event.actor?.name || event.actor?.email || null,
     documentFilename: event.document?.filename ?? null,
@@ -135,7 +145,7 @@ export async function listWorkspaceAuditEventsForExport(workspaceId: string, fil
   return events.map((event) => ({
     id: event.id,
     type: event.type,
-    label: auditEventLabel(event.type),
+    label: auditEventLabel(event.type, event.detail),
     createdAt: event.createdAt,
     actorName: event.actor?.name || event.actor?.email || null,
     actorEmail: event.actor?.email ?? null,
@@ -182,13 +192,39 @@ export async function listDocumentAuditEvents(workspaceId: string, documentId: s
     where: { workspaceId, documentId },
     orderBy: { createdAt: "desc" },
     take: Math.min(Math.max(limit, 1), 200),
-    select: { id: true, type: true, createdAt: true, actor: { select: { name: true, email: true } } },
+    select: { id: true, type: true, createdAt: true, detail: true, actor: { select: { name: true, email: true } } },
   })
   return events.map((event) => ({
     id: event.id,
     type: event.type,
-    label: auditEventLabel(event.type),
+    label: auditEventLabel(event.type, event.detail),
     createdAt: event.createdAt,
     actorName: event.actor?.name || event.actor?.email || null,
   }))
+}
+
+/** #198: one document's approval step-chain — every `review_task_stage_decided` event (written by
+ * decideReviewTaskStage, see models/review-tasks.ts) grouped into the per-stage shape the
+ * Approval tab renders, oldest stage first. Only stages that have actually been decided appear;
+ * a stage still awaiting a decision has no event yet and is left off rather than guessed at. */
+export async function listDocumentStageDecisions(workspaceId: string, documentId: string) {
+  const events = await prisma.documentAuditEvent.findMany({
+    where: { workspaceId, documentId, type: "review_task_stage_decided" },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, createdAt: true, detail: true, actor: { select: { name: true, email: true, avatar: true } } },
+  })
+  return events.map((event) => {
+    const detail = event.detail as { stageIndex: number; stageName: string; decision: "approve" | "reject"; note?: string } | null
+    if (!detail) return null
+    return {
+      id: event.id,
+      stageIndex: detail.stageIndex,
+      stageName: detail.stageName,
+      decision: detail.decision,
+      note: detail.note ?? null,
+      actorName: event.actor?.name || event.actor?.email || "Unknown",
+      actorAvatar: event.actor?.avatar ?? null,
+      decidedAt: event.createdAt,
+    }
+  }).filter((decision): decision is NonNullable<typeof decision> => decision !== null)
 }

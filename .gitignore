@@ -40,6 +40,7 @@ yarn-error.log*
 .env
 .env.production
 .env.production.local
+.env.whatsapp
 
 # vercel
 .vercel
@@ -66,3 +67,19 @@ pgdata
 .vercel
 .impeccable/hook.cache.json
 .env.production.bak.*
+
+# autopilot session artefacts (local only)
+.impeccable/live/
+.impeccable/live
+.scratch/
+docs/wayfinder-reports/*/logs/
+
+# wayfinder driver state: the phase high-water mark per ticket
+docs/wayfinder-reports/*/*.phase
+# live driver feed: a git stash/checkout in a session replaces the inode and the
+# detached driver keeps writing to the deleted one (2026-09-20, #330 session)
+docs/wayfinder-reports/*/detached*.out
+.preview/
+
+# wayfinder autopilot: provider secrets
+.claude/wayfinder-autopilot/mistral/.env

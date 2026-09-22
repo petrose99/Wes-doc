@@ -1,6 +1,7 @@
 "use client"
 
 import { IN, POP, usePlayOnScroll } from "@/components/marketing/landing/_lib/use-play-on-scroll"
+import { MOCK_TYPE } from "@/components/marketing/landing/_lib/mock-scale"
 import { Check, FileText, Sparkles } from "lucide-react"
 
 const ROWS = [
@@ -19,35 +20,35 @@ export function Sheets() {
   const { ref, played } = usePlayOnScroll()
 
   return (
-    <section id="worksheets" ref={ref} className="bg-cream-50 py-14 md:py-22">
+    <section id="worksheets" ref={ref} className="bg-white py-14 md:py-22">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-8 md:gap-13 px-5">
         <div className="min-w-0 flex-1 basis-[340px]">
-          <h2 className="text-balance font-display text-[clamp(1.9rem,3vw,2.6rem)] font-bold leading-[1.08] tracking-[-0.03em] text-stone-900">
+          <h2 className="text-balance font-display text-[clamp(1.9rem,3vw,2.6rem)] font-bold leading-[1.08] tracking-[-0.03em] text-slate-900">
             Every invoice, a row you can compute on
           </h2>
-          <p className="mt-4 max-w-[31rem] text-pretty text-[1.02rem] leading-[1.62] text-stone-600">
-            Open a worksheet whenever you need to work with numbers. Pull in your reviewed extractions, run a report out of the built-in ledger, drop in a financial statement from QuickBooks or Xero, or upload any Excel or CSV — then sort, add columns, and ask the built-in AI Assistant to write a formula or answer a question about the rows. Download the tab as CSV or the whole book as Excel when you&apos;re done.
+          <p className="mt-4 max-w-[31rem] text-pretty text-[1.02rem] leading-[1.62] text-slate-600">
+            Open a worksheet whenever you need to work with numbers. Pull in your reviewed extractions, run a report out of the built-in ledger, drop in a financial statement from QuickBooks or Xero, or upload any Excel or CSV. Then sort, add columns, and ask the built-in AI Assistant to write a formula or answer a question about the rows. Download the tab as CSV or the whole book as Excel when you&apos;re done.
           </p>
         </div>
 
         <div className="min-w-0 flex-1 basis-[440px]">
-          <div className="overflow-hidden rounded-2xl border border-cream-200 bg-white shadow-[0_1px_2px_rgba(28,25,23,.04),0_14px_36px_rgba(28,25,23,.07)]">
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(28,25,23,.04),0_14px_36px_rgba(28,25,23,.07)]">
             <div className="flex flex-wrap items-center gap-2.5 border-b border-slate-200 bg-gradient-to-b from-slate-50 to-slate-100 px-3.5 py-2.5">
-              <span className="text-[0.76rem] font-semibold text-slate-700">March close.xlsx</span>
-              <span className="ml-auto inline-flex h-[26px] items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 text-[0.7rem] font-semibold text-slate-600">
+              <span className={`font-semibold text-slate-700 ${MOCK_TYPE.evidence}`}>March close.xlsx</span>
+              <span className={`ml-auto inline-flex h-7 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 font-semibold text-slate-600 ${MOCK_TYPE.supporting}`}>
                 <FileText aria-hidden className="h-3 w-3 text-slate-500" />Export Excel
               </span>
-              <span className="inline-flex h-[26px] items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 text-[0.7rem] font-bold text-emerald-700">
+              <span className={`inline-flex h-7 items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 font-bold text-emerald-700 ${MOCK_TYPE.supporting}`}>
                 <Sparkles aria-hidden className="h-3 w-3 text-emerald-700" />AI Assistant
               </span>
             </div>
-            <div className="flex gap-3.5 border-b border-slate-100 px-3.5 py-1.5 text-[0.72rem] text-slate-500">
+            <div className={`flex flex-wrap gap-3.5 border-b border-slate-100 px-3.5 py-1.5 text-slate-600 ${MOCK_TYPE.supporting}`}>
               <span className="font-semibold text-emerald-700">Start</span>
               <span>Formulas</span>
               <span>Data</span>
             </div>
-            <div className="grid grid-cols-[30px_minmax(0,1.4fr)_minmax(0,1fr)_92px] text-[0.73rem]">
-              <div className="col-span-full grid grid-cols-subgrid border-b border-slate-100 bg-slate-50 text-[0.62rem] font-bold uppercase tracking-wide text-slate-400">
+            <div className={`grid grid-cols-[24px_minmax(0,1.4fr)_minmax(0,1fr)_auto] text-slate-700 md:grid-cols-[30px_minmax(0,1.4fr)_minmax(0,1fr)_92px] ${MOCK_TYPE.evidence}`}>
+              <div className={`col-span-full grid grid-cols-subgrid border-b border-slate-100 bg-slate-50 font-bold uppercase tracking-wide text-slate-600 ${MOCK_TYPE.label}`}>
                 <span className="border-r border-slate-100 px-1.5 py-1.5 text-center" />
                 <span className="border-r border-slate-100 px-2.5 py-1.5">Document</span>
                 <span className="border-r border-slate-100 px-2.5 py-1.5">Supplier</span>
@@ -55,14 +56,14 @@ export function Sheets() {
               </div>
               {ROWS.map((row) => (
                 <div key={row.n} className={`col-span-full grid grid-cols-subgrid border-b border-slate-50 text-slate-900 ${played ? IN : ""}`} style={played ? { animationDelay: `${row.delay}s` } : undefined}>
-                  <span className="border-r border-slate-50 px-1.5 py-2 text-center text-slate-300">{row.n}</span>
-                  <span className="truncate border-r border-slate-50 px-2.5 py-2 text-slate-700">{row.doc}</span>
-                  <span className="truncate border-r border-slate-50 px-2.5 py-2 text-slate-700">{row.supplier}</span>
+                  <span className="border-r border-slate-50 px-1.5 py-2 text-center text-slate-600">{row.n}</span>
+                  <span className="break-words border-r border-slate-50 px-2.5 py-2 text-slate-700">{row.doc}</span>
+                  <span className="break-words border-r border-slate-50 px-2.5 py-2 text-slate-700">{row.supplier}</span>
                   <span className="px-2.5 py-2 text-right font-semibold underline decoration-emerald-200 underline-offset-[3px]">{row.total}</span>
                 </div>
               ))}
             </div>
-            <div className="flex items-center gap-2 border-t border-slate-100 bg-slate-50 px-3.5 py-2.5 text-[0.72rem] text-slate-500">
+            <div className={`flex flex-wrap items-center gap-2 border-t border-slate-100 bg-slate-50 px-3.5 py-2.5 text-slate-600 ${MOCK_TYPE.supporting}`}>
               <span className={played ? IN : ""} style={played ? { animationDelay: "1.1s" } : undefined}>Cell traces to INV-4471.pdf · page 1</span>
               <span className={`ml-auto inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 font-semibold text-emerald-800 ${played ? POP : ""}`} style={played ? { animationDelay: "1.4s" } : undefined}>
                 <Check aria-hidden className="h-3 w-3 text-emerald-700" strokeWidth={2.4} />42 rows exported to Excel

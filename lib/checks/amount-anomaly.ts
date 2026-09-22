@@ -47,7 +47,7 @@ export function checkAmountAnomaly(input: {
     ? `Round-number amount (${input.amount}) is well above ${supplier}'s typical (mean ${mean.toFixed(2)}, σ ${stdev.toFixed(2)}).`
     : `Amount (${input.amount}) is ${Math.abs(zscore).toFixed(1)}σ from ${supplier}'s typical (mean ${mean.toFixed(2)}, σ ${stdev.toFixed(2)}).`
   return {
-    checkCode: "amount_anomaly", status: "warn", message,
+    checkCode: "amount_anomaly", status: "warn", message, fields: ["total"],
     detail: { amount: input.amount, mean, stdev, zscore, roundSpike, historyCount: history.length },
   }
 }

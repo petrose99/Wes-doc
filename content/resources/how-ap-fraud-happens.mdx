@@ -1,0 +1,41 @@
+---
+title: "How AP fraud actually happens: bank-detail changes, split invoices, and suspicious resubmissions"
+slug: "how-ap-fraud-happens"
+description: "The most convincing invoice-fraud attempts often look routine. Here are three patterns worth checking before a bill reaches approval."
+publishedAt: "2026-09-14"
+category: "guides"
+featureImage: "/resources/ap-fraud-controls.svg"
+---
+
+Invoice fraud rarely announces itself as a fake invoice. The document can have the right supplier name, a familiar layout, and an amount that looks ordinary. The risk is often in the relationship between this bill and the paperwork that came before it.
+
+## Start with the change, not the page
+
+A useful review asks what changed since the last trusted document: payment details, the number of submissions, the approval path, or the relationship between a bill and its purchase order. That turns fraud review from a visual spot-check into a repeatable control.
+
+## Bank-detail changes redirect a real-looking payment
+
+One common diversion pattern is a real-looking supplier invoice with a new bank account. DocuBite compares the payment IBAN extracted from the document with the supplier details already on file. A first-seen account is recorded as first sight; a later mismatch fails the check and keeps the bill from moving through touchless processing.
+
+The important part is the recovery step: verify the change with the supplier through a known channel before paying. An email reply to the message that carried the invoice is not a known channel if that mailbox may be compromised.
+
+## Split invoices crowd an approval threshold
+
+Approval limits can create an accidental target. Several invoices from the same supplier, each just below a threshold, can add up to a material amount inside a short window. Split-invoice detection looks for that crowding pattern rather than treating every bill as an isolated event.
+
+This is not a verdict that every small invoice is fraudulent. It is a reason to ask a human to look at the supplier, timing, purchase order, and approval context together.
+
+## Resubmissions hide in new files
+
+The same invoice can arrive again as a re-scan or a new photograph, so a file hash alone cannot describe the whole problem. Supplier, invoice number, and total provide stronger context; a one-character invoice-number difference can also point to OCR noise or a duplicate submission.
+
+That is why duplicate controls should be reviewable. A credit note or corrected re-issue can legitimately resemble an earlier bill, so the system should raise a useful signal and preserve the person's decision rather than silently merging documents.
+
+## The practical control loop
+
+1. Compare the supplier and payment details with what the workspace already knows.
+2. Look at the supplier's recent invoices together, not one at a time.
+3. Keep uncertain cases visible, with the reason and the next verification step.
+4. Record the outcome so the next review has context.
+
+The goal is not to make a promise that software can spot every fraud. The goal is to make the suspicious change hard to miss and easy to investigate. [DocuBite's controls and fraud checks](/product/controls) are built around that review posture.

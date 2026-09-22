@@ -141,7 +141,7 @@ export function NewWorkspaceForm({ defaultName, initialCountry }: {
       timezone: String(formData.get("timezone") || "UTC"),
       fiscalYearStart: String(formData.get("fiscalYearStart") || "january"),
     })
-    if (!result.success || !result.data) { setError(result.error || "Could not set up your workspace"); return }
+    if (!result.success || !result.data) { setError(result.error || "Could not set up your company"); return }
     router.push(`/workspaces/${result.data.workspaceId}`)
   })}>
     <div className="mx-auto grid max-w-md gap-4">

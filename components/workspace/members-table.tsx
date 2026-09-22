@@ -26,9 +26,10 @@ const Avatar = ({ label }: { label: string }) => (
   </span>
 )
 
-const roleTagClass = (role: string) => role === "owner" ? "bg-primary/10 text-primary" : role === "reviewer" ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" : "bg-muted text-muted-foreground"
+// #231 Q26 (#252): every pill ≥ 4.5:1 — the incumbent "Owner" pill measured 4.3:1 on the in-page detector.
+const roleTagClass = (role: string) => role === "owner" ? "bg-emerald-50 text-emerald-900" : role === "reviewer" ? "bg-indigo-50 text-indigo-900" : "bg-slate-100 text-slate-700"
 const RoleTag = ({ role }: { role: string }) => (
-  <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${roleTagClass(role)}`}>{role}</span>
+  <span className={`rounded px-1.5 py-0.5 text-[11px] font-medium capitalize ${roleTagClass(role)}`}>{role}</span>
 )
 
 /** Built from <ul>/flex rather than a table primitive: the design system has no table, select or
@@ -75,7 +76,7 @@ export function MembersTable({ workspaceId, workspaceKind, members, viewerId, vi
         setLastReviewer(intent)
         return
       }
-      toast.error(result.error || "Something went wrong")
+      toast.error(result.error ? `Couldn't do that — ${result.error}` : "Couldn't do that — the server didn't say why. Nothing changed.")
       return
     }
     toast.success(successCopy(intent))
@@ -120,16 +121,16 @@ export function MembersTable({ workspaceId, workspaceKind, members, viewerId, vi
   }
 
   return <>
-    <ul className="divide-y overflow-hidden rounded-lg border">
+    <ul className="divide-y divide-hairline-soft">
       {members.map((member) => {
         const self = member.userId === viewerId
         // The sole owner may not be demoted — the model refuses it, so do not offer it either.
         const lockedRole = !owner || (member.role === "owner" && owners <= 1)
-        return <li key={member.userId} className="flex flex-wrap items-center gap-x-3 gap-y-2 bg-card px-4 py-3 text-sm transition-colors hover:bg-muted/40">
+        return <li key={member.userId} className="flex flex-wrap items-center gap-x-3 gap-y-2 py-3 text-sm first:pt-0">
           <Avatar label={member.name || member.email} />
           <span className="min-w-0 flex-1">
-            <span className="block truncate font-medium text-foreground">{member.name || member.email}{self && <span className="ml-1.5 text-xs font-normal text-muted-foreground">you</span>}</span>
-            {member.name && <span className="block truncate text-xs text-muted-foreground">{member.email}</span>}
+            <span className="block truncate font-medium text-foreground">{member.name || member.email}{self && <span className="ml-1.5 text-xs font-normal text-slate-600">you</span>}</span>
+            {member.name && <span className="block truncate text-xs text-slate-600">{member.email}</span>}
           </span>
 
           {lockedRole
@@ -144,10 +145,10 @@ export function MembersTable({ workspaceId, workspaceKind, members, viewerId, vi
           {self
             // leaveWorkspace refuses a personal workspace outright, so do not offer a button
             // whose only outcome is an error toast.
-            ? workspaceKind !== "personal" && <Button type="button" variant="ghost" size="sm" className="text-muted-foreground hover:text-destructive" disabled={pending} onClick={() => setConfirm({ kind: "leave", member })}>Leave</Button>
+            ? workspaceKind !== "personal" && <Button type="button" variant="ghost" size="sm" className="text-slate-600 hover:text-destructive" disabled={pending} onClick={() => setConfirm({ kind: "leave", member })}>Leave</Button>
             : owner && <span className="flex gap-1">
-                {member.role !== "owner" && <Button type="button" variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground" disabled={pending} onClick={() => setConfirm({ kind: "transfer", member })}>Make owner</Button>}
-                <Button type="button" variant="ghost" size="sm" className="text-muted-foreground hover:text-destructive" disabled={pending} onClick={() => setConfirm({ kind: "remove", member })}>Remove</Button>
+                {member.role !== "owner" && <Button type="button" variant="ghost" size="sm" className="text-slate-600 hover:text-foreground" disabled={pending} onClick={() => setConfirm({ kind: "transfer", member })}>Make owner</Button>}
+                <Button type="button" variant="ghost" size="sm" className="text-slate-600 hover:text-destructive" disabled={pending} onClick={() => setConfirm({ kind: "remove", member })}>Remove</Button>
               </span>}
         </li>
       })}

@@ -28,12 +28,15 @@ export function checkStatementBalance(input: BalanceInput): CheckResult | null {
   const { breaks } = walkBalanceChain(balanceRows, input.openingBalance, input.currencyCode)
   const chainBreaks = breaks.map((b) => ({ rowIndex: b.rowIndex, expected: b.expected, printed: b.printed }))
   const detail: Record<string, unknown> = { openingBalance: input.openingBalance, netMovement, expectedClosing, closingBalance: input.closingBalance, chainBreaks }
+  const fields = ["opening_balance", "closing_balance", ...input.transactions.flatMap((_, index) => [
+    `transactions[${index}].debit`, `transactions[${index}].credit`, `transactions[${index}].running_balance`,
+  ])]
 
   if (amountsMatch(expectedClosing, input.closingBalance, input.currencyCode)) {
-    return { checkCode: "statement_balance", status: "pass", message: "Opening balance plus transactions matches the closing balance.", detail }
+    return { checkCode: "statement_balance", status: "pass", message: "Opening balance plus transactions matches the closing balance.", fields, detail }
   }
   return {
-    checkCode: "statement_balance", status: "warn", detail,
+    checkCode: "statement_balance", status: "warn", fields, detail,
     message: `Opening (${input.openingBalance}) + net movement (${round2(netMovement)}) = ${round2(expectedClosing)}, but closing balance is ${input.closingBalance}`,
   }
 }
@@ -72,12 +75,15 @@ function checkMultiAccountBalance(
   if (!accountDetails.some((a) => a.status !== "skipped")) return null
 
   const detail = { accounts: accountDetails }
+  const fields = ["opening_balance", "closing_balance", ...accounts.flatMap((_, index) => [
+    `accounts[${index}].opening_balance`, `accounts[${index}].closing_balance`,
+  ])]
   if (worstStatus === "pass") {
-    return { checkCode: "statement_balance", status: "pass", message: `All ${accountDetails.length} account(s) reconcile.`, detail }
+    return { checkCode: "statement_balance", status: "pass", message: `All ${accountDetails.length} account(s) reconcile.`, fields, detail }
   }
   const failing = accountDetails.filter((a) => a.status === "warn")
   return {
-    checkCode: "statement_balance", status: "warn", detail,
+    checkCode: "statement_balance", status: "warn", fields, detail,
     message: `${failing.length} of ${accountDetails.length} account(s) did not reconcile.`,
   }
 }

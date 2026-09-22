@@ -6,6 +6,8 @@
  *
  * Static. The confidence bars are markup, not animation — this section is read, not watched. */
 
+import { MOCK_TYPE } from "@/components/marketing/landing/_lib/mock-scale"
+
 const FIELDS: { label: string; value: string; confidence: number; flagged?: boolean }[] = [
   { label: "Supplier", value: "Northwind Trading", confidence: 0.99 },
   { label: "Invoice number", value: "INV-4471", confidence: 0.98 },
@@ -22,8 +24,8 @@ const LINES = [
 
 const POINTS = [
   {
-    title: "The hard copies, not just the clean ones",
-    body: "Handwriting, faxes, a phone photo of a crumpled receipt. These are the expected input, not the edge case — and a PDF holding six documents becomes six records.",
+    title: "PDFs and photos are valid input",
+    body: "Upload PDF, JPEG, PNG, WebP or HEIC files. EXIF rotation is applied to images before each page is parsed to text. A PDF holding six documents becomes six records.",
   },
   {
     title: "Line items, not only the header",
@@ -37,33 +39,32 @@ const POINTS = [
 
 export function Extraction() {
   return (
-    <section id="extraction" className="bg-cream-50 py-16 md:py-24">
+    <section id="extraction" className="bg-white py-16 md:py-24">
       <div className="mx-auto max-w-6xl px-5">
         <div className="max-w-[44rem]">
-          <span className="text-[0.74rem] font-bold uppercase tracking-[.08em] text-emerald-700">Extraction</span>
-          <h2 className="mt-3 text-balance font-display text-[clamp(2.05rem,3.4vw,3rem)] font-extrabold leading-[1.05] tracking-[-0.035em] text-stone-950">
+          <h2 className="text-balance font-display text-[clamp(2.05rem,3.4vw,3rem)] font-extrabold leading-[1.05] tracking-[-0.035em] text-slate-950">
             Every field off the page, and how sure it is of each one
           </h2>
-          <p className="mt-5 text-pretty text-[1.06rem] leading-[1.62] text-stone-600">
+          <p className="mt-5 max-w-[36rem] text-pretty text-[1.06rem] leading-[1.62] text-slate-600">
             This is the part everything else rests on. A document goes in and comes back as fields you can
-            work with — supplier, dates, tax, totals, the line items underneath — each carrying a confidence.
+            work with: supplier, dates, tax, totals, and the line items underneath. Each carries a confidence.
             What it is sure of goes straight through. What it is not is raised for you, not guessed at.
           </p>
         </div>
 
         <div className="mt-10 flex flex-wrap gap-8 md:gap-12">
           <div className="min-w-0 flex-1 basis-[440px]">
-            <div className="overflow-hidden rounded-2xl border border-cream-200 bg-white shadow-[0_1px_2px_rgba(28,25,23,.04),0_18px_44px_rgba(28,25,23,.09)]">
+            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(28,25,23,.04),0_18px_44px_rgba(28,25,23,.09)]">
               <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-3.5">
-                <span className="truncate font-display text-[0.95rem] font-bold text-slate-900">INV-4471.pdf</span>
-                <span className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[0.7rem] font-bold text-emerald-700">Invoice</span>
+                <span className={`min-w-0 break-words font-display font-bold text-slate-900 ${MOCK_TYPE.evidence}`}>INV-4471.pdf</span>
+                <span className={`shrink-0 rounded-full bg-emerald-50 px-2.5 py-0.5 font-bold text-emerald-700 ${MOCK_TYPE.supporting}`}>Invoice</span>
               </div>
 
               <dl className="divide-y divide-slate-50">
                 {FIELDS.map((field) => (
-                  <div key={field.label} className="grid grid-cols-[minmax(0,0.85fr)_minmax(0,1fr)_92px] items-center gap-3 px-5 py-2.5">
-                    <dt className="truncate text-[0.8rem] text-slate-500">{field.label}</dt>
-                    <dd className={`truncate text-[0.84rem] font-semibold ${field.flagged ? "text-amber-800" : "text-slate-900"}`}>{field.value}</dd>
+                  <div key={field.label} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-center gap-3 px-5 py-2.5 md:grid-cols-[minmax(0,0.85fr)_minmax(0,1fr)_auto]">
+                    <dt className={`min-w-0 break-words text-slate-600 ${MOCK_TYPE.evidence}`}>{field.label}</dt>
+                    <dd className={`min-w-0 break-words font-semibold ${MOCK_TYPE.evidence} ${field.flagged ? "text-amber-800" : "text-slate-900"}`}>{field.value}</dd>
                     <div className="flex items-center gap-1.5">
                       <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
                         <span
@@ -71,7 +72,7 @@ export function Extraction() {
                           style={{ width: `${Math.round(field.confidence * 100)}%` }}
                         />
                       </span>
-                      <span className="w-[26px] shrink-0 text-right text-[0.66rem] font-semibold tabular-nums text-slate-400">
+                      <span className={`w-8 shrink-0 text-right font-semibold tabular-nums text-slate-600 ${MOCK_TYPE.supporting}`}>
                         {Math.round(field.confidence * 100)}
                       </span>
                     </div>
@@ -80,11 +81,11 @@ export function Extraction() {
               </dl>
 
               <div className="border-t border-slate-100 bg-slate-50/60 px-5 py-3">
-                <p className="text-[0.72rem] font-semibold text-slate-500">Line items</p>
+                <p className={`font-semibold text-slate-600 ${MOCK_TYPE.supporting}`}>Line items</p>
                 {LINES.map((line) => (
-                  <div key={line.description} className="mt-1.5 flex items-baseline justify-between gap-3 text-[0.78rem]">
-                    <span className="min-w-0 truncate text-slate-700">{line.description}</span>
-                    <span className="shrink-0 tabular-nums text-slate-400">× {line.qty}</span>
+                  <div key={line.description} className={`mt-1.5 flex flex-wrap items-baseline justify-between gap-3 text-slate-700 ${MOCK_TYPE.evidence}`}>
+                    <span className="min-w-0 break-words">{line.description}</span>
+                    <span className="shrink-0 tabular-nums text-slate-600">× {line.qty}</span>
                     <span className="shrink-0 font-semibold tabular-nums text-slate-900">{line.amount}</span>
                   </div>
                 ))}
@@ -92,7 +93,7 @@ export function Extraction() {
 
               <div className="flex items-start gap-2.5 border-t border-amber-100 bg-amber-50/70 px-5 py-3">
                 <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" aria-hidden />
-                <p className="text-[0.79rem] leading-[1.5] text-amber-900">
+                <p className={`max-w-[27rem] text-pretty text-amber-900 ${MOCK_TYPE.evidence}`}>
                   The purchase order number was hard to read. It is waiting for you rather than sitting in your
                   books at 61% sure.
                 </p>
@@ -101,11 +102,11 @@ export function Extraction() {
           </div>
 
           <div className="min-w-0 flex-1 basis-[320px]">
-            <dl className="divide-y divide-cream-200 border-t border-cream-200">
+            <dl className="divide-y divide-slate-200 border-t border-slate-200">
               {POINTS.map((point) => (
                 <div key={point.title} className="py-4">
-                  <dt className="font-display text-[1.02rem] font-bold tracking-[-0.01em] text-stone-900">{point.title}</dt>
-                  <dd className="mt-1.5 text-pretty text-[0.94rem] leading-[1.58] text-stone-600">{point.body}</dd>
+                  <dt className="font-display text-[1.02rem] font-bold tracking-[-0.01em] text-slate-900">{point.title}</dt>
+                  <dd className="mt-1.5 text-pretty text-[0.94rem] leading-[1.58] text-slate-600">{point.body}</dd>
                 </div>
               ))}
             </dl>

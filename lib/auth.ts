@@ -1,4 +1,5 @@
 import config from "@/lib/config"
+import { DEV_BYPASS_USER, isDevAuthBypass } from "@/lib/supabase/dev-bypass"
 import { createClient } from "@/lib/supabase/server"
 import { resolveOrProvisionUser } from "@/models/users"
 import { User } from "@/prisma/client"
@@ -22,6 +23,7 @@ export type UserProfile = Pick<User, "id" | "name" | "email" | "avatar">
  * getUserBySupabaseUserId directly), never getUserById(session.user.id) as it would have been
  * under better-auth, where the two ids were the same value. */
 export const getSession = cache(async () => {
+  if (isDevAuthBypass()) return { user: { ...DEV_BYPASS_USER }, aal: "aal1" }
   const supabase = await createClient()
   const { data, error } = await supabase.auth.getClaims()
   if (error || !data) return null

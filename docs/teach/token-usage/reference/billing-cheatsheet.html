@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Session billing cheatsheet</title><link rel="stylesheet" href="../assets/course.css"></head>
+<body><main>
+<p class="kicker">Reference · cheatsheet</p>
+<h1>Reading a session's bill</h1>
+<p class="lede">One page to keep beside the run log.</p>
+
+<h2>The formula</h2>
+<p class="big">tokens sent = Σ<sub>turns</sub> context<sub>turn</sub></p>
+<p>Cost ≈ cache-read tokens × read rate + cache-write tokens × write rate + uncached × input rate + output × output rate. Rates: <a href="https://docs.claude.com/en/docs/about-claude/pricing">pricing page</a>, read fresh.</p>
+
+<h2>Read one session from its log</h2>
+<pre>python3 - docs/wayfinder-reports/226/logs/&lt;file&gt;.jsonl &lt;&lt;'EOF'
+import json,sys
+cc=cr=inp=out=n=0
+for l in open(sys.argv[1]):
+    if '"usage"' not in l: continue
+    j=json.loads(l)
+    if j.get('type')=='assistant' and not j.get('parent_tool_use_id'):
+        u=j['message']['usage']; n+=1
+        cc+=u['cache_creation_input_tokens']; cr+=u['cache_read_input_tokens']
+        inp+=u['input_tokens']; out+=u['output_tokens']
+print(f"turns {n}  read {cr:,}  write {cc:,}  uncached {inp:,}  output {out:,}")
+EOF</pre>
+<p>The <code>result</code> event at the end carries <code>total_cost_usd</code> when the session finished on its own.</p>
+
+<h2>What "healthy" looks like here (Sonnet, 2026-09-19)</h2>
+<table>
+<tr><th>Signal</th><th class="num">Good</th><th class="num">Investigate</th><th>Lever</th></tr>
+<tr><td>First-turn load</td><td class="num">≤ 30K</td><td class="num">≥ 45K</td><td>System prompt content, tool set, skills menu</td></tr>
+<tr><td>Turns per session</td><td class="num">30–80</td><td class="num">≥ 150</td><td>Batch independent calls; scripts over one-fact commands; hand off at milestones</td></tr>
+<tr><td>Cache read share</td><td class="num">≥ 95%</td><td class="num">≤ 85%</td><td>Stable prefix order; sessions back to back inside the TTL</td></tr>
+<tr><td>First-turn cache write</td><td class="num">≈ 0 (same phase) · ≤ 3K (new ticket)</td><td class="num">≥ 15K</td><td>Ticket-specific text last in the prompt</td></tr>
+<tr><td>Single tool result</td><td class="num">≤ 3K tokens</td><td class="num">≥ 8K</td><td>Ranged reads; grep before read; never read a persisted output whole</td></tr>
+<tr><td>Output per session</td><td class="num">&lt; 1% of tokens</td><td class="num">—</td><td>Not a lever; spend it where it saves turns</td></tr>
+</table>
+
+<h2>Levers, ranked by what they moved today</h2>
+<ol>
+<li><b>Context per turn</b>: fixed load 55K → 29K (skills menu off, five tools, replaced default prompt, brief slimmed).</li>
+<li><b>Turns</b>: hand-off line per phase, deterministic gate before readers, readers write to files.</li>
+<li><b>Waste guards</b>: hook refuses whole-file reads over 220 lines, persisted outputs, router skills, more than 10 images.</li>
+<li><b>Cache order</b>: stable text first, ticket text last; new ticket writes ~2K instead of ~20K.</li>
+</ol>
+<footer>See the <a href="glossary.html">glossary</a>. Ask the teacher to re-measure any row.</footer>
+</main></body></html>

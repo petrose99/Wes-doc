@@ -6,7 +6,10 @@ import { revalidatePath } from "next/cache"
 
 /** `documents` is only the detail-page prefix — there is no document list page; the sheet is
  * the view of that data, so document mutations revalidate the file's `sheet`. */
-export const paths = (workspaceId: string) => ({ overview: `/workspaces/${workspaceId}`, documents: `/workspaces/${workspaceId}/documents`, pipeline: `/workspaces/${workspaceId}/pipeline`, files: `/workspaces/${workspaceId}/worksheets`, dictation: `/workspaces/${workspaceId}/dictation`, templates: `/workspaces/${workspaceId}/settings/templates`, reports: `/workspaces/${workspaceId}/settings/reports`, workspace: `/workspaces/${workspaceId}/settings/workspace`, integrations: `/workspaces/${workspaceId}/settings/integrations`, tax: `/workspaces/${workspaceId}/settings/tax`, review: `/workspaces/${workspaceId}/review`, rules: `/workspaces/${workspaceId}/settings/rules`, modules: `/workspaces/${workspaceId}/settings/modules`, settingsEmail: `/workspaces/${workspaceId}/settings/email`, approvals: `/workspaces/${workspaceId}/automation/approvals`, expenses: `/workspaces/${workspaceId}/expenses`, accounting: `/workspaces/${workspaceId}/accounting` })
+// `approvals` used to name the Approval-workflows settings page before #236 gave the Approvals
+// destination itself a URL — kept as `approvalWorkflowSettings` (now Admin › Approval Flows, #252)
+// and the two queue routes added beside it, so neither call site silently points elsewhere.
+export const paths = (workspaceId: string) => ({ overview: `/workspaces/${workspaceId}`, documents: `/workspaces/${workspaceId}/documents`, pipeline: `/workspaces/${workspaceId}/pipeline`, files: `/workspaces/${workspaceId}/worksheets`, dictation: `/workspaces/${workspaceId}/dictation`, templates: `/workspaces/${workspaceId}/admin/configuration/whats-on`, reports: `/workspaces/${workspaceId}/admin/configuration/whats-on`, workspace: `/workspaces/${workspaceId}/admin/users`, integrations: `/workspaces/${workspaceId}/admin/integrations`, tax: `/workspaces/${workspaceId}/admin/configuration/tax`, review: `/workspaces/${workspaceId}/review`, rules: `/workspaces/${workspaceId}/admin/suppliers`, modules: `/workspaces/${workspaceId}/admin/configuration/whats-on`, settingsEmail: `/workspaces/${workspaceId}/admin/configuration/intake`, approvalWorkflowSettings: `/workspaces/${workspaceId}/admin/approval-flows`, receipts: `/workspaces/${workspaceId}/receipts`, expenses: `/workspaces/${workspaceId}/expenses`, accounting: `/workspaces/${workspaceId}/accounting`, exceptions: `/workspaces/${workspaceId}/exceptions`, approvalsInvoices: `/workspaces/${workspaceId}/approvals/invoices`, approvalsPoMismatches: `/workspaces/${workspaceId}/approvals/po-mismatches` })
 
 /** Revalidates the whole workspace segment layout, not just one page — needed whenever a change
  * (module toggle, rename, ownership transfer) should update the persistent sidebar, which the
@@ -19,7 +22,7 @@ export const sheetPath = (workspaceId: string, fileId: string) => `/workspaces/$
  * "member_not_found" into "member not found", which is fine for most codes but not all of them.
  * Codes not listed here still fall through to that behaviour. */
 const BILLING_MESSAGES: Record<string, string> = {
-  free_trial_storage_exceeded: "You've reached the 200 MB free-trial upload limit for this workspace.",
+  free_trial_storage_exceeded: "You've reached the 200 MB free-trial upload limit for this company.",
   fx_rate_pending: "This document is in a different currency and its exchange rate hasn't been fetched yet. Try again in a moment.",
   // Integrations (P1). The url_* codes come from lib/url-safety's SSRF guard.
   integrations_not_available: "Integrations aren't enabled on this deployment.",
@@ -38,17 +41,25 @@ const BILLING_MESSAGES: Record<string, string> = {
   bill_missing_total: "This document has no total to push.",
   ledger_duplicate: "A bill with this reference number already exists in your accounting ledger.",
   bank_match_not_found: "That match no longer exists.",
-  inbound_email_disabled_for_clinical: "Inbound email intake isn't available for a healthcare workspace.",
+  inbound_email_disabled_for_clinical: "Inbound email intake isn't available for a healthcare company.",
   pattern_invalid: "Enter a full email address (name@domain.com) or a domain (@domain.com).",
   allowed_sender_not_found: "That sender no longer exists.",
+  // #374: WhatsApp allowed-sender validation (models/inbound-whatsapp.ts addAllowedSender).
+  phone_number_invalid: "Enter a full phone number with country code, like +266 6123 4567.",
+  label_required: "Enter a name for this sender.",
   // Dext-parity Phase 3 WP3.1/WP3.2: approval workflows.
   approval_workflow_not_found: "That approval workflow no longer exists.",
   workflow_needs_at_least_one_stage: "Add at least one stage.",
   review_task_has_no_workflow: "This review task has no workflow attached.",
   workflow_stage_not_found: "That workflow stage no longer exists.",
-  stage_requires_owner: "Only a workspace owner can decide this stage.",
+  stage_requires_owner: "Only an owner can decide this stage.",
   review_task_already_has_workflow: "This review task already has a workflow attached.",
   review_task_not_open: "This review task has already moved past open — a workflow can only be started while it's open.",
+  // #236: Approvals — Send back for review / Cancel.
+  review_task_not_in_review: "This Approval isn't currently awaiting a decision.",
+  reason_required: "A reason is required.",
+  approval_already_advanced: "A stage has already been decided on this Approval — send it back for review instead of cancelling it.",
+  gate_not_found: "That check no longer exists.",
   payment_status_required: "Confirm whether this has been paid before approving it.",
   // Dext-parity Phase 3 WP3.3: expense claims.
   expense_claim_not_found: "That expense claim no longer exists.",
@@ -61,6 +72,9 @@ const BILLING_MESSAGES: Record<string, string> = {
   expense_claim_not_submitted: "This claim isn't awaiting a decision.",
   expense_claim_has_workflow: "This claim is on a workflow — decide its current stage instead.",
   expense_claim_has_no_workflow: "This claim has no workflow attached.",
+  // #250: Match manually.
+  po_match_not_found: "That purchase order link no longer exists. Reload the row and try again.",
+  purchase_order_not_found: "That purchase order no longer exists.",
 }
 
 export const errorMessage = (error: unknown, fallback: string) => {
@@ -68,7 +82,7 @@ export const errorMessage = (error: unknown, fallback: string) => {
   return BILLING_MESSAGES[error.message] || error.message.replaceAll("_", " ")
 }
 
-export const NO_ACCESS = "You no longer have access to this workspace"
+export const NO_ACCESS = "You no longer have access to this company"
 
 /** requireWorkspaceRole throws on a missing membership or insufficient role. Actions call this
  * instead so the client gets an ActionState error to show, rather than a rejected promise. */

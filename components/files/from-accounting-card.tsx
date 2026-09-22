@@ -4,7 +4,7 @@ import { createSheetFromAccountingReportAction } from "@/app/(app)/workspaces/[w
 import { BIGCAPITAL_REPORTS } from "@/lib/integrations/bigcapital/report-mapper"
 import { Landmark, Loader2, X } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { useCallback, useState, useTransition } from "react"
+import { useCallback, useEffect, useId, useRef, useState, useTransition } from "react"
 
 export function FromAccountingCard({ workspaceId }: { workspaceId: string }) {
   const [open, setOpen] = useState(false)
@@ -12,7 +12,7 @@ export function FromAccountingCard({ workspaceId }: { workspaceId: string }) {
   return <>
     <button
       onClick={() => setOpen(true)}
-      className="group flex items-center gap-3 rounded-xl border border-[#e6ebf1] bg-white px-4 py-3 text-left shadow-panel transition-[border-color,box-shadow,transform] duration-150 hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md sm:flex-col sm:items-start sm:gap-0 sm:p-5"
+      className="group flex items-center gap-3 rounded-xl border border-hairline bg-white px-4 py-3 text-left shadow-panel transition-[border-color,box-shadow,transform] duration-150 hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md sm:flex-col sm:items-start sm:gap-0 sm:p-5"
     >
       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700 sm:mb-3 sm:h-10 sm:w-10">
         <Landmark className="h-[17px] w-[17px] sm:h-5 sm:w-5" />
@@ -34,6 +34,36 @@ function AccountingReportDialog({ workspaceId, onClose }: { workspaceId: string;
   const [name, setName] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const openerRef = useRef<Element | null>(null)
+  const pendingRef = useRef(pending)
+  const onCloseRef = useRef(onClose)
+  const titleId = useId()
+
+  useEffect(() => { pendingRef.current = pending }, [pending])
+  useEffect(() => { onCloseRef.current = onClose }, [onClose])
+
+  useEffect(() => {
+    openerRef.current = document.activeElement
+    dialogRef.current?.querySelector<HTMLElement>("select, input, button")?.focus()
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !pendingRef.current) { onCloseRef.current(); return }
+      if (event.key !== "Tab") return
+      const dialog = dialogRef.current
+      if (!dialog) return
+      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>("a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex=\"-1\"])"))
+      if (!focusable.length) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => {
+      window.removeEventListener("keydown", onKeyDown)
+      if (openerRef.current instanceof HTMLElement) openerRef.current.focus()
+    }
+  }, [])
 
   const selectedReport = BIGCAPITAL_REPORTS.find((r) => r.type === reportType)
   const showDates = selectedReport?.supportsDateRange ?? false
@@ -52,17 +82,18 @@ function AccountingReportDialog({ workspaceId, onClose }: { workspaceId: string;
     })
   }, [workspaceId, reportType, fromDate, toDate, name, router])
 
-  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
-    <div className="w-full max-w-md rounded-2xl border border-[#e6ebf1] bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+  return <div role="presentation" className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => { if (!pending) onClose() }}>
+    <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} className="w-full max-w-md rounded-2xl border border-hairline bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold text-slate-900">From Finance</h2>
-        <button onClick={onClose} className="rounded p-1 text-slate-400 hover:text-slate-600"><X className="h-4 w-4" /></button>
+        <h2 id={titleId} className="text-lg font-bold text-slate-900">From Finance</h2>
+        <button type="button" aria-label="Close From Finance" disabled={pending} onClick={onClose} className="rounded p-1 text-slate-400 hover:text-slate-600 disabled:opacity-50"><X className="h-4 w-4" /></button>
       </div>
 
       <div className="mt-4 space-y-3">
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">Report</label>
+          <label htmlFor="accounting-report-type" className="mb-1 block text-sm font-medium text-slate-700">Report</label>
           <select
+            id="accounting-report-type"
             value={reportType}
             onChange={(e) => { setReportType(e.target.value); setError(null) }}
             className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-400"
@@ -73,20 +104,20 @@ function AccountingReportDialog({ workspaceId, onClose }: { workspaceId: string;
 
         {showDates && <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">From</label>
-            <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)}
+            <label htmlFor="accounting-report-from" className="mb-1 block text-sm font-medium text-slate-700">From</label>
+            <input id="accounting-report-from" type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)}
               className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-400" />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">To</label>
-            <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)}
+            <label htmlFor="accounting-report-to" className="mb-1 block text-sm font-medium text-slate-700">To</label>
+            <input id="accounting-report-to" type="date" value={toDate} onChange={(e) => setToDate(e.target.value)}
               className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-400" />
           </div>
         </div>}
 
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">Worksheet name <span className="font-normal text-slate-400">(optional)</span></label>
-          <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder={`${selectedReport?.label ?? "Report"} — ${new Date().toISOString().slice(0, 10)}`}
+          <label htmlFor="accounting-report-name" className="mb-1 block text-sm font-medium text-slate-700">Worksheet name <span className="font-normal text-slate-400">(optional)</span></label>
+          <input id="accounting-report-name" type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder={`${selectedReport?.label ?? "Report"} — ${new Date().toISOString().slice(0, 10)}`}
             className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-400" />
         </div>
       </div>
@@ -94,8 +125,8 @@ function AccountingReportDialog({ workspaceId, onClose }: { workspaceId: string;
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
 
       <div className="mt-5 flex justify-end gap-2">
-        <button onClick={onClose} className="rounded-md px-3 py-2 text-sm font-medium text-slate-600 hover:text-slate-800">Cancel</button>
-        <button onClick={submit} disabled={pending}
+        <button type="button" disabled={pending} onClick={onClose} className="rounded-md px-3 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 disabled:opacity-50">Cancel</button>
+        <button type="button" onClick={submit} disabled={pending}
           className="inline-flex items-center gap-2 rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50">
           {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Landmark className="h-4 w-4" />}
           Create worksheet

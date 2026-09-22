@@ -1,0 +1,599 @@
+{
+ "slug": "ramp-vs-bill",
+ "label": "Ramp versus Bill.com",
+ "url": "https://ramp.com/versus/bill-com",
+ "accessed": "2026-09-19T12:14:25.054Z",
+ "views": {
+  "390": {
+   "status": 200,
+   "shot": "/home/ubuntu/Dev/Wes-doc/docs/research/benchmark-captures/ramp/ramp-vs-bill-390.png",
+   "initialMotion": {
+    "opacityZeroEls": 2,
+    "animations": {},
+    "transitionEls": 46,
+    "total": 661
+   },
+   "errors": [
+    "overlaysHidden=1"
+   ],
+   "title": "Ramp vs BILL | Choose Ramp as a BILL Alternative",
+   "h1": "Ramp vs Bill",
+   "subhead": "17,000+ businesses have chosen Ramp over Bill Digitizing AP isn’t enough. Ramp made it autonomous — so finance teams spend less time reviewing invoices and more time driving the business. Email Get started for free Compare using AI Opens ChatGPT in a new tab.",
+   "headings": [
+    {
+     "tag": "H1",
+     "text": "Ramp vs Bill",
+     "top": 102
+    },
+    {
+     "tag": "H2",
+     "text": "17,000+ businesses have chosen Ramp over Bill",
+     "top": 153
+    },
+    {
+     "tag": "H2",
+     "text": "Top 3 reasons leaders pick Ramp over Bill",
+     "top": 1387
+    },
+    {
+     "tag": "H2",
+     "text": "Autonomous AP with 86% less clicks",
+     "top": 1521
+    },
+    {
+     "tag": "H2",
+     "text": "Save time with smart OCR",
+     "top": 1958
+    },
+    {
+     "tag": "H2",
+     "text": "Stronger pre-spend controls that scale",
+     "top": 2415
+    },
+    {
+     "tag": "H2",
+     "text": "Compare Ramp vs. Bill",
+     "top": 2912
+    },
+    {
+     "tag": "H2",
+     "text": "Why Ramp stands out among all AP solutions",
+     "top": 4601
+    },
+    {
+     "tag": "H2",
+     "text": "FAQ",
+     "top": 5429
+    },
+    {
+     "tag": "H3",
+     "text": "We are currently using Bill.com. What is the process to switch to Ramp?",
+     "top": 5494
+    },
+    {
+     "tag": "H3",
+     "text": "How long does it take to be fully live? What ongoing support do we get after go-live?",
+     "top": 5575
+    },
+    {
+     "tag": "H3",
+     "text": "How deep is your integration with my ERP?",
+     "top": 5680
+    },
+    {
+     "tag": "H2",
+     "text": "Time is money. Save both.",
+     "top": 5841
+    }
+   ],
+   "sections": [
+    {
+     "top": 62,
+     "height": 1245,
+     "heading": "Ramp vs Bill",
+     "imgs": 2,
+     "svgs": 1,
+     "videos": 0,
+     "ctas": [
+      "Get started for free"
+     ],
+     "textLen": 305,
+     "snippet": "Ramp vs Bill 17,000+ businesses have chosen Ramp over Bill Digitizing AP isn’t enough. Ramp made it autonomous — so finance teams spend less time reviewing invoices and more time driving the business. Email Get started f"
+    },
+    {
+     "top": 1307,
+     "height": 1525,
+     "heading": "Top 3 reasons leaders pick Ramp over Bill",
+     "imgs": 3,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 672,
+     "snippet": "Top 3 reasons leaders pick Ramp over Bill Autonomous AP with 86% less clicks Bill still makes teams click 21+ times per bill. Ramp uses AI to code, approve, and check fraud — so bills are created, approved, and paid in a"
+    },
+    {
+     "top": 2832,
+     "height": 1285,
+     "heading": "Compare Ramp vs. Bill",
+     "imgs": 2,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 1325,
+     "snippet": "Compare Ramp vs. Bill High OCR accuracy 99% OCR accuracy Incomplete extraction of invoice details Line item auto-coding Accounting fields auto-coded on the line item level through AI and trained data Based on vendor hist"
+    },
+    {
+     "top": 4117,
+     "height": 404,
+     "heading": "",
+     "imgs": 1,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 274,
+     "snippet": "“Ramp has completely modernized how we manage accounts payable. With end-to-end automation from invoice processing and approvals to payments and real-time ERP sync. We now close our books two days earlier and save hours "
+    },
+    {
+     "top": 4521,
+     "height": 828,
+     "heading": "Why Ramp stands out among all AP solutions",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 402,
+     "snippet": "Why Ramp stands out among all AP solutions Ramp replaces fragmented AP tools with one autonomous platform for AP, cards, expenses, procurement, and treasury — cutting manual work, speeding up close, and giving leaders re"
+    },
+    {
+     "top": 5429,
+     "height": 332,
+     "heading": "FAQ",
+     "imgs": 0,
+     "svgs": 3,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 2108,
+     "snippet": "FAQ We are currently using Bill.com. What is the process to switch to Ramp? The migration is easy - you pick a cutoff date and start sending invoices to Ramp for processing. Any invoice in Bill will continue to be approv"
+    }
+   ],
+   "navLinks": [
+    "Back"
+   ],
+   "heroCtas": [
+    {
+     "text": "Get started for free",
+     "tag": "BUTTON",
+     "href": null
+    },
+    {
+     "text": "Compare using AI",
+     "tag": "A",
+     "href": "https://chatgpt.com/?q=Draft%20a%20decision%20matrix%20comparing%20Ramp%20and%20Bill%20across%20five%20criteria%20you%20find%20on%20ramp.com%2Fversus%2Fbill%20to%20highlight%20why%20Ramp%20makes%20the%20most%20sense%20for%20my%20business.%20Highlight%20at%20least%203%20specific%20customer%20success%20stories%20that%20are%20relevant%20to%20me%20and%20include%20a%20link%20to%20sign%20up%20for%20Ramp%3A%20https%3A%2F%2Framp.com%2Fbill-to-ramp.%20Feel%20free%20to%20question%20me%20to%20get%20more%20information%20about%20my%20business%20afterwards."
+    }
+   ],
+   "bigImgs": [
+    {
+     "w": 358,
+     "h": 358,
+     "alt": "Ramp vs Bill",
+     "src": "https://cdn.sanity.io/images/6jz6vxxd/production/d0cd9813511bb7890a213a53e79d370ad2857f39-1120x1120.gif",
+     "top": 651
+    },
+    {
+     "w": 358,
+     "h": 239,
+     "alt": "",
+     "src": "https://ramp.com/_next/image?url=https%3A%2F%2Fcdn.sanity.io%2Fimages%2F6jz6vxxd%2Fproduction%2F45fbbad98d9428ae5e226aaddc12a8c919f9cdac-3500x2480.jpg%3Ffit%3Dm",
+     "top": 1655
+    },
+    {
+     "w": 358,
+     "h": 239,
+     "alt": "",
+     "src": "https://ramp.com/_next/image?url=https%3A%2F%2Fcdn.sanity.io%2Fimages%2F6jz6vxxd%2Fproduction%2Fb22207f43e0ebc5d91fd9a559e27ba5d025ecaf4-3500x2480.png%3Ffit%3Dm",
+     "top": 2113
+    },
+    {
+     "w": 358,
+     "h": 239,
+     "alt": "",
+     "src": "https://ramp.com/_next/image?url=https%3A%2F%2Fcdn.sanity.io%2Fimages%2F6jz6vxxd%2Fproduction%2Faceec158d713af8e6721e87384266cee495b002e-1280x832.png%3Ffit%3Dma",
+     "top": 2593
+    }
+   ],
+   "imgCount": 11,
+   "logoish": 0,
+   "videos": [],
+   "canvases": 0,
+   "lotties": 0,
+   "iframes": [
+    "https://www.googletagmanager.com/ns.html?id=GTM-WFDFDWP",
+    "https://pagead2.googlesyndication.com/pagead/ads?client=ca-pub-3938919135399013&output=html&adk=1812271804&adf=302519425",
+    "https://ramp-com.chilipiper.com/chat/loader/?embedOrigin=https%3A%2F%2Framp.com&workspaceId=fef2da9a-11bc-48f7-bd29-1762",
+    "https://pagead2.googlesyndication.com/pagead/html/r20260917/r20190131/zrt_lookup_fy2021.html"
+   ],
+   "fonts": [
+    [
+     "lausanne",
+     331
+    ],
+    [
+     "Material Icons Outlined",
+     2
+    ]
+   ],
+   "sectionBgs": [
+    [
+     "lab(8.86531 0.515342 0.18619)",
+     1
+    ],
+    [
+     "lab(100 0 0)",
+     1
+    ],
+    [
+     "lab(95.604 0.426412 1.20401)",
+     1
+    ]
+   ],
+   "buttonBgs": [
+    [
+     "lab(92.1406 -20.4979 84.7726)",
+     3
+    ],
+    [
+     "rgba(255, 255, 255, 0.05)",
+     1
+    ],
+    [
+     "lab(95.604 0.426412 1.20401)",
+     1
+    ]
+   ],
+   "type": {
+    "h1": {
+     "family": "lausanne, \"lausanne Fallback\"",
+     "size": "15px",
+     "weight": "400",
+     "lineHeight": "21px",
+     "letterSpacing": "normal",
+     "color": "lab(100 0 0 / 0.6)"
+    },
+    "h2": {
+     "family": "lausanne, \"lausanne Fallback\"",
+     "size": "34px",
+     "weight": "400"
+    },
+    "body": {
+     "family": "lausanne, \"lausanne Fallback\"",
+     "size": "16px",
+     "color": "lab(2.83994 0.367254 0.969091)",
+     "bg": "lab(8.86531 0.515342 0.18619)"
+    }
+   },
+   "motionAfterScroll": {
+    "animations": {},
+    "opacityZeroEls": 2,
+    "transitionEls": 50,
+    "stickyFixedEls": 20
+   },
+   "libs": {
+    "gsap": false,
+    "framer": false,
+    "webflow": false,
+    "lottie": false,
+    "splide_swiper": false,
+    "rive": false,
+    "nextjs": true,
+    "wordpress": false,
+    "hubspot": true
+   },
+   "wordCount": 1210,
+   "scrollHeight": 8225,
+   "bodyText": "Back Ramp vs Bill 17,000+ businesses have chosen Ramp over Bill Digitizing AP isn’t enough. Ramp made it autonomous — so finance teams spend less time reviewing invoices and more time driving the business. Email Get started for free Compare using AI Opens ChatGPT in a new tab. Former Bill customers using Ramp Top 3 reasons leaders pick Ramp over Bill Autonomous AP with 86% less clicks Bill still makes teams click 21+ times per bill. Ramp uses AI to code, approve, and check fraud — so bills are created, approved, and paid in as few as 3 clicks. Save time with smart OCR Bill’s OCR is fragmented and often captures only the invoice header, requiring manual correction. Ramp’s OCR extracts accounting fields at the line-item level with 99% accuracy. Stronger pre-spend controls that scale Bill offers basic purchasing. Ramp Procurement scales from lightweight requests to fully orchestrated workflows — with AI-guided intake, agent-run compliance checks, end-to-end P2P reporting. Compare Ramp vs. Bill High OCR accuracy 99% OCR accuracy Incomplete extraction of invoice details Line item auto-coding Accounting fields auto-coded on the line item level through AI and trained data Based on vendor history, not dynamic to invoice change Real-time ERP sync Real-time with 10 integrated ERP + UCSV; Two-way sync for vendor master data Batch sync every 24 hours, or manual Autonomous AP workflow with agents AP agents for auto-coding, approval recommendations, fraud detection with 60+ signals, auto-card payment with up to 1.5% cashback Legacy automation requiring more human touch (21 clicks to process an invoice vs. 3 clicks in Ramp) User friendly interface Customizable view; easy to navigate High click count Dynamic approval workflow 15 conditions for customization Limited conditions Faster settlement time for payment 2-3 days for ACH; no payment threshold 5+ days when exceeding entity payment threshold Single account for multi-entity company One account to manage all entities Multiple accounts required for multiple entities Automatic 1099 filing AI powered suggested box mappings and direct filing with the IRS and participating states Manual effort required Unified platform with procurement, card, expenses, treasury, and more Single platform for all spend Separate platforms for Bill and Divvy “Ramp has completely modernized how we manage accounts payable. With end-to-end automation from invoice processing and approvals to payments and real-time ERP sync. We now close our books two days earlier and save hours of manual work every week.” Muhammad Younes Controller Why Ramp stands out among all AP solutions Ramp replaces fragmented AP tools with one autonomous platform for AP, cards, expenses, procurement, and treasury — cutting manual work, speeding up close, and giving leaders real-time spend visibility. 2.4x faster invoice processing than legacy software 95% of businesses reported improved AP visibility 89% of the top 100 CPA firms work with clients on Ramp FAQ We are currently using Bill.com. What is the process to switch to Ramp? The migration is easy - you pick a cutoff date and start sending invoices to Ramp for processing. Any invoice in Bill will continue to be approved and paid. Once the last invoice is paid in Bill, all your AP will be processed in Ramp moving forward. Ramp offers bulk CSV migration templates to migrate vendor data, vendor’s tax information and bill records. How long does it take to be fully live? What ongoing support do we get after go-live? Ramp provides white-glove onboarding support to get you live quickly - often in just a few days. Onboarding is typically delivered across three hands-on sessions: 1. Initial Bill Pay setup: accounting integration, bank accounts, AP clerks, Bill Pay approval workflows, and change management plan. 2. Vendor setup: sync/export the first bill, import vendors, set vendor bill coding defaults, confirm vendor management details (renewals, 1099, payment details). 3. Launch Bill Pay: end-to-end testing, rollout to the AP team, and Q&A. After launch, a dedicated Customer Success Manager helps you optimize account setup, such as refining intake form questions, approval workflows, and integrations. Once implementation is complete, your team will receive ongoing support from a dedicated Account Manager. How deep is your integration with my ERP? Ramp has direct integrations with 10 leading ERPs including NetSuite, QuickBooks Online, Sage Intacct, Xero, Microsoft Dynamics Business Central, and Acumatica. If you’re on something else, we can still support you via CSV workflows, and in some cases a partner-built API integration. Ramp has direct, two-way ERP integrations that keep your ERP as the system of record while letting your team run day-to-day AP in Ramp. In practice, that means we can sync core accounting data and dimensions, and for Bill Pay we can sync bills and payments so your books stay current without manual re-entry. The exact objects and fields depend on the ERP, but our goal is end-to-end: intake and approvals in Ramp, clean posting and reconciliation in the ERP. Time is money. Save both. Email Get started for free About us Careers Emerging talent Customers Help center Product releases Ramp for Agents Ramp Labs API documentation Versus Products Platform Partners Solutions Free tools and resources Join the 70,000+ businesses simplifying their finances with Ramp. Email Get started for free LinkedIn X Facebook Ramp Business Corporation 28 West 23rd Street, Floor 2 New York, NY 10010 Terms of Service Editorial Guidelines Privacy Policy Your Privacy Choices Manage Preferences © 2026 Ramp Business Corporation. \"Ramp\" and the Ramp logo are registered trademarks of the company. Ramp Support: +1-855-206-7283 The Ramp Visa Corporate Card is issued in the U.S. by Celtic Bank, and to U.S. corporations operating globally by Column N.A., Member FDIC, and is subject to credit approval. The Ramp Visa Commercial Card is issued by Sutton Bank, Member FDIC. The Ramp Visa Business Card is issued by Lead Bank, Member FDIC. Each card is issued pursuant to a license from Visa USA Inc. Ramp Visa Business Cards are issued in Canada by Peoples Trust Company, pursuant to license by Visa* International. Visa Int./Peoples Trust Company, Licensed User. Card Balance not insured by the Canada Deposit Insurance Corporation. Ramp Business Corporation is registered as a Payment Service Provider with the Bank of Canada. Ramp cards are issued in the UK by Stripe Payments UK Limited, an electronic money institution authorized by the Financial Conduct Authority (firm reference number: 900461). Ramp cards are issued in the EEA by Stripe Technology Europe Limited, an electronic money institution authorized by the Central Bank of Ireland (firm reference number: C187865). Cards are issued under the Visa card scheme pursuant to a license from Visa Europe Limited. Visa is a registered trademark of Visa International Service Association. All other trademarks and service marks belong to their respective owners. *Ramp Business Corporation is a financial technology company and is not a bank. Bank deposit services provided by First Internet Bank of Indiana, Member FDIC. †Investment account with portfolios managed by Moment Advisors, LLC. Investing involves risk, including possible loss of principal. Asset allocation does not guarantee profit or protect against loss. Past performance does not guarantee future results. Additional information can be found here. Securities products offered by Apex Clearing Corporation, member FINRA, SIPC. The Investment Account is not insured by the FDIC, not a deposit product, and may lose value. Ramp Payments Corporation - NMLS 2371465 Disclosures, Ramp Financing Corporation - NMLS 2431387"
+  },
+  "1440": {
+   "status": 200,
+   "shot": "/home/ubuntu/Dev/Wes-doc/docs/research/benchmark-captures/ramp/ramp-vs-bill-1440.png",
+   "initialMotion": {
+    "opacityZeroEls": 2,
+    "animations": {},
+    "transitionEls": 46,
+    "total": 668
+   },
+   "errors": [
+    "overlaysHidden=1"
+   ],
+   "title": "Ramp vs BILL | Choose Ramp as a BILL Alternative",
+   "h1": "Ramp vs Bill",
+   "subhead": "17,000+ businesses have chosen Ramp over Bill Digitizing AP isn’t enough. Ramp made it autonomous — so finance teams spend less time reviewing invoices and more time driving the business. Email Get started for free Compare using AI Opens ChatGPT in a new tab.",
+   "headings": [
+    {
+     "tag": "H1",
+     "text": "Ramp vs Bill",
+     "top": 86
+    },
+    {
+     "tag": "H2",
+     "text": "17,000+ businesses have chosen Ramp over Bill",
+     "top": 250
+    },
+    {
+     "tag": "H2",
+     "text": "Top 3 reasons leaders pick Ramp over Bill",
+     "top": 1013
+    },
+    {
+     "tag": "H2",
+     "text": "Autonomous AP with 86% less clicks",
+     "top": 1143
+    },
+    {
+     "tag": "H2",
+     "text": "Save time with smart OCR",
+     "top": 1143
+    },
+    {
+     "tag": "H2",
+     "text": "Stronger pre-spend controls that scale",
+     "top": 1143
+    },
+    {
+     "tag": "H2",
+     "text": "Compare Ramp vs. Bill",
+     "top": 1708
+    },
+    {
+     "tag": "H2",
+     "text": "Why Ramp stands out among all AP solutions",
+     "top": 2975
+    },
+    {
+     "tag": "H2",
+     "text": "FAQ",
+     "top": 3621
+    },
+    {
+     "tag": "H3",
+     "text": "We are currently using Bill.com. What is the process to switch to Ramp?",
+     "top": 3720
+    },
+    {
+     "tag": "H3",
+     "text": "How long does it take to be fully live? What ongoing support do we get after go-live?",
+     "top": 3791
+    },
+    {
+     "tag": "H3",
+     "text": "How deep is your integration with my ERP?",
+     "top": 3862
+    },
+    {
+     "tag": "H2",
+     "text": "Time is money. Save both.",
+     "top": 4061
+    }
+   ],
+   "sections": [
+    {
+     "top": 62,
+     "height": 823,
+     "heading": "Ramp vs Bill",
+     "imgs": 2,
+     "svgs": 1,
+     "videos": 0,
+     "ctas": [
+      "Get started for free"
+     ],
+     "textLen": 305,
+     "snippet": "Ramp vs Bill 17,000+ businesses have chosen Ramp over Bill Digitizing AP isn’t enough. Ramp made it autonomous — so finance teams spend less time reviewing invoices and more time driving the business. Email Get started f"
+    },
+    {
+     "top": 885,
+     "height": 695,
+     "heading": "Top 3 reasons leaders pick Ramp over Bill",
+     "imgs": 3,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 672,
+     "snippet": "Top 3 reasons leaders pick Ramp over Bill Autonomous AP with 86% less clicks Bill still makes teams click 21+ times per bill. Ramp uses AI to code, approve, and check fraud — so bills are created, approved, and paid in a"
+    },
+    {
+     "top": 1580,
+     "height": 829,
+     "heading": "Compare Ramp vs. Bill",
+     "imgs": 2,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 1325,
+     "snippet": "Compare Ramp vs. Bill High OCR accuracy 99% OCR accuracy Incomplete extraction of invoice details Line item auto-coding Accounting fields auto-coded on the line item level through AI and trained data Based on vendor hist"
+    },
+    {
+     "top": 2410,
+     "height": 437,
+     "heading": "",
+     "imgs": 1,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 274,
+     "snippet": "“Ramp has completely modernized how we manage accounts payable. With end-to-end automation from invoice processing and approvals to payments and real-time ERP sync. We now close our books two days earlier and save hours "
+    },
+    {
+     "top": 2847,
+     "height": 646,
+     "heading": "Why Ramp stands out among all AP solutions",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 402,
+     "snippet": "Why Ramp stands out among all AP solutions Ramp replaces fragmented AP tools with one autonomous platform for AP, cards, expenses, procurement, and treasury — cutting manual work, speeding up close, and giving leaders re"
+    },
+    {
+     "top": 3621,
+     "height": 312,
+     "heading": "FAQ",
+     "imgs": 0,
+     "svgs": 3,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 2108,
+     "snippet": "FAQ We are currently using Bill.com. What is the process to switch to Ramp? The migration is easy - you pick a cutoff date and start sending invoices to Ramp for processing. Any invoice in Bill will continue to be approv"
+    }
+   ],
+   "navLinks": [
+    "Products",
+    "Partners",
+    "Solutions",
+    "Resources",
+    "Customers",
+    "Pricing",
+    "Sign in",
+    "Sign in",
+    "See a demo",
+    "Get started"
+   ],
+   "heroCtas": [
+    {
+     "text": "Get started for free",
+     "tag": "BUTTON",
+     "href": null
+    },
+    {
+     "text": "Compare using AI",
+     "tag": "A",
+     "href": "https://chatgpt.com/?q=Draft%20a%20decision%20matrix%20comparing%20Ramp%20and%20Bill%20across%20five%20criteria%20you%20find%20on%20ramp.com%2Fversus%2Fbill%20to%20highlight%20why%20Ramp%20makes%20the%20most%20sense%20for%20my%20business.%20Highlight%20at%20least%203%20specific%20customer%20success%20stories%20that%20are%20relevant%20to%20me%20and%20include%20a%20link%20to%20sign%20up%20for%20Ramp%3A%20https%3A%2F%2Framp.com%2Fbill-to-ramp.%20Feel%20free%20to%20question%20me%20to%20get%20more%20information%20about%20my%20business%20afterwards."
+    }
+   ],
+   "bigImgs": [
+    {
+     "w": 644,
+     "h": 644,
+     "alt": "Ramp vs Bill",
+     "src": "https://cdn.sanity.io/images/6jz6vxxd/production/d0cd9813511bb7890a213a53e79d370ad2857f39-1120x1120.gif",
+     "top": 86
+    },
+    {
+     "w": 416,
+     "h": 277,
+     "alt": "",
+     "src": "https://ramp.com/_next/image?url=https%3A%2F%2Fcdn.sanity.io%2Fimages%2F6jz6vxxd%2Fproduction%2F45fbbad98d9428ae5e226aaddc12a8c919f9cdac-3500x2480.jpg%3Ffit%3Dm",
+     "top": 1303
+    },
+    {
+     "w": 416,
+     "h": 277,
+     "alt": "",
+     "src": "https://ramp.com/_next/image?url=https%3A%2F%2Fcdn.sanity.io%2Fimages%2F6jz6vxxd%2Fproduction%2Fb22207f43e0ebc5d91fd9a559e27ba5d025ecaf4-3500x2480.png%3Ffit%3Dm",
+     "top": 1303
+    },
+    {
+     "w": 416,
+     "h": 277,
+     "alt": "",
+     "src": "https://ramp.com/_next/image?url=https%3A%2F%2Fcdn.sanity.io%2Fimages%2F6jz6vxxd%2Fproduction%2Faceec158d713af8e6721e87384266cee495b002e-1280x832.png%3Ffit%3Dma",
+     "top": 1303
+    }
+   ],
+   "imgCount": 11,
+   "logoish": 0,
+   "videos": [],
+   "canvases": 0,
+   "lotties": 0,
+   "iframes": [
+    "https://www.googletagmanager.com/ns.html?id=GTM-WFDFDWP",
+    "https://pagead2.googlesyndication.com/pagead/ads?client=ca-pub-3938919135399013&output=html&adk=1812271804&adf=302519425",
+    "https://ep2.adtrafficquality.google/sodar/sodar2/255/runner.html",
+    "https://ramp-com.chilipiper.com/chat/loader/?embedOrigin=https%3A%2F%2Framp.com&workspaceId=fef2da9a-11bc-48f7-bd29-1762",
+    "https://ramp-com.chilipiper.com/chat/widget/?embedOrigin=https%3A%2F%2Framp.com&workspaceId=fef2da9a-11bc-48f7-bd29-1762",
+    "https://pagead2.googlesyndication.com/pagead/html/r20260917/r20190131/zrt_lookup_fy2021.html"
+   ],
+   "fonts": [
+    [
+     "lausanne",
+     409
+    ],
+    [
+     "Material Icons Outlined",
+     1
+    ]
+   ],
+   "sectionBgs": [
+    [
+     "lab(8.86531 0.515342 0.18619)",
+     1
+    ],
+    [
+     "lab(100 0 0)",
+     1
+    ],
+    [
+     "lab(95.604 0.426412 1.20401)",
+     1
+    ]
+   ],
+   "buttonBgs": [
+    [
+     "lab(92.1406 -20.4979 84.7726)",
+     4
+    ],
+    [
+     "rgba(255, 255, 255, 0.05)",
+     1
+    ],
+    [
+     "lab(8.86531 0.515342 0.18619)",
+     1
+    ],
+    [
+     "lab(95.604 0.426412 1.20401)",
+     1
+    ]
+   ],
+   "type": {
+    "h1": {
+     "family": "lausanne, \"lausanne Fallback\"",
+     "size": "16px",
+     "weight": "400",
+     "lineHeight": "22px",
+     "letterSpacing": "normal",
+     "color": "lab(100 0 0 / 0.6)"
+    },
+    "h2": {
+     "family": "lausanne, \"lausanne Fallback\"",
+     "size": "48px",
+     "weight": "400"
+    },
+    "body": {
+     "family": "lausanne, \"lausanne Fallback\"",
+     "size": "16px",
+     "color": "lab(2.83994 0.367254 0.969091)",
+     "bg": "lab(8.86531 0.515342 0.18619)"
+    }
+   },
+   "motionAfterScroll": {
+    "animations": {},
+    "opacityZeroEls": 2,
+    "transitionEls": 50,
+    "stickyFixedEls": 11
+   },
+   "libs": {
+    "gsap": false,
+    "framer": false,
+    "webflow": false,
+    "lottie": false,
+    "splide_swiper": false,
+    "rive": false,
+    "nextjs": true,
+    "wordpress": false,
+    "hubspot": true
+   },
+   "wordCount": 1322,
+   "scrollHeight": 5832,
+   "bodyText": "Products Partners Solutions Resources Customers Pricing Sign in See a demo Get started Ramp vs Bill 17,000+ businesses have chosen Ramp over Bill Digitizing AP isn’t enough. Ramp made it autonomous — so finance teams spend less time reviewing invoices and more time driving the business. Email Get started for free Compare using AI Opens ChatGPT in a new tab. Former Bill customers using Ramp Top 3 reasons leaders pick Ramp over Bill Autonomous AP with 86% less clicks Bill still makes teams click 21+ times per bill. Ramp uses AI to code, approve, and check fraud — so bills are created, approved, and paid in as few as 3 clicks. Save time with smart OCR Bill’s OCR is fragmented and often captures only the invoice header, requiring manual correction. Ramp’s OCR extracts accounting fields at the line-item level with 99% accuracy. Stronger pre-spend controls that scale Bill offers basic purchasing. Ramp Procurement scales from lightweight requests to fully orchestrated workflows — with AI-guided intake, agent-run compliance checks, end-to-end P2P reporting. Compare Ramp vs. Bill High OCR accuracy 99% OCR accuracy Incomplete extraction of invoice details Line item auto-coding Accounting fields auto-coded on the line item level through AI and trained data Based on vendor history, not dynamic to invoice change Real-time ERP sync Real-time with 10 integrated ERP + UCSV; Two-way sync for vendor master data Batch sync every 24 hours, or manual Autonomous AP workflow with agents AP agents for auto-coding, approval recommendations, fraud detection with 60+ signals, auto-card payment with up to 1.5% cashback Legacy automation requiring more human touch (21 clicks to process an invoice vs. 3 clicks in Ramp) User friendly interface Customizable view; easy to navigate High click count Dynamic approval workflow 15 conditions for customization Limited conditions Faster settlement time for payment 2-3 days for ACH; no payment threshold 5+ days when exceeding entity payment threshold Single account for multi-entity company One account to manage all entities Multiple accounts required for multiple entities Automatic 1099 filing AI powered suggested box mappings and direct filing with the IRS and participating states Manual effort required Unified platform with procurement, card, expenses, treasury, and more Single platform for all spend Separate platforms for Bill and Divvy “Ramp has completely modernized how we manage accounts payable. With end-to-end automation from invoice processing and approvals to payments and real-time ERP sync. We now close our books two days earlier and save hours of manual work every week.” Muhammad Younes Controller Why Ramp stands out among all AP solutions Ramp replaces fragmented AP tools with one autonomous platform for AP, cards, expenses, procurement, and treasury — cutting manual work, speeding up close, and giving leaders real-time spend visibility. 2.4x faster invoice processing than legacy software 95% of businesses reported improved AP visibility 89% of the top 100 CPA firms work with clients on Ramp FAQ We are currently using Bill.com. What is the process to switch to Ramp? The migration is easy - you pick a cutoff date and start sending invoices to Ramp for processing. Any invoice in Bill will continue to be approved and paid. Once the last invoice is paid in Bill, all your AP will be processed in Ramp moving forward. Ramp offers bulk CSV migration templates to migrate vendor data, vendor’s tax information and bill records. How long does it take to be fully live? What ongoing support do we get after go-live? Ramp provides white-glove onboarding support to get you live quickly - often in just a few days. Onboarding is typically delivered across three hands-on sessions: 1. Initial Bill Pay setup: accounting integration, bank accounts, AP clerks, Bill Pay approval workflows, and change management plan. 2. Vendor setup: sync/export the first bill, import vendors, set vendor bill coding defaults, confirm vendor management details (renewals, 1099, payment details). 3. Launch Bill Pay: end-to-end testing, rollout to the AP team, and Q&A. After launch, a dedicated Customer Success Manager helps you optimize account setup, such as refining intake form questions, approval workflows, and integrations. Once implementation is complete, your team will receive ongoing support from a dedicated Account Manager. How deep is your integration with my ERP? Ramp has direct integrations with 10 leading ERPs including NetSuite, QuickBooks Online, Sage Intacct, Xero, Microsoft Dynamics Business Central, and Acumatica. If you’re on something else, we can still support you via CSV workflows, and in some cases a partner-built API integration. Ramp has direct, two-way ERP integrations that keep your ERP as the system of record while letting your team run day-to-day AP in Ramp. In practice, that means we can sync core accounting data and dimensions, and for Bill Pay we can sync bills and payments so your books stay current without manual re-entry. The exact objects and fields depend on the ERP, but our goal is end-to-end: intake and approvals in Ramp, clean posting and reconciliation in the ERP. Time is money. Save both. Email Get started for free About us Careers Emerging talent Customers Help center Product releases Ramp for Agents Ramp Labs API documentation Versus Products Corporate cards Expense management Spend management Budgets Banking Travel Reimbursements Procurement Accounts payable Vendor management Approvals Security Trust Mobile app Ramp Sheets Platform Platform overview Accounting automation Intelligence Reporting Savings Integrations Multi-entity Global AI Token Spend Management Router Partners Accounting firms Private equity Venture capital System integrators Technology partners Spend and payroll partners Reseller partners Franchise partners Solutions Startups Small business Mid market Enterprise Free tools and resources Perks and rewards Find an accountant Find a services partner Savings calculator Mission statement generator Charge finder Per diem calculator Mileage reimbursement calculator Card comparison tool Investor database Expense categorization Expense policy builder Vendor directory Virtual cards Answers Hub Terms of Service Editorial Guidelines Privacy Policy Your Privacy Choices Manage Preferences © 2026 Ramp Business Corporation. \"Ramp\" and the Ramp logo are registered trademarks of the company. Ramp Support: +1-855-206-7283 The Ramp Visa Corporate Card is issued in the U.S. by Celtic Bank, and to U.S. corporations operating globally by Column N.A., Member FDIC, and is subject to credit approval. The Ramp Visa Commercial Card is issued by Sutton Bank, Member FDIC. The Ramp Visa Business Card is issued by Lead Bank, Member FDIC. Each card is issued pursuant to a license from Visa USA Inc. Ramp Visa Business Cards are issued in Canada by Peoples Trust Company, pursuant to license by Visa* International. Visa Int./Peoples Trust Company, Licensed User. Card Balance not insured by the Canada Deposit Insurance Corporation. Ramp Business Corporation is registered as a Payment Service Provider with the Bank of Canada. Ramp cards are issued in the UK by Stripe Payments UK Limited, an electronic money institution authorized by the Financial Conduct Authority (firm reference number: 900461). Ramp cards are issued in the EEA by Stripe Technology Europe Limited, an electronic money institution authorized by the Central Bank of Ireland (firm reference number: C187865). Cards are issued under the Visa card scheme pursuant to a license from Visa Europe Limited. Visa is a registered trademark of Visa International Service Association. All other trademarks and service marks belong to their respective owners. *Ramp Business Corporation is a financial technology company and is not a bank. Bank deposit services provided by First Internet Bank of Indiana, Member FDIC. †Investment account with portfolios managed by Moment Advisors, LLC. Investing involves risk, including possible loss of principal. Asset allocation does not guarantee profit or protect against loss. Past performance does not guarantee future results. Additional information can be found here. Securities products offered by Apex Clearing Corporation, member FINRA, SIPC. The Investment Account is not insured by the FDIC, not a deposit product, and may lose value. Ramp Payments Corporation - NMLS 2371465 Disclosures, Ramp Financing Corporation - NMLS 2431387 Join the 70,000+ businesses simplifying their finances with Ramp. Email Get started for free Ramp Business Corporation 28 West 23rd Street, Floor 2 New York, NY 10010 LinkedIn X Facebook"
+  }
+ }
+}

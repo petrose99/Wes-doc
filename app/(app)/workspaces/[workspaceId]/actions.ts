@@ -1,5 +1,7 @@
 "use server"
 
+import { getDocumentClaimFacts } from "@/models/expense-claims"
+import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import type { SuggestResult } from "@/components/extract/types"
 import { ActionState } from "@/lib/actions"
 import { redirect } from "next/navigation"
@@ -7,6 +9,7 @@ import { recordDocumentAudit } from "@/lib/audit"
 import config from "@/lib/config"
 import { JurisdictionRequiredError } from "@/lib/jurisdictions/require"
 import { DOC_TYPE_SPECS, isDocType } from "@/lib/doc-types"
+import { describeMoveIneligibility } from "@/lib/reclassify"
 import { processDocumentJob } from "@/lib/document-processing"
 import { sampleDocumentPages } from "@/lib/document-suggest"
 import { DocumentFieldDefinition, documentTemplateFieldsSchema, parseTemplateFields } from "@/lib/document-templates"
@@ -17,7 +20,21 @@ import { scanDocumentBuffer } from "@/lib/malware-scan"
 import { parsePageRange } from "@/lib/page-range"
 import { refreshDocumentReadiness } from "@/lib/readiness/refresh"
 import { expandZipBuffer } from "@/lib/zip-ingestion"
-import { deleteWorkspaceDocuments, getDocumentsStatus, getWorkspaceDocument, markDocumentsReviewed, requeueAdaptiveExtraction, requeueDocumentExtraction, updateDocumentField, updateDocumentReview, validateDocumentInput } from "@/models/documents"
+import { cancelDocument, deleteWorkspaceDocuments, DocumentCancellationBlockedError, getDocumentsStatus, getWorkspaceDocument, markDocumentsReviewed, requeueAdaptiveExtraction, requeueDocumentExtraction, updateDocumentField, updateDocumentReview, validateDocumentInput } from "@/models/documents"
+import { listDocumentAuditEvents, listDocumentStageDecisions } from "@/models/audit-events"
+import { getActiveWorkflowStageState, getOpenLedgerRetryTask } from "@/models/review-tasks"
+import { getApprovalDetailFacts } from "@/models/approvals"
+import type { WorkspaceRole } from "@/models/workspaces"
+import { overrideGate } from "@/lib/gates/actions"
+import { MATCH_VARIANCE_GATE_TYPE } from "@/lib/gates/match-variance"
+import { canOverrideMismatch, setMismatchApprovers } from "@/models/mismatch-approvers"
+import { AUTO_START_ESTIMATE_DAYS, estimateAutoStarts, setDefaultApprovalFlow } from "@/models/approval-defaults"
+import { STALE_FLOW_ERROR } from "@/lib/approvals/default-flow"
+import { getOrCreateAutomationConfig, updateAutomationConfig } from "@/models/automation-config"
+import { adminPaths } from "@/lib/admin/paths"
+import { listOpenGatesForDocument, overrideEligibility } from "@/lib/gates/list"
+import { listOpenEscalationsForDocument } from "@/models/exceptions"
+import { getProcessingStateInput } from "@/models/processing-state"
 import { addDomainPackToFile, createFile, createFolder, deleteFileIfEmpty, deleteFiles, deleteFolder, duplicateFile, getFileTemplates, getWorkspaceFile, listFileShares, moveToFolder, removeFileShare, renameFile, renameFolder, setLinkAccess, touchFile, upsertFileShare } from "@/models/files"
 import { getCurrentUser } from "@/lib/auth"
 import { prisma } from "@/lib/db"
@@ -26,6 +43,8 @@ import { revalidatePath } from "next/cache"
 import { after } from "next/server"
 import { z } from "zod"
 import { errorMessage, NO_ACCESS, paths, requireMember, sheetPath } from "./action-helpers"
+import { runDeterministicChecks } from "@/models/document-checks"
+import { acceptStatementLayoutAsNew, resolveOrCreateInstitution } from "@/models/institutions"
 
 const templateForm = z.object({ name: z.string().trim().min(2).max(80), code: z.string().regex(/^[a-z][a-z0-9_]{1,62}$/), fields: z.string().min(2), prompt: z.string().max(2000).optional() })
 
@@ -154,15 +173,53 @@ export async function setDocumentTypeAction(workspaceId: string, documentId: str
   return { success: true, data: null }
 }
 
+const assertInstitutionForm = z.object({
+  institutionId: z.string().trim().min(1).optional(),
+  newInstitutionName: z.string().trim().min(1).max(120).optional(),
+}).refine((v) => v.institutionId || v.newInstitutionName, { message: "Pick an institution or name a new one" })
+
+/** #217: the bank-statement sibling of setDocumentTypeAction above — "user asserts which
+ * Institution this statement belongs to, assertion is authoritative" (#178), no AI
+ * classification. Picking an existing Institution or naming a new one both land here; a new name
+ * resolves through resolveOrCreateInstitution so a duplicate name (by another reviewer, or a
+ * double click) reuses the same row instead of erroring on the `[workspaceId, normalizedKey]`
+ * uniqueness. Re-runs the deterministic checks synchronously afterward — the layout-drift check
+ * (#207) has nothing to compare until an institution is asserted, so the pane would otherwise
+ * show its "not applicable" calm state until the next unrelated reprocess. */
+export async function assertInstitutionAction(workspaceId: string, documentId: string, input: { institutionId?: string; newInstitutionName?: string }): Promise<ActionState<{ institutionId: string; institutionName: string }>> {
+  const user = await getCurrentUser()
+  if (!(await requireMember(workspaceId, user.id))) return { success: false, error: NO_ACCESS }
+  const parsed = assertInstitutionForm.safeParse(input)
+  if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? "Pick an institution or name a new one" }
+  const document = await getWorkspaceDocument(workspaceId, documentId)
+  if (!document) return { success: false, error: "Document not found" }
+  try {
+    const institution = parsed.data.institutionId
+      ? await prisma.institution.findFirst({ where: { id: parsed.data.institutionId, workspaceId } })
+      : await resolveOrCreateInstitution(workspaceId, parsed.data.newInstitutionName!)
+    if (!institution) return { success: false, error: "Institution not found" }
+    await prisma.document.update({ where: { id: documentId }, data: { institutionId: institution.id } })
+    await runDeterministicChecks({ workspaceId, documentId })
+    revalidatePath(`${paths(workspaceId).documents}/${documentId}`)
+    return { success: true, data: { institutionId: institution.id, institutionName: institution.name } }
+  } catch (error) {
+    return { success: false, error: errorMessage(error, "Could not save the institution") }
+  }
+}
+
 export async function reclassifyDocumentAction(workspaceId: string, documentId: string, docType: string): Promise<ActionState<null>> {
   if (!isDocType(docType)) return { success: false, error: "Invalid document type" }
   const user = await getCurrentUser()
   if (!(await requireMember(workspaceId, user.id))) return { success: false, error: NO_ACCESS }
   const document = await prisma.document.findFirst({
     where: { id: documentId, workspaceId },
-    select: { id: true, fileId: true, codingData: true },
+    select: { id: true, fileId: true, codingData: true, docType: true },
   })
   if (!document) return { success: false, error: "Document not found" }
+  if (document.docType) {
+    const ineligibleReason = await describeMoveIneligibility(workspaceId, documentId, document.docType)
+    if (ineligibleReason) return { success: false, error: ineligibleReason }
+  }
   const prev = (document.codingData as Record<string, unknown> | null) ?? {}
   const spec = DOC_TYPE_SPECS[docType]
   await prisma.document.update({
@@ -172,15 +229,128 @@ export async function reclassifyDocumentAction(workspaceId: string, documentId: 
       codingData: { ...prev, documentType: spec.defaultCategory, documentTypeSource: "human", categoryConfirmed: true } as Prisma.InputJsonValue,
     },
   })
+  await recordDocumentAudit({
+    workspaceId, documentId, actorId: user.id, type: "document_reclassified",
+    detail: { fromType: document.docType, toType: docType },
+  })
   revalidatePath(`${paths(workspaceId).documents}/${documentId}`)
   return { success: true, data: null }
 }
 
-export async function saveDocumentReviewAction(workspaceId: string, documentId: string, formData: FormData): Promise<ActionState<null>> {
+/** #198: data for the selection-triggered Audit/Approval panel on the Invoices/Receipts list
+ * screens — the flat audit log (same shape as split-pane's Activity tab) plus the approval
+ * step-chain grouped from `review_task_stage_decided` events. #203 adds this document's open
+ * gates, each pre-flagged with the server's own hard/soft override eligibility so the client
+ * never has to re-derive the read-only-hard-gate rule itself. */
+export async function getSelectionAuditPanelDataAction(workspaceId: string, documentId: string) {
+  const user = await getCurrentUser()
+  const membership = await requireMember(workspaceId, user.id)
+  if (!membership) return null
+  const [auditEvents, stageDecisions, gates, stageState, escalations, facts, claimsEnabled, processing, ledgerRetryTask, sourceDocument] = await Promise.all([
+    listDocumentAuditEvents(workspaceId, documentId),
+    listDocumentStageDecisions(workspaceId, documentId),
+    listOpenGatesForDocument(workspaceId, documentId),
+    getActiveWorkflowStageState(workspaceId, documentId),
+    listOpenEscalationsForDocument(workspaceId, documentId),
+    // #257 S6/S7: who the approval waits on, the supplier's record, a near duplicate, the PO
+    // variance figures — for the Approval tab. Null-safe per field; never fails the whole load.
+    getApprovalDetailFacts(workspaceId, documentId, { userId: user.id, role: membership.role as WorkspaceRole }).catch(() => null),
+    getWorkspaceCapabilities(workspaceId).then((caps) => caps.has("expense-approvals")).catch(() => false),
+    // #258: who approved with no flow / whether it went touchless — the Approval tab is never
+    // empty on an Approved document, and the Status line names the actor once this lands.
+    getProcessingStateInput(workspaceId, documentId).catch(() => null),
+    // #281 spec.md §7: the Checks tab's ledger-push Retry — null when no push has failed.
+    getOpenLedgerRetryTask(workspaceId, documentId).catch(() => null),
+    // #374: the intake channel + sender for the Activity tab's audit line — only email/WhatsApp
+    // carry a sender identity; every other source (upload, camera, zip, api) has none to show.
+    getWorkspaceDocument(workspaceId, documentId).catch(() => null),
+  ])
+  const intake: { channel: "email" | "whatsapp"; sender: string } | null =
+    sourceDocument?.sourceWhatsapp ? { channel: "whatsapp", sender: sourceDocument.sourceWhatsapp } :
+    sourceDocument?.sourceEmail ? { channel: "email", sender: sourceDocument.sourceEmail } :
+    null
+  // #218: a stage only reads as "Pending" while its task is still open/in_review (stageState is
+  // null once resolved or workflow-less) and it hasn't already produced a review_task_stage_decided
+  // event — decidedIndexes covers the (rare but possible) case of a stage re-decided after a
+  // workflow restart, where an earlier index could otherwise show as both decided and pending.
+  const decidedIndexes = new Set(stageDecisions.map((decision) => decision.stageIndex))
+  const pendingStages = stageState
+    ? stageState.stages.filter((stage) => stage.stageIndex >= stageState.currentStageIndex && !decidedIndexes.has(stage.stageIndex))
+    : []
+  const claimView = claimsEnabled ? await getDocumentClaimFacts(workspaceId, documentId, { userId: user.id, role: membership.role as WorkspaceRole }).catch(() => null) : null
+  return {
+    facts,
+    intake,
+    claimsEnabled,
+    claim: claimView?.claim ?? null,
+    claimEligibility: claimView?.claimEligibility ?? null,
+    reviewed: processing?.reviewed ?? null,
+    touchless: processing?.touchlessThresholdPercent !== null && processing?.touchlessThresholdPercent !== undefined ? { thresholdPercent: processing.touchlessThresholdPercent } : null,
+    auditEvents: auditEvents.map((event) => ({ id: event.id, label: event.label, createdAt: event.createdAt.toISOString(), actorName: event.actorName })),
+    stageDecisions: stageDecisions.map((decision) => ({ ...decision, decidedAt: decision.decidedAt.toISOString() })),
+    pendingStages: pendingStages.map((stage) => ({ stageIndex: stage.stageIndex, stageName: stage.name })),
+    gates: gates.map((gate) => {
+      const eligibility = overrideEligibility(gate.severity)
+      return {
+        id: gate.id,
+        gateType: gate.gateType,
+        severity: gate.severity,
+        firedAt: gate.firedAt.toISOString(),
+        overridable: eligibility.overridable,
+        refusalReason: eligibility.overridable ? null : eligibility.reason,
+      }
+    }),
+    ledgerRetry: ledgerRetryTask ? { id: ledgerRetryTask.id, detail: ledgerRetryTask.detail ?? "The last push to your ledger failed." } : null,
+    escalations: escalations.map((escalation) => ({
+      id: escalation.id,
+      checkCode: escalation.checkCode,
+      message: escalation.message,
+      escalationStatus: escalation.escalationStatus,
+      escalatedAt: escalation.escalatedAt.toISOString(),
+    })),
+  }
+}
+
+/** #203: Override Mode's per-gate action. Refuses a hard gate as defense in depth even though the
+ * UI never renders an enabled control for one (per #40/#51's read-only-hard-gate rule, PR #109) —
+ * this is the surface-level enforcement point that rule expects, not `overrideGate` itself (see
+ * lib/gates/actions.ts's own comment on why it stays unopinionated about severity). */
+export async function overrideGateAction(workspaceId: string, gateId: string, formData: FormData): Promise<ActionState<null>> {
+  const user = await getCurrentUser()
+  if (!(await requireMember(workspaceId, user.id))) return { success: false, error: NO_ACCESS }
+  const gate = await prisma.gate.findUnique({ where: { id: gateId } })
+  if (!gate || gate.workspaceId !== workspaceId) return { success: false, error: "Gate not found" }
+  const eligibility = overrideEligibility(gate.severity)
+  if (!eligibility.overridable) return { success: false, error: eligibility.reason }
+  // #253: a PO mismatch is overridden by whoever Admin › PO Mismatch Flows › Who approves a
+  // mismatch names. An empty list there is the in-force default ("the current stage's approver"),
+  // which is exactly the any-member rule this path already applied — so an unconfigured workspace
+  // is unaffected. The refusal names the people who can, rather than only saying no.
+  if (gate.gateType === MATCH_VARIANCE_GATE_TYPE) {
+    const verdict = await canOverrideMismatch({ workspaceId, actorId: user.id })
+    if (!verdict.allowed) {
+      return { success: false, error: `Only ${verdict.approverNames.join(", ")} can override a PO mismatch in this workspace. Ask one of them, or change who approves a mismatch in Admin › PO Mismatch Flows.` }
+    }
+  }
+  const reason = String(formData.get("reason") ?? "").trim()
+  if (!reason) return { success: false, error: "A reason is required to override this gate." }
+  await overrideGate({ gateId, actorId: user.id, reason })
+  revalidatePath(`${paths(workspaceId).documents}/${gate.documentId}`)
+  return { success: true, data: null }
+}
+
+/** Saves the pane's field form. #258: with `stay`, returns the outcome (`approved` — the
+ * document reached "reviewed" — or the first still-missing required field's label) instead of
+ * redirecting, so the embedded pane and the `?full=1` route survive their own decision and can
+ * refresh in place; the legacy `/review` inbox keeps the redirect. */
+export type SaveReviewResult = { approved: boolean; missingLabel: string | null }
+
+export async function saveDocumentReviewAction(workspaceId: string, documentId: string, formData: FormData, options: { stay?: boolean } = {}): Promise<ActionState<SaveReviewResult | null>> {
   const user = await getCurrentUser()
   if (!(await requireMember(workspaceId, user.id))) return { success: false, error: NO_ACCESS }
   const document = await getWorkspaceDocument(workspaceId, documentId)
   if (!document) return { success: false, error: "Document not found" }
+  let outcome: SaveReviewResult | null = null
   try {
     const fields = parseTemplateFields(document.fieldSnapshot)
     const data: Record<string, unknown> = {}
@@ -213,8 +383,71 @@ export async function saveDocumentReviewAction(workspaceId: string, documentId: 
       if (field.type === "number") { data[field.key] = Number(raw); continue }
       data[field.key] = raw
     }
-    await updateDocumentReview({ workspaceId, documentId, reviewedData: data, actorId: user.id }); after(async () => { await refreshDocumentReadiness({ workspaceId, documentId }) }); revalidatePath(`${paths(workspaceId).documents}/${documentId}`); await revalidateSheet(workspaceId, document.fileId); redirect(paths(workspaceId).review)
+    const updated = await updateDocumentReview({ workspaceId, documentId, reviewedData: data, actorId: user.id })
+    after(async () => { await refreshDocumentReadiness({ workspaceId, documentId }) })
+    revalidatePath(`${paths(workspaceId).documents}/${documentId}`)
+    await revalidateSheet(workspaceId, document.fileId)
+    const missing = (updated.confidence as { missingRequiredFields?: string[] } | null)?.missingRequiredFields ?? []
+    const missingLabel = missing[0] ? fields.find((field) => field.key === missing[0])?.label ?? missing[0] : null
+    outcome = { approved: updated.status === "reviewed", missingLabel }
   } catch { return { success: false, error: "Check the field values" } }
+  if (options.stay) return { success: true, data: outcome }
+  redirect(paths(workspaceId).review)
+}
+
+/** A reviewer flags a check as "the document is wrong" rather than "the extraction misread it"
+ * (#202) — distinct from fixing the cell, which just corrects the reviewed value. Marks the
+ * check row `escalated` (status is a plain string column, no migration needed), opens its #210
+ * Exceptions lifecycle (`escalationStatus: "open"`), and writes a document audit event so the
+ * queue has a trail to query. */
+export async function escalateCheckAction(workspaceId: string, documentId: string, checkCode: string): Promise<ActionState<null>> {
+  const user = await getCurrentUser()
+  if (!(await requireMember(workspaceId, user.id))) return { success: false, error: NO_ACCESS }
+  const check = await prisma.documentCheckResult.findUnique({ where: { documentId_checkCode: { documentId, checkCode } } })
+  if (!check || check.workspaceId !== workspaceId || check.documentId !== documentId) return { success: false, error: "Check not found" }
+  await prisma.documentCheckResult.update({ where: { id: check.id }, data: { status: "escalated", escalationStatus: "open" } })
+  await recordDocumentAudit({ workspaceId, documentId, actorId: user.id, type: "check.escalated", detail: { checkCode, previousStatus: check.status } })
+  revalidatePath(`${paths(workspaceId).documents}/${documentId}`)
+  revalidatePath(paths(workspaceId).exceptions)
+  return { success: true, data: null }
+}
+
+/** #217: the drift banner's "Accept as new layout" action — the sibling of escalateCheckAction
+ * above for the statement_layout_drift check specifically. Where escalateCheckAction says "the
+ * document is wrong, route it to a human" and deliberately leaves the saved layout untouched,
+ * this says "the document is right, the institution's layout genuinely changed" and overwrites
+ * Institution.savedLayout with this statement's derived shape (models/institutions.ts). Confirmed
+ * drift never auto-updates the saved layout per #207/#217's resolution — only this explicit
+ * reviewer action does. */
+export async function acceptStatementLayoutAction(workspaceId: string, documentId: string): Promise<ActionState<null>> {
+  const user = await getCurrentUser()
+  if (!(await requireMember(workspaceId, user.id))) return { success: false, error: NO_ACCESS }
+  const result = await acceptStatementLayoutAsNew(workspaceId, documentId)
+  if (!result.success) return { success: false, error: result.error }
+  await recordDocumentAudit({ workspaceId, documentId, actorId: user.id, type: "check.layout_accepted", detail: { checkCode: "statement_layout_drift" } })
+  revalidatePath(`${paths(workspaceId).documents}/${documentId}`)
+  return { success: true, data: null }
+}
+
+/** #220: single-row terminal cancellation of an invoice, bound to a `ReasonDialogButton` next to
+ * the selection panel's other document-level actions. The reason-required contract is `cancel
+ * Document`'s, not re-validated here beyond pulling it off the form. */
+export async function cancelInvoiceAction(workspaceId: string, documentId: string, formData: FormData): Promise<ActionState<null>> {
+  const user = await getCurrentUser()
+  if (!(await requireMember(workspaceId, user.id))) return { success: false, error: NO_ACCESS }
+  const reason = String(formData.get("reason") || "").trim()
+  if (!reason) return { success: false, error: "A reason is required" }
+  try {
+    await cancelDocument({ workspaceId, documentId, actorId: user.id, reason })
+  } catch (error) {
+    if (error instanceof DocumentCancellationBlockedError) return { success: false, error: `Can't cancel — this invoice is already ${error.paymentStatus}` }
+    if (error instanceof Error && error.message === "document_already_cancelled") return { success: false, error: "This invoice is already cancelled" }
+    if (error instanceof Error && error.message === "document_not_found") return { success: false, error: "Invoice not found" }
+    return { success: false, error: "Could not cancel this invoice" }
+  }
+  revalidatePath(`${paths(workspaceId).documents}/${documentId}`)
+  revalidatePath(paths(workspaceId).pipeline)
+  return { success: true, data: null }
 }
 
 export async function createDocumentTemplateAction(workspaceId: string, formData: FormData): Promise<ActionState<null>> {
@@ -287,7 +520,7 @@ export async function matchDocumentShapeAction(workspaceId: string, formData: Fo
   const user = await getCurrentUser()
   const membership = await requireMember(workspaceId, user.id)
   if (!membership) return { success: false, error: NO_ACCESS }
-  if (!membership.workspace.aiEnabled) return { success: false, error: "AI extraction is disabled for this workspace" }
+  if (!membership.workspace.aiEnabled) return { success: false, error: "AI extraction is disabled for this company" }
   const file = formData.get("file")
   if (!(file instanceof File) || !file.size) return { success: false, error: "Add a document first" }
   try {
@@ -398,6 +631,102 @@ export async function setWorkspaceAiAction(workspaceId: string, enabled: boolean
     revalidatePath(paths(workspaceId).workspace)
     return { success: true, data: null }
   } catch { return { success: false, error: "Could not change the AI setting" } }
+}
+
+/** #206: the acceptable overage (percent of ordered quantity) before the PO/invoice line-
+ * consumption check flags a description group. 0-100 is the sane range for a percentage read
+ * as "how far over is still fine" — anything beyond that isn't a tolerance any more. */
+/** @deprecated #253 — superseded by setPoMismatchPolicyAction, which saves both tolerances and the
+ * approver list under Admin › PO Mismatch Flows' one save bar. Left in place rather than deleted:
+ * removing a shipped server action is an owner's call, not a build's (recorded as an orphan on the
+ * close comment for sign-off). No surface calls this any more. */
+export async function setPoQuantityToleranceAction(workspaceId: string, percent: number): Promise<ActionState<null>> {
+  const user = await getCurrentUser()
+  if (!(await requireMember(workspaceId, user.id, ["owner"]))) return { success: false, error: NO_ACCESS }
+  if (!Number.isFinite(percent) || percent < 0 || percent > 100) return { success: false, error: "Enter a percentage between 0 and 100" }
+  try {
+    await prisma.workspace.update({ where: { id: workspaceId }, data: { poQuantityTolerancePercent: percent } })
+    revalidatePath(paths(workspaceId).workspace)
+    return { success: true, data: null }
+  } catch { return { success: false, error: "Could not change the tolerance setting" } }
+}
+
+/** #253: Admin › PO Mismatch Flows saves as one form — both tolerances and the approver list under
+ * one Save. Three writes rather than one because they land in three places (Workspace, the
+ * automation config, Workspace again); they are ordered so the two tolerances commit before the
+ * approver list, and any failure returns a refusal with nothing half-applied that the owner cannot
+ * see, since the page re-reads on success.
+ *
+ * `matchVariancePercent` arrives 0–100 from the field and is stored 0–1, which is what
+ * WorkspaceAutomationConfig.matchTolerance.percent has always held (#228 Q12) — the gate and the
+ * View PO row (#250) read that number unchanged. The existing `floor` is preserved: it is a
+ * separate decision that this form does not surface, and dropping it would silently widen the
+ * gate. */
+export async function setPoMismatchPolicyAction(workspaceId: string, input: {
+  quantityPercent: number
+  matchVariancePercent: number
+  approverIds: string[]
+}): Promise<ActionState<null>> {
+  const user = await getCurrentUser()
+  if (!(await requireMember(workspaceId, user.id, ["owner"]))) return { success: false, error: NO_ACCESS }
+  if (!Number.isFinite(input.quantityPercent) || input.quantityPercent < 0 || input.quantityPercent > 100) {
+    return { success: false, error: "Enter a quantity tolerance between 0 and 100." }
+  }
+  if (!Number.isFinite(input.matchVariancePercent) || input.matchVariancePercent < 0 || input.matchVariancePercent > 100) {
+    return { success: false, error: "Enter a match variance between 0 and 100." }
+  }
+  try {
+    const config = await getOrCreateAutomationConfig(workspaceId)
+    const existingTolerance = (config.matchTolerance ?? null) as { percent?: number; floor?: { amount: number; currency?: string } } | null
+    await prisma.workspace.update({ where: { id: workspaceId }, data: { poQuantityTolerancePercent: input.quantityPercent } })
+    await updateAutomationConfig({
+      workspaceId,
+      actorId: user.id,
+      patch: {
+        matchTolerance: {
+          percent: input.matchVariancePercent / 100,
+          floor: existingTolerance?.floor ?? { amount: 0 },
+        },
+      },
+    })
+    await setMismatchApprovers({ workspaceId, userIds: input.approverIds, actorId: user.id })
+    revalidatePath(adminPaths(workspaceId).poMismatchFlows)
+    return { success: true, data: null }
+  } catch (error) {
+    if (error instanceof Error && error.message === "mismatch_approver_not_a_member") {
+      return { success: false, error: "one of the people you named is no longer a member of this company" }
+    }
+    return { success: false, error: "could not save the mismatch policy" }
+  }
+}
+
+/** #253: the Default flow selector on Admin › Approval Flows. `workflowId: null` clears it, which
+ * puts the workspace back to approvals starting by hand from the Invoices bulk bar. */
+export async function setDefaultApprovalFlowAction(workspaceId: string, workflowId: string | null): Promise<ActionState<null>> {
+  const user = await getCurrentUser()
+  if (!(await requireMember(workspaceId, user.id, ["owner"]))) return { success: false, error: NO_ACCESS }
+  try {
+    await setDefaultApprovalFlow({ workspaceId, workflowId, actorId: user.id })
+    revalidatePath(adminPaths(workspaceId).approvalFlows)
+    return { success: true, data: null }
+  } catch (error) {
+    if (error instanceof Error && error.message === "approval_workflow_not_found") {
+      return { success: false, error: STALE_FLOW_ERROR }
+    }
+    return { success: false, error: "could not change the default flow" }
+  }
+}
+
+/** #253: the 30-day estimate behind the confirm. Its own action rather than page data because it
+ * is only needed at the moment someone opens the confirm — counting it on every page render would
+ * put a 5,000-row scan behind a screen nobody is changing. */
+export async function estimateAutoStartsAction(workspaceId: string): Promise<ActionState<{ count: number; days: number }>> {
+  const user = await getCurrentUser()
+  if (!(await requireMember(workspaceId, user.id, ["owner"]))) return { success: false, error: NO_ACCESS }
+  try {
+    const count = await estimateAutoStarts(workspaceId)
+    return { success: true, data: { count, days: AUTO_START_ESTIMATE_DAYS } }
+  } catch { return { success: false, error: "Could not count the last 30 days" } }
 }
 
 /** F15: turning hipaaMode on immediately forces every file's linkAccess back to "none" — the
@@ -743,6 +1072,58 @@ export async function deleteWorksheetAction(workspaceId: string, fileId: string,
     await revalidateSheet(workspaceId, fileId)
     return { success: true, data: null }
   } catch (error) { return { success: false, error: errorMessage(error, "Could not delete the worksheet") } }
+}
+
+/** #271 — the per-person "Approval emails" switch (spec §4). A `User` column, not a workspace
+ * setting: the same person is one Approver across every company they belong to. Saves on
+ * change (a single boolean with immediate feedback — the one autosave outside Admin's save
+ * bar); the account page is revalidated so the phone panel and the menu suffix read the new
+ * value on their next render. */
+export async function setApprovalNoticeEmailsAction(workspaceId: string, enabled: boolean): Promise<ActionState<{ enabled: boolean }>> {
+  const user = await getCurrentUser()
+  if (typeof enabled !== "boolean") return { success: false, error: "Invalid value" }
+  try {
+    const updated = await prisma.user.update({ where: { id: user.id }, data: { approvalNoticeEmails: enabled }, select: { approvalNoticeEmails: true } })
+    revalidatePath(`/workspaces/${workspaceId}/account`)
+    revalidatePath(`/workspaces/${workspaceId}`, "layout")
+    return { success: true, data: { enabled: updated.approvalNoticeEmails } }
+  } catch (error) {
+    return { success: false, error: errorMessage(error, "Couldn't save this. Check your connection and try again.") }
+  }
+}
+
+/** The dialog reads the saved value when it opens (pre-flight B2) rather than trusting a prop
+ * rendered before a stop link may have flipped it in another tab. */
+export async function getApprovalNoticeEmailsAction(): Promise<ActionState<{ enabled: boolean }>> {
+  const user = await getCurrentUser()
+  return { success: true, data: { enabled: user.approvalNoticeEmails } }
+}
+
+const RAIL_WIDTHS = ["icons", "labels", "auto"] as const
+type RailWidth = (typeof RAIL_WIDTHS)[number]
+
+/** #342 — the sidebar rail width ("Icons only" / "Full labels" / "Auto"), per user rather than
+ * per browser: same shape as setApprovalNoticeEmailsAction above. Layout is re-rendered so the
+ * rail, Account page and account-menu suffix all read the new value on their next render. */
+export async function setRailWidthAction(workspaceId: string, railWidth: string): Promise<ActionState<{ railWidth: RailWidth }>> {
+  const user = await getCurrentUser()
+  if (!RAIL_WIDTHS.includes(railWidth as RailWidth)) return { success: false, error: "Invalid value" }
+  try {
+    const updated = await prisma.user.update({ where: { id: user.id }, data: { railWidth }, select: { railWidth: true } })
+    revalidatePath(`/workspaces/${workspaceId}/account`)
+    revalidatePath(`/workspaces/${workspaceId}`, "layout")
+    return { success: true, data: { railWidth: updated.railWidth as RailWidth } }
+  } catch (error) {
+    return { success: false, error: errorMessage(error, "Couldn't save this. Check your connection and try again.") }
+  }
+}
+
+/** The control reads the saved value when it mounts (pre-flight B2) rather than trusting a prop
+ * rendered before a change in another tab. */
+export async function getRailWidthAction(): Promise<ActionState<{ railWidth: RailWidth }>> {
+  const user = await getCurrentUser()
+  const railWidth = RAIL_WIDTHS.includes(user.railWidth as RailWidth) ? (user.railWidth as RailWidth) : "auto"
+  return { success: true, data: { railWidth } }
 }
 
 /* Workspace lifecycle actions (create, rename, delete, members, invitations) live in the

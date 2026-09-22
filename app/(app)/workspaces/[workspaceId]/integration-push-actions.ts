@@ -13,8 +13,7 @@ import { getCurrentUser } from "@/lib/auth"
 import config from "@/lib/config"
 import { BillMappingError, normalizeBillFromDocument } from "@/lib/integration-bill-mapping"
 import { extractBankStatementPayload } from "@/lib/integrations/bigcapital/bank-statement-mapper"
-import { attemptIntegrationPush, kickIntegrationPushDrain } from "@/lib/integration-push"
-import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
+import { attemptIntegrationPush, getActiveIntegrationConnectionId, kickIntegrationPushDrain } from "@/lib/integration-push"
 import { getWorkspaceDocument, listReadyToPushDocuments } from "@/models/documents"
 import { getCategoryAccountMap, upsertWorkspaceIntegrationPush, workspaceIntegrationsPlanEnabled } from "@/models/integrations"
 import { listCategoryAccountMappings, resolveCategoryAccount } from "@/models/category-account-mappings"
@@ -26,13 +25,13 @@ import { errorMessage, NO_ACCESS, requireMember } from "./action-helpers"
  * the document + connection, upserts the push row, and runs one inline attempt. Auth/plan checks
  * are the caller's job — the batch caller checks them once for the whole run rather than once per
  * document. */
-async function pushDocumentToConnection(
+export async function pushDocumentToConnection(
   workspaceId: string,
   documentId: string,
   connectionId: string,
   userId: string,
   expenseAccountId?: string
-): Promise<{ status: string }> {
+): Promise<{ status: string; errorCode?: string | null }> {
   const document = await getWorkspaceDocument(workspaceId, documentId)
   if (!document) throw new Error("Document not found")
   if (document.status !== "reviewed") throw new Error("Only reviewed documents can be pushed")
@@ -62,7 +61,7 @@ async function pushDocumentToConnection(
 
   let resolvedAccountId = expenseAccountId
   if (!resolvedAccountId && category && connection.defaultExpenseAccountId) {
-    const [mappings, inferredMap] = await Promise.all([listCategoryAccountMappings(connectionId), getCategoryAccountMap(workspaceId, connectionId)])
+    const [mappings, inferredMap] = await Promise.all([listCategoryAccountMappings(workspaceId, connectionId), getCategoryAccountMap(workspaceId, connectionId)])
     resolvedAccountId = resolveCategoryAccount(mappings, category, inferredMap, connection.defaultExpenseAccountId)
   }
 
@@ -95,9 +94,15 @@ async function pushDocumentToConnection(
     createdById: userId,
   })
   await attemptIntegrationPush(push.id)
-  const updated = await prisma.integrationPush.findUnique({ where: { id: push.id }, select: { status: true } })
+  const updated = await prisma.integrationPush.findUnique({ where: { id: push.id }, select: { status: true, errorCode: true } })
   if (updated?.status === "pending") await kickIntegrationPushDrain()
-  return { status: updated?.status ?? "pending" }
+  // #281 spec.md §7: a succeeded push (fresh or a Checks-tab Retry) closes any open
+  // `push_preflight` task on this document — the task named the pre-flight cause the push has now
+  // cleared, so it never sits open once the ledger holds the document.
+  if (updated?.status === "succeeded") {
+    await prisma.reviewTask.updateMany({ where: { workspaceId, documentId, reason: "push_preflight", status: { in: ["open", "in_review"] } }, data: { status: "approved", resolvedAt: new Date() } })
+  }
+  return { status: updated?.status ?? "pending", errorCode: updated?.errorCode ?? null }
 }
 
 export async function pushDocumentToAccountingAction(
@@ -123,6 +128,14 @@ export async function pushDocumentToAccountingAction(
   }
 }
 
+/** #281 spec.md §7: the Checks tab's Retry — re-runs the same push against the workspace's active
+ * connection (there is exactly one, per §2), closing the open `push_preflight` task on success. */
+export async function retryLedgerPushAction(workspaceId: string, documentId: string): Promise<ActionState<{ status: string }>> {
+  const connectionId = await getActiveIntegrationConnectionId(workspaceId)
+  if (!connectionId) return { success: false, error: "No ledger connected" }
+  return pushDocumentToAccountingAction(workspaceId, documentId, connectionId)
+}
+
 /** Batch counterpart to pushDocumentToAccountingAction: resolves the "ready to push" set
  * server-side (never trusts a client-supplied document list) and pushes each one in turn through
  * the same upsert-per-(document,connection) path, so re-running the whole batch is exactly as
@@ -132,27 +145,32 @@ export async function pushAllReadyDocumentsAction(
   workspaceId: string,
   connectionId: string,
   accountOverrides?: Record<string, string>
-): Promise<ActionState<{ pushed: number; failed: number }>> {
+): Promise<ActionState<{ pushed: number; failed: number; results: Array<{ documentId: string; status: "succeeded" | "queued" | "failed"; error?: string }> }>> {
   if (!config.integrations.enabled) return { success: false, error: errorMessage(new Error("integrations_not_available"), NO_ACCESS) }
   const user = await getCurrentUser()
   if (!(await requireMember(workspaceId, user.id))) return { success: false, error: NO_ACCESS }
   if (!(await workspaceIntegrationsPlanEnabled(workspaceId))) return { success: false, error: errorMessage(new Error("integrations_plan_required"), NO_ACCESS) }
 
-  const ready = await listReadyToPushDocuments(workspaceId, connectionId)
+  const { documents: ready } = await listReadyToPushDocuments(workspaceId, connectionId)
   let pushed = 0
   let failed = 0
+  const results: Array<{ documentId: string; status: "succeeded" | "queued" | "failed"; error?: string }> = []
   for (const doc of ready) {
     try {
       const result = await pushDocumentToConnection(workspaceId, doc.id, connectionId, user.id, accountOverrides?.[doc.id])
-      if (result.status === "failed") failed += 1
-      else pushed += 1
-    } catch {
+      // #249: a push that fails inside attemptIntegrationPush (rather than throwing here) used to
+      // report bare "failed" with no reason — the same object the catch block below already
+      // carries one on. `errorCode` is the field attemptIntegrationPush itself writes on failure.
+      if (result.status === "failed") { failed += 1; results.push({ documentId: doc.id, status: "failed", error: result.errorCode ?? "Could not push this document" }) }
+      else { pushed += 1; results.push({ documentId: doc.id, status: result.status === "succeeded" ? "succeeded" : "queued" }) }
+    } catch (error) {
       failed += 1
+      results.push({ documentId: doc.id, status: "failed", error: errorMessage(error, "Could not push this document") })
     }
   }
   await recordDocumentAudit({ workspaceId, actorId: user.id, type: "integration_batch_push", detail: { connectionId, pushed, failed, totalReady: ready.length } })
   revalidatePath(`/workspaces/${workspaceId}/accounting`)
-  return { success: true, data: { pushed, failed } }
+  return { success: true, data: { pushed, failed, results } }
 }
 
 export async function listDocumentPushesAction(workspaceId: string, documentId: string) {

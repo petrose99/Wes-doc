@@ -1,6 +1,6 @@
 import { STAGE_LABELS, PIPELINE_STAGES, type PipelineStage } from "@/lib/documents/stages"
 import { AlertTriangle, Banknote, CheckCircle2, Inbox, Loader2, SearchCheck, Send } from "lucide-react"
-import Link from "next/link"
+import { ListScreenNavigation } from "@/components/list-screen/list-screen-shell"
 
 const STAGE_ICONS: Record<PipelineStage, typeof Loader2> = {
   inbox: Inbox,
@@ -29,20 +29,15 @@ export function StageTabs({ workspaceId, active, counts, failedCount = 0, visibl
   visibleStages?: readonly PipelineStage[]
 }) {
   const stages = visibleStages ?? PIPELINE_STAGES
-  return <nav className="flex flex-wrap gap-1 border-b px-6" aria-label="Pipeline stage">
-    {stages.map((stage) => {
-      const isActive = stage === active
-      const Icon = STAGE_ICONS[stage]
-      return <Link key={stage} href={`/workspaces/${workspaceId}/pipeline?stage=${stage}`}
-        aria-current={isActive ? "page" : undefined}
-        className={`flex items-center gap-1.5 rounded-t-md border-b-2 px-3 py-2.5 text-sm font-medium transition-colors ${isActive ? "border-emerald-700 text-emerald-800" : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800"}`}>
-        <Icon className="h-4 w-4 shrink-0" />
-        {STAGE_LABELS[stage]}
-        <span className={`rounded-full px-1.5 py-0.5 text-xs font-semibold tabular-nums ${isActive ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-500"}`}>{counts[stage]}</span>
-        {stage === "inbox" && failedCount > 0 && <span className="inline-flex items-center gap-0.5 rounded-full bg-red-100 px-1.5 py-0.5 text-xs font-semibold tabular-nums text-red-700" title={`${failedCount} failed extraction${failedCount === 1 ? "" : "s"} — open Inbox to re-extract or delete`}>
-          <AlertTriangle className="h-3 w-3" />{failedCount}
-        </span>}
-      </Link>
-    })}
-  </nav>
+  return <ListScreenNavigation ariaLabel="Pipeline stage" items={stages.map((stage) => ({
+    id: stage,
+    href: `/workspaces/${workspaceId}/pipeline?stage=${stage}`,
+    active: stage === active,
+    icon: STAGE_ICONS[stage],
+    label: STAGE_LABELS[stage],
+    count: counts[stage],
+    trailing: stage === "inbox" && failedCount > 0 && <span className="inline-flex items-center gap-0.5 rounded-full bg-red-100 px-1.5 py-0.5 text-xs font-semibold tabular-nums text-red-700" title={`${failedCount} failed extraction${failedCount === 1 ? "" : "s"} — open Inbox to re-extract or delete`}>
+      <AlertTriangle className="h-3 w-3" />{failedCount}
+    </span>,
+  }))} />
 }

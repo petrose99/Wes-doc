@@ -29,10 +29,10 @@ export function checkTaxConsistency(input: TaxConsistencyInput): CheckResult | n
   const detail = { rateLabel: rate.label, rate: rate.rate, expectedTax, taxTotal: input.taxTotal }
 
   if (amountsMatch(expectedTax, input.taxTotal, input.currencyCode)) {
-    return { checkCode: "tax_consistency", status: "pass", message: `Tax matches the ${rate.label} rate (${percent(rate.rate)}).`, detail }
+    return { checkCode: "tax_consistency", status: "pass", fields: ["subtotal", "tax_total", "document_date"], message: `Tax matches the ${rate.label} rate (${percent(rate.rate)}).`, detail }
   }
   return {
-    checkCode: "tax_consistency", status: "warn", detail,
+    checkCode: "tax_consistency", status: "warn", fields: ["subtotal", "tax_total", "document_date"], detail,
     message: `Expected tax at the ${rate.label} rate (${percent(rate.rate)}) is ${round2(expectedTax)}, but tax total is ${input.taxTotal}.`,
   }
 }

@@ -4,6 +4,7 @@ import { AlertCircle } from "lucide-react"
 export function FormError({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
     <div
+      role="alert"
       className={cn(
         "inline-flex items-center gap-2 px-3 py-2 rounded-md bg-red-50 text-red-700 border border-red-200",
         className

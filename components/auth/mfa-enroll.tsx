@@ -72,7 +72,7 @@ export function MfaEnroll() {
     } finally { setBusy(false) }
   }
 
-  if (factors === null) return null
+  if (factors === null) return <p className="text-sm text-slate-600" aria-live="polite">Checking your two-factor status…</p>
 
   const active = factors.find((factor) => factor.status === "verified")
 

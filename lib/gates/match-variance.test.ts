@@ -9,13 +9,15 @@ const gateFindMany = vi.fn()
 const gateUpdate = vi.fn()
 const documentFindUnique = vi.fn()
 const documentMatchFindFirst = vi.fn()
+// #250: the PO link lookup lists every non-rejected match and ranks it (lib/matching/po-link).
+const documentMatchFindMany = vi.fn()
 const automationConfigFindUnique = vi.fn()
 
 vi.mock("@/lib/db", () => ({
   prisma: {
     gate: { findUnique: gateFindUnique, findMany: gateFindMany, update: gateUpdate },
     document: { findUnique: documentFindUnique },
-    documentMatch: { findFirst: documentMatchFindFirst },
+    documentMatch: { findFirst: documentMatchFindFirst, findMany: documentMatchFindMany },
     workspaceAutomationConfig: { findUnique: automationConfigFindUnique },
     auditEvent: { create: vi.fn() },
   },
@@ -60,6 +62,8 @@ beforeEach(() => {
   gateUpdate.mockReset()
   documentFindUnique.mockReset()
   documentMatchFindFirst.mockReset()
+  documentMatchFindMany.mockReset()
+  documentMatchFindMany.mockResolvedValue([])
   automationConfigFindUnique.mockReset()
   ;(resolveGate as unknown as ReturnType<typeof vi.fn>).mockReset()
 })
@@ -222,7 +226,7 @@ describe("reevaluateMatchVarianceForDocument", () => {
     })
     // Real runner delegates to documentMatch + automationConfig; simulate "no PO now linked"
     // — bill sits alone, so the runner returns blocked:false, which is the resolve branch.
-    documentMatchFindFirst.mockResolvedValue(null)
+    documentMatchFindMany.mockResolvedValue([])
     automationConfigFindUnique.mockResolvedValueOnce({ matchTolerance: tolerance })
     const out = await reevaluateMatchVarianceForDocument({ workspaceId: "w1", documentId: "inv-1" })
     expect(out).toEqual({ outcome: "resolved" })
@@ -237,13 +241,9 @@ describe("reevaluateMatchVarianceForDocument", () => {
     documentFindUnique.mockResolvedValueOnce({
       id: "inv-1", workspaceId: "w1", docType: "invoice", fieldSnapshot: { total: 110_000 }, receivedAt: new Date(),
     })
-    documentMatchFindFirst.mockImplementation(async (args: unknown) => {
-      const q = args as { where: { matchType: string } }
-      if (q.where.matchType === "po_to_invoice") {
-        return { sourceId: "po-1", source: { fieldSnapshot: { total: 100_000 } } }
-      }
-      return null
-    })
+    // A confirmed link is compared whatever PO number the invoice cites (lib/matching/po-link).
+    documentMatchFindMany.mockResolvedValueOnce([{ sourceId: "po-1", status: "confirmed", confidence: 0.9, source: { fieldSnapshot: { total: 100_000 } } }])
+    documentMatchFindFirst.mockResolvedValue(null)
     automationConfigFindUnique.mockResolvedValueOnce({ matchTolerance: tolerance })
 
     const out = await reevaluateMatchVarianceForDocument({ workspaceId: "w1", documentId: "inv-1" })
@@ -272,13 +272,14 @@ describe("reevaluateOpenMatchVarianceGates", () => {
     documentFindUnique.mockResolvedValueOnce({
       id: "inv-2", workspaceId: "w1", docType: "invoice", fieldSnapshot: { total: 110_000 }, receivedAt: new Date(),
     })
-    documentMatchFindFirst.mockImplementation(async (args: unknown) => {
-      const q = args as { where: { matchType: string; sourceId?: string; targetId?: string } }
+    documentMatchFindMany.mockImplementation(async (args: unknown) => {
+      const q = args as { where: { matchType: string; targetId?: string } }
       if (q.where.matchType === "po_to_invoice" && q.where.targetId === "inv-2") {
-        return { sourceId: "po-2", source: { fieldSnapshot: { total: 100_000 } } }
+        return [{ sourceId: "po-2", status: "confirmed", confidence: 0.9, source: { fieldSnapshot: { total: 100_000 } } }]
       }
-      return null
+      return []
     })
+    documentMatchFindFirst.mockResolvedValue(null)
     automationConfigFindUnique.mockResolvedValue({ matchTolerance: tolerance })
 
     const out = await reevaluateOpenMatchVarianceGates("w1")
@@ -293,7 +294,7 @@ describe("default matchVarianceGateRunner registration surface", () => {
   })
 
   it("integrates with the real deps: no linked PO → passes silently", async () => {
-    documentMatchFindFirst.mockResolvedValue(null)
+    documentMatchFindMany.mockResolvedValue([])
     automationConfigFindUnique.mockResolvedValueOnce({ matchTolerance: tolerance })
     const verdict = (await matchVarianceGateRunner.run(baseCtx())) as GateVerdict
     expect(verdict).toEqual({ blocked: false })

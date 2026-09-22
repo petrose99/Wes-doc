@@ -1,0 +1,33 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "gray-on-color",
+        "value": "*",
+        "files": [
+          "app/(app)/workspaces/[workspaceId]/page.tsx"
+        ],
+        "createdAt": "2026-09-12T20:50:21.328Z",
+        "reason": "false positive: rule matches text-slate-600 co-occurring with hover:bg-indigo-50/hover:text-indigo-700 in the same class string; base is text-slate-600 on bg-white and the hover state pairs indigo text with indigo bg, both real AA-contrast pairs"
+      },
+      {
+        "rule": "gray-on-color",
+        "value": "*",
+        "files": [
+          "components/pipeline/document-detail/rationale-popover.tsx"
+        ],
+        "createdAt": "2026-09-14T17:44:10.445Z",
+        "reason": "text-slate-700 on amber-50/purple-50 tints is this file's pre-existing check/badge convention (predates #202), readable in practice"
+      }
+    ]
+  },
+  "hook": {
+    "enabled": true,
+    "limits": {
+      "maxFindings": 5,
+      "maxChars": 8000
+    }
+  }
+}

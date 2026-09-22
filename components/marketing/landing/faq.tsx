@@ -1,52 +1,40 @@
 const QUESTIONS = [
   {
     q: "What can it actually read?",
-    a: "Invoices, receipts, bank statements, and any custom PDF or image you define a template for. Handwritten notes and low-quality scans are expected input. Files up to 50 MB, multi-page documents included — and where one PDF holds several documents, it gets split.",
+    a: "Invoices, receipts, bank statements, and any custom PDF or image you define a template for. PDFs and JPEG, PNG, WebP and HEIC images are supported. Fields that need a closer look are flagged for review. Files up to 50 MB, with multi-page documents included. When one PDF holds several documents, it gets split.",
   },
   {
     q: "Where do my files live?",
-    a: "In private, encrypted storage with keys managed for you. Browsers never connect to storage directly — every view is authorised and streamed through the application. Sources and reviewed data are retained for the life of the workspace, and deleting the workspace deletes them.",
-  },
-  {
-    q: "Can my team review together?",
-    a: "Yes. Each workspace has owner and member roles with email invitations, a shared review queue badged with what's outstanding, and approval workflows for the documents that need a second signature. Every change is recorded against the person who made it.",
-  },
-  {
-    q: "How does emailing documents in work?",
-    a: "Each workspace gets its own address. Forward a bill to it, or hand the address to your suppliers so their invoices arrive without you touching them. Only senders you have allowed are accepted — anything else is refused and recorded. Zips are unpacked, supplier-portal links are followed, and if a mail has no attachment but reads like an invoice, the message body itself is turned into a PDF and read.",
-  },
-  {
-    q: "Does it code documents on its own?",
-    a: "Only as far as you let it. A workspace starts out merely suggesting, and you move it to auto-with-approval or fully touchless when you are ready. Once three documents from the same supplier have been coded the same way, it applies that coding itself instead of asking the AI. New suppliers always reach a person first, and a confidence floor, amount bands, your written policy and a random sample of the automatic work all still hold documents back for review.",
-  },
-  {
-    q: "Can I get my data out?",
-    a: "Reviewed data streams out as CSV whenever you want it, columns and all. Reviewed invoices and receipts push to your accounting tool — QuickBooks, Xero and more — as bills. And when you're ready to pay, DocuBite assembles a bank-ready payment file with per-supplier remittance advice that you upload to your own bank. Nothing here is a one-way door.",
+    a: "In private, encrypted storage with keys managed for you. Browsers never connect to storage directly. Every view is authorised and streamed through the application. Sources and reviewed data are retained for the life of the workspace, and deleting the workspace deletes them.",
   },
   {
     q: "Does DocuBite move money or pay bills?",
-    a: "No — that's deliberate. DocuBite gets your bills ready to pay: coded, checked, matched, approved, synced to your ledger, and — when you're ready — assembled into a bank-payment file with a supplier remittance. You take that file to your own bank's bulk-payment portal and press send. Payment execution stays on rails you already trust, so DocuBite works wherever in the world you bank — without ever asking you to switch.",
+    a: "No, that's deliberate. DocuBite gets your bills ready to pay: coded, checked, matched, approved, synced to your ledger, and assembled into a bank-payment file with a supplier remittance when you're ready. You take that file to your own bank's bulk-payment portal and press send. Payment execution stays outside DocuBite.",
+  },
+  {
+    q: "Can I get my data out?",
+    a: "Reviewed data streams out as CSV whenever you want it, columns and all. Reviewed invoices and receipts push to your accounting tool, including QuickBooks and Xero, as bills. And when you're ready to pay, DocuBite assembles a bank-ready payment file with per-supplier remittance advice that you upload to your own bank. Nothing here is a one-way door.",
   },
 ]
 
 export function Faq() {
   return (
-    <section id="faq" className="bg-cream-50 py-14 md:py-22">
+    <section id="faq" className="bg-white py-14 md:py-22">
       <div className="mx-auto max-w-[820px] px-5">
-        <h2 className="mb-7 font-display text-[clamp(1.9rem,3vw,2.6rem)] font-bold leading-[1.1] tracking-[-0.03em] text-stone-900">
+        <h2 className="mb-7 font-display text-[clamp(1.9rem,3vw,2.6rem)] font-bold leading-[1.1] tracking-[-0.03em] text-slate-900">
           The questions we get asked
         </h2>
         <div className="flex flex-col gap-2.5">
           {QUESTIONS.map((item) => (
-            <details key={item.q} className="group rounded-xl border border-cream-200 bg-white p-5">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-base font-semibold text-stone-900 [&::-webkit-details-marker]:hidden">
+            <details key={item.q} className="group rounded-xl border border-slate-200 bg-white p-5">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-base font-semibold text-slate-900 [&::-webkit-details-marker]:hidden">
                 <span>{item.q}</span>
                 <span aria-hidden className="grid h-6 w-6 shrink-0 place-items-center text-lg font-bold leading-none text-emerald-700">
                   <span className="group-open:hidden">+</span>
                   <span className="hidden group-open:inline">−</span>
                 </span>
               </summary>
-              <p className="mt-3 text-pretty text-[0.94rem] leading-[1.6] text-stone-600">{item.a}</p>
+              <p className="mt-3 max-w-[33rem] text-pretty text-[0.94rem] leading-[1.6] text-slate-600">{item.a}</p>
             </details>
           ))}
         </div>

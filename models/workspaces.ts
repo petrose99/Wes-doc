@@ -7,9 +7,8 @@ import { recordAdminAudit } from "@/lib/auth-audit"
 import { archiveWorkspaceAuditEvents } from "@/lib/audit-archive"
 import { deleteDocumentSource } from "@/lib/document-storage"
 import { prisma } from "@/lib/db"
-import config from "@/lib/config"
+import { unscoped } from "@/lib/workspace-scope"
 import { deleteFiles } from "@/models/files"
-import { enqueueBigcapitalProvisionJob } from "@/models/bigcapital"
 import { provisionMemberAccount } from "@/models/bigcapital-members"
 import { User } from "@/prisma/client"
 import crypto, { randomBytes } from "crypto"
@@ -115,15 +114,9 @@ export async function createWorkspaceForUser(user: Pick<User, "id" | "name" | "e
       members: { create: { userId: user.id, role: "owner" } },
     },
   })
-  // Enqueued, never awaited into the request: provisioning the Bigcapital org is several external
-  // API calls (see models/bigcapital.ts) and must not add that latency to signup/workspace creation.
-  // Best-effort — a failure to enqueue just means no job exists yet; the Accounting tab's repair
-  // action (P2) re-enqueues on demand.
-  if (config.integrations.bigcapital.enabled) {
-    await enqueueBigcapitalProvisionJob(workspace.id, user.id).catch((error) => {
-      console.error("[workspaces] failed to enqueue bigcapital provisioning:", error instanceof Error ? error.message : error)
-    })
-  }
+  // #329: every workspace starts Not connected — no provider is auto-provisioned on creation.
+  // Connecting any accounting provider (including Bigcapital) is now purely the owner's Connect
+  // click on Admin › Integrations (see components/integrations/integrations-manager.tsx).
   await recordDocumentAudit({ workspaceId: workspace.id, actorId: user.id, type: "workspace_created", detail: { kind: workspace.kind, name: workspace.name } })
   return workspace
 }
@@ -135,7 +128,10 @@ export async function createTeamWorkspace(user: Pick<User, "id" | "name" | "emai
 
 export const getWorkspacesForUser = cache(async (userId: string) => prisma.workspace.findMany({
   where: { members: { some: { userId } } },
-  include: { members: { where: { userId }, select: { role: true } } },
+  include: {
+    members: { where: { userId }, select: { role: true } },
+    organization: { select: { id: true, name: true } },
+  },
   orderBy: { createdAt: "asc" },
 }))
 
@@ -347,7 +343,12 @@ export async function deleteWorkspace(input: { workspaceId: string; actorId: str
 
 /** Returns the workspace name alongside the token so the caller can compose the invitation
  * email without a second query for something it just read. There is no seat limit anymore. */
-export async function createWorkspaceInvitation(input: { workspaceId: string; ownerId: string; email: string; role?: WorkspaceRole }) {
+/** `additionalGrants`: #254/#286 — extra (workspaceId, role) pairs beyond the primary workspace,
+ * so one invitation can add a user to several companies in an organization at once. The caller
+ * (Users' invite form, #286) is responsible for checking the inviter has "owner" on each extra
+ * workspace too; this function only enforces it for the primary one, matching every existing
+ * single-company caller unchanged. */
+export async function createWorkspaceInvitation(input: { workspaceId: string; ownerId: string; email: string; role?: WorkspaceRole; additionalGrants?: { workspaceId: string; role?: WorkspaceRole }[] }) {
   await requireWorkspaceRole(input.workspaceId, input.ownerId, ["owner"])
   const workspace = await prisma.workspace.findUniqueOrThrow({ where: { id: input.workspaceId } })
   const email = input.email.trim().toLowerCase()
@@ -356,7 +357,18 @@ export async function createWorkspaceInvitation(input: { workspaceId: string; ow
   if (await prisma.workspaceMember.findFirst({ where: { workspaceId: input.workspaceId, user: { email } } })) throw new Error("member_already_exists")
   const token = randomBytes(32).toString("base64url")
   await prisma.workspaceInvitation.deleteMany({ where: { workspaceId: input.workspaceId, email, acceptedAt: null } })
-  const invitation = await prisma.workspaceInvitation.create({ data: { workspaceId: input.workspaceId, sentById: input.ownerId, email, role: parseRole(input.role || "member"), tokenHash: invitationHash(token), expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) } })
+  const additionalGrants = (input.additionalGrants ?? []).filter((grant) => grant.workspaceId !== input.workspaceId)
+  const invitation = await prisma.workspaceInvitation.create({
+    data: {
+      workspaceId: input.workspaceId,
+      sentById: input.ownerId,
+      email,
+      role: parseRole(input.role || "member"),
+      tokenHash: invitationHash(token),
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      additionalGrants: additionalGrants.length ? { create: additionalGrants.map((grant) => ({ workspaceId: grant.workspaceId, role: parseRole(grant.role || "member") })) } : undefined,
+    },
+  })
   await recordDocumentAudit({ workspaceId: input.workspaceId, actorId: input.ownerId, type: "invitation_created", detail: { email, role: invitation.role } })
   return { token, invitation, workspaceName: workspace.name }
 }
@@ -401,7 +413,7 @@ export async function getInvitationEmailForToken(token: string) {
 }
 
 export async function acceptWorkspaceInvitation(token: string, user: Pick<User, "id" | "email">) {
-  const invitation = await prisma.workspaceInvitation.findUnique({ where: { tokenHash: invitationHash(token) } })
+  const invitation = await prisma.workspaceInvitation.findUnique({ where: { tokenHash: invitationHash(token) }, include: { additionalGrants: true } })
   if (!invitation) throw new Error("invitation_invalid")
   if (invitation.email !== user.email.toLowerCase()) throw new Error("invitation_email_mismatch")
   // Idempotent for the person who already used it: a back button, a second tab, or a re-opened
@@ -421,6 +433,26 @@ export async function acceptWorkspaceInvitation(token: string, user: Pick<User, 
   const context = await getRequestAuditContext()
   const audit = reviewerAuditEventRows({ workspaceId: invitation.workspaceId, actorId: user.id, targetUserId: user.id, prevReviewers, delta, reason: "invitation_accepted" }, context)
 
+  // #254/#286: additionalGrants add the same user to further companies in one acceptance. Each
+  // gets its own upsert + reviewer/mode accounting, exactly like the primary workspace above —
+  // an org-wide invite is N per-workspace grants, never a shortcut around WorkspaceMember.
+  const extraGrants: { workspaceId: string; role: string }[] = []
+  for (const grant of invitation.additionalGrants ?? []) {
+    const grantExisting = await prisma.workspaceMember.findUnique({ where: { workspaceId_userId: { workspaceId: grant.workspaceId, userId: user.id } } })
+    const grantDelta = reviewerDelta(grantExisting?.role ?? null, grant.role) as -1 | 0 | 1
+    const grantPrevReviewers = grantDelta === 0 ? 0 : await countReviewers(grant.workspaceId)
+    extraGrants.push({ workspaceId: grant.workspaceId, role: grant.role })
+    const grantAudit = reviewerAuditEventRows({ workspaceId: grant.workspaceId, actorId: user.id, targetUserId: user.id, prevReviewers: grantPrevReviewers, delta: grantDelta, reason: "invitation_accepted" }, context)
+    await prisma.$transaction([
+      prisma.workspaceMember.upsert({ where: { workspaceId_userId: { workspaceId: grant.workspaceId, userId: user.id } }, update: { role: grant.role }, create: { workspaceId: grant.workspaceId, userId: user.id, role: grant.role } }),
+      prisma.documentAuditEvent.create({
+        data: auditEventData({ workspaceId: grant.workspaceId, actorId: user.id, type: "invitation_accepted", detail: { role: grant.role } }, context),
+      }),
+      ...grantAudit.rows.map((data) => prisma.documentAuditEvent.create({ data })),
+    ])
+    await afterModeFlip(grant.workspaceId, grantAudit.before, grantAudit.after)
+  }
+
   await prisma.$transaction([
     prisma.workspaceMember.upsert({ where: { workspaceId_userId: { workspaceId: invitation.workspaceId, userId: user.id } }, update: { role: invitation.role }, create: { workspaceId: invitation.workspaceId, userId: user.id, role: invitation.role } }),
     prisma.workspaceInvitation.update({ where: { id: invitation.id }, data: { acceptedAt: new Date() } }),
@@ -432,9 +464,80 @@ export async function acceptWorkspaceInvitation(token: string, user: Pick<User, 
   await afterModeFlip(invitation.workspaceId, audit.before, audit.after)
   const fullUser = await prisma.user.findUnique({ where: { id: user.id }, select: { id: true, name: true, email: true } })
   if (fullUser) {
-    provisionMemberAccount(invitation.workspaceId, { id: fullUser.id, name: fullUser.name ?? "", email: fullUser.email }).catch((err) => {
-      console.error("[bigcapital-members] provision after invite accept failed:", err instanceof Error ? err.message : err)
-    })
+    for (const workspaceId of [invitation.workspaceId, ...extraGrants.map((g) => g.workspaceId)]) {
+      provisionMemberAccount(workspaceId, { id: fullUser.id, name: fullUser.name ?? "", email: fullUser.email }).catch((err) => {
+        console.error("[bigcapital-members] provision after invite accept failed:", err instanceof Error ? err.message : err)
+      })
+    }
   }
   return invitation.workspaceId
+}
+
+/** Users (#286) "Add to a company": an owner grants an existing account another company without
+ * an invitation round-trip. Same per-grant accounting as one `additionalGrants` entry in
+ * acceptWorkspaceInvitation — create the WorkspaceMember row, reviewer-delta / mode-flip audit,
+ * Bigcapital provisioning — but refused (not upserted) when the row already exists: the surface
+ * says "added", never "role changed". Authorisation is the caller's (the action checks ownership). */
+export async function addExistingUserToWorkspace(input: { workspaceId: string; actorId: string; userId: string; role: WorkspaceRole }) {
+  const role = parseRole(input.role)
+  const user = await prisma.user.findUnique({ where: { id: input.userId }, select: { id: true, name: true, email: true } })
+  if (!user) throw new Error("user_not_found")
+  const existing = await prisma.workspaceMember.findUnique({ where: { workspaceId_userId: { workspaceId: input.workspaceId, userId: input.userId } } })
+  if (existing) throw new Error("member_already_exists")
+  const delta = reviewerDelta(null, role) as -1 | 0 | 1
+  const prevReviewers = delta === 0 ? 0 : await countReviewers(input.workspaceId)
+  const context = await getRequestAuditContext()
+  const audit = reviewerAuditEventRows({ workspaceId: input.workspaceId, actorId: input.actorId, targetUserId: input.userId, prevReviewers, delta, reason: "added_by_owner" }, context)
+  const [created] = await prisma.$transaction([
+    prisma.workspaceMember.create({ data: { workspaceId: input.workspaceId, userId: input.userId, role } }),
+    prisma.documentAuditEvent.create({
+      data: auditEventData({ workspaceId: input.workspaceId, actorId: input.actorId, type: "workspace_member_added", detail: { targetUserId: input.userId, role } }, context),
+    }),
+    ...audit.rows.map((data) => prisma.documentAuditEvent.create({ data })),
+  ])
+  await afterModeFlip(input.workspaceId, audit.before, audit.after)
+  provisionMemberAccount(input.workspaceId, { id: user.id, name: user.name ?? "", email: user.email }).catch((err) => {
+    console.error("[bigcapital-members] provision after add failed:", err instanceof Error ? err.message : err)
+  })
+  return created
+}
+
+export type MemberBankDetails = { bankName: string; accountNumber: string; branchCode: string }
+
+/** ADR 0003: bank details live on the membership (one company, one person) and are set or
+ * cleared whole. The audit row records that they changed, never the values. Authorisation
+ * (owner of the company or the member themself) is the caller's. */
+export async function setWorkspaceMemberBankDetails(input: { workspaceId: string; actorId: string; userId: string; details: MemberBankDetails | null }) {
+  const member = await prisma.workspaceMember.findUnique({ where: { workspaceId_userId: { workspaceId: input.workspaceId, userId: input.userId } } })
+  if (!member) throw new Error("member_not_found")
+  let details: MemberBankDetails | null = null
+  if (input.details) {
+    const bankName = input.details.bankName.trim()
+    const accountNumber = input.details.accountNumber.replace(/\s+/g, "")
+    const branchCode = input.details.branchCode.trim()
+    if (!bankName || !/^\d{6,20}$/.test(accountNumber) || branchCode.length < 3 || branchCode.length > 10) throw new Error("invalid_bank_details")
+    details = { bankName, accountNumber, branchCode }
+  }
+  const context = await getRequestAuditContext()
+  const [updated] = await prisma.$transaction([
+    prisma.workspaceMember.update({
+      where: { id: member.id },
+      data: details
+        ? { bankName: details.bankName, bankAccountNumber: details.accountNumber, bankBranchCode: details.branchCode }
+        : { bankName: null, bankAccountNumber: null, bankBranchCode: null },
+    }),
+    prisma.documentAuditEvent.create({
+      data: auditEventData({ workspaceId: input.workspaceId, actorId: input.actorId, type: "workspace_member_bank_details_changed", detail: { targetUserId: input.userId, cleared: !details } }, context),
+    }),
+  ])
+  return updated
+}
+
+/** A pending invitation with its grants — what Resend (#286) needs to re-issue it whole. Unscoped
+ * on purpose: the caller checks ownership of the primary company before acting on it. */
+export async function getPendingInvitationWithGrants(invitationId: string) {
+  return unscoped(() => prisma.workspaceInvitation.findFirst({
+    where: { id: invitationId, acceptedAt: null },
+    include: { additionalGrants: true, workspace: { select: { id: true, name: true } }, sentBy: { select: { name: true, email: true } } },
+  }))
 }

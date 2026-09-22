@@ -26,17 +26,21 @@ export type ArithmeticInput = {
 export function checkInvoiceArithmetic(input: ArithmeticInput): CheckResult | null {
   const issues: string[] = []
   const detail: Record<string, unknown> = {}
+  const fields = new Set<string>()
 
   if (input.subtotal !== null && input.taxTotal !== null && input.total !== null) {
+    fields.add("subtotal")
+    fields.add("tax_total")
+    fields.add("total")
     const shipping = input.shippingTotal ?? null
     const baseExpected = input.subtotal + input.taxTotal + (shipping ?? 0)
     detail.subtotalPlusTax = baseExpected
-    if (shipping !== null) detail.shippingTotal = shipping
+    if (shipping !== null) { detail.shippingTotal = shipping; fields.add("shipping_total") }
 
     const otherAmounts = (input.otherCharges ?? []).map((c) => c.amount)
     const allOtherPresent = otherAmounts.length > 0 && otherAmounts.every((a): a is number => a !== null)
     const otherSum = allOtherPresent ? otherAmounts.reduce((s, a) => s + (a as number), 0) : 0
-    if (allOtherPresent) detail.otherChargesSum = otherSum
+    if (allOtherPresent) { detail.otherChargesSum = otherSum; fields.add("other_charges") }
 
     const baseMatch = amountsMatch(baseExpected, input.total, input.currencyCode)
     const inclusiveMatch = allOtherPresent && otherSum !== 0 && amountsMatch(baseExpected + otherSum, input.total, input.currencyCode)
@@ -53,6 +57,7 @@ export function checkInvoiceArithmetic(input: ArithmeticInput): CheckResult | nu
   const amounts = input.lineItems.map((item) => item.amount)
   const everyAmountPresent = input.lineItems.length > 0 && amounts.every((amount): amount is number => amount !== null)
   if (everyAmountPresent) {
+    input.lineItems.forEach((_, index) => fields.add(`line_items[${index}].amount`))
     const sum = amounts.reduce((total, amount) => total + (amount as number), 0)
     const target = input.subtotal ?? input.total
     detail.lineItemSum = sum
@@ -65,8 +70,8 @@ export function checkInvoiceArithmetic(input: ArithmeticInput): CheckResult | nu
   if (!checkedSomething) return null
 
   return issues.length
-    ? { checkCode: "invoice_arithmetic", status: "fail", message: issues.join("; "), detail }
-    : { checkCode: "invoice_arithmetic", status: "pass", message: "Arithmetic checks out.", detail }
+    ? { checkCode: "invoice_arithmetic", status: "fail", message: issues.join("; "), fields: [...fields], detail }
+    : { checkCode: "invoice_arithmetic", status: "pass", message: "Arithmetic checks out.", fields: [...fields], detail }
 }
 
 function round2(value: number): number {

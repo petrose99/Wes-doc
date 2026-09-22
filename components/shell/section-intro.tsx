@@ -49,7 +49,7 @@ export function SectionIntro({ section, workspaceId }: { section: SectionKey; wo
       >
         <HelpCircle className="h-4 w-4" />
       </button>
-      {popoverOpen && <div className="absolute left-1/2 top-full z-50 mt-1.5 w-72 -translate-x-1/2 rounded-lg border border-[#e6ebf1] bg-white p-3.5 shadow-lg">
+      {popoverOpen && <div className="absolute left-1/2 top-full z-50 mt-1.5 w-72 -translate-x-1/2 rounded-lg border border-hairline bg-white p-3.5 shadow-lg">
         <p className="mb-2 text-[13px] font-semibold text-slate-800">{copy.banner}</p>
         <ul className="space-y-1.5">
           {copy.howItWorks.map((step, i) => (

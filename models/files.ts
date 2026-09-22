@@ -5,6 +5,7 @@
 // app/(app)/workspaces/[workspaceId]/actions.ts and do the auth.
 import { auditEventData, getRequestAuditContext } from "@/lib/audit"
 import { DEFAULT_DOCUMENT_TEMPLATES, parseTemplateFields } from "@/lib/document-templates"
+import type { SheetTemplate } from "@/components/extract/types"
 import { dictationAdapters, findExtractionDomainPack } from "@/lib/domains"
 import { deleteDocumentSource, documentStorageKey, putDocumentSource, readDocumentSource } from "@/lib/document-storage"
 import { prisma } from "@/lib/db"
@@ -282,6 +283,20 @@ export async function folderTrail(workspaceId: string, folderId: string | null) 
 }
 
 export const getWorkspaceFile = cache(async (workspaceId: string, fileId: string) => prisma.documentFile.findFirst({ where: { id: fileId, workspaceId } }))
+
+/** #266 spec Screen 5: the pipeline container's id plus its "Document type" choices, in the
+ * shape `AddTypeButton`/`AddDocumentsDialog` want — the same build `pipeline/page.tsx`'s own
+ * `uploadTemplates` already does, lifted here so the four typed queues don't each repeat it. */
+export async function getIntakeUpload(workspaceId: string, userId: string): Promise<{ fileId: string; templates: SheetTemplate[] }> {
+  const file = await ensurePipelineFile(workspaceId, userId)
+  const templates = await getFileTemplates(workspaceId, file.id)
+  const uploadTemplates: SheetTemplate[] = templates.flatMap((candidate) => {
+    const version = candidate.versions[0]
+    if (!version) return []
+    return [{ id: candidate.id, code: candidate.code, name: candidate.name, multiRow: candidate.multiRow, documentCount: 0, fields: parseTemplateFields(version.fields), prompt: version.prompt || "" }]
+  })
+  return { fileId: file.id, templates: uploadTemplates }
+}
 
 export const getFileTemplates = cache(async (workspaceId: string, fileId: string) => prisma.documentTemplate.findMany({
   where: { workspaceId, fileId },

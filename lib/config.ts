@@ -51,6 +51,15 @@ const envSchema = z.object({
   // proper per-project control if that ever needs to be more than one number for one deployment.
   SESSION_IDLE_TIMEOUT_MINUTES: z.coerce.number().int().positive().default(30 * 24 * 60),
   DISABLE_SIGNUP: z.enum(["true", "false"]).default("false"),
+  // Local-only: skip Supabase entirely and treat every request as a fixed dev user. Inert in
+  // production — config.auth.devBypass below is also gated on NODE_ENV, and the production unset
+  // guard still refuses to boot without real Supabase secrets regardless of this flag.
+  DEV_AUTH_BYPASS: z.enum(["true", "false"]).default("false"),
+  // #238: the workspace home is the Invoices queue (CONTEXT.md "Workspace home"). "dashboard"
+  // keeps the old overview page reachable at /workspaces/<id>/dashboard and lands there instead,
+  // for one release, so a deployment can step back if the queue landing surprises anyone. Then
+  // the flag and the page go.
+  DASHBOARD_LANDING: z.enum(["queue", "dashboard"]).default("queue"),
   RESEND_API_KEY: z.string().default("please-set-your-resend-api-key-here"),
   RESEND_FROM_EMAIL: z.string().default("DocuBite <user@localhost>"),
   // NEXT_PUBLIC_ because components/auth/google-button.tsx reads it in the browser — Google
@@ -238,6 +247,23 @@ const envSchema = z.object({
   // The domain inbound addresses are issued under — "<token>@" + this. Informational (shown
   // nowhere yet, since the feature is dark), read once a workspace's address needs displaying.
   EMAIL_INBOUND_DOMAIN: z.string().default("inbound.docubite.com"),
+  // WhatsApp intake (#372/#374). One WhatsApp Business Cloud API number per deployment, routed to
+  // a workspace by WhatsAppAllowedSender.phoneNumber rather than a per-workspace token — see
+  // models/inbound-whatsapp.ts. Fail-closed the same way as EMAIL_INBOUND_SECRET: unset until a
+  // number is actually provisioned, not a placeholder to leave blank in production.
+  WHATSAPP_APP_SECRET: z.string().optional(),
+  // Meta's webhook subscription verification handshake (the GET challenge) — a shared secret you
+  // choose when configuring the webhook in Meta's App Dashboard, distinct from WHATSAPP_APP_SECRET.
+  WHATSAPP_VERIFY_TOKEN: z.string().optional(),
+  // The Cloud API phone_number_id (not the phone number itself) used for outbound Graph API calls
+  // (fetching media, sending the acknowledgement).
+  WHATSAPP_PHONE_NUMBER_ID: z.string().optional(),
+  // A permanent access token for the Graph API calls above (System User token in production).
+  WHATSAPP_ACCESS_TOKEN: z.string().optional(),
+  // The human-facing E.164 number shown wherever the operator sets out to add a document
+  // (Admin › Configuration › Intake's Share-this-number, the Add dialog) — distinct from
+  // WHATSAPP_PHONE_NUMBER_ID, which is Meta's internal id for the same number.
+  WHATSAPP_BUSINESS_NUMBER: z.string().optional(),
   // FX conversion (lib/fx/rates.ts). Every rate goes through Frankfurter's free, no-auth wrapper
   // around the ECB reference feed — no key needed and it covers historical rates back to 1999,
   // which is what most documents actually need. FASTRATES_API_KEY is optional and, when set, is
@@ -288,7 +314,7 @@ if (process.env.NODE_ENV === "production" && process.env.NEXT_PHASE !== "phase-p
 export const isGoogleAuthEnabled = Boolean(env.NEXT_PUBLIC_GOOGLE_CLIENT_ID)
 
 const config = {
-  app: { title: "DocuBite", description: "Take a bite out of document busywork. DocuBite reads invoices, receipts and bank statements — even handwritten and scanned ones — into a live sheet where every value traces to its source, and reports on whole folders: what's missing, what's duplicated, what needs a look.", version: packageJson.version || "0.0.1", baseURL: env.BASE_URL, supportEmail: "support@docubite.com" },
+  app: { title: "DocuBite", description: "Take a bite out of document busywork. DocuBite reads invoices, receipts and bank statements into a live sheet where every value traces to its source, and reports on whole folders: what's missing, what's duplicated, what needs a look.", version: packageJson.version || "0.0.1", baseURL: env.BASE_URL, supportEmail: "support@docubite.com" },
   ai: { openaiApiKey: env.OPENAI_API_KEY, openaiModelName: env.OPENAI_MODEL_NAME, geminiApiKey: env.GEMINI_API_KEY, geminiModelName: env.GEMINI_MODEL_NAME, provider: env.AI_PROVIDER },
   documents: {
     maxFileSizeBytes: 50 * 1024 * 1024,
@@ -360,7 +386,14 @@ const config = {
     kmsKeyId: env.STORAGE_KMS_KEY_ID || env.AWS_S3_KMS_KEY_ID,
   },
   aws: { region: env.AWS_REGION, internalWorkerSecret: env.INTERNAL_WORKER_SECRET, malwareScanUrl: env.MALWARE_SCAN_URL },
-  auth: { loginUrl: "/login", disableSignup: env.DISABLE_SIGNUP === "true", idleTimeoutMinutes: env.SESSION_IDLE_TIMEOUT_MINUTES },
+  auth: {
+    loginUrl: "/login",
+    disableSignup: env.DISABLE_SIGNUP === "true",
+    idleTimeoutMinutes: env.SESSION_IDLE_TIMEOUT_MINUTES,
+    // Never true under `next build`/`next start` — Next forces NODE_ENV=production there, so the
+    // env var alone cannot switch auth off in a deployed container.
+    devBypass: process.env.NODE_ENV !== "production" && env.DEV_AUTH_BYPASS === "true",
+  },
   // The project itself, plus the two keys: anonKey is safe in the browser (Postgres RLS is what
   // actually protects data reached through it — irrelevant here since this project is Auth-only
   // and holds no application tables), serviceRoleKey bypasses RLS entirely and is used only from
@@ -378,6 +411,9 @@ const config = {
     rlsEnabled: env.DB_RLS_ENABLED === "true",
   },
   security: { cspEnforce: env.CSP_ENFORCE === "true" },
+  /** #238: where /workspaces/<id> lands. `dashboardLanding` is the one-release escape hatch that
+   * also keeps /workspaces/<id>/dashboard open; off, that address is not found. */
+  workspace: { dashboardLanding: env.DASHBOARD_LANDING === "dashboard" },
   fx: {
     frankfurterBase: env.FRANKFURTER_API_BASE.replace(/\/+$/, ""),
     fastratesKey: env.FASTRATES_API_KEY || "",
@@ -388,6 +424,15 @@ const config = {
   // shape as embeddings/integrations elsewhere in this file. Off by default in every environment,
   // including production, until DNS/a provider is actually provisioned for it.
   inboundEmail: { enabled: Boolean(env.EMAIL_INBOUND_SECRET), secret: env.EMAIL_INBOUND_SECRET || "", domain: env.EMAIL_INBOUND_DOMAIN },
+  // #372/#374: same "unset secret = feature dark" convention as inboundEmail above.
+  whatsapp: {
+    enabled: Boolean(env.WHATSAPP_APP_SECRET && env.WHATSAPP_VERIFY_TOKEN && env.WHATSAPP_PHONE_NUMBER_ID && env.WHATSAPP_ACCESS_TOKEN),
+    appSecret: env.WHATSAPP_APP_SECRET || "",
+    verifyToken: env.WHATSAPP_VERIFY_TOKEN || "",
+    phoneNumberId: env.WHATSAPP_PHONE_NUMBER_ID || "",
+    accessToken: env.WHATSAPP_ACCESS_TOKEN || "",
+    businessNumber: env.WHATSAPP_BUSINESS_NUMBER || "",
+  },
   // Agnostic dictation (lib/dictation). Off by default and fail-safe by design: with it off, or on
   // any router/extraction failure, a dictation with no pre-selected template still gets the general
   // handler's default format — never a forced route, never a blocked recording.

@@ -338,6 +338,23 @@ export function isPushableDocument(doc: { docType?: string | null; template?: { 
   return (PUSHABLE_DOC_TYPES as string[]).includes(resolveDocType(doc))
 }
 
+/** #270 §1: the four values Search's generic columns (Supplier, Number, Date, Amount) read off
+ * `reviewedData ?? rawExtraction` for each doc type. Reuses `checkFields`'s keys where a type has
+ * them; the five types with no `checkFields` (delivery_note onward) map onto their nearest
+ * `canonicalKeys` equivalent instead of leaving the columns permanently blank. */
+export type SearchFieldMap = { supplier?: string; number?: string; date?: string; amount?: string }
+export const SEARCH_FIELD_KEYS: Record<DocType, SearchFieldMap> = {
+  invoice: { supplier: "vendor", number: "invoice_number", date: "issue_date", amount: "total" },
+  receipt: { supplier: "merchant", number: "receipt_number", date: "purchase_date", amount: "total" },
+  bank_statement: { supplier: "bank_name", number: "account_number", date: "statement_period_start", amount: "closing_balance" },
+  purchase_order: { supplier: "supplier", number: "po_number", date: "order_date", amount: "total" },
+  delivery_note: { supplier: "supplier", number: "delivery_note_number", date: "delivery_date" },
+  contract: { date: "contract_date", amount: "contract_value" },
+  payslip: { supplier: "employer", date: "pay_period_start", amount: "net_pay" },
+  tax_form: { supplier: "taxpayer_name", number: "tax_id", date: "filing_date", amount: "total_tax" },
+  other: { date: "date" },
+}
+
 export const PAID_STATUSES = ["paid", "unpaid"] as const
 export type PaidStatus = (typeof PAID_STATUSES)[number]
 
@@ -359,4 +376,21 @@ export function isCategoryConfirmed(codingData: Record<string, unknown> | null):
   if (codingData.categoryConfirmed === true) return true
   if (codingData.documentTypeSource === "human") return true
   return false
+}
+
+/** #297: types whose accounting Direction (Payable/Receivable) is asserted on the document —
+ * the field-table's Direction row and the pane's Direction radiogroup both key off this instead
+ * of a hand-picked list, so a future type only needs one flag. Purchase Order is category-bearing
+ * too, but always Payable (see directionLockedFor) — Bank Statement and every secondary type have
+ * no row at all. */
+const DIRECTION_FIELD_TYPES: DocType[] = ["invoice", "receipt", "purchase_order"]
+
+export function hasDirectionField(docType: DocType): boolean {
+  return DIRECTION_FIELD_TYPES.includes(docType)
+}
+
+/** Purchase orders are always payable — the radiogroup renders locked with a visible footnote
+ * rather than a real choice (#297). */
+export function directionLockedFor(docType: DocType): boolean {
+  return docType === "purchase_order"
 }

@@ -24,7 +24,7 @@ import { toast } from "sonner"
  * Audio is deliberately absent. A dictation is a clinical document that gets read back and signed,
  * not a row staged for a spreadsheet, so it has its own surface at /workspaces/:id/dictation —
  * see components/dictation/. Accepting audio here would route it into the sheet flow instead. */
-const DOCUMENT_TYPES = "application/pdf,image/jpeg,image/png,image/webp,image/heic"
+export const DOCUMENT_TYPES = "application/pdf,image/jpeg,image/png,image/webp,image/heic"
 const MAX_STAGED_FILES = 100
 
 const usageLabel = (used: number, limit: number) => (limit < 0 ? `${used} used` : `${used} of ${limit}`)
@@ -123,6 +123,19 @@ export function ExtractPanel({ workspaceId, fileId, fileName, template, template
   // folder of documents announces itself once, when it finishes, rather than on every poll.
   const batchQueuedIds = useRef<string[]>([])
   const batchToasted = useRef(false)
+
+  const trackedRows = staged.filter((row) => row.documentId)
+  const extractingCount = trackedRows.filter((row) => row.status === "uploading" || row.status === "queued" || row.status === "processing").length
+  const reviewCount = trackedRows.filter((row) => row.status === "attention").length
+  const failedCount = trackedRows.filter((row) => row.status === "failed").length
+  const doneCount = trackedRows.filter((row) => row.status === "done" || row.status === "attention").length
+  const extractionMessage = extractingCount
+    ? `${extractingCount} document${extractingCount === 1 ? " is" : "s are"} still extracting. ${doneCount} complete${reviewCount ? `, ${reviewCount} need review` : ""}${failedCount ? `, ${failedCount} failed` : ""}.`
+    : failedCount
+      ? `${failedCount} document${failedCount === 1 ? " failed" : "s failed"}. Review the failed file${failedCount === 1 ? "" : "s"} and retry processing.`
+      : doneCount > 0
+        ? `${doneCount} document${doneCount === 1 ? " is" : "s are"} ready${reviewCount ? `; ${reviewCount} need review` : ""}.`
+        : null
 
   // webkitdirectory has no typed React prop, so it is set on the element directly. Setting
   // `directory` too covers non-webkit engines that honour the standard name.
@@ -343,7 +356,7 @@ export function ExtractPanel({ workspaceId, fileId, fileName, template, template
         else if (duplicates.length) {
           const first = duplicates[0]
           toast.info(duplicates.length === 1 ? "Already uploaded" : `All ${duplicates.length} files were already uploaded`, {
-            description: duplicates.length === 1 ? `“${first.filename}” is already in this workspace — nothing new to extract.` : "These documents are already in this workspace — nothing new to extract.",
+            description: duplicates.length === 1 ? `“${first.filename}” is already in this company — nothing new to extract.` : "These documents are already in this company — nothing new to extract.",
             ...(duplicates.length === 1 ? { action: { label: "View document", onClick: () => router.push(`/workspaces/${workspaceId}/documents/${first.id}`) } } : {}),
           })
         }
@@ -573,6 +586,9 @@ export function ExtractPanel({ workspaceId, fileId, fileName, template, template
           {staged.length > 0 && <div className="mt-3 space-y-0.5 overflow-y-auto pr-1">
             {staged.map((row) => <FileRow key={row.localId} staged={row} busy={busy} sourceUrl={row.documentId ? `/api/documents/${row.documentId}/source` : null} onExtract={() => void uploadRows([row])} onReprocess={() => void reprocess(row)} onReextractAdaptively={() => void reextractAdaptively(row)} onRemove={() => removeRow(row)} onDiff={row.documentId ? () => setDiffDocId(row.documentId) : undefined} />)}
           </div>}
+          {extractionMessage && <p role={failedCount ? "alert" : "status"} aria-live={failedCount ? "assertive" : "polite"} aria-atomic="true" className={`mt-2 text-xs ${failedCount ? "text-red-600" : "text-slate-500"}`}>
+            {extractionMessage}
+          </p>}
           {staged.length > 0 && <div className="mt-2.5 flex items-center gap-4 text-sm">
             <button type="button" className="font-medium text-slate-400 hover:text-slate-600 disabled:opacity-50" disabled={busy} onClick={resetAll}>Reset all files</button>
             <button type="button" className="font-medium text-red-500 hover:text-red-700 disabled:opacity-50" disabled={busy || deleting} onClick={requestDeleteAll}>Delete all files</button>

@@ -1,7 +1,8 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/admin/panel-card"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -18,9 +19,10 @@ import {
   setDefaultExpenseAccountAction,
   syncAccountingEntitiesAction,
 } from "@/app/(app)/workspaces/[workspaceId]/integration-connection-actions"
-import { Check, Copy } from "lucide-react"
+import { getBigcapitalStatusAction, repairBigcapitalConnectionAction } from "@/app/(app)/workspaces/[workspaceId]/accounting-actions"
+import { Check, Copy, Loader2 } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { useState, useTransition } from "react"
+import { useEffect, useRef, useState, useTransition } from "react"
 import { toast } from "sonner"
 
 type ApiKey = { id: string; name: string; keyPrefix: string; lastUsedAt: Date | null; revokedAt: Date | null; createdAt: Date }
@@ -38,7 +40,9 @@ type IntegrationConnection = {
   lastSyncedAt: Date | null
 }
 
-const PROVIDER_LABELS: Record<string, string> = { quickbooks: "QuickBooks", xero: "Xero" }
+// Kept in sync with lib/finance/actions.ts's copy (that module can't import client components) —
+// this is the only client-side fork; both list the same three providers.
+const PROVIDER_LABELS: Record<string, string> = { quickbooks: "QuickBooks", xero: "Xero", bigcapital: "Bigcapital" }
 
 /** One connected-provider card: shows tenant/status, a default-expense-account picker (fetched live
  * from the provider on demand — the chart of accounts isn't cached), and Disconnect. */
@@ -51,6 +55,7 @@ function AccountingConnectionCard({ workspaceId, connection, isOwner, onChanged 
   const [pending, startTransition] = useTransition()
   const [accounts, setAccounts] = useState<{ id: string; name: string }[] | null>(null)
   const [loadingAccounts, setLoadingAccounts] = useState(false)
+  const [disconnectOpen, setDisconnectOpen] = useState(false)
 
   const loadAccounts = () => {
     setLoadingAccounts(true)
@@ -73,11 +78,11 @@ function AccountingConnectionCard({ workspaceId, connection, isOwner, onChanged 
   }
 
   return (
-    <li className="rounded border px-3 py-2">
-      <div className="flex items-center justify-between gap-3">
-        <span className="min-w-0">
+    <li className="rounded-md border border-hairline px-3 py-2">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <span className="min-w-0 basis-full sm:basis-auto">
           <span className="font-medium">{PROVIDER_LABELS[connection.provider] ?? connection.provider}</span>{" "}
-          <span className="text-xs text-muted-foreground">{connection.tenantName || connection.externalTenantId}</span>
+          <span className="text-xs text-slate-600">{connection.tenantName || connection.externalTenantId}</span>
           {connection.status === "needs_reauth" && <span className="ml-2 text-xs text-red-600">needs reconnect</span>}
         </span>
         {isOwner && connection.status === "active" && (
@@ -90,25 +95,34 @@ function AccountingConnectionCard({ workspaceId, connection, isOwner, onChanged 
             Sync accounts
           </Button>
         )}
+        {/* #329: only Bigcapital has a session/deep-link destination route today
+         * (/api/accounting/session — reused from accounting-dashboard.tsx). QuickBooks/Xero have
+         * none in this codebase yet; adding one for them is separate scope, left as fog. */}
+        {connection.status === "active" && connection.provider === "bigcapital" && (
+          <a
+            className="text-sm font-medium text-emerald-700 hover:underline"
+            href={`/api/accounting/session?workspaceId=${workspaceId}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Open in Bigcapital
+          </a>
+        )}
         {isOwner && (
           <Button type="button" size="sm" variant="ghost" disabled={pending}
-            onClick={() => { if (confirm(`Disconnect ${PROVIDER_LABELS[connection.provider] ?? connection.provider}? Pushes to it will stop.`)) startTransition(async () => {
-              const res = await disconnectIntegrationAction(workspaceId, connection.id)
-              if (res.success) onChanged()
-              else toast.error(res.error || "Could not disconnect")
-            }) }}>
+            onClick={() => setDisconnectOpen(true)}>
             Disconnect
           </Button>
         )}
       </div>
       {isOwner && connection.status === "active" && (
-        <p className="mt-1 text-xs text-muted-foreground">
+        <p className={connection.lastSyncedAt ? "mt-1 text-xs text-slate-600" : "mt-1 text-xs font-medium text-slate-700"}>
           {connection.lastSyncedAt ? `Accounts last synced ${connection.lastSyncedAt.toLocaleString()}` : "Accounts not yet synced"}
         </p>
       )}
       {isOwner && connection.status === "active" && (
         <div className="mt-2 flex items-center gap-2 text-xs">
-          <Label htmlFor={`account-${connection.id}`} className="shrink-0 text-muted-foreground">Default expense account</Label>
+          <Label htmlFor={`account-${connection.id}`} className="shrink-0 text-slate-600">Default expense account</Label>
           {accounts === null ? (
             <Button type="button" size="sm" variant="outline" disabled={loadingAccounts} onClick={loadAccounts}>
               {connection.defaultExpenseAccountName || (loadingAccounts ? "Loading…" : "Choose account")}
@@ -127,6 +141,19 @@ function AccountingConnectionCard({ workspaceId, connection, isOwner, onChanged 
           )}
         </div>
       )}
+      <ConfirmDialog
+        open={disconnectOpen}
+        destructive
+        busy={pending}
+        title={`Disconnect ${PROVIDER_LABELS[connection.provider] ?? connection.provider}?`}
+        description="New pushes to this provider will stop. Existing ledger records will not be removed."
+        confirmLabel={pending ? "Disconnecting…" : "Disconnect provider"}
+        onConfirm={() => startTransition(async () => {
+          const res = await disconnectIntegrationAction(workspaceId, connection.id)
+          if (res.success) { setDisconnectOpen(false); onChanged() }
+          else toast.error(res.error || "Could not disconnect")
+        })}
+        onCancel={() => setDisconnectOpen(false)} />
     </li>
   )
 }
@@ -159,8 +186,103 @@ function SecretReveal({ label, value, onDone }: { label: string; value: string; 
   )
 }
 
+/** Bigcapital's not-connected/needs-reconnect row: no OAuth redirect exists for it (it provisions
+ * via a background job, not a redirect), so Connect/Reconnect call `repairBigcapitalConnectionAction`
+ * directly and then poll `getBigcapitalStatusAction` for the job to resolve, rather than navigating
+ * away like QuickBooks/Xero do. Polling stops on unmount, on a connection appearing, or after ~15
+ * attempts (30s) — spec.md §1 state 2, B5. */
+function BigcapitalRow({ workspaceId, isOwner, initialJob, onChanged }: {
+  workspaceId: string
+  isOwner: boolean
+  // Read fresh on page load (server component) so a reload lands correctly in Authorising… without
+  // needing the client poll to have survived — spec.md §1 state 2/3, "tab closed and reopened".
+  initialJob: { status: string; errorCode: string | null } | null
+  onChanged: () => void
+}) {
+  const [authorising, setAuthorising] = useState(initialJob?.status === "pending")
+  // A job exists but didn't resolve to a connection (error/failed) — same "not_started" collapse
+  // as a fresh workspace, just with the reconnect label per preflight's states table.
+  const needsReconnect = Boolean(initialJob) && initialJob?.status !== "pending"
+  const [pending, setPending] = useState(false)
+  const pollAttempts = useRef(0)
+  const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    if (initialJob?.status === "pending") poll()
+    return () => { if (pollTimer.current) clearTimeout(pollTimer.current) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const poll = () => {
+    pollTimer.current = setTimeout(async () => {
+      pollAttempts.current += 1
+      const { connection, job } = await getBigcapitalStatusAction(workspaceId)
+      if (connection) {
+        setAuthorising(false)
+        onChanged()
+        return
+      }
+      if (job?.status && job.status !== "pending") {
+        setAuthorising(false)
+        toast.error(`Could not connect Bigcapital — ${job.errorCode ? job.errorCode.replaceAll("_", " ") : "unknown error"}`)
+        onChanged()
+        return
+      }
+      if (pollAttempts.current >= 15) {
+        setAuthorising(false)
+        toast.error("Couldn't confirm the connection — refresh to check")
+        return
+      }
+      poll()
+    }, 2000)
+  }
+
+  const connect = () => {
+    setPending(true)
+    ;(async () => {
+      const res = await repairBigcapitalConnectionAction(workspaceId)
+      setPending(false)
+      if (res.success) {
+        pollAttempts.current = 0
+        setAuthorising(true)
+        poll()
+      } else {
+        toast.error(res.error || "Could not connect Bigcapital")
+      }
+    })()
+  }
+
+  if (authorising) {
+    return (
+      <li className="flex items-center justify-between rounded-md border border-hairline px-3 py-2">
+        <span className="font-medium">{PROVIDER_LABELS.bigcapital}</span>
+        <span role="status" aria-live="polite" className="flex items-center gap-1.5 text-xs text-slate-600">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+          Authorising…
+        </span>
+      </li>
+    )
+  }
+
+  return (
+    <li className="flex items-center justify-between rounded-md border border-hairline px-3 py-2">
+      <span className="min-w-0">
+        <span className="font-medium">{PROVIDER_LABELS.bigcapital}</span>
+        {needsReconnect && <span className="ml-2 text-xs text-red-600">needs reconnect</span>}
+      </span>
+      {isOwner ? (
+        <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={connect}>
+          {needsReconnect ? "Reconnect" : "Connect"}
+        </Button>
+      ) : (
+        <span className="text-xs text-slate-600">{needsReconnect ? "Bigcapital · needs reconnect" : "Not connected"}</span>
+      )}
+    </li>
+  )
+}
+
 export function IntegrationsManager({
-  workspaceId, isOwner, eventTypes, apiKeys, endpoints, deliveries, accountingProviders, connections,
+  workspaceId, isOwner, eventTypes, apiKeys, endpoints, deliveries, accountingProviders, connections, bigcapitalJob,
 }: {
   workspaceId: string
   isOwner: boolean
@@ -168,8 +290,11 @@ export function IntegrationsManager({
   apiKeys: ApiKey[]
   endpoints: Endpoint[]
   deliveries: Delivery[]
-  accountingProviders: { quickbooks: boolean; xero: boolean }
+  accountingProviders: { quickbooks: boolean; xero: boolean; bigcapital: boolean }
   connections: IntegrationConnection[]
+  // Only meaningful when there's no bigcapital connection yet — a pending/failed provisioning job,
+  // read fresh on page load. See BigcapitalRow.
+  bigcapitalJob: { status: string; errorCode: string | null } | null
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
@@ -178,6 +303,8 @@ export function IntegrationsManager({
   const [url, setUrl] = useState("")
   const [selectedEvents, setSelectedEvents] = useState<string[]>([])
   const [freshSecret, setFreshSecret] = useState<string | null>(null)
+  const [revokeKey, setRevokeKey] = useState<ApiKey | null>(null)
+  const [deleteEndpoint, setDeleteEndpoint] = useState<Endpoint | null>(null)
 
   const run = (fn: () => Promise<{ success: boolean; error?: string }>, onOk?: () => void) =>
     startTransition(async () => {
@@ -190,20 +317,25 @@ export function IntegrationsManager({
     setSelectedEvents((prev) => (prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]))
 
   const connectionsByProvider = new Map(connections.map((c) => [c.provider, c]))
-  const anyProviderConfigured = accountingProviders.quickbooks || accountingProviders.xero
+  const anyProviderConfigured = accountingProviders.quickbooks || accountingProviders.xero || accountingProviders.bigcapital
+  const hasAnyConnection = connections.length > 0
 
   return (
-    <div className="space-y-6">
-      {/* Accounting connectors (P2) — omitted entirely if neither provider is configured on this deployment. */}
+    <div className="space-y-10">
+      {/* Accounting connectors (P2) — omitted entirely if no provider is configured on this deployment. */}
       {anyProviderConfigured && (
         <Card>
           <CardHeader>
             <CardTitle>Accounting</CardTitle>
-            <CardDescription>Connect QuickBooks or Xero to push a reviewed invoice or receipt as a bill.</CardDescription>
+            <CardDescription>
+              {hasAnyConnection
+                ? "Push a reviewed invoice or receipt as a bill to your connected system."
+                : "Connect QuickBooks, Xero or Bigcapital to push a reviewed invoice or receipt as a bill. Already use one of these to run your books? Pick that one — DocuBite posts to whichever you connect, nothing changes which system stays your ledger of record."}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <ul className="space-y-2 text-sm">
-              {(["quickbooks", "xero"] as const)
+              {(["quickbooks", "xero", "bigcapital"] as const)
                 .filter((provider) => accountingProviders[provider])
                 .map((provider) => {
                   const connection = connectionsByProvider.get(provider)
@@ -218,8 +350,19 @@ export function IntegrationsManager({
                       />
                     )
                   }
+                  if (provider === "bigcapital") {
+                    return (
+                      <BigcapitalRow
+                        key={provider}
+                        workspaceId={workspaceId}
+                        isOwner={isOwner}
+                        initialJob={bigcapitalJob}
+                        onChanged={() => router.refresh()}
+                      />
+                    )
+                  }
                   return (
-                    <li key={provider} className="flex items-center justify-between rounded border px-3 py-2">
+                    <li key={provider} className="flex items-center justify-between rounded-md border border-hairline px-3 py-2">
                       <span className="font-medium">{PROVIDER_LABELS[provider]}</span>
                       {isOwner ? (
                         <a
@@ -229,7 +372,7 @@ export function IntegrationsManager({
                           Connect
                         </a>
                       ) : (
-                        <span className="text-xs text-muted-foreground">Not connected</span>
+                        <span className="text-xs text-slate-600">Not connected</span>
                       )}
                     </li>
                   )
@@ -264,25 +407,37 @@ export function IntegrationsManager({
           )}
           <ul className="space-y-1 text-sm">
             {apiKeys.map((key) => (
-              <li key={key.id} className="flex items-center justify-between gap-3 rounded border px-3 py-2">
+              <li key={key.id} className="flex items-center justify-between gap-3 rounded-md border border-hairline px-3 py-2">
                 <span className="min-w-0">
                   <span className="font-medium">{key.name}</span>{" "}
-                  <code className="font-mono text-xs text-muted-foreground">{key.keyPrefix}…</code>
+                  <code className="font-mono text-xs text-slate-600">{key.keyPrefix}…</code>
                   {key.revokedAt && <span className="ml-2 text-xs text-red-600">revoked</span>}
                 </span>
                 <span className="flex items-center gap-3">
-                  <span className="text-xs text-muted-foreground">{key.lastUsedAt ? `used ${new Date(key.lastUsedAt).toLocaleDateString()}` : "never used"}</span>
+                  <span className="text-xs text-slate-600">{key.lastUsedAt ? `used ${new Date(key.lastUsedAt).toLocaleDateString()}` : "never used"}</span>
                   {isOwner && !key.revokedAt && (
                     <Button type="button" size="sm" variant="ghost" disabled={pending}
-                      onClick={() => { if (confirm("Revoke this key? Requests using it will stop working immediately.")) run(() => revokeApiKeyAction(workspaceId, key.id)) }}>
+                      onClick={() => setRevokeKey(key)}>
                       Revoke
                     </Button>
                   )}
                 </span>
               </li>
             ))}
-            {!apiKeys.length && <li className="text-muted-foreground">No API keys yet.</li>}
+            {!apiKeys.length && <li className="text-slate-600">No API keys yet.</li>}
           </ul>
+          <ConfirmDialog
+            open={revokeKey !== null}
+            destructive
+            busy={pending}
+            title={`Revoke ${revokeKey?.name ?? "this API key"}?`}
+            description="Requests using this key will stop working immediately. This cannot be undone."
+            confirmLabel={pending ? "Revoking…" : "Revoke API key"}
+            onConfirm={() => {
+              if (!revokeKey) return
+              run(() => revokeApiKeyAction(workspaceId, revokeKey.id), () => setRevokeKey(null))
+            }}
+            onCancel={() => setRevokeKey(null)} />
         </CardContent>
       </Card>
 
@@ -310,7 +465,7 @@ export function IntegrationsManager({
                 <Input id="endpoint-url" type="url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://hooks.example.com/docubite" required />
               </div>
               <fieldset>
-                <legend className="text-sm font-medium">Events <span className="font-normal text-muted-foreground">(none selected = all)</span></legend>
+                <legend className="text-sm font-medium">Events <span className="font-normal text-slate-600">(none selected = all)</span></legend>
                 <div className="mt-1 grid grid-cols-2 gap-1 sm:grid-cols-3">
                   {eventTypes.map((type) => (
                     <label key={type} className="flex items-center gap-2 text-xs">
@@ -325,10 +480,10 @@ export function IntegrationsManager({
           )}
           <ul className="space-y-1 text-sm">
             {endpoints.map((endpoint) => (
-              <li key={endpoint.id} className="flex items-center justify-between gap-3 rounded border px-3 py-2">
+              <li key={endpoint.id} className="flex items-center justify-between gap-3 rounded-md border border-hairline px-3 py-2">
                 <span className="min-w-0">
                   <span className="block truncate font-mono text-xs">{endpoint.url}</span>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-xs text-slate-600">
                     {endpoint.events.length ? endpoint.events.join(", ") : "all events"}
                     {endpoint.status !== "active" && <span className="ml-2 text-red-600">disabled</span>}
                   </span>
@@ -340,15 +495,27 @@ export function IntegrationsManager({
                       {endpoint.status === "active" ? "Disable" : "Enable"}
                     </Button>
                     <Button type="button" size="sm" variant="ghost" disabled={pending}
-                      onClick={() => { if (confirm("Delete this endpoint?")) run(() => deleteWebhookEndpointAction(workspaceId, endpoint.id)) }}>
+                      onClick={() => setDeleteEndpoint(endpoint)}>
                       Delete
                     </Button>
                   </span>
                 )}
               </li>
             ))}
-            {!endpoints.length && <li className="text-muted-foreground">No webhook endpoints yet.</li>}
+            {!endpoints.length && <li className="text-slate-600">No webhook endpoints yet.</li>}
           </ul>
+          <ConfirmDialog
+            open={deleteEndpoint !== null}
+            destructive
+            busy={pending}
+            title="Delete this webhook endpoint?"
+            description={deleteEndpoint ? `${deleteEndpoint.url} will stop receiving document events. This cannot be undone.` : undefined}
+            confirmLabel={pending ? "Deleting…" : "Delete endpoint"}
+            onConfirm={() => {
+              if (!deleteEndpoint) return
+              run(() => deleteWebhookEndpointAction(workspaceId, deleteEndpoint.id), () => setDeleteEndpoint(null))
+            }}
+            onCancel={() => setDeleteEndpoint(null)} />
         </CardContent>
       </Card>
 
@@ -362,7 +529,7 @@ export function IntegrationsManager({
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b text-left text-xs text-muted-foreground">
+                <tr className="border-b text-left text-xs text-slate-600">
                   <th className="py-2 pr-3">Event</th>
                   <th className="py-2 pr-3">Status</th>
                   <th className="py-2 pr-3">Response</th>
@@ -376,10 +543,10 @@ export function IntegrationsManager({
                     <td className="py-2 pr-3 font-mono text-xs">{d.eventType}</td>
                     <td className="py-2 pr-3">
                       <span className={d.status === "delivered" ? "text-emerald-700" : d.status === "failed" ? "text-red-600" : "text-indigo-700"}>{d.status}</span>
-                      {d.attempts > 1 && <span className="text-xs text-muted-foreground"> ·{d.attempts}×</span>}
+                      {d.attempts > 1 && <span className="text-xs text-slate-600"> ·{d.attempts}×</span>}
                     </td>
-                    <td className="py-2 pr-3 text-xs text-muted-foreground">{d.responseStatus ?? d.errorCode ?? "—"}</td>
-                    <td className="py-2 pr-3 text-xs text-muted-foreground">{new Date(d.createdAt).toLocaleString()}</td>
+                    <td className="py-2 pr-3 text-xs text-slate-600">{d.responseStatus ?? d.errorCode ?? "—"}</td>
+                    <td className="py-2 pr-3 text-xs text-slate-600">{new Date(d.createdAt).toLocaleString()}</td>
                     <td className="py-2 text-right">
                       {isOwner && d.status !== "delivered" && (
                         <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={() => run(() => redeliverDeliveryAction(workspaceId, d.id))}>Redeliver</Button>
@@ -388,7 +555,7 @@ export function IntegrationsManager({
                   </tr>
                 ))}
                 {!deliveries.length && (
-                  <tr><td colSpan={5} className="py-3 text-muted-foreground">No deliveries yet.</td></tr>
+                  <tr><td colSpan={5} className="py-3 text-slate-600">No deliveries yet.</td></tr>
                 )}
               </tbody>
             </table>

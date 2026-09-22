@@ -1,0 +1,14 @@
+# LiteLLM proxy: exposes Mistral behind the Anthropic Messages API so
+# `claude -p` (the autopilot's driver) can run unchanged on a Mistral key.
+# Any model id of the form mistral/<name> is passed straight through.
+model_list:
+  - model_name: "mistral/*"
+    litellm_params:
+      model: "mistral/*"
+      api_key: os.environ/MISTRAL_API_KEY
+      parallel_tool_calls: false   # several calls in one turn stream back merged into one tool_use ({..}{..}) — claude -p rejects it
+litellm_settings:
+  drop_params: true          # Anthropic-only params (thinking, cache_control, betas) are dropped, not rejected
+  num_retries: 2
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY

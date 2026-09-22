@@ -255,7 +255,7 @@ describe("reopenClose", () => {
     closeItemUpdateMany.mockResolvedValue({ count: 4 })
     await reopenClose({ closeId: "c1", actorId: "u1", reason: "AP adjustment" })
     expect(closeItemUpdateMany).toHaveBeenCalledWith({
-      where: { closeId: "c1" },
+      where: { workspaceId: "w1", closeId: "c1" },
       data: { reSignRequired: true },
     })
     const event = auditCreate.mock.calls[0][0].data

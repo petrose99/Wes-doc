@@ -15,16 +15,16 @@ export function TeamWorkspaceForm() {
   return <form className="flex flex-col gap-4" action={(formData) => startTransition(async () => {
     const result = await createWorkspaceAction(String(formData.get("name") || ""))
     if (!result.success || !result.data) {
-      setError(result.error || "Could not create the workspace")
+      setError(result.error || "Couldn't add the company")
       return
     }
     setError(null)
-    toast.success("Workspace created")
+    toast.success("Company added")
     router.push(`/workspaces/${result.data.workspaceId}`)
   })}>
     <div className="flex flex-wrap items-center gap-2">
-      <Input name="name" placeholder="Team workspace name" className="max-w-xs" required />
-      <Button type="submit" disabled={pending}>{pending ? "Creating…" : "Create workspace"}</Button>
+      <Input name="name" placeholder="Company name" className="max-w-xs" required />
+      <Button type="submit" disabled={pending}>{pending ? "Adding…" : "Add company"}</Button>
     </div>
     {error && <p className="text-sm text-destructive">{error}</p>}
   </form>

@@ -1,7 +1,20 @@
-import { WorkspaceScopeError, checkWorkspaceScope, hasWorkspaceFilter, unscoped } from "@/lib/workspace-scope"
+import { WORKSPACE_SCOPED_MODELS, WorkspaceScopeError, checkWorkspaceScope, hasWorkspaceFilter, unscoped } from "@/lib/workspace-scope"
 import { describe, expect, it } from "vitest"
 
 const WS = "11111111-1111-1111-1111-111111111111"
+
+// #255: the 29 models newly added to WORKSPACE_SCOPED_MODELS by the scope-guard sweep. One case
+// per model, matching the existing Document cases above, so a future removal from the Set is
+// caught here rather than silently reopening a tenant-isolation gap.
+const NEWLY_GUARDED_MODELS = [
+  "FieldSuggestion", "DocumentSheetPlacement", "AuditEvent", "Gate", "WarnCheck",
+  "BigcapitalAccount", "BigcapitalMemberAccount", "IntegrationProvisionJob",
+  "HealthCheckResult", "HealthScore", "HealthScoreConfig", "CodingCorrection",
+  "CategoryAccountMapping", "CategoryNature", "UserListPreference", "SavedView",
+  "PaymentRun", "PaymentRunItem", "Supplier", "SupplierAlias", "InboundEmailIntake",
+  "BankMatchMemory", "GoldenDocument", "ReviewerActivity", "SupplierMergeEvent",
+  "SupplierMatchLabel", "Close", "CloseItem", "Institution",
+]
 
 describe("hasWorkspaceFilter", () => {
   it("accepts a direct filter and one nested in AND/NOT", () => {
@@ -83,5 +96,25 @@ describe("checkWorkspaceScope", () => {
   it("names the model and operation, so a warning is actionable", () => {
     expect(() => checkWorkspaceScope("DocumentFieldValue", "count", { where: {} }))
       .toThrow(/DocumentFieldValue\.count\(\).*workspaceId/s)
+  })
+})
+
+describe("#255 scope-guard sweep", () => {
+  it("is in WORKSPACE_SCOPED_MODELS for every newly guarded model", () => {
+    for (const model of NEWLY_GUARDED_MODELS) expect(WORKSPACE_SCOPED_MODELS.has(model)).toBe(true)
+  })
+
+  it("throws an unscoped read of each newly guarded model, and permits it once scoped", () => {
+    for (const model of NEWLY_GUARDED_MODELS) {
+      expect(() => checkWorkspaceScope(model, "findMany", { where: {} })).toThrow(WorkspaceScopeError)
+      expect(() => checkWorkspaceScope(model, "findMany", { where: { workspaceId: WS } })).not.toThrow()
+    }
+  })
+
+  it("leaves the two membership models, and the analytics-event model, deliberately unguarded", () => {
+    for (const model of ["WorkspaceMember", "WorkspaceInvitation", "ProductEvent"]) {
+      expect(WORKSPACE_SCOPED_MODELS.has(model)).toBe(false)
+      expect(() => checkWorkspaceScope(model, "findMany", { where: {} })).not.toThrow()
+    }
   })
 })

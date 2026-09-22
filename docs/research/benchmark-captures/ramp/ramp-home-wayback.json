@@ -1,0 +1,789 @@
+{
+ "slug": "ramp-home-wayback",
+ "label": "Ramp homepage (Wayback 2026-09-10)",
+ "url": "https://web.archive.org/web/20260910145847if_/https://ramp.com/",
+ "accessed": "2026-09-19T12:14:25.194Z",
+ "views": {
+  "390": {
+   "status": 200,
+   "shot": "/home/ubuntu/Dev/Wes-doc/docs/research/benchmark-captures/ramp/ramp-home-wayback-390.png",
+   "initialMotion": {
+    "opacityZeroEls": 6,
+    "animations": {
+     "pulse 2s infinite": 8
+    },
+    "transitionEls": 80,
+    "total": 1027
+   },
+   "errors": [
+    "Failed to load chunk /_next/static/immutable/chunks/3mw-stbqav-ps.js from module 964893",
+    "overlaysHidden=0"
+   ],
+   "title": "Spend Management, Corporate Cards & Accounts Payable Solutions | Ramp",
+   "h1": "Time is money. Save both.",
+   "subhead": "Cards, expenses, bill payments, and banking* – in the blink of AI.",
+   "headings": [
+    {
+     "tag": "H1",
+     "text": "Time is money. Save both.",
+     "top": 227
+    },
+    {
+     "tag": "H2",
+     "text": "Join 70,000 of the world’s most ambitious companies growing 3.2x faster than the average American business.",
+     "top": 1063
+    },
+    {
+     "tag": "H2",
+     "text": "One platform for all of finance. Agents for every workflow, working 24/7.",
+     "top": 1431
+    },
+    {
+     "tag": "H3",
+     "text": "Cards & Expenses that handle themselves",
+     "top": 1659
+    },
+    {
+     "tag": "H3",
+     "text": "Procure to pay without chasing approvals",
+     "top": 2203
+    },
+    {
+     "tag": "H3",
+     "text": "Accounting automation eliminates month-end madness",
+     "top": 2747
+    },
+    {
+     "tag": "H3",
+     "text": "Banking that flows money to the highest return",
+     "top": 3219
+    },
+    {
+     "tag": "H3",
+     "text": "200+ Integrations to the tools you already use",
+     "top": 3691
+    },
+    {
+     "tag": "H2",
+     "text": "See recommendations for your business",
+     "top": 4313
+    },
+    {
+     "tag": "H2",
+     "text": "Systems that never spoke",
+     "top": 4954
+    },
+    {
+     "tag": "H2",
+     "text": "Built on the intelligence of 70k+ finance teams. One platform for the agentic era.",
+     "top": 6498
+    },
+    {
+     "tag": "H2",
+     "text": "Introducing Stack by Ramp. The AI operating system built for today’s top accounting teams.",
+     "top": 6859
+    },
+    {
+     "tag": "H2",
+     "text": "Keep your finance team focused on strategy. Let agents handle the busywork.",
+     "top": 7664
+    },
+    {
+     "tag": "H2",
+     "text": "AI that learns from your team. And gets smarter with every team that joins.",
+     "top": 8494
+    },
+    {
+     "tag": "H2",
+     "text": "Scale the team. Shrink the paperwork.",
+     "top": 9523
+    },
+    {
+     "tag": "H2",
+     "text": "Set user access on autopilot.",
+     "top": 9999
+    },
+    {
+     "tag": "H2",
+     "text": "One platform for all your global spend.",
+     "top": 10459
+    },
+    {
+     "tag": "H2",
+     "text": "We've got the receipts.",
+     "top": 10733
+    },
+    {
+     "tag": "H2",
+     "text": "Time is money. Save both.",
+     "top": 11579
+    }
+   ],
+   "sections": [
+    {
+     "top": 132,
+     "height": 782,
+     "heading": "Time is money. Save both.",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 2,
+     "ctas": [
+      "banking*",
+      "Get started for free"
+     ],
+     "textLen": 160,
+     "snippet": "US CORPORATE PAYMENTS PROCESSED BY RAMP: Time is money. Save both. Cards, expenses, bill payments, and banking* – in the blink of AI. Email Get started for free"
+    },
+    {
+     "top": 914,
+     "height": 437,
+     "heading": "Join 70,000 of the world’s most ambitious companies growing 3.2x faster than the average American business.",
+     "imgs": 4,
+     "svgs": 2,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 172,
+     "snippet": "AGENTS AT WORK TODAY: Join 70,000 of the world’s most ambitious companies growing 3.2x faster than the average American business. Read the report $1M+ saved on global spend"
+    },
+    {
+     "top": 1431,
+     "height": 2674,
+     "heading": "One platform for all of finance. Agents for every workflow, working 24/7.",
+     "imgs": 2,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 336,
+     "snippet": "One platform for all of finance. Agents for every workflow, working 24/7. Switch in days, not months View Demo Cards & Expenses that handle themselves Procure to pay without chasing approvals Accounting automation elimin"
+    },
+    {
+     "top": 4265,
+     "height": 433,
+     "heading": "See recommendations for your business",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 172,
+     "snippet": "See recommendations for your business Start with your company website URL, then add any context about your business or spend challenges. Company website or business context"
+    },
+    {
+     "top": 4858,
+     "height": 1600,
+     "heading": "Systems that never spoke",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 93,
+     "snippet": "Systems that never spoke This is what five separate systems to reimburse a flight looks like."
+    },
+    {
+     "top": 6498,
+     "height": 2673,
+     "heading": "Built on the intelligence of 70k+ finance teams. One platform for the agentic era.",
+     "imgs": 1,
+     "svgs": 5,
+     "videos": 1,
+     "ctas": [],
+     "textLen": 1028,
+     "snippet": "Built on the intelligence of 70k+ finance teams. One platform for the agentic era. Explore Ramp Intelligence Introducing Stack by Ramp. The AI operating system built for today’s top accounting teams. Learn about Ramp Sta"
+    },
+    {
+     "top": 9251,
+     "height": 192,
+     "heading": "",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 119,
+     "snippet": "See what agents can automate. Get a personalized look at the busy work agents can take off your team's plate. View Demo"
+    },
+    {
+     "top": 9523,
+     "height": 1087,
+     "heading": "Scale the team. Shrink the paperwork.",
+     "imgs": 2,
+     "svgs": 2,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 432,
+     "snippet": "Scale the team. Shrink the paperwork. You had a bureaucracy. Now you have a business again. Set user access on autopilot. Provision cards, permissions, and limits automatically based on role, location, department and cus"
+    },
+    {
+     "top": 10690,
+     "height": 810,
+     "heading": "We've got the receipts.",
+     "imgs": 17,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 2431,
+     "snippet": "70,000 teams and counting We've got the receipts. View Demo Shannon McCormick International Workplace Experience Lead, Notion As soon as I texted my first Ramp receipt, I realized Ramp is a game-changer. It’s incredibly "
+    }
+   ],
+   "navLinks": [
+    "Back"
+   ],
+   "heroCtas": [
+    {
+     "text": "Back",
+     "tag": "BUTTON",
+     "href": null
+    },
+    {
+     "text": "banking*",
+     "tag": "BUTTON",
+     "href": null
+    },
+    {
+     "text": "Get started for free",
+     "tag": "BUTTON",
+     "href": null
+    }
+   ],
+   "bigImgs": [
+    {
+     "w": 356,
+     "h": 446,
+     "alt": "",
+     "src": "https://web.archive.org/web/20260910145847im_/https://ramp.com/_next/image?url=%2F_next%2Fstatic%2Fimmutable%2Fmedia%2Fplatform-treasury-card-mobile.2xu1oesi8ai",
+     "top": 3187
+    },
+    {
+     "w": 356,
+     "h": 356,
+     "alt": "Stack by Ramp",
+     "src": "https://web.archive.org/web/20260910145847im_/https://ramp.com/_next/image?url=https%3A%2F%2Fair-prod.imgix.net%2Fa184a499-09f0-4fcf-9eed-a166c47bea09.jpg%3Fw%3",
+     "top": 7006
+    },
+    {
+     "w": 358,
+     "h": 286,
+     "alt": "Bill-creation workflow with amount threshold, department approvals, and vendor n",
+     "src": "https://web.archive.org/web/20260910145847im_/https://ramp.com/_next/image?url=%2F_next%2Fstatic%2Fimmutable%2Fmedia%2Fhome-refresh-enterprise-workflow.0tqmzq1s",
+     "top": 9689
+    },
+    {
+     "w": 358,
+     "h": 286,
+     "alt": "Stippled globe with sample card spend in Tokyo, London, Stockholm, and Mexico Ci",
+     "src": "https://web.archive.org/web/20260910145847im_/https://ramp.com/_next/image?url=%2F_next%2Fstatic%2Fimmutable%2Fmedia%2Fhome-refresh-global-spend-globe.2qh2zv3js",
+     "top": 10148
+    }
+   ],
+   "imgCount": 28,
+   "logoish": 0,
+   "videos": [
+    {
+     "autoplay": true,
+     "loop": true,
+     "src": "https://web.archive.org/web/20260910145847im_/https://assets.ramp.com/nextjs/videos/homepage-hero-mobile-423.webm",
+     "w": 356,
+     "top": 525
+    },
+    {
+     "autoplay": true,
+     "loop": true,
+     "src": "https://web.archive.org/web/20260910145847im_/https://assets.ramp.com/nextjs/videos/homepage-hero-423.webm",
+     "w": 0,
+     "top": 0
+    },
+    {
+     "autoplay": true,
+     "loop": true,
+     "src": "https://web.archive.org/web/20260910145847im_/https://assets.ramp.com/nextjs/videos/homepage-perplexity-thumbnail.mp4",
+     "w": 356,
+     "top": 7823
+    }
+   ],
+   "canvases": 9,
+   "lotties": 0,
+   "iframes": [],
+   "fonts": [
+    [
+     "lausanne",
+     690
+    ],
+    [
+     "Material Icons Outlined",
+     8
+    ],
+    [
+     "Material Icons",
+     2
+    ]
+   ],
+   "sectionBgs": [
+    [
+     "lab(100 0 0)",
+     1
+    ]
+   ],
+   "buttonBgs": [
+    [
+     "lab(95.604 0.426412 1.20401)",
+     8
+    ],
+    [
+     "lab(92.1406 -20.4979 84.7726)",
+     5
+    ],
+    [
+     "lab(100 0 0)",
+     2
+    ],
+    [
+     "rgba(33, 33, 33, 0.05)",
+     1
+    ],
+    [
+     "lab(8.86531 0.515342 0.18619)",
+     1
+    ]
+   ],
+   "type": {
+    "h1": {
+     "family": "lausanne, \"lausanne Fallback\"",
+     "size": "40px",
+     "weight": "400",
+     "lineHeight": "42px",
+     "letterSpacing": "-0.01px",
+     "color": "lab(2.83994 0.367254 0.969091)"
+    },
+    "h2": {
+     "family": "lausanne, \"lausanne Fallback\"",
+     "size": "22px",
+     "weight": "400"
+    },
+    "body": {
+     "family": "lausanne, \"lausanne Fallback\"",
+     "size": "16px",
+     "color": "lab(2.83994 0.367254 0.969091)",
+     "bg": "lab(100 0 0)"
+    }
+   },
+   "motionAfterScroll": {
+    "animations": {
+     "pulse 2s infinite": 8
+    },
+    "opacityZeroEls": 6,
+    "transitionEls": 80,
+    "stickyFixedEls": 4
+   },
+   "libs": {
+    "gsap": false,
+    "framer": false,
+    "webflow": false,
+    "lottie": false,
+    "splide_swiper": false,
+    "rive": false,
+    "nextjs": true,
+    "wordpress": false,
+    "hubspot": false
+   },
+   "wordCount": 1235,
+   "scrollHeight": 13963,
+   "bodyText": "New: AI Token Spend Management — see, understand, and control your AI bill. Back US CORPORATE PAYMENTS PROCESSED BY RAMP: Time is money. Save both. Cards, expenses, bill payments, and banking* – in the blink of AI. Email Get started for free AGENTS AT WORK TODAY: Join 70,000 of the world’s most ambitious companies growing 3.2x faster than the average American business. Read the report $1M+ saved on global spend One platform for all of finance. Agents for every workflow, working 24/7. Switch in days, not months View Demo Cards & Expenses that handle themselves Procure to pay without chasing approvals Accounting automation eliminates month-end madness Banking that flows money to the highest return 200+ Integrations to the tools you already use See recommendations for your business Start with your company website URL, then add any context about your business or spend challenges. Company website or business context By continuing, you understand that Ramp uses AI to suggest content and acknowledge our Privacy Policy. Systems that never spoke This is what five separate systems to reimburse a flight looks like. Built on the intelligence of 70k+ finance teams. One platform for the agentic era. Explore Ramp Intelligence Introducing Stack by Ramp. The AI operating system built for today’s top accounting teams. Learn about Ramp Stack Stack has finally automated what we all knew was coming with AI, but it did it in a reliable and consistent manner. Tyler Otto President, Specialized Accounting Read their story Keep your finance team focused on strategy. Let agents handle the busywork. Learn about Ramp Intelligence Gone are the days of scrambling to chase receipts, manually coding really large data sets. All of that has been automatically addressed throughout the month in real time. Lauren Feeney Controller, Perplexity Read their story AI that learns from your team. And gets smarter with every team that joins. Learn about Policy Agents We have thousands of transactions a month, and the number of manual edits I make has dropped drastically. Ramp's AI just keeps getting smarter every week. Neusha Sayadian Fractional CFO, Valence See what agents can automate. Get a personalized look at the busy work agents can take off your team's plate. View Demo Scale the team. Shrink the paperwork. You had a bureaucracy. Now you have a business again. Set user access on autopilot. Provision cards, permissions, and limits automatically based on role, location, department and custom fields. Enterprise Solutions One platform for all your global spend. Issue cards in 30+ currencies and reimburse employees in local currencies, including pounds, euros, yen, and pesos. Global Spend Management 70,000 teams and counting We've got the receipts. View Demo Shannon McCormick International Workplace Experience Lead, Notion As soon as I texted my first Ramp receipt, I realized Ramp is a game-changer. It’s incredibly intuitive. Heather Bruzus Principal Accountant, Mindbody & ClassPass We got positive feedback, which just doesn't happen very often. That proved this was the right decision. Tzu-San Hung Head of Strategic Finance, Notion Beautiful tools use beautiful tools. Matteo Franceschetti CEO, Eight Sleep Ramp was a complete game changer. It's a single platform that can handle every aspect of our spending. Christine Mimnagh-Fleming Sr. Manager, Finance Transformation, Shopify Ramp is so intuitive, people get it right away. Carey Peek CFO, KIPP Nashville Public Schools Implementing Ramp has been my biggest win as CFO. Employees love it and often go out of their way to tell me so. Mayor Neil Bradshaw Mayor, City of Ketchum, ID Ramp gives us the ability to make more informed financial policy decisions. It was one of the best decisions we've ever made. Bret Taylor CEO, Sierra It's almost like we're a more self-actualized company because everyone is just working on what we do differently. Michael Bohn Head of Business Operations, Foursquare The average person can figure Ramp out without training. That’s what drives 100% adoption. Ben Whipple Director of Public Works, City of Ketchum, ID I snap a picture of the receipt, Ramp handles the rest like magic, and I move on. Michael Litwin VP Controller, Virgin Voyages Before Ramp it was a process from the dark ages. We had people just doing expenses full-time. It was miserable. Staci Robinson AP Manager, Pair Eyewear Ramp's AI has given me a better work-life balance. I have more time for my family now that the AI handles much of the work I used to do manually. Irish Rose Controller, Eight Sleep Closing the books with Ramp is effortless. Andrew Clarke SVP Finance, Studs We've consolidated four platforms into one with Ramp. Jason Penegar VP Controller, Boys & Girls Clubs of America The Ramp journey has been incredible. A flawless implementation… Sarah Bird Controller, Seed Health It's rare to feel like a company and a team is a partner, and that they really want to understand what you need. That's what we've experienced with Ramp. Carolynn Yipp Assistant Controller, Poshmark It's very easy to use, very intuitive, and requires almost zero training. Time is money. Save both. Email Get started for free About us Careers Emerging talent Customers Help center Product releases Ramp for Agents Ramp Labs API documentation Versus Products Platform Partners Solutions Free tools and resources Join the 70,000+ businesses simplifying their finances with Ramp. Email Get started for free LinkedIn X Facebook Ramp Business Corporation 28 West 23rd Street, Floor 2 New York, NY 10010 Terms of Service Editorial Guidelines Privacy Policy Your Privacy Choices Manage Preferences © 2026 Ramp Business Corporation. \"Ramp\" and the Ramp logo are registered trademarks of the company. Ramp Support: +1-855-206-7283 The Ramp Visa Corporate Card is issued in the U.S. by Celtic Bank, and to U.S. corporations operating globally by Column N.A., Member FDIC, and is subject to credit approval. The Ramp Visa Commercial Card is issued by Sutton Bank, Member FDIC. The Ramp Visa Business Card is issued by Lead Bank, Member FDIC. Each card is issued pursuant to a license from Visa USA Inc. Ramp Visa Business Cards are issued in Canada by Peoples Trust Company, pursuant to license by Visa* International. Visa Int./Peoples Trust Company, Licensed User. Card Balance not insured by the Canada Deposit Insurance Corporation. Ramp Business Corporation is registered as a Payment Service Provider with the Bank of Canada. Ramp cards are issued in the UK by Stripe Payments UK Limited, an electronic money institution authorized by the Financial Conduct Authority (firm reference number: 900461). Ramp cards are issued in the EEA by Stripe Technology Europe Limited, an electronic money institution authorized by the Central Bank of Ireland (firm reference number: C187865). Cards are issued under the Visa card scheme pursuant to a license from Visa Europe Limited. Visa is a registered trademark of Visa International Service Association. All other trademarks and service marks belong to their respective owners. *Ramp Business Corporation is a financial technology company and is not a bank. Bank deposit services provided by First Internet Bank of Indiana, Member FDIC. †Investment account with portfolios managed by Moment Advisors, LLC. Investing involves risk, including possible loss of principal. Asset allocation does not guarantee profit or protect against loss. Past performance does not guarantee future results. Additional information can be found here. Securities products offered by Apex Clearing Corporation, member FINRA, SIPC. The Investment Account is not insured by the FDIC, not a deposit product, and may lose value. Ramp Payments Corporation - NMLS 2371465 Disclosures, Ramp Financing Corporation - NMLS 2431387"
+  },
+  "1440": {
+   "status": 200,
+   "shot": "/home/ubuntu/Dev/Wes-doc/docs/research/benchmark-captures/ramp/ramp-home-wayback-1440.png",
+   "initialMotion": {
+    "opacityZeroEls": 7,
+    "animations": {
+     "pulse 2s infinite": 8
+    },
+    "transitionEls": 82,
+    "total": 1027
+   },
+   "errors": [
+    "overlaysHidden=0",
+    "Failed to load chunk /_next/static/immutable/chunks/3mw-stbqav-ps.js from module 964893"
+   ],
+   "title": "Spend Management, Corporate Cards & Accounts Payable Solutions | Ramp",
+   "h1": "Time is money. Save both.",
+   "subhead": "Cards, expenses, bill payments, and banking* – in the blink of AI.",
+   "headings": [
+    {
+     "tag": "H1",
+     "text": "Time is money. Save both.",
+     "top": 229
+    },
+    {
+     "tag": "H2",
+     "text": "Join 70,000 of the world’s most ambitious companies growing 3.2x faster than the average American business.",
+     "top": 1235
+    },
+    {
+     "tag": "H2",
+     "text": "One platform for all of finance. Agents for every workflow, working 24/7.",
+     "top": 1880
+    },
+    {
+     "tag": "H3",
+     "text": "Cards & Expenses that handle themselves",
+     "top": 2136
+    },
+    {
+     "tag": "H3",
+     "text": "Procure to pay without chasing approvals",
+     "top": 2136
+    },
+    {
+     "tag": "H3",
+     "text": "Accounting automation eliminates month-end madness",
+     "top": 2643
+    },
+    {
+     "tag": "H3",
+     "text": "Banking that flows money to the highest return",
+     "top": 2643
+    },
+    {
+     "tag": "H3",
+     "text": "200+ Integrations to the tools you already use",
+     "top": 2643
+    },
+    {
+     "tag": "H2",
+     "text": "See recommendations for your business",
+     "top": 3456
+    },
+    {
+     "tag": "H2",
+     "text": "Systems that never spoke",
+     "top": 4156
+    },
+    {
+     "tag": "H2",
+     "text": "Built on the intelligence of 70k+ finance teams. One platform for the agentic era.",
+     "top": 6920
+    },
+    {
+     "tag": "H2",
+     "text": "Introducing Stack by Ramp. The AI operating system built for today’s top accounting teams.",
+     "top": 7223
+    },
+    {
+     "tag": "H2",
+     "text": "Keep your finance team focused on strategy. Let agents handle the busywork.",
+     "top": 8111
+    },
+    {
+     "tag": "H2",
+     "text": "AI that learns from your team. And gets smarter with every team that joins.",
+     "top": 8999
+    },
+    {
+     "tag": "H2",
+     "text": "Scale the team. Shrink the paperwork.",
+     "top": 10189
+    },
+    {
+     "tag": "H2",
+     "text": "Set user access on autopilot.",
+     "top": 10935
+    },
+    {
+     "tag": "H2",
+     "text": "One platform for all your global spend.",
+     "top": 10935
+    },
+    {
+     "tag": "H2",
+     "text": "We've got the receipts.",
+     "top": 11231
+    },
+    {
+     "tag": "H2",
+     "text": "Time is money. Save both.",
+     "top": 12172
+    }
+   ],
+   "sections": [
+    {
+     "top": 102,
+     "height": 1013,
+     "heading": "Time is money. Save both.",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 2,
+     "ctas": [
+      "banking*",
+      "Get started for free"
+     ],
+     "textLen": 160,
+     "snippet": "US CORPORATE PAYMENTS PROCESSED BY RAMP: Time is money. Save both. Cards, expenses, bill payments, and banking* – in the blink of AI. Email Get started for free"
+    },
+    {
+     "top": 1115,
+     "height": 637,
+     "heading": "Join 70,000 of the world’s most ambitious companies growing 3.2x faster than the average American business.",
+     "imgs": 4,
+     "svgs": 2,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 172,
+     "snippet": "AGENTS AT WORK TODAY: Join 70,000 of the world’s most ambitious companies growing 3.2x faster than the average American business. Read the report $1M+ saved on global spend"
+    },
+    {
+     "top": 1880,
+     "height": 1256,
+     "heading": "One platform for all of finance. Agents for every workflow, working 24/7.",
+     "imgs": 2,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 336,
+     "snippet": "One platform for all of finance. Agents for every workflow, working 24/7. Switch in days, not months View Demo Cards & Expenses that handle themselves Procure to pay without chasing approvals Accounting automation elimin"
+    },
+    {
+     "top": 3392,
+     "height": 444,
+     "heading": "See recommendations for your business",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 172,
+     "snippet": "See recommendations for your business Start with your company website URL, then add any context about your business or spend challenges. Company website or business context"
+    },
+    {
+     "top": 4092,
+     "height": 2700,
+     "heading": "Systems that never spoke",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 93,
+     "snippet": "Systems that never spoke This is what five separate systems to reimburse a flight looks like."
+    },
+    {
+     "top": 6920,
+     "height": 2834,
+     "heading": "Built on the intelligence of 70k+ finance teams. One platform for the agentic era.",
+     "imgs": 1,
+     "svgs": 5,
+     "videos": 1,
+     "ctas": [
+      "Watch Video",
+      "Watch Video"
+     ],
+     "textLen": 1052,
+     "snippet": "Built on the intelligence of 70k+ finance teams. One platform for the agentic era. Explore Ramp Intelligence Watch Video Introducing Stack by Ramp. The AI operating system built for today’s top accounting teams. Learn ab"
+    },
+    {
+     "top": 9882,
+     "height": 179,
+     "heading": "",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 119,
+     "snippet": "See what agents can automate. Get a personalized look at the busy work agents can take off your team's plate. View Demo"
+    },
+    {
+     "top": 10189,
+     "height": 871,
+     "heading": "Scale the team. Shrink the paperwork.",
+     "imgs": 2,
+     "svgs": 2,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 432,
+     "snippet": "Scale the team. Shrink the paperwork. You had a bureaucracy. Now you have a business again. Set user access on autopilot. Provision cards, permissions, and limits automatically based on role, location, department and cus"
+    },
+    {
+     "top": 11188,
+     "height": 856,
+     "heading": "We've got the receipts.",
+     "imgs": 17,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 2431,
+     "snippet": "70,000 teams and counting We've got the receipts. View Demo Shannon McCormick International Workplace Experience Lead, Notion As soon as I texted my first Ramp receipt, I realized Ramp is a game-changer. It’s incredibly "
+    }
+   ],
+   "navLinks": [
+    "Learn more",
+    "Products",
+    "Partners",
+    "Solutions",
+    "Resources",
+    "Customers",
+    "Pricing",
+    "Sign in",
+    "Sign in",
+    "See a demo",
+    "Get started"
+   ],
+   "heroCtas": [
+    {
+     "text": "banking*",
+     "tag": "BUTTON",
+     "href": null
+    },
+    {
+     "text": "Get started for free",
+     "tag": "BUTTON",
+     "href": null
+    }
+   ],
+   "bigImgs": [
+    {
+     "w": 327,
+     "h": 327,
+     "alt": "Notion",
+     "src": "https://web.archive.org/web/20260910145847im_/https://ramp.com/_next/image?url=%2F_next%2Fstatic%2Fimmutable%2Fmedia%2Fcustomer-notion.09sf99zyvnrli.webp&w=1920",
+     "top": 1424
+    },
+    {
+     "w": 419,
+     "h": 524,
+     "alt": "",
+     "src": "https://web.archive.org/web/20260910145847im_/https://ramp.com/_next/image?url=%2F_next%2Fstatic%2Fimmutable%2Fmedia%2Fplatform-treasury-card.353417wdpun5_.webp",
+     "top": 2635
+    },
+    {
+     "w": 753,
+     "h": 753,
+     "alt": "Stack by Ramp",
+     "src": "https://ramp.com/_next/image?url=https%3A%2F%2Fair-prod.imgix.net%2Fa184a499-09f0-4fcf-9eed-a166c47bea09.jpg%3Fw%3D2265%26h%3D2079%26fm%3Dwebp%26fit%3Dcrop%26au",
+     "top": 7224
+    },
+    {
+     "w": 644,
+     "h": 515,
+     "alt": "Bill-creation workflow with amount threshold, department approvals, and vendor n",
+     "src": "https://ramp.com/_next/image?url=%2F_next%2Fstatic%2Fimmutable%2Fmedia%2Fhome-refresh-enterprise-workflow.0tqmzq1sbq-62.webp&w=2048&q=75",
+     "top": 10380
+    },
+    {
+     "w": 644,
+     "h": 515,
+     "alt": "Stippled globe with sample card spend in Tokyo, London, Stockholm, and Mexico Ci",
+     "src": "https://ramp.com/_next/image?url=%2F_next%2Fstatic%2Fimmutable%2Fmedia%2Fhome-refresh-global-spend-globe.2qh2zv3jsxtvm.webp&w=3840&q=75",
+     "top": 10380
+    }
+   ],
+   "imgCount": 28,
+   "logoish": 0,
+   "videos": [
+    {
+     "autoplay": true,
+     "loop": true,
+     "src": "https://web.archive.org/web/20260910145847im_/https://assets.ramp.com/nextjs/videos/homepage-hero-mobile-423.webm",
+     "w": 0,
+     "top": 0
+    },
+    {
+     "autoplay": true,
+     "loop": true,
+     "src": "https://web.archive.org/web/20260910145847im_/https://assets.ramp.com/nextjs/videos/homepage-hero-423.webm",
+     "w": 1310,
+     "top": 466
+    },
+    {
+     "autoplay": true,
+     "loop": true,
+     "src": "https://web.archive.org/web/20260910145847im_/https://assets.ramp.com/nextjs/videos/homepage-perplexity-thumbnail.mp4",
+     "w": 753,
+     "top": 8112
+    }
+   ],
+   "canvases": 9,
+   "lotties": 0,
+   "iframes": [],
+   "fonts": [
+    [
+     "lausanne",
+     776
+    ],
+    [
+     "Material Icons Outlined",
+     12
+    ],
+    [
+     "Material Icons",
+     2
+    ]
+   ],
+   "sectionBgs": [
+    [
+     "lab(100 0 0)",
+     1
+    ]
+   ],
+   "buttonBgs": [
+    [
+     "lab(95.604 0.426412 1.20401)",
+     8
+    ],
+    [
+     "lab(92.1406 -20.4979 84.7726)",
+     6
+    ],
+    [
+     "lab(8.86531 0.515342 0.18619)",
+     2
+    ],
+    [
+     "lab(100 0 0)",
+     2
+    ],
+    [
+     "rgba(255, 255, 255, 0.05)",
+     1
+    ]
+   ],
+   "type": {
+    "h1": {
+     "family": "lausanne, \"lausanne Fallback\"",
+     "size": "64px",
+     "weight": "400",
+     "lineHeight": "64px",
+     "letterSpacing": "-0.01px",
+     "color": "lab(2.83994 0.367254 0.969091)"
+    },
+    "h2": {
+     "family": "lausanne, \"lausanne Fallback\"",
+     "size": "28px",
+     "weight": "400"
+    },
+    "body": {
+     "family": "lausanne, \"lausanne Fallback\"",
+     "size": "16px",
+     "color": "lab(2.83994 0.367254 0.969091)",
+     "bg": "lab(100 0 0)"
+    }
+   },
+   "motionAfterScroll": {
+    "animations": {
+     "pulse 2s infinite": 8
+    },
+    "opacityZeroEls": 7,
+    "transitionEls": 82,
+    "stickyFixedEls": 4
+   },
+   "libs": {
+    "gsap": false,
+    "framer": false,
+    "webflow": false,
+    "lottie": false,
+    "splide_swiper": false,
+    "rive": false,
+    "nextjs": true,
+    "wordpress": false,
+    "hubspot": false
+   },
+   "wordCount": 1353,
+   "scrollHeight": 13943,
+   "bodyText": "New: AI Token Spend Management — see, understand, and control your AI bill. Learn more Products Partners Solutions Resources Customers Pricing Sign in See a demo Get started US CORPORATE PAYMENTS PROCESSED BY RAMP: Time is money. Save both. Cards, expenses, bill payments, and banking* – in the blink of AI. Email Get started for free AGENTS AT WORK TODAY: Join 70,000 of the world’s most ambitious companies growing 3.2x faster than the average American business. Read the report $1M+ saved on global spend One platform for all of finance. Agents for every workflow, working 24/7. Switch in days, not months View Demo Cards & Expenses that handle themselves Procure to pay without chasing approvals Accounting automation eliminates month-end madness Banking that flows money to the highest return 200+ Integrations to the tools you already use See recommendations for your business Start with your company website URL, then add any context about your business or spend challenges. Company website or business context By continuing, you understand that Ramp uses AI to suggest content and acknowledge our Privacy Policy. Systems that never spoke This is what five separate systems to reimburse a flight looks like. Built on the intelligence of 70k+ finance teams. One platform for the agentic era. Explore Ramp Intelligence Watch Video Introducing Stack by Ramp. The AI operating system built for today’s top accounting teams. Learn about Ramp Stack Stack has finally automated what we all knew was coming with AI, but it did it in a reliable and consistent manner. Tyler Otto President, Specialized Accounting Read their story Watch Video Keep your finance team focused on strategy. Let agents handle the busywork. Learn about Ramp Intelligence Gone are the days of scrambling to chase receipts, manually coding really large data sets. All of that has been automatically addressed throughout the month in real time. Lauren Feeney Controller, Perplexity Read their story AI that learns from your team. And gets smarter with every team that joins. Learn about Policy Agents We have thousands of transactions a month, and the number of manual edits I make has dropped drastically. Ramp's AI just keeps getting smarter every week. Neusha Sayadian Fractional CFO, Valence See what agents can automate. Get a personalized look at the busy work agents can take off your team's plate. View Demo Scale the team. Shrink the paperwork. You had a bureaucracy. Now you have a business again. Set user access on autopilot. Provision cards, permissions, and limits automatically based on role, location, department and custom fields. Enterprise Solutions One platform for all your global spend. Issue cards in 30+ currencies and reimburse employees in local currencies, including pounds, euros, yen, and pesos. Global Spend Management 70,000 teams and counting We've got the receipts. View Demo Shannon McCormick International Workplace Experience Lead, Notion As soon as I texted my first Ramp receipt, I realized Ramp is a game-changer. It’s incredibly intuitive. Heather Bruzus Principal Accountant, Mindbody & ClassPass We got positive feedback, which just doesn't happen very often. That proved this was the right decision. Tzu-San Hung Head of Strategic Finance, Notion Beautiful tools use beautiful tools. Matteo Franceschetti CEO, Eight Sleep Ramp was a complete game changer. It's a single platform that can handle every aspect of our spending. Christine Mimnagh-Fleming Sr. Manager, Finance Transformation, Shopify Ramp is so intuitive, people get it right away. Carey Peek CFO, KIPP Nashville Public Schools Implementing Ramp has been my biggest win as CFO. Employees love it and often go out of their way to tell me so. Mayor Neil Bradshaw Mayor, City of Ketchum, ID Ramp gives us the ability to make more informed financial policy decisions. It was one of the best decisions we've ever made. Bret Taylor CEO, Sierra It's almost like we're a more self-actualized company because everyone is just working on what we do differently. Michael Bohn Head of Business Operations, Foursquare The average person can figure Ramp out without training. That’s what drives 100% adoption. Ben Whipple Director of Public Works, City of Ketchum, ID I snap a picture of the receipt, Ramp handles the rest like magic, and I move on. Michael Litwin VP Controller, Virgin Voyages Before Ramp it was a process from the dark ages. We had people just doing expenses full-time. It was miserable. Staci Robinson AP Manager, Pair Eyewear Ramp's AI has given me a better work-life balance. I have more time for my family now that the AI handles much of the work I used to do manually. Irish Rose Controller, Eight Sleep Closing the books with Ramp is effortless. Andrew Clarke SVP Finance, Studs We've consolidated four platforms into one with Ramp. Jason Penegar VP Controller, Boys & Girls Clubs of America The Ramp journey has been incredible. A flawless implementation… Sarah Bird Controller, Seed Health It's rare to feel like a company and a team is a partner, and that they really want to understand what you need. That's what we've experienced with Ramp. Carolynn Yipp Assistant Controller, Poshmark It's very easy to use, very intuitive, and requires almost zero training. Time is money. Save both. Email Get started for free About us Careers Emerging talent Customers Help center Product releases Ramp for Agents Ramp Labs API documentation Versus Products Corporate cards Expense management Spend management Budgets Banking Travel Reimbursements Procurement Accounts payable Vendor management Approvals Security Trust Mobile app Ramp Sheets Platform Platform overview Accounting automation Intelligence Reporting Savings Integrations Multi-entity Global AI Token Spend Management Router Partners Accounting firms Private equity Venture capital System integrators Technology partners Spend and payroll partners Reseller partners Franchise partners Solutions Startups Small business Mid market Enterprise Free tools and resources Perks and rewards Find an accountant Find a services partner Savings calculator Mission statement generator Charge finder Per diem calculator Mileage reimbursement calculator Card comparison tool Investor database Expense categorization Expense policy builder Vendor directory Virtual cards Answers Hub Terms of Service Editorial Guidelines Privacy Policy Your Privacy Choices Manage Preferences © 2026 Ramp Business Corporation. \"Ramp\" and the Ramp logo are registered trademarks of the company. Ramp Support: +1-855-206-7283 The Ramp Visa Corporate Card is issued in the U.S. by Celtic Bank, and to U.S. corporations operating globally by Column N.A., Member FDIC, and is subject to credit approval. The Ramp Visa Commercial Card is issued by Sutton Bank, Member FDIC. The Ramp Visa Business Card is issued by Lead Bank, Member FDIC. Each card is issued pursuant to a license from Visa USA Inc. Ramp Visa Business Cards are issued in Canada by Peoples Trust Company, pursuant to license by Visa* International. Visa Int./Peoples Trust Company, Licensed User. Card Balance not insured by the Canada Deposit Insurance Corporation. Ramp Business Corporation is registered as a Payment Service Provider with the Bank of Canada. Ramp cards are issued in the UK by Stripe Payments UK Limited, an electronic money institution authorized by the Financial Conduct Authority (firm reference number: 900461). Ramp cards are issued in the EEA by Stripe Technology Europe Limited, an electronic money institution authorized by the Central Bank of Ireland (firm reference number: C187865). Cards are issued under the Visa card scheme pursuant to a license from Visa Europe Limited. Visa is a registered trademark of Visa International Service Association. All other trademarks and service marks belong to their respective owners. *Ramp Business Corporation is a financial technology company and is not a bank. Bank deposit services provided by First Internet Bank of Indiana, Member FDIC. †Investment account with portfolios managed by Moment Advisors, LLC. Investing involves risk, including possible loss of principal. Asset allocation does not guarantee profit or protect against loss. Past performance does not guarantee future results. Additional information can be found here. Securities products offered by Apex Clearing Corporation, member FINRA, SIPC. The Investment Account is not insured by the FDIC, not a deposit product, and may lose value. Ramp Payments Corporation - NMLS 2371465 Disclosures, Ramp Financing Corporation - NMLS 2431387 Join the 70,000+ businesses simplifying their finances with Ramp. Email Get started for free Ramp Business Corporation 28 West 23rd Street, Floor 2 New York, NY 10010 LinkedIn X Facebook"
+  }
+ }
+}

@@ -85,9 +85,9 @@ export default async function SheetsPage({ params, searchParams }: {
     </form>
 
     {files.length > 0 ? (
-      <div className="divide-y rounded-xl border border-[#e6ebf1] bg-white shadow-panel">
+      <div className="divide-y rounded-xl border border-hairline bg-white shadow-panel">
         {files.map((file) => (
-          <Link key={file.id} href={`${base}/worksheets/${file.id}/sheet`} className="flex items-center gap-3 px-5 py-3.5 transition-colors hover:bg-slate-50">
+          <Link key={file.id} href={`${base}/worksheets/${file.id}/sheet${search ? `?q=${encodeURIComponent(search)}` : ""}`} className="flex items-center gap-3 px-5 py-3.5 transition-colors hover:bg-slate-50">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-emerald-50 text-emerald-700">
               <Table2 className="h-[17px] w-[17px]" />
             </span>

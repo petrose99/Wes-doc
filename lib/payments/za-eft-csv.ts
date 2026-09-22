@@ -11,7 +11,10 @@
  * SEPA (pain.001) support is a future add; it lives next to this file when we get to it. */
 
 export type PaymentInstruction = {
-  documentId: string
+  documentId?: string
+  /** Set instead of documentId when the instruction pays out an expense claim (#295) rather than
+   * a supplier bill — mirrors PaymentRunItem's documentId/expenseClaimId split. */
+  expenseClaimId?: string
   supplier: string
   bankAccountNumber: string | null
   branchCode: string | null
@@ -21,6 +24,33 @@ export type PaymentInstruction = {
   /** Optional beneficiary email for the bank's own remittance notification, when the portal
    * supports it (Standard Bank's does). */
   beneficiaryEmail?: string | null
+}
+
+/** One `PaymentInstruction` for a reimbursement claim, alongside the per-bill instructions built
+ * in models/payment-batches.ts. `beneficiary_name`/email come from the claimant's User, bank
+ * fields from their WorkspaceMember — same fields the ZA EFT columns already read for a supplier,
+ * so validatePaymentInstructions and formatZaEftCsv need no claim-specific branch. */
+export function buildClaimPaymentInstruction(input: {
+  expenseClaimId: string
+  claimantName: string
+  claimantEmail: string | null
+  title: string | null
+  submittedAt: Date | null
+  bankAccountNumber: string | null
+  branchCode: string | null
+  amount: number
+  currencyCode: string
+}): PaymentInstruction {
+  return {
+    expenseClaimId: input.expenseClaimId,
+    supplier: input.claimantName,
+    bankAccountNumber: input.bankAccountNumber,
+    branchCode: input.branchCode,
+    amount: input.amount,
+    currencyCode: input.currencyCode,
+    reference: `Expense claim ${input.title ?? input.submittedAt?.toISOString().slice(0, 10) ?? input.expenseClaimId.slice(0, 8)}`,
+    beneficiaryEmail: input.claimantEmail,
+  }
 }
 
 export type ZaEftCsvOptions = {

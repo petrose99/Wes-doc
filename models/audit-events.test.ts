@@ -14,4 +14,11 @@ describe("auditEventLabel", () => {
   it("falls back to a title-cased version of unknown types", () => {
     expect(auditEventLabel("some_future_event")).toBe("Some future event")
   })
+
+  it("says which types a document was moved between (#297)", () => {
+    expect(auditEventLabel("document_reclassified", { fromType: "receipt", toType: "invoice" })).toBe(
+      "Moved to Invoice (was Receipt)",
+    )
+    expect(auditEventLabel("document_reclassified", { toType: "invoice" })).toBe("Moved to Invoice")
+  })
 })

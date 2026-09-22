@@ -598,3 +598,50 @@ export async function getSupplierTrust(workspaceId: string, limit = 12): Promise
     }
   })
 }
+
+export type MetricTrend = { direction: "up" | "down" | "flat"; deltaPercentagePoints: number }
+
+export type TouchlessRateTrend = TouchlessRateStats & { trend: MetricTrend | null }
+
+/** #205: the Invoices header strip's one metric. Reuses getTouchlessRateStats for the current
+ * `days`-day window, then computes the immediately preceding window of the same length so the
+ * strip can show a trend arrow without a second shape of query. `trend` is null when the prior
+ * window had no extracted documents at all — nothing to compare against yet, not a 0pt move. */
+export async function getTouchlessRateTrend(workspaceId: string, days = 30): Promise<TouchlessRateTrend> {
+  const current = await getTouchlessRateStats(workspaceId, days)
+  const sinceCurrent = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+  const sincePrior = new Date(Date.now() - days * 2 * 24 * 60 * 60 * 1000)
+  const [priorExtracted, priorTouchless] = await Promise.all([
+    prisma.document.count({ where: { workspaceId, status: { notIn: POST_INTAKE_STATUSES }, receivedAt: { gte: sincePrior, lt: sinceCurrent } } }),
+    prisma.documentAuditEvent.count({ where: { workspaceId, type: "push.touchless_enqueued", createdAt: { gte: sincePrior, lt: sinceCurrent } } }),
+  ])
+  if (priorExtracted === 0) return { ...current, trend: null }
+  const priorRate = priorTouchless / priorExtracted
+  const deltaPercentagePoints = Math.round((current.touchlessRate - priorRate) * 1000) / 10
+  return { ...current, trend: { direction: deltaPercentagePoints > 0 ? "up" : deltaPercentagePoints < 0 ? "down" : "flat", deltaPercentagePoints } }
+}
+
+export type DocumentMatchRateStats = { total: number; matched: number; matchRate: number }
+
+/** #205's Purchase Orders / Receipts header metric: the share of a workspace's recently-received
+ * documents of `docType` that carry at least one DocumentMatch of `matchTypes`, on either side of
+ * the edge (a PO is always a match source, a receipt always a match target — see
+ * lib/matching/engine.ts's getMatchType). No equivalent exists for Bank Statements yet — #207
+ * shipped Institution + layout-drift detection, not a bank-reconciliation matcher — so that
+ * surface's strip renders an unavailable state instead of calling this. */
+export async function getDocumentMatchRateStats(workspaceId: string, docType: string, matchTypes: string[], days = 30): Promise<DocumentMatchRateStats> {
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+  const [total, matched] = await Promise.all([
+    prisma.document.count({ where: { workspaceId, docType, receivedAt: { gte: since } } }),
+    prisma.document.count({
+      where: {
+        workspaceId, docType, receivedAt: { gte: since },
+        OR: [
+          { documentMatchesAsSource: { some: { matchType: { in: matchTypes } } } },
+          { documentMatchesAsTarget: { some: { matchType: { in: matchTypes } } } },
+        ],
+      },
+    }),
+  ])
+  return { total, matched, matchRate: total > 0 ? matched / total : 0 }
+}

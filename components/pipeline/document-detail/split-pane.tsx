@@ -1,45 +1,48 @@
 "use client"
 
-import { AutomationRuleForm } from "@/components/workspace/automation-rule-form"
-import { CreateReviewTaskButton } from "@/components/documents/create-review-task-button"
-import { DeleteDocumentButton } from "@/components/documents/delete-document-button"
 import { FieldRow } from "@/components/pipeline/document-detail/field-row"
-import { LineItemsSection } from "@/components/pipeline/document-detail/line-items-section"
+import { LineItemsSection, type LineItemsPoProps } from "@/components/pipeline/document-detail/line-items-section"
+import { checkAppliesToField, type FieldCheck } from "@/components/pipeline/document-detail/check-types"
+import { parseLiveCheckValues, rebuildLiveChecks } from "@/components/pipeline/document-detail/live-checks"
 import { StageIndicator, type StageStep } from "@/components/pipeline/document-detail/stage-indicator"
 import { useFieldNav } from "@/components/pipeline/document-detail/use-field-nav"
-import { archiveDocumentsAction, flagDocumentsAction, moveDocumentsToStageAction, updateDocumentNoteAction } from "@/app/(app)/workspaces/[workspaceId]/pipeline-actions"
-import { setDocumentTypeAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
-import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { updateDocumentNoteAction } from "@/app/(app)/workspaces/[workspaceId]/pipeline-actions"
+import { PaneDocumentContext, useRegisterDocumentActions, type RegisteredDocument } from "@/components/queue/document-actions-menu"
+import { BillHistoryDisclosure, BillPane, BillReadOnlyContext, BillStatusTrack, DatesRow, PaymentDetailsLink, SupplierCard, useBillReadOnly, type BillPaneProviderLink } from "@/components/pipeline/document-detail/bill-pane"
+import type { SupplierSummary } from "@/models/supplier-summary"
+import { escalateCheckAction, type SaveReviewResult } from "@/app/(app)/workspaces/[workspaceId]/actions"
+import type { ActionState } from "@/lib/actions"
+import { useRouter } from "next/navigation"
+import { InstitutionAssert } from "@/components/pipeline/document-detail/institution-assert"
+import { StatementDriftBanner } from "@/components/pipeline/document-detail/statement-drift-banner"
+import { ApprovalTab, AuditLog, ChecksTab, type DocumentHistory } from "@/components/queue/history-tabs"
+import { usePhoneLane } from "@/lib/client/use-phone-lane"
 import { SourceViewer, type ProvenanceTarget, type SourceDocument } from "@/components/viewer/source-preview"
+import { PaneResizeGrip, usePaneResize } from "@/components/queue/pane-resize-grip"
 import type { DocumentFieldDefinition } from "@/lib/document-templates"
-import type { PipelineStage } from "@/lib/documents/stages"
 import type { Ref } from "@/lib/provenance"
 import type { FieldRationale } from "@/lib/rationale"
-import { Archive, ArrowDown, ArrowLeft, ArrowUp, Building2, CheckCircle2, ChevronLeft, ChevronRight, Eye, EyeOff, Flag, Loader2, Maximize2, Minimize2, PanelLeftClose, PanelLeftOpen } from "lucide-react"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { useState, type ReactNode } from "react"
+import type { ProcessingState } from "@/lib/documents/processing-state"
+import type { ProcessingFact } from "@/lib/documents/processing-fact"
+import type { DocType } from "@/lib/doc-types"
+import { CheckCircle2, ChevronDown, ChevronUp, ExternalLink, Loader2 } from "lucide-react"
+import { Fragment, useActionState, useContext, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react"
 import { toast } from "sonner"
 
-type Tab = "details" | "note" | "activity"
-type PanelLayout = "split" | "source-only" | "details-only"
-
-/** Shared label map for the four document-type states. Extracted so the chip in the top bar, the
- * inline "Type:" line, and the future stage indicator all read the same names — a mismatch here
- * showed up in the audit as "Expense / Sale / Bank Statement / Other" competing with the Bill /
- * Sales invoice glossary elsewhere in the app. */
-const DOC_TYPE_LABELS: Record<"expense" | "sale" | "bank_statement" | "other", string> = {
-  expense: "Bill",
-  sale: "Sales invoice",
-  bank_statement: "Bank statement",
-  other: "Other",
-}
+type Tab = "details" | "note" | "activity" | "approval" | "checks"
+/** #360 Section 3: the viewer/form split, a continuous percentage (viewer width), not the old
+ * three-state Split/Details/Source radiogroup. Same sessionStorage key, new shape — an old
+ * `"split"`/`"details-only"`/`"source-only"` string from a still-open tab is tolerated by
+ * `parseSplitPct` below (falls back to the default on a non-numeric/out-of-bounds read). */
+const LAYOUT_KEY = "pane-layout"
+/** #257 spec 3.5: whether the phone lane's source strip is expanded; remembered for the session. */
+const SOURCE_KEY = "dp.source"
 
 export function SplitPane({
   workspaceId, source, fields, data, fieldConfidence, provenanceFields, provenanceItems, initialTarget, conflictingLabels, missingRequiredFields,
-  saveReview, documentType: initialDocumentType, note: initialNote, auditEvents, prevHref, nextHref, position, stage, afterActionHref,
-  header, canPush, pushCard, canCreateRule, defaultSupplier, matchKind, bankMatches, documentMatches, paymentStatus, rationales, fxBadge, stageIndicator,
+  saveReview, documentType: initialDocumentType, note: initialNote, auditEvents,
+  header, canPush, pushCard, matchKind, bankMatches, documentMatches, rationales, checks, fxBadge, stageIndicator,
+  institutions, institutionId, institutionName, history, po = null, initialTab, state, queueTitle, queueDocType, moveCurrentType, moveDisabledReason,
 }: {
   workspaceId: string
   source: SourceDocument
@@ -51,54 +54,94 @@ export function SplitPane({
   initialTarget: ProvenanceTarget | null
   conflictingLabels: string[]
   missingRequiredFields: string[]
-  saveReview: (formData: FormData) => Promise<void>
+  /** #258: returns the save's outcome instead of redirecting, so the pane (and the `?full=1`
+   * route) can toast it and refresh in place — see `saveDocumentReviewAction`'s `stay`. */
+  saveReview: (formData: FormData) => Promise<ActionState<SaveReviewResult | null>>
   documentType: "expense" | "sale" | "bank_statement" | null
   note: string
   auditEvents: Array<{ id: string; label: string; createdAt: string; actorName: string | null }>
-  prevHref: string | null
-  nextHref: string | null
-  position: { index: number; total: number } | null
-  stage: PipelineStage | "archive" | null
-  afterActionHref: string
-  header: { filename: string; documentId: string; fileId: string; status: string; flagged: boolean; reviewLink: { href: string; label: string } | null }
+  /** What the frame around this pane needs to carry its ⋯ (#259): identity, flag/archive/cancel
+   * state and the open review task's link. */
+  header: { filename: string; documentId: string; fileId: string; status: string; flagged: boolean; archived: boolean; cancelled: boolean; cancelledReason: string | null; reviewLink: { href: string; label: string } | null }
+  /** #297: the guard caption when the document can't move (pending approval / Posted-Paid / PO
+   * with matched invoices) — computed server-side, never re-derived client-side (B1). Null means
+   * eligible. */
+  moveDisabledReason?: string | null
   canPush: boolean
   pushCard: ReactNode
-  canCreateRule: boolean
-  defaultSupplier: string
   matchKind: "bank" | "supplier_statement" | null
   bankMatches: ReactNode
   documentMatches?: ReactNode
   paymentStatus?: string | null
   rationales?: Record<string, FieldRationale>
+  /** Deterministic check results for this document, already resolved to the persisted form paths
+   * they compared (#202). Empty for document types with no applicable checks. */
+  checks?: FieldCheck[]
   fxBadge?: ReactNode
   /** The five-step Extracted → Checks → Approval → Sync → Pay indicator. Derived at the page
    * level so this client component doesn't need to pull in review-task/integration-push readers. */
   stageIndicator?: StageStep[]
+  /** #217: this workspace's Institutions, for the bank-statement assert control — empty/unused
+   * for any other document type. */
+  institutions?: Array<{ id: string; name: string }>
+  institutionId?: string | null
+  institutionName?: string | null
+  /** #225: the Approval / Audit / Checks tabs' data, loaded with the document so they sit in the
+   * same tab strip as Details and Note. Supplied by the queue's loader; the standalone route
+   * shows the Activity tab instead. */
+  history?: DocumentHistory | null
+  /** #228 / #250: the invoice's Purchase Order link for the line-items section's View PO row and
+   * Match manually. Null for every non-invoice document. */
+  po?: LineItemsPoProps | null
+  /** #236: which tab this pane opens on — Approvals opens straight to "approval", PO Mismatches
+   * to "checks". Undefined keeps the historic "details" default for every other queue. */
+  initialTab?: Tab
+  /** #258: the document's processing state, computed server-side by the same function the row
+   * uses (`getProcessingStateInput` → `processingState`), for the Approval tab's no-flow cases. */
+  state?: ProcessingState
+  /** #258: "Invoices" / "Receipts" — the Approval tab's in-review guidance names the queue's
+   * own bulk bar (Receipts has no Start approval there). */
+  queueTitle?: string
+  /** #297: the queue's own type (`resolveDocType`, not the category), the Direction row's key
+   * question — Invoice/Receipt show it, Purchase Order shows it locked, everything else shows
+   * none. Distinct from the `documentType`/category prop below. */
+  queueDocType: DocType
+  /** #297 §5: the raw type to exclude from Move's target list — undefined for a Library document
+   * whose `queueDocType` is only a `resolveDocType` template-fallback guess, not a real queue. */
+  moveCurrentType?: DocType
 }) {
-  const router = useRouter()
-  const [tab, setTab] = useState<Tab>("details")
+  const [tab, setTab] = useState<Tab>(initialTab ?? "details")
   const [target, setTarget] = useState<ProvenanceTarget | null>(initialTarget)
   const [note, setNote] = useState(initialNote)
   const [savingNote, setSavingNote] = useState(false)
-  const [flagged, setFlagged] = useState(header.flagged)
-  const [docType, setDocType] = useState<"expense" | "sale" | "bank_statement" | "other" | null>(initialDocumentType)
-  const [savingDocType, setSavingDocType] = useState(false)
-  const [busyAction, setBusyAction] = useState<"flag" | "archive" | "ready" | null>(null)
-  const [layout, setLayout] = useState<PanelLayout>("split")
+  // The layout choice persists for the session so moving ↑/↓ through a queue keeps the panels
+  // where the operator put them; read after mount so server and first client render agree.
+  const resize = usePaneResize(LAYOUT_KEY)
+  const { splitPct, dragging, rowRef } = resize
+  const [sourceShown, setSourceShown] = useState(true)
+  const phone = usePhoneLane()
+  useEffect(() => {
+    if (window.sessionStorage.getItem(SOURCE_KEY) === "hidden") setSourceShown(false)
+  }, [])
+  const toggleSource = () => setSourceShown((prev) => { window.sessionStorage.setItem(SOURCE_KEY, prev ? "hidden" : "shown"); return !prev })
+  const fileHref = `/api/documents/${source.documentId}/source`
 
-  const selectDocType = async (type: "expense" | "sale" | "bank_statement" | "other") => {
-    setSavingDocType(true)
-    setDocType(type)
-    try {
-      const result = await setDocumentTypeAction(workspaceId, header.documentId, type)
-      if (!result.success) { toast.error(result.error || "Could not save document type"); setDocType(docType); return }
-    } catch {
-      toast.error("Could not reach the server")
-      setDocType(docType)
-    } finally {
-      setSavingDocType(false)
-    }
-  }
+  // Hand the frame around us the document, so its ⋯ carries Archive · Flag · Delete… (#259). The
+  // standalone route wraps this component in its own frame, so the same registration serves both.
+  // #258: the decision the Status line upgrades its sentence with — the last stage decision when
+  // a flow ran, else the queue-side `document_reviewed` (already gated on `status === "reviewed"`
+  // by the loader). Null while the history hasn't loaded, so the row-derived sentence stands.
+  const lastStageDecision = history?.stageDecisions.length ? history.stageDecisions[history.stageDecisions.length - 1] : null
+  const decision = lastStageDecision
+    ? { kind: lastStageDecision.decision === "approve" ? "approved" as const : "rejected" as const, actorName: lastStageDecision.actorName, at: lastStageDecision.decidedAt }
+    : history?.reviewed ? { kind: "approved" as const, actorName: history.reviewed.actorName, at: history.reviewed.at }
+    : null
+  useRegisterDocumentActions({
+    workspaceId, documentId: header.documentId, fileId: header.fileId, filename: header.filename,
+    flagged: header.flagged, archived: header.archived, cancelled: header.cancelled, cancelledReason: header.cancelledReason, reviewLink: header.reviewLink,
+    docType: queueDocType, currentType: moveCurrentType, moveDisabledReason: moveDisabledReason ?? null,
+    decision,
+  })
 
   const arrayIndex = fields.findIndex((field) => field.type === "array")
   let summaryStart = arrayIndex
@@ -120,139 +163,56 @@ export function SplitPane({
     }
   }
 
-  const toggleFlag = async () => {
-    setBusyAction("flag")
-    const next = !flagged
-    try {
-      const result = await flagDocumentsAction(workspaceId, [header.documentId], next)
-      if (!result.success) { toast.error(result.error || "Could not update the flag"); return }
-      setFlagged(next)
-    } catch {
-      toast.error("Could not reach the server")
-    } finally {
-      setBusyAction(null)
-    }
+  // A real tablist for the keyboard: the selected tab is the one tab stop, ←/→ (and Home/End)
+  // move and select, each tab names its panel. Below `lg` (#257 spec 3.5) the order puts the
+  // decision first — Approval · Details · Checks · Audit · Note — since the phone lane exists to
+  // decide; desktop keeps Details first.
+  const tabId = (value: Tab) => `${source.documentId}-tab-${value}`
+  const panelId = (value: Tab) => `${source.documentId}-panel-${value}`
+  const tabButton = (value: Tab, label: string, count?: number) => <button type="button" key={value} role="tab" id={tabId(value)} aria-controls={panelId(value)}
+    aria-selected={tab === value} tabIndex={tab === value ? 0 : -1}
+    aria-label={count ? `${label}, ${count} open` : undefined}
+    className={`flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded-t-md border-b-2 px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-600 lg:min-h-0 ${tab === value ? "border-emerald-700 text-emerald-800" : "border-transparent text-slate-600 hover:text-slate-900"}`}
+    onClick={() => setTab(value)}>
+    {label}
+    {!!count && <span className="rounded-full bg-amber-100 px-1.5 py-px text-xs font-semibold tabular-nums text-amber-800">{count}</span>}
+  </button>
+  const panelProps = (value: Tab) => ({ id: panelId(value), role: "tabpanel", "aria-labelledby": tabId(value), tabIndex: -1 as const })
+  const onTabKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    const tabs = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]'))
+    const index = tabs.indexOf(document.activeElement as HTMLButtonElement)
+    if (index < 0) return
+    let next: number | null = null
+    if (event.key === "ArrowRight") next = (index + 1) % tabs.length
+    else if (event.key === "ArrowLeft") next = (index - 1 + tabs.length) % tabs.length
+    else if (event.key === "Home") next = 0
+    else if (event.key === "End") next = tabs.length - 1
+    if (next === null) return
+    event.preventDefault()
+    tabs[next].focus()
+    tabs[next].click()
   }
 
-  const archive = async () => {
-    setBusyAction("archive")
-    try {
-      const result = await archiveDocumentsAction(workspaceId, [header.documentId], true)
-      if (!result.success) { toast.error(result.error || "Could not archive this document"); return }
-      toast.success("Archived")
-      router.push(afterActionHref)
-      router.refresh()
-    } catch {
-      toast.error("Could not reach the server")
-    } finally {
-      setBusyAction(null)
-    }
-  }
+  // #236: "extracted fields are read-only while a stage is pending" (decision #6) — derived from
+  // the same `history.pendingStages` the Approval tab already renders, so it applies wherever a
+  // workflow is mid-run, with no new prop for a caller to remember to pass. Full mode (#259)
+  // carries no `history`, so it never locks — it has no decision bar to lock underneath.
+  const fieldsReadOnly = !!history && history.pendingStages.length > 0
 
-  const moveToReady = async () => {
-    setBusyAction("ready")
-    try {
-      const result = await moveDocumentsToStageAction(workspaceId, [header.documentId], "approved")
-      if (!result.success) { toast.error(result.error || "Could not approve this document"); return }
-      // Validation can hold the document back (missing required fields / no document type) — say
-      // so instead of announcing an approval the Review tab immediately contradicts.
-      if ((result.data?.heldBack ?? 0) > 0) {
-        toast.warning("Not approved yet — fill in the missing required fields (and pick a document type) first.")
-        router.refresh()
-        return
-      }
-      toast.success("Approved")
-      router.push(afterActionHref)
-      router.refresh()
-    } catch {
-      toast.error("Could not reach the server")
-    } finally {
-      setBusyAction(null)
-    }
-  }
+  return <div className="flex h-full min-h-0 flex-col overflow-hidden bg-white">
+    {/* The one band under the pane header: Extracted → Checks → Approval → Sync → Pay. The frame
+        around this component owns the name, the Status line and the ⋯ (#259); the document
+        introduces itself once, up there, never again down here. */}
+    {stageIndicator && stageIndicator.length > 0 && <StageIndicator steps={stageIndicator} />}
 
-  const cycleLayout = () => {
-    setLayout((prev) => {
-      if (prev === "split") return "details-only"
-      if (prev === "details-only") return "source-only"
-      return "split"
-    })
-  }
-
-  const tabButton = (value: Tab, label: string) => <button type="button" key={value}
-    className={`rounded-t-md border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${tab === value ? "border-emerald-600 text-emerald-700" : "border-transparent text-slate-500 hover:text-slate-700"}`}
-    onClick={() => setTab(value)}>{label}</button>
-
-  const toolbarBtn = "inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 shadow-sm hover:bg-slate-50 hover:text-slate-800 disabled:pointer-events-none disabled:opacity-40 transition-colors"
-
-  const statusColor = header.status === "reviewed" ? "bg-emerald-100 text-emerald-800 border-emerald-200"
-    : header.status === "needs_review" || header.status === "ready_for_review" ? "bg-amber-100 text-amber-800 border-amber-200"
-    : "bg-slate-100 text-slate-700 border-slate-200"
-
-  const showSource = layout === "split" || layout === "source-only"
-  const showDetails = layout === "split" || layout === "details-only"
-
-  return <div className="flex h-screen flex-col overflow-hidden bg-slate-50">
-    {/* Top bar */}
-    <div className="flex items-center gap-2 border-b border-slate-200 bg-white px-4 py-2">
-      <Link href={stage ? `/workspaces/${workspaceId}/pipeline?stage=${stage}` : `/workspaces/${workspaceId}/pipeline`} className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700">
-        <ArrowLeft className="h-4 w-4" />Back
-      </Link>
-
-      <div className="mx-2 h-5 w-px bg-slate-200" />
-
-      <h1 className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-800" title={header.filename}>{header.filename}</h1>
-
-      <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${statusColor}`}>
-        {header.status.replaceAll("_", " ")}
-      </span>
-
-      {docType && <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium ${docType === "expense" ? "border-red-200 bg-red-50 text-red-700" : docType === "sale" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : docType === "bank_statement" ? "border-blue-200 bg-blue-50 text-blue-700" : "border-slate-200 bg-slate-50 text-slate-700"}`}>
-        {docType === "expense" ? <ArrowUp className="h-3 w-3" /> : docType === "sale" ? <ArrowDown className="h-3 w-3" /> : docType === "bank_statement" ? <Building2 className="h-3 w-3" /> : null}
-        {DOC_TYPE_LABELS[docType]}
-      </span>}
-
-      {paymentStatus && <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${paymentStatus === "paid" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : paymentStatus === "partial" ? "border-amber-200 bg-amber-50 text-amber-700" : "border-red-200 bg-red-50 text-red-700"}`}>
-        {paymentStatus === "paid" ? "Paid" : paymentStatus === "partial" ? "Partially paid" : "Unpaid"}
-      </span>}
-
-      <div className="mx-2 h-5 w-px bg-slate-200" />
-
-      <button type="button" title={flagged ? "Remove flag" : "Flag for attention"} disabled={busyAction === "flag"} onClick={() => void toggleFlag()}
-        className={`rounded-lg p-1.5 transition-colors ${flagged ? "bg-indigo-50 text-indigo-500" : "text-slate-400 hover:bg-slate-100 hover:text-slate-600"}`}>
-        <Flag className={`h-4 w-4 ${flagged ? "fill-indigo-400" : ""}`} />
-      </button>
-
-      {/* Keyed off the document's own status, not the ?stage= the reader arrived from — a doc
-          opened from search (no stage param) still needs its Approve button. Hidden once the
-          document is reviewed: it's already approved, re-approving is a no-op. */}
-      {header.status !== "reviewed" && header.status !== "queued" && header.status !== "failed" && stage !== "archive" && <button type="button" disabled={busyAction === "ready"} onClick={() => void moveToReady()} className={toolbarBtn}>
-        {busyAction === "ready" ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}Approve
-      </button>}
-      {stage !== "archive" && <button type="button" disabled={busyAction === "archive"} onClick={() => void archive()} className={toolbarBtn}>
-        {busyAction === "archive" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Archive className="h-4 w-4" />}Archive
-      </button>}
-
-      {header.reviewLink && <Link className="text-xs text-emerald-600 underline" href={header.reviewLink.href}>{header.reviewLink.label}</Link>}
-
-      <DeleteDocumentButton workspaceId={workspaceId} fileId={header.fileId} documentId={header.documentId} filename={header.filename} />
-
-      <div className="mx-2 h-5 w-px bg-slate-200" />
-
-      {/* Layout toggle */}
-      <button type="button" onClick={cycleLayout} title={layout === "split" ? "Expand details" : layout === "details-only" ? "Show source only" : "Split view"} className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600">
-        {layout === "split" ? <Maximize2 className="h-4 w-4" /> : layout === "details-only" ? <PanelLeftOpen className="h-4 w-4" /> : <Minimize2 className="h-4 w-4" />}
-      </button>
-
-      {position && <span className="text-xs tabular-nums text-slate-400">{position.index}/{position.total}</span>}
-      <Link href={prevHref ?? "#"} aria-disabled={!prevHref} className={`rounded-lg p-1 ${prevHref ? "text-slate-500 hover:bg-slate-100 hover:text-slate-700" : "pointer-events-none text-slate-300"}`}><ChevronLeft className="h-4 w-4" /></Link>
-      <Link href={nextHref ?? "#"} aria-disabled={!nextHref} className={`rounded-lg p-1 ${nextHref ? "text-slate-500 hover:bg-slate-100 hover:text-slate-700" : "pointer-events-none text-slate-300"}`}><ChevronRight className="h-4 w-4" /></Link>
-    </div>
-
-    {/* Five-step lifecycle: Extracted → Checks → Approval → Sync → Pay. See stage-indicator.tsx. */}
-    {stageIndicator && stageIndicator.length > 0 && <div className="border-b border-slate-200 bg-white">
-      <StageIndicator steps={stageIndicator} />
-    </div>}
+    {/* #217: the drift banner (or its calm "first statement" reading) always renders first among
+        this pane's banners/notices, above the generic missing-fields one below. */}
+    {initialDocumentType === "bank_statement" && institutionId && <StatementDriftBanner
+      workspaceId={workspaceId}
+      documentId={header.documentId}
+      institutionName={institutionName ?? null}
+      driftCheck={(checks ?? []).find((check) => check.checkCode === "statement_layout_drift") ?? null}
+    />}
 
     {/* Alert banner */}
     {(missingRequiredFields.length > 0 || conflictingLabels.length > 0) && <div className="border-b border-indigo-200 bg-indigo-50 px-6 py-2 text-sm text-indigo-700">
@@ -260,113 +220,145 @@ export function SplitPane({
       {conflictingLabels.length > 0 && <p>Pages disagreed on: <strong>{conflictingLabels.join(", ")}</strong> — please confirm against the source.</p>}
     </div>}
 
-    {/* Main content area */}
-    <div className="flex min-h-0 flex-1 overflow-hidden">
-      {/* Source panel */}
-      {showSource && <div className={`flex min-h-0 flex-col overflow-hidden border-r border-slate-200 bg-white transition-[flex-basis] duration-200 ${layout === "source-only" ? "flex-1" : "basis-[52%]"}`}>
-        {layout !== "split" && <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2">
-          <span className="text-xs font-medium uppercase tracking-wider text-slate-400">Source document</span>
-          <button type="button" onClick={() => setLayout("split")} className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600" title="Split view">
-            <PanelLeftClose className="h-4 w-4" />
+    {/* Main content area. Below `lg` (the pane is a full-screen sheet there) the source stacks
+        above the fields at a fixed height so both stay reachable without a second sheet. */}
+    <div ref={rowRef} className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
+      {/* Source panel. The strip at its top carries the filename and Open file; width at ≥lg is a
+          continuous percentage of the row, set by the grip below (#360 Section 3), not a discrete
+          Split/Details/Source choice. */}
+      <div className={`flex min-h-0 flex-col overflow-hidden border-slate-200 ${sourceShown ? "h-[38vh]" : "h-auto"} shrink-0 border-b lg:h-auto lg:shrink lg:border-b-0 lg:border-r lg:[flex-basis:var(--split-pct)] ${dragging ? "" : "motion-safe:transition-[flex-basis] motion-safe:duration-200"}`}
+        style={{ ["--split-pct" as string]: `${splitPct}%` }}>
+        {/* #257 spec 3.5: on the phone the source is a strip the approver can expand when the
+            decision needs a look at the page — collapsed, the tabs get the height. Desktop (≥lg)
+            drops this strip entirely (#360 §4); Open file becomes the floating icon button below. */}
+        <div className="flex min-h-9 shrink-0 items-center gap-2 border-b border-slate-100 px-3 py-1 text-[13px] lg:hidden">
+          <span className="min-w-0 flex-1 break-all font-medium leading-snug text-slate-700">{header.filename}</span>
+          <a href={fileHref} target="_blank" rel="noopener noreferrer" title="Open the source file in a new tab"
+            className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600">
+            <ExternalLink className="h-3.5 w-3.5" aria-hidden />Open file
+          </a>
+          <button type="button" onClick={toggleSource} aria-expanded={sourceShown} aria-controls={`${source.documentId}-source`}
+            className="inline-flex h-9 shrink-0 items-center gap-1 rounded-md px-2 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600">
+            {sourceShown ? <ChevronUp className="h-3.5 w-3.5" aria-hidden /> : <ChevronDown className="h-3.5 w-3.5" aria-hidden />}
+            {sourceShown ? "Hide source" : "Show source"}
           </button>
-        </div>}
-        <SourceViewer source={source} target={target} />
-      </div>}
+        </div>
+        <div className="relative min-h-0 flex-1">
+          <a href={fileHref} target="_blank" rel="noopener noreferrer" aria-label="Open file in a new tab" title="Open file in a new tab"
+            className="absolute right-2 top-2 z-10 hidden h-9 w-9 items-center justify-center rounded-full bg-white/90 text-slate-600 shadow-sm backdrop-blur hover:bg-white hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 lg:flex">
+            <ExternalLink className="h-4 w-4" aria-hidden />
+          </a>
+          <div id={`${source.documentId}-source`} className={sourceShown ? "contents" : "hidden lg:contents"}><SourceViewer source={source} target={target} /></div>
+        </div>
+      </div>
+
+      {/* Resize grip (#360 Section 3, ≥lg only — the phone lane keeps its stacked layout unchanged,
+          B5/WCAG 2.5.7: Home/End/Arrow keys resize without requiring the drag). */}
+      <PaneResizeGrip state={resize} />
 
       {/* Details panel */}
-      {showDetails && <div className={`flex min-h-0 flex-col overflow-hidden bg-white transition-[flex-basis] duration-200 ${layout === "details-only" ? "flex-1" : "basis-[48%]"}`}>
-        <div className="flex items-center border-b border-slate-100">
-          <div className="flex gap-0.5 px-3 pt-1">
-            {tabButton("details", "Details")}
-            {tabButton("note", "Note")}
-            {tabButton("activity", "Activity")}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <div className="flex items-center shadow-[inset_0_-1px_0_0_theme(colors.slate.100)]">
+          <div className="flex gap-0.5 overflow-x-auto px-3 pt-1" role="tablist" aria-label="Document detail" onKeyDown={onTabKeyDown}>
+            {history && phone
+              ? <>
+                {tabButton("approval", "Approval")}
+                {tabButton("details", "Details")}
+                {tabButton("checks", "Checks", history.gates.length + (history.ledgerRetry ? 1 : 0))}
+                {tabButton("activity", "Audit")}
+                {tabButton("note", "Note")}
+              </>
+              : <>
+                {tabButton("details", "Details")}
+                {tabButton("note", "Note")}
+                {history
+                  ? <>
+                    {tabButton("approval", "Approval")}
+                    {tabButton("activity", "Audit")}
+                    {tabButton("checks", "Checks", history.gates.length + (history.ledgerRetry ? 1 : 0))}
+                  </>
+                  : tabButton("activity", "Activity")}
+              </>}
           </div>
-          {layout !== "split" && <button type="button" onClick={() => setLayout("split")} className="ml-auto mr-3 rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600" title="Split view">
-            <PanelLeftOpen className="h-4 w-4" />
-          </button>}
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
-          {tab === "details" && <div className={`mx-auto space-y-4 p-4 ${layout === "details-only" ? "max-w-2xl" : ""}`}>
-            {/* Document type confirmation — compact inline when confirmed, prominent when not */}
-            {docType ? (
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-xs text-slate-500">Type:</span>
-                <span className="font-medium text-slate-800">{docType === "expense" ? "Expense" : docType === "sale" ? "Sale" : docType === "bank_statement" ? "Bank Statement" : "Other"}</span>
-                <button type="button" disabled={savingDocType} onClick={() => setDocType(null)}
-                  className="text-xs text-slate-400 hover:text-slate-600">Change</button>
-              </div>
-            ) : (
-              <div>
-                <p className="mb-1.5 text-sm font-medium text-slate-800">What type of document is this?</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {(["expense", "sale", "bank_statement", "other"] as const).map((value) => (
-                    <button key={value} type="button" disabled={savingDocType} onClick={() => void selectDocType(value)}
-                      className="rounded border px-2.5 py-1 text-sm text-slate-600 hover:bg-slate-50">
-                      {DOC_TYPE_LABELS[value]}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
+          {tab === "details" && <div {...panelProps("details")} className={`mx-auto space-y-4 p-4`}>
+            {/* #217: a bank statement needs an asserted Institution before the layout-drift
+                check (#207) has anything to compare against. */}
+            {initialDocumentType === "bank_statement" && <InstitutionAssert
+              workspaceId={workspaceId}
+              documentId={header.documentId}
+              institutions={institutions ?? []}
+              institutionId={institutionId ?? null}
+              institutionName={institutionName ?? null}
+            />}
+
+            {/* Decision #6: a stage is still pending on this invoice's Approval, so its extracted
+                fields are locked rather than editable underneath a decision in flight. */}
+            {fieldsReadOnly && <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              Fields are locked while an approval decision is pending on this invoice.
+            </p>}
 
             {/* Review form — A4.1 field navigation: land on the lowest-confidence field first,
                 Enter = confirm-and-advance. Non-array fields are what the nav visits; the array
                 editor has its own confidence signal and its own keyboard flow. */}
-            <FieldNavForm
-              saveReview={saveReview}
-              docType={docType}
-              formFields={formFields}
-              data={data}
-              fieldConfidence={fieldConfidence}
-              provenanceFields={provenanceFields}
-              provenanceItems={provenanceItems}
-              summaryFields={summaryFields}
-              rationales={rationales ?? null}
-              setTarget={setTarget}
-            />
+            <fieldset disabled={fieldsReadOnly} className="min-w-0">
+              <FieldNavForm
+                saveReview={saveReview}
+                formFields={formFields}
+                data={data}
+                fieldConfidence={fieldConfidence}
+                provenanceFields={provenanceFields}
+                provenanceItems={provenanceItems}
+                summaryFields={summaryFields}
+                rationales={rationales ?? null}
+                checks={checks ?? []}
+                workspaceId={workspaceId}
+                documentId={header.documentId}
+                setTarget={setTarget}
+                po={po}
+              />
+            </fieldset>
 
             {fxBadge && <div className="pt-2">{fxBadge}</div>}
             {canPush && <div className="pt-2">{pushCard}</div>}
 
-            {canCreateRule && <Card className="border-slate-200 shadow-sm">
-              <CardHeader><CardTitle>Create a rule from this document</CardTitle><CardDescription>Matches this supplier automatically on future documents.</CardDescription></CardHeader>
-              <CardContent><AutomationRuleForm workspaceId={workspaceId} defaultSupplier={defaultSupplier} /></CardContent>
-            </Card>}
-
             {matchKind && bankMatches}
             {documentMatches}
-
-            {!header.reviewLink && <CreateReviewTaskButton workspaceId={workspaceId} documentId={header.documentId} />}
           </div>}
 
-          {tab === "note" && <div className={`mx-auto space-y-3 p-6 ${layout === "details-only" ? "max-w-2xl" : ""}`}>
+          {tab === "note" && <div {...panelProps("note")} className={`mx-auto space-y-3 p-6`}>
             <textarea className="min-h-48 w-full rounded-lg border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm transition-colors focus:border-emerald-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100" placeholder="A note only your team sees — not sent anywhere, not part of the extracted data."
               value={note} onChange={(event) => setNote(event.target.value)} />
-            <button type="button" disabled={savingNote} className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:opacity-40" onClick={() => void saveNote()}>
+            <button type="button" disabled={savingNote} className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-800 disabled:opacity-40" onClick={() => void saveNote()}>
               {savingNote && <Loader2 className="h-4 w-4 animate-spin" />}Save note
             </button>
           </div>}
 
-          {tab === "activity" && <div className={`mx-auto p-6 ${layout === "details-only" ? "max-w-2xl" : ""}`}>
-            {auditEvents.length === 0 ? <p className="text-sm text-slate-400">No activity recorded yet.</p> : <div className="space-y-1">
-              {auditEvents.map((event) => <div key={event.id} className="flex items-center justify-between gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-slate-50">
-                <span className="text-sm text-slate-700">{event.label}</span>
-                <span className="shrink-0 text-xs text-slate-400">{event.actorName ?? "System"} · {new Date(event.createdAt).toLocaleString()}</span>
-              </div>)}
-            </div>}
+          {tab === "activity" && <div {...panelProps("activity")} className={`mx-auto p-6`}>
+            <AuditLog events={history?.auditEvents ?? auditEvents} intake={history?.intake} />
+          </div>}
+
+          {tab === "approval" && history && <div {...panelProps("approval")} className={`mx-auto p-4 lg:p-6`}>
+            <ApprovalTab workspaceId={workspaceId} documentId={header.documentId} history={history} state={state} queueTitle={queueTitle} cancelledReason={header.cancelledReason} />
+          </div>}
+
+          {tab === "checks" && history && <div {...panelProps("checks")} className={`mx-auto p-6`}>
+            <ChecksTab workspaceId={workspaceId} documentId={header.documentId} gates={history.gates} escalations={history.escalations} ledgerRetry={history.ledgerRetry} />
           </div>}
         </div>
-      </div>}
+      </div>
     </div>
   </div>
 }
 
 /** A4: the inner form that owns the field-nav state. Split out of SplitPane so the hook can
- * derive its ordering directly from formFields without SplitPane touching field-nav internals. */
-function FieldNavForm({ saveReview, docType, formFields, data, fieldConfidence, provenanceFields, provenanceItems, summaryFields, rationales, setTarget }: {
-  saveReview: (formData: FormData) => void | Promise<void>
-  docType: string | null
+ * derive its ordering directly from formFields without SplitPane touching field-nav internals.
+ * Exported for #361's `BillSplitPane` (Invoices' Bill shell), which reuses this field-editing
+ * form unchanged inside its own composition. */
+export function FieldNavForm({ saveReview, formFields, data, fieldConfidence, provenanceFields, provenanceItems, summaryFields, rationales, checks, workspaceId, documentId, setTarget, po, submitId = "save-review-submit", billMode = false, supplierPaymentTermsDays = null, supplierBankAccountFact = null }: {
+  saveReview: (formData: FormData) => Promise<ActionState<SaveReviewResult | null>>
   formFields: DocumentFieldDefinition[]
   data: Record<string, unknown>
   fieldConfidence: Record<string, number>
@@ -374,14 +366,72 @@ function FieldNavForm({ saveReview, docType, formFields, data, fieldConfidence, 
   provenanceItems: Record<string, (Ref | null)[]>
   summaryFields: DocumentFieldDefinition[]
   rationales: Record<string, FieldRationale> | null
+  checks: FieldCheck[]
+  workspaceId: string
+  documentId: string
   setTarget: (target: ProvenanceTarget) => void
+  po: LineItemsPoProps | null
+  /** #361: `BillSplitPane` also renders `BillFooterActions`' Approve/Post button carrying
+   * `#save-review-submit` (#258's reload-focus contract) — this form's own Save review button
+   * needs a different id there so the two don't collide. `undefined` renders no id. */
+  submitId?: string
+  /** #362 §2: `BillSplitPane` only — passed straight through to `LineItemsSection`. */
+  billMode?: boolean
+  /** #362 §3: the resolved supplier's raw net-days (`SupplierSummary.paymentTermsDays`) — null
+   * when unmatched or the supplier has no term set, which is also `DatesRow`'s "plain editable
+   * Due date" signal. `BillSplitPane` only. */
+  supplierPaymentTermsDays?: number | null
+  /** #362 §4: the resolved supplier's `SupplierSummary.bankAccountFact` — null when unmatched or
+   * the supplier has no bank fact on file, which is also `PaymentDetailsLink`'s "Needs bank
+   * details" signal. `BillSplitPane` only. */
+  supplierBankAccountFact?: string | null
 }) {
+  // #362 §3: located by key, not position — invoice templates key the invoice date `issue_date`
+  // (falling back to the generic `date` key other templates use); `due_date` is shared.
+  const invoiceDateField = billMode ? formFields.find((field) => field.key === "issue_date" || field.key === "date") ?? null : null
+  const dueDateField = billMode ? formFields.find((field) => field.key === "due_date") ?? null : null
+  const billReadOnly = useBillReadOnly()
   const navItems = formFields.map((field) => ({ key: field.key, confidence: fieldConfidence[field.key] ?? null, type: field.type }))
   const nav = useFieldNav(navItems)
+  const formRef = useRef<HTMLFormElement>(null)
+  const [liveChecks, setLiveChecks] = useState(checks)
+  // #258 (B2): Save review is the one in-pane mutation that changes the processing state. The
+  // action returns instead of redirecting; success toasts the outcome and asks the queue to
+  // refresh (`onMutated` → `QueueScreen.refresh()`), so the row pill, glyph, Status line, stepper
+  // and Approval tab re-derive together. Full mode has no queue around it and refreshes itself.
+  // Failure keeps the uncontrolled inputs as typed and leaves focus on the button.
+  const paneContext = useContext(PaneDocumentContext)
+  const router = useRouter()
+  const [saveState, saveAction, saving] = useActionState<ActionState<SaveReviewResult | null> | null, FormData>(
+    async (_previous, formData) => {
+      try { return await saveReview(formData) } catch { return { success: false, error: "Could not save — try again" } }
+    }, null)
+  useEffect(() => {
+    if (!saveState) return
+    if (!saveState.success) { toast.error(saveState.error || "Could not save — try again"); return }
+    const outcome = saveState.data
+    if (outcome?.approved) toast.success("Approved")
+    else toast.success(outcome?.missingLabel ? `Saved — still In review: ${outcome.missingLabel}` : "Saved — still In review")
+    if (paneContext?.onMutated) paneContext.onMutated("changed")
+    else router.refresh()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saveState])
   // One summary line in place of the per-field "Extracted" badges the audit had FieldRow drop:
   // says how many fields landed, and how many of those are worth a second look.
   const extractedCount = formFields.filter((field) => data[field.key] !== undefined && data[field.key] !== null && data[field.key] !== "").length
-  return <form action={saveReview} className="space-y-3" onKeyDown={nav.onFormKeyDown}>
+
+  const recompute = () => {
+    if (!formRef.current) return
+    setLiveChecks(rebuildLiveChecks(checks, parseLiveCheckValues(new FormData(formRef.current)), true))
+  }
+
+  const onEscalate = async (check: FieldCheck) => {
+    setLiveChecks((prev) => prev.map((c) => (c.checkCode === check.checkCode ? { ...c, escalated: true } : c)))
+    const result = await escalateCheckAction(workspaceId, documentId, check.checkCode)
+    if (!result.success) toast.error(result.error || "Could not escalate this check")
+  }
+
+  return <form ref={formRef} action={saveAction} className="space-y-3" onKeyDown={nav.onFormKeyDown} onInput={recompute}>
     {extractedCount > 0 && <p className="text-xs text-slate-500">
       All {extractedCount} field{extractedCount === 1 ? "" : "s"} extracted{nav.totalSuspects > 0 ? ` — ${nav.totalSuspects} low-confidence` : ""}.
     </p>}
@@ -389,15 +439,141 @@ function FieldNavForm({ saveReview, docType, formFields, data, fieldConfidence, 
       <span><span className="font-semibold">{nav.suspectsRemaining}</span> of {nav.totalSuspects} low-confidence fields to review — Enter confirms and moves to the next.</span>
       <button type="button" className="rounded-md border border-amber-300 bg-white px-2 py-0.5 font-medium text-amber-800 hover:bg-amber-100" onClick={() => nav.focusNext()}>Next suspect</button>
     </div>}
-    {formFields.map((field) => field.type === "array"
-      ? <LineItemsSection key={field.key} field={field} value={data[field.key]} fieldKey={field.key} summaryFields={summaryFields} fieldValues={data} provenanceFields={provenanceFields} provenanceItems={provenanceItems[field.key] ?? []} onFocusSource={setTarget} />
-      : <FieldRow key={field.key} field={field} value={data[field.key]} confidence={fieldConfidence[field.key] ?? null} ref={provenanceFields[field.key] ?? null} onFocusSource={setTarget} rationale={rationales?.[field.key] ?? null}
-          registerNav={nav.registerField} isCurrent={nav.currentKey === field.key} isCompleted={nav.completedKeys.has(field.key)} />)}
+    {formFields.map((field) => {
+      // #362 §3: in bill mode, Invoice date and Due date move out of the plain field list into
+      // `DatesRow`, rendered directly under the line-item table — they don't get a second
+      // `FieldRow` here.
+      if (billMode && (field.key === invoiceDateField?.key || field.key === dueDateField?.key)) return null
+      if (field.type === "array") return <Fragment key={field.key}>
+        <LineItemsSection field={field} value={data[field.key]} fieldKey={field.key} summaryFields={field.key === "line_items" ? summaryFields : []} fieldValues={data} provenanceFields={provenanceFields} provenanceItems={provenanceItems[field.key] ?? []} onFocusSource={setTarget}
+          checks={liveChecks.filter((check) => check.fields.some((f) => f === field.key || f.startsWith(`${field.key}[`)))} onEscalate={onEscalate} po={field.key === "line_items" ? po : null}
+          // #362 §2: this ticket's chip columns/footer-total/Add-row are specced for the
+          // `line_items` table only — `other_charges` (also `type: "array"`) is out of scope
+          // (no ticket contract for it) and keeps its pre-existing plain rendering. The lock,
+          // though, is not scoped that way (close c3): a Cancelled/Paid/Touchless bill's
+          // `other_charges` rows were still editable and tab-reachable — `readOnly` gates on
+          // `billMode` alone, independent of which array field this is.
+          billMode={billMode && field.key === "line_items"} readOnly={billMode && billReadOnly} />
+        {/* #362: `other_charges` is also `type: "array"` (lib/domains/finance.ts) — gate to
+          the `line_items` field so DatesRow/PaymentDetailsLink render once, not once per
+          array field. */}
+        {billMode && field.key === "line_items" && invoiceDateField && dueDateField && <DatesRow invoiceDateField={invoiceDateField} invoiceDateValue={typeof data[invoiceDateField.key] === "string" ? data[invoiceDateField.key] as string : null}
+          dueDateField={dueDateField} dueDateValue={typeof data[dueDateField.key] === "string" ? data[dueDateField.key] as string : null}
+          paymentTermsDays={supplierPaymentTermsDays} readOnly={billReadOnly} />}
+        {billMode && field.key === "line_items" && <PaymentDetailsLink workspaceId={workspaceId} documentId={documentId} bankAccountFact={supplierBankAccountFact} />}
+      </Fragment>
+      return <FieldRow key={field.key} field={field} value={data[field.key]} confidence={fieldConfidence[field.key] ?? null} ref={provenanceFields[field.key] ?? null} onFocusSource={setTarget} rationale={rationales?.[field.key] ?? null}
+        checks={liveChecks.filter((check) => checkAppliesToField(check, field.key))} onEscalate={onEscalate}
+        registerNav={nav.registerField} isCurrent={nav.currentKey === field.key} isCompleted={nav.completedKeys.has(field.key)} />
+    })}
     <div className="flex items-center gap-3 border-t border-slate-100 pt-3">
-      <button type="submit" disabled={!docType} className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40" title={!docType ? "Choose Expense or Sale first" : undefined}>
-        <CheckCircle2 className="h-4 w-4" />Save review
+      <button type="submit" id={submitId} aria-busy={saving || undefined} className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40">
+        {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <CheckCircle2 className="h-4 w-4" aria-hidden />}{saving ? "Saving…" : "Save review"}
       </button>
-      {!docType && <span className="text-xs text-amber-600">Choose a document type first</span>}
     </div>
   </form>
+}
+
+/** #361 step 5: the Invoices queue's detail content — `BillPane`'s shell (drag-grip split,
+ * header, status track, footer verb) around the same field-editing form this file already
+ * builds, minus the retired five-tab strip (Details/Note/Activity/Approval/Checks folds into
+ * `BillStatusTrack` + `BillHistoryDisclosure`, spec §4/§6). Its own component (not a branch
+ * inside `SplitPane`) so it owns exactly one `useRegisterDocumentActions` call — `BillPane`
+ * already calls it once internally. Receipts/PO Mismatches/Bank Statements/Bill Pay keep
+ * `SplitPane` untouched (#363/#365 move those later). */
+export function BillSplitPane({
+  workspaceId, source, fields, data, fieldConfidence, provenanceFields, provenanceItems, initialTarget, conflictingLabels, missingRequiredFields,
+  saveReview, note, auditEvents, header, rationales, checks, fxBadge, documentMatches, po = null,
+  providerLink, state, fact, ledger, openCheckCodes, paidAt, blockedByCheck, escalated, approvalStatus, rejectedByActor, openReviewTaskId,
+  supplierSummary,
+}: {
+  workspaceId: string
+  source: SourceDocument
+  fields: DocumentFieldDefinition[]
+  data: Record<string, unknown>
+  fieldConfidence: Record<string, number>
+  provenanceFields: Record<string, Ref>
+  provenanceItems: Record<string, (Ref | null)[]>
+  initialTarget: ProvenanceTarget | null
+  conflictingLabels: string[]
+  missingRequiredFields: string[]
+  saveReview: (formData: FormData) => Promise<ActionState<SaveReviewResult | null>>
+  note: string
+  auditEvents: Array<{ id: string; label: string; createdAt: string; actorName: string | null }>
+  header: { filename: string; documentId: string; fileId: string; flagged: boolean; archived: boolean; cancelled: boolean; cancelledReason: string | null; reviewLink: { href: string; label: string } | null }
+  rationales?: Record<string, FieldRationale>
+  checks?: FieldCheck[]
+  fxBadge?: ReactNode
+  documentMatches?: ReactNode
+  po?: LineItemsPoProps | null
+  /** #355 Q2: null when no provider is connected or the document has no ledger line yet — no
+   * pushed-record external URL exists in the schema yet to build one from (ponytail: renders
+   * nothing until a later ticket adds that field, same as an unconnected workspace). */
+  providerLink: BillPaneProviderLink
+  state: ProcessingState
+  fact: ProcessingFact
+  ledger?: string | null
+  openCheckCodes: string[]
+  paidAt: Date | null
+  blockedByCheck: boolean
+  escalated: boolean
+  approvalStatus: "not_started" | "in_progress" | "approved" | "rejected" | "cancelled"
+  rejectedByActor: string | null
+  openReviewTaskId: string | null
+  /** #362 §1: fetched once at pane load by the caller (server component) — `null` when the
+   * queue calling this pane isn't Invoices' supplier-scoped flow (kept optional so any other
+   * future `BillSplitPane` caller doesn't have to thread a query it has no supplier for). */
+  supplierSummary?: SupplierSummary | null
+}) {
+  const [target, setTarget] = useState<ProvenanceTarget | null>(initialTarget)
+  const router = useRouter()
+  const fileHref = `/api/documents/${source.documentId}/source`
+
+  const arrayIndex = fields.findIndex((field) => field.type === "array")
+  let summaryStart = arrayIndex
+  while (summaryStart > 0 && fields[summaryStart - 1].type === "number") summaryStart--
+  const summaryFields = arrayIndex > -1 ? fields.slice(summaryStart, arrayIndex) : []
+  const summaryKeys = new Set(summaryFields.map((field) => field.key))
+  const formFields = fields.filter((field) => !summaryKeys.has(field.key))
+
+  const document: RegisteredDocument = {
+    workspaceId, documentId: header.documentId, fileId: header.fileId, filename: header.filename,
+    flagged: header.flagged, archived: header.archived, cancelled: header.cancelled, cancelledReason: header.cancelledReason,
+    reviewLink: header.reviewLink,
+  }
+
+  // #362: `BillReadOnlyContext`'s value — Cancelled, Paid (a synced payment status) or Touchless
+  // (sent automatically, never reviewed). Nothing was providing this before, which left every
+  // consumer's `useBillReadOnly()` reading the context's `false` default even on a paid/cancelled
+  // document (caught live: a read-only-pane tab walk landed on `input#vendor`).
+  const billReadOnly = header.cancelled || state === "touchless" || paidAt !== null
+
+  return <BillReadOnlyContext.Provider value={billReadOnly}>
+  <BillPane document={document} providerLink={providerLink} fileHref={fileHref}
+    viewer={<SourceViewer source={source} target={target} />}
+    form={<div className="space-y-4 p-4">
+      <BillStatusTrack workspaceId={workspaceId} openReviewTaskId={openReviewTaskId} state={state} fact={fact} ledger={ledger}
+        openCheckCodes={openCheckCodes} cancelledReason={header.cancelledReason} paidAt={paidAt} blockedByCheck={blockedByCheck}
+        escalated={escalated} approvalStatus={approvalStatus} rejectedByActor={rejectedByActor} onDone={() => router.refresh()} />
+
+      {(missingRequiredFields.length > 0 || conflictingLabels.length > 0) && <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm text-indigo-700">
+        {missingRequiredFields.length > 0 && <p>Missing required fields: <strong>{missingRequiredFields.join(", ")}</strong></p>}
+        {conflictingLabels.length > 0 && <p>Pages disagreed on: <strong>{conflictingLabels.join(", ")}</strong> — please confirm against the source.</p>}
+      </div>}
+
+      {supplierSummary && <SupplierCard summary={supplierSummary} workspaceId={workspaceId} />}
+
+      <FieldNavForm saveReview={saveReview} formFields={formFields} data={data} fieldConfidence={fieldConfidence}
+        provenanceFields={provenanceFields} provenanceItems={provenanceItems} summaryFields={summaryFields}
+        rationales={rationales ?? null} checks={checks ?? []} workspaceId={workspaceId} documentId={header.documentId}
+        setTarget={setTarget} po={po} submitId={undefined} billMode
+        supplierPaymentTermsDays={supplierSummary?.matched ? supplierSummary.paymentTermsDays : null}
+        supplierBankAccountFact={supplierSummary?.matched ? supplierSummary.bankAccountFact : null} />
+
+      {fxBadge && <div>{fxBadge}</div>}
+      {documentMatches}
+
+      <BillHistoryDisclosure workspaceId={workspaceId} documentId={header.documentId} note={note} auditEvents={auditEvents} />
+    </div>} />
+  </BillReadOnlyContext.Provider>
 }

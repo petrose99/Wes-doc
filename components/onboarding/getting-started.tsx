@@ -44,7 +44,7 @@ export function GettingStartedCard({ workspaceId, initialState, liveCounts }: {
   const doneCount = ONBOARDING_STEPS.filter((s) => isStepDone(s.key)).length
   const progress = Math.round((doneCount / ONBOARDING_STEPS.length) * 100)
 
-  return <div className="rounded-2xl border border-[#e6ebf1] bg-white p-5 shadow-panel">
+  return <div className="rounded-2xl border border-hairline bg-white p-5 shadow-panel">
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-2">
         <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-600"><Rocket className="h-[17px] w-[17px]" /></span>

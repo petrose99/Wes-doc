@@ -1,0 +1,615 @@
+{
+ "slug": "vicai-pricing-redirect",
+ "label": "Vic.ai pricing (redirects to request-demo)",
+ "url": "https://www.vic.ai/pricing",
+ "accessed": "2026-09-19T12:22:37.121Z",
+ "views": {
+  "390": {
+   "status": 200,
+   "shot": "/home/ubuntu/Dev/Wes-doc/docs/research/benchmark-captures/vicai/vicai-pricing-redirect-390.png",
+   "initialMotion": {
+    "opacityZeroEls": 2,
+    "animations": {},
+    "transitionEls": 145,
+    "total": 1172
+   },
+   "errors": [
+    "overlaysHidden=0"
+   ],
+   "title": "Book a Vic.ai Demo | AI Accounting & AP Automation Software",
+   "h1": "Save 70% of your team’s time with autonomous finance",
+   "subhead": "Here’s what you can look forward to discussing in your Vic.ai discovery meeting: Learn how AI can be applied to your AP process to improve productivity and accuracy See an overview of the Vic.ai platform with an initial walkthrough Hear how similar companies use Vic.ai to solve common AP challenges",
+   "headings": [
+    {
+     "tag": "H1",
+     "text": "Save 70% of your team’s time with autonomous finance",
+     "top": 181
+    },
+    {
+     "tag": "H2",
+     "text": "Real customers. Proven ROI. Unmatched AP automation results.",
+     "top": 1727
+    },
+    {
+     "tag": "H2",
+     "text": "Learn more about Vic.ai’s solutions",
+     "top": 2663
+    }
+   ],
+   "sections": [
+    {
+     "top": 50,
+     "height": 1617,
+     "heading": "Save 70% of your team’s time with autonomous finance",
+     "imgs": 8,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 4217,
+     "snippet": "Get a demo Save 70% of your team’s time with autonomous finance Here’s what you can look forward to discussing in your Vic.ai discovery meeting: Learn how AI can be applied to your AP process to improve productivity and "
+    },
+    {
+     "top": 1667,
+     "height": 936,
+     "heading": "Real customers. Proven ROI. Unmatched AP automation results.",
+     "imgs": 8,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 842,
+     "snippet": "Real customers. Proven ROI. Unmatched AP automation results. We are excited to push the envelope on autonomous PO matching with Vic.ai. It presents us with a great opportunity to incorporate AI and augment our decision-m"
+    },
+    {
+     "top": 2603,
+     "height": 991,
+     "heading": "Learn more about Vic.ai’s solutions",
+     "imgs": 16,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [
+      "View all resources"
+     ],
+     "textLen": 195,
+     "snippet": "Learn more about Vic.ai’s solutions View all resources Case Study Diesel Direct: Fueling growth with AI-powered accounting Webinar CFO Dive: Mastering the Future of Finance with AI as a Colleague"
+    },
+    {
+     "top": 3594,
+     "height": 970,
+     "heading": "",
+     "imgs": 9,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [
+      "Subscribe to our newsletter"
+     ],
+     "textLen": 268,
+     "snippet": "Why Vic.ai? Products Solutions Resources Company Request demo Vic.ai is on a mission to transform how finance teams operate by building the world’s first autonomous finance platform. Subscribe to our newsletter Copyright"
+    }
+   ],
+   "navLinks": [],
+   "heroCtas": [],
+   "bigImgs": [
+    {
+     "w": 358,
+     "h": 140,
+     "alt": "Inner resource card media",
+     "src": "https://cdn.prod.website-files.com/6744228cb0d971a21462bf5a/67d1038f30133c251c1ef27c_67326094c800cc3cbd4fc4b4_dielsel-direct-case-study.png",
+     "top": 2873
+    },
+    {
+     "w": 358,
+     "h": 140,
+     "alt": "Inner resource card media",
+     "src": "https://cdn.prod.website-files.com/6744228cb0d971a21462bf5a/67d103bd29d89198fbb528de_66f1eafdd8b691cc23f06fa9_WEB_CFOD-Dive-Sept-Webinar.png",
+     "top": 3184
+    },
+    {
+     "w": 360,
+     "h": 65,
+     "alt": "",
+     "src": "https://cdn.prod.website-files.com/67284e81c67879feb155c7f7/6734d184796e8ed1c9f0383f_bottom-footer-logo.svg",
+     "top": 4499
+    }
+   ],
+   "imgCount": 31,
+   "logoish": 4,
+   "videos": [],
+   "canvases": 0,
+   "lotties": 0,
+   "iframes": [
+    "",
+    ""
+   ],
+   "fonts": [
+    [
+     "Poppins",
+     235
+    ],
+    [
+     "webflow-icons",
+     5
+    ]
+   ],
+   "sectionBgs": [],
+   "buttonBgs": [
+    [
+     "rgba(255, 255, 255, 0.5)",
+     2
+    ],
+    [
+     "rgb(255, 255, 255)",
+     2
+    ]
+   ],
+   "type": {
+    "h1": {
+     "family": "Poppins, sans-serif",
+     "size": "28px",
+     "weight": "500",
+     "lineHeight": "33.6px",
+     "letterSpacing": "normal",
+     "color": "rgb(0, 0, 0)"
+    },
+    "h2": {
+     "family": "Poppins, sans-serif",
+     "size": "28px",
+     "weight": "500"
+    },
+    "body": {
+     "family": "Poppins, sans-serif",
+     "size": "14px",
+     "color": "rgb(51, 51, 51)",
+     "bg": "rgb(255, 255, 255)"
+    }
+   },
+   "motionAfterScroll": {
+    "animations": {},
+    "opacityZeroEls": 2,
+    "transitionEls": 145,
+    "stickyFixedEls": 6
+   },
+   "libs": {
+    "gsap": false,
+    "framer": false,
+    "webflow": true,
+    "lottie": false,
+    "splide_swiper": true,
+    "rive": false,
+    "nextjs": false,
+    "wordpress": false,
+    "hubspot": true
+   },
+   "wordCount": 810,
+   "scrollHeight": 4564,
+   "bodyText": "Access exclusive insights in the AI Momentum Report Login Get a demo Save 70% of your team’s time with autonomous finance Here’s what you can look forward to discussing in your Vic.ai discovery meeting: Learn how AI can be applied to your AP process to improve productivity and accuracy See an overview of the Vic.ai platform with an initial walkthrough Hear how similar companies use Vic.ai to solve common AP challenges You're in great company Join leading finance teams who are using Vic.ai to reduce costs and eliminate manual work. Let’s get in touch! Where is your company based?* United States Canada Afghanistan Åland Islands Albania Algeria American Samoa Andorra Angola Anguilla Antarctica Antigua and Barbuda Argentina Armenia Aruba Asia/Pacific Region Australia Austria Azerbaijan Bahamas Bahrain Bangladesh Barbados Belarus Belgium Belize Benin Bermuda Bhutan Bolivia Bosnia and Herzegovina Botswana Bouvet Island Brazil British Indian Ocean Territory British Virgin Islands Brunei Bulgaria Burkina Faso Burundi Cambodia Cameroon Canary Islands Cape Verde Caribbean Netherlands Cayman Islands Central African Republic Chad Chile China Christmas Island Cocos (Keeling) Islands Colombia Comoros Congo Cook Islands Costa Rica Cote d'Ivoire Croatia Cuba Curaçao Cyprus Czech Republic Democratic Republic of the Congo Denmark Djibouti Dominica Dominican Republic East Timor Ecuador Egypt El Salvador Equatorial Guinea Eritrea Estonia Ethiopia Europe Falkland Islands Faroe Islands Fiji Finland France French Guiana French Polynesia French Southern and Antarctic Lands Gabon Gambia Georgia Germany Ghana Gibraltar Greece Greenland Grenada Guadeloupe Guam Guatemala Guernsey Guinea Guinea-Bissau Guyana Haiti Heard Island and McDonald Islands Honduras Hong Kong Hungary Iceland India Indonesia Iran Iraq Ireland Isle of Man Israel Italy Jamaica Japan Jersey Jordan Kazakhstan Kenya Kiribati Kosovo Kuwait Kyrgyzstan Laos Latvia Lebanon Lesotho Liberia Libya Liechtenstein Lithuania Luxembourg Macau Macedonia (FYROM) Madagascar Malawi Malaysia Maldives Mali Malta Marshall Islands Martinique Mauritania Mauritius Mayotte Mexico Micronesia Moldova Monaco Mongolia Montenegro Montserrat Morocco Mozambique Myanmar (Burma) Namibia Nauru Nepal Netherlands Netherlands Antilles New Caledonia New Zealand Nicaragua Niger Nigeria Niue Norfolk Island North Korea Northern Mariana Islands Norway Oman Pakistan Palau Palestine Panama Papua New Guinea Paraguay Peru Philippines Pitcairn Islands Poland Portugal Puerto Rico Qatar Réunion Romania Russia Rwanda Saint Barthélemy Saint Helena Saint Kitts and Nevis Saint Lucia Saint Martin Saint Pierre and Miquelon Saint Vincent and the Grenadines Samoa San Marino Sao Tome and Principe Saudi Arabia Senegal Serbia Seychelles Sierra Leone Singapore Sint Maarten Slovakia Slovenia Solomon Islands Somalia South Africa South Georgia and the South Sandwich Islands South Korea South Sudan Spain Sri Lanka Sudan Suriname Svalbard and Jan Mayen Swaziland Sweden Switzerland Syria Taiwan Tajikistan Tanzania Thailand Togo Tokelau Tonga Trinidad and Tobago Tunisia Turkey Turkmenistan Turks and Caicos Islands Tuvalu U.S. Virgin Islands Uganda Ukraine United Arab Emirates United Kingdom United States Minor Outlying Islands Uruguay Uzbekistan Vanuatu Vatican City Venezuela Vietnam Wallis and Futuna Western Sahara Yemen Zambia Zimbabwe Company annual revenue* Under $50 Million $50 Million - $99.9 Million $100 Million - $499.9 Million $500 Million - $999.9 Million $1 Billion - $5 Billion $5 Billion + Monthly invoice volume* 0 - 500 Invoices 501 - 1,000 Invoices 1,001 - 2,000 Invoices 2,001 - 5,000 Invoices 5,001 - 10,000 Invoices 10,001 - 15,000 Invoices 15,001 - 20,000 Invoices 20,000+ Invoices Don't know ERP platform* Oracle NetSuite Sage Intacct Microsoft Dynamics 365 Business Central Microsoft Dynamics 365 Finance & Operations QuickBooks Online QuickBooks Desktop Bill.com Xero SAP ECC SAP S/4HANA Oracle Fusion Oracle E-Business Suite (EBS) Oracle JD Edwards Oracle Peoplesoft Workday Coupa FinancialForce Viewpoint Vista Procore Deltek Vision Deltek Costpoint JAMIS Prime Epicor Infor CloudSuite (LN / M3 / SX.e) Acumatica Plex Appfolio Yardi RealPage ServiceTitan Sage 300 Sage X3 Microsoft Dynamics GP Odoo Other Not sure Real customers. Proven ROI. Unmatched AP automation results. We are excited to push the envelope on autonomous PO matching with Vic.ai. It presents us with a great opportunity to incorporate AI and augment our decision-making. Conor Clair Senior Finance Manager of Accounting, Milwaukee Tool Our AP team is no longer struggling to get invoices approved on-time, and leadership loves being able to compare previous bills on-the-go with the mobile app. Rachel Knapp VP, Financial & Accounting Systems, Higher Ground Education The standout difference with Vic.ai is its advanced AI technology. Unlike other vendors that rely heavily on templates — which are not only time-consuming to set up but also demand significant expertise — their platform eliminates the need for templating altogether. Paul Dachsteiner VP of IT and IS, Stonewall Kitchen Learn more about Vic.ai’s solutions View all resources Case Study Diesel Direct: Fueling growth with AI-powered accounting Webinar CFO Dive: Mastering the Future of Finance with AI as a Colleague Why Vic.ai? Products Solutions Resources Company Request demo Vic.ai is on a mission to transform how finance teams operate by building the world’s first autonomous finance platform. Subscribe to our newsletter Copyright © 2026 Vic.ai Privacy Policy Login Request Demo"
+  },
+  "1440": {
+   "status": 200,
+   "shot": "/home/ubuntu/Dev/Wes-doc/docs/research/benchmark-captures/vicai/vicai-pricing-redirect-1440.png",
+   "initialMotion": {
+    "opacityZeroEls": 6,
+    "animations": {
+     "x, rotating2 2.5s, 2.5s infinite, infinite": 3
+    },
+    "transitionEls": 218,
+    "total": 1179
+   },
+   "errors": [
+    "overlaysHidden=0"
+   ],
+   "title": "Book a Vic.ai Demo | AI Accounting & AP Automation Software",
+   "h1": "Save 70% of your team’s time with autonomous finance",
+   "subhead": "Here’s what you can look forward to discussing in your Vic.ai discovery meeting: Learn how AI can be applied to your AP process to improve productivity and accuracy See an overview of the Vic.ai platform with an initial walkthrough Hear how similar companies use Vic.ai to solve common AP challenges",
+   "headings": [
+    {
+     "tag": "H1",
+     "text": "Save 70% of your team’s time with autonomous finance",
+     "top": 242
+    },
+    {
+     "tag": "H2",
+     "text": "Real customers. Proven ROI. Unmatched AP automation results.",
+     "top": 1183
+    },
+    {
+     "tag": "H2",
+     "text": "Learn more about Vic.ai’s solutions",
+     "top": 1868
+    }
+   ],
+   "sections": [
+    {
+     "top": 50,
+     "height": 1073,
+     "heading": "Save 70% of your team’s time with autonomous finance",
+     "imgs": 8,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 4217,
+     "snippet": "Get a demo Save 70% of your team’s time with autonomous finance Here’s what you can look forward to discussing in your Vic.ai discovery meeting: Learn how AI can be applied to your AP process to improve productivity and "
+    },
+    {
+     "top": 1123,
+     "height": 685,
+     "heading": "Real customers. Proven ROI. Unmatched AP automation results.",
+     "imgs": 8,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 842,
+     "snippet": "Real customers. Proven ROI. Unmatched AP automation results. We are excited to push the envelope on autonomous PO matching with Vic.ai. It presents us with a great opportunity to incorporate AI and augment our decision-m"
+    },
+    {
+     "top": 1808,
+     "height": 635,
+     "heading": "Learn more about Vic.ai’s solutions",
+     "imgs": 16,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [
+      "View all resources"
+     ],
+     "textLen": 195,
+     "snippet": "Learn more about Vic.ai’s solutions View all resources Case Study Diesel Direct: Fueling growth with AI-powered accounting Webinar CFO Dive: Mastering the Future of Finance with AI as a Colleague"
+    },
+    {
+     "top": 2443,
+     "height": 1045,
+     "heading": "",
+     "imgs": 9,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [
+      "Subscribe to our newsletter"
+     ],
+     "textLen": 890,
+     "snippet": "Why Vic.ai? Why Vic.ai? Customers Products Accounts Payable Invoice Processing PO Matching Approvals AP Inbox Bill Pay and Vendor Portal Expense Management Analytics and Insights Autonomous Finance Platform How It Works "
+    }
+   ],
+   "navLinks": [
+    "Invoice Processing",
+    "PO Matching",
+    "Approvals",
+    "How It Works",
+    "ERP Integrations",
+    "Trust and Security",
+    "Centralize AP Operations",
+    "Faster Monthly Close",
+    "Fraud Prevention",
+    "Vendor Management",
+    "Scale For Growth",
+    "CFO",
+    "Controller",
+    "Accounts Payable",
+    "Freight and Logistics",
+    "Construction",
+    "Manufacturing",
+    "Retail",
+    "Case Studies",
+    "Datasheets",
+    "Guides",
+    "Videos",
+    "Podcasts",
+    "Glossary",
+    "Webinars",
+    "Events",
+    "Become a Partner"
+   ],
+   "heroCtas": [
+    {
+     "text": "Why Vic.ai? AI-first. People-centric. Industry lea",
+     "tag": "A",
+     "href": "/why-vic-ai"
+    },
+    {
+     "text": "Customers See why industry-leading finance teams a",
+     "tag": "A",
+     "href": "/customers"
+    },
+    {
+     "text": "CEO Perspective VicAgents™ and the future of auton",
+     "tag": "A",
+     "href": "/blog/vic-agents-future-of-autonomous-finance"
+    },
+    {
+     "text": "Accounts Payable Experience the power of AI-first ",
+     "tag": "A",
+     "href": "/accounts-payable"
+    },
+    {
+     "text": "Invoice Processing",
+     "tag": "A",
+     "href": "/accounts-payable/invoice-processing"
+    },
+    {
+     "text": "PO Matching",
+     "tag": "A",
+     "href": "/accounts-payable/po-matching"
+    },
+    {
+     "text": "Approvals",
+     "tag": "A",
+     "href": "/accounts-payable/approvals"
+    },
+    {
+     "text": "AP Inbox Meet Victoria, our agent-powered AP inbox",
+     "tag": "A",
+     "href": "/ap-inbox"
+    },
+    {
+     "text": "Bill Pay and Vendor Portal Save money and take ful",
+     "tag": "A",
+     "href": "/payments"
+    },
+    {
+     "text": "Expense Management Put AI-powered expense manageme",
+     "tag": "A",
+     "href": "/expense-management-corporate-card"
+    },
+    {
+     "text": "Analytics and Insights Uncover AI-powered insights",
+     "tag": "A",
+     "href": "/analytics-and-insights"
+    },
+    {
+     "text": "How It Works",
+     "tag": "A",
+     "href": "/how-it-works"
+    },
+    {
+     "text": "ERP Integrations",
+     "tag": "A",
+     "href": "/erp-integrations"
+    },
+    {
+     "text": "Trust and Security",
+     "tag": "A",
+     "href": "/trust-and-security"
+    },
+    {
+     "text": "VicAgents™ Discover agentic AI partners built spec",
+     "tag": "A",
+     "href": "/vic-agents"
+    },
+    {
+     "text": "Centralize AP Operations",
+     "tag": "A",
+     "href": "/solutions/centralize-ap-operations"
+    },
+    {
+     "text": "Faster Monthly Close",
+     "tag": "A",
+     "href": "/solutions/faster-monthly-close"
+    },
+    {
+     "text": "Fraud Prevention",
+     "tag": "A",
+     "href": "/solutions/fraud-prevention"
+    },
+    {
+     "text": "Vendor Management",
+     "tag": "A",
+     "href": "/solutions/vendor-management"
+    },
+    {
+     "text": "Scale For Growth",
+     "tag": "A",
+     "href": "/solutions/scale-for-growth"
+    },
+    {
+     "text": "CFO",
+     "tag": "A",
+     "href": "/solutions/cfo"
+    },
+    {
+     "text": "Controller",
+     "tag": "A",
+     "href": "/solutions/controller"
+    },
+    {
+     "text": "Accounts Payable",
+     "tag": "A",
+     "href": "/solutions/ap-manager"
+    },
+    {
+     "text": "Freight and Logistics",
+     "tag": "A",
+     "href": "/solutions/transportation-freight-and-logistics"
+    },
+    {
+     "text": "Construction",
+     "tag": "A",
+     "href": "/solutions/construction"
+    },
+    {
+     "text": "Manufacturing",
+     "tag": "A",
+     "href": "/solutions/manufacturing"
+    },
+    {
+     "text": "Retail",
+     "tag": "A",
+     "href": "/solutions/retail"
+    },
+    {
+     "text": "Resource Center Discover how AI is driving real, t",
+     "tag": "A",
+     "href": "/resources"
+    },
+    {
+     "text": "Case Studies",
+     "tag": "A",
+     "href": "/resources/case-studies"
+    },
+    {
+     "text": "Datasheets",
+     "tag": "A",
+     "href": "/resources/datasheets"
+    },
+    {
+     "text": "Guides",
+     "tag": "A",
+     "href": "/resources/guides"
+    },
+    {
+     "text": "Videos",
+     "tag": "A",
+     "href": "/resources/videos"
+    },
+    {
+     "text": "Podcasts",
+     "tag": "A",
+     "href": "/resources/podcasts"
+    },
+    {
+     "text": "Glossary",
+     "tag": "A",
+     "href": "/glossary-ai-accounting"
+    },
+    {
+     "text": "Webinars",
+     "tag": "A",
+     "href": "/resources/webinars"
+    },
+    {
+     "text": "Events",
+     "tag": "A",
+     "href": "/resources/events"
+    },
+    {
+     "text": "Blog The future of finance is autonomous. Learn ho",
+     "tag": "A",
+     "href": "/blog"
+    },
+    {
+     "text": "Product Tour Explore Vic.ai and discover the benef",
+     "tag": "A",
+     "href": "/product-tour"
+    },
+    {
+     "text": "Industry Report | Download Now AI Momentum Report:",
+     "tag": "A",
+     "href": "https://content.vic.ai/ai-momentum-report"
+    },
+    {
+     "text": "About Vic.ai Vic.ai is on a mission to empower fin",
+     "tag": "A",
+     "href": "/about-us"
+    },
+    {
+     "text": "Careers Join our amazing team of AI enthusiasts an",
+     "tag": "A",
+     "href": "/careers"
+    },
+    {
+     "text": "Contact Us We look forward to hearing from you. Ge",
+     "tag": "A",
+     "href": "/contact-us"
+    },
+    {
+     "text": "Newsroom Vic.ai is making waves in accounting and ",
+     "tag": "A",
+     "href": "/news"
+    },
+    {
+     "text": "Partners Learn about our extensive partner network",
+     "tag": "A",
+     "href": "/partners"
+    },
+    {
+     "text": "Become a Partner",
+     "tag": "A",
+     "href": "/partner-request"
+    },
+    {
+     "text": "News Vic.ai launches VicPay, Vendor Portal, and Vi",
+     "tag": "A",
+     "href": "/blog/q2-product-launch-from-automation-to-agentic-ai"
+    }
+   ],
+   "bigImgs": [
+    {
+     "w": 760,
+     "h": 137,
+     "alt": "",
+     "src": "https://cdn.prod.website-files.com/67284e81c67879feb155c7f7/6734d184796e8ed1c9f0383f_bottom-footer-logo.svg",
+     "top": 3351
+    }
+   ],
+   "imgCount": 97,
+   "logoish": 4,
+   "videos": [],
+   "canvases": 0,
+   "lotties": 0,
+   "iframes": [
+    "",
+    ""
+   ],
+   "fonts": [
+    [
+     "Poppins",
+     686
+    ]
+   ],
+   "sectionBgs": [],
+   "buttonBgs": [
+    [
+     "rgba(255, 255, 255, 0.5)",
+     2
+    ],
+    [
+     "rgb(255, 255, 255)",
+     2
+    ],
+    [
+     "rgb(67, 123, 240)",
+     1
+    ]
+   ],
+   "type": {
+    "h1": {
+     "family": "Poppins, sans-serif",
+     "size": "38px",
+     "weight": "500",
+     "lineHeight": "45.6px",
+     "letterSpacing": "normal",
+     "color": "rgb(0, 0, 0)"
+    },
+    "h2": {
+     "family": "Poppins, sans-serif",
+     "size": "38px",
+     "weight": "500"
+    },
+    "body": {
+     "family": "Poppins, sans-serif",
+     "size": "14px",
+     "color": "rgb(51, 51, 51)",
+     "bg": "rgb(255, 255, 255)"
+    }
+   },
+   "motionAfterScroll": {
+    "animations": {
+     "x, rotating2 2.5s, 2.5s infinite, infinite": 3
+    },
+    "opacityZeroEls": 7,
+    "transitionEls": 218,
+    "stickyFixedEls": 6
+   },
+   "libs": {
+    "gsap": false,
+    "framer": false,
+    "webflow": true,
+    "lottie": false,
+    "splide_swiper": true,
+    "rive": false,
+    "nextjs": false,
+    "wordpress": false,
+    "hubspot": true
+   },
+   "wordCount": 1289,
+   "scrollHeight": 3488,
+   "bodyText": "Access exclusive insights in the AI Momentum Report Why Vic.ai? WHY Why Vic.ai? AI-first. People-centric. Industry leadership. Discover the Vic.ai difference. Read More Customers See why industry-leading finance teams achieve unmatched ROI and love Vic.ai. Read More CEO Perspective VicAgents™ and the future of autonomous finance: why enterprise accounting needs agentic AI. Products Accounts Payable Experience the power of AI-first AP automation. Explore Vic.ai APSuite™ Invoice Processing PO Matching Approvals AP Inbox Meet Victoria, our agent-powered AP inbox for Accounts Payable. Explore VicInbox™ Bill Pay and Vendor Portal Save money and take full control of your cash flow. Explore VicPay™ Expense Management Put AI-powered expense management at your fingertips. Explore VicCard™ Analytics and Insights Uncover AI-powered insights for your business. Explore VicAnalytics™ Autonomous Finance Platform The industry's first AI-native accounting platform. How It Works ERP Integrations Trust and Security VicAgents™ Discover agentic AI partners built specifically for finance workflows. Explore VicAgents™ Solutions By Use Case Vic.ai is built for real-world complexity, designed for your business needs. Centralize AP Operations Faster Monthly Close Fraud Prevention Vendor Management Scale For Growth By Role Today's finance leaders use Vic.ai to stay ahead. See how Vic.ai gives you unparalleled insight and control. CFO Controller Accounts Payable By Industry Vic.ai helps move your business forward at the speed of AI. Explore our industry expertise. Freight and Logistics Construction Manufacturing Retail Resources Resource Center Discover how AI is driving real, tangible ROI for companies and finance teams. Read More LEARN Case Studies Datasheets Guides Videos Podcasts Glossary CONNECT Webinars Events Blog The future of finance is autonomous. Learn how AI is changing the game for finance teams everywhere. Read More Product Tour Explore Vic.ai and discover the benefits of our autonomous finance platform at your own pace. Take Tour Industry Report | Download Now AI Momentum Report: Benchmarking the New Era of AP Automation Company OVERVIEW About Vic.ai Vic.ai is on a mission to empower finance teams everywhere with AI-first solutions. Read More Careers Join our amazing team of AI enthusiasts and build your dream career. Read More Contact Us We look forward to hearing from you. Get In Touch Newsroom Vic.ai is making waves in accounting and finance. Read More Partners Learn about our extensive partner network from technology and solutions partners to VARs. Read More Become a Partner News Vic.ai launches VicPay, Vendor Portal, and VicAgents, introducing agentic AI partners for enterprise finance Login Request demo Get a demo Save 70% of your team’s time with autonomous finance Here’s what you can look forward to discussing in your Vic.ai discovery meeting: Learn how AI can be applied to your AP process to improve productivity and accuracy See an overview of the Vic.ai platform with an initial walkthrough Hear how similar companies use Vic.ai to solve common AP challenges You're in great company Join leading finance teams who are using Vic.ai to reduce costs and eliminate manual work. Let’s get in touch! Where is your company based?* United States Canada Afghanistan Åland Islands Albania Algeria American Samoa Andorra Angola Anguilla Antarctica Antigua and Barbuda Argentina Armenia Aruba Asia/Pacific Region Australia Austria Azerbaijan Bahamas Bahrain Bangladesh Barbados Belarus Belgium Belize Benin Bermuda Bhutan Bolivia Bosnia and Herzegovina Botswana Bouvet Island Brazil British Indian Ocean Territory British Virgin Islands Brunei Bulgaria Burkina Faso Burundi Cambodia Cameroon Canary Islands Cape Verde Caribbean Netherlands Cayman Islands Central African Republic Chad Chile China Christmas Island Cocos (Keeling) Islands Colombia Comoros Congo Cook Islands Costa Rica Cote d'Ivoire Croatia Cuba Curaçao Cyprus Czech Republic Democratic Republic of the Congo Denmark Djibouti Dominica Dominican Republic East Timor Ecuador Egypt El Salvador Equatorial Guinea Eritrea Estonia Ethiopia Europe Falkland Islands Faroe Islands Fiji Finland France French Guiana French Polynesia French Southern and Antarctic Lands Gabon Gambia Georgia Germany Ghana Gibraltar Greece Greenland Grenada Guadeloupe Guam Guatemala Guernsey Guinea Guinea-Bissau Guyana Haiti Heard Island and McDonald Islands Honduras Hong Kong Hungary Iceland India Indonesia Iran Iraq Ireland Isle of Man Israel Italy Jamaica Japan Jersey Jordan Kazakhstan Kenya Kiribati Kosovo Kuwait Kyrgyzstan Laos Latvia Lebanon Lesotho Liberia Libya Liechtenstein Lithuania Luxembourg Macau Macedonia (FYROM) Madagascar Malawi Malaysia Maldives Mali Malta Marshall Islands Martinique Mauritania Mauritius Mayotte Mexico Micronesia Moldova Monaco Mongolia Montenegro Montserrat Morocco Mozambique Myanmar (Burma) Namibia Nauru Nepal Netherlands Netherlands Antilles New Caledonia New Zealand Nicaragua Niger Nigeria Niue Norfolk Island North Korea Northern Mariana Islands Norway Oman Pakistan Palau Palestine Panama Papua New Guinea Paraguay Peru Philippines Pitcairn Islands Poland Portugal Puerto Rico Qatar Réunion Romania Russia Rwanda Saint Barthélemy Saint Helena Saint Kitts and Nevis Saint Lucia Saint Martin Saint Pierre and Miquelon Saint Vincent and the Grenadines Samoa San Marino Sao Tome and Principe Saudi Arabia Senegal Serbia Seychelles Sierra Leone Singapore Sint Maarten Slovakia Slovenia Solomon Islands Somalia South Africa South Georgia and the South Sandwich Islands South Korea South Sudan Spain Sri Lanka Sudan Suriname Svalbard and Jan Mayen Swaziland Sweden Switzerland Syria Taiwan Tajikistan Tanzania Thailand Togo Tokelau Tonga Trinidad and Tobago Tunisia Turkey Turkmenistan Turks and Caicos Islands Tuvalu U.S. Virgin Islands Uganda Ukraine United Arab Emirates United Kingdom United States Minor Outlying Islands Uruguay Uzbekistan Vanuatu Vatican City Venezuela Vietnam Wallis and Futuna Western Sahara Yemen Zambia Zimbabwe Company annual revenue* Under $50 Million $50 Million - $99.9 Million $100 Million - $499.9 Million $500 Million - $999.9 Million $1 Billion - $5 Billion $5 Billion + Monthly invoice volume* 0 - 500 Invoices 501 - 1,000 Invoices 1,001 - 2,000 Invoices 2,001 - 5,000 Invoices 5,001 - 10,000 Invoices 10,001 - 15,000 Invoices 15,001 - 20,000 Invoices 20,000+ Invoices Don't know ERP platform* Oracle NetSuite Sage Intacct Microsoft Dynamics 365 Business Central Microsoft Dynamics 365 Finance & Operations QuickBooks Online QuickBooks Desktop Bill.com Xero SAP ECC SAP S/4HANA Oracle Fusion Oracle E-Business Suite (EBS) Oracle JD Edwards Oracle Peoplesoft Workday Coupa FinancialForce Viewpoint Vista Procore Deltek Vision Deltek Costpoint JAMIS Prime Epicor Infor CloudSuite (LN / M3 / SX.e) Acumatica Plex Appfolio Yardi RealPage ServiceTitan Sage 300 Sage X3 Microsoft Dynamics GP Odoo Other Not sure Real customers. Proven ROI. Unmatched AP automation results. We are excited to push the envelope on autonomous PO matching with Vic.ai. It presents us with a great opportunity to incorporate AI and augment our decision-making. Conor Clair Senior Finance Manager of Accounting, Milwaukee Tool Our AP team is no longer struggling to get invoices approved on-time, and leadership loves being able to compare previous bills on-the-go with the mobile app. Rachel Knapp VP, Financial & Accounting Systems, Higher Ground Education The standout difference with Vic.ai is its advanced AI technology. Unlike other vendors that rely heavily on templates — which are not only time-consuming to set up but also demand significant expertise — their platform eliminates the need for templating altogether. Paul Dachsteiner VP of IT and IS, Stonewall Kitchen Learn more about Vic.ai’s solutions View all resources Case Study Diesel Direct: Fueling growth with AI-powered accounting Webinar CFO Dive: Mastering the Future of Finance with AI as a Colleague Why Vic.ai? Why Vic.ai? Customers Products Accounts Payable Invoice Processing PO Matching Approvals AP Inbox Bill Pay and Vendor Portal Expense Management Analytics and Insights Autonomous Finance Platform How It Works Integrations Trust and Security FAQs VicAgents Solutions By Use Case Centralize AP Operations Faster Monthly Close Fraud Prevention Vendor Management Scale For Growth By Role CFO Controller Accounts Payable By Industry Freight and Logistics Construction Manufacturing Retail Resources Blog Resource Center Case Studies Datasheets Guides Videos Podcasts Webinars Events Glossary Company About Vic.ai Careers Newsroom News Press Contact Us Partners Become a Partner Vic.ai is on a mission to transform how finance teams operate by building the world’s first autonomous finance platform. Subscribe to our newsletter Copyright © 2026 Vic.ai Privacy Policy Login Request Demo"
+  }
+ }
+}

@@ -3,13 +3,6 @@
 @custom-variant dark (&:where(.dark, .dark *));
 @config "../tailwind.config.ts";
 
-/* Warm paper cream for the marketing site only — the app shell keeps its slate/white tokens. */
-@theme {
-  --color-cream-50: #FBF7F0;
-  --color-cream-100: #F5EEE1;
-  --color-cream-200: #EDE3D0;
-}
-
 /* The palette is emerald on a cool slate neutral ramp — the colours the app shell already uses
  * for its brand mark, active nav item and links. The stock shadcn tokens these replaced were a
  * near-black primary (240 5.9% 10%) on cool blue-grey neutrals, so every Button rendered flat
@@ -90,6 +83,16 @@
     --sidebar-border: 200 13% 25%;
     --sidebar-ring: 200 13% 60%;
   }
+}
+
+/* #231 Q21 (#252): the hairline rules the Controls grammar drew with three hex values
+ * (#e6ebf1 / #f1f5f9 / #dbe3ec) are tokens now, so Admin's Panel, Ledger, Sheet and the save
+ * bar rule with one vocabulary — `border-hairline`, `divide-hairline-soft`,
+ * `border-hairline-dashed`. Values are unchanged; the names carry the roles. */
+@theme {
+  --color-hairline: #e6ebf1;
+  --color-hairline-soft: #f1f5f9;
+  --color-hairline-dashed: #dbe3ec;
 }
 
 /* next/font sets both variables on <html> (app/layout.tsx). Declared as plain CSS rather than
@@ -210,6 +213,8 @@
  * flash-of-hidden-content for no-JS or pre-hydration paints. */
 @keyframes db-in { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: none; } }
 @keyframes db-pop { from { opacity: 0; transform: scale(.94); } to { opacity: 1; transform: none; } }
+/* #257: the phone lane's full-screen Detail sheet slides in from the right (200ms); motion-safe only. */
+@keyframes db-sheet-in { from { transform: translateX(100%); } to { transform: none; } }
 @keyframes db-sweep { 0% { transform: translateY(-40%); opacity: 0; } 10% { opacity: 1; } 70% { transform: translateY(300%); opacity: 1; } 100% { transform: translateY(300%); opacity: 0; } }
 @keyframes db-pulse { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
 /* Fills a bar from its left edge. Like db-in and db-pop, it ends at the element's resting

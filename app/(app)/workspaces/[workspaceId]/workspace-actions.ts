@@ -42,12 +42,12 @@ async function deliverInvitation(input: { email: string; workspaceName: string; 
  * strongest plan the user owns, so the upsell cannot be clicked past. */
 export async function createWorkspaceAction(name: string): Promise<ActionState<{ workspaceId: string }>> {
   const user = await getCurrentUser()
-  if (!name.trim()) return { success: false, error: "Enter a workspace name" }
+  if (!name.trim()) return { success: false, error: "Enter a company name" }
   try {
     const workspace = await createTeamWorkspace(user, name)
     revalidateWorkspaceLayout()
     return { success: true, data: { workspaceId: workspace.id } }
-  } catch (error) { return { success: false, error: errorMessage(error, "Could not create the workspace") } }
+  } catch (error) { return { success: false, error: errorMessage(error, "Could not create the company") } }
 }
 
 export async function renameWorkspaceAction(workspaceId: string, name: string): Promise<ActionState<{ name: string }>> {
@@ -58,7 +58,7 @@ export async function renameWorkspaceAction(workspaceId: string, name: string): 
     revalidatePath(paths(workspaceId).workspace)
     revalidateWorkspaceLayout()
     return { success: true, data: { name: workspace.name } }
-  } catch (error) { return { success: false, error: errorMessage(error, "Could not rename the workspace") } }
+  } catch (error) { return { success: false, error: errorMessage(error, "Could not rename the company") } }
 }
 
 /** No redirect() here, and none in leaveWorkspaceAction. The moment the membership is gone the
@@ -73,7 +73,7 @@ export async function deleteWorkspaceAction(workspaceId: string): Promise<Action
     await deleteWorkspace({ workspaceId, actorId: user.id })
     revalidatePath("/workspaces", "layout")
     return { success: true, data: null }
-  } catch (error) { return { success: false, error: errorMessage(error, "Could not delete the workspace") } }
+  } catch (error) { return { success: false, error: errorMessage(error, "Could not delete the company") } }
 }
 
 export async function leaveWorkspaceAction(workspaceId: string, options: { confirmLastReviewerRemoval?: boolean } = {}): Promise<ActionState<null>> {
@@ -83,7 +83,7 @@ export async function leaveWorkspaceAction(workspaceId: string, options: { confi
     await leaveWorkspace(workspaceId, user.id, { confirmLastReviewerRemoval: options.confirmLastReviewerRemoval })
     revalidatePath("/workspaces", "layout")
     return { success: true, data: null }
-  } catch (error) { return { success: false, error: errorMessage(error, "Could not leave the workspace") } }
+  } catch (error) { return { success: false, error: errorMessage(error, "Could not leave the company") } }
 }
 
 /* ------------------------------------------------------------------------- membership --- */

@@ -21,7 +21,7 @@ export default async function AcceptInvitationPage({ params }: { params: Promise
     // the Referer of everything the login page loads; a link the visitor clicks keeps it to one hop.
     return shell(<Card>
       <CardHeader>
-        <CardTitle>You have been invited to a workspace</CardTitle>
+        <CardTitle>You've been invited to a company</CardTitle>
         <CardDescription>Sign in — or create an account — with the email address the invitation was sent to, and you will be added automatically.</CardDescription>
       </CardHeader>
       <CardContent>
@@ -41,7 +41,7 @@ export default async function AcceptInvitationPage({ params }: { params: Promise
         <CardDescription>
           {mismatch
             ? `You are signed in as ${user.email}. Sign out and sign back in with the invited address to accept.`
-            : "This invitation has expired or has already been used. Ask the workspace owner to send a new one."}
+            : "This invitation has expired or has already been used. Ask an owner of the company to send a new one."}
         </CardDescription>
       </CardHeader>
       {mismatch && <CardContent><SignOutButton label="Sign out" redirectTo={`/invite/${encodeURIComponent(token)}`} /></CardContent>}

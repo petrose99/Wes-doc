@@ -1,0 +1,306 @@
+[
+  {
+    "name": "invoices-list",
+    "width": 1440,
+    "note": "",
+    "findings": [
+      {
+        "type": "detector-error",
+        "detail": "page.addScriptTag: Error: Failed to load script at http://localhost:8400/detect.js\n    at script.onerror (eval at evaluate (:311:30), <anonymous>:8:80)"
+      }
+    ],
+    "realCount": 1,
+    "shot": "/home/ubuntu/Dev/Wes-doc/shots-r1/invoices-list-1440.png",
+    "pageErrors": []
+  },
+  {
+    "name": "invoices-drop-frame",
+    "width": 1440,
+    "note": "",
+    "findings": [
+      {
+        "type": "detector-error",
+        "detail": "page.addScriptTag: Error: Failed to load script at http://localhost:8400/detect.js\n    at script.onerror (eval at evaluate (:311:30), <anonymous>:8:80)"
+      }
+    ],
+    "realCount": 1,
+    "shot": "/home/ubuntu/Dev/Wes-doc/shots-r1/invoices-drop-frame-1440.png",
+    "pageErrors": []
+  },
+  {
+    "name": "invoices-dialog-idle",
+    "width": 1440,
+    "note": "",
+    "findings": [
+      {
+        "type": "detector-error",
+        "detail": "page.addScriptTag: Error: Failed to load script at http://localhost:8400/detect.js\n    at script.onerror (eval at evaluate (:311:30), <anonymous>:8:80)"
+      }
+    ],
+    "realCount": 1,
+    "shot": "/home/ubuntu/Dev/Wes-doc/shots-r1/invoices-dialog-idle-1440.png",
+    "pageErrors": []
+  },
+  {
+    "name": "invoices-dialog-staged",
+    "width": 1440,
+    "note": "",
+    "findings": [
+      {
+        "type": "detector-error",
+        "detail": "page.addScriptTag: Error: Failed to load script at http://localhost:8400/detect.js\n    at script.onerror (eval at evaluate (:311:30), <anonymous>:8:80)"
+      }
+    ],
+    "realCount": 1,
+    "shot": "/home/ubuntu/Dev/Wes-doc/shots-r1/invoices-dialog-staged-1440.png",
+    "pageErrors": []
+  },
+  {
+    "name": "invoices-dialog-refused-format",
+    "width": 1440,
+    "note": "",
+    "findings": [
+      {
+        "type": "detector-error",
+        "detail": "page.addScriptTag: Error: Failed to load script at http://localhost:8400/detect.js\n    at script.onerror (eval at evaluate (:311:30), <anonymous>:8:80)"
+      }
+    ],
+    "realCount": 1,
+    "shot": "/home/ubuntu/Dev/Wes-doc/shots-r1/invoices-dialog-refused-format-1440.png",
+    "pageErrors": []
+  },
+  {
+    "name": "invoices-dialog-uploading",
+    "width": 1440,
+    "note": "",
+    "findings": [
+      {
+        "type": "detector-error",
+        "detail": "page.addScriptTag: Error: Failed to load script at http://localhost:8400/detect.js\n    at script.onerror (eval at evaluate (:311:30), <anonymous>:8:80)"
+      }
+    ],
+    "realCount": 1,
+    "shot": "/home/ubuntu/Dev/Wes-doc/shots-r1/invoices-dialog-uploading-1440.png",
+    "pageErrors": []
+  },
+  {
+    "name": "invoices-dialog-done",
+    "width": 1440,
+    "note": "",
+    "findings": [
+      {
+        "type": "detector-error",
+        "detail": "page.addScriptTag: Error: Failed to load script at http://localhost:8400/detect.js\n    at script.onerror (eval at evaluate (:311:30), <anonymous>:8:80)"
+      }
+    ],
+    "realCount": 1,
+    "shot": "/home/ubuntu/Dev/Wes-doc/shots-r1/invoices-dialog-done-1440.png",
+    "pageErrors": []
+  },
+  {
+    "name": "purchase-orders-list",
+    "width": 1440,
+    "note": "",
+    "findings": [
+      {
+        "type": "detector-error",
+        "detail": "page.addScriptTag: Error: Failed to load script at http://localhost:8400/detect.js\n    at script.onerror (eval at evaluate (:311:30), <anonymous>:8:80)"
+      }
+    ],
+    "realCount": 1,
+    "shot": "/home/ubuntu/Dev/Wes-doc/shots-r1/purchase-orders-list-1440.png",
+    "pageErrors": []
+  },
+  {
+    "name": "purchase-orders-drop-frame",
+    "width": 1440,
+    "note": "",
+    "findings": [
+      {
+        "type": "detector-error",
+        "detail": "page.addScriptTag: Error: Failed to load script at http://localhost:8400/detect.js\n    at script.onerror (eval at evaluate (:311:30), <anonymous>:8:80)"
+      }
+    ],
+    "realCount": 1,
+    "shot": "/home/ubuntu/Dev/Wes-doc/shots-r1/purchase-orders-drop-frame-1440.png",
+    "pageErrors": []
+  },
+  {
+    "name": "purchase-orders-dialog-idle",
+    "width": 1440,
+    "note": "",
+    "findings": [
+      {
+        "type": "detector-error",
+        "detail": "page.addScriptTag: Error: Failed to load script at http://localhost:8400/detect.js\n    at script.onerror (eval at evaluate (:311:30), <anonymous>:8:80)"
+      }
+    ],
+    "realCount": 1,
+    "shot": "/home/ubuntu/Dev/Wes-doc/shots-r1/purchase-orders-dialog-idle-1440.png",
+    "pageErrors": []
+  },
+  {
+    "name": "purchase-orders-dialog-staged",
+    "width": 1440,
+    "note": "",
+    "findings": [
+      {
+        "type": "detector-error",
+        "detail": "page.addScriptTag: Error: Failed to load script at http://localhost:8400/detect.js\n    at script.onerror (eval at evaluate (:311:30), <anonymous>:8:80)"
+      }
+    ],
+    "realCount": 1,
+    "shot": "/home/ubuntu/Dev/Wes-doc/shots-r1/purchase-orders-dialog-staged-1440.png",
+    "pageErrors": []
+  },
+  {
+    "name": "purchase-orders-dialog-refused-format",
+    "width": 1440,
+    "note": "",
+    "findings": [
+      {
+        "type": "detector-error",
+        "detail": "page.addScriptTag: Error: Failed to load script at http://localhost:8400/detect.js\n    at script.onerror (eval at evaluate (:311:30), <anonymous>:8:80)"
+      }
+    ],
+    "realCount": 1,
+    "shot": "/home/ubuntu/Dev/Wes-doc/shots-r1/purchase-orders-dialog-refused-format-1440.png",
+    "pageErrors": []
+  },
+  {
+    "name": "receipts-list",
+    "width": 1440,
+    "note": "",
+    "findings": [
+      {
+        "type": "detector-error",
+        "detail": "page.addScriptTag: Error: Failed to load script at http://localhost:8400/detect.js\n    at script.onerror (eval at evaluate (:311:30), <anonymous>:8:80)"
+      }
+    ],
+    "realCount": 1,
+    "shot": "/home/ubuntu/Dev/Wes-doc/shots-r1/receipts-list-1440.png",
+    "pageErrors": []
+  },
+  {
+    "name": "receipts-drop-frame",
+    "width": 1440,
+    "note": "",
+    "findings": [
+      {
+        "type": "detector-error",
+        "detail": "page.addScriptTag: Error: Failed to load script at http://localhost:8400/detect.js\n    at script.onerror (eval at evaluate (:311:30), <anonymous>:8:80)"
+      }
+    ],
+    "realCount": 1,
+    "shot": "/home/ubuntu/Dev/Wes-doc/shots-r1/receipts-drop-frame-1440.png",
+    "pageErrors": []
+  },
+  {
+    "name": "receipts-dialog-idle",
+    "width": 1440,
+    "note": "",
+    "findings": [
+      {
+        "type": "detector-error",
+        "detail": "page.addScriptTag: Error: Failed to load script at http://localhost:8400/detect.js\n    at script.onerror (eval at evaluate (:311:30), <anonymous>:8:80)"
+      }
+    ],
+    "realCount": 1,
+    "shot": "/home/ubuntu/Dev/Wes-doc/shots-r1/receipts-dialog-idle-1440.png",
+    "pageErrors": []
+  },
+  {
+    "name": "receipts-dialog-staged",
+    "width": 1440,
+    "note": "",
+    "findings": [
+      {
+        "type": "detector-error",
+        "detail": "page.addScriptTag: Error: Failed to load script at http://localhost:8400/detect.js\n    at script.onerror (eval at evaluate (:311:30), <anonymous>:8:80)"
+      }
+    ],
+    "realCount": 1,
+    "shot": "/home/ubuntu/Dev/Wes-doc/shots-r1/receipts-dialog-staged-1440.png",
+    "pageErrors": []
+  },
+  {
+    "name": "receipts-dialog-refused-format",
+    "width": 1440,
+    "note": "",
+    "findings": [
+      {
+        "type": "detector-error",
+        "detail": "page.addScriptTag: Error: Failed to load script at http://localhost:8400/detect.js\n    at script.onerror (eval at evaluate (:311:30), <anonymous>:8:80)"
+      }
+    ],
+    "realCount": 1,
+    "shot": "/home/ubuntu/Dev/Wes-doc/shots-r1/receipts-dialog-refused-format-1440.png",
+    "pageErrors": []
+  },
+  {
+    "name": "bank-statements-list",
+    "width": 1440,
+    "note": "",
+    "findings": [
+      {
+        "type": "detector-error",
+        "detail": "page.addScriptTag: Error: Failed to load script at http://localhost:8400/detect.js\n    at script.onerror (eval at evaluate (:311:30), <anonymous>:8:80)"
+      }
+    ],
+    "realCount": 1,
+    "shot": "/home/ubuntu/Dev/Wes-doc/shots-r1/bank-statements-list-1440.png",
+    "pageErrors": []
+  },
+  {
+    "name": "bank-statements-drop-frame",
+    "width": 1440,
+    "note": "",
+    "findings": [
+      {
+        "type": "detector-error",
+        "detail": "page.addScriptTag: Error: Failed to load script at http://localhost:8400/detect.js\n    at script.onerror (eval at evaluate (:311:30), <anonymous>:8:80)"
+      }
+    ],
+    "realCount": 1,
+    "shot": "/home/ubuntu/Dev/Wes-doc/shots-r1/bank-statements-drop-frame-1440.png",
+    "pageErrors": []
+  },
+  {
+    "name": "bank-statements-dialog-idle",
+    "width": 1440,
+    "note": "",
+    "findings": [
+      {
+        "type": "detector-error",
+        "detail": "page.addScriptTag: Error: Failed to load script at http://localhost:8400/detect.js\n    at script.onerror (eval at evaluate (:311:30), <anonymous>:8:80)"
+      }
+    ],
+    "realCount": 1,
+    "shot": "/home/ubuntu/Dev/Wes-doc/shots-r1/bank-statements-dialog-idle-1440.png",
+    "pageErrors": []
+  },
+  {
+    "name": "bank-statements-dialog-staged",
+    "width": 1440,
+    "error": "locator.click: Timeout 30000ms exceeded.",
+    "findings": [],
+    "realCount": 0,
+    "pageErrors": []
+  },
+  {
+    "name": "bank-statements-dialog-refused-format",
+    "width": 1440,
+    "error": "locator.click: Timeout 30000ms exceeded.",
+    "findings": [],
+    "realCount": 0,
+    "pageErrors": []
+  },
+  {
+    "name": "pipeline-redirect",
+    "width": 1440,
+    "error": "page.waitForTimeout: Target page, context or browser has been closed",
+    "findings": [],
+    "realCount": 0,
+    "pageErrors": []
+  }
+]

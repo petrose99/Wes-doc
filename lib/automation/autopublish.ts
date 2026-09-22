@@ -42,7 +42,7 @@ async function enqueuePush(
   const category = (typeof coding.account === "string" && coding.account) || (typeof reviewedData.category === "string" && reviewedData.category) || null
   let resolvedAccountId: string | undefined
   if (category && connection.defaultExpenseAccountId) {
-    const [mappings, inferredMap] = await Promise.all([listCategoryAccountMappings(connection.id), getCategoryAccountMap(workspaceId, connection.id)])
+    const [mappings, inferredMap] = await Promise.all([listCategoryAccountMappings(workspaceId, connection.id), getCategoryAccountMap(workspaceId, connection.id)])
     resolvedAccountId = resolveCategoryAccount(mappings, category, inferredMap, connection.defaultExpenseAccountId)
   }
   const documentType = coding.documentType === "expense" || coding.documentType === "sale" || coding.documentType === "bank_statement" ? coding.documentType : "expense"

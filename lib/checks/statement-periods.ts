@@ -26,9 +26,9 @@ export function findMissingStatementPeriods(periods: StatementPeriod[]): CheckRe
     }
   }
 
-  if (!gaps.length) return { checkCode: "missing_statement_period", status: "pass", message: "No gaps between statement periods." }
+  if (!gaps.length) return { checkCode: "missing_statement_period", status: "pass", message: "No gaps between statement periods.", fields: ["statement_period_start", "statement_period_end"] }
   return {
-    checkCode: "missing_statement_period", status: "warn", detail: { gaps },
+    checkCode: "missing_statement_period", status: "warn", fields: ["statement_period_start", "statement_period_end"], detail: { gaps },
     message: `Gap${gaps.length === 1 ? "" : "s"} in statement coverage: ${gaps.map((gap) => `${gap.from} to ${gap.to}`).join(", ")}`,
   }
 }

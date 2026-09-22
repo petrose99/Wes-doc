@@ -40,16 +40,16 @@ export function VendorHistorySheet({ workspaceId, rows, pinnedRuleIds, isOwner }
         type="search"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="Search vendor or document type"
-        aria-label="Search vendors"
-        className="w-full rounded-md border border-[#e6ebf1] py-1.5 pl-8 pr-3 text-[13px] text-slate-800 placeholder:text-slate-400 focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600"
+        placeholder="Search supplier or document type"
+        aria-label="Search suppliers"
+        className="w-full rounded-md border border-hairline py-1.5 pl-8 pr-3 text-[13px] text-slate-800 placeholder:text-slate-400 focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600"
       />
     </div>
 
     {filtered.length === 0
-      ? <p className="rounded-md border border-dashed border-[#dbe3ec] px-4 py-6 text-center text-sm text-slate-500">No vendor or document type matches &ldquo;{query}&rdquo;.</p>
+      ? <p className="rounded-md border border-dashed border-hairline-dashed px-4 py-6 text-center text-sm text-slate-500">No supplier or document type matches &ldquo;{query}&rdquo;.</p>
       : <Sheet minWidth={720} head={<>
-          <Th>Vendor</Th>
+          <Th>Supplier</Th>
           <Th>Document type</Th>
           <Th align="right">Reviewed so far</Th>
           <Th>What gets filled in</Th>

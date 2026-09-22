@@ -1,0 +1,320 @@
+{
+ "slug": "docubite-pricing",
+ "label": "DocuBite pricing",
+ "url": "http://localhost:3000/pricing",
+ "accessed": "2026-09-19T11:51:38.221Z",
+ "views": {
+  "390": {
+   "status": 200,
+   "shot": "/home/ubuntu/Dev/Wes-doc/docs/research/benchmark-captures/docubite/docubite-pricing-390.png",
+   "initialMotion": {
+    "opacityZeroEls": 0,
+    "animations": {},
+    "transitionEls": 23,
+    "total": 261
+   },
+   "errors": [],
+   "title": "Pricing — DocuBite",
+   "h1": "See how DocuBite fits your workflow.",
+   "subhead": "Create an account to explore the workspace. For larger teams, request an Enterprise demo to discuss your setup.",
+   "headings": [
+    {
+     "tag": "H1",
+     "text": "See how DocuBite fits your workflow.",
+     "top": 182
+    }
+   ],
+   "sections": [
+    {
+     "top": 65,
+     "height": 538,
+     "heading": "See how DocuBite fits your workflow.",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 246,
+     "snippet": "Pricing See how DocuBite fits your workflow. Create an account to explore the workspace. For larger teams, request an Enterprise demo to discuss your setup. Create an account Request an Enterprise demo Files are held in "
+    }
+   ],
+   "navLinks": [
+    "Skip to main content",
+    "DocuBite",
+    "Open workspace"
+   ],
+   "heroCtas": [
+    {
+     "text": "Create an account",
+     "tag": "A",
+     "href": "/signup"
+    },
+    {
+     "text": "Request an Enterprise demo",
+     "tag": "A",
+     "href": "/demo"
+    },
+    {
+     "text": "Privacy",
+     "tag": "A",
+     "href": "/docs/privacy_policy"
+    },
+    {
+     "text": "Terms",
+     "tag": "A",
+     "href": "/docs/terms"
+    },
+    {
+     "text": "Cookies",
+     "tag": "A",
+     "href": "/docs/cookie"
+    },
+    {
+     "text": "How we use AI",
+     "tag": "A",
+     "href": "/docs/ai"
+    },
+    {
+     "text": "support@docubite.com",
+     "tag": "A",
+     "href": "mailto:support@docubite.com"
+    }
+   ],
+   "bigImgs": [],
+   "imgCount": 0,
+   "logoish": 0,
+   "videos": [],
+   "canvases": 0,
+   "lotties": 0,
+   "iframes": [],
+   "fonts": [
+    [
+     "inter",
+     39
+    ],
+    [
+     "Bricolage Grotesque",
+     3
+    ]
+   ],
+   "sectionBgs": [
+    [
+     "rgb(255, 255, 255)",
+     1
+    ],
+    [
+     "lab(98.1434 -0.369519 -1.05966)",
+     1
+    ]
+   ],
+   "buttonBgs": [
+    [
+     "lab(44.4871 -41.0396 11.0361)",
+     2
+    ],
+    [
+     "rgb(255, 255, 255)",
+     2
+    ]
+   ],
+   "type": {
+    "h1": {
+     "family": "\"Bricolage Grotesque\", \"Bricolage Grotesque Fallback\", ui-sans-serif, system-ui, sans-serif",
+     "size": "38.4px",
+     "weight": "800",
+     "lineHeight": "40.32px",
+     "letterSpacing": "-1.152px",
+     "color": "lab(1.76974 1.32743 -9.28855)"
+    },
+    "h2": {
+     "family": "inter, \"inter Fallback\", ui-sans-serif, system-ui, sans-serif",
+     "size": "13.76px",
+     "weight": "500"
+    },
+    "body": {
+     "family": "inter, \"inter Fallback\", ui-sans-serif, system-ui, sans-serif",
+     "size": "16px",
+     "color": "rgb(15, 23, 41)",
+     "bg": "rgb(255, 255, 255)"
+    }
+   },
+   "motionAfterScroll": {
+    "animations": {},
+    "opacityZeroEls": 0,
+    "transitionEls": 23,
+    "stickyFixedEls": 1
+   },
+   "libs": {
+    "gsap": false,
+    "framer": false,
+    "webflow": false,
+    "lottie": false,
+    "splide_swiper": false,
+    "rive": false,
+    "nextjs": true,
+    "wordpress": false,
+    "hubspot": false
+   },
+   "wordCount": 55,
+   "scrollHeight": 844,
+   "bodyText": "Skip to main content DocuBite Open workspace Pricing See how DocuBite fits your workflow. Create an account to explore the workspace. For larger teams, request an Enterprise demo to discuss your setup. Create an account Request an Enterprise demo Files are held in private encrypted storage. DocuBite Privacy Terms Cookies How we use AI support@docubite.com"
+  },
+  "1440": {
+   "status": 200,
+   "shot": "/home/ubuntu/Dev/Wes-doc/docs/research/benchmark-captures/docubite/docubite-pricing-1440.png",
+   "initialMotion": {
+    "opacityZeroEls": 0,
+    "animations": {},
+    "transitionEls": 23,
+    "total": 260
+   },
+   "errors": [],
+   "title": "Pricing — DocuBite",
+   "h1": "See how DocuBite fits your workflow.",
+   "subhead": "Create an account to explore the workspace. For larger teams, request an Enterprise demo to discuss your setup.",
+   "headings": [
+    {
+     "tag": "H1",
+     "text": "See how DocuBite fits your workflow.",
+     "top": 214
+    }
+   ],
+   "sections": [
+    {
+     "top": 66,
+     "height": 556,
+     "heading": "See how DocuBite fits your workflow.",
+     "imgs": 0,
+     "svgs": 0,
+     "videos": 0,
+     "ctas": [],
+     "textLen": 246,
+     "snippet": "Pricing See how DocuBite fits your workflow. Create an account to explore the workspace. For larger teams, request an Enterprise demo to discuss your setup. Create an account Request an Enterprise demo Files are held in "
+    }
+   ],
+   "navLinks": [
+    "Skip to main content",
+    "DocuBite",
+    "Product",
+    "Solutions",
+    "Pricing",
+    "Resources",
+    "Open workspace"
+   ],
+   "heroCtas": [
+    {
+     "text": "Create an account",
+     "tag": "A",
+     "href": "/signup"
+    },
+    {
+     "text": "Request an Enterprise demo",
+     "tag": "A",
+     "href": "/demo"
+    },
+    {
+     "text": "Privacy",
+     "tag": "A",
+     "href": "/docs/privacy_policy"
+    },
+    {
+     "text": "Terms",
+     "tag": "A",
+     "href": "/docs/terms"
+    },
+    {
+     "text": "Cookies",
+     "tag": "A",
+     "href": "/docs/cookie"
+    },
+    {
+     "text": "How we use AI",
+     "tag": "A",
+     "href": "/docs/ai"
+    },
+    {
+     "text": "support@docubite.com",
+     "tag": "A",
+     "href": "mailto:support@docubite.com"
+    }
+   ],
+   "bigImgs": [],
+   "imgCount": 0,
+   "logoish": 0,
+   "videos": [],
+   "canvases": 0,
+   "lotties": 0,
+   "iframes": [],
+   "fonts": [
+    [
+     "inter",
+     61
+    ],
+    [
+     "Bricolage Grotesque",
+     3
+    ]
+   ],
+   "sectionBgs": [
+    [
+     "rgb(255, 255, 255)",
+     1
+    ],
+    [
+     "lab(98.1434 -0.369519 -1.05966)",
+     1
+    ]
+   ],
+   "buttonBgs": [
+    [
+     "lab(44.4871 -41.0396 11.0361)",
+     2
+    ],
+    [
+     "rgb(255, 255, 255)",
+     1
+    ]
+   ],
+   "type": {
+    "h1": {
+     "family": "\"Bricolage Grotesque\", \"Bricolage Grotesque Fallback\", ui-sans-serif, system-ui, sans-serif",
+     "size": "57.6px",
+     "weight": "800",
+     "lineHeight": "60.48px",
+     "letterSpacing": "-1.728px",
+     "color": "lab(1.76974 1.32743 -9.28855)"
+    },
+    "h2": {
+     "family": "inter, \"inter Fallback\", ui-sans-serif, system-ui, sans-serif",
+     "size": "13.76px",
+     "weight": "500"
+    },
+    "body": {
+     "family": "inter, \"inter Fallback\", ui-sans-serif, system-ui, sans-serif",
+     "size": "16px",
+     "color": "rgb(15, 23, 41)",
+     "bg": "rgb(255, 255, 255)"
+    }
+   },
+   "motionAfterScroll": {
+    "animations": {},
+    "opacityZeroEls": 0,
+    "transitionEls": 23,
+    "stickyFixedEls": 1
+   },
+   "libs": {
+    "gsap": false,
+    "framer": false,
+    "webflow": false,
+    "lottie": false,
+    "splide_swiper": false,
+    "rive": false,
+    "nextjs": true,
+    "wordpress": false,
+    "hubspot": false
+   },
+   "wordCount": 60,
+   "scrollHeight": 900,
+   "bodyText": "Skip to main content DocuBite Product Solutions Pricing Resources About Open workspace Pricing See how DocuBite fits your workflow. Create an account to explore the workspace. For larger teams, request an Enterprise demo to discuss your setup. Create an account Request an Enterprise demo Files are held in private encrypted storage. DocuBite Privacy Terms Cookies How we use AI support@docubite.com"
+  }
+ }
+}

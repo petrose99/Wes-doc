@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin Glossary</title><link rel="stylesheet" href="../assets/course.css"></head>
+<body><main>
+<p class="kicker">Reference · glossary</p>
+<h1>Organization, Company, Role</h1>
+<p class="lede">The four words that carry the whole admin layer. Source: <code>CONTEXT.md</code> lines 155–170. Print this.</p>
+
+<table>
+<tr><th>Word</th><th>Is</th><th>Never called</th></tr>
+<tr><td><b>Company</b></td><td>One set of books: a team workspace. What Bill Pay, Invoices, Approvals all belong to.</td><td>workspace (on screen), entity, tenant</td></tr>
+<tr><td><b>Personal</b></td><td>The one workspace every user gets for themselves. Never inside an organization.</td><td>personal workspace, home</td></tr>
+<tr><td><b>Organization</b></td><td>A named group of companies one firm runs under one login. Belonging to it opens <em>no</em> company.</td><td>firm, account, tenant</td></tr>
+<tr><td><b>Role</b></td><td>Your standing in <em>one</em> company: Owner, Reviewer or Member. Per company; the only thing that decides what you can do there.</td><td>permission level, access level</td></tr>
+<tr><td><b>Organization admin</b></td><td>A single flag on a person, shown as a fact or “—”. Lets you rename the org and see it in Admin. Opens no company.</td><td>Org admin, organization member, organization owner</td></tr>
+<tr><td><b>Admin</b></td><td>The area at the bottom of the rail. Organization section (Dashboard, Companies, Users) + current Company section (Configuration, flows, Suppliers, Integrations).</td><td>Settings, Controls, administrator (as a role)</td></tr>
+</table>
+
+<div class="note">Three admin-ish words and no fourth: <b>Organization admin</b> (the org), <b>Owner</b> (a company), <b>Admin</b> (the area). The platform operator's <code>User.role = "admin"</code> is never shown.</div>
+
+<h2>Where each lives in the data</h2>
+<table>
+<tr><th>Word</th><th>Prisma</th><th>Note</th></tr>
+<tr><td>Company / Personal</td><td><code>Workspace.kind</code> = <code>team</code> / <code>personal</code></td><td><code>prisma/schema.prisma</code></td></tr>
+<tr><td>Organization</td><td><code>Organization</code>; <code>Workspace.organizationId</code> nullable</td><td>ADR 0002: the column grants nothing</td></tr>
+<tr><td>Role</td><td><code>WorkspaceMember.role</code></td><td>the only access grant</td></tr>
+<tr><td>Organization admin</td><td><code>OrganizationMember.role</code>, always <code>"admin"</code></td><td>written only by <code>createOrganization</code></td></tr>
+</table>
+<footer>Back to <a href="../lessons/0001-four-words.html">Lesson 1</a>.</footer>
+</main></body></html>

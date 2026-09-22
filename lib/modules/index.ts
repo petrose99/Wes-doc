@@ -43,19 +43,24 @@ export const MODULES: ModuleDefinition[] = [
   { key: "assistant", name: "AI Assistant", description: "Ask questions and take actions across your workspace.", industry: "core", tier: "always", activation: "enable" },
   { key: "reports", name: "Reports", description: "Draft and export reports from extracted data.", industry: "core", tier: "always", activation: "enable" },
 
-  { key: "review-queue", name: "Review queue", description: "Triage incoming documents that need a person to look at them.", industry: "finance", tier: "always", activation: "enable", navItems: [{ href: "review", label: "Review", icon: "inbox" }] },
+  // #236: renamed from "Review queue" — the module still gates the same capability
+  // (createReviewTask, decideReviewTaskStage, …), but the user-facing surface is now the
+  // Approvals destination (Ready to Approve / PO Mismatches), not a standalone Review queue.
+  // navItems dropped: the sidebar hardcodes the Approvals rail entry the same way it already
+  // does for Exceptions, rather than driving it off a module nav item.
+  { key: "review-queue", name: "Approvals", description: "Route submitted invoices through approval stages, and triage documents that need a person to look at them first.", industry: "finance", tier: "always", activation: "enable" },
   // Approval workflows is workflow *configuration*, reachable from the Automation page's own tabs
   // (Approvals lives at /automation/approvals). It used to declare a sidebar navItem, which
   // produced a duplicate "Approvals" rail entry alongside Automation itself — the audit flagged
   // that as the clearest instance of the same destination being advertised twice.
   { key: "approval-workflows", name: "Approval workflows", description: "Route a document through multiple approval stages before it's marked approved.", industry: "finance", tier: "always", activation: "enable" },
-  { key: "supplier-rules", name: "Supplier rules", description: "Auto-code recurring suppliers and, optionally, auto-publish them.", industry: "finance", tier: "always", activation: "enable", navItems: [{ href: "settings/rules", label: "Rules", icon: "workflow" }] },
+  { key: "supplier-rules", name: "Supplier rules", description: "Auto-code recurring suppliers and, optionally, auto-publish them.", industry: "finance", tier: "always", activation: "enable", navItems: [{ href: "admin/suppliers", label: "Suppliers", icon: "workflow" }] },
   { key: "document-checks", name: "Document checks", description: "Deterministic duplicate, arithmetic, tax, and gap checks on every document.", industry: "finance", tier: "always", activation: "enable" },
   // Renamed from "tax-profiles" (#49) — the module now surfaces the workspace jurisdiction picker;
   // rate snapshots keep their existing TaxProfileVersion behaviour (rates stay retroactive; rule
   // packs read live from lib/jurisdictions/<code>/). Existing WorkspaceModule rows are re-keyed
   // by the 20260911100000_add_workspace_jurisdiction migration.
-  { key: "jurisdiction", name: "Jurisdiction", description: "The workspace's tax jurisdiction, rate snapshots, and rule pack — required for AP inbound.", industry: "finance", tier: "always", activation: "enable", navItems: [{ href: "settings/tax", label: "Jurisdiction", icon: "landmark" }] },
+  { key: "jurisdiction", name: "Tax", description: "The company's tax jurisdiction, rate snapshots, and rule pack — required before email intake accepts an invoice.", industry: "finance", tier: "always", activation: "enable", navItems: [{ href: "admin/configuration/tax", label: "Tax", icon: "landmark" }] },
   { key: "accounting-push", name: "Accounting push", description: "Push invoices, receipts, and expenses to QuickBooks or Xero.", industry: "finance", tier: "always", activation: "enable", requiresConfig: "integrations", pushableTemplateCodes: ["invoice", "receipt", "expense_receipt", "bank_statement"] },
   { key: "finance-agent", name: "Finance agent", description: "An AI assistant with finance-specific tools: coding, rules, and pushes.", industry: "finance", tier: "always", activation: "enable" },
   { key: "statement-packs", name: "Statement packs", description: "Bank statements, purchase orders, remittance advice, and supplier statements.", industry: "finance", tier: "always", activation: "enable", domainPack: "finance", optionalTemplateCodes: ["bank_statement", "purchase_order", "remittance_advice", "supplier_statement"] },

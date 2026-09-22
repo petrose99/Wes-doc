@@ -1,0 +1,232 @@
+[
+  {
+    "name": "01-invoices-queue",
+    "url": "/workspaces/af91555d-7450-4b21-a8ac-73db092617c8/invoices",
+    "h1": "Invoices17",
+    "note": "Invoices queue, Open view"
+  },
+  {
+    "name": "02-invoices-closed",
+    "url": "/workspaces/af91555d-7450-4b21-a8ac-73db092617c8/invoices?status=closed",
+    "h1": "Invoices17",
+    "note": "Closed facet"
+  },
+  {
+    "name": "03-detail-pane-details",
+    "url": "/workspaces/af91555d-7450-4b21-a8ac-73db092617c8/invoices/10a4d716-56d4-4311-b322-7297262996d3",
+    "h1": "Invoices17",
+    "note": "Detail pane, Details tab, PO-backed invoice with line mismatch"
+  },
+  {
+    "name": "05-match-manually",
+    "url": "/workspaces/af91555d-7450-4b21-a8ac-73db092617c8/invoices/10a4d716-56d4-4311-b322-7297262996d3",
+    "h1": "Invoices17",
+    "note": "Match manually mode on the invoice lines"
+  },
+  {
+    "name": "06-checks-tab",
+    "url": "/workspaces/af91555d-7450-4b21-a8ac-73db092617c8/invoices/10a4d716-56d4-4311-b322-7297262996d3",
+    "h1": "Invoices17",
+    "note": "Checks tab on the Detail pane"
+  },
+  {
+    "name": "07-queue-options-menu",
+    "url": "/workspaces/af91555d-7450-4b21-a8ac-73db092617c8/invoices/10a4d716-56d4-4311-b322-7297262996d3",
+    "h1": "Invoices17",
+    "note": "Queue ⋯ menu with Turn on Override Mode"
+  },
+  {
+    "name": "08-override-mode-on",
+    "url": "/workspaces/af91555d-7450-4b21-a8ac-73db092617c8/invoices/10a4d716-56d4-4311-b322-7297262996d3",
+    "h1": "Invoices17",
+    "note": "Override Mode on: banner + Override… on overridable checks"
+  },
+  {
+    "name": "06",
+    "error": "locator.click: Timeout 30000ms exceeded."
+  },
+  {
+    "name": "10-approval-tab",
+    "url": "/workspaces/af91555d-7450-4b21-a8ac-73db092617c8/invoices/8c1421f0-6caf-4095-82f9-132f852711f2",
+    "h1": "Invoices17",
+    "note": "Approval tab, approved invoice (approval chain)"
+  },
+  {
+    "name": "11-audit-tab",
+    "url": "/workspaces/af91555d-7450-4b21-a8ac-73db092617c8/invoices/8c1421f0-6caf-4095-82f9-132f852711f2",
+    "h1": "Invoices17",
+    "note": "Audit trail tab"
+  },
+  {
+    "name": "12-pane-overflow-menu",
+    "url": "/workspaces/af91555d-7450-4b21-a8ac-73db092617c8/invoices/8c1421f0-6caf-4095-82f9-132f852711f2",
+    "h1": "Invoices17",
+    "note": "Pane overflow: Archive / Cancel / Delete / Add to claim"
+  },
+  {
+    "name": "13-suggested-po",
+    "url": "/workspaces/af91555d-7450-4b21-a8ac-73db092617c8/invoices/f8aae653-d6f2-497d-90a9-7e2d62dc6356",
+    "h1": "Invoices17",
+    "note": "Likely PO chip awaiting confirmation"
+  },
+  {
+    "name": "14-invoices-bulk-bar",
+    "url": "/workspaces/af91555d-7450-4b21-a8ac-73db092617c8/invoices",
+    "h1": "Invoices17",
+    "note": "Bulk bar actions on selected invoices"
+  },
+  {
+    "name": "15-purchase-orders-queue",
+    "url": "/workspaces/af91555d-7450-4b21-a8ac-73db092617c8/purchase-orders",
+    "h1": "Purchase Orders4",
+    "note": ""
+  },
+  {
+    "name": "16-po-pane-consumption",
+    "url": "/workspaces/af91555d-7450-4b21-a8ac-73db092617c8/purchase-orders/9ccd3d76-5325-44b7-8a9a-89650a297874",
+    "h1": "Purchase Orders4",
+    "note": "PO pane with cumulative invoiced-against-ordered"
+  },
+  {
+    "name": "17-receipts-queue",
+    "url": "/workspaces/af91555d-7450-4b21-a8ac-73db092617c8/receipts",
+    "h1": "Receipts16",
+    "note": ""
+  },
+  {
+    "name": "18-receipts-bulk-bar",
+    "url": "/workspaces/af91555d-7450-4b21-a8ac-73db092617c8/receipts",
+    "h1": "Receipts16",
+    "note": "Receipts bulk bar with Add to claim"
+  },
+  {
+    "name": "17",
+    "error": "locator.click: Timeout 30000ms exceeded."
+  },
+  {
+    "name": "21-bank-statements-queue",
+    "url": "/workspaces/af91555d-7450-4b21-a8ac-73db092617c8/bank-statements",
+    "h1": "Bank Statements2",
+    "note": ""
+  },
+  {
+    "name": "21",
+    "error": "page.screenshot: Timeout 30000ms exceeded."
+  },
+  {
+    "name": "23-exceptions-queue",
+    "url": "/workspaces/af91555d-7450-4b21-a8ac-73db092617c8/exceptions",
+    "h1": "Exceptions2",
+    "note": ""
+  },
+  {
+    "name": "24-exception-pane",
+    "url": "/workspaces/af91555d-7450-4b21-a8ac-73db092617c8/exceptions/aa180e4b-ebc6-4798-afe2-3425595c345f",
+    "h1": "Exceptions2",
+    "note": ""
+  },
+  {
+    "name": "25-approvals-ready-to-approve",
+    "url": "/workspaces/af91555d-7450-4b21-a8ac-73db092617c8/approvals/invoices",
+    "h1": "Ready to ApproveInvoices5",
+    "note": "Approvals › Invoices, Ready to Approve view"
+  },
+  {
+    "name": "26-approval-pane-decision-bar",
+    "url": "/workspaces/af91555d-7450-4b21-a8ac-73db092617c8/approvals/invoices/28a0bb04-e34f-4040-bf16-b48f4679b9cc",
+    "h1": "Ready to ApproveInvoices5",
+    "note": "Approval pane with Approve / Reject / Send back"
+  },
+  {
+    "name": "27-approvals-po-mismatches",
+    "url": "/workspaces/af91555d-7450-4b21-a8ac-73db092617c8/approvals/po-mismatches",
+    "h1": "Ready to ApprovePO Mismatches1",
+    "note": ""
+  },
+  {
+    "name": "28-approvals-expense-claims",
+    "url": "/workspaces/af91555d-7450-4b21-a8ac-73db092617c8/approvals/expense-claims",
+    "h1": "Ready to ApproveExpense claims1",
+    "note": ""
+  },
+  {
+    "name": "29-expense-claim-pane",
+    "url": "/workspaces/af91555d-7450-4b21-a8ac-73db092617c8/approvals/expense-claims/838a004d-da4e-4dd6-b5d4-7ddc6b2d5b06",
+    "h1": "Ready to ApproveExpense claims1",
+    "note": ""
+  },
+  {
+    "name": "30-bill-pay-queue",
+    "url": "/workspaces/af91555d-7450-4b21-a8ac-73db092617c8/payments/bill-pay",
+    "h1": "Bill Pay10",
+    "note": ""
+  },
+  {
+    "name": "31-bill-pay-pane",
+    "url": "/workspaces/af91555d-7450-4b21-a8ac-73db092617c8/payments/bill-pay/6cb108af-76a1-4029-82cc-9f7bdf452eef",
+    "h1": "Bill Pay10",
+    "note": ""
+  },
+  {
+    "name": "30",
+    "error": "locator.click: Timeout 30000ms exceeded."
+  },
+  {
+    "name": "35-finance",
+    "url": "/workspaces/af91555d-7450-4b21-a8ac-73db092617c8/finance",
+    "h1": "Finance",
+    "note": ""
+  },
+  {
+    "name": "36-search-empty",
+    "url": "/workspaces/af91555d-7450-4b21-a8ac-73db092617c8/search",
+    "h1": "",
+    "note": "Search before typing"
+  },
+  {
+    "name": "37-search-results",
+    "url": "/workspaces/af91555d-7450-4b21-a8ac-73db092617c8/search",
+    "h1": "",
+    "note": "Search results for 'northwind'"
+  },
+  {
+    "name": "38-library-archive",
+    "url": "/workspaces/af91555d-7450-4b21-a8ac-73db092617c8/library",
+    "h1": "Archive",
+    "note": "route /library"
+  },
+  {
+    "name": "39-activity",
+    "url": "/workspaces/af91555d-7450-4b21-a8ac-73db092617c8/activity",
+    "h1": "Activity",
+    "note": "route /activity"
+  },
+  {
+    "name": "40-health-checks",
+    "url": "/workspaces/af91555d-7450-4b21-a8ac-73db092617c8/health",
+    "h1": "Data health",
+    "note": "route /health"
+  },
+  {
+    "name": "41-close",
+    "url": "chrome-error://chromewebdata/",
+    "h1": "",
+    "note": "route /close"
+  },
+  {
+    "name": "38",
+    "error": "page.screenshot: Timeout 30000ms exceeded."
+  },
+  {
+    "name": "50",
+    "error": "page.screenshot: Timeout 30000ms exceeded."
+  },
+  {
+    "name": "70",
+    "error": "locator.click: Timeout 30000ms exceeded."
+  },
+  {
+    "name": "80",
+    "error": "page.screenshot: Timeout 30000ms exceeded."
+  }
+]

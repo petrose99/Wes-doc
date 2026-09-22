@@ -1,4 +1,4 @@
-import { Building2, ClipboardCheck, FileText, Landmark, PenLine, Plug, Receipt, ScanLine, Sheet, ShieldCheck, Users, type LucideIcon } from "lucide-react"
+import { Building2, ClipboardCheck, Landmark, Users, type LucideIcon } from "lucide-react"
 
 /** The Solutions mega-menu and the /solutions/[slug] pages read from this one list, so a new
  * solution is a single entry here rather than a page plus a nav edit that can drift apart.
@@ -6,32 +6,26 @@ import { Building2, ClipboardCheck, FileText, Landmark, PenLine, Plug, Receipt, 
  * `group` drives the menu columns:
  *  - "ap"      — WHO the AP loop is for (bookkeeper, controller, finance-ops team). The primary
  *                surface after the WP-AP2 reposition: DocuBite is AI accounts payable first.
- *  - "type"    — what a document IS (invoice, receipt, statement). Kept as proof the extraction
- *                still handles every shape a bill can arrive as, not as the lead pitch.
- *  - "quality" — what CONDITION a document arrives in (handwritten, scanned). Same as above:
- *                a "does it work on my messy files?" reassurance layer.
  */
-export type SolutionGroup = "ap" | "type" | "quality"
+export type SolutionGroup = "ap"
 
 export type Solution = {
   slug: string
   group: SolutionGroup
-  /** Menu label and page eyebrow. */
+  /** Menu label and role heading. */
   name: string
   /** The one-liner under the label in the mega-menu. */
   tagline: string
   icon: LucideIcon
   title: string
   description: string
-  /** Chips under the hero: the fields this document kind is read for. */
+  /** Chips under the hero: workflow signals relevant to this role. */
   fields: string[]
   points: { title: string; text: string }[]
 }
 
 export const SOLUTION_GROUPS: { id: SolutionGroup; label: string }[] = [
   { id: "ap", label: "For AP teams" },
-  { id: "type", label: "By document type" },
-  { id: "quality", label: "By document quality" },
 ]
 
 export const SOLUTIONS: Solution[] = [
@@ -43,7 +37,7 @@ export const SOLUTIONS: Solution[] = [
     icon: ClipboardCheck,
     title: "AP automation a controller can defend to an auditor",
     description: "Run supplier invoices through fraud checks (bank-detail freeze, split-invoice detection, suspicious resubmission), 2- and 3-way match them to the PO, route them through amount-thresholded approval stages, and push to your ledger — with a full audit trail on every step.",
-    fields: ["Vendor onboarding red flags", "Bank-detail change freeze", "3-way match discrepancies", "Amount-thresholded approvals", "QuickBooks / Xero / Bigcapital push", "SOC2-aligned audit trail"],
+    fields: ["Vendor onboarding red flags", "Bank-detail change freeze", "3-way match discrepancies", "Amount-thresholded approvals", "QuickBooks / Xero / built-in ledger", "Document-level audit trail"],
     points: [
       { title: "Fraud checks that Dext-class tools don't run", text: "A supplier's IBAN silently changing to a new account is one of the most common invoice-fraud vectors. DocuBite freezes the bill, opens a review task, and only clears once a person has looked. Split-invoice and suspicious-resubmission detection sit next to it." },
       { title: "3-way matching wired end-to-end", text: "POs, invoices and receipts match on vendor + amount + date + PO number with configurable tolerances. Discrepancies surface with the exact deltas so a controller sees what to negotiate, not just that something is off." },
@@ -73,101 +67,11 @@ export const SOLUTIONS: Solution[] = [
     icon: Building2,
     title: "AP the whole finance team can watch, not just do",
     description: "Aging cockpit that shows every bill, every aging bucket, every blocked-by-check bill in one screen. Bank-ready payment files a controller can prepare and hand to treasury without a spreadsheet in between. Everything auditable, everything measurable.",
-    fields: ["AP aging cockpit (current / 1-30 / 31-60 / 61-90 / 90+)", "Blocked-by-check filter for stuck bills", "ZA EFT / bulk-payment CSV export", "Per-supplier remittance advice", "Bank-match reconciliation once paid", "Health dashboard for AP performance"],
+    fields: ["AP aging cockpit (current / 1-30 / 31-60 / 61-90 / 90+)", "Blocked-by-check filter for stuck bills", "ZA EFT / bulk-payment CSV export", "Bank-match reconciliation once paid", "Health dashboard for AP performance"],
     points: [
       { title: "One aging view for every bill", text: "Not per-account, not per-supplier — every AP bill in the workspace, bucketed by days past due, with payment status from the ledger sync and a blocked-by-check flag on any bill that failed one of DocuBite's checks. What a CFO looks at on a Monday." },
-      { title: "Pay-ready, not pay-executing", text: "Select bills, generate a ZA EFT CSV your bank's bulk-payment portal accepts (Standard Bank, Absa, Nedbank, FNB), plus per-supplier remittance advice. Payment execution stays on your bank's rails — we keep DocuBite outside every payment license." },
+      { title: "Pay-ready, not pay-executing", text: "Select bills and generate a ZA EFT CSV your bank's bulk-payment portal accepts (Standard Bank, Absa, Nedbank, FNB). Payment execution stays on your bank's rails — we keep DocuBite outside every payment license." },
       { title: "Bank match closes the loop", text: "Once your bank pushes settled transactions back through the ledger sync, the existing bank-match pipeline ties them to the paid bills so the aging cockpit updates itself." },
-    ],
-  },
-  {
-    slug: "invoices",
-    group: "type",
-    name: "Invoices",
-    tagline: "Supplier, number, dates, line items, tax",
-    icon: FileText,
-    title: "Invoice data extraction that survives real supplier PDFs",
-    description: "Pull supplier, invoice number, dates, totals, tax and line items out of every supplier invoice — whatever layout it arrives in — and review the result before it reaches your ledger.",
-    fields: ["Supplier name", "Invoice number", "Issue date", "Due date", "Net total", "Tax amount", "Gross total", "Currency", "Line items"],
-    points: [
-      { title: "Every supplier has a different layout", text: "Templates key on what a field means, not where it sits on the page, so a new supplier does not need a new template — the same invoice template reads all of them. Repeat suppliers are recognised by shape before any AI runs — the same setup applies itself." },
-      { title: "Line items come out as rows, not a blob", text: "Repeating item tables are extracted into their own rows with description, quantity, unit price and tax, ready to export alongside the header fields." },
-      { title: "Totals are checked, not assumed", text: "Values the model was unsure about are flagged for review rather than quietly filled in, so a misread tax amount is something you correct, not something you discover in a reconciliation." },
-    ],
-  },
-  {
-    slug: "receipts",
-    group: "type",
-    name: "Receipts",
-    tagline: "Merchant, date, total, tax, line items",
-    icon: Receipt,
-    title: "Turn a shoebox of receipts into expense rows",
-    description: "Photographed till receipts, crumpled thermal paper and emailed PDFs all read into the same clean set of expense fields, ready for review and CSV export.",
-    fields: ["Merchant", "Purchase date", "Receipt number", "Total", "Tax total", "Line items", "Currency"],
-    points: [
-      { title: "Phone photos are the normal case", text: "Receipts arrive as camera snaps at an angle, in bad light, on curled thermal paper. Pages that local text extraction cannot read are sent down the vision path instead of failing." },
-      { title: "Faded thermal print still resolves", text: "Low-contrast thermal receipts are the single most common reason extraction fails elsewhere. They are handled as a first-class case, not an edge case." },
-      { title: "One row per receipt, in the shape you export", text: "Fields land in a reviewable sheet, so the handoff to your bookkeeping workflow is a CSV you already know the columns of." },
-    ],
-  },
-  {
-    slug: "expense-receipts",
-    group: "type",
-    name: "Expense receipts",
-    tagline: "Merchant, total, tax code, category, payment method",
-    icon: Receipt,
-    title: "Receipts read straight to a categorized expense feed",
-    description: "The Expense receipt worksheet reads a receipt into one row — merchant, total, tax code and payment method as printed, plus a category when the receipt itself shows one — ready to review and export without touching a line-item table first.",
-    fields: ["Merchant", "Purchase date", "Total", "Tax total", "Tax code", "Category", "Payment method", "Currency"],
-    points: [
-      { title: "One row per receipt, not a line-item table", text: "Add the Expense receipt worksheet from Settings when you want fast categorization rather than an itemized breakdown — the same Receipt worksheet with line items is still there when you need it." },
-      { title: "Category is read, never invented", text: "If the receipt itself is stamped or annotated with a category, it comes through; if not, the field is left blank rather than guessed at." },
-      { title: "Tax code is read verbatim", text: "Whatever rate label or exemption code is printed on the receipt lands in the field as printed — matching it against your configured tax rates is a review step, not something extraction assumes for you." },
-    ],
-  },
-  {
-    slug: "bank-statements",
-    group: "type",
-    name: "Bank statements",
-    tagline: "Multi-page transaction tables into rows",
-    icon: Landmark,
-    title: "Bank statement PDFs, read as transaction tables",
-    description: "Multi-page statements come back as structured transaction rows — date, description, money in, money out, running balance — with the account header captured alongside them. Add the Bank statement worksheet from Settings; it isn't seeded by default.",
-    fields: ["Account holder", "Account number", "Statement period", "Opening balance", "Closing balance", "Transaction rows"],
-    points: [
-      { title: "Tables that run across pages stay one table", text: "Statements are processed in page batches and the transaction rows are stitched back together, so a table broken by a page header does not become two half-tables." },
-      { title: "Money in and money out stay apart", text: "Debit and credit columns are extracted as distinct fields rather than one signed number, which is what makes the export usable without a second cleanup pass." },
-      { title: "Balances give you a check to run", text: "Opening and closing balances come out with the rows, so the arithmetic can be verified before anyone trusts the data." },
-    ],
-  },
-  {
-    slug: "handwritten-documents",
-    group: "quality",
-    name: "Handwritten documents",
-    tagline: "Delivery notes, forms, annotated invoices",
-    icon: PenLine,
-    title: "Handwriting that other extraction tools skip",
-    description: "Signed delivery notes, filled-in paper forms and invoices with a scribbled correction in the margin. Handwritten pages are read rather than coming back empty.",
-    fields: ["Written values", "Filled form fields", "Margin annotations", "Signatures present", "Dates", "Quantities"],
-    points: [
-      { title: "Handwriting is not a special case", text: "The parser that reads a laser-printed invoice reads a handwritten delivery note the same way, so a filled-in form does not come back as an empty page." },
-      { title: "Annotations are content, not noise", text: "A quantity crossed out and rewritten by hand is the value that matters. Extraction instructions can say so, so the corrected figure is the one that lands in the field." },
-      { title: "Low confidence is surfaced, not hidden", text: "Handwriting is where a confident wrong answer costs the most. Uncertain fields arrive flagged for a human to settle." },
-    ],
-  },
-  {
-    slug: "scanned-pdfs",
-    group: "quality",
-    name: "Scanned PDFs",
-    tagline: "Image-only PDFs, faxes, photocopies",
-    icon: ScanLine,
-    title: "Image-only PDFs with no text layer at all",
-    description: "A scanned PDF is a picture of a page in a PDF wrapper — copy and paste gets you nothing. Every page is parsed into text before any field is extracted from it.",
-    fields: ["Any template field", "Page text", "Tables", "Stamps and headers", "Multi-page documents"],
-    points: [
-      { title: "Only text reaches the model", text: "The document is parsed into text first, and that text is what gets sent on for structuring — the page image itself never reaches the AI model." },
-      { title: "Skew, speckle and photocopy grey", text: "Third-generation photocopies and fax-quality scans are what the parser is built for, so a bad scan is read rather than refused." },
-      { title: "Long documents are batched, not truncated", text: "Multi-page scans are processed in batches so a forty-page bundle comes back whole rather than stopping at whatever fitted in one request." },
     ],
   },
 ]
@@ -201,18 +105,6 @@ export const INDUSTRIES: Industry[] = [
       "Total per supplier with the assistant, click any figure to its line",
     ],
   },
-]
-
-/** The homepage's Product mega-menu, and the footer's Product column. Anchors into homepage
- * sections rather than dedicated pages — every target already exists and carries an id. */
-export type ProductLink = { href: string; name: string; tagline: string; icon: LucideIcon }
-
-export const PRODUCT_LINKS: ProductLink[] = [
-  { href: "/#extraction", name: "Document extraction", tagline: "Invoices, receipts and scans into a live sheet", icon: FileText },
-  { href: "/#how", name: "AI in the sheet", tagline: "=AI() runs on your data, without leaving the cell", icon: Sheet },
-  { href: "/#folders", name: "Folder reports", tagline: "Duplicates, gaps and what needs attention", icon: FileText },
-  { href: "/#integrations", name: "Integrations & API", tagline: "QuickBooks, Xero, and a webhook-backed REST API", icon: Plug },
-  { href: "/#security", name: "Security & compliance", tagline: "Audit trail, malware scanning", icon: ShieldCheck },
 ]
 
 export const getSolution = (slug: string) => SOLUTIONS.find((solution) => solution.slug === slug)
