@@ -7,15 +7,10 @@ vi.mock("@/lib/integration-token-refresh", () => ({ getValidAccessToken: vi.fn()
 vi.mock("@/lib/workspace-scope", () => ({ unscoped: (fn: () => unknown) => fn() }))
 vi.mock("@/lib/integrations/quickbooks/client", () => ({ listBills: vi.fn(), listExpenses: vi.fn(), listBankTransactions: vi.fn() }))
 vi.mock("@/lib/integrations/xero/client", () => ({ listBills: vi.fn(), listExpenses: vi.fn(), listBankTransactions: vi.fn() }))
-vi.mock("@/lib/integrations/bigcapital/client", () => ({
-  listBills: vi.fn().mockResolvedValue([]),
-  listExpenses: vi.fn().mockResolvedValue([]),
-  listSaleInvoices: vi.fn().mockResolvedValue([]),
-}))
 
 const { syncLedgerTransactions, syncDueLedgerConnections, resetLedgerSyncBackoff } = await import("@/lib/health/sync")
 const { prisma } = await import("@/lib/db")
-const bigcapital = await import("@/lib/integrations/bigcapital/client")
+const xero = await import("@/lib/integrations/xero/client")
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = prisma as any
@@ -34,7 +29,7 @@ describe("syncLedgerTransactions", () => {
   function stubPrisma() {
     const transactions: unknown[][] = []
     db.integrationConnection = {
-      findUniqueOrThrow: vi.fn().mockResolvedValue({ id: "conn1", workspaceId: "ws1", provider: "bigcapital", externalTenantId: "org1" }),
+      findUniqueOrThrow: vi.fn().mockResolvedValue({ id: "conn1", workspaceId: "ws1", provider: "xero", externalTenantId: "org1" }),
     }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     db.ledgerTransaction = {
@@ -62,17 +57,17 @@ describe("syncLedgerTransactions", () => {
 
   it("refuses a connection with no tenant id rather than syncing nothing under a null org", async () => {
     stubPrisma()
-    db.integrationConnection.findUniqueOrThrow.mockResolvedValue({ id: "conn1", workspaceId: "ws1", provider: "bigcapital", externalTenantId: null })
+    db.integrationConnection.findUniqueOrThrow.mockResolvedValue({ id: "conn1", workspaceId: "ws1", provider: "xero", externalTenantId: null })
     await expect(syncLedgerTransactions("conn1")).rejects.toThrow("integration_connection_not_ready")
   })
 })
 
 describe("syncDueLedgerConnections", () => {
-  /** One never-synced bigcapital connection — no LedgerTransaction rows, so always "due". */
+  /** One never-synced xero connection — no LedgerTransaction rows, so always "due". */
   function stubDueConnection(listBills: ReturnType<typeof vi.fn>) {
     db.integrationConnection = {
-      findMany: vi.fn().mockResolvedValue([{ id: "conn1", provider: "bigcapital" }]),
-      findUniqueOrThrow: vi.fn().mockResolvedValue({ id: "conn1", workspaceId: "ws1", provider: "bigcapital", externalTenantId: "org1" }),
+      findMany: vi.fn().mockResolvedValue([{ id: "conn1", provider: "xero" }]),
+      findUniqueOrThrow: vi.fn().mockResolvedValue({ id: "conn1", workspaceId: "ws1", provider: "xero", externalTenantId: "org1" }),
     }
     db.ledgerTransaction = {
       groupBy: vi.fn().mockResolvedValue([]),
@@ -84,7 +79,7 @@ describe("syncDueLedgerConnections", () => {
       findMany: vi.fn().mockResolvedValue([]),
     }
     db.$transaction = vi.fn().mockResolvedValue([])
-    vi.mocked(bigcapital.listBills).mockImplementation(listBills)
+    vi.mocked(xero.listBills).mockImplementation(listBills)
   }
 
   it("holds a failed connection off instead of retrying it on the next tick", async () => {
@@ -143,8 +138,8 @@ describe("syncDueLedgerConnections", () => {
     expect(listBills).toHaveBeenCalledTimes(1)
 
     vi.useFakeTimers()
-    // BIGCAPITAL_SYNC_STALE_MS is an hour; just past it the connection is attempted again.
-    vi.setSystemTime(Date.now() + 61 * 60 * 1000)
+    // LEDGER_SYNC_STALE_MS is 24 hours; just past it the connection is attempted again.
+    vi.setSystemTime(Date.now() + 25 * 60 * 60 * 1000)
     await expect(syncDueLedgerConnections()).resolves.toBe(1)
     expect(listBills).toHaveBeenCalledTimes(2)
   })

@@ -3,15 +3,13 @@
  * should normally only move as a side effect of another transaction (paying a bill, depositing
  * funds), never posted to directly.
  *
- * Detection is name-based, not type-based: none of the three provider clients' account-list calls
- * (quickbooks.listAccounts, xero.listAccounts, bigcapital.listAccounts — see
- * lib/integrations/sync.ts) fetch or cache an account-type/classification field today, only
- * id/name/active (AccountingEntity has nothing else to read — same gap contact-defaults-missing.ts
- * hit for vendors). A live check against a real Bigcapital instance during this phase's
- * verification confirmed real control accounts always carry one of these exact names ("Accounts
- * Payable (A/P)", "Accounts Receivable (A/R)", "Undeposited Funds", "Opening Balance Equity",
- * "Retained Earnings"), so name matching is a reasonable stand-in until the sync caches real
- * account-type data. */
+ * Detection is name-based, not type-based: neither provider client's account-list call
+ * (quickbooks.listAccounts, xero.listAccounts — see lib/integrations/sync.ts) fetches or caches an
+ * account-type/classification field today, only id/name/active (AccountingEntity has nothing else
+ * to read — same gap contact-defaults-missing.ts hit for vendors). Real control accounts
+ * consistently carry one of these exact names ("Accounts Payable (A/P)", "Accounts Receivable
+ * (A/R)", "Undeposited Funds", "Opening Balance Equity", "Retained Earnings"), so name matching is
+ * a reasonable stand-in until the sync caches real account-type data. */
 import type { CheckDefinition, CheckRunResult } from "@/lib/health/types"
 
 const CONTROL_ACCOUNT_NAME_PATTERNS = [
