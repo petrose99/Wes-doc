@@ -103,7 +103,7 @@ function AccountingConnectionCard({ workspaceId, connection, isOwner, onChanged 
         <span className="min-w-0 basis-full sm:basis-auto">
           <span className="font-medium">{PROVIDER_LABELS[connection.provider] ?? connection.provider}</span>{" "}
           <span className="text-xs text-slate-600">{connection.tenantName || connection.externalTenantId}</span>
-          {connection.status === "needs_reconnect" && <span className="ml-2 text-xs text-red-600">needs reconnect</span>}
+          {connection.status === "needs_reconnect" && <span className="ml-2 text-xs font-medium text-amber-700">needs reconnect</span>}
         </span>
         {isOwner && connection.status === "connected" && (
           <Button type="button" size="sm" variant="ghost" disabled={pending}
@@ -148,12 +148,17 @@ function AccountingConnectionCard({ workspaceId, connection, isOwner, onChanged 
           )}
         </div>
       )}
+      {isOwner && connection.status === "connected" && !connection.defaultExpenseAccountId && (
+        <p className="mt-1 text-xs font-medium text-amber-700">
+          Set a default expense account so pushed items have somewhere to post.
+        </p>
+      )}
       <ConfirmDialog
         open={disconnectOpen}
         destructive
         busy={pending}
         title={`Disconnect ${PROVIDER_LABELS[connection.provider] ?? connection.provider}?`}
-        description="New pushes to this provider will stop. Existing ledger records will not be removed."
+        description="Existing ledger records stay posted. Future pushes stop until you reconnect, and category/account mappings will be forgotten."
         confirmLabel={pending ? "Disconnecting…" : "Disconnect provider"}
         onConfirm={() => startTransition(async () => {
           const res = await disconnectIntegrationAction(workspaceId, connection.id)
