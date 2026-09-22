@@ -480,22 +480,30 @@ while [ "$n" -lt "$MAX" ]; do
     printf -- '- `impeccable <sub-command>` (`shape`, `layout`, `typeset`, `clarify`, `polish`, `critique`, `audit`, `adapt`, …) → `%s/.claude/skills/impeccable/reference/<name>.md`\n- craft floor → `%s/.claude/skills/impeccable/reference/craft-floor.md` (read whole before the first UI edit)\n' "$ROOT" "$ROOT"
     printf -- '- Detector: `impeccable detect --json <targets>` (CLI) and the in-page `detect.js` overlay — see the area primer.\n'
   }
-  # Prompt-cache order: everything identical across tickets and phases first
-  # (core, protocol, brief, skill table), then the phase brief (identical
-  # across sessions of one phase), and the ticket-specific text (arguments,
-  # paths, continuation note) last. The cache is a prefix match, so a new
-  # ticket then re-writes only the tail (~1–2K) instead of everything after
-  # the first differing byte (~20K on #287's phase change, 2026-09-19).
+  # Prompt-cache order — three tiers, each frozen for as long as it can be:
+  #   1. identical across every ticket and phase: core, brief, skill table;
+  #   2. identical across sessions of one ticket kind and phase: the protocol
+  #      variant (the 2K digest for a phased session, the full skill body for
+  #      a single one) and the phase brief;
+  #   3. per-run: ARGUMENTS, paths, continuation note — only under "This run".
+  # The cache is a prefix match, so a tier-1 byte is served from cache for
+  # every session on the map, and a tier-2 byte for every session of that
+  # kind. The protocol variant used to sit at tier 1 (line ~55), so a phased
+  # and a single session shared only core.md and re-paid the brief and skill
+  # table (~170 lines) on every switch between kinds (2026-09-22); now they
+  # share everything up to the phase brief. Nothing per-run may appear above
+  # "## This run": ticket, lane, branch, dates, hand-off state all live there.
   { if [ "${PROMPT_MODE:-slash}" = bare ]; then cat "$AP/core.md"; printf '\n\n---\n\n'; fi
+    cat "$BRIEF"
+    [ "${PROMPT_MODE:-slash}" = bare ] && skill_table
     # Load diet (2026-09-20): a phased session (spec/build/measure/close) gets
     # the 2K protocol digest, not the 12K skill body — it charts nothing.
     if [ "${PROMPT_MODE:-slash}" = system ] || [ "${PROMPT_MODE:-slash}" = bare ]; then
-      if [ -n "$PHASE" ] && [ -f "$AP/protocol-phased.md" ]; then cat "$AP/protocol-phased.md"; printf '\n\n---\n\n'
-      else printf '# Wayfinder protocol (the /wayfinder skill, loaded by the driver)\n\n'; awk 'f{print} /^---$/{c++; if(c==2)f=1}' "$ROOT/.claude/skills/wayfinder/SKILL.md"; printf '\n\n(ARGUMENTS — the map and ticket — are given under "This run" at the end of this prompt.)\n\n---\n\n'; fi
+      printf '\n\n---\n\n'
+      if [ -n "$PHASE" ] && [ -f "$AP/protocol-phased.md" ]; then cat "$AP/protocol-phased.md"
+      else printf '# Wayfinder protocol (the /wayfinder skill, loaded by the driver)\n\n'; awk 'f{print} /^---$/{c++; if(c==2)f=1}' "$ROOT/.claude/skills/wayfinder/SKILL.md"; printf '\n\n(ARGUMENTS — the map and ticket — are given under "This run" at the end of this prompt.)'; fi
     fi
-    cat "$BRIEF"
-    [ "${PROMPT_MODE:-slash}" = bare ] && skill_table
-    [ -f "$PHASE_BRIEF" ] && { printf '\n\n'; cat "$PHASE_BRIEF"; }
+    [ -f "$PHASE_BRIEF" ] && { printf '\n\n---\n\n'; cat "$PHASE_BRIEF"; }
     printf '\n\n## This run\n\nARGUMENTS: %s %s (map #%s, ticket #%s)\n\n- Repository: `%s` (branch `%s`)\n- Generic lessons (every project): `%s`\n- Project lessons (this repo): `%s`\n- Report: `%s/%s.md`\n- Hand-off file (keep it current at every milestone): `%s/%s.handoff.md`\n- Scratch folder for captures and the filled preflight: `%s/scratch-%s/`\n- Report template: `%s/report.md` · project rules: `%s/CLAUDE.md`, `%s/CONTEXT.md`\n\n%s\n' "$MAP" "$T" "$MAP" "$T" "$WT" "$(git -C "$WT" rev-parse --abbrev-ref HEAD 2>/dev/null)" "$GENERIC_LESSONS" "$PROJECT_LESSONS" "$TOUT" "$T" "$TOUT" "$T" "$LOGS" "$T" "$AP" "$WT" "$WT" "$CONT"; } > "$RUN_BRIEF"
   # Memory: the whole session (claude + dev server + headless browser + node
   # workers) runs inside one cgroup scope with a hard ceiling, so the kernel
