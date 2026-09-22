@@ -326,5 +326,25 @@
   });
   fetchShot(0); shots[0].addEventListener("load", pump, { once: true }); shots[0].addEventListener("error", pump, { once: true });
   render();
+  // ?debug — an on-screen readout of what this browser did, for when "the frame is empty" cannot
+  // be reproduced from the server side. Nothing is sent anywhere.
+  if (/[?&]debug\b/.test(location.search)) {
+    const errors = [];
+    addEventListener("error", (e) => errors.push((e.message || String(e)) + (e.filename ? " @" + e.lineno : "")));
+    shots.forEach((im, n) => im.addEventListener("error", () => errors.push("img " + (n + 1) + " failed: " + im.src)));
+    const box = document.createElement("pre");
+    box.style.cssText = "position:fixed;left:0;right:0;bottom:0;z-index:99;max-height:45vh;overflow:auto;margin:0;padding:8px;background:#000;color:#0f0;font:11px/1.35 monospace;white-space:pre-wrap;word-break:break-all";
+    document.body.appendChild(box);
+    const t0 = performance.now();
+    setInterval(() => {
+      box.textContent = [
+        "t=" + ((performance.now() - t0) / 1000).toFixed(1) + "s  step " + (i + 1) + "  viewport " + innerWidth + "x" + innerHeight + (narrow ? " (phone variant)" : " (desktop variant)"),
+        "UA " + navigator.userAgent,
+        "online " + navigator.onLine + "  webp-css " + CSS.supports("background-image", "url(data:image/webp;base64,)") + "  fonts " + document.fonts.status,
+        ...shots.map((im, n) => (n + 1) + " " + (im.classList.contains("on") ? "ON " : im.classList.contains("was") ? "was" : "   ") + " src=" + (im.getAttribute("src") || "-").split("/").pop() + " complete=" + im.complete + " natural=" + im.naturalWidth + "x" + im.naturalHeight + " opacity=" + getComputedStyle(im).opacity + " box=" + Math.round(im.getBoundingClientRect().width) + "x" + Math.round(im.getBoundingClientRect().height)),
+        "errors: " + (errors.length ? errors.join(" | ") : "none"),
+      ].join("\n");
+    }, 500);
+  }
 </script>
 </body></html>
