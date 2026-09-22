@@ -231,7 +231,7 @@ function ProviderConnectTile({ workspaceId, provider, onConnected }: {
   onConnected: () => void
 }) {
   const label = PROVIDER_LABELS[provider] ?? provider
-  const [phase, setPhase] = useState<"idle" | "connecting" | "popup-blocked" | "error">("idle")
+  const [phase, setPhase] = useState<"idle" | "connecting" | "popup-blocked" | "error" | "delayed">("idle")
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   const connect = async () => {
@@ -253,6 +253,11 @@ function ProviderConnectTile({ workspaceId, provider, onConnected }: {
       // connection shows as connected, so keep the "connecting" label and let the refresh catch it.
       onConnected()
       setTimeout(onConnected, 1500)
+      // If the webhook never lands (dropped, slow, misconfigured), don't leave the tile stuck on
+      // "Connecting…" forever with no way out — after a longer wait, offer a manual recheck instead
+      // of silence. `onConnected`'s router.refresh() will have already unmounted/re-rendered this
+      // tile as connected by then if the webhook did land, so this only fires on the stuck path.
+      setTimeout(() => setPhase((p) => (p === "connecting" ? "delayed" : p)), 12000)
     } catch (error) {
       const type = error instanceof AuthError ? error.type : undefined
       if (type === "blocked_by_browser") {
@@ -268,11 +273,23 @@ function ProviderConnectTile({ workspaceId, provider, onConnected }: {
   }
 
   if (phase === "connecting") return <span className="mt-auto text-xs text-slate-600">Connecting…</span>
+  if (phase === "delayed") {
+    // The provider round-trip finished but the AUTH webhook hasn't landed after a while — give the
+    // owner a way out instead of leaving "Connecting…" up forever with no escape (H1/H9).
+    return (
+      <span className="mt-auto flex flex-col gap-1">
+        <span className="text-xs text-slate-600">Still finishing up — this can take a minute.</span>
+        <Button type="button" variant="link" size="sm" className="h-auto justify-start p-0 text-emerald-700" onClick={onConnected}>
+          Check again
+        </Button>
+      </span>
+    )
+  }
   if (phase === "popup-blocked") {
     return (
       <span className="mt-auto flex flex-col gap-1">
         <span className="text-xs text-red-600">Connect was blocked — allow pop-ups for this site and try again.</span>
-        <button type="button" className="text-left text-sm font-medium text-emerald-700 hover:underline" onClick={connect}>Try again</button>
+        <Button type="button" variant="link" size="sm" className="h-auto justify-start p-0 text-emerald-700" onClick={connect}>Try again</Button>
       </span>
     )
   }
@@ -280,14 +297,14 @@ function ProviderConnectTile({ workspaceId, provider, onConnected }: {
     return (
       <span className="mt-auto flex flex-col gap-1">
         <span className="text-xs text-red-600">{errorMessage}</span>
-        <button type="button" className="text-left text-sm font-medium text-emerald-700 hover:underline" onClick={connect}>Try again</button>
+        <Button type="button" variant="link" size="sm" className="h-auto justify-start p-0 text-emerald-700" onClick={connect}>Try again</Button>
       </span>
     )
   }
   return (
-    <button type="button" className="mt-auto text-left text-sm font-medium text-emerald-700 hover:underline" onClick={connect}>
+    <Button type="button" variant="link" size="sm" className="mt-auto h-auto justify-start p-0 text-emerald-700" onClick={connect}>
       Connect
-    </button>
+    </Button>
   )
 }
 
@@ -388,7 +405,7 @@ export function IntegrationsManager({
                 {PROVIDER_TILES.map(({ provider, description, live }) => (
                   <li
                     key={provider}
-                    className="flex flex-col gap-2 rounded-md border border-hairline p-4"
+                    className={`flex flex-col gap-2 rounded-md border border-hairline p-4 ${live ? "" : "opacity-60"}`}
                   >
                     <Landmark className="h-5 w-5 text-slate-500" aria-hidden />
                     <span className="font-medium">{PROVIDER_LABELS[provider]}</span>
