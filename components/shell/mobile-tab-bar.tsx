@@ -9,7 +9,7 @@ import { usePathname } from "next/navigation"
  * the workspace total); Invoices is the workspace home (CONTEXT.md) and carries no badge — it is
  * not a second waiting-on-you signal (#232 §2); Exceptions keeps the rail's badge; Account is the
  * person (#231 Q18, #252: Admin is a desktop area) and, below `md`, also the door to every other
- * queue via "Also in this workspace" (`account/page.tsx`) — Finance included, Payments excluded
+ * queue via "Also in this workspace" (`account/page.tsx`) — Accounting included, Payments excluded
  * (#251 is owner-decided on desktop only).
  *
  * Hidden on /sheet and /documents/ — those surfaces get their full viewport on a phone; users
@@ -42,7 +42,7 @@ export function MobileTabBar({ workspaceId, approvalsReadyCount = 0, openExcepti
         || (tab.label === "Approvals" && pathname.startsWith(`${base}/approvals`))
         || (tab.label === "Account" && (pathname.startsWith(`${base}/settings`) || pathname.startsWith(`${base}/admin`)
           || pathname.startsWith(`${base}/purchase-orders`) || pathname.startsWith(`${base}/receipts`) || pathname.startsWith(`${base}/bank-statements`)
-          || pathname.startsWith(`${base}/library`) || pathname.startsWith(`${base}/finance`) || pathname.startsWith(`${base}/payments`)))
+          || pathname.startsWith(`${base}/library`) || pathname.startsWith(`${base}/accounting`) || pathname.startsWith(`${base}/payments`)))
         || (tab.label === "Invoices" && (pathname.startsWith(`${base}/pipeline`) || pathname.startsWith(`${base}/documents`) || pathname.startsWith(`${base}/review`) || pathname.startsWith(`${base}/bills`)))
       // Same cap as the rail badge: three digits of "99+" reads; four digits of a real count does not.
       const badge = tab.badge == null ? null : tab.badge > 99 ? "99+" : String(tab.badge)

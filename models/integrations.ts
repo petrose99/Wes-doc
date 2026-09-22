@@ -269,6 +269,22 @@ export async function setWorkspaceIntegrationDefaultAccount(
   if (!res.count) throw new Error("integration_connection_not_found")
 }
 
+/** Sage has no `connection_config` tenant field (ADR 0005): the AUTH webhook creates its row with
+ * `externalTenantId: null`, and the connect flow's own in-page "Choose a business" step (a
+ * `GET /businesses` proxy call, listBusinesses in lib/integrations/sage/client.ts) fills it in
+ * here once the owner picks one. */
+export async function setWorkspaceIntegrationTenant(
+  workspaceId: string,
+  connectionId: string,
+  tenant: { externalTenantId: string; tenantName: string }
+) {
+  const res = await prisma.integrationConnection.updateMany({
+    where: { id: connectionId, workspaceId, provider: "sage" },
+    data: { externalTenantId: tenant.externalTenantId, tenantName: tenant.tenantName },
+  })
+  if (!res.count) throw new Error("integration_connection_not_found")
+}
+
 /** Disconnects (deletes) a connection: Nango-side revocation is the caller's job (lib/nango.ts's
  * deleteConnection) before this runs. Per ADR 0005 its IntegrationPush/LedgerTransaction rows keep
  * their `connectionId` as a nullable, now-dangling FK (onDelete: SetNull, not Cascade) — they are

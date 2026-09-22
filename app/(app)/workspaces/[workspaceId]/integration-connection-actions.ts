@@ -11,12 +11,14 @@ import { getCurrentUser } from "@/lib/auth"
 import config from "@/lib/config"
 import { listExpenseAccounts as listQuickbooksAccounts } from "@/lib/integrations/quickbooks/client"
 import { listExpenseAccounts as listXeroAccounts } from "@/lib/integrations/xero/client"
+import { listBusinesses as listSageBusinesses } from "@/lib/integrations/sage/client"
 import { syncAccountingEntities } from "@/lib/integrations/sync"
 import { syncLedgerTransactions } from "@/lib/health/sync"
 import {
   deleteWorkspaceIntegrationConnection,
   listWorkspaceIntegrationConnections,
   setWorkspaceIntegrationDefaultAccount,
+  setWorkspaceIntegrationTenant,
   workspaceIntegrationsPlanEnabled,
 } from "@/models/integrations"
 import { prisma } from "@/lib/db"
@@ -111,6 +113,36 @@ export async function syncLedgerTransactionsAction(workspaceId: string, connecti
     return { success: true, data: { synced } }
   } catch (error) {
     return { success: false, error: errorMessage(error, "Could not sync ledger transactions") }
+  }
+}
+
+/** Sage's own in-page "Choose a business" step, right after auth (ADR 0005): Sage's OAuth grant
+ * isn't scoped to one business, so unlike QuickBooks/Xero's `connection_config` tenant, the pick
+ * happens here rather than off the AUTH webhook. An empty list is a named dead end, not an error —
+ * the caller renders "create one in Sage first" rather than a retry. */
+export async function listSageBusinessesAction(workspaceId: string, connectionId: string): Promise<ActionState<{ id: string; name: string }[]>> {
+  const gate = await guardIntegrations(workspaceId)
+  if ("error" in gate) return { success: false, error: errorMessage(new Error(gate.error), NO_ACCESS) }
+  try {
+    const connection = await prisma.integrationConnection.findFirst({ where: { id: connectionId, workspaceId, provider: "sage" }, select: { id: true } })
+    if (!connection) return { success: false, error: "That connection no longer exists" }
+    const businesses = await listSageBusinesses(connectionId)
+    return { success: true, data: businesses }
+  } catch (error) {
+    return { success: false, error: errorMessage(error, "Could not load Sage businesses") }
+  }
+}
+
+export async function confirmSageBusinessAction(workspaceId: string, connectionId: string, businessId: string, businessName: string): Promise<ActionState> {
+  const gate = await guardIntegrations(workspaceId)
+  if ("error" in gate) return { success: false, error: errorMessage(new Error(gate.error), NO_ACCESS) }
+  try {
+    await setWorkspaceIntegrationTenant(workspaceId, connectionId, { externalTenantId: businessId, tenantName: businessName })
+    await recordDocumentAudit({ workspaceId, actorId: gate.userId, type: "integration_tenant_selected", detail: { connectionId, businessId } })
+    revalidatePath(paths(workspaceId).integrations)
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: errorMessage(error, "Could not confirm the business") }
   }
 }
 

@@ -33,6 +33,7 @@
     "@langchain/core": "^1.2.3",
     "@langchain/google-genai": "^2.2.0",
     "@langchain/openai": "^1.5.5",
+    "@nangohq/frontend": "^0.71.10",
     "@premieroctet/next-admin": "^8.4.2",
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
