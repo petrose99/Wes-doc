@@ -116,7 +116,7 @@ export async function describePushToAccounting(workspaceId: string, documentId: 
   // be proposed as one. Every provider gets an explicit label (PROVIDER_LABELS, matching push-to-
   // accounting-card.tsx) rather than assuming which one is active.
   const connection = await prisma.integrationConnection.findFirst({
-    where: { workspaceId, status: "active", defaultExpenseAccountId: { not: null } },
+    where: { workspaceId, status: "connected", defaultExpenseAccountId: { not: null } },
     orderBy: { createdAt: "asc" },
     select: { id: true, provider: true },
   })

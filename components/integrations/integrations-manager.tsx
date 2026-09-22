@@ -82,9 +82,9 @@ function AccountingConnectionCard({ workspaceId, connection, isOwner, onChanged 
         <span className="min-w-0 basis-full sm:basis-auto">
           <span className="font-medium">{PROVIDER_LABELS[connection.provider] ?? connection.provider}</span>{" "}
           <span className="text-xs text-slate-600">{connection.tenantName || connection.externalTenantId}</span>
-          {connection.status === "needs_reauth" && <span className="ml-2 text-xs text-red-600">needs reconnect</span>}
+          {connection.status === "needs_reconnect" && <span className="ml-2 text-xs text-red-600">needs reconnect</span>}
         </span>
-        {isOwner && connection.status === "active" && (
+        {isOwner && connection.status === "connected" && (
           <Button type="button" size="sm" variant="ghost" disabled={pending}
             onClick={() => startTransition(async () => {
               const res = await syncAccountingEntitiesAction(workspaceId, connection.id)
@@ -101,12 +101,12 @@ function AccountingConnectionCard({ workspaceId, connection, isOwner, onChanged 
           </Button>
         )}
       </div>
-      {isOwner && connection.status === "active" && (
+      {isOwner && connection.status === "connected" && (
         <p className={connection.lastSyncedAt ? "mt-1 text-xs text-slate-600" : "mt-1 text-xs font-medium text-slate-700"}>
           {connection.lastSyncedAt ? `Accounts last synced ${connection.lastSyncedAt.toLocaleString()}` : "Accounts not yet synced"}
         </p>
       )}
-      {isOwner && connection.status === "active" && (
+      {isOwner && connection.status === "connected" && (
         <div className="mt-2 flex items-center gap-2 text-xs">
           <Label htmlFor={`account-${connection.id}`} className="shrink-0 text-slate-600">Default expense account</Label>
           {accounts === null ? (
@@ -173,7 +173,7 @@ function SecretReveal({ label, value, onDone }: { label: string; value: string; 
 }
 
 export function IntegrationsManager({
-  workspaceId, isOwner, eventTypes, apiKeys, endpoints, deliveries, accountingProviders, connections,
+  workspaceId, isOwner, eventTypes, apiKeys, endpoints, deliveries, nangoEnabled, connections,
 }: {
   workspaceId: string
   isOwner: boolean
@@ -181,7 +181,7 @@ export function IntegrationsManager({
   apiKeys: ApiKey[]
   endpoints: Endpoint[]
   deliveries: Delivery[]
-  accountingProviders: { quickbooks: boolean; xero: boolean }
+  nangoEnabled: boolean
   connections: IntegrationConnection[]
 }) {
   const router = useRouter()
@@ -205,7 +205,7 @@ export function IntegrationsManager({
     setSelectedEvents((prev) => (prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]))
 
   const connectionsByProvider = new Map(connections.map((c) => [c.provider, c]))
-  const anyProviderConfigured = accountingProviders.quickbooks || accountingProviders.xero
+  const anyProviderConfigured = nangoEnabled
   const hasAnyConnection = connections.length > 0
 
   return (
@@ -224,7 +224,6 @@ export function IntegrationsManager({
           <CardContent>
             <ul className="space-y-2 text-sm">
               {(["quickbooks", "xero"] as const)
-                .filter((provider) => accountingProviders[provider])
                 .map((provider) => {
                   const connection = connectionsByProvider.get(provider)
                   if (connection) {

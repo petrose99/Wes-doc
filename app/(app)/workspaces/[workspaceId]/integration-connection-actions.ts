@@ -9,7 +9,6 @@ import { ActionState } from "@/lib/actions"
 import { recordDocumentAudit } from "@/lib/audit"
 import { getCurrentUser } from "@/lib/auth"
 import config from "@/lib/config"
-import { getValidAccessToken, TokenRefreshError } from "@/lib/integration-token-refresh"
 import { listExpenseAccounts as listQuickbooksAccounts } from "@/lib/integrations/quickbooks/client"
 import { listExpenseAccounts as listXeroAccounts } from "@/lib/integrations/xero/client"
 import { syncAccountingEntities } from "@/lib/integrations/sync"
@@ -48,23 +47,19 @@ export async function listExpenseAccountsAction(workspaceId: string, connectionI
       select: { id: true, provider: true, externalTenantId: true },
     })
     if (!connection || !connection.externalTenantId) return { success: false, error: "That connection no longer exists" }
-    const accessToken = await getValidAccessToken(connection.id)
     let accounts: { id: string; name: string }[]
     switch (connection.provider) {
       case "quickbooks":
-        accounts = await listQuickbooksAccounts(connection.externalTenantId, accessToken)
+        accounts = await listQuickbooksAccounts(connection.externalTenantId, connection.id)
         break
       case "xero":
-        accounts = (await listXeroAccounts(connection.externalTenantId, accessToken)).map((a) => ({ id: a.code, name: a.name }))
+        accounts = (await listXeroAccounts(connection.externalTenantId, connection.id)).map((a) => ({ id: a.code, name: a.name }))
         break
       default:
         return { success: false, error: "Unsupported accounting provider" }
     }
     return { success: true, data: accounts }
   } catch (error) {
-    if (error instanceof TokenRefreshError && error.message === "integration_needs_reauth") {
-      return { success: false, error: "This connection needs to be reconnected before its accounts can be listed" }
-    }
     return { success: false, error: errorMessage(error, "Could not list expense accounts") }
   }
 }
@@ -96,9 +91,6 @@ export async function syncAccountingEntitiesAction(workspaceId: string, connecti
     revalidatePath(paths(workspaceId).integrations)
     return { success: true }
   } catch (error) {
-    if (error instanceof TokenRefreshError && error.message === "integration_needs_reauth") {
-      return { success: false, error: "This connection needs to be reconnected before it can be synced" }
-    }
     return { success: false, error: errorMessage(error, "Could not sync accounts") }
   }
 }
@@ -118,9 +110,6 @@ export async function syncLedgerTransactionsAction(workspaceId: string, connecti
     revalidatePath(`/workspaces/${workspaceId}/health`)
     return { success: true, data: { synced } }
   } catch (error) {
-    if (error instanceof TokenRefreshError && error.message === "integration_needs_reauth") {
-      return { success: false, error: "This connection needs to be reconnected before its ledger can be synced" }
-    }
     return { success: false, error: errorMessage(error, "Could not sync ledger transactions") }
   }
 }

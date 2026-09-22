@@ -145,7 +145,7 @@ export async function syncDueLedgerConnections(): Promise<number> {
   // lib/workspace-scope.ts's own documented exception for background workers that claim jobs
   // across all tenants.
   const connections = await unscoped(() => prisma.integrationConnection.findMany({
-    where: { status: "active" },
+    where: { status: "connected" },
     select: { id: true, provider: true },
   }))
   if (!connections.length) return 0

@@ -179,9 +179,8 @@ export async function getDocumentForApi(workspaceId: string, documentId: string)
 
 // --- Accounting connectors (P2): QuickBooks / Xero ---
 
-/** Never selects accessTokenEnc/refreshTokenEnc — write-only outside the push/refresh internals
- * (lib/integration-token-refresh.ts, lib/integration-push.ts), which read them straight off Prisma
- * rather than through this list helper. */
+/** ADR 0005: no access/refresh token ever lives in this table — Nango holds them. Every column here
+ * is safe to select and return as-is. */
 export async function listWorkspaceIntegrationConnections(workspaceId: string) {
   return prisma.integrationConnection.findMany({
     where: { workspaceId },

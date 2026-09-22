@@ -59,7 +59,7 @@ export default async function HealthPage({ params, searchParams }: {
   if (!capabilities.has("data-health")) notFound()
 
   const activeCheck = findCheck(checkParam)
-  const activeConnection = await prisma.integrationConnection.findFirst({ where: { workspaceId, status: "active" }, select: { id: true }, orderBy: { createdAt: "asc" } })
+  const activeConnection = await prisma.integrationConnection.findFirst({ where: { workspaceId, status: "connected" }, select: { id: true }, orderBy: { createdAt: "asc" } })
 
   return <main className="mx-auto w-full max-w-6xl space-y-6 p-6">
     <header className="flex items-start justify-between gap-4">
