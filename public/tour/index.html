@@ -1,4 +1,11 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex">
+<link rel="preload" as="image" href="shots/01-intake.png" fetchpriority="high">
+<link rel="preload" as="image" href="shots/02-invoices.png">
+<link rel="preload" as="image" href="shots/03-review.png">
+<link rel="preload" as="image" href="shots/04-exceptions.png">
+<link rel="preload" as="image" href="shots/05-approvals.png">
+<link rel="preload" as="image" href="shots/06-payments.png">
+<link rel="preload" as="image" href="shots/07-close.png">
 <title>DocuBite Walkthrough</title>
 <style>
   @font-face { font-family: "Inter"; font-weight: 400; src: url("/fonts/Inter/Inter-Regular.otf") format("opentype"); font-display: swap; }
@@ -63,10 +70,11 @@
   .frame .chrome i { width: 9px; height: 9px; border-radius: 50%; background: var(--line); display: block; }
   .shot { position: relative; aspect-ratio: 1440 / 900; border-radius: 6px; overflow: hidden; background: #fff; max-width: 100%; }
   @supports not (aspect-ratio: 1 / 1) { .shot::before { content: ""; display: block; padding-top: 62.5%; } }
-  .shot img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; opacity: 1; transition: opacity .35s ease; }
-  .shot img.swap { opacity: 0; }
+  .shot img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; opacity: 0; transition: opacity .2s ease; }
+  .shot img.was { opacity: 1; z-index: 1; }
+  .shot img.on { opacity: 1; z-index: 2; transition: none; }
   .spot {
-    position: absolute; border-radius: 8px; pointer-events: none;
+    position: absolute; z-index: 3; border-radius: 8px; pointer-events: none;
     box-shadow: 0 0 0 2px var(--ring), 0 0 0 9999px var(--dim);
     transition: left .55s cubic-bezier(.16,1,.3,1), top .55s cubic-bezier(.16,1,.3,1),
                 width .55s cubic-bezier(.16,1,.3,1), height .55s cubic-bezier(.16,1,.3,1), opacity .3s ease;
@@ -79,7 +87,7 @@
   .stage.end .spot { opacity: 0; }
 
   .card {
-    position: absolute; z-index: 2; width: min(380px, calc(100% - 24px));
+    position: absolute; z-index: 4; width: min(380px, calc(100% - 24px));
     background: var(--card); color: var(--ink); border-radius: 12px; padding: 16px 18px;
     box-shadow: var(--shadow); border: 1px solid var(--line);
     transition: left .55s cubic-bezier(.16,1,.3,1), top .55s cubic-bezier(.16,1,.3,1), opacity .3s ease;
@@ -89,7 +97,7 @@
   .card .tag { display: inline-block; margin-bottom: 8px; font-size: 11.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
 
   .end-card {
-    position: absolute; inset: 0; z-index: 3; display: none; align-items: center; justify-content: center; padding: 24px;
+    position: absolute; inset: 0; z-index: 5; display: none; align-items: center; justify-content: center; padding: 24px;
     background: var(--dim);
   }
   .stage.end .end-card { display: flex; }
@@ -148,7 +156,13 @@
     <div class="frame">
       <div class="chrome" aria-hidden="true"><i></i><i></i><i></i></div>
       <div class="shot">
-        <img id="shot" src="shots/01-intake.png" alt="" width="1440" height="900" decoding="async">
+        <img class="on" src="shots/01-intake.png" alt="" width="1440" height="900" fetchpriority="high">
+        <img src="shots/02-invoices.png" alt="" width="1440" height="900" loading="eager" decoding="async">
+        <img src="shots/03-review.png" alt="" width="1440" height="900" loading="eager" decoding="async">
+        <img src="shots/04-exceptions.png" alt="" width="1440" height="900" loading="eager" decoding="async">
+        <img src="shots/05-approvals.png" alt="" width="1440" height="900" loading="eager" decoding="async">
+        <img src="shots/06-payments.png" alt="" width="1440" height="900" loading="eager" decoding="async">
+        <img src="shots/07-close.png" alt="" width="1440" height="900" loading="eager" decoding="async">
         <div class="spot" id="spot"></div>
         <div class="card" id="card" role="region" aria-live="polite">
           <span class="tag" id="cardTag"></span>
@@ -225,7 +239,8 @@
   ];
 
   const $ = (id) => document.getElementById(id);
-  const stage = $("stage"), shot = $("shot"), spot = $("spot"), card = $("card");
+  const stage = $("stage"), spot = $("spot"), card = $("card");
+  const shots = Array.from(document.querySelectorAll(".shot img"));
   const dots = $("dots");
   let i = 0;
   let loadToken = 0;
@@ -265,18 +280,21 @@
       ' <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 3 5 5-5 5"/></svg>');
     if (end) return;
     const s = steps[i];
-    if (shot.getAttribute("src") !== s.img) {
-      // Swap directly and fade in on the element's own load event; a token guards against an
-      // earlier, slower load finishing after a later step was chosen.
+    const next = shots[i];
+    if (!next.classList.contains("on")) {
+      // Every screenshot is already in the DOM: switching is a class toggle, not a load. The
+      // outgoing shot stays underneath until the incoming one has decoded, so the frame is
+      // never blank; a token guards against a slow load finishing after a later step was chosen.
       const token = ++loadToken;
-      shot.classList.add("swap");
-      shot.src = s.img;
-      const reveal = () => { if (token === loadToken) shot.classList.remove("swap"); };
-      if (shot.complete && shot.naturalWidth) reveal();
-      else { shot.onload = reveal; shot.onerror = reveal; }
-      setTimeout(reveal, 4000); // never leave the frame blank on a stalled connection
+      const prev = shots.find((im) => im.classList.contains("on"));
+      shots.forEach((im) => im.classList.remove("on", "was"));
+      if (prev) prev.classList.add("was");
+      next.classList.add("on");
+      const settle = () => { if (token === loadToken && prev) prev.classList.remove("was"); };
+      if (next.complete && next.naturalWidth) settle();
+      else { next.onload = settle; next.onerror = settle; setTimeout(settle, 4000); }
     }
-    shot.alt = `DocuBite screen: ${s.title}`;
+    shots.forEach((im, n) => { im.alt = n === i ? `DocuBite screen: ${s.title}` : ""; });
     Object.assign(spot.style, { left: s.spot.l + "%", top: s.spot.t + "%", width: s.spot.w + "%", height: s.spot.h + "%" });
     $("cardTag").textContent = s.tag; $("cardTitle").textContent = s.title; $("cardBody").textContent = s.body;
     $("mTag").textContent = s.tag; $("mTitle").textContent = s.title; $("mBody").textContent = s.body;
@@ -290,8 +308,6 @@
     if (e.key === "ArrowRight") { e.preventDefault(); go(i >= total ? 0 : i + 1); }
     if (e.key === "ArrowLeft") { e.preventDefault(); go(i - 1); }
   });
-  // Preload the rest so steps don't flash.
-  steps.slice(1).forEach((s) => { const im = new Image(); im.src = s.img; });
   render();
 </script>
 </body></html>
