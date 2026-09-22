@@ -19,7 +19,7 @@ import {
   setDefaultExpenseAccountAction,
   syncAccountingEntitiesAction,
 } from "@/app/(app)/workspaces/[workspaceId]/integration-connection-actions"
-import { Check, Copy } from "lucide-react"
+import { Check, Copy, Landmark } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState, useTransition } from "react"
 import { toast } from "sonner"
@@ -41,7 +41,12 @@ type IntegrationConnection = {
 
 // Kept in sync with lib/finance/actions.ts's copy (that module can't import client components) —
 // this is the only client-side fork; both list the same providers.
-const PROVIDER_LABELS: Record<string, string> = { quickbooks: "QuickBooks", xero: "Xero" }
+const PROVIDER_LABELS: Record<string, string> = { quickbooks: "QuickBooks", xero: "Xero", sage: "Sage" }
+const PROVIDER_TILES: { provider: string; description: string; live: boolean }[] = [
+  { provider: "quickbooks", description: "QuickBooks Online", live: true },
+  { provider: "xero", description: "Xero", live: true },
+  { provider: "sage", description: "Sage Business Cloud Accounting", live: false },
+]
 
 /** One connected-provider card: shows tenant/status, a default-expense-account picker (fetched live
  * from the provider on demand — the chart of accounts isn't cached), and Disconnect. */
@@ -222,38 +227,48 @@ export function IntegrationsManager({
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <ul className="space-y-2 text-sm">
-              {(["quickbooks", "xero"] as const)
-                .map((provider) => {
-                  const connection = connectionsByProvider.get(provider)
-                  if (connection) {
-                    return (
-                      <AccountingConnectionCard
-                        key={provider}
-                        workspaceId={workspaceId}
-                        connection={connection}
-                        isOwner={isOwner}
-                        onChanged={() => router.refresh()}
-                      />
-                    )
-                  }
-                  return (
-                    <li key={provider} className="flex items-center justify-between rounded-md border border-hairline px-3 py-2">
-                      <span className="font-medium">{PROVIDER_LABELS[provider]}</span>
-                      {isOwner ? (
+            {hasAnyConnection ? (
+              <ul className="space-y-2 text-sm">
+                {(["quickbooks", "xero"] as const)
+                  .filter((provider) => connectionsByProvider.has(provider))
+                  .map((provider) => (
+                    <AccountingConnectionCard
+                      key={provider}
+                      workspaceId={workspaceId}
+                      connection={connectionsByProvider.get(provider)!}
+                      isOwner={isOwner}
+                      onChanged={() => router.refresh()}
+                    />
+                  ))}
+              </ul>
+            ) : (
+              <ul className="grid gap-3 sm:grid-cols-3">
+                {PROVIDER_TILES.map(({ provider, description, live }) => (
+                  <li
+                    key={provider}
+                    className="flex flex-col gap-2 rounded-md border border-hairline p-4"
+                  >
+                    <Landmark className="h-5 w-5 text-slate-500" aria-hidden />
+                    <span className="font-medium">{PROVIDER_LABELS[provider]}</span>
+                    <span className="text-xs text-slate-600">{description}</span>
+                    {live ? (
+                      isOwner ? (
                         <a
-                          className="text-sm font-medium text-emerald-700 hover:underline"
+                          className="mt-auto text-sm font-medium text-emerald-700 hover:underline"
                           href={`/api/integrations/${provider}/connect?workspaceId=${workspaceId}`}
                         >
                           Connect
                         </a>
                       ) : (
-                        <span className="text-xs text-slate-600">Not connected</span>
-                      )}
-                    </li>
-                  )
-                })}
-            </ul>
+                        <span className="mt-auto text-xs text-slate-600">Not connected</span>
+                      )
+                    ) : (
+                      <span className="mt-auto text-xs text-slate-500">Coming soon</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
           </CardContent>
         </Card>
       )}
