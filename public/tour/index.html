@@ -1,11 +1,11 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex">
-<link rel="preload" as="image" href="shots/01-intake.png" fetchpriority="high">
-<link rel="preload" as="image" href="shots/02-invoices.png">
-<link rel="preload" as="image" href="shots/03-review.png">
-<link rel="preload" as="image" href="shots/04-exceptions.png">
-<link rel="preload" as="image" href="shots/05-approvals.png">
-<link rel="preload" as="image" href="shots/06-payments.png">
-<link rel="preload" as="image" href="shots/07-close.png">
+<link rel="preload" as="image" href="shots/01-intake.webp" fetchpriority="high">
+<link rel="preload" as="image" href="shots/02-invoices.webp">
+<link rel="preload" as="image" href="shots/03-review.webp">
+<link rel="preload" as="image" href="shots/04-exceptions.webp">
+<link rel="preload" as="image" href="shots/05-approvals.webp">
+<link rel="preload" as="image" href="shots/06-payments.webp">
+<link rel="preload" as="image" href="shots/07-close.webp">
 <title>DocuBite Walkthrough</title>
 <style>
   @font-face { font-family: "Inter"; font-weight: 400; src: url("/fonts/Inter/Inter-Regular.otf") format("opentype"); font-display: swap; }
@@ -156,13 +156,13 @@
     <div class="frame">
       <div class="chrome" aria-hidden="true"><i></i><i></i><i></i></div>
       <div class="shot">
-        <img class="on" src="shots/01-intake.png" alt="" width="1440" height="900" fetchpriority="high">
-        <img src="shots/02-invoices.png" alt="" width="1440" height="900" loading="eager" decoding="async">
-        <img src="shots/03-review.png" alt="" width="1440" height="900" loading="eager" decoding="async">
-        <img src="shots/04-exceptions.png" alt="" width="1440" height="900" loading="eager" decoding="async">
-        <img src="shots/05-approvals.png" alt="" width="1440" height="900" loading="eager" decoding="async">
-        <img src="shots/06-payments.png" alt="" width="1440" height="900" loading="eager" decoding="async">
-        <img src="shots/07-close.png" alt="" width="1440" height="900" loading="eager" decoding="async">
+        <img class="on" src="shots/01-intake.webp" alt="" width="1440" height="900" fetchpriority="high">
+        <img src="shots/02-invoices.webp" alt="" width="1440" height="900" loading="eager" decoding="async">
+        <img src="shots/03-review.webp" alt="" width="1440" height="900" loading="eager" decoding="async">
+        <img src="shots/04-exceptions.webp" alt="" width="1440" height="900" loading="eager" decoding="async">
+        <img src="shots/05-approvals.webp" alt="" width="1440" height="900" loading="eager" decoding="async">
+        <img src="shots/06-payments.webp" alt="" width="1440" height="900" loading="eager" decoding="async">
+        <img src="shots/07-close.webp" alt="" width="1440" height="900" loading="eager" decoding="async">
         <div class="spot" id="spot"></div>
         <div class="card" id="card" role="region" aria-live="polite">
           <span class="tag" id="cardTag"></span>
@@ -208,31 +208,31 @@
 <script>
   // Hotspots are percentages of the 1440×900 capture.
   const steps = [
-    { img: "shots/01-intake.png", tag: "1 · Intake",
+    { img: "shots/01-intake.webp", tag: "1 · Intake",
       title: "Drop the month's invoices in.",
       body: "Upload a batch, or forward them to the workspace's email address. Each file is typed on the way in — invoice, purchase order, receipt, bank statement.",
       spot: { l: 35.5, t: 36.5, w: 29, h: 14 } },
-    { img: "shots/02-invoices.png", tag: "2 · Invoices queue",
+    { img: "shots/02-invoices.webp", tag: "2 · Invoices queue",
       title: "Every invoice lands in one queue, already read.",
       body: "Supplier, number and amount are lifted off the document. A green underline means the field was read with high confidence; the state column tells you what still needs a person.",
       spot: { l: 4.5, t: 15, w: 95.2, h: 20.5 } },
-    { img: "shots/03-review.png", tag: "3 · Review",
+    { img: "shots/03-review.webp", tag: "3 · Review",
       title: "Fields sit beside the source page.",
       body: "Correct anything in place and it becomes a rule for next time. When it looks right, approve — no re-keying into a spreadsheet.",
       spot: { l: 73.5, t: 41.5, w: 26, h: 53 } },
-    { img: "shots/04-exceptions.png", tag: "4 · Checks",
+    { img: "shots/04-exceptions.webp", tag: "4 · Checks",
       title: "Checks explain themselves.",
       body: "Duplicates, line items that don't add up, missing VAT numbers — each one is a sentence, not an error code, with the invoice it belongs to.",
       spot: { l: 20.5, t: 9.5, w: 34, h: 13.5 } },
-    { img: "shots/05-approvals.png", tag: "5 · Approvals",
+    { img: "shots/05-approvals.webp", tag: "5 · Approvals",
       title: "Routed to the right person, with the variance in front of them.",
       body: "Invoice approvals, PO mismatches and expense claims each have their own queue. A PO variance shows the amount and the percentage before anyone signs.",
       spot: { l: 4.5, t: 15.9, w: 95.2, h: 6.9 } },
-    { img: "shots/06-payments.png", tag: "6 · Bill pay",
+    { img: "shots/06-payments.webp", tag: "6 · Bill pay",
       title: "What's due, by age, in Maloti.",
       body: "Open invoices are bucketed by how overdue they are. Tick the ones to pay and DocuBite builds the payment run from the account you choose.",
       spot: { l: 4.5, t: 0.4, w: 95.2, h: 7.6 } },
-    { img: "shots/07-close.png", tag: "7 · Month-end close",
+    { img: "shots/07-close.webp", tag: "7 · Month-end close",
       title: "Close the month from a checklist.",
       body: "Bank reconciliation, AP aging, accruals and the VAT workpaper are computed for the period. Sign each item off, then lock it.",
       spot: { l: 28.7, t: 27.5, w: 59, h: 42 } },
