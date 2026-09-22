@@ -14,14 +14,18 @@ import {
   setWebhookEndpointStatusAction,
 } from "@/app/(app)/workspaces/[workspaceId]/integrations-actions"
 import {
+  confirmSageBusinessAction,
   disconnectIntegrationAction,
   listExpenseAccountsAction,
+  listSageBusinessesAction,
   setDefaultExpenseAccountAction,
   syncAccountingEntitiesAction,
 } from "@/app/(app)/workspaces/[workspaceId]/integration-connection-actions"
+import { NativeSelect } from "@/components/ui/native-select"
 import { Check, Copy, Landmark } from "lucide-react"
+import Nango, { AuthError } from "@nangohq/frontend"
 import { useRouter } from "next/navigation"
-import { useState, useTransition } from "react"
+import { useEffect, useState, useTransition } from "react"
 import { toast } from "sonner"
 
 type ApiKey = { id: string; name: string; keyPrefix: string; lastUsedAt: Date | null; revokedAt: Date | null; createdAt: Date }
@@ -60,6 +64,18 @@ function AccountingConnectionCard({ workspaceId, connection, isOwner, onChanged 
   const [accounts, setAccounts] = useState<{ id: string; name: string }[] | null>(null)
   const [loadingAccounts, setLoadingAccounts] = useState(false)
   const [disconnectOpen, setDisconnectOpen] = useState(false)
+
+  // Sage's OAuth grant isn't scoped to one business (ADR 0005): the AUTH webhook creates this row
+  // with externalTenantId null, and the owner picks one here before the connection is usable —
+  // an empty account/sync UI underneath would be misleading until that pick is made.
+  if (connection.provider === "sage" && !connection.externalTenantId) {
+    return (
+      <li className="rounded-md border border-hairline px-3 py-2">
+        <span className="font-medium">{PROVIDER_LABELS[connection.provider] ?? connection.provider}</span>
+        <SageBusinessPicker workspaceId={workspaceId} connectionId={connection.id} onChosen={onChanged} />
+      </li>
+    )
+  }
 
   const loadAccounts = () => {
     setLoadingAccounts(true)
@@ -119,16 +135,16 @@ function AccountingConnectionCard({ workspaceId, connection, isOwner, onChanged 
               {connection.defaultExpenseAccountName || (loadingAccounts ? "Loading…" : "Choose account")}
             </Button>
           ) : (
-            <select
+            <NativeSelect
               id={`account-${connection.id}`}
-              className="rounded border px-2 py-1 text-xs"
+              className="h-7 w-auto py-0 text-xs"
               defaultValue={connection.defaultExpenseAccountId ?? ""}
               disabled={pending}
               onChange={(e) => onSelectAccount(e.target.value)}
             >
               <option value="" disabled>Select an account</option>
               {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-            </select>
+            </NativeSelect>
           )}
         </div>
       )}
@@ -146,6 +162,127 @@ function AccountingConnectionCard({ workspaceId, connection, isOwner, onChanged 
         })}
         onCancel={() => setDisconnectOpen(false)} />
     </li>
+  )
+}
+
+/** Sage's in-page "Choose a business" step (ADR 0005, #383): loads automatically once the card
+ * mounts (the connection already exists — Sage's AUTH webhook fired, it just has no tenant yet),
+ * and treats an empty list as a named dead end with a way out rather than an error. */
+function SageBusinessPicker({ workspaceId, connectionId, onChosen }: {
+  workspaceId: string
+  connectionId: string
+  onChosen: () => void
+}) {
+  const [pending, startTransition] = useTransition()
+  const [businesses, setBusinesses] = useState<{ id: string; name: string }[] | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    listSageBusinessesAction(workspaceId, connectionId).then((res) => {
+      if (cancelled) return
+      if (res.success) setBusinesses(res.data ?? [])
+      else setLoadError(res.error || "Could not load Sage businesses")
+    })
+    return () => { cancelled = true }
+  }, [workspaceId, connectionId])
+
+  const choose = (id: string, name: string) =>
+    startTransition(async () => {
+      const res = await confirmSageBusinessAction(workspaceId, connectionId, id, name)
+      if (res.success) onChosen()
+      else toast.error(res.error || "Could not confirm the business")
+    })
+
+  if (loadError) return <p className="mt-1 text-xs text-red-600">{loadError}</p>
+  if (businesses === null) return <p className="mt-1 text-xs text-slate-600">Loading businesses…</p>
+  if (businesses.length === 0) {
+    return <p className="mt-1 text-xs text-slate-700">No businesses found on this Sage account — create one in Sage first.</p>
+  }
+  return (
+    <div className="mt-1">
+      <p className="text-xs text-slate-600">Choose a business</p>
+      <ul className="mt-1 flex flex-wrap gap-2">
+        {businesses.map((b) => (
+          <li key={b.id}>
+            <Button type="button" size="sm" variant="outline" disabled={pending} onClick={() => choose(b.id, b.name)}>
+              {b.name}
+            </Button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+/** One provider tile's Connect affordance and its handshake states (state inventory from #383's
+ * resolution): popup-blocked and provider-error keep the same button so the owner can retry
+ * in place; a closed-early handshake reverts to idle without an error tone (the owner chose to
+ * back out, that is not a failure). The AUTH webhook, not this promise resolving, is what marks
+ * the connection `connected` — `onConnected` only asks the page to refresh and pick that up. */
+function ProviderConnectTile({ workspaceId, provider, onConnected }: {
+  workspaceId: string
+  provider: string
+  onConnected: () => void
+}) {
+  const label = PROVIDER_LABELS[provider] ?? provider
+  const [phase, setPhase] = useState<"idle" | "connecting" | "popup-blocked" | "error">("idle")
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  const connect = async () => {
+    setPhase("connecting")
+    try {
+      const res = await fetch("/api/integrations/connect-session", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ workspaceId, providerConfigKey: provider }),
+      })
+      if (!res.ok) {
+        setErrorMessage(`${label} couldn't connect — try again or use a different account.`)
+        setPhase("error")
+        return
+      }
+      const { token } = (await res.json()) as { token: string }
+      await new Nango({ connectSessionToken: token }).auth(provider)
+      // Handshake resolved on the provider's side; the AUTH webhook still has to land before the
+      // connection shows as connected, so keep the "connecting" label and let the refresh catch it.
+      onConnected()
+      setTimeout(onConnected, 1500)
+    } catch (error) {
+      const type = error instanceof AuthError ? error.type : undefined
+      if (type === "blocked_by_browser") {
+        setPhase("popup-blocked")
+      } else if (type === "window_closed") {
+        toast("Connect cancelled")
+        setPhase("idle")
+      } else {
+        setErrorMessage(`${label} couldn't connect — try again or use a different account.`)
+        setPhase("error")
+      }
+    }
+  }
+
+  if (phase === "connecting") return <span className="mt-auto text-xs text-slate-600">Connecting…</span>
+  if (phase === "popup-blocked") {
+    return (
+      <span className="mt-auto flex flex-col gap-1">
+        <span className="text-xs text-red-600">Connect was blocked — allow pop-ups for this site and try again.</span>
+        <button type="button" className="text-left text-sm font-medium text-emerald-700 hover:underline" onClick={connect}>Try again</button>
+      </span>
+    )
+  }
+  if (phase === "error") {
+    return (
+      <span className="mt-auto flex flex-col gap-1">
+        <span className="text-xs text-red-600">{errorMessage}</span>
+        <button type="button" className="text-left text-sm font-medium text-emerald-700 hover:underline" onClick={connect}>Try again</button>
+      </span>
+    )
+  }
+  return (
+    <button type="button" className="mt-auto text-left text-sm font-medium text-emerald-700 hover:underline" onClick={connect}>
+      Connect
+    </button>
   )
 }
 
@@ -229,7 +366,7 @@ export function IntegrationsManager({
           <CardContent>
             {hasAnyConnection ? (
               <ul className="space-y-2 text-sm">
-                {(["quickbooks", "xero"] as const)
+                {(["quickbooks", "xero", "sage"] as const)
                   .filter((provider) => connectionsByProvider.has(provider))
                   .map((provider) => (
                     <AccountingConnectionCard
@@ -253,12 +390,7 @@ export function IntegrationsManager({
                     <span className="text-xs text-slate-600">{description}</span>
                     {live ? (
                       isOwner ? (
-                        <a
-                          className="mt-auto text-sm font-medium text-emerald-700 hover:underline"
-                          href={`/api/integrations/${provider}/connect?workspaceId=${workspaceId}`}
-                        >
-                          Connect
-                        </a>
+                        <ProviderConnectTile workspaceId={workspaceId} provider={provider} onConnected={() => router.refresh()} />
                       ) : (
                         <span className="mt-auto text-xs text-slate-600">Not connected</span>
                       )
