@@ -1,11 +1,6 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex">
-<link rel="preload" as="image" href="shots/01-intake.webp" fetchpriority="high">
-<link rel="preload" as="image" href="shots/02-invoices.webp">
-<link rel="preload" as="image" href="shots/03-review.webp">
-<link rel="preload" as="image" href="shots/04-exceptions.webp">
-<link rel="preload" as="image" href="shots/05-approvals.webp">
-<link rel="preload" as="image" href="shots/06-payments.webp">
-<link rel="preload" as="image" href="shots/07-close.webp">
+<link rel="preload" as="image" href="shots/01-intake.webp" fetchpriority="high" media="(min-width: 701px)">
+<link rel="preload" as="image" href="shots/01-intake-720.webp" fetchpriority="high" media="(max-width: 700px)">
 <title>DocuBite Walkthrough</title>
 <style>
   @font-face { font-family: "Inter"; font-weight: 400; src: url("/fonts/Inter/Inter-Regular.otf") format("opentype"); font-display: swap; }
@@ -70,7 +65,7 @@
   .frame .chrome i { width: 9px; height: 9px; border-radius: 50%; background: var(--line); display: block; }
   .shot { position: relative; aspect-ratio: 1440 / 900; border-radius: 6px; overflow: hidden; background: #fff; max-width: 100%; }
   @supports not (aspect-ratio: 1 / 1) { .shot::before { content: ""; display: block; padding-top: 62.5%; } }
-  .shot img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; opacity: 0; transition: opacity .2s ease; }
+  .shot img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; opacity: 0; transition: opacity .2s ease; background-size: cover; background-position: center; }
   .shot img.was { opacity: 1; z-index: 1; }
   .shot img.on { opacity: 1; z-index: 2; transition: none; }
   .spot {
@@ -156,13 +151,13 @@
     <div class="frame">
       <div class="chrome" aria-hidden="true"><i></i><i></i><i></i></div>
       <div class="shot">
-        <img class="on" src="shots/01-intake.webp" alt="" width="1440" height="900" fetchpriority="high">
-        <img src="shots/02-invoices.webp" alt="" width="1440" height="900" loading="eager" decoding="async">
-        <img src="shots/03-review.webp" alt="" width="1440" height="900" loading="eager" decoding="async">
-        <img src="shots/04-exceptions.webp" alt="" width="1440" height="900" loading="eager" decoding="async">
-        <img src="shots/05-approvals.webp" alt="" width="1440" height="900" loading="eager" decoding="async">
-        <img src="shots/06-payments.webp" alt="" width="1440" height="900" loading="eager" decoding="async">
-        <img src="shots/07-close.webp" alt="" width="1440" height="900" loading="eager" decoding="async">
+        <img class="on" alt="" width="1440" height="900" fetchpriority="high" style="background-image:url(data:image/webp;base64,UklGRlAAAABXRUJQVlA4IEQAAADwAwCdASogABQAPt1cpkyopSOiMAgBEBuJaQDNhBrHNDa3YFDrJtfAAKu7197pz/Y2O3jTF+wWd5WNOCWZGbQNr2f4AA==)">
+        <img alt="" width="1440" height="900" decoding="async" style="background-image:url(data:image/webp;base64,UklGRkgAAABXRUJQVlA4IDwAAACQAwCdASogABQAPt1iq08opSQiKAqpEBuJaQDO7BWEj3EdV62gAP7w5g1jOMEmHPPrDZ9X2cTomrgSKAA=)">
+        <img alt="" width="1440" height="900" decoding="async" style="background-image:url(data:image/webp;base64,UklGRlIAAABXRUJQVlA4IEYAAABwAwCdASogABQAPtVYoUyoJSMiMAwBABqJZwDQGCzZ3Hk78PAA/vEH4YsViKeTq1s/qyQcGKbwcLZxwyqdYoqr5kz66ZAA)">
+        <img alt="" width="1440" height="900" decoding="async" style="background-image:url(data:image/webp;base64,UklGRj4AAABXRUJQVlA4IDIAAAAwAwCdASogABQAPt1kqU+opaOiKAqpEBuJaQAATGH8qEzAAP7xP6gqdM9giOPaUQAAAA==)">
+        <img alt="" width="1440" height="900" decoding="async" style="background-image:url(data:image/webp;base64,UklGRkIAAABXRUJQVlA4IDYAAADwAgCdASogABQAPt1kqU+opSOiKAqpEBuJaQAAS4uGAAD+8T+roZWz4sFKrPDn0ddokngAAAA=)">
+        <img alt="" width="1440" height="900" decoding="async" style="background-image:url(data:image/webp;base64,UklGRkYAAABXRUJQVlA4IDoAAADwAgCdASogABQAPt1orFEopaQiqAgBEBuJaQAAP9BcAAD+8OWXH8zvOqOpeo1bD81h7CaDQGzUQcAA)">
+        <img alt="" width="1440" height="900" decoding="async" style="background-image:url(data:image/webp;base64,UklGRkgAAABXRUJQVlA4IDwAAABwAwCdASogABQAPt1mqFAopaOiqAqpEBuJaQAAPgDcCoTc1wQA/vDlie4YbjKgKsXNXrcVuTotfBMAAAA=)">
         <div class="spot" id="spot"></div>
         <div class="card" id="card" role="region" aria-live="polite">
           <span class="tag" id="cardTag"></span>
@@ -241,6 +236,21 @@
   const $ = (id) => document.getElementById(id);
   const stage = $("stage"), spot = $("spot"), card = $("card");
   const shots = Array.from(document.querySelectorAll(".shot img"));
+  // One image at a time, in step order, the current step first: on a slow link seven parallel
+  // downloads share the pipe and the first screenshot lands last (12s at 400kbps). Phones get
+  // the 720px variant (a third of the bytes); the inline blurred placeholder shows meanwhile.
+  const narrow = matchMedia("(max-width: 700px)").matches;
+  const srcOf = (s) => narrow ? s.img.replace(".webp", "-720.webp") : s.img;
+  const started = new Set();
+  function fetchShot(n) {
+    if (n >= steps.length || started.has(n)) return false;
+    started.add(n); shots[n].src = srcOf(steps[n]); return true;
+  }
+  function pump() {
+    const n = steps.findIndex((_, k) => !started.has(k));
+    if (n < 0) return;
+    fetchShot(n); shots[n].addEventListener("load", pump, { once: true }); shots[n].addEventListener("error", pump, { once: true });
+  }
   const dots = $("dots");
   let i = 0;
   let loadToken = 0;
@@ -281,6 +291,7 @@
     if (end) return;
     const s = steps[i];
     const next = shots[i];
+    fetchShot(i);
     if (!next.classList.contains("on")) {
       // Every screenshot is already in the DOM: switching is a class toggle, not a load. The
       // outgoing shot stays underneath until the incoming one has decoded, so the frame is
@@ -308,6 +319,7 @@
     if (e.key === "ArrowRight") { e.preventDefault(); go(i >= total ? 0 : i + 1); }
     if (e.key === "ArrowLeft") { e.preventDefault(); go(i - 1); }
   });
+  fetchShot(0); shots[0].addEventListener("load", pump, { once: true }); shots[0].addEventListener("error", pump, { once: true });
   render();
 </script>
 </body></html>
