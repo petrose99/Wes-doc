@@ -13,7 +13,6 @@
 import { createAdminClient } from "@/lib/supabase/server"
 import { createWorkspaceForUser } from "@/models/workspaces"
 import { createOrganization, addCompanyToOrganization } from "@/models/organizations"
-import { drainProvisionJobs } from "@/models/bigcapital"
 import { prisma } from "@/lib/db"
 import { DEV_BYPASS_USER } from "@/lib/supabase/dev-bypass"
 
@@ -137,15 +136,6 @@ async function main() {
   console.log("\nSeeded accounts:\n")
   for (const row of seeded) console.log(`  ${row.email.padEnd(30)} ${row.password.padEnd(24)} ${row.role}`)
   console.log("")
-
-  // Process any pending Bigcapital provisioning jobs inline (normally handled by the job worker).
-  // Best-effort: if the Bigcapital containers aren't running, this silently skips.
-  try {
-    const processed = await drainProvisionJobs()
-    if (processed > 0) console.log(`Provisioned ${processed} Bigcapital organization(s).\n`)
-  } catch {
-    console.log("Bigcapital provisioning skipped (containers not running?).\n")
-  }
 }
 
 main()

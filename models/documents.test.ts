@@ -342,7 +342,7 @@ describe("listReadyToPushDocuments", () => {
     db.document.findMany.mockResolvedValue([
       { id: "d1", filename: "a.pdf", docType: "invoice", template: { code: "invoice" }, reviewedData: { vendor: "Acme", total: 100 }, rawExtraction: null, codingData: null },
     ])
-    db.integrationPush.findMany.mockResolvedValue([{ id: "p1", connectionId: "conn1", documentId: "d1", provider: "bigcapital", status: "succeeded", attempts: 1, externalBillId: null, externalRecordKind: null, errorCode: null, createdAt: new Date(), completedAt: new Date() }])
+    db.integrationPush.findMany.mockResolvedValue([{ id: "p1", connectionId: "conn1", documentId: "d1", provider: "xero", status: "succeeded", attempts: 1, externalBillId: null, externalRecordKind: null, errorCode: null, createdAt: new Date(), completedAt: new Date() }])
     const { documents, droppedCount } = await listReadyToPushDocuments("w1", "conn1")
     expect(documents).toEqual([])
     expect(droppedCount).toBe(0)

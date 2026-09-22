@@ -20,7 +20,6 @@
 import { recordDocumentAudit } from "@/lib/audit"
 import { attemptIntegrationPush } from "@/lib/integration-push"
 import { getValidAccessToken, TokenRefreshError } from "@/lib/integration-token-refresh"
-import * as bigcapital from "@/lib/integrations/bigcapital/client"
 import * as quickbooks from "@/lib/integrations/quickbooks/client"
 import * as xero from "@/lib/integrations/xero/client"
 import { prisma } from "@/lib/db"
@@ -95,9 +94,6 @@ export async function executeVoidDuplicate(input: { workspaceId: string; finding
         break
       case "xero":
         await xero.voidBill(connection.externalTenantId, accessToken, transaction.externalId)
-        break
-      case "bigcapital":
-        await bigcapital.voidBill(accessToken, connection.externalTenantId, transaction.externalId)
         break
       default:
         return { ok: false, dryRun: false, message: `Unsupported provider "${connection.provider}"` }

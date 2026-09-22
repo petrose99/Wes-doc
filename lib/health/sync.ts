@@ -2,7 +2,6 @@ import { prisma } from "@/lib/db"
 import { getValidAccessToken } from "@/lib/integration-token-refresh"
 import * as quickbooks from "@/lib/integrations/quickbooks/client"
 import * as xero from "@/lib/integrations/xero/client"
-import * as bigcapital from "@/lib/integrations/bigcapital/client"
 import { unscoped } from "@/lib/workspace-scope"
 import { Prisma } from "@/prisma/client"
 
@@ -106,7 +105,6 @@ export async function syncLedgerTransactions(connectionId: string): Promise<{ sy
 }
 
 const LEDGER_SYNC_STALE_MS = 24 * 60 * 60 * 1000
-const BIGCAPITAL_SYNC_STALE_MS = 1 * 60 * 60 * 1000
 
 /** When each connection may next be attempted, and how many times in a row it has failed.
  *
@@ -166,8 +164,7 @@ export async function syncDueLedgerConnections(): Promise<number> {
   let synced = 0
   for (const connection of connections) {
     const latestSyncedAt = latestSyncByConnection.get(connection.id)
-    const staleMs = connection.provider === "bigcapital" ? BIGCAPITAL_SYNC_STALE_MS : LEDGER_SYNC_STALE_MS
-    const due = !latestSyncedAt || now - latestSyncedAt.getTime() > staleMs
+    const due = !latestSyncedAt || now - latestSyncedAt.getTime() > LEDGER_SYNC_STALE_MS
     if (!due) continue
     const hold = syncHolds.get(connection.id)
     if (hold && now < hold.nextAttemptAt) continue
@@ -175,7 +172,7 @@ export async function syncDueLedgerConnections(): Promise<number> {
       await syncLedgerTransactions(connection.id)
       // Held for the staleness window even on success: if the provider returned nothing there is no
       // row to carry a syncedAt, and the check above would call this connection due again instantly.
-      syncHolds.set(connection.id, { failures: 0, nextAttemptAt: now + staleMs })
+      syncHolds.set(connection.id, { failures: 0, nextAttemptAt: now + LEDGER_SYNC_STALE_MS })
       synced++
     } catch (error) {
       const failures = (hold?.failures ?? 0) + 1
@@ -229,8 +226,6 @@ function fetchProviderLedgerTransactions(provider: string, externalTenantId: str
       return fetchQuickBooksLedgerTransactions(externalTenantId, accessToken)
     case "xero":
       return fetchXeroLedgerTransactions(externalTenantId, accessToken)
-    case "bigcapital":
-      return fetchBigcapitalLedgerTransactions(externalTenantId, accessToken)
     default:
       throw new Error(`unsupported_integration_provider_${provider}`)
   }
@@ -293,56 +288,3 @@ async function fetchXeroLedgerTransactions(tenantId: string, accessToken: string
   ]
 }
 
-/** Bigcapital's connection carries an API key (never rotated by getValidAccessToken — see
- * models/bigcapital.ts) rather than an OAuth access token, same as fetchBigcapitalEntities in
- * lib/integrations/sync.ts. No bank-transaction list is synced for this provider — its
- * /api/banking/transactions endpoint requires a specific accountId (verified against a real
- * instance during this phase; there is no top-level "list every bank transaction" endpoint), which
- * doesn't fit this sync's one-connection-wide pull; a later phase can add a per-account loop once
- * bank/cash accounts are identifiable from cached data (see control-account-postings.ts's note
- * about account-type data not being cached today). */
-function computePaymentStatus(dueAmount: number | null, paidAmount: number | null, total: number | null): string | null {
-  if (dueAmount == null && paidAmount == null) return null
-  const due = dueAmount ?? total ?? 0
-  const paid = paidAmount ?? 0
-  if (due <= 0 && paid > 0) return "paid"
-  if (paid <= 0) return "unpaid"
-  return "partial"
-}
-
-async function fetchBigcapitalLedgerTransactions(organizationId: string, apiKey: string): Promise<SyncRow[]> {
-  const [bills, expenses, invoices] = await Promise.all([
-    bigcapital.listBills(apiKey, organizationId),
-    bigcapital.listExpenses(apiKey, organizationId),
-    bigcapital.listSaleInvoices(apiKey, organizationId),
-  ])
-  return [
-    ...bills.map((b): SyncRow => ({
-      kind: "bill", externalId: b.id, contactExternalId: b.contactId, contactName: b.contactName,
-      accountExternalId: b.accountId, accountName: b.accountName, docNumber: b.docNumber,
-      amount: b.total, taxAmount: b.taxAmount, currencyCode: b.currencyCode, txnDate: toDate(b.txnDate),
-      reconciled: false,
-      dueAmount: b.dueAmount, paidAmount: b.paidAmount,
-      paymentStatus: computePaymentStatus(b.dueAmount, b.paidAmount, b.total),
-      raw: b,
-    })),
-    ...expenses.map((e): SyncRow => ({
-      kind: "expense", externalId: e.id, contactExternalId: e.contactId, contactName: e.contactName,
-      accountExternalId: e.accountId, accountName: e.accountName, docNumber: e.docNumber,
-      amount: e.total, taxAmount: e.taxAmount, currencyCode: e.currencyCode, txnDate: toDate(e.txnDate),
-      reconciled: false,
-      dueAmount: e.dueAmount, paidAmount: e.paidAmount,
-      paymentStatus: computePaymentStatus(e.dueAmount, e.paidAmount, e.total),
-      raw: e,
-    })),
-    ...invoices.map((inv): SyncRow => ({
-      kind: "invoice" as SyncRow["kind"], externalId: inv.id, contactExternalId: inv.contactId, contactName: inv.contactName,
-      accountExternalId: inv.accountId, accountName: inv.accountName, docNumber: inv.docNumber,
-      amount: inv.total, taxAmount: inv.taxAmount, currencyCode: inv.currencyCode, txnDate: toDate(inv.txnDate),
-      reconciled: false,
-      dueAmount: inv.dueAmount, paidAmount: inv.paidAmount,
-      paymentStatus: computePaymentStatus(inv.dueAmount, inv.paidAmount, inv.total),
-      raw: inv,
-    })),
-  ]
-}

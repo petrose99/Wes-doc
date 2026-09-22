@@ -9,7 +9,6 @@ import { deleteDocumentSource } from "@/lib/document-storage"
 import { prisma } from "@/lib/db"
 import { unscoped } from "@/lib/workspace-scope"
 import { deleteFiles } from "@/models/files"
-import { provisionMemberAccount } from "@/models/bigcapital-members"
 import { User } from "@/prisma/client"
 import crypto, { randomBytes } from "crypto"
 import { cache } from "react"
@@ -115,8 +114,8 @@ export async function createWorkspaceForUser(user: Pick<User, "id" | "name" | "e
     },
   })
   // #329: every workspace starts Not connected — no provider is auto-provisioned on creation.
-  // Connecting any accounting provider (including Bigcapital) is now purely the owner's Connect
-  // click on Admin › Integrations (see components/integrations/integrations-manager.tsx).
+  // Connecting an accounting provider is purely the owner's Connect click on Admin › Integrations
+  // (see components/integrations/integrations-manager.tsx).
   await recordDocumentAudit({ workspaceId: workspace.id, actorId: user.id, type: "workspace_created", detail: { kind: workspace.kind, name: workspace.name } })
   return workspace
 }
@@ -462,21 +461,13 @@ export async function acceptWorkspaceInvitation(token: string, user: Pick<User, 
     ...audit.rows.map((data) => prisma.documentAuditEvent.create({ data })),
   ])
   await afterModeFlip(invitation.workspaceId, audit.before, audit.after)
-  const fullUser = await prisma.user.findUnique({ where: { id: user.id }, select: { id: true, name: true, email: true } })
-  if (fullUser) {
-    for (const workspaceId of [invitation.workspaceId, ...extraGrants.map((g) => g.workspaceId)]) {
-      provisionMemberAccount(workspaceId, { id: fullUser.id, name: fullUser.name ?? "", email: fullUser.email }).catch((err) => {
-        console.error("[bigcapital-members] provision after invite accept failed:", err instanceof Error ? err.message : err)
-      })
-    }
-  }
   return invitation.workspaceId
 }
 
 /** Users (#286) "Add to a company": an owner grants an existing account another company without
  * an invitation round-trip. Same per-grant accounting as one `additionalGrants` entry in
- * acceptWorkspaceInvitation — create the WorkspaceMember row, reviewer-delta / mode-flip audit,
- * Bigcapital provisioning — but refused (not upserted) when the row already exists: the surface
+ * acceptWorkspaceInvitation — create the WorkspaceMember row, reviewer-delta / mode-flip audit —
+ * but refused (not upserted) when the row already exists: the surface
  * says "added", never "role changed". Authorisation is the caller's (the action checks ownership). */
 export async function addExistingUserToWorkspace(input: { workspaceId: string; actorId: string; userId: string; role: WorkspaceRole }) {
   const role = parseRole(input.role)
@@ -496,9 +487,6 @@ export async function addExistingUserToWorkspace(input: { workspaceId: string; a
     ...audit.rows.map((data) => prisma.documentAuditEvent.create({ data })),
   ])
   await afterModeFlip(input.workspaceId, audit.before, audit.after)
-  provisionMemberAccount(input.workspaceId, { id: user.id, name: user.name ?? "", email: user.email }).catch((err) => {
-    console.error("[bigcapital-members] provision after add failed:", err instanceof Error ? err.message : err)
-  })
   return created
 }
 

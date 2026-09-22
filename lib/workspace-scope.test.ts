@@ -8,7 +8,6 @@ const WS = "11111111-1111-1111-1111-111111111111"
 // caught here rather than silently reopening a tenant-isolation gap.
 const NEWLY_GUARDED_MODELS = [
   "FieldSuggestion", "DocumentSheetPlacement", "AuditEvent", "Gate", "WarnCheck",
-  "BigcapitalAccount", "BigcapitalMemberAccount", "IntegrationProvisionJob",
   "HealthCheckResult", "HealthScore", "HealthScoreConfig", "CodingCorrection",
   "CategoryAccountMapping", "CategoryNature", "UserListPreference", "SavedView",
   "PaymentRun", "PaymentRunItem", "Supplier", "SupplierAlias", "InboundEmailIntake",

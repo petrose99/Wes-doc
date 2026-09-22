@@ -26,7 +26,6 @@ const BILLING_MESSAGES: Record<string, string> = {
   fx_rate_pending: "This document is in a different currency and its exchange rate hasn't been fetched yet. Try again in a moment.",
   // Integrations (P1). The url_* codes come from lib/url-safety's SSRF guard.
   integrations_not_available: "Integrations aren't enabled on this deployment.",
-  accounting_not_available: "The Bigcapital accounting bridge isn't enabled on this deployment.",
   url_scheme_not_https: "The webhook URL must start with https://.",
   url_private_ip: "That URL points at a private or internal address, which isn't allowed.",
   url_invalid: "That doesn't look like a valid URL.",

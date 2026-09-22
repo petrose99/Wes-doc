@@ -22,8 +22,8 @@ const RESOLVED_STATUSES = new Set<ReviewTaskStatus>(["approved", "rejected"])
  * (its docType was reclassified, say) is never blocked on a stale requirement.
  *
  * WP-AP2: skipped when a ledger sync will fill in paymentStatus authoritatively. Any pending or
- * succeeded IntegrationPush on this document means the accounting provider (QuickBooks / Xero /
- * Bigcapital) is the source of truth for paid state going forward, and asking a reviewer to
+ * succeeded IntegrationPush on this document means the accounting provider (QuickBooks / Xero)
+ * is the source of truth for paid state going forward, and asking a reviewer to
  * commit to "paid" or "unpaid" at approve-time — before payment has even happened — is friction
  * with no signal. This matches how every other AP-first platform behaves: Bill.com's "Mark as
  * Paid" is documented as the escape hatch for payments made OUTSIDE Bill; Tipalti's "mark paid

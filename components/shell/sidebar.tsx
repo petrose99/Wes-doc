@@ -60,8 +60,8 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
   /** Every module key currently enabled for this workspace (getWorkspaceCapabilities(...).enabled),
    * used to build the nav entries each module registers via ModuleDefinition.navItems. */
   enabledModuleKeys: string[]
-  /** config.integrations.bigcapital.enabled — a deployment-level gate for whether Finance is a
-   * live destination on this rail. */
+  /** anyAccountingProviderEnabled() — a deployment-level gate for whether Finance is a live
+   * destination on this rail. */
   accountingEnabled?: boolean
   /** counts.to_review from countDocumentsByStage — surfaced on Documents so "something needs you"
    * is visible from every page. */

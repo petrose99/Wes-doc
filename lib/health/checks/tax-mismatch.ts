@@ -9,11 +9,10 @@
  * Provider caveat (see the Phase C report): QuickBooks' and Xero's ledger-sync mappings
  * (lib/health/sync.ts) never populate LedgerTransactionSlice.taxAmount — neither provider's Bill/
  * Purchase/Invoice list query used there requests a tax breakdown field, so taxAmount is always
- * null for those two providers today. Rather than silently skip (a false "nothing to report") or
- * crash on the null, a pushed+taxed document whose ledger row has no taxAmount at all produces an
- * "info" finding saying so — exactly the degrade-to-info posture the plan calls for whenever the
- * data needed to actually verify tax isn't available from the provider. Bigcapital's bill sync does
- * populate taxAmount (tax_amount_withheld), so that provider gets the real warning-level check. */
+ * null today. Rather than silently skip (a false "nothing to report") or crash on the null, a
+ * pushed+taxed document whose ledger row has no taxAmount at all produces an "info" finding saying
+ * so — exactly the degrade-to-info posture the plan calls for whenever the data needed to actually
+ * verify tax isn't available from the provider. */
 import { amountsMatch } from "@/lib/checks/types"
 import type { CheckDefinition, CheckDocumentSlice, CheckRunResult, LedgerTransactionSlice } from "@/lib/health/types"
 

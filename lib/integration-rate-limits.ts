@@ -1,5 +1,5 @@
 /** A7.7: rate-limit-aware push queue. QuickBooks: 500 requests / minute per realm. Xero:
- * 60 / minute + 5000 / day per tenant. Bigcapital: unlimited (customer-hosted). A push that
+ * 60 / minute + 5000 / day per tenant. A push that
  * would breach the bucket is DEFERRED (nextAttemptAt pushed out until the bucket resets)
  * instead of consumed as an attempt, so a workspace never burns its 5-attempt limit on
  * provider-side backpressure. Pure token-bucket accounting; the executor calls tryClaim before
@@ -13,7 +13,6 @@ export type Bucket = {
 export const PROVIDER_BUCKETS: Record<string, Bucket> = {
   quickbooks: { perMinute: 500, perDay: null },
   xero: { perMinute: 60, perDay: 5000 },
-  bigcapital: { perMinute: 10_000, perDay: null },
 }
 
 export type RateWindow = {

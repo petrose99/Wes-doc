@@ -9,10 +9,6 @@ import * as quickbooks from "@/lib/integrations/quickbooks/client"
 import { toQuickBooksBillBody } from "@/lib/integrations/quickbooks/bill-mapper"
 import * as xero from "@/lib/integrations/xero/client"
 import { toXeroBillBody } from "@/lib/integrations/xero/bill-mapper"
-import * as bigcapital from "@/lib/integrations/bigcapital/client"
-import { toBigcapitalBillBody } from "@/lib/integrations/bigcapital/bill-mapper"
-import { toBigcapitalInvoiceBody } from "@/lib/integrations/bigcapital/invoice-mapper"
-import { type BankStatementPayload, toBigcapitalCashflowBody } from "@/lib/integrations/bigcapital/bank-statement-mapper"
 import { computePushUpdate, PUSH_LEASE_MS, type PushAttemptResult } from "@/lib/integration-push-policy"
 import { preflightPush } from "@/lib/integration-preflight"
 import { createReviewTask } from "@/models/review-tasks"
@@ -57,9 +53,6 @@ async function ledgerHasDuplicate(provider: string, externalTenantId: string | n
         return await quickbooks.findBillByDocNumber(externalTenantId, accessToken, referenceNumber)
       case "xero":
         return await xero.findBillByInvoiceNumber(externalTenantId, accessToken, referenceNumber)
-      case "bigcapital":
-        if (direction === "receivable") return await bigcapital.findInvoiceByReferenceNumber(accessToken, externalTenantId, referenceNumber)
-        return await bigcapital.findBillByReferenceNumber(accessToken, externalTenantId, referenceNumber)
       default:
         return false
     }
@@ -107,35 +100,6 @@ async function preflightAgainstCache(push: { workspaceId: string; documentId: st
     await createReviewTask({ workspaceId: push.workspaceId, documentId: push.documentId, reason: "push_preflight", detail: `${verdict.errorCode}: ${verdict.message}`, priority: 1, createdById: null }).catch(() => {})
   }
   throw new IntegrationPermanentError(verdict.errorCode)
-}
-
-async function pushBankStatementToBigcapital(organizationId: string, apiKey: string, payload: BankStatementPayload): Promise<{ count: number; recordKind: string }> {
-  let created = 0
-  for (const txn of payload.transactions) {
-    const body = toBigcapitalCashflowBody(txn, payload.cashflowAccountId, payload.creditAccountId)
-    await bigcapital.createCashflowTransaction(apiKey, organizationId, body)
-    created++
-  }
-  return { count: created, recordKind: "cashflow_batch" }
-}
-
-async function pushToBigcapital(organizationId: string, apiKey: string, bill: NormalizedBill, accountId: string, direction: "payable" | "receivable" = "payable"): Promise<{ id: string; recordKind: string }> {
-  if (direction === "receivable") {
-    const [customerId, itemId] = await Promise.all([
-      bigcapital.findOrCreateCustomer(apiKey, organizationId, bill.vendorName),
-      bigcapital.findOrCreateIncomeItem(apiKey, organizationId, accountId),
-    ])
-    const body = toBigcapitalInvoiceBody(bill, customerId, itemId)
-    const created = await bigcapital.createSaleInvoice(apiKey, organizationId, body)
-    return { id: created.id, recordKind: "sale_invoice" }
-  }
-  const [vendorId, itemId] = await Promise.all([
-    bigcapital.findOrCreateVendor(apiKey, organizationId, bill.vendorName),
-    bigcapital.findOrCreateExpenseItem(apiKey, organizationId, accountId),
-  ])
-  const body = toBigcapitalBillBody(bill, vendorId, itemId)
-  const created = await bigcapital.createBill(apiKey, organizationId, body)
-  return { id: created.id, recordKind: "bill" }
 }
 
 /** Attempts one claimed push and records the outcome. Safe to call on a row another driver may also
@@ -188,19 +152,6 @@ export async function attemptIntegrationPush(pushId: string, now = new Date()): 
           case "xero":
             created = await pushToXero(connection.externalTenantId, accessToken, bill, expenseAccountId, push.idempotencyKey)
             break
-          case "bigcapital": {
-            if (payloadRaw.documentType === "bank_statement" && Array.isArray((payloadRaw as unknown as BankStatementPayload).transactions)) {
-              const bsPayload = payloadRaw as unknown as BankStatementPayload
-              const bsResult = await pushBankStatementToBigcapital(connection.externalTenantId, accessToken, bsPayload)
-              created = { id: `cashflow_batch_${bsResult.count}` }
-              await prisma.integrationPush.update({ where: { id: push.id }, data: { externalRecordKind: bsResult.recordKind } }).catch(() => {})
-            } else {
-              const bcResult = await pushToBigcapital(connection.externalTenantId, accessToken, bill, expenseAccountId, direction)
-              created = { id: bcResult.id }
-              await prisma.integrationPush.update({ where: { id: push.id }, data: { externalRecordKind: bcResult.recordKind } }).catch(() => {})
-            }
-            break
-          }
           default:
             throw new IntegrationPermanentError(`${connection.provider}_push_not_implemented`)
         }
@@ -307,12 +258,16 @@ export async function getActiveIntegrationConnectionId(workspaceId: string): Pro
 
 export type LedgerBandStatus = "disconnected" | "needs_reauth" | "no_default_account"
 
-/** #281 spec.md §6: the cause behind the queue-scoped connection-failure band — null when a
- * connection is active and has a default account (band hidden), or when integrations are off (no
- * connection is ever expected, so nothing to say). Most-recent connection by `createdAt` mirrors
- * `getActiveIntegrationConnectionId`'s own "the" connection — one workspace, one ledger. */
+/** #281 spec.md §6, widened by #380: the cause behind the queue-scoped connection-failure band —
+ * null only when a connection is active and has a default account (band hidden). Integrations
+ * being off no longer suppresses the band: with Bigcapital removed and no ledger connect flow
+ * built yet (a later ticket), "no ledger" is the default state every workspace is in, and the
+ * glossary's rule ("posting is offered nowhere while no ledger is connected; the queue says why
+ * once, above the rows") applies regardless of whether the integrations feature is configured.
+ * Most-recent connection by `createdAt` mirrors `getActiveIntegrationConnectionId`'s own "the"
+ * connection — one workspace, one ledger. */
 export async function getLedgerConnectionBandStatus(workspaceId: string): Promise<LedgerBandStatus | null> {
-  if (!config.integrations.enabled) return null
+  if (!config.integrations.enabled) return "disconnected"
   const connection = await prisma.integrationConnection.findFirst({
     where: { workspaceId }, orderBy: { createdAt: "desc" }, select: { status: true, defaultExpenseAccountId: true },
   })

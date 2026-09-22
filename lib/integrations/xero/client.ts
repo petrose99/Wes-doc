@@ -168,7 +168,7 @@ export type XeroLedgerTransaction = {
   contactName: string | null
   /** The first line item's account code — an invoice/bank transaction can have several lines
    * against several accounts; the first is taken as this transaction's representative account,
-   * same simplification the QuickBooks/Bigcapital ledger-sync functions make. */
+   * same simplification the QuickBooks ledger-sync function makes. */
   accountCode: string | null
 }
 

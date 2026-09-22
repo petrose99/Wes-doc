@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 // Mocked at the module boundary — these tests never touch a database or a real provider. In
-// particular quickbooks/xero/bigcapital's voidBill is mocked here rather than exercised for real:
+// particular quickbooks/xero's voidBill is mocked here rather than exercised for real:
 // per the Phase C safety rule, a real (non-dry-run) voidBill/delete/push-retry is verified ONLY at
 // this mocked level, never against a live server. See the Phase C report for the live-verification
 // steps that were and weren't performed.
@@ -13,7 +13,6 @@ vi.mock("@/lib/integration-token-refresh", () => ({
 }))
 vi.mock("@/lib/integrations/quickbooks/client", () => ({ voidBill: vi.fn().mockResolvedValue(undefined) }))
 vi.mock("@/lib/integrations/xero/client", () => ({ voidBill: vi.fn().mockResolvedValue(undefined) }))
-vi.mock("@/lib/integrations/bigcapital/client", () => ({ voidBill: vi.fn().mockResolvedValue(undefined) }))
 vi.mock("@/lib/integration-push", () => ({ attemptIntegrationPush: vi.fn().mockResolvedValue(undefined) }))
 vi.mock("@/models/health", () => ({ resolveHealthFinding: vi.fn() }))
 
@@ -22,7 +21,7 @@ const { prisma } = await import("@/lib/db")
 const { recordDocumentAudit } = await import("@/lib/audit")
 const { resolveHealthFinding } = await import("@/models/health")
 const quickbooks = await import("@/lib/integrations/quickbooks/client")
-const bigcapital = await import("@/lib/integrations/bigcapital/client")
+const xero = await import("@/lib/integrations/xero/client")
 const { attemptIntegrationPush } = await import("@/lib/integration-push")
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -38,7 +37,7 @@ const ledgerTransaction = {
   currencyCode: "USD", contactName: "Acme", active: true,
 }
 
-const connection = { id: "conn1", provider: "bigcapital", externalTenantId: "org1", status: "active" }
+const connection = { id: "conn1", provider: "xero", externalTenantId: "org1", status: "active" }
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -56,7 +55,7 @@ describe("executeVoidDuplicate", () => {
     expect(result.dryRun).toBe(true)
     expect(result.message).toMatch(/Dry run/)
     expect(quickbooks.voidBill).not.toHaveBeenCalled()
-    expect(bigcapital.voidBill).not.toHaveBeenCalled()
+    expect(xero.voidBill).not.toHaveBeenCalled()
     expect(resolveHealthFinding).not.toHaveBeenCalled()
     expect(recordDocumentAudit).not.toHaveBeenCalled()
   })
@@ -64,14 +63,14 @@ describe("executeVoidDuplicate", () => {
   it("calls the provider's voidBill and resolves the finding on a real execution", async () => {
     const result = await executeVoidDuplicate({ workspaceId: "ws1", findingId: "f1", actorId: "u1", dryRun: false })
     expect(result.ok).toBe(true)
-    expect(bigcapital.voidBill).toHaveBeenCalledWith("token-123", "org1", "e2")
+    expect(xero.voidBill).toHaveBeenCalledWith("org1", "token-123", "e2")
     expect(db.ledgerTransaction.update).toHaveBeenCalledWith({ where: { id: "lt2" }, data: { active: false } })
     expect(resolveHealthFinding).toHaveBeenCalledWith({ workspaceId: "ws1", findingId: "f1", actorId: "u1", action: "void_duplicate" })
     expect(recordDocumentAudit).toHaveBeenCalledWith(expect.objectContaining({ type: "health_remediation_void_duplicate", outcome: "success" }))
   })
 
   it("leaves the finding open and does not resolve it when the provider call fails", async () => {
-    (bigcapital.voidBill as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error("bigcapital_http_500"))
+    (xero.voidBill as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error("xero_http_500"))
     const result = await executeVoidDuplicate({ workspaceId: "ws1", findingId: "f1", actorId: "u1", dryRun: false })
     expect(result.ok).toBe(false)
     expect(resolveHealthFinding).not.toHaveBeenCalled()
@@ -82,7 +81,7 @@ describe("executeVoidDuplicate", () => {
     db.healthCheckResult.findFirst.mockResolvedValue({ ...openVoidFinding, suggestedActionPayload: { otherExternalTransactionId: "e2", kind: "expense" } })
     const result = await executeVoidDuplicate({ workspaceId: "ws1", findingId: "f1", actorId: "u1", dryRun: false })
     expect(result.ok).toBe(false)
-    expect(bigcapital.voidBill).not.toHaveBeenCalled()
+    expect(xero.voidBill).not.toHaveBeenCalled()
   })
 
   it("refuses to act on a finding that is not open", async () => {
