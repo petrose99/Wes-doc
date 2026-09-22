@@ -522,7 +522,11 @@ while [ "$n" -lt "$MAX" ]; do
   # PostToolUse hook (scripts/wayfinder-autopilot/hooks/context-guard.sh,
   # wired in .claude/settings.json) tells the session to hand off. The hard
   # stop is the soft cap plus the hand-off allowance.
-  CTXF="$LOGS/ctx-$T"; echo "0 0" > "$CTXF"; rm -f "$CTXF.signal"
+  # Recreated (not truncated) per session: its birth time is the session's
+  # start for the Stop hook's "written this session" test, and the flags the
+  # hooks keep beside it (.signal, .craft-floor, .png-count, .handoff-nagged,
+  # .stop-blocks) are one session's, never the previous one's (2026-09-22).
+  CTXF="$LOGS/ctx-$T"; rm -f "$CTXF" "$CTXF".*; echo "0 0" > "$CTXF"
   SYSFLAG="--append-system-prompt-file"; BAREFLAGS=()
   if [ "${PROMPT_MODE:-slash}" = bare ]; then
     SESSION_PROMPT="Work Wayfinder map #$MAP, ticket #$T, per the Wayfinder protocol and autopilot brief in your system prompt. Begin by claiming the ticket: run gh issue edit $T --add-assignee @me"

@@ -2,7 +2,7 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Read|Skill|Bash|Write|Edit",
+        "matcher": "Read|Skill|Bash|Write|Edit|Agent|Task",
         "hooks": [
           {
             "type": "command",
@@ -19,6 +19,17 @@
             "type": "command",
             "command": "scripts/wayfinder-autopilot/hooks/context-guard.sh",
             "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "scripts/wayfinder-autopilot/hooks/stop-guard.sh",
+            "timeout": 30
           }
         ]
       }

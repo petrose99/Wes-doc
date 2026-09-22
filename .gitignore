@@ -70,7 +70,7 @@ pgdata
 # autopilot session artefacts (local only)
 .impeccable/live/
 .impeccable/live
-.scratch/
+.scratch*/
 docs/wayfinder-reports/*/logs/
 
 # wayfinder driver state: the phase high-water mark per ticket

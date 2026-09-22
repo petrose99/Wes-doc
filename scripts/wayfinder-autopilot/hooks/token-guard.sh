@@ -1,5 +1,5 @@
 #!/bin/bash
-# PreToolUse hook (Read, Skill, Bash). Silent unless the wayfinder driver set
+# PreToolUse hook (Read, Skill, Bash, Write, Edit, Agent). Silent unless the wayfinder driver set
 # WAYFINDER_CTX_FILE for this session. Denies the tool calls that map #226's
 # logs showed cost the most for the least — deterministically, so the brief's
 # prose rules do not have to be obeyed to hold:
@@ -25,6 +25,10 @@
 #      .test.ts in the same commit is refused unless the subject carries
 #      `no-test: <reason>`; `gh issue close` on a ticket whose commits touched
 #      backend code is refused without `review: P0=0 P1=0` on the report.
+#   8. Build phase: the measure-phase readers' skills (evaluate, include,
+#      impeccable critique/audit) are refused — phases/build.md says the gate
+#      steps run no critique/evaluate, and #380's G2 session ignored that at
+#      ~6K of skill text plus six re-scoring agents (2026-09-22).
 [ -n "${WAYFINDER_CTX_FILE:-}" ] || exit 0
 IN="$(cat)"
 python3 - "$IN" <<'PY'
@@ -41,6 +45,14 @@ MENU = "AUTOPILOT: impeccable's routing menu is not needed — the phase brief n
 DEVSRV = "DEV SERVER: one command brings up everything a round needs — `node .impeccable/live/dev.mjs start <ws>` starts the heap-capped Next dev server on :3000 AND the impeccable live-server on :8400 (the in-page detector), waits until both answer, and preps the workspace (jurisdiction etc.). `dev.mjs stop` stops both; `status` shows the ports. Never start either by hand: `npm run dev`, nohup, setsid, disown, trailing `&`, `impeccable live-server` and per-ticket livesrv/start-live-server scripts all die with the turn, hang it, or are denied by the sandbox."
 ROUND = "ROUND SCRIPT: a ticket's round script only lists states and the clicks between them — it imports `round`/`roundArgs` from scripts/wayfinder-autopilot/capture-round.mjs and uses the shared probes on `s` (focusIs, visible, hidden, count(selector, within), dialog, waitFor, probe, uniqueFile, tabWalk, press). Own probe code (document.activeElement reads, hand-rolled focus/visible/count helpers, argv parsing) is where #266 lost two sessions to harness bugs; the shared ones are tested. See the header of capture-round.mjs."
 def is_router(p): return "skills/intent/SKILL.md" in p or "skills/intent/intent/SKILL.md" in p
+MEASURE_SKILLS = re.compile(r"(autopilot/skills/(evaluate|include)\.md|skills/(evaluate|include)/SKILL\.md|impeccable/reference/(critique|audit)\.md)")
+BUILD_ONLY = "BUILD PHASE: critique, evaluate, audit and include are the measure session's readers (phases/build.md: no critique, no evaluate, no include readers in any gate step). This phase runs the round script, gate.mjs and the detector, fixes what they list, and ends at `milestone: build-done`; the scores come from the next phase, on its own budget."
+def measure_skill(p): return os.environ.get("WAYFINDER_PHASE", "") == "build" and bool(MEASURE_SKILLS.search(p))
+# The same drift through a subagent: #380's G2 launched six scoring agents
+# ("critique + evaluate", "re-score after fix", "correct-polarity critique"),
+# each a fresh 20K+ context, chasing numbers the measure phase produces once.
+SCORING = re.compile(r"\b(critique|evaluate|heuristic|nielsen|ux health|health score|re-?scor\w*|scor(e|ing) (the|two|these|both|this))\b", re.I)
+BUILD_AGENT = "BUILD PHASE: no scoring agents here — critique/evaluate readers run in the measure session (phases/measure.md), once, on a fresh budget, and the close session decides on their output. A build-phase Agent is for a bounded read-only search or a fix; the gate's evidence is gate.mjs + detector counts, not heuristic scores."
 def spec_done():
     try: return "milestone: spec-done" in open(hand).read()
     except Exception: return False
@@ -150,6 +162,7 @@ if tool == "Bash":
     if inp.get("run_in_background"):
         deny("NO BACKGROUND COMMANDS: a headless session ends the moment a turn has no tool call, and everything it started dies with it. Run this in the foreground (`timeout` up to 600000 ms) and read its result in the same turn; a long capture round is one foreground call, not a wait.")
     if is_router(c): deny(ROUTER)
+    if measure_skill(c) and re.search(r"\b(cat|sed|head|tail|less|awk|grep|rg)\b", c): deny(BUILD_ONLY)
     # A capture round without a long tool timeout gets backgrounded by the
     # harness at 2 min, and the session then polls the task file turn after
     # turn (#270 G2 r1: sleep/echo/while-ps loops at 40K a turn).
@@ -180,10 +193,15 @@ if tool == "Bash":
     if cont and "impeccable/reference/shape.md" in c and spec_done():
         deny("CONTINUATION: `impeccable shape` is the pre-build sub-command and the spec phase already ran it. Read craft-floor.md by range and the sub-command this phase needs (polish, critique, audit, clarify, adapt).")
     sys.exit(0)
+if tool in ("Agent", "Task"):
+    if os.environ.get("WAYFINDER_PHASE", "") == "build" and SCORING.search(inp.get("description", "") + " " + inp.get("prompt", "")):
+        deny(BUILD_AGENT)
+    sys.exit(0)
 if tool == "Read":
     p = inp.get("file_path", ""); ranged = "limit" in inp or "offset" in inp
     if CRAFT in p: mark_craft(); sys.exit(0)
     if is_router(p): deny(ROUTER)
+    if measure_skill(p): deny(BUILD_ONLY)
     if "impeccable/reference/routing.md" in p: deny(MENU)
     if cont and "impeccable/reference/shape.md" in p and spec_done():
         deny("CONTINUATION: `impeccable shape` is the pre-build sub-command and the spec phase already ran it. Read craft-floor.md by range and the sub-command this phase needs (polish, critique, audit, clarify, adapt).")
