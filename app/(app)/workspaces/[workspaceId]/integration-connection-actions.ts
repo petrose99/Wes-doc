@@ -12,7 +12,6 @@ import config from "@/lib/config"
 import { getValidAccessToken, TokenRefreshError } from "@/lib/integration-token-refresh"
 import { listExpenseAccounts as listQuickbooksAccounts } from "@/lib/integrations/quickbooks/client"
 import { listExpenseAccounts as listXeroAccounts } from "@/lib/integrations/xero/client"
-import { listAccounts as listBigcapitalAccounts } from "@/lib/integrations/bigcapital/client"
 import { syncAccountingEntities } from "@/lib/integrations/sync"
 import { syncLedgerTransactions } from "@/lib/health/sync"
 import {
@@ -57,9 +56,6 @@ export async function listExpenseAccountsAction(workspaceId: string, connectionI
         break
       case "xero":
         accounts = (await listXeroAccounts(connection.externalTenantId, accessToken)).map((a) => ({ id: a.code, name: a.name }))
-        break
-      case "bigcapital":
-        accounts = await listBigcapitalAccounts(accessToken, connection.externalTenantId)
         break
       default:
         return { success: false, error: "Unsupported accounting provider" }

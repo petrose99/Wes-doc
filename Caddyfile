@@ -13,7 +13,3 @@
 {$DOCUBITE_WWW_DOMAIN} {
 	redir https://{$DOCUBITE_DOMAIN}{uri} permanent
 }
-
-{$BIGCAPITAL_DOMAIN} {
-	reverse_proxy bigcapital-webapp:80
-}

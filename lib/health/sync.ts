@@ -172,7 +172,7 @@ export async function syncDueLedgerConnections(): Promise<number> {
       await syncLedgerTransactions(connection.id)
       // Held for the staleness window even on success: if the provider returned nothing there is no
       // row to carry a syncedAt, and the check above would call this connection due again instantly.
-      syncHolds.set(connection.id, { failures: 0, nextAttemptAt: now + staleMs })
+      syncHolds.set(connection.id, { failures: 0, nextAttemptAt: now + LEDGER_SYNC_STALE_MS })
       synced++
     } catch (error) {
       const failures = (hold?.failures ?? 0) + 1

@@ -12,7 +12,6 @@ import { recordDocumentAudit } from "@/lib/audit"
 import { getCurrentUser } from "@/lib/auth"
 import config from "@/lib/config"
 import { BillMappingError, normalizeBillFromDocument } from "@/lib/integration-bill-mapping"
-import { extractBankStatementPayload } from "@/lib/integrations/bigcapital/bank-statement-mapper"
 import { attemptIntegrationPush, getActiveIntegrationConnectionId, kickIntegrationPushDrain } from "@/lib/integration-push"
 import { getWorkspaceDocument, listReadyToPushDocuments } from "@/models/documents"
 import { getCategoryAccountMap, upsertWorkspaceIntegrationPush, workspaceIntegrationsPlanEnabled } from "@/models/integrations"
@@ -65,31 +64,22 @@ export async function pushDocumentToConnection(
     resolvedAccountId = resolveCategoryAccount(mappings, category, inferredMap, connection.defaultExpenseAccountId)
   }
 
-  let payload: object
-  if (documentType === "bank_statement" && connection.provider === "bigcapital") {
-    const cashflowAccountId = resolvedAccountId ?? connection.defaultExpenseAccountId
-    const creditAccountId = connection.defaultExpenseAccountId
-    if (!cashflowAccountId || !creditAccountId) throw new Error("No bank account configured for statement push")
-    payload = extractBankStatementPayload(document.id, reviewedData, cashflowAccountId, creditAccountId)
-  } else {
-    // Ledger books everything in the workspace's base currency: if the document has been
-    // converted, the bill body carries the converted total + base currency, NOT the extracted
-    // ones. A same-currency document has baseCurrencyTotal populated via the "identity" shortcut,
-    // so this branch covers those too — and a foreign-currency doc with pending FX was rejected
-    // above, so at this point either baseCurrencyTotal exists or the document was already same-
-    // currency to begin with.
-    const fxOverride = workspaceBase && document.baseCurrencyTotal !== null
-      ? { total: Number(document.baseCurrencyTotal), currencyCode: workspaceBase }
-      : null
-    const bill = normalizeBillFromDocument({ documentId: document.id, filename: document.filename, templateCode: document.template?.code ?? null, reviewedData, fxOverride })
-    const direction: "payable" | "receivable" = documentType === "sale" ? "receivable" : "payable"
-    payload = { ...bill, documentType, direction, ...(resolvedAccountId ? { expenseAccountId: resolvedAccountId } : {}), ...(category ? { category } : {}) }
-  }
+  // Ledger books everything in the workspace's base currency: if the document has been
+  // converted, the bill body carries the converted total + base currency, NOT the extracted
+  // ones. A same-currency document has baseCurrencyTotal populated via the "identity" shortcut,
+  // so this covers those too — and a foreign-currency doc with pending FX was rejected above, so
+  // at this point either baseCurrencyTotal exists or the document was already same-currency.
+  const fxOverride = workspaceBase && document.baseCurrencyTotal !== null
+    ? { total: Number(document.baseCurrencyTotal), currencyCode: workspaceBase }
+    : null
+  const bill = normalizeBillFromDocument({ documentId: document.id, filename: document.filename, templateCode: document.template?.code ?? null, reviewedData, fxOverride })
+  const direction: "payable" | "receivable" = documentType === "sale" ? "receivable" : "payable"
+  const payload: object = { ...bill, documentType, direction, ...(resolvedAccountId ? { expenseAccountId: resolvedAccountId } : {}), ...(category ? { category } : {}) }
 
   const push = await upsertWorkspaceIntegrationPush(workspaceId, {
     connectionId: connection.id,
     documentId: document.id,
-    provider: connection.provider as "quickbooks" | "xero" | "bigcapital",
+    provider: connection.provider as "quickbooks" | "xero",
     payload,
     createdById: userId,
   })

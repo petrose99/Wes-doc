@@ -271,7 +271,7 @@ The hard limit of 200 MB of stored documents per workspace. It must be disclosed
 _Avoid_: Unlimited storage
 
 **Connected accounting system**:
-An external accounting platform a workspace can connect to today, currently QuickBooks Online, Xero or Bigcapital.
+An external accounting platform a workspace can connect to today, currently QuickBooks Online or Xero.
 _Avoid_: Available integration when the connector is not live
 
 **Planned integration**:
@@ -311,7 +311,7 @@ The Product capability that surfaces scored pipeline, ledger, and tax hygiene so
 _Avoid_: Data correctness guarantee, audit certification
 
 **Integrations & API**:
-The Product capability for sending reviewed data to a connected accounting system (Xero, QuickBooks or Bigcapital) and workspace-scoped external systems through documented API and webhook surfaces.
+The Product capability for sending reviewed data to a connected accounting system (Xero or QuickBooks) and workspace-scoped external systems through documented API and webhook surfaces.
 _Avoid_: Universal integration, available connector when it is only planned
 
 **Capability page**:
