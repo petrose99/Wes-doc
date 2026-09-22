@@ -33,7 +33,7 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ w
   ])
   const connectionsWithSync = await Promise.all(connections.map(async (connection) => ({ ...connection, lastSyncedAt: await getLastSyncedAt(workspaceId, connection.id) })))
 
-  const activeConnection = connections.find((c) => c.status === "active")
+  const activeConnection = connections.find((c) => c.status === "connected")
   const [mappings, entities, facets] = activeConnection
     ? await Promise.all([listCategoryAccountMappings(workspaceId, activeConnection.id), listAccountingEntities(workspaceId, "account"), listLibraryFacets(workspaceId)])
     : [[], [], null]
@@ -50,7 +50,7 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ w
       apiKeys={apiKeys}
       endpoints={endpoints}
       deliveries={deliveries}
-      accountingProviders={{ quickbooks: config.integrations.quickbooks.enabled, xero: config.integrations.xero.enabled }}
+      nangoEnabled={config.integrations.nango.enabled}
       connections={connectionsWithSync}
     />
 

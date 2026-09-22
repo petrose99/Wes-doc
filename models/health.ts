@@ -175,7 +175,7 @@ async function loadLowConfidenceFields(workspaceId: string): Promise<LowConfiden
  * for the default-account picker. */
 async function loadLedgerContext(workspaceId: string): Promise<LedgerContext | null> {
   const connection = await prisma.integrationConnection.findFirst({
-    where: { workspaceId, status: "active" },
+    where: { workspaceId, status: "connected" },
     select: { id: true },
     orderBy: { createdAt: "asc" },
   })
@@ -645,7 +645,7 @@ export type ProjectedHealthScoreResult = ProjectedScoreResult & {
 
 export async function getProjectedHealthScore(workspaceId: string): Promise<ProjectedHealthScoreResult | null> {
   try {
-    const connection = await prisma.integrationConnection.findFirst({ where: { workspaceId, status: "active" }, select: { id: true } })
+    const connection = await prisma.integrationConnection.findFirst({ where: { workspaceId, status: "connected" }, select: { id: true } })
     if (!connection) return null
 
     const now = new Date()

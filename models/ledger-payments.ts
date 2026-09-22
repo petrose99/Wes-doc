@@ -20,7 +20,7 @@ export async function getDocumentPaymentStatuses(
   })
   if (!pushes.length) return new Map()
 
-  const connectionIds = [...new Set(pushes.map((p) => p.connectionId))]
+  const connectionIds = [...new Set(pushes.map((p) => p.connectionId).filter((id): id is string => Boolean(id)))]
   const externalIds = pushes.map((p) => p.externalBillId!).filter(Boolean)
   const ledgerRows = await prisma.ledgerTransaction.findMany({
     where: {

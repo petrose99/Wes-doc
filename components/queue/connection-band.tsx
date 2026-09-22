@@ -4,18 +4,16 @@ import type { LedgerBandStatus } from "@/lib/integration-push"
 
 const COPY: Record<LedgerBandStatus, string> = {
   disconnected: "No ledger connected — posts are waiting.",
-  needs_reauth: "Ledger needs reauthorization — posts are waiting.",
-  no_default_account: "Ledger has no default account set — posts are waiting.",
+  needs_reconnect: "Ledger needs reconnecting — posts are waiting.",
 }
 
 /** "disconnected" now also covers the (post-#380) default case of never having had a
  * connection — "Reconnect" would misstate that, so it gets the same "Connect" label the
  * Finance/Accounting page's own button uses (#380's one-term rule: connect the ledger,
- * once, in one word). The other two statuses did have a connection, so "Reconnect" still fits. */
+ * once, in one word). "needs_reconnect" did have a connection, so "Reconnect" still fits. */
 const LINK_LABEL: Record<LedgerBandStatus, string> = {
   disconnected: "Connect",
-  needs_reauth: "Reconnect",
-  no_default_account: "Reconnect",
+  needs_reconnect: "Reconnect",
 }
 
 /** #281 spec.md §6: the queue-scoped connection-failure band — same structural family as

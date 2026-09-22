@@ -20,7 +20,7 @@ async function enqueuePush(
   if (!isPushableDocument(document)) return false
   if (!isCategoryConfirmed((document.codingData as Record<string, unknown> | null))) return false
 
-  const connection = await prisma.integrationConnection.findFirst({ where: { workspaceId, status: "active" }, orderBy: { createdAt: "asc" } })
+  const connection = await prisma.integrationConnection.findFirst({ where: { workspaceId, status: "connected" }, orderBy: { createdAt: "asc" } })
   if (!connection) return false
 
   const existingPush = await prisma.integrationPush.findFirst({ where: { workspaceId, documentId: document.id, connectionId: connection.id }, select: { id: true } })

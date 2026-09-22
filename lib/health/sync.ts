@@ -1,5 +1,4 @@
 import { prisma } from "@/lib/db"
-import { getValidAccessToken } from "@/lib/integration-token-refresh"
 import * as quickbooks from "@/lib/integrations/quickbooks/client"
 import * as xero from "@/lib/integrations/xero/client"
 import { unscoped } from "@/lib/workspace-scope"
@@ -7,8 +6,8 @@ import { Prisma } from "@/prisma/client"
 
 /** Phase B: pulls bills/expenses/bank-transactions from the connection's provider and upserts
  * them as LedgerTransaction rows — mirrors lib/integrations/sync.ts's syncAccountingEntities
- * exactly (same connection lookup, same getValidAccessToken credential handling, same
- * upsert-then-soft-retire $transaction shape). A row from a prior sync the provider no longer
+ * exactly (same connection lookup, connection.id doubling as Nango's connectionId per ADR 0005,
+ * same upsert-then-soft-retire $transaction shape). A row from a prior sync the provider no longer
  * returns is marked inactive rather than deleted, same convention as AccountingEntity. */
 export async function syncLedgerTransactions(connectionId: string): Promise<{ synced: number }> {
   const connection = await prisma.integrationConnection.findUniqueOrThrow({
@@ -17,8 +16,7 @@ export async function syncLedgerTransactions(connectionId: string): Promise<{ sy
   })
   if (!connection.externalTenantId) throw new Error("integration_connection_not_ready")
 
-  const accessToken = await getValidAccessToken(connection.id)
-  const rows = await fetchProviderLedgerTransactions(connection.provider, connection.externalTenantId, accessToken)
+  const rows = await fetchProviderLedgerTransactions(connection.provider, connection.externalTenantId, connection.id)
 
   const syncedAt = new Date()
   // Phase 5: rows DocuBite itself reconciled must not be clobbered back to false by a sync that
@@ -147,7 +145,7 @@ export async function syncDueLedgerConnections(): Promise<number> {
   // lib/workspace-scope.ts's own documented exception for background workers that claim jobs
   // across all tenants.
   const connections = await unscoped(() => prisma.integrationConnection.findMany({
-    where: { status: "active" },
+    where: { status: "connected" },
     select: { id: true, provider: true },
   }))
   if (!connections.length) return 0
@@ -220,12 +218,12 @@ function readXeroIsReconciled(payload: unknown): boolean {
   return raw.IsReconciled === true || raw.isReconciled === true
 }
 
-function fetchProviderLedgerTransactions(provider: string, externalTenantId: string, accessToken: string): Promise<SyncRow[]> {
+function fetchProviderLedgerTransactions(provider: string, externalTenantId: string, connectionId: string): Promise<SyncRow[]> {
   switch (provider) {
     case "quickbooks":
-      return fetchQuickBooksLedgerTransactions(externalTenantId, accessToken)
+      return fetchQuickBooksLedgerTransactions(externalTenantId, connectionId)
     case "xero":
-      return fetchXeroLedgerTransactions(externalTenantId, accessToken)
+      return fetchXeroLedgerTransactions(externalTenantId, connectionId)
     default:
       throw new Error(`unsupported_integration_provider_${provider}`)
   }
@@ -237,10 +235,10 @@ function fetchProviderLedgerTransactions(provider: string, externalTenantId: str
  * row starts reconciled: false — QuickBooks' API has no "cleared/reconciled" flag on Bill/Purchase
  * (that concept lives on bank feed transactions, which this app doesn't sync), so
  * unreconciled_transactions.ts is only ever informative, never a false "already reconciled". */
-async function fetchQuickBooksLedgerTransactions(realmId: string, accessToken: string): Promise<SyncRow[]> {
+async function fetchQuickBooksLedgerTransactions(realmId: string, connectionId: string): Promise<SyncRow[]> {
   const [bills, expenses] = await Promise.all([
-    quickbooks.listBills(realmId, accessToken),
-    quickbooks.listExpenses(realmId, accessToken),
+    quickbooks.listBills(realmId, connectionId),
+    quickbooks.listExpenses(realmId, connectionId),
   ])
   return [
     ...bills.map((b): SyncRow => ({
@@ -263,10 +261,10 @@ async function fetchQuickBooksLedgerTransactions(realmId: string, accessToken: s
  * lib/integrations/xero/client.ts's listBankTransactions). accountCode doubles as both
  * accountExternalId and accountName here (Xero accounts have no separate numeric id — see
  * lib/integrations/sync.ts's fetchXeroEntities using the same Code-as-id convention). */
-async function fetchXeroLedgerTransactions(tenantId: string, accessToken: string): Promise<SyncRow[]> {
+async function fetchXeroLedgerTransactions(tenantId: string, connectionId: string): Promise<SyncRow[]> {
   const [bills, bankTransactions] = await Promise.all([
-    xero.listBills(tenantId, accessToken),
-    xero.listBankTransactions(tenantId, accessToken),
+    xero.listBills(tenantId, connectionId),
+    xero.listBankTransactions(tenantId, connectionId),
   ])
   return [
     ...bills.map((b): SyncRow => ({

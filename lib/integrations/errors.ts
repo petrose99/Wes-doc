@@ -6,8 +6,8 @@
 
 /** Thrown by a provider client when a call fails because the connection's authorization itself is
  * no longer valid (401 with an invalid/expired/revoked token, or a refresh whose grant was revoked).
- * lib/integration-token-refresh.ts catches this specifically to move the connection to
- * "needs_reauth" instead of treating it as an ordinary retryable failure. */
+ * lib/integration-push.ts catches this specifically to move the connection to "needs_reconnect"
+ * instead of treating it as an ordinary retryable failure. */
 export class IntegrationAuthError extends Error {}
 
 /** Thrown for a provider failure that will fail identically on every retry — the push is failed
