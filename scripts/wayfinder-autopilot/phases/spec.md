@@ -1,7 +1,30 @@
 ## Phase brief: SPEC
 
+**Classify the work by the paths it touches before anything else** (the
+same rule as a CI `paths:` filter or CODEOWNERS: the files decide which
+checks are owed, not the ticket's title). Draft the build plan's step list
+first — name and files per step — and mark each step's kind:
+
+- `kind: surface` — any file under `app/**` or `components/**` that renders
+  (`.tsx`, `.css`; tests excluded). The step owes the design pass below and
+  the detector at measure.
+- `kind: backend` — everything else (`lib/`, `models/`, `prisma/`, `worker/`,
+  `scripts/`, `app/api/**` routes, actions files). No Intent or Impeccable
+  reads, no craft floor, no detector: read the code it touches, build it,
+  run its check.
+
+The pre-build pass (items 1–4) is owed **only if at least one step is
+`surface`**, and scoped to those steps' states and copy. A ticket whose
+steps are all backend writes one line on the hand-off — `design pass: not
+owed (no surface steps)` — skips items 1–4 and G1–G2, and goes straight to
+item 5 with G3 as its only gate. A mixed ticket (#380: four backend steps
+and one surface step) runs items 1–4 for the surface step alone, sized to
+it — not to the deletion around it. The build hook enforces the rendering
+half: an `Edit`/`Write` under `app/**|components/**` is refused until the
+session has read `craft-floor.md`.
+
 **The skills are there so the first pass is right.** Before the first line of
-code on an execution ticket, the pre-build pass is mandatory and is done
+code on a surface step, the pre-build pass is mandatory and is done
 properly, not skimmed:
 
 1. `specify` (its file, read directly — this brief is the router; the
@@ -57,9 +80,9 @@ properly, not skimmed:
    no heuristic under 3, two 4s, Clean.** Under the gate you change the
    spec, never the code later. The filled tables are the build checklist.
 5. **Write the build plan onto the hand-off** as the last act of this phase:
-   ordered `step: N — ‹name› — todo` lines, one per surface/state group,
-   each naming the spec lines it comes from, the files it touches and its
-   check; the three gate steps last (`G1 — round script`, `G2 — r0 and
+   ordered `step: N — ‹name› — kind: surface|backend — todo` lines, one
+   per surface/state group (or per backend module group), each naming the
+   spec lines it comes from, the files it touches and its check; the three gate steps last (`G1 — round script`, `G2 — r0 and
    fixes`, `G3 — build-done`, as `phases/build.md` defines them). The build
    sessions run one step each from this plan.
 6. **Size the ticket to the phases, now — before any code.** The four-phase

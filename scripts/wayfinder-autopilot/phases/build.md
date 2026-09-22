@@ -1,8 +1,18 @@
 ## Phase brief: BUILD
 
 **One plan step per session.** The hand-off carries the build plan: ordered
-`step: N — ‹name› — todo|done` lines with the spec lines, files and check for
-each. If the plan is not there (a spec that predates it), write it first from
+`step: N — ‹name› — kind: surface|backend — todo|done` lines with the spec
+lines, files and check for each. **The kind decides what the step owes** (a
+path filter, not a judgement call — see phases/spec.md "Classify"): a
+`surface` step (renders under `app/**` or `components/**`) reads
+`craft-floor.md` whole and the Intent digests the spec's Action Summary
+named (`fortify` for its states, `articulate` for its words) before its
+first edit, and builds with the detector hook on; a `backend` step reads
+none of that — the code it touches, the step's check, done. A step line
+without a `kind:` (a plan written before this rule) is classified now from
+its file list and the line amended. The hook refuses an `Edit`/`Write` of a
+rendering file until `craft-floor.md` has been read this session; it never
+touches a backend path. If the plan is not there (a spec that predates it), write it first from
 the spec's tables and then build step 1. Otherwise build the **first `todo`
 step only**: read the hand-off, then the spec sections and pre-flight parts
 that step names by line range, the one area primer for this surface, and any

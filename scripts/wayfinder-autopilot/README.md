@@ -34,6 +34,8 @@ scripts/wayfinder-autopilot/stop.sh <map>                     # stop cleanly: ru
 Watch: `tail -f docs/wayfinder-reports/<map>/detached.out`.
 Stop: `kill <driver pid>` (current ticket finishes, nothing new starts).
 
+Path-based design gate: the spec phase marks every plan step `kind: surface|backend` from the files it touches (`app/**`/`components/**` rendering files → surface); only surface steps owe the Intent/Impeccable pass and the detector, and `token-guard.sh` refuses an Edit/Write of a rendering file until `craft-floor.md` has been read in that session. Backend paths are never gated.
+
 Phased builds: a "Build …" task ticket runs as four fresh sessions — spec → build → measure → close — read off `milestone:` lines in the hand-off (`spec-done`, `build-done`, `measured`); the driver keeps a high-water mark in `<ticket>.phase` so a phase never moves backwards.
 
 Capture rounds: `capture-round.mjs` is the shared runner for the measure and close phases (fresh context per state, detector injection, residue filter, keyboard probes, per-state error isolation, `detector.json` + `keyboard.json`); a ticket's round script is a state list on top of it. The token-guard hook refuses `git commit` and any Write/Edit of the hand-off while it is over `WAYFINDER_HANDOFF_MAX_LINES` (80 in this repo's `config.sh`); context-guard nags once as well, and the run-log row records the length. The same hook refuses `gh issue close` on a ticket that touched `app/` or `components/` until the report's `scores:` line carries close-critique ≥ 30 and close-evaluate ≥ 80.

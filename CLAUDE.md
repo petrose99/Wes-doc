@@ -8,6 +8,8 @@ The two split one job. **Intent decides *why, what and how it behaves*** — who
 
 "Design work" means any of: visual design, layout, spacing, typography, colour, motion, component structure, information architecture, user flows, UX copy, empty/error/loading states, responsive behaviour, or accessibility of a rendered surface. It covers both the marketing site (`app/(marketing)`, `components/marketing`) and the authenticated app (`app/app`, `components/**`).
 
+**The gate is path-based, not title-based** (added 2026-09-22, the way CI `paths:` filters and CODEOWNERS work): a change owes the design pass when it touches a rendering file — `app/**` or `components/**`, `.tsx`/`.css`, tests excluded — and owes nothing from Intent or Impeccable when it touches only `lib/`, `models/`, `prisma/`, `worker/`, `scripts/`, `app/api/**` or `*actions.ts`. A backend change is worked out from the code and its tests; calling the design skills on it is waste, not diligence. A mixed ticket (a deletion with one reduced page, say) runs the pass for the rendering step alone, sized to it. Autopilot build plans carry `kind: surface|backend` per step, and the token-guard hook refuses an edit of a rendering file until `craft-floor.md` has been read in that session.
+
 How to comply:
 
 1. **Call the Skill tool with `intent` before the work starts.** Route to the Intent skill that matches the request — `strategize`, `investigate`, `blueprint`, `journey`, `organize`, `wireframe`, `articulate`, `evaluate`, `fortify`, `include`, `transpose`, `localize`, `measure`, `philosopher`, `specify`. Establish project context once per session (users, product, constraints, ethical stance, success); say what is assumed where context is missing.

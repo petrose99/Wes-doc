@@ -15,6 +15,11 @@
 #      router and names the skills. Same for impeccable's routing menu.
 #   5. `impeccable shape` after spec-done — the pre-build sub-command; the
 #      later phases use polish/critique/audit, which stay allowed.
+#   6. Path-based design gate: an Edit/Write of a rendering file (app/** or
+#      components/**, .tsx/.css, not tests) is refused until this session
+#      has read craft-floor.md (Read, or Bash cat/sed of it). Backend paths
+#      (lib/, models/, prisma/, worker/, app/api/**, *actions.ts) are never
+#      gated — the files decide what a step owes, not the ticket's title.
 [ -n "${WAYFINDER_CTX_FILE:-}" ] || exit 0
 IN="$(cat)"
 python3 - "$IN" <<'PY'
@@ -44,6 +49,23 @@ def handoff_lines(text=None):
     except Exception: return 0
 hmax = int(os.environ.get("WAYFINDER_HANDOFF_MAX_LINES", "80"))
 def too_long(n): return f"HAND-OFF TOO LONG: {hand} would be {n} lines (limit {hmax}). It is a state file, not a log: keep the `milestone:` lines, the `step:` plan (a done step is one line, no notes under it), an Artifacts list of paths, Open findings as a pointer to <scratch>/close.md, and the exact next step. Delete every '(this session)' / '## G2 notes' narrative; move anything worth keeping into a file in the scratch folder and link it. Then retry."
+# Path-based design gate (#376, 2026-09-22). The spec brief classifies each
+# build step `surface|backend` from its paths; this is the half the hook can
+# hold deterministically. craft-floor.md read → flag file beside the ctx file.
+CRAFT = "impeccable/reference/craft-floor.md"
+def craft_flag(): return ctx + ".craft-floor"
+def mark_craft():
+    try: open(craft_flag(), "w").write("1")
+    except Exception: pass
+def craft_read():
+    return os.path.exists(craft_flag())
+def is_render_path(p):
+    p = os.path.relpath(os.path.abspath(p), os.getcwd()) if p else ""
+    if p.startswith("../"): return False
+    if not re.match(r"^(app|components)/.*\.(tsx|css)$", p): return False
+    if re.search(r"\.test\.tsx$|/api/|actions\.ts$", p): return False
+    return True
+DESIGN = "DESIGN GATE: {p} renders (app/** or components/**), so this step is `kind: surface` and owes the design pass before its first edit: read `.claude/skills/impeccable/reference/craft-floor.md` whole (it is short) and the Intent digests the spec's Action Summary named (fortify for the states, articulate for the words — the *Skill files* list in the system prompt). Backend paths (lib/, models/, prisma/, worker/, app/api/**, *actions.ts) are not gated. Then retry the edit."
 # Closing-bar gate. #327 and #328 closed with `close-critique=n/a` and no
 # detector run: a single-session task that changed rendered files treated
 # the bar as optional. A `gh issue close` of this session's ticket is refused
@@ -104,6 +126,7 @@ def closing_bar(c):
     deny(f"CLOSING BAR: ticket #{t} changed rendered files ({', '.join(ui[:5])}{' …' if len(ui) > 5 else ''}), so it closes only at the bar: the report {rep} needs a `scores:` line with integer close-critique >= 30 (every heuristic >= 3) and close-evaluate >= 80, produced by the critique/evaluate readers on a capture round with the in-page detector cleared. Found: {line.strip() or 'no scores: line'}. Run phases/measure.md then close.md (a small ticket does both in this session), write the line, then close — or hand off with `Autopilot: continue —`.")
 if tool == "Bash":
     c = inp.get("command", "")
+    if CRAFT in c and re.search(r"\b(cat|sed|head|tail|less|awk)\b", c): mark_craft()
     # A background command plus "I'll wait for the notification" ends a
     # headless session (#266 session 26 lost a capture round this way; #253
     # before it). Run it in the foreground with a timeout instead.
@@ -132,6 +155,7 @@ if tool == "Bash":
     sys.exit(0)
 if tool == "Read":
     p = inp.get("file_path", ""); ranged = "limit" in inp or "offset" in inp
+    if CRAFT in p: mark_craft(); sys.exit(0)
     if is_router(p): deny(ROUTER)
     if "impeccable/reference/routing.md" in p: deny(MENU)
     if cont and "impeccable/reference/shape.md" in p and spec_done():
@@ -155,6 +179,8 @@ if tool == "Read":
         if lines > mx:
             deny(f"READ BY RANGE: {os.path.basename(p)} is {lines} lines. Whole-file reads are the largest avoidable cost in these sessions (each is re-read on every later turn). Run `grep -n <symbol|heading> {p}` first, then Read with offset+limit for just the lines you need (or `sed -n a,bp`). Files under {mx} lines may be read whole.")
     sys.exit(0)
+if tool in ("Write", "Edit") and is_render_path(inp.get("file_path", "")) and not craft_read():
+    deny(DESIGN.format(p=os.path.relpath(os.path.abspath(inp.get("file_path", "")), os.getcwd())))
 if tool in ("Write", "Edit") and hand and os.path.abspath(inp.get("file_path", "")) == os.path.abspath(hand):
     if tool == "Write": n = handoff_lines(inp.get("content", ""))
     else:
