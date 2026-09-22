@@ -1,70 +1,19 @@
-import config from "@/lib/config"
-import { IntegrationAuthError } from "@/lib/integrations/errors"
-import { XERO_API_BASE, XERO_CONNECTIONS_URL, XERO_TOKEN_URL } from "@/lib/integrations/xero/config"
-import { xeroApiError } from "@/lib/integrations/xero/errors"
+import { nangoProxy } from "@/lib/nango"
+import { XERO_API_BASE } from "@/lib/integrations/xero/config"
 
-/** Thin fetch wrappers around the Xero Accounting API + the tenant-discovery /connections endpoint.
- * No SDK, same rationale as lib/integrations/quickbooks/client.ts. Every function throws rather than
- * returning an error union. */
+/** Thin wrappers around the Xero Accounting API, called through Nango's proxy (ADR 0005: Nango
+ * owns the OAuth app, token refresh, and tenant discovery — `getConnectionConfig` in lib/nango.ts
+ * reads back the connected `tenantId` after the Nango `AUTH` webhook fires, replacing this file's
+ * old fetchConnections). No SDK, same rationale as lib/integrations/quickbooks/client.ts. Every
+ * function throws rather than returning an error union. */
 
-const REQUEST_TIMEOUT_MS = 15_000
-
-type TokenResponse = { connectionId: string; refreshToken: string; expiresInSeconds: number }
-
-function basicAuthHeader(): string {
-  return "Basic " + Buffer.from(`${config.integrations.xero.clientId}:${config.integrations.xero.clientSecret}`).toString("base64")
-}
-
-async function tokenRequest(body: URLSearchParams): Promise<TokenResponse> {
-  const response = await fetch(XERO_TOKEN_URL, {
-    method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded", accept: "application/json", authorization: basicAuthHeader() },
-    body,
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-  })
-  if (!response.ok) {
-    if (response.status === 400 || response.status === 401) throw new IntegrationAuthError(`xero_token_http_${response.status}`)
-    throw xeroApiError(response.status)
-  }
-  const json = (await response.json()) as { access_token: string; refresh_token: string; expires_in: number }
-  return { accessToken: json.access_token, refreshToken: json.refresh_token, expiresInSeconds: json.expires_in }
-}
-
-export async function exchangeCodeForTokens(code: string, redirectUri: string): Promise<TokenResponse> {
-  return tokenRequest(new URLSearchParams({ grant_type: "authorization_code", code, redirect_uri: redirectUri }))
-}
-
-export async function refreshTokens(refreshToken: string): Promise<TokenResponse> {
-  return tokenRequest(new URLSearchParams({ grant_type: "refresh_token", refresh_token: refreshToken }))
-}
-
-/** Fetches the tenant (organisation) connections available to this access token, right after the
- * initial token exchange — Xero's authorize step doesn't hand back a tenant id the way QuickBooks'
- * realmId does, so this is how the callback learns which organisation was actually authorized. */
-export async function fetchConnections(connectionId: string): Promise<Array<{ tenantId: string; tenantName: string }>> {
-  const response = await fetch(XERO_CONNECTIONS_URL, {
-    headers: { authorization: `Bearer ${accessToken}`, accept: "application/json" },
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-  })
-  if (!response.ok) throw xeroApiError(response.status)
-  const json = (await response.json()) as Array<{ tenantId: string; tenantName: string }>
-  return json.map((c) => ({ tenantId: c.tenantId, tenantName: c.tenantName }))
-}
+const PROVIDER_CONFIG_KEY = "xero"
 
 async function apiRequest<T>(tenantId: string, connectionId: string, path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${XERO_API_BASE}${path}`, {
+  return nangoProxy<T>(connectionId, PROVIDER_CONFIG_KEY, `${XERO_API_BASE}${path}`, {
     ...init,
-    headers: {
-      authorization: `Bearer ${accessToken}`,
-      "xero-tenant-id": tenantId,
-      accept: "application/json",
-      "content-type": "application/json",
-      ...(init?.headers || {}),
-    },
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    headers: { "xero-tenant-id": tenantId, ...(init?.headers || {}) },
   })
-  if (!response.ok) throw xeroApiError(response.status)
-  return (await response.json()) as T
 }
 
 export type XeroAccount = { code: string; name: string }

@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 // Mocked at the module boundary, same posture as lib/health/actions.test.ts — no database, no
 // provider. What matters here is the shape of the writes handed to $transaction.
 vi.mock("@/lib/db", () => ({ prisma: {} }))
-vi.mock("@/lib/integration-token-refresh", () => ({ getValidAccessToken: vi.fn().mockResolvedValue("api-key-1") }))
 vi.mock("@/lib/workspace-scope", () => ({ unscoped: (fn: () => unknown) => fn() }))
 vi.mock("@/lib/integrations/quickbooks/client", () => ({ listBills: vi.fn(), listExpenses: vi.fn(), listBankTransactions: vi.fn() }))
 vi.mock("@/lib/integrations/xero/client", () => ({ listBills: vi.fn(), listExpenses: vi.fn(), listBankTransactions: vi.fn() }))

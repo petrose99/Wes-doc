@@ -7,10 +7,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 // steps that were and weren't performed.
 vi.mock("@/lib/db", () => ({ prisma: {} }))
 vi.mock("@/lib/audit", () => ({ recordDocumentAudit: vi.fn() }))
-vi.mock("@/lib/integration-token-refresh", () => ({
-  getValidAccessToken: vi.fn().mockResolvedValue("token-123"),
-  TokenRefreshError: class TokenRefreshError extends Error {},
-}))
 vi.mock("@/lib/integrations/quickbooks/client", () => ({ voidBill: vi.fn().mockResolvedValue(undefined) }))
 vi.mock("@/lib/integrations/xero/client", () => ({ voidBill: vi.fn().mockResolvedValue(undefined) }))
 vi.mock("@/lib/integration-push", () => ({ attemptIntegrationPush: vi.fn().mockResolvedValue(undefined) }))
@@ -63,7 +59,7 @@ describe("executeVoidDuplicate", () => {
   it("calls the provider's voidBill and resolves the finding on a real execution", async () => {
     const result = await executeVoidDuplicate({ workspaceId: "ws1", findingId: "f1", actorId: "u1", dryRun: false })
     expect(result.ok).toBe(true)
-    expect(xero.voidBill).toHaveBeenCalledWith("org1", "token-123", "e2")
+    expect(xero.voidBill).toHaveBeenCalledWith("org1", "conn1", "e2")
     expect(db.ledgerTransaction.update).toHaveBeenCalledWith({ where: { id: "lt2" }, data: { active: false } })
     expect(resolveHealthFinding).toHaveBeenCalledWith({ workspaceId: "ws1", findingId: "f1", actorId: "u1", action: "void_duplicate" })
     expect(recordDocumentAudit).toHaveBeenCalledWith(expect.objectContaining({ type: "health_remediation_void_duplicate", outcome: "success" }))

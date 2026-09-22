@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 vi.mock("@/lib/db", () => ({ prisma: {} }))
 vi.mock("@/prisma/client", () => ({ Prisma: { JsonNull: null } }))
-vi.mock("@/lib/integration-token-refresh", () => ({ getValidAccessToken: vi.fn().mockResolvedValue("token-1") }))
 vi.mock("@/lib/integrations/quickbooks/client", () => ({
   listAccounts: vi.fn(),
   listVendors: vi.fn(),

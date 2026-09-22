@@ -19,7 +19,6 @@
 //      human clicked Confirm) and, being a server action, a request behind it.
 import { recordDocumentAudit } from "@/lib/audit"
 import { attemptIntegrationPush } from "@/lib/integration-push"
-import { getValidAccessToken, TokenRefreshError } from "@/lib/integration-token-refresh"
 import * as quickbooks from "@/lib/integrations/quickbooks/client"
 import * as xero from "@/lib/integrations/xero/client"
 import { prisma } from "@/lib/db"
@@ -35,7 +34,6 @@ export type RemediationOutcome = {
 }
 
 function errorMessage(error: unknown): string {
-  if (error instanceof TokenRefreshError) return `Could not obtain a valid access token: ${error.message}`
   return error instanceof Error ? error.message : "Unknown error"
 }
 
@@ -73,6 +71,7 @@ export async function executeVoidDuplicate(input: { workspaceId: string; finding
   })
   if (!transaction) return { ok: false, dryRun, message: "Duplicate transaction not found in the synced ledger" }
   if (!transaction.active) return { ok: false, dryRun, message: "That ledger transaction is already inactive" }
+  if (!transaction.connectionId) return { ok: false, dryRun, message: "That ledger transaction's connection was disconnected" }
 
   const connection = await prisma.integrationConnection.findUnique({
     where: { id: transaction.connectionId },
@@ -87,13 +86,12 @@ export async function executeVoidDuplicate(input: { workspaceId: string; finding
   }
 
   try {
-    const accessToken = await getValidAccessToken(connection.id)
     switch (connection.provider) {
       case "quickbooks":
-        await quickbooks.voidBill(connection.externalTenantId, accessToken, transaction.externalId)
+        await quickbooks.voidBill(connection.externalTenantId, connection.id, transaction.externalId)
         break
       case "xero":
-        await xero.voidBill(connection.externalTenantId, accessToken, transaction.externalId)
+        await xero.voidBill(connection.externalTenantId, connection.id, transaction.externalId)
         break
       default:
         return { ok: false, dryRun: false, message: `Unsupported provider "${connection.provider}"` }

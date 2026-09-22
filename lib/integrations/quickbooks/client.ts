@@ -1,61 +1,19 @@
-import config from "@/lib/config"
-import { IntegrationAuthError } from "@/lib/integrations/errors"
-import { QUICKBOOKS_TOKEN_URL, quickbooksCompanyBase } from "@/lib/integrations/quickbooks/config"
+import { nangoProxy } from "@/lib/nango"
+import { quickbooksCompanyBase } from "@/lib/integrations/quickbooks/config"
 import { quickbooksApiError } from "@/lib/integrations/quickbooks/errors"
 
-/** Thin fetch wrappers around the QuickBooks Online Accounting API. No SDK — the surface used here
- * (OAuth token exchange/refresh, a name-exact vendor query-or-create, one expense account list, one
- * bill create) is small enough that a dependency buys nothing. Every function throws (never returns
- * an error union) so callers use ordinary try/catch, matching the rest of the codebase's client
- * wrappers (e.g. lib/mineru.ts). */
+/** Thin wrappers around the QuickBooks Online Accounting API, called through Nango's proxy (ADR
+ * 0005: Nango owns the OAuth app and token refresh, `lib/nango.ts` is the only module that talks to
+ * it directly, and classifies proxy failures into the same IntegrationAuthError/Permanent/Retryable
+ * set `lib/integrations/quickbooks/errors.ts` used to build itself). No SDK — the surface used here
+ * (a name-exact vendor query-or-create, one expense account list, one bill create) is small enough
+ * that a dependency buys nothing. Every function throws (never returns an error union) so callers
+ * use ordinary try/catch, matching the rest of the codebase's client wrappers (e.g. lib/mineru.ts). */
 
-const REQUEST_TIMEOUT_MS = 15_000
-
-type TokenResponse = { connectionId: string; refreshToken: string; expiresInSeconds: number }
-
-function basicAuthHeader(): string {
-  return "Basic " + Buffer.from(`${config.integrations.quickbooks.clientId}:${config.integrations.quickbooks.clientSecret}`).toString("base64")
-}
-
-async function tokenRequest(body: URLSearchParams): Promise<TokenResponse> {
-  const response = await fetch(QUICKBOOKS_TOKEN_URL, {
-    method: "POST",
-    headers: {
-      "content-type": "application/x-www-form-urlencoded",
-      accept: "application/json",
-      authorization: basicAuthHeader(),
-    },
-    body,
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-  })
-  if (!response.ok) {
-    if (response.status === 400 || response.status === 401) throw new IntegrationAuthError(`quickbooks_token_http_${response.status}`)
-    throw quickbooksApiError(response.status)
-  }
-  const json = (await response.json()) as { access_token: string; refresh_token: string; expires_in: number }
-  return { accessToken: json.access_token, refreshToken: json.refresh_token, expiresInSeconds: json.expires_in }
-}
-
-/** Exchanges the callback's authorization `code` for an initial token pair. `redirectUri` must be
- * byte-identical to the one sent on the authorize request. */
-export async function exchangeCodeForTokens(code: string, redirectUri: string): Promise<TokenResponse> {
-  return tokenRequest(new URLSearchParams({ grant_type: "authorization_code", code, redirect_uri: redirectUri }))
-}
-
-/** Refreshes an access token. QuickBooks rotates the refresh token on every use, so the caller must
- * persist the returned refreshToken, not just the accessToken. */
-export async function refreshTokens(refreshToken: string): Promise<TokenResponse> {
-  return tokenRequest(new URLSearchParams({ grant_type: "refresh_token", refresh_token: refreshToken }))
-}
+const PROVIDER_CONFIG_KEY = "quickbooks"
 
 async function apiRequest<T>(realmId: string, connectionId: string, path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${quickbooksCompanyBase(realmId)}${path}`, {
-    ...init,
-    headers: { authorization: `Bearer ${accessToken}`, accept: "application/json", "content-type": "application/json", ...(init?.headers || {}) },
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-  })
-  if (!response.ok) throw quickbooksApiError(response.status)
-  return (await response.json()) as T
+  return nangoProxy<T>(connectionId, PROVIDER_CONFIG_KEY, `${quickbooksCompanyBase(realmId)}${path}`, init)
 }
 
 /** Escapes a value for QuickBooks' SQL-like query language single-quoted string literals. */
