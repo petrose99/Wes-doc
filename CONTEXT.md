@@ -134,7 +134,7 @@ The one link between a Company and its accounting provider, made by an Owner fro
 _Avoid_: Integration (as the user-facing noun), OAuth, token, Nango, sync (for the connection itself)
 
 **Bill Pay**:
-The queue of approved, unpaid invoices and approved, unpaid Expense claims from which payment batches are created. An invoice reaches it only once its processing state is Approved, a claim once it is approved; a row that cannot be paid yet (no bank details for its Payee) stays visible with the reason. A claim row has no terms, no discount, no countdown and no partial payment: its amount is the frozen claim total. A row held by a pending or approved payment batch reads *Scheduled* — still on the queue, not batchable again until the batch is rejected or paid. Amount to pay defaults to the discounted total inside an open discount window, else what is still due; an operator may set a smaller amount (a partial payment) per row.
+The queue of approved, unpaid invoices and approved, unpaid Expense claims from which payment batches are created. An invoice reaches it only once its processing state is Approved, a claim once it is approved; a row that cannot be paid yet (no bank details for its Payee) stays visible with the reason. A claim row has no terms, no discount, no countdown and no partial payment: its amount is the frozen claim total. A row with an open Payment line reads *Scheduled* while its batch is pending or approved and *Sent* once the file went in — still on the queue, not batchable again until the line is Withdrawn, Failed or Paid (a partial Paid leaves the rest batchable). Amount to pay defaults to the discounted total inside an open discount window, else what is still due; an operator may set a smaller amount (a partial payment) per row.
 _Avoid_: Payables, payment run (the queue), pay list
 
 **Payee**:
@@ -142,8 +142,28 @@ Who a Bill Pay row and a payment-file line pay: the invoice's Supplier or the Ex
 _Avoid_: Beneficiary (the file's column name, not the concept), vendor (for a person)
 
 **Payment batch**:
-A named set of approved invoices and approved Expense claims, one payer account and one currency, submitted by a member for an owner's decision. Pending approval, then Approved (its payment file can be downloaded), then Paid; or Rejected with a reason at either step until it is marked paid, which releases its invoices to Bill Pay. Whether the file has been downloaded is a fact shown on the batch, not a state. An owner may approve a batch they submitted themselves; the approval is labelled as self-approved, never blocked. A batch never moves money.
+A named set of approved invoices and approved Expense claims, one payer account and one currency, submitted by a member for an owner's decision. Pending approval, then Approved (its payment file, in the payer account's bank format, can be downloaded), then Sent once someone confirms the downloaded file went into the bank; from Sent each Payment line settles on its own, and the batch reads Settled when none is left open — a reading of its lines, not a state of its own. Rejected with a reason is possible until Sent, and withdraws its lines, releasing their rows to Bill Pay; after Sent there is no rejecting — lines fail instead, all at once when the bank refused the whole file; a Bank details change on one of its Payees rejects it automatically. Whether the file has been downloaded is a fact shown on the batch, not a state. An owner may approve a batch they submitted themselves; the approval is labelled as self-approved, never blocked. A batch never moves money: the customer uploads its file to their own bank.
 _Avoid_: Payment run, remittance (that is the advice sent to the supplier), transfer
+
+**Payment line**:
+One Payee's row in a Payment batch, carrying a Line reference that never changes, so an invoice or claim has at most one open line and is never paid twice. Each time a row enters a batch it gets a new line; a withdrawn or failed line keeps its identity for good. Queued while its batch is pending or approved, Withdrawn if the batch is rejected, Sent with its batch, then Paid (a Bank Statement line matched it, or an Owner marked it paid by hand with a reason) or Failed (an Owner said so, with a reason; its row returns to Bill Pay). A Paid line is a Payment record. A line the payer bank's file can't carry — an LS payer paying a ZA account — never enters a batch.
+_Avoid_: Transaction, instruction, payment (unqualified)
+
+**Line reference**:
+The short code ("DB" and eight characters) that names one Payment line, unique in its workspace and never reused. It leads every reference written into the file — beside the invoice number where the bank allows — so a statement line can be traced back to exactly one line.
+_Avoid_: Payment reference (ambiguous with the invoice number), transaction id
+
+**Sent**:
+The batch state that says its downloaded file went into the customer's bank, as confirmed by any member (who and when recorded). It is not proof of payment; every line can still fail. It can be undone, back to Approved, only while no line has settled.
+_Avoid_: Paid, submitted, processed
+
+**Bank details change**:
+An edit to a Payee's bank, branch code or account number after they were first entered (a new account type or holder name, or the same number reformatted, is not a change). It holds that Payee — no new batch, and any pending or approved batch holding them is rejected — until an Owner acknowledges or rejects it. Acknowledging records who and when and asks for no proof: confirming the account with the supplier is the Owner's responsibility, not DocuBite's. Rejecting restores the last acknowledged details. Several edits before a decision are one change, from the last acknowledged details to the latest; editing back to the acknowledged details ends it. The person who made the change cannot decide it unless they are the only Owner (then it reads self-acknowledged). A Payee's first bank details are not a change. Bank details are only ever saved by a person: details read off an invoice or a Bank confirmation are offered to pre-fill, never written, and an invoice whose details differ from those on file fails a Check.
+_Avoid_: Verified account, bank verification, AVS (DocuBite does not verify accounts); "verified" names only supplier trust
+
+**Bank confirmation**:
+The supplier's (or Claimant's) own letter confirming their bank details, optionally attached to a version of those details. It pre-fills them and is shown to the Owner deciding a Bank details change; it never marks the details verified and is never required.
+_Avoid_: Proof of account (as a requirement), verification letter
 
 **Payer account**:
 A named workspace bank account a payment batch is to be paid from — a label that tells the uploader which bank portal the file belongs to. DocuBite never holds the account's credentials and the file never carries its number.
@@ -154,7 +174,7 @@ A supplier's net days and, when offered, an early-payment discount: the percent 
 _Avoid_: Terms code, "2-10-30"
 
 **Payment record**:
-A DocuBite-side fact that an amount was paid against an invoice on a date, by a batch or by hand (Mark as paid). An invoice's paid state is derived from the ledger when it confirms payment, otherwise from its payment records. A payment record can be removed with a reason.
+A DocuBite-side fact that an amount was paid against an invoice on a date: written when a Payment line settles Paid, or by hand (Mark as paid) for a payment made outside DocuBite. An invoice's paid state is derived from the ledger when it confirms payment, otherwise from its payment records. A payment record can be removed with a reason.
 _Avoid_: Mark as paid (the action, not the record), settlement, ledger payment (that is the ledger's own line)
 
 **Company**:
