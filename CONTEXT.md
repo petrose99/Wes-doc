@@ -146,7 +146,7 @@ A named set of approved invoices and approved Expense claims, one payer account 
 _Avoid_: Payment run, remittance (that is the advice sent to the supplier), transfer
 
 **Payment line**:
-One Payee's row in a Payment batch, carrying a Line reference that never changes, so an invoice or claim has at most one open line and is never paid twice. Each time a row enters a batch it gets a new line; a withdrawn or failed line keeps its identity for good. Queued while its batch is pending or approved, Withdrawn if the batch is rejected, Sent with its batch, then Paid (a Bank Statement line carrying its Line or Batch reference matched it, an Owner confirmed a Settlement suggestion, or an Owner marked it paid by hand with a reason) or Failed (the bank returned it, or an Owner said so with a reason; its row returns to Bill Pay). A Paid line is a Payment record. A line the payer bank's file can't carry — an LS payer paying a ZA account — never enters a batch.
+One invoice's or claim's row in a Payment batch (a Payee with three invoices in a batch has three lines), carrying a Line reference that never changes, so an invoice or claim has at most one open line and is never paid twice. Each time a row enters a batch it gets a new line; a withdrawn or failed line keeps its identity for good. Queued while its batch is pending or approved, Withdrawn if the batch is rejected, Sent with its batch, then Paid (a Bank Statement line carrying its Line or Batch reference matched it, an Owner confirmed a Settlement suggestion, or an Owner marked it paid by hand with a reason) or Failed (the bank returned it, or an Owner said so with a reason; its row returns to Bill Pay). A Paid line is a Payment record. A line the payer bank's file can't carry — an LS payer paying a ZA account — never enters a batch.
 _Avoid_: Transaction, instruction, payment (unqualified)
 
 **Line reference**:
@@ -156,6 +156,10 @@ _Avoid_: Payment reference (ambiguous with the invoice number), transaction id
 **Batch reference**:
 The short code that names one Payment batch, written in the file's header where the bank carries it to the payer's statement, so one consolidated debit for the whole file can be traced back to its batch. Like a Line reference, unique in its workspace and never reused.
 _Avoid_: Batch number, run reference
+
+**Paid twice**:
+The red flag on two Payment lines for the same invoice or claim that both left the account: a late Paid on a line whose bill had already been paid again, or two different debits carrying one Line reference. It stays until an Owner records the supplier's refund (Returned on one line) or keeps the money as a supplier credit, with a reason.
+_Avoid_: Duplicate payment (that is a Check on invoices), overpaid
 
 **Settlement suggestion**:
 A Bank Statement line that may have paid (or returned) a Sent Payment line but carries neither its Line reference nor its Batch reference — the exact amount with a matching Payee name in the days around Sent, or the exact total of a batch's open lines. It settles nothing until an Owner confirms it, choosing among every candidate shown. Only a reference DocuBite wrote, with the exact amount, settles a line without a person.
