@@ -142,11 +142,11 @@ Who a Bill Pay row and a payment-file line pay: the invoice's Supplier or the Ex
 _Avoid_: Beneficiary (the file's column name, not the concept), vendor (for a person)
 
 **Payment batch**:
-A named set of approved invoices and approved Expense claims, one payer account and one currency, submitted by a member for an owner's decision. Pending approval, then Approved — which sends its lines to the payer account's payment rail (Chaperone, in Lesotho) — after which each Payment line settles on its own, and the batch reads Settled when none is left open (a reading of its lines, not a state of its own). Rejected with a reason is possible only before approval sends it, and withdraws its lines, releasing their rows to Bill Pay; a Bank details change on one of its Payees rejects a batch not yet sent. An owner may approve a batch they submitted themselves; the approval is labelled as self-approved, never blocked. DocuBite writes no bank file: the rail moves the money from the workspace's own account.
+A named set of approved invoices and approved Expense claims, one payer account and one currency, submitted by a member for an owner's decision. Pending approval, then Approved — which hands its lines to the payer account's payment rail (Chaperone, in Lesotho) to be sent one by one — or Rejected with a reason while still pending, which withdraws its lines and releases their rows to Bill Pay. After approval the batch reads as its lines: *Sending n of m*, *Paused — balance too low* (Send remaining once the balance is topped up), and *Settled* when none is left open. An Owner may Withdraw unsent lines at any time after approval; a line the rail already has can't be pulled back. A Payout details change on one of its Payees rejects a pending batch and withdraws that Payee's unsent lines from an approved one. An owner may approve a batch they submitted themselves; the approval is labelled as self-approved, never blocked. DocuBite writes no bank file: the rail moves the money from the workspace's own account.
 _Avoid_: Payment run, remittance (that is the advice sent to the supplier), transfer
 
 **Payment line**:
-One invoice's or claim's row in a Payment batch (a Payee with three invoices in a batch has three lines), carrying a Line reference that never changes, so an invoice or claim has at most one open line and is never paid twice. Each time a row enters a batch it gets a new line; a withdrawn or failed line keeps its identity for good. Queued while its batch is pending or approved, Withdrawn if the batch is rejected, Sent once the payment rail accepted it, then Paid (the rail reported it settled, or an Owner marked it paid by hand with a reason) or Failed (the rail reported it failed, or an Owner said so with a reason; its row returns to Bill Pay). A Paid line is a Payment record.
+One invoice's or claim's row in a Payment batch (a Payee with three invoices in a batch has three lines), carrying a Line reference that never changes, so an invoice or claim has at most one open line and is never paid twice. Each time a row enters a batch it gets a new line; a withdrawn or failed line keeps its identity for good. Queued while its batch is pending or approved and not yet sent, Withdrawn if the batch is rejected or an Owner withdraws it, Sending while the rail has been asked and hasn't answered, Sent once the rail accepted it, then Paid (the rail reported it settled, or an Owner marked it paid by hand with a reason) or Failed (the rail refused or reversed it, or an Owner said so with a reason; its row returns to Bill Pay). A Paid line is a Payment record.
 _Avoid_: Transaction, instruction, payment (unqualified)
 
 **Line reference**:
@@ -156,6 +156,10 @@ _Avoid_: Payment reference (ambiguous with the invoice number), transaction id
 **Paid twice**:
 The red flag on two Payment lines for the same invoice or claim that both left the account: the rail reporting Paid on a line whose bill had already been paid another way (by hand, or on a later line). It stays until an Owner records the supplier's refund (Returned on one line) or keeps the money as a supplier credit, with a reason.
 _Avoid_: Duplicate payment (that is a Check on invoices), overpaid
+
+**Sending**:
+The Payment line state between Queued and Sent: the rail has been asked to pay it and its answer isn't known yet — in flight, or lost to a timeout. A Sending line is never asked again until a lookup by its Line reference shows the rail doesn't have it; it can't be marked by hand while a lookup can still settle it.
+_Avoid_: Pending, processing, submitted
 
 **Sent**:
 The Payment line state that says the payment rail accepted it and returned its own reference, recorded automatically. It is not proof of payment — the line can still fail — and it cannot be undone.
