@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: accepted, partly superseded by ADR 0009 (2026-09-23) — the file, Sent-by-person and bank-code routing no longer hold; the line, its reference, one open line and the settle entry point stand
 ---
 
 # The Payment line is the unit of settlement; a batch stops at Sent

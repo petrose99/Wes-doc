@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: superseded by ADR 0009 (2026-09-23) — Chaperone reports Paid; statement lines settle nothing
 ---
 
 # A statement settles a Payment line on its own only by reference; everything else is a suggestion an Owner confirms

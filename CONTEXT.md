@@ -134,7 +134,7 @@ The one link between a Company and its accounting provider, made by an Owner fro
 _Avoid_: Integration (as the user-facing noun), OAuth, token, Nango, sync (for the connection itself)
 
 **Bill Pay**:
-The queue of approved, unpaid invoices and approved, unpaid Expense claims from which payment batches are created. An invoice reaches it only once its processing state is Approved, a claim once it is approved; a row that cannot be paid yet (no bank details for its Payee, or a Bank details change waiting for a decision) stays visible with the reason. A claim row has no terms, no discount, no countdown and no partial payment: its amount is the frozen claim total. A row with an open Payment line reads *Scheduled* while its batch is pending or approved and *Sent* once the file went in — still on the queue, not batchable again until the line is Withdrawn, Failed or Paid (a partial Paid leaves the rest batchable). Amount to pay defaults to the discounted total inside an open discount window, else what is still due; an operator may set a smaller amount (a partial payment) per row.
+The queue of approved, unpaid invoices and approved, unpaid Expense claims from which payment batches are created. An invoice reaches it only once its processing state is Approved, a claim once it is approved; a row that cannot be paid yet (no bank details for its Payee, or a Bank details change waiting for a decision) stays visible with the reason. A claim row has no terms, no discount, no countdown and no partial payment: its amount is the frozen claim total. A row with an open Payment line reads *Scheduled* while its batch is pending or approved and *Sent* once the payment rail accepted it — still on the queue, not batchable again until the line is Withdrawn, Failed or Paid (a partial Paid leaves the rest batchable). Amount to pay defaults to the discounted total inside an open discount window, else what is still due; an operator may set a smaller amount (a partial payment) per row.
 _Avoid_: Payables, payment run (the queue), pay list
 
 **Payee**:
@@ -142,31 +142,23 @@ Who a Bill Pay row and a payment-file line pay: the invoice's Supplier or the Ex
 _Avoid_: Beneficiary (the file's column name, not the concept), vendor (for a person)
 
 **Payment batch**:
-A named set of approved invoices and approved Expense claims, one payer account and one currency, submitted by a member for an owner's decision. Pending approval, then Approved (its payment file, in the payer account's bank format, can be downloaded), then Sent once someone confirms the downloaded file went into the bank; from Sent each Payment line settles on its own, and the batch reads Settled when none is left open — a reading of its lines, not a state of its own. Rejected with a reason is possible until Sent, and withdraws its lines, releasing their rows to Bill Pay; after Sent there is no rejecting — lines fail instead, all at once when the bank refused the whole file; a Bank details change on one of its Payees rejects it automatically. Whether the file has been downloaded is a fact shown on the batch, not a state. An owner may approve a batch they submitted themselves; the approval is labelled as self-approved, never blocked. A batch never moves money: the customer uploads its file to their own bank.
+A named set of approved invoices and approved Expense claims, one payer account and one currency, submitted by a member for an owner's decision. Pending approval, then Approved — which sends its lines to the payer account's payment rail (Chaperone, in Lesotho) — after which each Payment line settles on its own, and the batch reads Settled when none is left open (a reading of its lines, not a state of its own). Rejected with a reason is possible only before approval sends it, and withdraws its lines, releasing their rows to Bill Pay; a Bank details change on one of its Payees rejects a batch not yet sent. An owner may approve a batch they submitted themselves; the approval is labelled as self-approved, never blocked. DocuBite writes no bank file: the rail moves the money from the workspace's own account.
 _Avoid_: Payment run, remittance (that is the advice sent to the supplier), transfer
 
 **Payment line**:
-One invoice's or claim's row in a Payment batch (a Payee with three invoices in a batch has three lines), carrying a Line reference that never changes, so an invoice or claim has at most one open line and is never paid twice. Each time a row enters a batch it gets a new line; a withdrawn or failed line keeps its identity for good. Queued while its batch is pending or approved, Withdrawn if the batch is rejected, Sent with its batch, then Paid (a Bank Statement line carrying its Line or Batch reference matched it, an Owner confirmed a Settlement suggestion, or an Owner marked it paid by hand with a reason) or Failed (the bank returned it, or an Owner said so with a reason; its row returns to Bill Pay). A Paid line is a Payment record. A line the payer bank's file can't carry — an LS payer paying a ZA account — never enters a batch.
+One invoice's or claim's row in a Payment batch (a Payee with three invoices in a batch has three lines), carrying a Line reference that never changes, so an invoice or claim has at most one open line and is never paid twice. Each time a row enters a batch it gets a new line; a withdrawn or failed line keeps its identity for good. Queued while its batch is pending or approved, Withdrawn if the batch is rejected, Sent once the payment rail accepted it, then Paid (the rail reported it settled, or an Owner marked it paid by hand with a reason) or Failed (the rail reported it failed, or an Owner said so with a reason; its row returns to Bill Pay). A Paid line is a Payment record.
 _Avoid_: Transaction, instruction, payment (unqualified)
 
 **Line reference**:
-The short code ("DB" and eight characters) that names one Payment line, unique in its workspace and never reused. It leads every reference written into the file — beside the invoice number where the bank allows — so a statement line can be traced back to exactly one line.
+The short code ("DB" and eight characters) that names one Payment line, unique in its workspace and never reused. It is the payment ID the payment rail is given — so the same line can never be paid twice however often it is submitted — and leads the reference the Payee sees.
 _Avoid_: Payment reference (ambiguous with the invoice number), transaction id
 
-**Batch reference**:
-The short code that names one Payment batch, written in the file's header where the bank carries it to the payer's statement, so one consolidated debit for the whole file can be traced back to its batch. Like a Line reference, unique in its workspace and never reused.
-_Avoid_: Batch number, run reference
-
 **Paid twice**:
-The red flag on two Payment lines for the same invoice or claim that both left the account: a late Paid on a line whose bill had already been paid again, or two different debits carrying one Line reference. It stays until an Owner records the supplier's refund (Returned on one line) or keeps the money as a supplier credit, with a reason.
+The red flag on two Payment lines for the same invoice or claim that both left the account: the rail reporting Paid on a line whose bill had already been paid another way (by hand, or on a later line). It stays until an Owner records the supplier's refund (Returned on one line) or keeps the money as a supplier credit, with a reason.
 _Avoid_: Duplicate payment (that is a Check on invoices), overpaid
 
-**Settlement suggestion**:
-A Bank Statement line that may have paid (or returned) a Sent Payment line but carries neither its Line reference nor its Batch reference — the exact amount with a matching Payee name in the days around Sent, or the exact total of a batch's open lines. It settles nothing until an Owner confirms it, choosing among every candidate shown. Only a reference DocuBite wrote, with the exact amount, settles a line without a person.
-_Avoid_: Match (unqualified), auto-match, proposed payment
-
 **Sent**:
-The batch state that says its downloaded file went into the customer's bank, as confirmed by any member (who and when recorded). It is not proof of payment; every line can still fail. It can be undone, back to Approved, only while no line has settled.
+The Payment line state that says the payment rail accepted it and returned its own reference, recorded automatically. It is not proof of payment — the line can still fail — and it cannot be undone.
 _Avoid_: Paid, submitted, processed
 
 **Bank details change**:
@@ -178,7 +170,7 @@ The supplier's (or Claimant's) own letter confirming their bank details, optiona
 _Avoid_: Proof of account (as a requirement), verification letter
 
 **Payer account**:
-A named workspace bank account a payment batch is to be paid from — a label that tells the uploader which bank portal the file belongs to. DocuBite never holds the account's credentials and the file never carries its number.
+A named workspace account a payment batch is paid from: the workspace's own account with a payment rail (a Chaperone merchant account, in Lesotho), whose credentials DocuBite keeps sealed. Its country decides which rail pays; a payer account with no rail wired (South Africa, for now) can't pay batches. DocuBite never holds or pools the money.
 _Avoid_: Pay From (Vic's column label is fine on screen; the concept is the payer account), funding source, bank connection
 
 **Payment terms**:
