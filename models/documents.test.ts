@@ -21,7 +21,7 @@ vi.mock("@/lib/config", async (importOriginal) => {
   return { default: { ...actual.default, integrations: { ...(actual.default.integrations as object), enabled: true } } }
 })
 
-const { createDocumentFromBuffer, deleteWorkspaceDocuments, dismissAccountCorrectionForDocuments, documentDataForExport, documentHash, documentSourceFor, findBillsAffectedByAccountChange, getBillAccountPickerData, isSupportedDocumentBuffer, listReadyToPushDocuments, recordAccountCorrectionApplied, resolveDocumentCodingItems, setDocumentPaymentStatus, stageWhereClause, updateDocumentField, validateDocumentInput } = await import("@/models/documents")
+const { createDocumentFromBuffer, deleteWorkspaceDocuments, dismissAccountCorrectionForDocuments, documentDataForExport, documentHash, documentSourceFor, findAccountCorrectionReminders, findBillsAffectedByAccountChange, getBillAccountPickerData, isSupportedDocumentBuffer, listReadyToPushDocuments, recordAccountCorrectionApplied, resolveDocumentCodingItems, setDocumentPaymentStatus, stageWhereClause, updateDocumentField, validateDocumentInput } = await import("@/models/documents")
 const { prisma } = await import("@/lib/db")
 const { deleteDocumentSource } = await import("@/lib/document-storage")
 const { recordFieldCorrection } = await import("@/models/field-corrections")
@@ -421,6 +421,48 @@ describe("findBillsAffectedByAccountChange", () => {
     ])
     const affected = await findBillsAffectedByAccountChange("w1", "conn1", "acc-newer")
     expect(affected).toEqual([expect.objectContaining({ id: "d1" })])
+  })
+})
+
+describe("findAccountCorrectionReminders (#430 Screen 3)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    db.document = { findMany: vi.fn().mockResolvedValue([]) }
+    db.integrationPush = { findMany: vi.fn().mockResolvedValue([]) }
+  })
+
+  it("returns nothing when every candidate is already on the rule's current account", async () => {
+    db.document.findMany.mockResolvedValue([
+      { id: "d1", reviewedData: { vendor: "Acme Fuels" }, rawExtraction: null, codingData: { items: [{ account_external_id: "acc-new" }] }, paymentStatus: "paid", accountCorrectionDismissedAt: null, accountCorrectionDismissedFromAccountId: null },
+    ])
+    const reminders = await findAccountCorrectionReminders("w1", "conn1", [{ supplierName: "Acme Fuels", accountExternalId: "acc-new" }])
+    expect(reminders.size).toBe(0)
+  })
+
+  it("counts distinct documents (not lines) still on the old account, keyed by supplier name", async () => {
+    db.document.findMany.mockResolvedValue([
+      { id: "d1", reviewedData: { vendor: "Acme Fuels" }, rawExtraction: null, codingData: { items: [{ account_external_id: "acc-old" }, { account_external_id: "acc-old" }] }, paymentStatus: "paid", accountCorrectionDismissedAt: null, accountCorrectionDismissedFromAccountId: null },
+      { id: "d2", reviewedData: { vendor: "Acme Fuels" }, rawExtraction: null, codingData: { items: [{ account_external_id: "acc-old" }] }, paymentStatus: null, accountCorrectionDismissedAt: null, accountCorrectionDismissedFromAccountId: null },
+    ])
+    db.integrationPush.findMany.mockResolvedValue([{ id: "p1", connectionId: "conn1", documentId: "d2", status: "succeeded" }])
+    const reminders = await findAccountCorrectionReminders("w1", "conn1", [{ supplierName: "Acme Fuels", accountExternalId: "acc-new" }])
+    expect(reminders.get("Acme Fuels")).toEqual({ oldAccountExternalId: "acc-old", count: 2 })
+  })
+
+  it("excludes a document dismissed via Leave them for this exact old account", async () => {
+    db.document.findMany.mockResolvedValue([
+      { id: "d1", reviewedData: { vendor: "Acme Fuels" }, rawExtraction: null, codingData: { items: [{ account_external_id: "acc-old" }] }, paymentStatus: "paid", accountCorrectionDismissedAt: new Date(), accountCorrectionDismissedFromAccountId: "acc-old" },
+    ])
+    const reminders = await findAccountCorrectionReminders("w1", "conn1", [{ supplierName: "Acme Fuels", accountExternalId: "acc-new" }])
+    expect(reminders.size).toBe(0)
+  })
+
+  it("ignores a document from a supplier that has no rule in the batch", async () => {
+    db.document.findMany.mockResolvedValue([
+      { id: "d1", reviewedData: { vendor: "Unknown Co" }, rawExtraction: null, codingData: { items: [{ account_external_id: "acc-old" }] }, paymentStatus: "paid", accountCorrectionDismissedAt: null, accountCorrectionDismissedFromAccountId: null },
+    ])
+    const reminders = await findAccountCorrectionReminders("w1", "conn1", [{ supplierName: "Acme Fuels", accountExternalId: "acc-new" }])
+    expect(reminders.size).toBe(0)
   })
 })
 

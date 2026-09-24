@@ -243,3 +243,20 @@ export async function leaveAffectedBillsAction(workspaceId: string, oldAccountEx
   revalidatePath(paths(workspaceId).integrations)
   return { success: true }
 }
+
+/** Screen 3's row-level "Leave them" — the reminder line already knows the count, not the specific
+ * document ids (the table never fetched the full bill list, only the count from
+ * `findAccountCorrectionReminders`), so this re-runs the same affected-bills query server-side and
+ * dismisses every match in one step, rather than making the click first open Screen 1 just to read
+ * ids back out. */
+export async function leaveAllAffectedByRuleAction(workspaceId: string, connectionId: string, oldAccountExternalId: string): Promise<ActionState> {
+  const gate = await guard(workspaceId)
+  if ("error" in gate) return { success: false, error: errorMessage(new Error(gate.error), NO_ACCESS) }
+  const affected = await findBillsAffectedByAccountChange(workspaceId, connectionId, oldAccountExternalId)
+  const documentIds = affected.map((b) => b.id)
+  if (!documentIds.length) return { success: true }
+  await dismissAccountCorrectionForDocuments(workspaceId, documentIds, oldAccountExternalId)
+  await recordDocumentAudit({ workspaceId, actorId: gate.userId, type: "ledger_account_correction_left", detail: { oldAccountExternalId, documentIds } })
+  revalidatePath(paths(workspaceId).integrations)
+  return { success: true }
+}

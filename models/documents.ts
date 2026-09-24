@@ -482,6 +482,60 @@ export async function findBillsAffectedByAccountChange(workspaceId: string, conn
   return results
 }
 
+export type AccountCorrectionReminder = { oldAccountExternalId: string; count: number }
+
+/** Screen 3's per-rule reminder (#430) — `SupplierAccountRule` stores only the *current* account,
+ * not what it used to be, so a reminder can't be read off the rule row directly. Instead this
+ * derives it from the same fact `findBillsAffectedByAccountChange` already reads: a posted/paid
+ * document's `codingData.items[].account_external_id` that no longer matches the rule's current
+ * account is, definitionally, still on some old account. Batches one candidate scan across every
+ * rule on the connection (reused precedent from that function) rather than one query per rule —
+ * this runs on every load of the Supplier accounts table. Picks the most-affected old account per
+ * supplier if more than one is present (rare: would need two corrections stacked before either was
+ * resolved); "Leave them"/an update naturally shrinks that set on the next load. */
+export async function findAccountCorrectionReminders(workspaceId: string, connectionId: string, rules: { supplierName: string; accountExternalId: string }[]): Promise<Map<string, AccountCorrectionReminder>> {
+  if (!rules.length) return new Map()
+  const [pushes, candidates] = await Promise.all([
+    listWorkspaceIntegrationPushes(workspaceId),
+    prisma.document.findMany({
+      where: { workspaceId, status: "reviewed", codingData: { not: Prisma.JsonNull } },
+      select: { id: true, reviewedData: true, rawExtraction: true, codingData: true, paymentStatus: true, accountCorrectionDismissedAt: true, accountCorrectionDismissedFromAccountId: true },
+    }),
+  ])
+  const succeededByDocumentId = new Map(pushes.filter((p) => p.connectionId === connectionId && p.status === "succeeded").map((p) => [p.documentId, p]))
+  const currentAccountBySupplier = new Map(rules.map((r) => [r.supplierName, r.accountExternalId]))
+  const docIdsBySupplierAndOldAccount = new Map<string, Map<string, Set<string>>>()
+  for (const doc of candidates) {
+    const ledgerFact: "posted" | "paid" | null = doc.paymentStatus === "paid" ? "paid" : succeededByDocumentId.has(doc.id) ? "posted" : null
+    if (!ledgerFact) continue
+    const reviewedData = (doc.reviewedData as Record<string, unknown> | null) ?? (doc.rawExtraction as Record<string, unknown> | null) ?? {}
+    const vendorName = (typeof reviewedData.vendor === "string" && reviewedData.vendor) || (typeof reviewedData.merchant === "string" && reviewedData.merchant) || null
+    const currentAccount = vendorName ? currentAccountBySupplier.get(vendorName) : undefined
+    if (!currentAccount) continue
+    const coding = (doc.codingData as Record<string, unknown> | null) ?? {}
+    const items = Array.isArray(coding.items) ? (coding.items as Array<{ account_external_id?: string | null }>) : []
+    for (const item of items) {
+      const oldAccount = item.account_external_id
+      if (!oldAccount || oldAccount === currentAccount) continue
+      if (doc.accountCorrectionDismissedAt && doc.accountCorrectionDismissedFromAccountId === oldAccount) continue
+      let bySupplier = docIdsBySupplierAndOldAccount.get(vendorName!)
+      if (!bySupplier) { bySupplier = new Map(); docIdsBySupplierAndOldAccount.set(vendorName!, bySupplier) }
+      let docIds = bySupplier.get(oldAccount)
+      if (!docIds) { docIds = new Set(); bySupplier.set(oldAccount, docIds) }
+      docIds.add(doc.id)
+    }
+  }
+  const result = new Map<string, AccountCorrectionReminder>()
+  for (const [supplierName, byOldAccount] of docIdsBySupplierAndOldAccount) {
+    let best: { oldAccountExternalId: string; count: number } | null = null
+    for (const [oldAccountExternalId, docIds] of byOldAccount) {
+      if (!best || docIds.size > best.count) best = { oldAccountExternalId, count: docIds.size }
+    }
+    if (best) result.set(supplierName, best)
+  }
+  return result
+}
+
 /** Screen 1/3's "Leave them" (#430) — marks the given documents as resolved-without-updating for
  * this specific old account, so `findBillsAffectedByAccountChange` stops surfacing them until (if
  * ever) a further correction targets a different old account. Idempotent: re-running on an

@@ -1,6 +1,12 @@
 "use client"
 
 import { forgetSupplierAccountRuleAction } from "@/app/(app)/workspaces/[workspaceId]/integration-connection-actions"
+import {
+  checkAffectedByRuleChangeAction,
+  leaveAllAffectedByRuleAction,
+  type AffectedByRuleChange,
+} from "@/app/(app)/workspaces/[workspaceId]/account-correction-actions"
+import { AccountCorrectionDialog } from "@/components/integrations/account-correction-dialog"
 import { Input } from "@/components/ui/input"
 import type { SupplierAccountRuleRow } from "@/models/supplier-account-rules"
 import { useMemo, useState, useTransition } from "react"
@@ -9,10 +15,16 @@ import { toast } from "sonner"
 
 const FILTER_THRESHOLD = 20
 
+/** #430 Screen 3 — keyed by `SupplierAccountRule.supplierName` (the rules table's own unique key),
+ * one entry per supplier still carrying posted/paid bills on an account other than the rule's
+ * current one. Server-resolved account name travels with the count so the row never needs its own
+ * fetch just to render "still on {old account name}". */
+export type SupplierAccountReminder = { oldAccountExternalId: string; oldAccountName: string; count: number }
+
 /** Accounting page's learned-supplier table (#429 / ADR 0011): one row per supplier whose account
  * was learned from an approved document's largest line. Layout follows
  * CategoryAccountMappingTable's precedent (native table, no new component for the filter box). */
-export function SupplierAccountsTable({ workspaceId, connectionId, rules, accountLabels, defaultAccountName, providerLabel, isOwner }: {
+export function SupplierAccountsTable({ workspaceId, connectionId, rules, accountLabels, defaultAccountName, providerLabel, isOwner, reminders }: {
   workspaceId: string
   connectionId: string
   rules: SupplierAccountRuleRow[]
@@ -22,10 +34,27 @@ export function SupplierAccountsTable({ workspaceId, connectionId, rules, accoun
   defaultAccountName: string | null
   providerLabel: string
   isOwner: boolean
+  /** #430 Screen 3 reminders, keyed by supplierName. Empty/absent for a supplier with nothing
+   * outstanding — most rows, most of the time. */
+  reminders: Record<string, SupplierAccountReminder>
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [filter, setFilter] = useState("")
+  const [review, setReview] = useState<{ rule: SupplierAccountRuleRow; reminder: SupplierAccountReminder; data: AffectedByRuleChange } | null>(null)
+
+  const openReview = (rule: SupplierAccountRuleRow, reminder: SupplierAccountReminder) => startTransition(async () => {
+    const res = await checkAffectedByRuleChangeAction(workspaceId, connectionId, reminder.oldAccountExternalId, rule.accountExternalId)
+    if (res.success && res.data) setReview({ rule, reminder, data: res.data })
+    else if (res.success) { toast.success("Already up to date — nothing left to review"); router.refresh() }
+    else toast.error(res.error || "Could not load those bills")
+  })
+
+  const leaveThemForRule = (rule: SupplierAccountRuleRow, reminder: SupplierAccountReminder) => startTransition(async () => {
+    const res = await leaveAllAffectedByRuleAction(workspaceId, connectionId, reminder.oldAccountExternalId)
+    if (res.success) { toast.success(`Left ${rule.supplierName}'s ${reminder.count} bill${reminder.count === 1 ? "" : "s"} on ${reminder.oldAccountName}`); router.refresh() }
+    else toast.error(res.error || "Could not leave those bills")
+  })
 
   const visible = useMemo(
     () => (filter.trim() ? rules.filter((r) => r.supplierName.toLowerCase().includes(filter.trim().toLowerCase())) : rules),
@@ -73,13 +102,27 @@ export function SupplierAccountsTable({ workspaceId, connectionId, rules, accoun
         <tbody>
           {visible.map((rule) => {
             const account = accountLabels[rule.accountExternalId]
+            const reminder = reminders[rule.supplierName]
             return (
-              <tr key={rule.id} className="border-b border-hairline-soft last:border-0">
+              <tr key={rule.id} className="border-b border-hairline-soft last:border-0 align-top">
                 <td className="py-2">{rule.supplierName}</td>
                 <td className="py-2">
                   {account?.archived
                     ? <>{defaultAccountName ?? account.label} <span className="text-slate-600">({rule.supplierName}&rsquo;s account was archived in {providerLabel})</span></>
                     : (account?.label ?? rule.accountExternalId)}
+                  {isOwner && reminder && (
+                    <p className="mt-1 text-xs text-amber-700">
+                      {reminder.count} posted bill{reminder.count === 1 ? "" : "s"} still on {reminder.oldAccountName} ·{" "}
+                      <button type="button" disabled={pending} onClick={() => openReview(rule, reminder)}
+                        className="font-medium underline-offset-2 hover:underline">
+                        Review
+                      </button>
+                      {" "}<button type="button" disabled={pending} onClick={() => leaveThemForRule(rule, reminder)}
+                        className="font-medium underline-offset-2 hover:underline">
+                        Leave them
+                      </button>
+                    </p>
+                  )}
                 </td>
                 <td className="py-2 text-slate-600">{rule.lastUsedAt.toLocaleDateString()}</td>
                 {isOwner && (
@@ -98,6 +141,22 @@ export function SupplierAccountsTable({ workspaceId, connectionId, rules, accoun
           )}
         </tbody>
       </table>
+      {review && (
+        <AccountCorrectionDialog
+          open
+          onClose={() => setReview(null)}
+          workspaceId={workspaceId}
+          connectionId={connectionId}
+          provider={review.data.provider}
+          providerLabel={review.data.providerLabel}
+          oldAccountExternalId={review.reminder.oldAccountExternalId}
+          oldAccountName={review.data.oldAccountName}
+          newAccountExternalId={review.rule.accountExternalId}
+          newAccountName={review.data.newAccountName}
+          bills={review.data.bills}
+          onResolved={() => { setReview(null); router.refresh() }}
+        />
+      )}
     </div>
   )
 }
