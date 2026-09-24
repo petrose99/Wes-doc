@@ -167,14 +167,40 @@ export type UpdateDocumentAccountsOutcome =
   | { status: "updated"; provider: string }
   | { status: "refused"; reason: AccountCorrectionRefusal }
 
+/** Shared by the pre-check and the update action below: finds the document's own succeeded push
+ * (one accounting connection per bill) and its connection row. Returns an `error` string when the
+ * bill isn't postable at all (never a `refusal`, which is the provider's own per-bill answer, not
+ * a lookup failure). */
+async function resolveDocumentPushConnection(workspaceId: string, documentId: string) {
+  const pushes = await listWorkspaceIntegrationPushes(workspaceId, documentId)
+  const succeeded = pushes.find((p) => p.status === "succeeded" && p.connectionId)
+  if (!succeeded || !succeeded.externalBillId || !succeeded.connectionId) return { error: "This bill hasn't been posted to an accounting connection" as const }
+  const connection = await prisma.integrationConnection.findFirst({ where: { id: succeeded.connectionId, workspaceId }, select: { id: true, provider: true, externalTenantId: true } })
+  if (!connection || !connection.externalTenantId) return { error: "That connection no longer exists" as const }
+  return { externalBillId: succeeded.externalBillId, connection: connection as { id: string; provider: string; externalTenantId: string } }
+}
+
+/** Screen 2's Detail-pane "locked" state (spec §Screen 2 States) — pre-checks correctability
+ * before the person edits anything, so a books-closed or paid-and-refused bill disables the
+ * Account control up front with the refusal reason, cheaper than letting them try and fail. */
+export async function checkDocumentAccountCorrectableAction(workspaceId: string, documentId: string): Promise<ActionState<AccountCorrectionRefusal | null>> {
+  const gate = await guard(workspaceId)
+  if ("error" in gate) return { success: false, error: errorMessage(new Error(gate.error), NO_ACCESS) }
+  const resolved = await resolveDocumentPushConnection(workspaceId, documentId)
+  if ("error" in resolved) return { success: false, error: resolved.error }
+  const document = await prisma.document.findFirst({ where: { id: documentId, workspaceId }, select: { receivedAt: true } })
+  if (!document) return { success: false, error: "Document not found" }
+  const refusal = await checkCorrectable(resolved.connection.provider, resolved.connection.externalTenantId, resolved.connection.id, resolved.externalBillId, document.receivedAt.toISOString())
+  return { success: true, data: refusal }
+}
+
 /** Screen 2's single-document Detail-pane "Update in {Provider}" (#430 step 4) — resolves the
- * document's own succeeded push (there is exactly one accounting connection per bill; no
- * `oldAccountExternalId` concept here, since a person may retarget several lines to different
- * accounts in one edit), pre-checks correctability the same way Screen 1 does, resends every line
- * with only the changed ones' Account replaced, and — on success — records the new account per
- * line by index (`recordDocumentLineAccountsCorrected`, never `recordAccountCorrectionApplied`:
- * this path doesn't retarget by matching an old account, and never touches a `SupplierAccountRule`
- * per spec §Screen 2). */
+ * document's own succeeded push, pre-checks correctability the same way Screen 1 does, resends
+ * every line with only the changed ones' Account replaced, and — on success — records the new
+ * account per line by index (`recordDocumentLineAccountsCorrected`, never
+ * `recordAccountCorrectionApplied`: this path doesn't retarget by matching an old account, since a
+ * person may retarget several lines to different accounts in one edit, and never touches a
+ * `SupplierAccountRule` per spec §Screen 2). */
 export async function updateDocumentLineAccountsAction(
   workspaceId: string,
   documentId: string,
@@ -183,19 +209,17 @@ export async function updateDocumentLineAccountsAction(
   const gate = await guard(workspaceId)
   if ("error" in gate) return { success: false, error: errorMessage(new Error(gate.error), NO_ACCESS) }
   if (!changes.length) return { success: false, error: "Nothing to update" }
-  const pushes = await listWorkspaceIntegrationPushes(workspaceId, documentId)
-  const succeeded = pushes.find((p) => p.status === "succeeded" && p.connectionId)
-  if (!succeeded || !succeeded.externalBillId || !succeeded.connectionId) return { success: false, error: "This bill hasn't been posted to an accounting connection" }
-  const connection = await prisma.integrationConnection.findFirst({ where: { id: succeeded.connectionId, workspaceId }, select: { id: true, provider: true, externalTenantId: true } })
-  if (!connection || !connection.externalTenantId) return { success: false, error: "That connection no longer exists" }
+  const resolved = await resolveDocumentPushConnection(workspaceId, documentId)
+  if ("error" in resolved) return { success: false, error: resolved.error }
+  const { connection, externalBillId } = resolved
   const document = await prisma.document.findFirst({ where: { id: documentId, workspaceId }, select: { receivedAt: true } })
   if (!document) return { success: false, error: "Document not found" }
-  const refusal = await checkCorrectable(connection.provider, connection.externalTenantId, connection.id, succeeded.externalBillId, document.receivedAt.toISOString())
+  const refusal = await checkCorrectable(connection.provider, connection.externalTenantId, connection.id, externalBillId, document.receivedAt.toISOString())
   if (refusal) return { success: true, data: { status: "refused", reason: refusal } }
   const accountRefByLineIndex = new Map(changes.map((c) => [c.index, c.newAccountExternalId]))
   try {
-    if (connection.provider === "quickbooks") await updateQuickBooksBillAccounts(connection.externalTenantId, connection.id, succeeded.externalBillId, accountRefByLineIndex)
-    else if (connection.provider === "xero") await updateXeroBillAccounts(connection.externalTenantId, connection.id, succeeded.externalBillId, accountRefByLineIndex)
+    if (connection.provider === "quickbooks") await updateQuickBooksBillAccounts(connection.externalTenantId, connection.id, externalBillId, accountRefByLineIndex)
+    else if (connection.provider === "xero") await updateXeroBillAccounts(connection.externalTenantId, connection.id, externalBillId, accountRefByLineIndex)
     else return { success: false, error: "Unsupported accounting provider" }
     await recordDocumentLineAccountsCorrected(workspaceId, documentId, changes)
     await recordDocumentAudit({ workspaceId, actorId: gate.userId, documentId, type: "ledger_account_corrected", detail: { connectionId: connection.id, changes } })

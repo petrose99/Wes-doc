@@ -8,8 +8,20 @@ import type { LineMatch } from "@/lib/matching/line-match"
 import { CheckGlyph, RationalePopover } from "@/components/pipeline/document-detail/rationale-popover"
 import type { FieldCheck } from "@/components/pipeline/document-detail/check-types"
 import { Breakdown, breakdownFor, formatAmount, formatQuantity, LineStatusPill, MatchGlyph, type BreakdownCell } from "@/components/documents/po-compare"
-import { Crosshair, Plus, Trash2 } from "lucide-react"
+import { checkDocumentAccountCorrectableAction, updateDocumentLineAccountsAction, type AccountCorrectionRefusal } from "@/app/(app)/workspaces/[workspaceId]/account-correction-actions"
+import { Crosshair, Loader2, Plus, Trash2 } from "lucide-react"
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
+
+/** #430 §Screen 2: the refusal-reason sentence, the same plain-words vocabulary as Screen 1's
+ * dialog rows (`components/integrations/account-correction-dialog.tsx`) — one copy source, read
+ * here and there, never re-derived. */
+function accountCorrectionRefusalSentence(refusal: AccountCorrectionRefusal): string {
+  if (refusal.code === "book_closed") return `Books closed for this period — update in ${refusal.provider} directly.`
+  if (refusal.code === "period_locked") return `Locked period in ${refusal.provider} — update in ${refusal.provider} directly.`
+  if (refusal.code === "paid") return `Paid in ${refusal.provider} — this line can't be changed through DocuBite.`
+  if (refusal.code === "voided") return `Voided in ${refusal.provider} — this line can't be changed through DocuBite.`
+  return `Could not find this bill in ${refusal.provider}.`
+}
 
 /** #362 §2 / #429: the read-only ledger-account chip — still used for Class/Customer:Job (no
  * capability to derive those from yet) and as the pre-#429/unconnected fallback for Account
@@ -26,13 +38,25 @@ function LedgerAccountChip({ label }: { label: string | null }) {
  * per-line override write path — an enabled control with nothing to submit it to is exactly the
  * dead control `LedgerAccountChip`'s old comment (B1) warned against shipping. Changing the
  * account is the Accounting page's Default editor (spec §B/§C), not this cell. */
-function LineAccountCell({ row, accountOptions, supplierRuleAccountId, providerName, supplierName, approved }: {
+function LineAccountCell({ row, accountOptions, supplierRuleAccountId, providerName, supplierName, approved, editable = false, pendingValue, onChange, locked = null }: {
   row: LineAccountRow | null
   accountOptions: AccountOption[]
   supplierRuleAccountId: string | null
   providerName: string | null
   supplierName: string | null
   approved: boolean
+  /** #430 §Screen 2: on a posted/paid bill's line, the Account cell is the one editable field —
+   * everything else in this pane stays read-only (spec: "keeps only the Account field editable per
+   * line"). `false` (the pre-#430 default) keeps the disabled chip-select every other caller and
+   * every other field in this row still uses. */
+  editable?: boolean
+  /** The person's not-yet-saved pick for this line, or `undefined` when unchanged. */
+  pendingValue?: string
+  onChange?: (value: string) => void
+  /** #430 §Screen 2 "locked" state: the provider pre-check already knows this bill can't be
+   * changed (books closed / paid / voided) — the Account control itself disables with the reason,
+   * before the person tries and fails. */
+  locked?: AccountCorrectionRefusal | null
 }) {
   if (!row) return <LedgerAccountChip label={null} />
   const accountId = row.account_external_id
@@ -56,6 +80,22 @@ function LineAccountCell({ row, accountOptions, supplierRuleAccountId, providerN
   // #429 spec §A: shown only pre-approval, only when this line's account would change what
   // `learnSupplierAccountRuleFromApproval` (models/documents.ts) writes for this vendor.
   const showHint = !approved && !!accountId && accountId !== supplierRuleAccountId
+  if (editable) {
+    const selected = pendingValue ?? accountId ?? ""
+    const dirty = pendingValue !== undefined && pendingValue !== (accountId ?? "")
+    return <div className="min-w-0 space-y-0.5">
+      <select disabled={!!locked} value={selected} onChange={(event) => onChange?.(event.target.value)}
+        aria-label={`Account${dirty ? " (unsaved)" : ""}`}
+        aria-readonly={!!locked}
+        className={`w-full min-w-0 truncate rounded-md border bg-white px-2 py-1 text-xs font-medium text-slate-800 focus:outline-none focus:ring-1 focus:ring-inset focus:ring-emerald-500 disabled:cursor-default disabled:bg-slate-50 disabled:text-slate-600 disabled:opacity-100 ${dirty ? "border-amber-400" : "border-slate-200"}`}>
+        <option value="">— No account —</option>
+        {account && !accountOptions.some((option) => option.externalId === account.externalId) && <option value={account.externalId}>{optionLabel(account)}</option>}
+        {accountOptions.map((option) => <option key={option.externalId} value={option.externalId}>{optionLabel(option)}</option>)}
+      </select>
+      {locked ? <p className="text-[11px] font-medium text-red-700">{accountCorrectionRefusalSentence(locked)}</p>
+        : <p className={`truncate text-[11px] ${!accountId ? "font-medium text-red-700" : "text-slate-500"}`}>{provenance}</p>}
+    </div>
+  }
   return <div className="min-w-0 space-y-0.5">
     <select disabled value={accountId ?? ""} aria-label="Account"
       className="w-full min-w-0 truncate rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-600 disabled:cursor-default disabled:opacity-100">
@@ -99,6 +139,12 @@ export type BillLineItemsTotals = {
   providerName?: string | null
   supplierName?: string | null
   approved?: boolean
+  /** #430 §Screen 2: `posted`/`paid` turns the Account cell into the single editable field on an
+   * otherwise-locked row (spec: "on a document whose ledger fact is posted or paid"). `null`/absent
+   * (not yet pushed, or unconnected) keeps every line at #429's disabled chip-select. */
+  ledgerFact?: "posted" | "paid" | null
+  workspaceId?: string
+  documentId?: string
 }
 
 type Row = { id: number; values: Record<string, unknown> }
