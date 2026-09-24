@@ -74,7 +74,7 @@ function TotalField({ field, value, ref: provenanceRef, onFocusSource, compare }
   </div>
 }
 
-export function LineItemsSection({ field, value, fieldKey, summaryFields, fieldValues, provenanceFields, provenanceItems, onFocusSource, checks = [], onEscalate, po = null, billMode = false, readOnly = false, lineAccounts = null, accountOptions = [], supplierRuleAccountId = null, accountProviderName = null, accountSupplierName = null, approved = false }: {
+export function LineItemsSection({ field, value, fieldKey, summaryFields, fieldValues, provenanceFields, provenanceItems, onFocusSource, checks = [], onEscalate, po = null, billMode = false, readOnly = false, lineAccounts = null, accountOptions = [], supplierRuleAccountId = null, accountProviderName = null, accountSupplierName = null, approved = false, accountLedgerFact = null, accountWorkspaceId, accountDocumentId }: {
   field: DocumentFieldDefinition
   value: unknown
   fieldKey: string
@@ -100,6 +100,12 @@ export function LineItemsSection({ field, value, fieldKey, summaryFields, fieldV
   accountProviderName?: string | null
   accountSupplierName?: string | null
   approved?: boolean
+  /** #430 §Screen 2: `BillSplitPane`'s `ledger`/workspaceId/documentId, passed straight through
+   * into `LineItemsEditor`'s `bill` prop — turns the Account cell editable-with-Update-bar on a
+   * posted/paid document instead of #429's disabled chip. */
+  accountLedgerFact?: "posted" | "paid" | null
+  accountWorkspaceId?: string
+  accountDocumentId?: string
 }) {
   const [summary, setSummary] = useState<InvoicePoSummary | null>(po?.summary ?? null)
   // View PO opens by itself when there is something red to see — the count on the chip is the
@@ -138,6 +144,7 @@ export function LineItemsSection({ field, value, fieldKey, summaryFields, fieldV
   const bill = billMode ? {
     extractedTotal, currency: po?.currency ?? null,
     accounts: lineAccounts, accountOptions, supplierRuleAccountId, providerName: accountProviderName, supplierName: accountSupplierName, approved,
+    ledgerFact: accountLedgerFact, workspaceId: accountWorkspaceId, documentId: accountDocumentId,
   } : null
 
   return <div ref={sectionRef} className="scroll-mt-3 space-y-2">

@@ -248,6 +248,36 @@ export function LineItemsEditor({ fieldKey, itemFields, initialRows, provenanceI
   const footerTotal = bill ? Object.values(amounts).reduce((sum, n) => sum + n, 0) : null
   const mismatch = bill && bill.extractedTotal !== null && footerTotal !== null && Math.abs(footerTotal - bill.extractedTotal) > 0.005
 
+  // #430 §Screen 2: the single-row Account-only edit on a Posted/Paid bill. Pending picks live
+  // here (keyed by row index, not id — the account rows array is index-aligned) until "Update in
+  // {Provider}" resends the bill; `refusal` is set either by the mount-time pre-check (before the
+  // person tries) or by the update action's own `status: "refused"` answer (the ledger's own
+  // write-time refusal — spec's "write-time refusal gets the same treatment").
+  const [pendingAccounts, setPendingAccounts] = useState<Map<number, string>>(new Map())
+  const [updateState, setUpdateState] = useState<"idle" | "loading">("idle")
+  const [updateError, setUpdateError] = useState<string | null>(null)
+  const [refusal, setRefusal] = useState<AccountCorrectionRefusal | null>(null)
+  useEffect(() => {
+    if (!bill?.ledgerFact || !bill.workspaceId || !bill.documentId) return
+    let cancelled = false
+    checkDocumentAccountCorrectableAction(bill.workspaceId, bill.documentId).then((result) => {
+      if (!cancelled && result.success) setRefusal(result.data ?? null)
+    })
+    return () => { cancelled = true }
+  }, [bill?.ledgerFact, bill?.workspaceId, bill?.documentId])
+  const setPendingAccount = (index: number, value: string) => setPendingAccounts((current) => { const next = new Map(current); next.set(index, value); return next })
+  const submitAccountUpdate = async () => {
+    if (!bill?.workspaceId || !bill?.documentId || pendingAccounts.size === 0) return
+    setUpdateState("loading")
+    setUpdateError(null)
+    const changes = [...pendingAccounts].map(([index, newAccountExternalId]) => ({ index, newAccountExternalId }))
+    const result = await updateDocumentLineAccountsAction(bill.workspaceId, bill.documentId, changes)
+    setUpdateState("idle")
+    if (!result.success || !result.data) { setUpdateError(result.error ?? "Could not update this bill"); return }
+    if (result.data.status === "refused") { setRefusal(result.data.reason); return }
+    setPendingAccounts(new Map())
+  }
+
   const addRow = () => setRows((current) => [...current, { id: (current.at(-1)?.id ?? -1) + 1, values: {} }])
   const removeRow = (id: number) => {
     setRows((current) => (current.length > 1 ? current.filter((row) => row.id !== id) : current))
@@ -374,6 +404,28 @@ export function LineItemsEditor({ fieldKey, itemFields, initialRows, provenanceI
     <span className="tabular-nums font-medium text-slate-700">{formatAmount(footerTotal, bill.currency)}</span>
   </div>
 
+  // #430 §Screen 2: appears only once a person has picked a different Account on a Posted/Paid
+  // line (`pendingAccounts.size > 0`) — the control that resends the bill, spec line 138's "only
+  // the account changes; amounts and VAT stay as posted" reassurance underneath it.
+  const providerLabel = bill?.providerName || "the ledger"
+  const accountUpdateBar = bill?.ledgerFact && pendingAccounts.size > 0 && <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-emerald-200 bg-emerald-50/60 px-2.5 py-1.5 text-xs">
+    <div className="min-w-0">
+      <p className="font-medium text-emerald-900">Only the account changes; amounts and VAT stay as posted.</p>
+      {updateError && <p role="alert" className="mt-0.5 text-red-700">{updateError} <button type="button" onClick={submitAccountUpdate} className="font-medium underline underline-offset-2 hover:no-underline">Retry</button></p>}
+    </div>
+    <div className="flex items-center gap-1.5">
+      <button type="button" onClick={() => { setPendingAccounts(new Map()); setUpdateError(null) }} disabled={updateState === "loading"}
+        className="inline-flex min-h-8 items-center rounded-md border border-slate-300 bg-white px-3 text-xs font-medium text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 disabled:opacity-60">
+        Discard changes
+      </button>
+      <button type="button" onClick={submitAccountUpdate} disabled={updateState === "loading"}
+        className="inline-flex min-h-8 items-center gap-1 rounded-md bg-emerald-700 px-3 text-xs font-semibold text-white hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-1 disabled:opacity-60">
+        {updateState === "loading" && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
+        Update in {providerLabel}
+      </button>
+    </div>
+  </div>
+
   // No overflow-hidden on the frame: the check popover and the hidden descriptions live inside
   // the cells, and a ring draws the frame so the table sits flush with no border to inset from.
   if (!wide) {
@@ -396,7 +448,7 @@ export function LineItemsEditor({ fieldKey, itemFields, initialRows, provenanceI
             </div>
             {bill && <div className="flex flex-wrap items-center gap-1.5 px-2">
               <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Account</span>
-              <LineAccountCell row={bill?.accounts?.[index] ?? null} accountOptions={bill?.accountOptions ?? []} supplierRuleAccountId={bill?.supplierRuleAccountId ?? null} providerName={bill?.providerName ?? null} supplierName={bill?.supplierName ?? null} approved={bill?.approved ?? false} />
+              <LineAccountCell row={bill?.accounts?.[index] ?? null} accountOptions={bill?.accountOptions ?? []} supplierRuleAccountId={bill?.supplierRuleAccountId ?? null} providerName={bill?.providerName ?? null} supplierName={bill?.supplierName ?? null} approved={bill?.approved ?? false} editable={!!bill?.ledgerFact} pendingValue={pendingAccounts.get(index)} onChange={(value) => setPendingAccount(index, value)} locked={refusal} />
               <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">PO match</span>
               <PoLineMatchChip state="none" />
             </div>}
@@ -415,6 +467,7 @@ export function LineItemsEditor({ fieldKey, itemFields, initialRows, provenanceI
       </ul>
       {addRowButton}
       {billFooter}
+      {accountUpdateBar}
     </div>
   }
 
@@ -447,7 +500,7 @@ export function LineItemsEditor({ fieldKey, itemFields, initialRows, provenanceI
           const line = lineByRow.get(index) ?? null
           return <tr key={row.id} className="group even:bg-slate-50/50 hover:bg-emerald-50/40">
             {columns.map((item) => <td key={item.key} className="border-b border-slate-100 p-0 align-top">{renderCell(row, index, item, line)}</td>)}
-            {bill && <td className="border-b border-slate-100 px-2 py-1.5 align-top"><LineAccountCell row={bill?.accounts?.[index] ?? null} accountOptions={bill?.accountOptions ?? []} supplierRuleAccountId={bill?.supplierRuleAccountId ?? null} providerName={bill?.providerName ?? null} supplierName={bill?.supplierName ?? null} approved={bill?.approved ?? false} /></td>}
+            {bill && <td className="border-b border-slate-100 px-2 py-1.5 align-top"><LineAccountCell row={bill?.accounts?.[index] ?? null} accountOptions={bill?.accountOptions ?? []} supplierRuleAccountId={bill?.supplierRuleAccountId ?? null} providerName={bill?.providerName ?? null} supplierName={bill?.supplierName ?? null} approved={bill?.approved ?? false} editable={!!bill?.ledgerFact} pendingValue={pendingAccounts.get(index)} onChange={(value) => setPendingAccount(index, value)} locked={refusal} /></td>}
             {bill && <td className="border-b border-slate-100 px-2 py-1.5 align-top"><PoLineMatchChip state="none" /></td>}
             {bill && classJob && <td className="border-b border-slate-100 px-2 py-1.5 align-top"><LedgerAccountChip label={null} /></td>}
             {bill && classJob && <td className="border-b border-slate-100 px-2 py-1.5 align-top"><LedgerAccountChip label={null} /></td>}
@@ -459,5 +512,6 @@ export function LineItemsEditor({ fieldKey, itemFields, initialRows, provenanceI
     </table>
     {addRowButton}
     {billFooter}
+    {accountUpdateBar}
   </div>
 }
