@@ -20,6 +20,7 @@ import { recordFieldCorrection } from "@/models/field-corrections"
 import { resetSupplierStreak } from "@/models/suppliers"
 import { listWorkspaceIntegrationPushes, getCategoryAccountMap } from "@/models/integrations"
 import { listCategoryAccountMappings, resolveCategoryAccount } from "@/models/category-account-mappings"
+import { listAccountingEntities } from "@/models/accounting-entities"
 import { getDocumentPaymentStatuses } from "@/models/ledger-payments"
 import { emitWorkspaceEvent } from "@/lib/webhooks"
 import { resolveDuplicateGatesAgainst } from "@/lib/gates/duplicate"
@@ -538,6 +539,42 @@ export async function resolveDocumentCodingItems(input: {
   })
   const rows = resolveDocumentLineAccounts(lineCount, resolution)
   return ruleArchivedFallback ? rows.map((row) => ({ ...row, account_archived_fallback: true })) : rows
+}
+
+export type AccountOption = { externalId: string; code: string | null; name: string }
+
+// #429: same map as lib/finance/actions.ts's push-copy PROVIDER_LABELS and
+// components/integrations/integrations-manager.tsx's connect-flow one — every provider gets an
+// explicit label, duplicated per call site rather than shared, matching that existing precedent.
+const PROVIDER_LABELS: Record<string, string> = { quickbooks: "QuickBooks", xero: "Xero", sage: "Sage" }
+
+/** #429 step 5: everything the Detail pane's per-line Account `<select>` needs beyond what
+ * `codingData.items` (the resolved rows) already carries — the pickable chart of accounts, the
+ * vendor's existing `SupplierAccountRule` account (so the pane can tell "this line already
+ * matches Acme's usual" from "picking this becomes Acme's usual"), and the provider's display
+ * name for the archived-account/chart-sync copy. `null` when integrations are off or the
+ * workspace has no connected provider — the caller renders the plain (non-bill) table in that
+ * case, same guard as `resolveDocumentCodingItems`. */
+export async function getBillAccountPickerData(workspaceId: string, vendorName: string | null): Promise<{
+  accountOptions: AccountOption[]
+  supplierRuleAccountId: string | null
+  providerName: string | null
+} | null> {
+  if (!config.integrations.enabled) return null
+  const connection = await prisma.integrationConnection.findFirst({ where: { workspaceId, status: "connected" }, select: { id: true, provider: true } })
+  if (!connection) return null
+  const normalizedVendor = vendorName ? normalizeSupplierName(vendorName) : ""
+  const [entities, rule] = await Promise.all([
+    listAccountingEntities(workspaceId, "account"),
+    normalizedVendor
+      ? prisma.supplierAccountRule.findFirst({ where: { connectionId: connection.id, supplierName: normalizedVendor }, select: { accountExternalId: true } })
+      : Promise.resolve(null),
+  ])
+  return {
+    accountOptions: entities.map((entity) => ({ externalId: entity.externalId, code: entity.code, name: entity.name })),
+    supplierRuleAccountId: rule?.accountExternalId ?? null,
+    providerName: PROVIDER_LABELS[connection.provider] ?? connection.provider,
+  }
 }
 
 /** #429: learns a supplier's usual expense account when a document is approved — the account
