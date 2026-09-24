@@ -214,7 +214,14 @@ export function Sidebar({ workspaceId, workspaces, user, enabledModuleKeys, acco
   // stranding Escape's focus-return with nowhere to land (#287 close, F2).
   // #342 spec §4: "Icons only" (expandsOnHover = false) never reveals these on hover/focus —
   // a genuinely new state, every other compact rail expands on hover.
-  const expandClasses = (display: string) => !compact ? "" : !expandsOnHover ? "hidden" : `hidden group-hover/rail:${display} group-focus-within/rail:${display} group-has-[[aria-expanded=true]]/rail:${display}`
+  // Spelled out in full, never interpolated: Tailwind only emits a class it finds written whole in
+  // the source, and a `group-hover/rail:${display}` template shipped every nav label blank in the
+  // expanded rail (2026-09-24).
+  const EXPAND_CLASSES = {
+    inline: "hidden group-hover/rail:inline group-focus-within/rail:inline group-has-[[aria-expanded=true]]/rail:inline",
+    block: "hidden group-hover/rail:block group-focus-within/rail:block group-has-[[aria-expanded=true]]/rail:block",
+  } as const
+  const expandClasses = (display: keyof typeof EXPAND_CLASSES) => !compact ? "" : !expandsOnHover ? "hidden" : EXPAND_CLASSES[display]
   const labelClass = expandClasses("inline")
   // #262: collapsed-rail tooltip carries the `g` jump key beside the label (H6 recognition — the
   // dialog is the source of truth, this is a hint). Only the eight destinations the shortcut
