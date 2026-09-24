@@ -4,11 +4,15 @@ import { bulkUpdateReviewTaskStatusAction, decideReviewTaskStageAction, updateRe
 import { createAutomationRuleAction, setDocumentCodingAction } from "@/app/(app)/workspaces/[workspaceId]/automation-actions"
 import { decideExpenseClaimAction } from "@/app/(app)/workspaces/[workspaceId]/expense-claim-actions"
 import { pushDocumentToAccountingAction } from "@/app/(app)/workspaces/[workspaceId]/integration-push-actions"
+import { checkAffectedByRuleChangeAction, type AffectedByRuleChange } from "@/app/(app)/workspaces/[workspaceId]/account-correction-actions"
+import { AccountCorrectionDialog } from "@/components/integrations/account-correction-dialog"
 import type { FinanceProposalResult } from "@/lib/finance/actions"
 import { useRouter } from "next/navigation"
 import { CircleCheck, Loader2, X } from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
+
+type RuleChangeRef = { connectionId: string; oldAccountExternalId: string; newAccountExternalId: string }
 
 const ERROR_MESSAGES: Record<string, string> = {
   review_queue_not_enabled: "The review queue isn't enabled for this workspace.",
@@ -43,6 +47,12 @@ export function FinanceProposalPart({ workspaceId, state, output }: {
   const router = useRouter()
   const [resolved, setResolved] = useState<"accepted" | "dismissed" | null>(null)
   const [pending, setPending] = useState(false)
+  // #430 Screen 1's bulk-approve trigger: "Accept" on an approve_review_tasks proposal can
+  // retarget more than one SupplierAccountRule at once (one per distinct old account). Each is
+  // checked for affected bills up front; only the ones that actually found any queue here, shown
+  // one dialog at a time — the spec's "no dialog, nothing to show" rule applies per rule change,
+  // not to the whole batch.
+  const [corrections, setCorrections] = useState<{ ref: RuleChangeRef; data: AffectedByRuleChange }[]>([])
 
   if (state !== "output-available" || !output) {
     return <p className="flex items-center gap-1.5 text-xs text-slate-500"><Loader2 className="h-3 w-3 animate-spin" />Preparing…</p>
@@ -59,6 +69,14 @@ export function FinanceProposalPart({ workspaceId, state, output }: {
       setResolved("accepted")
       toast.success("Done")
       router.refresh()
+      if (result.ruleChanges.length > 0) {
+        const found: { ref: RuleChangeRef; data: AffectedByRuleChange }[] = []
+        for (const ref of result.ruleChanges) {
+          const check = await checkAffectedByRuleChangeAction(workspaceId, ref.connectionId, ref.oldAccountExternalId, ref.newAccountExternalId)
+          if (check.success && check.data) found.push({ ref, data: check.data })
+        }
+        if (found.length > 0) setCorrections(found)
+      }
     } catch {
       toast.error("Could not reach the server")
       setPending(false)
@@ -66,7 +84,24 @@ export function FinanceProposalPart({ workspaceId, state, output }: {
   }
 
   if (resolved === "accepted") {
-    return <p className="flex items-center gap-1.5 rounded-md bg-emerald-50 px-2.5 py-2 text-xs text-emerald-800"><CircleCheck className="h-3.5 w-3.5 shrink-0" />{output.summary} — done</p>
+    const current = corrections[0]
+    return <>
+      <p className="flex items-center gap-1.5 rounded-md bg-emerald-50 px-2.5 py-2 text-xs text-emerald-800"><CircleCheck className="h-3.5 w-3.5 shrink-0" />{output.summary} — done</p>
+      {current && (
+        <AccountCorrectionDialog
+          open
+          onClose={() => setCorrections((prev) => prev.slice(1))}
+          workspaceId={workspaceId}
+          connectionId={current.ref.connectionId}
+          provider={current.data.provider}
+          providerLabel={current.data.providerLabel}
+          oldAccountExternalId={current.ref.oldAccountExternalId}
+          oldAccountName={current.data.oldAccountName}
+          newAccountExternalId={current.ref.newAccountExternalId}
+          newAccountName={current.data.newAccountName}
+          bills={current.data.bills} />
+      )}
+    </>
   }
   if (resolved === "dismissed") {
     return <p className="flex items-center gap-1.5 rounded-md bg-slate-50 px-2.5 py-2 text-xs text-slate-500"><X className="h-3.5 w-3.5 shrink-0" />Dismissed</p>
@@ -87,19 +122,19 @@ export function FinanceProposalPart({ workspaceId, state, output }: {
   </div>
 }
 
-async function runProposal(workspaceId: string, proposal: Exclude<FinanceProposalResult, { error: string }>): Promise<{ success: boolean; error: string }> {
+async function runProposal(workspaceId: string, proposal: Exclude<FinanceProposalResult, { error: string }>): Promise<{ success: boolean; error: string; ruleChanges: RuleChangeRef[] }> {
   switch (proposal.kind) {
     case "approve_review_tasks": {
       const result = await bulkUpdateReviewTaskStatusAction(workspaceId, proposal.taskIds, "approved")
-      return { success: result.success, error: result.error ?? "" }
+      return { success: result.success, error: result.error ?? "", ruleChanges: result.data?.ruleChanges ?? [] }
     }
     case "reject_review_task": {
       const result = await updateReviewTaskStatusAction(workspaceId, proposal.taskId, "rejected")
-      return { success: result.success, error: result.error ?? "" }
+      return { success: result.success, error: result.error ?? "", ruleChanges: [] }
     }
     case "set_document_coding": {
       const result = await setDocumentCodingAction(workspaceId, proposal.documentId, proposal.codingData)
-      return { success: result.success, error: result.error ?? "" }
+      return { success: result.success, error: result.error ?? "", ruleChanges: [] }
     }
     case "create_supplier_rule": {
       const formData = new FormData()
@@ -110,19 +145,19 @@ async function runProposal(workspaceId: string, proposal: Exclude<FinanceProposa
       if (proposal.requireReview) formData.set("requireReview", "on")
       if (proposal.autopublish) formData.set("autopublish", "on")
       const result = await createAutomationRuleAction(workspaceId, formData)
-      return { success: result.success, error: result.error ?? "" }
+      return { success: result.success, error: result.error ?? "", ruleChanges: [] }
     }
     case "push_to_accounting": {
       const result = await pushDocumentToAccountingAction(workspaceId, proposal.documentId, proposal.connectionId)
-      return { success: result.success, error: result.error ?? "" }
+      return { success: result.success, error: result.error ?? "", ruleChanges: [] }
     }
     case "decide_review_task_stage": {
       const result = await decideReviewTaskStageAction(workspaceId, proposal.taskId, proposal.decision)
-      return { success: result.success, error: result.error ?? "" }
+      return { success: result.success, error: result.error ?? "", ruleChanges: [] }
     }
     case "decide_expense_claim": {
       const result = await decideExpenseClaimAction(workspaceId, proposal.claimId, proposal.hasWorkflow, proposal.decision)
-      return { success: result.success, error: result.error ?? "" }
+      return { success: result.success, error: result.error ?? "", ruleChanges: [] }
     }
   }
 }
