@@ -61,7 +61,9 @@ export const AddDocumentsDialog = forwardRef<AddDocumentsDialogHandle, {
    * "survives close" pattern as `FileHubUploadButton` (spec interaction logic, B4). */
   onUploaded: (documentIds: string[]) => void
 }>(function AddDocumentsDialog({ open, onClose, workspaceId, fileId, templates, initialType, inboundAddress, whatsappNumber = null, onUploaded }, ref) {
-  const [type, setType] = useState(initialType)
+  // The queue the dialog was opened from is the type (CONTEXT.md "Document type": never asked
+  // again on that queue; a wrong one is fixed by Move) — no in-dialog picker (2026-09-24).
+  const type = initialType
   const [rows, setRows] = useState<Row[]>([])
   const [rejections, setRejections] = useState<string[]>([])
   const [sending, setSending] = useState(false)
@@ -128,27 +130,19 @@ export const AddDocumentsDialog = forwardRef<AddDocumentsDialogHandle, {
   }
 
   function reset() {
-    setRows([]); setRejections([]); setDone(null); setType(initialType)
+    setRows([]); setRejections([]); setDone(null)
   }
 
   const label = TYPE_LABELS[type] ?? type
   const nStaged = rows.filter((row) => row.status === "staged").length
 
-  return <Dialog open={open} title={`Add ${label}`} onClose={locked ? () => {} : () => { reset(); onClose() }} initialFocus="#add-documents-type">
+  return <Dialog open={open} title={`Add ${label}`} onClose={locked ? () => {} : () => { reset(); onClose() }} initialFocus="#add-documents-drop">
     <div className="flex flex-col gap-4 px-5 py-4">
       {done ? <>
         <p className="text-sm text-slate-700">{done.length} added to {TYPE_LABELS[type] ? `${TYPE_LABELS[type][0].toUpperCase()}${TYPE_LABELS[type].slice(1)}` : label}</p>
         <ul className="flex flex-col gap-1 text-sm text-slate-600">{done.map((item, index) => <li key={index}>{item.filename}</li>)}</ul>
       </> : <>
-        <label className="flex flex-col gap-1.5 text-sm font-medium text-slate-700">
-          Document type
-          <select id="add-documents-type" value={type} onChange={(event) => setType(event.target.value)} disabled={locked}
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm disabled:opacity-50">
-            {templates.map((template) => <option key={template.code} value={template.code}>{template.name}</option>)}
-          </select>
-        </label>
-
-        <div role="button" tabIndex={0} aria-disabled={locked}
+        <div id="add-documents-drop" role="button" tabIndex={0} aria-disabled={locked}
           className="flex flex-col items-center justify-center gap-1.5 border-y-2 border-dashed border-slate-300 px-4 py-6 text-sm text-slate-600 hover:border-emerald-400 hover:bg-emerald-50/40"
           onDrop={(event) => { event.preventDefault(); if (!locked) addFiles(event.dataTransfer.files) }}
           onDragOver={(event) => event.preventDefault()}
