@@ -10,13 +10,17 @@ import { projectDocumentFields } from "@/lib/field-projection"
 import { LOW_CONFIDENCE, PIPELINE_STAGES, type PipelineStage } from "@/lib/documents/stages"
 import { applyFxToDocument } from "@/lib/fx/apply-to-document"
 import { normalizeBillFromDocument } from "@/lib/integration-bill-mapping"
+import { resolveDocumentLineAccounts, resolveLineAccount, usesLegacyAccountChain, type LineAccountRow } from "@/lib/finance/line-account-resolution"
+import { normalizeSupplierName } from "@/lib/suppliers/normalize"
 import { unscoped } from "@/lib/workspace-scope"
 import type { DocumentProvenance } from "@/lib/provenance"
 import { replaceDocumentFieldValues } from "@/models/document-field-values"
 import { recordCodingCorrection } from "@/models/coding-corrections"
 import { recordFieldCorrection } from "@/models/field-corrections"
 import { resetSupplierStreak } from "@/models/suppliers"
-import { listWorkspaceIntegrationPushes } from "@/models/integrations"
+import { listWorkspaceIntegrationPushes, getCategoryAccountMap } from "@/models/integrations"
+import { listCategoryAccountMappings, resolveCategoryAccount } from "@/models/category-account-mappings"
+import { listAccountingEntities } from "@/models/accounting-entities"
 import { getDocumentPaymentStatuses } from "@/models/ledger-payments"
 import { emitWorkspaceEvent } from "@/lib/webhooks"
 import { resolveDuplicateGatesAgainst } from "@/lib/gates/duplicate"
@@ -476,6 +480,166 @@ function asScalarString(value: unknown): string | null {
   return null
 }
 
+/** #429: resolves each reviewed line's ledger account once, at the point Save review runs — the
+ * same "human confirms this document" trigger the pre-#429 category chain ran at. Null when there
+ * is no connected accounting connection (nothing to resolve against yet); the resulting rows are
+ * stamped onto `codingData.items`, read back by the Detail pane, the push actions (as
+ * `lineAccounts`), and the queue eligibility check. A document coded before the connection existed
+ * (`usesLegacyAccountChain`) keeps resolving through the pre-connection CategoryAccountMapping
+ * chain rather than a supplier-rule/Default chain that didn't exist when it was coded. */
+export async function resolveDocumentCodingItems(input: {
+  workspaceId: string
+  vendorName: string | null
+  category: string | null
+  codingSource: string | null
+  codedAt: Date
+  lineCount: number
+}): Promise<LineAccountRow[] | null> {
+  if (!config.integrations.enabled) return null
+  const connection = await prisma.integrationConnection.findFirst({
+    where: { workspaceId: input.workspaceId, status: "connected" },
+    select: { id: true, createdAt: true, defaultExpenseAccountId: true, defaultExpenseAccountGuessed: true },
+  })
+  if (!connection) return null
+  const lineCount = Math.max(input.lineCount, 1)
+  if (usesLegacyAccountChain(input.codingSource, input.codedAt, connection.createdAt)) {
+    if (!connection.defaultExpenseAccountId) return null
+    const [mappings, inferredMap] = await Promise.all([
+      listCategoryAccountMappings(input.workspaceId, connection.id),
+      getCategoryAccountMap(input.workspaceId, connection.id),
+    ])
+    const accountExternalId = resolveCategoryAccount(mappings, input.category, inferredMap, connection.defaultExpenseAccountId)
+    return resolveDocumentLineAccounts(lineCount, { accountExternalId, accountSource: null })
+  }
+  const normalizedVendor = input.vendorName ? normalizeSupplierName(input.vendorName) : ""
+  const rule = normalizedVendor
+    ? await prisma.supplierAccountRule.findFirst({ where: { connectionId: connection.id, supplierName: normalizedVendor }, select: { accountExternalId: true } })
+    : null
+  // #429 archived-account fallback: a supplier rule or the connection Default can point at an
+  // AccountingEntity a person later deactivated in the provider. Check both candidates' activity
+  // in one query rather than trusting either id blindly.
+  const candidateIds = [rule?.accountExternalId, connection.defaultExpenseAccountId].filter((id): id is string => Boolean(id))
+  const activeAccounts = candidateIds.length
+    ? await prisma.accountingEntity.findMany({ where: { connectionId: connection.id, entityType: "account", externalId: { in: candidateIds }, active: true }, select: { externalId: true } })
+    : []
+  const activeIds = new Set(activeAccounts.map((account) => account.externalId))
+  const ruleAccountId = rule?.accountExternalId ?? null
+  const ruleAccountActive = ruleAccountId ? activeIds.has(ruleAccountId) : false
+  const ruleArchivedFallback = Boolean(ruleAccountId) && !ruleAccountActive
+  // An archived Default is not "fall back further" — there is nothing left to fall back to — so
+  // it resolves like no Default at all, and the existing "every line has an Account" eligibility
+  // check (lib/integration-push-selection.ts) blocks posting the same way a missing Default does.
+  const defaultAccountId = connection.defaultExpenseAccountId && activeIds.has(connection.defaultExpenseAccountId)
+    ? connection.defaultExpenseAccountId
+    : null
+  const resolution = resolveLineAccount({
+    supplierRuleAccountId: ruleAccountActive ? ruleAccountId : null,
+    defaultAccountId,
+    defaultAccountGuessed: connection.defaultExpenseAccountGuessed,
+  })
+  const rows = resolveDocumentLineAccounts(lineCount, resolution)
+  return ruleArchivedFallback ? rows.map((row) => ({ ...row, account_archived_fallback: true })) : rows
+}
+
+export type AccountOption = { externalId: string; code: string | null; name: string }
+
+// #429: same map as lib/finance/actions.ts's push-copy PROVIDER_LABELS and
+// components/integrations/integrations-manager.tsx's connect-flow one — every provider gets an
+// explicit label, duplicated per call site rather than shared, matching that existing precedent.
+const PROVIDER_LABELS: Record<string, string> = { quickbooks: "QuickBooks", xero: "Xero", sage: "Sage" }
+
+/** #429 step 5: everything the Detail pane's per-line Account `<select>` needs beyond what
+ * `codingData.items` (the resolved rows) already carries — the pickable chart of accounts, the
+ * vendor's existing `SupplierAccountRule` account (so the pane can tell "this line already
+ * matches Acme's usual" from "picking this becomes Acme's usual"), and the provider's display
+ * name for the archived-account/chart-sync copy. `null` when integrations are off or the
+ * workspace has no connected provider — the caller renders the plain (non-bill) table in that
+ * case, same guard as `resolveDocumentCodingItems`. */
+export async function getBillAccountPickerData(workspaceId: string, vendorName: string | null): Promise<{
+  accountOptions: AccountOption[]
+  supplierRuleAccountId: string | null
+  providerName: string | null
+} | null> {
+  if (!config.integrations.enabled) return null
+  const connection = await prisma.integrationConnection.findFirst({ where: { workspaceId, status: "connected" }, select: { id: true, provider: true } })
+  if (!connection) return null
+  const normalizedVendor = vendorName ? normalizeSupplierName(vendorName) : ""
+  const [entities, rule] = await Promise.all([
+    listAccountingEntities(workspaceId, "account"),
+    normalizedVendor
+      ? prisma.supplierAccountRule.findFirst({ where: { connectionId: connection.id, supplierName: normalizedVendor }, select: { accountExternalId: true } })
+      : Promise.resolve(null),
+  ])
+  return {
+    accountOptions: entities.map((entity) => ({ externalId: entity.externalId, code: entity.code, name: entity.name })),
+    supplierRuleAccountId: rule?.accountExternalId ?? null,
+    providerName: PROVIDER_LABELS[connection.provider] ?? connection.provider,
+  }
+}
+
+/** #429: learns a supplier's usual expense account when a document is approved — the account
+ * resolved onto the line with the largest amount (they are currently all the same account, per
+ * resolveLineAccount's one-account-per-document scope, but this reads amounts rather than
+ * assuming that so it keeps working if that scope ever loosens). Upserts
+ * `SupplierAccountRule[connectionId, supplierName]`, refreshing `lastUsedAt` on every re-approval
+ * of the same supplier so "Forget" (Accounting page) always deletes a genuinely stale row.
+ * Fire-and-forget like the other approval-signal writers in models/suppliers.ts: a missed rule
+ * only costs a future pre-fill, never the approval it rode in on. Skips legacy-chain resolutions
+ * (`account_source: null`) — those didn't come from the supplier/Default chain this rule feeds. */
+export async function learnSupplierAccountRuleFromApproval(workspaceId: string, documentId: string): Promise<void> {
+  try {
+    const document = await prisma.document.findFirst({
+      where: { id: documentId, workspaceId },
+      select: { reviewedData: true, codingData: true },
+    })
+    if (!document) return
+    const reviewedData = (document.reviewedData as Record<string, unknown> | null) ?? {}
+    const vendorName = (typeof reviewedData.vendor === "string" && reviewedData.vendor) || (typeof reviewedData.merchant === "string" && reviewedData.merchant) || null
+    if (!vendorName?.trim()) return
+    const coding = (document.codingData as Record<string, unknown> | null) ?? {}
+    const items = Array.isArray(coding.items) ? (coding.items as LineAccountRow[]) : []
+    if (!items.length) return
+    const lineItems = Array.isArray(reviewedData.line_items) ? (reviewedData.line_items as Array<Record<string, unknown>>) : []
+    let bestIndex = -1
+    let bestAmount = -Infinity
+    items.forEach((item, index) => {
+      if (!item.account_external_id || !item.account_source) return
+      const amount = typeof lineItems[index]?.amount === "number" ? (lineItems[index].amount as number) : 0
+      if (bestIndex === -1 || amount > bestAmount) { bestIndex = index; bestAmount = amount }
+    })
+    if (bestIndex === -1) return
+    const accountExternalId = items[bestIndex].account_external_id
+    if (!accountExternalId) return
+    const connection = await prisma.integrationConnection.findFirst({ where: { workspaceId, status: "connected" }, select: { id: true } })
+    if (!connection) return
+    const supplierName = normalizeSupplierName(vendorName)
+    await prisma.supplierAccountRule.upsert({
+      where: { connectionId_supplierName: { connectionId: connection.id, supplierName } },
+      create: { workspaceId, connectionId: connection.id, supplierName, accountExternalId, lastUsedAt: new Date() },
+      update: { accountExternalId, lastUsedAt: new Date() },
+    })
+  } catch (error) {
+    console.error("[documents] failed to learn supplier account rule:", error instanceof Error ? error.message : error)
+  }
+}
+
+/** #429: bumps `lastUsedAt` when a push actually posts using a supplier's learned account, so
+ * "Forget" on the Accounting page judges staleness by real use, not just how long ago the rule
+ * was learned. Only bumps when the pushed account still matches the rule's account — a document
+ * whose vendor no longer matches this rule (renamed, or the rule was retargeted) should not keep
+ * a stale rule looking fresh. Fire-and-forget, same rationale as the writers above. */
+export async function touchSupplierAccountRuleUsage(workspaceId: string, connectionId: string, vendorName: string | null, accountExternalId: string | null): Promise<void> {
+  if (!vendorName?.trim() || !accountExternalId) return
+  try {
+    await prisma.supplierAccountRule.updateMany({
+      where: { workspaceId, connectionId, supplierName: normalizeSupplierName(vendorName), accountExternalId },
+      data: { lastUsedAt: new Date() },
+    })
+  } catch (error) {
+    console.error("[documents] failed to bump supplier account rule usage:", error instanceof Error ? error.message : error)
+  }
+}
+
 export async function updateDocumentReview(input: { workspaceId: string; documentId: string; reviewedData: Record<string, unknown>; actorId: string }) {
   const document = await getWorkspaceDocument(input.workspaceId, input.documentId)
   if (!document) throw new Error("document_not_found")
@@ -491,7 +655,16 @@ export async function updateDocumentReview(input: { workspaceId: string; documen
   // the classifier wasn't confident about (`categoryConfirmed` never set true) would stay
   // unpushable forever (`isCategoryConfirmed`, read by readiness/autopublish/integration push).
   const newlyConfirmedCategory = hasDirectionField(resolveDocType(document)) && coding.categoryConfirmed !== true
-  const nextCoding = newlyConfirmedCategory ? { ...coding, categoryConfirmed: true } : null
+  const vendorName = (typeof reviewedData.vendor === "string" && reviewedData.vendor) || (typeof reviewedData.merchant === "string" && reviewedData.merchant) || null
+  const category = typeof coding.account === "string" ? coding.account : null
+  const lineCount = Array.isArray(reviewedData.line_items) ? reviewedData.line_items.length : 0
+  const items = await resolveDocumentCodingItems({
+    workspaceId: input.workspaceId, vendorName, category, codingSource: document.codingSource, codedAt: document.receivedAt, lineCount,
+  })
+  const codingUpdates: Record<string, unknown> = {}
+  if (newlyConfirmedCategory) codingUpdates.categoryConfirmed = true
+  if (items) codingUpdates.items = items
+  const nextCoding = Object.keys(codingUpdates).length ? { ...coding, ...codingUpdates } : null
   // Re-project the structured spine from the values a human signed off on. Source is "manual"
   // because these are now reviewed values, but the per-field scores are carried over from the
   // extraction rather than being reset to 1: a bulk "mark reviewed" does not mean somebody read

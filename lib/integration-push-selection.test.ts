@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest"
-import { filterOverridesToEligible, resolveSelectionEligibility } from "./integration-push-selection"
+import { resolveSelectionEligibility } from "./integration-push-selection"
 
 const baseDoc = {
   status: "reviewed",
   docType: "invoice",
-  codingData: { categoryConfirmed: true },
+  codingData: { categoryConfirmed: true, items: [{ account_external_id: "acct_1", account_source: "default_guessed" }] },
   baseCurrencyTotal: 100,
   cancelledAt: null,
 }
@@ -21,22 +21,17 @@ describe("resolveSelectionEligibility", () => {
     expect(resolveSelectionEligibility({ ...baseDoc, status: "pending" }, opts)).toEqual({ eligible: false, reason: "Not yet approved" })
     expect(resolveSelectionEligibility({ ...baseDoc, docType: "contract" }, opts)).toEqual({ eligible: false, reason: "Document type not supported" })
     expect(resolveSelectionEligibility({ ...baseDoc, baseCurrencyTotal: null }, { ...opts, docCurrency: "EUR" })).toEqual({ eligible: false, reason: "Currency conversion pending" })
-    expect(resolveSelectionEligibility({ ...baseDoc, codingData: {} }, opts)).toEqual({ eligible: false, reason: "Category not confirmed" })
+    expect(resolveSelectionEligibility({ ...baseDoc, codingData: { items: baseDoc.codingData.items } }, opts)).toEqual({ eligible: false, reason: "Category not confirmed" })
   })
 
   it("does not gate on currency when the doc is already in the workspace base currency", () => {
     expect(resolveSelectionEligibility({ ...baseDoc, baseCurrencyTotal: null }, opts)).toEqual({ eligible: true })
   })
-})
 
-describe("filterOverridesToEligible", () => {
-  it("keeps only overrides for server-confirmed eligible ids — an override for a rejected id is never read", () => {
-    const eligibleIds = new Set(["a", "b"])
-    const overrides = { a: "acct_1", c: "acct_3" }
-    expect(filterOverridesToEligible(eligibleIds, overrides)).toEqual({ a: "acct_1" })
-  })
-
-  it("returns an empty map when no overrides were supplied", () => {
-    expect(filterOverridesToEligible(new Set(["a"]), undefined)).toEqual({})
+  it("#429: is ineligible — 'needs an Account' — when a line has no resolved account", () => {
+    expect(resolveSelectionEligibility({ ...baseDoc, codingData: { categoryConfirmed: true, items: [{ account_external_id: null, account_source: null }] } }, opts))
+      .toEqual({ eligible: false, reason: "needs an Account" })
+    expect(resolveSelectionEligibility({ ...baseDoc, codingData: { categoryConfirmed: true } }, opts))
+      .toEqual({ eligible: false, reason: "needs an Account" })
   })
 })

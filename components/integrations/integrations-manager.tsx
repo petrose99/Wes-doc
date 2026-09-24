@@ -1,5 +1,6 @@
 "use client"
 
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/admin/panel-card"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
@@ -39,6 +40,7 @@ type IntegrationConnection = {
   status: string
   defaultExpenseAccountId: string | null
   defaultExpenseAccountName: string | null
+  defaultExpenseAccountGuessed: boolean
   createdAt: Date
   lastSyncedAt: Date | null
 }
@@ -63,6 +65,7 @@ function AccountingConnectionCard({ workspaceId, connection, isOwner, onChanged 
   const [pending, startTransition] = useTransition()
   const [accounts, setAccounts] = useState<{ id: string; name: string }[] | null>(null)
   const [loadingAccounts, setLoadingAccounts] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [disconnectOpen, setDisconnectOpen] = useState(false)
 
   // Sage's OAuth grant isn't scoped to one business (ADR 0005): the AUTH webhook creates this row
@@ -79,11 +82,18 @@ function AccountingConnectionCard({ workspaceId, connection, isOwner, onChanged 
 
   const loadAccounts = () => {
     setLoadingAccounts(true)
+    setLoadError(null)
     startTransition(async () => {
       const res = await listExpenseAccountsAction(workspaceId, connection.id)
       setLoadingAccounts(false)
+      // #429: "Reading your chart of accounts…" while this is in flight, "Couldn't read the
+      // chart of accounts from {Provider}. [Try again]" on failure — the Default row's states.
       if (res.success) setAccounts(res.data ?? [])
-      else toast.error(res.error || "Could not load expense accounts")
+      else {
+        const message = res.error || `Couldn't read the chart of accounts from ${PROVIDER_LABELS[connection.provider] ?? connection.provider}.`
+        setLoadError(message)
+        toast.error(message)
+      }
     })
   }
 
@@ -128,12 +138,20 @@ function AccountingConnectionCard({ workspaceId, connection, isOwner, onChanged 
         </p>
       )}
       {isOwner && connection.status === "connected" && (
-        <div className="mt-2 flex items-center gap-2 text-xs">
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
           <Label htmlFor={`account-${connection.id}`} className="shrink-0 text-slate-600">Default expense account</Label>
           {accounts === null ? (
-            <Button type="button" size="sm" variant="outline" disabled={loadingAccounts} onClick={loadAccounts}>
-              {connection.defaultExpenseAccountName || (loadingAccounts ? "Loading…" : "Choose account")}
-            </Button>
+            loadingAccounts ? (
+              <span className="text-slate-600" aria-live="polite">Reading your chart of accounts…</span>
+            ) : loadError ? (
+              <span className="text-amber-700">
+                {loadError} <button type="button" className="font-medium underline underline-offset-2" onClick={loadAccounts}>Try again</button>
+              </span>
+            ) : (
+              <Button type="button" size="sm" variant="outline" disabled={loadingAccounts} onClick={loadAccounts}>
+                {connection.defaultExpenseAccountName || "Choose account"}
+              </Button>
+            )
           ) : (
             <NativeSelect
               id={`account-${connection.id}`}
@@ -145,6 +163,11 @@ function AccountingConnectionCard({ workspaceId, connection, isOwner, onChanged 
               <option value="" disabled>Select an account</option>
               {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
             </NativeSelect>
+          )}
+          {/* Neutral, not amber — a guess isn't yet an attention state (craft-floor: amber is
+              reserved for attention). Only shown once a Default exists to guess about. */}
+          {connection.defaultExpenseAccountId && connection.defaultExpenseAccountGuessed && (
+            <Badge variant="secondary" className="shrink-0">Guessed</Badge>
           )}
         </div>
       )}

@@ -8,6 +8,8 @@ import type { DocumentFieldDefinition } from "@/lib/document-templates"
 import type { Ref } from "@/lib/provenance"
 import type { FieldCheck } from "@/components/pipeline/document-detail/check-types"
 import type { InvoicePoSummary } from "@/models/po-matching"
+import type { AccountOption } from "@/models/documents"
+import type { LineAccountRow } from "@/lib/finance/line-account-resolution"
 import { Crosshair, Equal, EqualNot } from "lucide-react"
 import { useCallback, useEffect, useRef, useState } from "react"
 
@@ -72,7 +74,7 @@ function TotalField({ field, value, ref: provenanceRef, onFocusSource, compare }
   </div>
 }
 
-export function LineItemsSection({ field, value, fieldKey, summaryFields, fieldValues, provenanceFields, provenanceItems, onFocusSource, checks = [], onEscalate, po = null, billMode = false, readOnly = false }: {
+export function LineItemsSection({ field, value, fieldKey, summaryFields, fieldValues, provenanceFields, provenanceItems, onFocusSource, checks = [], onEscalate, po = null, billMode = false, readOnly = false, lineAccounts = null, accountOptions = [], supplierRuleAccountId = null, accountProviderName = null, accountSupplierName = null, approved = false }: {
   field: DocumentFieldDefinition
   value: unknown
   fieldKey: string
@@ -89,6 +91,15 @@ export function LineItemsSection({ field, value, fieldKey, summaryFields, fieldV
   billMode?: boolean
   /** #362: `BillReadOnlyContext` passthrough to `LineItemsEditor`. */
   readOnly?: boolean
+  /** #429 step 5: `BillSplitPane` only — the resolved per-line accounts, chart-of-accounts
+   * options, the vendor's current supplier-rule account, and the provider's display name, all
+   * passed straight through into `LineItemsEditor`'s `bill` prop. */
+  lineAccounts?: LineAccountRow[] | null
+  accountOptions?: AccountOption[]
+  supplierRuleAccountId?: string | null
+  accountProviderName?: string | null
+  accountSupplierName?: string | null
+  approved?: boolean
 }) {
   const [summary, setSummary] = useState<InvoicePoSummary | null>(po?.summary ?? null)
   // View PO opens by itself when there is something red to see — the count on the chip is the
@@ -124,7 +135,10 @@ export function LineItemsSection({ field, value, fieldKey, summaryFields, fieldV
   const rawTotal = totalField ? fieldValues[totalField.key] : null
   const parsedTotal = typeof rawTotal === "number" ? rawTotal : typeof rawTotal === "string" && rawTotal !== "" ? Number(rawTotal) : null
   const extractedTotal = parsedTotal !== null && Number.isFinite(parsedTotal) ? parsedTotal : null
-  const bill = billMode ? { extractedTotal, currency: po?.currency ?? null } : null
+  const bill = billMode ? {
+    extractedTotal, currency: po?.currency ?? null,
+    accounts: lineAccounts, accountOptions, supplierRuleAccountId, providerName: accountProviderName, supplierName: accountSupplierName, approved,
+  } : null
 
   return <div ref={sectionRef} className="scroll-mt-3 space-y-2">
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-1">

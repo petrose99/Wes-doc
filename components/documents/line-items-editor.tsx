@@ -1,6 +1,8 @@
 "use client"
 
 import type { DocumentItemFieldDefinition } from "@/lib/document-templates"
+import type { LineAccountRow } from "@/lib/finance/line-account-resolution"
+import type { AccountOption } from "@/models/documents"
 import type { Ref } from "@/lib/provenance"
 import type { LineMatch } from "@/lib/matching/line-match"
 import { CheckGlyph, RationalePopover } from "@/components/pipeline/document-detail/rationale-popover"
@@ -9,11 +11,61 @@ import { Breakdown, breakdownFor, formatAmount, formatQuantity, LineStatusPill, 
 import { Crosshair, Plus, Trash2 } from "lucide-react"
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 
-/** #362 §2: the read-only ledger-account chip — always "—" until #356 wires a derived/coded
- * account onto the line. A plain `<span>`, never a button: clicking it is #356's job, and B1
- * forbids shipping a dead control before that lands. */
+/** #362 §2 / #429: the read-only ledger-account chip — still used for Class/Customer:Job (no
+ * capability to derive those from yet) and as the pre-#429/unconnected fallback for Account
+ * itself. A plain `<span>`, never a button: nothing here writes a class/job onto the line. */
 function LedgerAccountChip({ label }: { label: string | null }) {
   return <span className="inline-flex max-w-full items-center truncate rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-600">{label ?? "—"}</span>
+}
+
+/** #429: the per-line Account cell — spec §A. A native `<select>` (the spec's own wording),
+ * pre-selected to the line's resolved account, with the provenance sentence in words underneath
+ * (never a badge alone) and, pre-approval, the "becomes the usual account" hint. Disabled: the
+ * account chain resolves automatically per document (one account for every line,
+ * `lib/finance/line-account-resolution.ts`'s documented scope) and this ticket's backend added no
+ * per-line override write path — an enabled control with nothing to submit it to is exactly the
+ * dead control `LedgerAccountChip`'s old comment (B1) warned against shipping. Changing the
+ * account is the Accounting page's Default editor (spec §B/§C), not this cell. */
+function LineAccountCell({ row, accountOptions, supplierRuleAccountId, providerName, supplierName, approved }: {
+  row: LineAccountRow | null
+  accountOptions: AccountOption[]
+  supplierRuleAccountId: string | null
+  providerName: string | null
+  supplierName: string | null
+  approved: boolean
+}) {
+  if (!row) return <LedgerAccountChip label={null} />
+  const accountId = row.account_external_id
+  const account = accountId ? accountOptions.find((option) => option.externalId === accountId) ?? null : null
+  const optionLabel = (option: AccountOption) => (option.code ? `${option.code} — ${option.name}` : option.name)
+  const supplier = supplierName?.trim() || "This supplier"
+  let provenance: string
+  if (!accountId) {
+    provenance = "No account — needs an Account"
+  } else if (row.account_source === "supplier") {
+    provenance = `${supplier}'s usual`
+  } else if (row.account_archived_fallback) {
+    provenance = `Default · ${supplier}'s usual is archived${providerName ? ` in ${providerName}` : ""}`
+  } else if (row.account_source === "default_guessed") {
+    provenance = "Default · guessed"
+  } else if (row.account_source === "default_confirmed") {
+    provenance = "Default"
+  } else {
+    provenance = "Account"
+  }
+  // #429 spec §A: shown only pre-approval, only when this line's account would change what
+  // `learnSupplierAccountRuleFromApproval` (models/documents.ts) writes for this vendor.
+  const showHint = !approved && !!accountId && accountId !== supplierRuleAccountId
+  return <div className="min-w-0 space-y-0.5">
+    <select disabled value={accountId ?? ""} aria-label="Account"
+      className="w-full min-w-0 truncate rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-600 disabled:cursor-default disabled:opacity-100">
+      <option value="">— No account —</option>
+      {account && !accountOptions.some((option) => option.externalId === account.externalId) && <option value={account.externalId}>{optionLabel(account)}</option>}
+      {accountOptions.map((option) => <option key={option.externalId} value={option.externalId}>{optionLabel(option)}</option>)}
+    </select>
+    <p className={`truncate text-[11px] ${!accountId ? "font-medium text-red-700" : "text-slate-500"}`}>{provenance}</p>
+    {showHint && <p className="text-[11px] text-emerald-700">Becomes {supplier}&rsquo;s usual when approved</p>}
+  </div>
 }
 
 // #362 §5: Class/Customer:Job columns reuse `LedgerAccountChip` directly (same inert-span
@@ -36,7 +88,18 @@ function PoLineMatchChip({ state }: { state: PoLineMatchState }) {
 /** #362 §2: the Bill-only footer — a pure function of the `amount` column already in memory
  * (B2: no round trip), checked against the document's own extracted total. Optional so every
  * other `LineItemsEditor` caller (Receipts, generic FieldRow) is unaffected. */
-export type BillLineItemsTotals = { extractedTotal: number | null; currency: string | null }
+export type BillLineItemsTotals = {
+  extractedTotal: number | null
+  currency: string | null
+  /** #429: per-line resolved accounts (`codingData.items`), in row order — `null`/absent renders
+   * the pre-#429 empty chip (unconnected workspace, or a document not yet coded). */
+  accounts?: LineAccountRow[] | null
+  accountOptions?: AccountOption[]
+  supplierRuleAccountId?: string | null
+  providerName?: string | null
+  supplierName?: string | null
+  approved?: boolean
+}
 
 type Row = { id: number; values: Record<string, unknown> }
 
@@ -287,7 +350,7 @@ export function LineItemsEditor({ fieldKey, itemFields, initialRows, provenanceI
             </div>
             {bill && <div className="flex flex-wrap items-center gap-1.5 px-2">
               <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Account</span>
-              <LedgerAccountChip label={null} />
+              <LineAccountCell row={bill?.accounts?.[index] ?? null} accountOptions={bill?.accountOptions ?? []} supplierRuleAccountId={bill?.supplierRuleAccountId ?? null} providerName={bill?.providerName ?? null} supplierName={bill?.supplierName ?? null} approved={bill?.approved ?? false} />
               <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">PO match</span>
               <PoLineMatchChip state="none" />
             </div>}
@@ -338,7 +401,7 @@ export function LineItemsEditor({ fieldKey, itemFields, initialRows, provenanceI
           const line = lineByRow.get(index) ?? null
           return <tr key={row.id} className="group even:bg-slate-50/50 hover:bg-emerald-50/40">
             {columns.map((item) => <td key={item.key} className="border-b border-slate-100 p-0 align-top">{renderCell(row, index, item, line)}</td>)}
-            {bill && <td className="border-b border-slate-100 px-2 py-1.5 align-top"><LedgerAccountChip label={null} /></td>}
+            {bill && <td className="border-b border-slate-100 px-2 py-1.5 align-top"><LineAccountCell row={bill?.accounts?.[index] ?? null} accountOptions={bill?.accountOptions ?? []} supplierRuleAccountId={bill?.supplierRuleAccountId ?? null} providerName={bill?.providerName ?? null} supplierName={bill?.supplierName ?? null} approved={bill?.approved ?? false} /></td>}
             {bill && <td className="border-b border-slate-100 px-2 py-1.5 align-top"><PoLineMatchChip state="none" /></td>}
             {bill && classJob && <td className="border-b border-slate-100 px-2 py-1.5 align-top"><LedgerAccountChip label={null} /></td>}
             {bill && classJob && <td className="border-b border-slate-100 px-2 py-1.5 align-top"><LedgerAccountChip label={null} /></td>}

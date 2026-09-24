@@ -7,11 +7,25 @@ vi.mock("@/lib/document-storage", () => ({ documentStorageKey: vi.fn(), document
 vi.mock("@/lib/analytics", () => ({ track: vi.fn() }))
 vi.mock("@/models/document-field-values", () => ({ replaceDocumentFieldValues: vi.fn() }))
 vi.mock("@/models/field-corrections", () => ({ recordFieldCorrection: vi.fn().mockResolvedValue(undefined) }))
+vi.mock("@/models/integrations", async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>()
+  return { ...actual, getCategoryAccountMap: vi.fn().mockResolvedValue({}) }
+})
+vi.mock("@/models/category-account-mappings", () => ({ listCategoryAccountMappings: vi.fn().mockResolvedValue([]), resolveCategoryAccount: vi.fn((_m: unknown, _c: unknown, _i: unknown, def: string) => def) }))
+// #429: getBillAccountPickerData reads accounts through listAccountingEntities, which wraps
+// prisma.accountingEntity.findMany in React's cache() — outside a render that memoizes across
+// unrelated test cases with the same args, so it's mocked directly rather than through db.*.
+vi.mock("@/models/accounting-entities", () => ({ listAccountingEntities: vi.fn() }))
+vi.mock("@/lib/config", async (importOriginal) => {
+  const actual = await importOriginal<{ default: Record<string, unknown> }>()
+  return { default: { ...actual.default, integrations: { ...(actual.default.integrations as object), enabled: true } } }
+})
 
-const { createDocumentFromBuffer, deleteWorkspaceDocuments, documentDataForExport, documentHash, documentSourceFor, isSupportedDocumentBuffer, listReadyToPushDocuments, setDocumentPaymentStatus, stageWhereClause, updateDocumentField, validateDocumentInput } = await import("@/models/documents")
+const { createDocumentFromBuffer, deleteWorkspaceDocuments, documentDataForExport, documentHash, documentSourceFor, getBillAccountPickerData, isSupportedDocumentBuffer, listReadyToPushDocuments, resolveDocumentCodingItems, setDocumentPaymentStatus, stageWhereClause, updateDocumentField, validateDocumentInput } = await import("@/models/documents")
 const { prisma } = await import("@/lib/db")
 const { deleteDocumentSource } = await import("@/lib/document-storage")
 const { recordFieldCorrection } = await import("@/models/field-corrections")
+const { listAccountingEntities } = await import("@/models/accounting-entities")
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = prisma as any
@@ -382,5 +396,207 @@ describe("stageWhereClause null-safety regression", () => {
     expect(notPaid).toBeDefined()
     const or = notPaid?.OR as Array<Record<string, unknown>>
     expect(or.some((c) => c.paymentStatus === null)).toBe(true)
+  })
+})
+
+// #429: resolveDocumentCodingItems is the DB-touching orchestration around the pure resolution
+// chain in lib/finance/line-account-resolution.ts (that module's own tests cover the pure
+// decisions — supplier rule wins, guessed vs confirmed Default, legacy fallback). These tests
+// cover only the orchestration: no connection → null, legacy documents route through
+// CategoryAccountMapping, current documents route through the supplier-rule/Default chain.
+describe("resolveDocumentCodingItems", () => {
+  beforeEach(() => {
+    db.integrationConnection = { findFirst: vi.fn() }
+    db.supplierAccountRule = { findFirst: vi.fn() }
+    // Default: whatever account id is asked about comes back active, so the pre-existing tests
+    // below (written before the #429 archived-account fallback) keep exercising the ordinary
+    // supplier-rule/Default chain, not the fallback path. The fallback has its own describe block.
+    db.accountingEntity = { findMany: vi.fn((args: { where: { externalId: { in: string[] } } }) => Promise.resolve(args.where.externalId.in.map((externalId: string) => ({ externalId })))) }
+  })
+
+  it("resolves nothing when the workspace has no connected accounting connection", async () => {
+    db.integrationConnection.findFirst.mockResolvedValue(null)
+    const items = await resolveDocumentCodingItems({
+      workspaceId: "w1", vendorName: "Acme", category: "software", codingSource: null, codedAt: new Date("2026-01-01"), lineCount: 2,
+    })
+    expect(items).toBeNull()
+  })
+
+  it("a document coded before the connection existed resolves through the legacy category chain, not a supplier rule", async () => {
+    db.integrationConnection.findFirst.mockResolvedValue({
+      id: "conn1", createdAt: new Date("2026-06-01"), defaultExpenseAccountId: "default_1", defaultExpenseAccountGuessed: false,
+    })
+    const items = await resolveDocumentCodingItems({
+      workspaceId: "w1", vendorName: "Acme", category: "software", codingSource: "ai", codedAt: new Date("2026-01-01"), lineCount: 2,
+    })
+    expect(db.supplierAccountRule.findFirst).not.toHaveBeenCalled()
+    expect(items).toEqual([
+      { account_external_id: "default_1", account_source: null },
+      { account_external_id: "default_1", account_source: null },
+    ])
+  })
+
+  it("a current document with a matching supplier rule resolves every line to the rule's account", async () => {
+    db.integrationConnection.findFirst.mockResolvedValue({
+      id: "conn1", createdAt: new Date("2026-01-01"), defaultExpenseAccountId: "default_1", defaultExpenseAccountGuessed: true,
+    })
+    db.supplierAccountRule.findFirst.mockResolvedValue({ accountExternalId: "acme_usual" })
+    const items = await resolveDocumentCodingItems({
+      workspaceId: "w1", vendorName: "Acme Holdings", category: null, codingSource: "ai", codedAt: new Date("2026-06-15"), lineCount: 1,
+    })
+    expect(items).toEqual([{ account_external_id: "acme_usual", account_source: "supplier" }])
+  })
+
+  it("a current document with no supplier rule falls back to the connection's Default, marked guessed", async () => {
+    db.integrationConnection.findFirst.mockResolvedValue({
+      id: "conn1", createdAt: new Date("2026-01-01"), defaultExpenseAccountId: "default_1", defaultExpenseAccountGuessed: true,
+    })
+    db.supplierAccountRule.findFirst.mockResolvedValue(null)
+    const items = await resolveDocumentCodingItems({
+      workspaceId: "w1", vendorName: "New Vendor", category: null, codingSource: "ai", codedAt: new Date("2026-06-15"), lineCount: 1,
+    })
+    expect(items).toEqual([{ account_external_id: "default_1", account_source: "default_guessed" }])
+  })
+
+  it("stamps at least one row even for a document with no line items, so the synthesized 'Total' line still gets an account", async () => {
+    db.integrationConnection.findFirst.mockResolvedValue({
+      id: "conn1", createdAt: new Date("2026-01-01"), defaultExpenseAccountId: "default_1", defaultExpenseAccountGuessed: true,
+    })
+    db.supplierAccountRule.findFirst.mockResolvedValue(null)
+    const items = await resolveDocumentCodingItems({
+      workspaceId: "w1", vendorName: null, category: null, codingSource: "ai", codedAt: new Date("2026-06-15"), lineCount: 0,
+    })
+    expect(items).toHaveLength(1)
+  })
+
+  describe("archived-account fallback (#429)", () => {
+    it("falls back to the Default and flags the row when the matched supplier rule's account is archived", async () => {
+      db.integrationConnection.findFirst.mockResolvedValue({
+        id: "conn1", createdAt: new Date("2026-01-01"), defaultExpenseAccountId: "default_1", defaultExpenseAccountGuessed: false,
+      })
+      db.supplierAccountRule.findFirst.mockResolvedValue({ accountExternalId: "acme_usual" })
+      db.accountingEntity.findMany.mockResolvedValue([{ externalId: "default_1" }]) // acme_usual not active
+      const items = await resolveDocumentCodingItems({
+        workspaceId: "w1", vendorName: "Acme", category: null, codingSource: "ai", codedAt: new Date("2026-06-15"), lineCount: 1,
+      })
+      expect(items).toEqual([{ account_external_id: "default_1", account_source: "default_confirmed", account_archived_fallback: true }])
+    })
+
+    it("resolves no account at all when the connection's Default itself is archived and there is no rule", async () => {
+      db.integrationConnection.findFirst.mockResolvedValue({
+        id: "conn1", createdAt: new Date("2026-01-01"), defaultExpenseAccountId: "default_1", defaultExpenseAccountGuessed: false,
+      })
+      db.supplierAccountRule.findFirst.mockResolvedValue(null)
+      db.accountingEntity.findMany.mockResolvedValue([]) // default_1 not active
+      const items = await resolveDocumentCodingItems({
+        workspaceId: "w1", vendorName: "New Vendor", category: null, codingSource: "ai", codedAt: new Date("2026-06-15"), lineCount: 1,
+      })
+      expect(items).toEqual([{ account_external_id: null, account_source: null }])
+    })
+  })
+})
+
+// #429: getBillAccountPickerData feeds the Detail pane's per-line Account select (spec §A) — the
+// synced accounts, the vendor's supplier rule (if any) and the provider's display name.
+describe("getBillAccountPickerData", () => {
+  beforeEach(() => {
+    db.integrationConnection = { findFirst: vi.fn() }
+    db.supplierAccountRule = { findFirst: vi.fn() }
+    vi.mocked(listAccountingEntities).mockResolvedValue([{ externalId: "acc_1", code: "6100", name: "Office supplies" }])
+  })
+
+  it("returns null when the workspace has no connected accounting connection", async () => {
+    db.integrationConnection.findFirst.mockResolvedValue(null)
+    const result = await getBillAccountPickerData("w1", "Acme")
+    expect(result).toBeNull()
+    expect(db.supplierAccountRule.findFirst).not.toHaveBeenCalled()
+  })
+
+  it("skips the supplier-rule lookup and returns a null supplierRuleAccountId when there is no vendor name", async () => {
+    db.integrationConnection.findFirst.mockResolvedValue({ id: "conn1", provider: "quickbooks" })
+    const result = await getBillAccountPickerData("w1", null)
+    expect(db.supplierAccountRule.findFirst).not.toHaveBeenCalled()
+    expect(result).toEqual({
+      accountOptions: [{ externalId: "acc_1", code: "6100", name: "Office supplies" }],
+      supplierRuleAccountId: null,
+      providerName: "QuickBooks",
+    })
+  })
+
+  it("returns the vendor's supplier-rule account and the provider's display name when both exist", async () => {
+    db.integrationConnection.findFirst.mockResolvedValue({ id: "conn1", provider: "xero" })
+    db.supplierAccountRule.findFirst.mockResolvedValue({ accountExternalId: "acme_usual" })
+    const result = await getBillAccountPickerData("w1", "Acme Holdings")
+    expect(result).toEqual({
+      accountOptions: [{ externalId: "acc_1", code: "6100", name: "Office supplies" }],
+      supplierRuleAccountId: "acme_usual",
+      providerName: "Xero",
+    })
+  })
+})
+
+describe("learnSupplierAccountRuleFromApproval", () => {
+  beforeEach(() => {
+    db.document = { findFirst: vi.fn() }
+    db.integrationConnection = { findFirst: vi.fn() }
+    db.supplierAccountRule = { upsert: vi.fn() }
+  })
+
+  it("upserts a rule keyed on the connection and the normalized supplier for the line with the largest amount", async () => {
+    const { learnSupplierAccountRuleFromApproval } = await import("@/models/documents")
+    db.document.findFirst.mockResolvedValue({
+      reviewedData: { vendor: "ACME Ltd.", line_items: [{ amount: 10 }, { amount: 90 }] },
+      codingData: { items: [{ account_external_id: "small_acct", account_source: "default_guessed" }, { account_external_id: "big_acct", account_source: "default_guessed" }] },
+    })
+    db.integrationConnection.findFirst.mockResolvedValue({ id: "conn1" })
+    await learnSupplierAccountRuleFromApproval("w1", "doc1")
+    expect(db.supplierAccountRule.upsert).toHaveBeenCalledWith({
+      where: { connectionId_supplierName: { connectionId: "conn1", supplierName: "acme" } },
+      create: { workspaceId: "w1", connectionId: "conn1", supplierName: "acme", accountExternalId: "big_acct", lastUsedAt: expect.any(Date) },
+      update: { accountExternalId: "big_acct", lastUsedAt: expect.any(Date) },
+    })
+  })
+
+  it("does nothing for a legacy-chain resolution (no account_source)", async () => {
+    const { learnSupplierAccountRuleFromApproval } = await import("@/models/documents")
+    db.document.findFirst.mockResolvedValue({
+      reviewedData: { vendor: "Acme", line_items: [{ amount: 10 }] },
+      codingData: { items: [{ account_external_id: "legacy_acct", account_source: null }] },
+    })
+    await learnSupplierAccountRuleFromApproval("w1", "doc1")
+    expect(db.integrationConnection.findFirst).not.toHaveBeenCalled()
+    expect(db.supplierAccountRule.upsert).not.toHaveBeenCalled()
+  })
+
+  it("does nothing when the document has no vendor name", async () => {
+    const { learnSupplierAccountRuleFromApproval } = await import("@/models/documents")
+    db.document.findFirst.mockResolvedValue({
+      reviewedData: { line_items: [{ amount: 10 }] },
+      codingData: { items: [{ account_external_id: "acct", account_source: "default_guessed" }] },
+    })
+    await learnSupplierAccountRuleFromApproval("w1", "doc1")
+    expect(db.supplierAccountRule.upsert).not.toHaveBeenCalled()
+  })
+})
+
+describe("touchSupplierAccountRuleUsage", () => {
+  beforeEach(() => {
+    db.supplierAccountRule = { updateMany: vi.fn() }
+  })
+
+  it("bumps lastUsedAt for the matching rule", async () => {
+    const { touchSupplierAccountRuleUsage } = await import("@/models/documents")
+    await touchSupplierAccountRuleUsage("w1", "conn1", "ACME Ltd.", "acct_1")
+    expect(db.supplierAccountRule.updateMany).toHaveBeenCalledWith({
+      where: { workspaceId: "w1", connectionId: "conn1", supplierName: "acme", accountExternalId: "acct_1" },
+      data: { lastUsedAt: expect.any(Date) },
+    })
+  })
+
+  it("does nothing without a vendor name or account", async () => {
+    const { touchSupplierAccountRuleUsage } = await import("@/models/documents")
+    await touchSupplierAccountRuleUsage("w1", "conn1", null, "acct_1")
+    await touchSupplierAccountRuleUsage("w1", "conn1", "Acme", null)
+    expect(db.supplierAccountRule.updateMany).not.toHaveBeenCalled()
   })
 })

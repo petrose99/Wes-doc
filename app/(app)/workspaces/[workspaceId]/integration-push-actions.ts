@@ -13,9 +13,8 @@ import { getCurrentUser } from "@/lib/auth"
 import config from "@/lib/config"
 import { BillMappingError, normalizeBillFromDocument } from "@/lib/integration-bill-mapping"
 import { attemptIntegrationPush, getActiveIntegrationConnectionId, kickIntegrationPushDrain } from "@/lib/integration-push"
-import { getWorkspaceDocument, listReadyToPushDocuments } from "@/models/documents"
-import { getCategoryAccountMap, upsertWorkspaceIntegrationPush, workspaceIntegrationsPlanEnabled } from "@/models/integrations"
-import { listCategoryAccountMappings, resolveCategoryAccount } from "@/models/category-account-mappings"
+import { getWorkspaceDocument, listReadyToPushDocuments, touchSupplierAccountRuleUsage } from "@/models/documents"
+import { upsertWorkspaceIntegrationPush, workspaceIntegrationsPlanEnabled } from "@/models/integrations"
 import { prisma } from "@/lib/db"
 import { revalidatePath } from "next/cache"
 import { errorMessage, NO_ACCESS, requireMember } from "./action-helpers"
@@ -28,8 +27,7 @@ export async function pushDocumentToConnection(
   workspaceId: string,
   documentId: string,
   connectionId: string,
-  userId: string,
-  expenseAccountId?: string
+  userId: string
 ): Promise<{ status: string; errorCode?: string | null }> {
   const document = await getWorkspaceDocument(workspaceId, documentId)
   if (!document) throw new Error("Document not found")
@@ -58,11 +56,11 @@ export async function pushDocumentToConnection(
   const category = (typeof coding.account === "string" && coding.account) || (typeof reviewedData.category === "string" && reviewedData.category) || null
   const documentType = coding.documentType === "expense" || coding.documentType === "sale" || coding.documentType === "bank_statement" ? coding.documentType : "expense"
 
-  let resolvedAccountId = expenseAccountId
-  if (!resolvedAccountId && category && connection.defaultExpenseAccountId) {
-    const [mappings, inferredMap] = await Promise.all([listCategoryAccountMappings(workspaceId, connectionId), getCategoryAccountMap(workspaceId, connectionId)])
-    resolvedAccountId = resolveCategoryAccount(mappings, category, inferredMap, connection.defaultExpenseAccountId)
-  }
+  // #429: per-line accounts are resolved once at Save review (models/documents.ts::
+  // updateDocumentReview::resolveDocumentCodingItems) and stamped onto codingData.items — no
+  // per-push mapping resolution left to do here. The connection Default still backs
+  // `payload.expenseAccountId`, read by the preflight cache check (lib/integration-push.ts).
+  const codingItems = Array.isArray((coding as { items?: unknown }).items) ? (coding.items as Array<{ account_external_id: string | null }>) : null
 
   // Ledger books everything in the workspace's base currency: if the document has been
   // converted, the bill body carries the converted total + base currency, NOT the extracted
@@ -72,9 +70,9 @@ export async function pushDocumentToConnection(
   const fxOverride = workspaceBase && document.baseCurrencyTotal !== null
     ? { total: Number(document.baseCurrencyTotal), currencyCode: workspaceBase }
     : null
-  const bill = normalizeBillFromDocument({ documentId: document.id, filename: document.filename, templateCode: document.template?.code ?? null, reviewedData, fxOverride })
+  const bill = normalizeBillFromDocument({ documentId: document.id, filename: document.filename, templateCode: document.template?.code ?? null, reviewedData, fxOverride, lineAccounts: codingItems })
   const direction: "payable" | "receivable" = documentType === "sale" ? "receivable" : "payable"
-  const payload: object = { ...bill, documentType, direction, ...(resolvedAccountId ? { expenseAccountId: resolvedAccountId } : {}), ...(category ? { category } : {}) }
+  const payload: object = { ...bill, documentType, direction, ...(connection.defaultExpenseAccountId ? { expenseAccountId: connection.defaultExpenseAccountId } : {}), ...(category ? { category } : {}) }
 
   const push = await upsertWorkspaceIntegrationPush(workspaceId, {
     connectionId: connection.id,
@@ -91,6 +89,9 @@ export async function pushDocumentToConnection(
   // cleared, so it never sits open once the ledger holds the document.
   if (updated?.status === "succeeded") {
     await prisma.reviewTask.updateMany({ where: { workspaceId, documentId, reason: "push_preflight", status: { in: ["open", "in_review"] } }, data: { status: "approved", resolvedAt: new Date() } })
+    const vendorName = (typeof reviewedData.vendor === "string" && reviewedData.vendor) || (typeof reviewedData.merchant === "string" && reviewedData.merchant) || null
+    const usedAccountExternalId = codingItems?.[0]?.account_external_id ?? null
+    await touchSupplierAccountRuleUsage(workspaceId, connection.id, vendorName, usedAccountExternalId)
   }
   return { status: updated?.status ?? "pending", errorCode: updated?.errorCode ?? null }
 }
@@ -98,8 +99,7 @@ export async function pushDocumentToConnection(
 export async function pushDocumentToAccountingAction(
   workspaceId: string,
   documentId: string,
-  connectionId: string,
-  expenseAccountId?: string
+  connectionId: string
 ): Promise<ActionState<{ status: string }>> {
   if (!config.integrations.enabled) return { success: false, error: errorMessage(new Error("integrations_not_available"), NO_ACCESS) }
   const user = await getCurrentUser()
@@ -107,7 +107,7 @@ export async function pushDocumentToAccountingAction(
   if (!(await workspaceIntegrationsPlanEnabled(workspaceId))) return { success: false, error: errorMessage(new Error("integrations_plan_required"), NO_ACCESS) }
 
   try {
-    const result = await pushDocumentToConnection(workspaceId, documentId, connectionId, user.id, expenseAccountId)
+    const result = await pushDocumentToConnection(workspaceId, documentId, connectionId, user.id)
     await recordDocumentAudit({ workspaceId, actorId: user.id, documentId, type: "integration_push_enqueued", detail: { connectionId } })
     revalidatePath(`/workspaces/${workspaceId}/documents/${documentId}`)
     revalidatePath(`/workspaces/${workspaceId}/accounting`)
@@ -133,8 +133,7 @@ export async function retryLedgerPushAction(workspaceId: string, documentId: str
  * ready set next time. */
 export async function pushAllReadyDocumentsAction(
   workspaceId: string,
-  connectionId: string,
-  accountOverrides?: Record<string, string>
+  connectionId: string
 ): Promise<ActionState<{ pushed: number; failed: number; results: Array<{ documentId: string; status: "succeeded" | "queued" | "failed"; error?: string }> }>> {
   if (!config.integrations.enabled) return { success: false, error: errorMessage(new Error("integrations_not_available"), NO_ACCESS) }
   const user = await getCurrentUser()
@@ -147,7 +146,7 @@ export async function pushAllReadyDocumentsAction(
   const results: Array<{ documentId: string; status: "succeeded" | "queued" | "failed"; error?: string }> = []
   for (const doc of ready) {
     try {
-      const result = await pushDocumentToConnection(workspaceId, doc.id, connectionId, user.id, accountOverrides?.[doc.id])
+      const result = await pushDocumentToConnection(workspaceId, doc.id, connectionId, user.id)
       // #249: a push that fails inside attemptIntegrationPush (rather than throwing here) used to
       // report bare "failed" with no reason — the same object the catch block below already
       // carries one on. `errorCode` is the field attemptIntegrationPush itself writes on failure.

@@ -32,13 +32,14 @@ import { documentBlocksKey, readDocumentBlocks } from "@/lib/document-storage"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { listBankMatches } from "@/models/bank-matches"
 import { listDocumentAuditEvents } from "@/models/audit-events"
-import { getWorkspaceDocument } from "@/models/documents"
+import { getWorkspaceDocument, getBillAccountPickerData } from "@/models/documents"
 import { getFewShotExamples } from "@/models/field-corrections"
 import { getOpenReviewTaskForDocument } from "@/models/review-tasks"
 import { listWorkspaceInstitutions } from "@/models/institutions"
 import { listWorkspaceIntegrationConnections, listWorkspaceIntegrationPushes } from "@/models/integrations"
 import { getDocumentPaymentStatuses } from "@/models/ledger-payments"
 import { getSupplierSummaryForDocument } from "@/models/supplier-summary"
+import type { LineAccountRow } from "@/lib/finance/line-account-resolution"
 import { requireWorkspaceRole } from "@/models/workspaces"
 import { documentDestinationPath } from "@/lib/typed-destinations"
 import { notFound, redirect } from "next/navigation"
@@ -373,8 +374,19 @@ export async function DocumentDetailPage({ params, searchParams, embedded = fals
     // #362 §1: scoped to this branch only — the extra query would run on every document-page
     // render otherwise, and no other queue's `BillSplitPane` usage has a supplier concept yet.
     const supplierSummary = await getSupplierSummaryForDocument(workspaceId, supplier || null, templateCode || null)
+    // #429 step 5: same scoping rationale — the chart-of-accounts + supplier-rule lookup only
+    // matters to the per-line Account column this pane renders. `codingData.items` (the already-
+    // resolved LineAccountRow[] from `resolveDocumentCodingItems`, populated at Save review/step
+    // 3b) rides on the `codingData` object already read above; nothing else to fetch for it.
+    const billAccountPicker = await getBillAccountPickerData(workspaceId, supplier || null)
+    const codingItems = Array.isArray(codingData.items) ? (codingData.items as LineAccountRow[]) : null
     return <BillSplitPane
     supplierSummary={supplierSummary}
+    lineAccounts={codingItems}
+    accountOptions={billAccountPicker?.accountOptions ?? []}
+    supplierRuleAccountId={billAccountPicker?.supplierRuleAccountId ?? null}
+    accountProviderName={billAccountPicker?.providerName ?? null}
+    accountSupplierName={supplier || null}
     workspaceId={workspaceId} source={{ documentId: document.id, filename: document.filename, mimeType: document.mimeType }}
     fields={fields} data={data} fieldConfidence={fieldConfidence}
     provenanceFields={provenance?.fields ?? {}} provenanceItems={provenance?.items ?? {}}

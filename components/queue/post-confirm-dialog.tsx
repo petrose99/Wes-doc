@@ -55,7 +55,7 @@ export function PostConfirmDialog({ open, onClose, workspaceId, connectionId, re
     setBusy(true)
     setError(null)
     try {
-      const result = await postSelectedDocumentsAction(workspaceId, connectionId, records.map((r) => r.id), overrides)
+      const result = await postSelectedDocumentsAction(workspaceId, connectionId, records.map((r) => r.id))
       if (!result.success || !result.data) { setError(result.error ?? "Could not post these documents"); return }
       const { posted, failed, results } = result.data
       const total = results.length

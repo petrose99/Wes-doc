@@ -26,15 +26,17 @@ export async function listExpenseAccounts(tenantId: string, connectionId: string
   return (result.Accounts ?? []).map((a) => ({ code: a.Code, name: a.Name }))
 }
 
-export type XeroSyncedAccount = { code: string; name: string; active: boolean }
+export type XeroSyncedAccount = { code: string; name: string; active: boolean; accountClass: string }
 export type XeroSyncedContact = { id: string; name: string; active: boolean }
 export type XeroSyncedTaxRate = { name: string; active: boolean }
 
 /** All accounts (any class, any status) for WP1.5's chart-of-accounts sync — Xero has no
- * server-side pagination for /Accounts (unlike /Contacts), so this is a single request. */
+ * server-side pagination for /Accounts (unlike /Contacts), so this is a single request.
+ * `accountClass` rides along so #429's Default-account guess can tell an EXPENSE account from any
+ * other kind without a second round-trip. */
 export async function listAccounts(tenantId: string, connectionId: string): Promise<XeroSyncedAccount[]> {
-  const result = await apiRequest<{ Accounts?: Array<{ Code?: string; Name: string; Status: string }> }>(tenantId, connectionId, "/Accounts")
-  return (result.Accounts ?? []).filter((a) => a.Code).map((a) => ({ code: a.Code as string, name: a.Name, active: a.Status === "ACTIVE" }))
+  const result = await apiRequest<{ Accounts?: Array<{ Code?: string; Name: string; Status: string; Class: string }> }>(tenantId, connectionId, "/Accounts")
+  return (result.Accounts ?? []).filter((a) => a.Code).map((a) => ({ code: a.Code as string, name: a.Name, active: a.Status === "ACTIVE", accountClass: a.Class }))
 }
 
 /** Every contact flagged as a supplier. /Contacts pages at 100 rows via the `page` query param;

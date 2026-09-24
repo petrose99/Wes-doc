@@ -12,7 +12,7 @@ import { ActionState } from "@/lib/actions"
 import { recordDocumentAudit } from "@/lib/audit"
 import { getCurrentUser } from "@/lib/auth"
 import config from "@/lib/config"
-import { filterOverridesToEligible, resolveSelectionEligibility } from "@/lib/integration-push-selection"
+import { resolveSelectionEligibility } from "@/lib/integration-push-selection"
 import { workspaceIntegrationsPlanEnabled } from "@/models/integrations"
 import { prisma } from "@/lib/db"
 import { revalidatePath } from "next/cache"
@@ -24,8 +24,7 @@ export type SelectionPostOutcome = { documentId: string; status: "succeeded" | "
 export async function postSelectedDocumentsAction(
   workspaceId: string,
   connectionId: string,
-  documentIds: string[],
-  accountOverrides?: Record<string, string>
+  documentIds: string[]
 ): Promise<ActionState<{ posted: number; failed: number; results: SelectionPostOutcome[] }>> {
   if (!config.integrations.enabled) return { success: false, error: errorMessage(new Error("integrations_not_available"), NO_ACCESS) }
   if (!documentIds.length) return { success: false, error: "No documents selected" }
@@ -57,12 +56,11 @@ export async function postSelectedDocumentsAction(
     eligibleIds.add(documentId)
   }
 
-  const overridesForEligible = filterOverridesToEligible(eligibleIds, accountOverrides)
   let posted = 0
   let failed = 0
   for (const documentId of eligibleIds) {
     try {
-      const result = await pushDocumentToConnection(workspaceId, documentId, connectionId, user.id, overridesForEligible[documentId])
+      const result = await pushDocumentToConnection(workspaceId, documentId, connectionId, user.id)
       if (result.status === "failed") { failed += 1; results.push({ documentId, status: "failed", error: result.errorCode ?? "Could not push this document" }) }
       else { posted += 1; results.push({ documentId, status: result.status === "succeeded" ? "succeeded" : "queued" }) }
     } catch (error) {
