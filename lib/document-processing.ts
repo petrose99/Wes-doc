@@ -108,6 +108,17 @@ export function shouldReassignWorksheet(input: {
   return input.classification.docType !== input.currentTemplateCode
 }
 
+/** Whether the post-extraction route may move a document to the worksheet its classified docType
+ * calls for. Same policy as shouldReassignWorksheet — a type a person chose (the queue a document
+ * was added on, a worksheet's own upload) is never overruled — except that a document nobody typed
+ * (no worksheet, or the "generic" fallback) is routed too, since there is no choice to respect.
+ * CONTEXT.md "Document type": a wrong one is fixed by Move, not by the classifier. */
+export function mayAutoRouteAfterExtraction(input: { codingData: unknown; currentTemplateCode: string | null | undefined }): boolean {
+  const coding = (input.codingData as Record<string, unknown> | null) ?? {}
+  if (coding.worksheetSource === "auto") return true
+  return !input.currentTemplateCode || input.currentTemplateCode === "generic"
+}
+
 /** One page of the document as parsed markdown. */
 export type PageContent = { page: number; text: string }
 
@@ -807,7 +818,7 @@ export async function processDocumentJob(jobId: string) {
     await track("document_extraction_completed", { documentId: document.id, templateCode: document.template?.code ?? "unknown", status: "success", durationMs: Date.now() - document.receivedAt.getTime() }, { workspaceId: document.workspaceId })
     await prisma.ingestionItem.updateMany({ where: { workspaceId: document.workspaceId, documentId: document.id }, data: { status: "extracted" } })
     const classifiedDocType = classificationData?.docType ?? resolveDocType(document)
-    if (isDocType(classifiedDocType)) {
+    if (isDocType(classifiedDocType) && mayAutoRouteAfterExtraction({ codingData: document.codingData, currentTemplateCode: document.template?.code })) {
       await autoRouteToSheet(document, classifiedDocType, inferredFields).catch((e) =>
         console.error("[processing] auto-route failed (non-fatal):", e instanceof Error ? e.message : e))
     }
