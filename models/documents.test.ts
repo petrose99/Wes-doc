@@ -12,15 +12,20 @@ vi.mock("@/models/integrations", async (importOriginal) => {
   return { ...actual, getCategoryAccountMap: vi.fn().mockResolvedValue({}) }
 })
 vi.mock("@/models/category-account-mappings", () => ({ listCategoryAccountMappings: vi.fn().mockResolvedValue([]), resolveCategoryAccount: vi.fn((_m: unknown, _c: unknown, _i: unknown, def: string) => def) }))
+// #429: getBillAccountPickerData reads accounts through listAccountingEntities, which wraps
+// prisma.accountingEntity.findMany in React's cache() — outside a render that memoizes across
+// unrelated test cases with the same args, so it's mocked directly rather than through db.*.
+vi.mock("@/models/accounting-entities", () => ({ listAccountingEntities: vi.fn() }))
 vi.mock("@/lib/config", async (importOriginal) => {
   const actual = await importOriginal<{ default: Record<string, unknown> }>()
   return { default: { ...actual.default, integrations: { ...(actual.default.integrations as object), enabled: true } } }
 })
 
-const { createDocumentFromBuffer, deleteWorkspaceDocuments, documentDataForExport, documentHash, documentSourceFor, isSupportedDocumentBuffer, listReadyToPushDocuments, resolveDocumentCodingItems, setDocumentPaymentStatus, stageWhereClause, updateDocumentField, validateDocumentInput } = await import("@/models/documents")
+const { createDocumentFromBuffer, deleteWorkspaceDocuments, documentDataForExport, documentHash, documentSourceFor, getBillAccountPickerData, isSupportedDocumentBuffer, listReadyToPushDocuments, resolveDocumentCodingItems, setDocumentPaymentStatus, stageWhereClause, updateDocumentField, validateDocumentInput } = await import("@/models/documents")
 const { prisma } = await import("@/lib/db")
 const { deleteDocumentSource } = await import("@/lib/document-storage")
 const { recordFieldCorrection } = await import("@/models/field-corrections")
+const { listAccountingEntities } = await import("@/models/accounting-entities")
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = prisma as any
@@ -487,6 +492,45 @@ describe("resolveDocumentCodingItems", () => {
         workspaceId: "w1", vendorName: "New Vendor", category: null, codingSource: "ai", codedAt: new Date("2026-06-15"), lineCount: 1,
       })
       expect(items).toEqual([{ account_external_id: null, account_source: null }])
+    })
+  })
+})
+
+// #429: getBillAccountPickerData feeds the Detail pane's per-line Account select (spec §A) — the
+// synced accounts, the vendor's supplier rule (if any) and the provider's display name.
+describe("getBillAccountPickerData", () => {
+  beforeEach(() => {
+    db.integrationConnection = { findFirst: vi.fn() }
+    db.supplierAccountRule = { findFirst: vi.fn() }
+    vi.mocked(listAccountingEntities).mockResolvedValue([{ externalId: "acc_1", code: "6100", name: "Office supplies" }])
+  })
+
+  it("returns null when the workspace has no connected accounting connection", async () => {
+    db.integrationConnection.findFirst.mockResolvedValue(null)
+    const result = await getBillAccountPickerData("w1", "Acme")
+    expect(result).toBeNull()
+    expect(db.supplierAccountRule.findFirst).not.toHaveBeenCalled()
+  })
+
+  it("skips the supplier-rule lookup and returns a null supplierRuleAccountId when there is no vendor name", async () => {
+    db.integrationConnection.findFirst.mockResolvedValue({ id: "conn1", provider: "quickbooks" })
+    const result = await getBillAccountPickerData("w1", null)
+    expect(db.supplierAccountRule.findFirst).not.toHaveBeenCalled()
+    expect(result).toEqual({
+      accountOptions: [{ externalId: "acc_1", code: "6100", name: "Office supplies" }],
+      supplierRuleAccountId: null,
+      providerName: "QuickBooks",
+    })
+  })
+
+  it("returns the vendor's supplier-rule account and the provider's display name when both exist", async () => {
+    db.integrationConnection.findFirst.mockResolvedValue({ id: "conn1", provider: "xero" })
+    db.supplierAccountRule.findFirst.mockResolvedValue({ accountExternalId: "acme_usual" })
+    const result = await getBillAccountPickerData("w1", "Acme Holdings")
+    expect(result).toEqual({
+      accountOptions: [{ externalId: "acc_1", code: "6100", name: "Office supplies" }],
+      supplierRuleAccountId: "acme_usual",
+      providerName: "Xero",
     })
   })
 })

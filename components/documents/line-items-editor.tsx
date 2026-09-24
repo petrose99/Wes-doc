@@ -350,7 +350,7 @@ export function LineItemsEditor({ fieldKey, itemFields, initialRows, provenanceI
             </div>
             {bill && <div className="flex flex-wrap items-center gap-1.5 px-2">
               <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Account</span>
-              <LedgerAccountChip label={null} />
+              <LineAccountCell row={bill?.accounts?.[index] ?? null} accountOptions={bill?.accountOptions ?? []} supplierRuleAccountId={bill?.supplierRuleAccountId ?? null} providerName={bill?.providerName ?? null} supplierName={bill?.supplierName ?? null} approved={bill?.approved ?? false} />
               <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">PO match</span>
               <PoLineMatchChip state="none" />
             </div>}
@@ -401,7 +401,7 @@ export function LineItemsEditor({ fieldKey, itemFields, initialRows, provenanceI
           const line = lineByRow.get(index) ?? null
           return <tr key={row.id} className="group even:bg-slate-50/50 hover:bg-emerald-50/40">
             {columns.map((item) => <td key={item.key} className="border-b border-slate-100 p-0 align-top">{renderCell(row, index, item, line)}</td>)}
-            {bill && <td className="border-b border-slate-100 px-2 py-1.5 align-top"><LedgerAccountChip label={null} /></td>}
+            {bill && <td className="border-b border-slate-100 px-2 py-1.5 align-top"><LineAccountCell row={bill?.accounts?.[index] ?? null} accountOptions={bill?.accountOptions ?? []} supplierRuleAccountId={bill?.supplierRuleAccountId ?? null} providerName={bill?.providerName ?? null} supplierName={bill?.supplierName ?? null} approved={bill?.approved ?? false} /></td>}
             {bill && <td className="border-b border-slate-100 px-2 py-1.5 align-top"><PoLineMatchChip state="none" /></td>}
             {bill && classJob && <td className="border-b border-slate-100 px-2 py-1.5 align-top"><LedgerAccountChip label={null} /></td>}
             {bill && classJob && <td className="border-b border-slate-100 px-2 py-1.5 align-top"><LedgerAccountChip label={null} /></td>}
