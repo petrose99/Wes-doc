@@ -139,6 +139,15 @@ export async function confirmSageBusinessAction(workspaceId: string, connectionI
   try {
     await setWorkspaceIntegrationTenant(workspaceId, connectionId, { externalTenantId: businessId, tenantName: businessName })
     await recordDocumentAudit({ workspaceId, actorId: gate.userId, type: "integration_tenant_selected", detail: { connectionId, businessId } })
+    // #429: Sage has no tenant at Nango's `creation` webhook (ADR 0005), so this business pick is
+    // its connect-completion path — chart sync (and the Default-account guess) happens here
+    // instead of the webhook. A sync failure must not fail the business pick itself; the Default
+    // row's surface shows the retry state.
+    try {
+      await syncAccountingEntities(connectionId)
+    } catch {
+      // left for the Default row's retry state.
+    }
     revalidatePath(paths(workspaceId).integrations)
     return { success: true }
   } catch (error) {

@@ -50,15 +50,18 @@ async function paginatedQuery<Row>(realmId: string, connectionId: string, queryW
   }
 }
 
-export type QuickBooksSyncedAccount = { id: string; name: string; active: boolean }
+export type QuickBooksSyncedAccount = { id: string; name: string; active: boolean; accountType: string }
 export type QuickBooksSyncedVendor = { id: string; name: string; active: boolean }
 export type QuickBooksSyncedTaxCode = { id: string; name: string; active: boolean }
 
 /** All active accounts of any type, for WP1.5's chart-of-accounts sync — distinct from
- * listExpenseAccounts above, which stays scoped to the default-account picker's narrower need. */
+ * listExpenseAccounts above, which stays scoped to the default-account picker's narrower need.
+ * `accountType` rides along (not selected by listExpenseAccounts, which already filters
+ * server-side) so #429's Default-account guess can tell an Expense account from any other kind
+ * without a second round-trip. */
 export async function listAccounts(realmId: string, connectionId: string): Promise<QuickBooksSyncedAccount[]> {
-  const rows = await paginatedQuery<{ Id: string; Name: string; Active: boolean }>(realmId, connectionId, "select Id, Name, Active from Account where Active = true", "Account")
-  return rows.map((row) => ({ id: row.Id, name: row.Name, active: row.Active }))
+  const rows = await paginatedQuery<{ Id: string; Name: string; Active: boolean; AccountType: string }>(realmId, connectionId, "select Id, Name, Active, AccountType from Account where Active = true", "Account")
+  return rows.map((row) => ({ id: row.Id, name: row.Name, active: row.Active, accountType: row.AccountType }))
 }
 
 export async function listVendors(realmId: string, connectionId: string): Promise<QuickBooksSyncedVendor[]> {
