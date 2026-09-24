@@ -20,6 +20,10 @@ await round({ out, base: `http://localhost:3000/workspaces/${WS}`, only, ...(wid
     if (await s.visible(select, 8000)) {
       await select.scrollIntoViewIfNeeded()
       await s.snap("account-cell", "per-line Account select + provenance line")
+      // #429: this select is intentionally `disabled` (see line-items-editor.tsx's LineAccountCell
+      // comment) — a display-only field with no per-line override write path, not an interactive
+      // control. Record that fact as a probe rather than attempting to focus/tab through it.
+      s.probe("account-select-disabled", await select.isDisabled(), "Account select is read-only by design (no per-line override write path)")
     } else {
       s.probe("account-cell-visible", false, "no select[aria-label=Account] found on the line items table")
     }
@@ -39,6 +43,11 @@ await round({ out, base: `http://localhost:3000/workspaces/${WS}`, only, ...(wid
     await s.snap("", "Supplier accounts table — populated + archived row")
     const archivedRow = page.getByText(/was archived in/i).first()
     s.probe("archived-row-copy", await s.visible(archivedRow, 5000), "archived-account inline note")
+    const firstForget = page.getByRole("button", { name: /forget/i }).first()
+    if (await s.visible(firstForget, 3000)) {
+      await firstForget.focus()
+      keyboard("supplier-row-tab-walk", await s.tabWalk(6))
+    }
     if (width === 1440) {
       const filter = page.getByPlaceholder(/filter/i).first()
       if (await s.visible(filter, 3000)) {

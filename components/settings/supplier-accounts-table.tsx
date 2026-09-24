@@ -48,6 +48,10 @@ export function SupplierAccountsTable({ workspaceId, connectionId, rules, accoun
 
   return (
     <div className="space-y-3">
+      <p className="max-w-prose text-sm text-slate-600">
+        Learned from each supplier&rsquo;s most recently approved document. Forget removes the rule;
+        the next approval for that supplier learns a new one.
+      </p>
       {rules.length > FILTER_THRESHOLD && (
         <Input
           value={filter}
