@@ -366,8 +366,16 @@ export async function resolveAccountNames(connectionId: string, accountExternalI
     where: { connectionId, entityType: "account", externalId: { in: ids } },
     select: { externalId: true, name: true },
   })
+  // #430 evaluate re-run finding (P1): this used to fall back to the raw external id itself when the
+  // AccountingEntity lookup missed, which meant callers' own "resolve or format the id" guards
+  // (page.tsx, account-correction-actions.ts) never fired — the raw id always looked "resolved".
+  // Omit the key entirely on a miss so callers' `names[id] ?? formatUnresolvedAccountId(id)` fallback
+  // actually runs.
   const map: Record<string, string> = {}
-  for (const id of ids) map[id] = rows.find((r) => r.externalId === id)?.name ?? id
+  for (const id of ids) {
+    const name = rows.find((r) => r.externalId === id)?.name
+    if (name) map[id] = name
+  }
   return map
 }
 
