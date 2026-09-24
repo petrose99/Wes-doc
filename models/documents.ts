@@ -10,13 +10,16 @@ import { projectDocumentFields } from "@/lib/field-projection"
 import { LOW_CONFIDENCE, PIPELINE_STAGES, type PipelineStage } from "@/lib/documents/stages"
 import { applyFxToDocument } from "@/lib/fx/apply-to-document"
 import { normalizeBillFromDocument } from "@/lib/integration-bill-mapping"
+import { resolveDocumentLineAccounts, resolveLineAccount, usesLegacyAccountChain, type LineAccountRow } from "@/lib/finance/line-account-resolution"
+import { normalizeSupplierName } from "@/lib/suppliers/normalize"
 import { unscoped } from "@/lib/workspace-scope"
 import type { DocumentProvenance } from "@/lib/provenance"
 import { replaceDocumentFieldValues } from "@/models/document-field-values"
 import { recordCodingCorrection } from "@/models/coding-corrections"
 import { recordFieldCorrection } from "@/models/field-corrections"
 import { resetSupplierStreak } from "@/models/suppliers"
-import { listWorkspaceIntegrationPushes } from "@/models/integrations"
+import { listWorkspaceIntegrationPushes, getCategoryAccountMap } from "@/models/integrations"
+import { listCategoryAccountMappings, resolveCategoryAccount } from "@/models/category-account-mappings"
 import { getDocumentPaymentStatuses } from "@/models/ledger-payments"
 import { emitWorkspaceEvent } from "@/lib/webhooks"
 import { resolveDuplicateGatesAgainst } from "@/lib/gates/duplicate"
@@ -476,6 +479,49 @@ function asScalarString(value: unknown): string | null {
   return null
 }
 
+/** #429: resolves each reviewed line's ledger account once, at the point Save review runs — the
+ * same "human confirms this document" trigger the pre-#429 category chain ran at. Null when there
+ * is no connected accounting connection (nothing to resolve against yet); the resulting rows are
+ * stamped onto `codingData.items`, read back by the Detail pane, the push actions (as
+ * `lineAccounts`), and the queue eligibility check. A document coded before the connection existed
+ * (`usesLegacyAccountChain`) keeps resolving through the pre-connection CategoryAccountMapping
+ * chain rather than a supplier-rule/Default chain that didn't exist when it was coded. */
+export async function resolveDocumentCodingItems(input: {
+  workspaceId: string
+  vendorName: string | null
+  category: string | null
+  codingSource: string | null
+  codedAt: Date
+  lineCount: number
+}): Promise<LineAccountRow[] | null> {
+  if (!config.integrations.enabled) return null
+  const connection = await prisma.integrationConnection.findFirst({
+    where: { workspaceId: input.workspaceId, status: "connected" },
+    select: { id: true, createdAt: true, defaultExpenseAccountId: true, defaultExpenseAccountGuessed: true },
+  })
+  if (!connection) return null
+  const lineCount = Math.max(input.lineCount, 1)
+  if (usesLegacyAccountChain(input.codingSource, input.codedAt, connection.createdAt)) {
+    if (!connection.defaultExpenseAccountId) return null
+    const [mappings, inferredMap] = await Promise.all([
+      listCategoryAccountMappings(input.workspaceId, connection.id),
+      getCategoryAccountMap(input.workspaceId, connection.id),
+    ])
+    const accountExternalId = resolveCategoryAccount(mappings, input.category, inferredMap, connection.defaultExpenseAccountId)
+    return resolveDocumentLineAccounts(lineCount, { accountExternalId, accountSource: null })
+  }
+  const normalizedVendor = input.vendorName ? normalizeSupplierName(input.vendorName) : ""
+  const rule = normalizedVendor
+    ? await prisma.supplierAccountRule.findFirst({ where: { connectionId: connection.id, supplierName: normalizedVendor }, select: { accountExternalId: true } })
+    : null
+  const resolution = resolveLineAccount({
+    supplierRuleAccountId: rule?.accountExternalId ?? null,
+    defaultAccountId: connection.defaultExpenseAccountId,
+    defaultAccountGuessed: connection.defaultExpenseAccountGuessed,
+  })
+  return resolveDocumentLineAccounts(lineCount, resolution)
+}
+
 export async function updateDocumentReview(input: { workspaceId: string; documentId: string; reviewedData: Record<string, unknown>; actorId: string }) {
   const document = await getWorkspaceDocument(input.workspaceId, input.documentId)
   if (!document) throw new Error("document_not_found")
@@ -491,7 +537,16 @@ export async function updateDocumentReview(input: { workspaceId: string; documen
   // the classifier wasn't confident about (`categoryConfirmed` never set true) would stay
   // unpushable forever (`isCategoryConfirmed`, read by readiness/autopublish/integration push).
   const newlyConfirmedCategory = hasDirectionField(resolveDocType(document)) && coding.categoryConfirmed !== true
-  const nextCoding = newlyConfirmedCategory ? { ...coding, categoryConfirmed: true } : null
+  const vendorName = (typeof reviewedData.vendor === "string" && reviewedData.vendor) || (typeof reviewedData.merchant === "string" && reviewedData.merchant) || null
+  const category = typeof coding.account === "string" ? coding.account : null
+  const lineCount = Array.isArray(reviewedData.line_items) ? reviewedData.line_items.length : 0
+  const items = await resolveDocumentCodingItems({
+    workspaceId: input.workspaceId, vendorName, category, codingSource: document.codingSource, codedAt: document.receivedAt, lineCount,
+  })
+  const codingUpdates: Record<string, unknown> = {}
+  if (newlyConfirmedCategory) codingUpdates.categoryConfirmed = true
+  if (items) codingUpdates.items = items
+  const nextCoding = Object.keys(codingUpdates).length ? { ...coding, ...codingUpdates } : null
   // Re-project the structured spine from the values a human signed off on. Source is "manual"
   // because these are now reviewed values, but the per-field scores are carried over from the
   // extraction rather than being reset to 1: a bulk "mark reviewed" does not mean somebody read

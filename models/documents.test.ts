@@ -7,8 +7,17 @@ vi.mock("@/lib/document-storage", () => ({ documentStorageKey: vi.fn(), document
 vi.mock("@/lib/analytics", () => ({ track: vi.fn() }))
 vi.mock("@/models/document-field-values", () => ({ replaceDocumentFieldValues: vi.fn() }))
 vi.mock("@/models/field-corrections", () => ({ recordFieldCorrection: vi.fn().mockResolvedValue(undefined) }))
+vi.mock("@/models/integrations", async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>()
+  return { ...actual, getCategoryAccountMap: vi.fn().mockResolvedValue({}) }
+})
+vi.mock("@/models/category-account-mappings", () => ({ listCategoryAccountMappings: vi.fn().mockResolvedValue([]), resolveCategoryAccount: vi.fn((_m: unknown, _c: unknown, _i: unknown, def: string) => def) }))
+vi.mock("@/lib/config", async (importOriginal) => {
+  const actual = await importOriginal<{ default: Record<string, unknown> }>()
+  return { default: { ...actual.default, integrations: { ...(actual.default.integrations as object), enabled: true } } }
+})
 
-const { createDocumentFromBuffer, deleteWorkspaceDocuments, documentDataForExport, documentHash, documentSourceFor, isSupportedDocumentBuffer, listReadyToPushDocuments, setDocumentPaymentStatus, stageWhereClause, updateDocumentField, validateDocumentInput } = await import("@/models/documents")
+const { createDocumentFromBuffer, deleteWorkspaceDocuments, documentDataForExport, documentHash, documentSourceFor, isSupportedDocumentBuffer, listReadyToPushDocuments, resolveDocumentCodingItems, setDocumentPaymentStatus, stageWhereClause, updateDocumentField, validateDocumentInput } = await import("@/models/documents")
 const { prisma } = await import("@/lib/db")
 const { deleteDocumentSource } = await import("@/lib/document-storage")
 const { recordFieldCorrection } = await import("@/models/field-corrections")
@@ -382,5 +391,72 @@ describe("stageWhereClause null-safety regression", () => {
     expect(notPaid).toBeDefined()
     const or = notPaid?.OR as Array<Record<string, unknown>>
     expect(or.some((c) => c.paymentStatus === null)).toBe(true)
+  })
+})
+
+// #429: resolveDocumentCodingItems is the DB-touching orchestration around the pure resolution
+// chain in lib/finance/line-account-resolution.ts (that module's own tests cover the pure
+// decisions — supplier rule wins, guessed vs confirmed Default, legacy fallback). These tests
+// cover only the orchestration: no connection → null, legacy documents route through
+// CategoryAccountMapping, current documents route through the supplier-rule/Default chain.
+describe("resolveDocumentCodingItems", () => {
+  beforeEach(() => {
+    db.integrationConnection = { findFirst: vi.fn() }
+    db.supplierAccountRule = { findFirst: vi.fn() }
+  })
+
+  it("resolves nothing when the workspace has no connected accounting connection", async () => {
+    db.integrationConnection.findFirst.mockResolvedValue(null)
+    const items = await resolveDocumentCodingItems({
+      workspaceId: "w1", vendorName: "Acme", category: "software", codingSource: null, codedAt: new Date("2026-01-01"), lineCount: 2,
+    })
+    expect(items).toBeNull()
+  })
+
+  it("a document coded before the connection existed resolves through the legacy category chain, not a supplier rule", async () => {
+    db.integrationConnection.findFirst.mockResolvedValue({
+      id: "conn1", createdAt: new Date("2026-06-01"), defaultExpenseAccountId: "default_1", defaultExpenseAccountGuessed: false,
+    })
+    const items = await resolveDocumentCodingItems({
+      workspaceId: "w1", vendorName: "Acme", category: "software", codingSource: "ai", codedAt: new Date("2026-01-01"), lineCount: 2,
+    })
+    expect(db.supplierAccountRule.findFirst).not.toHaveBeenCalled()
+    expect(items).toEqual([
+      { account_external_id: "default_1", account_source: null },
+      { account_external_id: "default_1", account_source: null },
+    ])
+  })
+
+  it("a current document with a matching supplier rule resolves every line to the rule's account", async () => {
+    db.integrationConnection.findFirst.mockResolvedValue({
+      id: "conn1", createdAt: new Date("2026-01-01"), defaultExpenseAccountId: "default_1", defaultExpenseAccountGuessed: true,
+    })
+    db.supplierAccountRule.findFirst.mockResolvedValue({ accountExternalId: "acme_usual" })
+    const items = await resolveDocumentCodingItems({
+      workspaceId: "w1", vendorName: "Acme Holdings", category: null, codingSource: "ai", codedAt: new Date("2026-06-15"), lineCount: 1,
+    })
+    expect(items).toEqual([{ account_external_id: "acme_usual", account_source: "supplier" }])
+  })
+
+  it("a current document with no supplier rule falls back to the connection's Default, marked guessed", async () => {
+    db.integrationConnection.findFirst.mockResolvedValue({
+      id: "conn1", createdAt: new Date("2026-01-01"), defaultExpenseAccountId: "default_1", defaultExpenseAccountGuessed: true,
+    })
+    db.supplierAccountRule.findFirst.mockResolvedValue(null)
+    const items = await resolveDocumentCodingItems({
+      workspaceId: "w1", vendorName: "New Vendor", category: null, codingSource: "ai", codedAt: new Date("2026-06-15"), lineCount: 1,
+    })
+    expect(items).toEqual([{ account_external_id: "default_1", account_source: "default_guessed" }])
+  })
+
+  it("stamps at least one row even for a document with no line items, so the synthesized 'Total' line still gets an account", async () => {
+    db.integrationConnection.findFirst.mockResolvedValue({
+      id: "conn1", createdAt: new Date("2026-01-01"), defaultExpenseAccountId: "default_1", defaultExpenseAccountGuessed: true,
+    })
+    db.supplierAccountRule.findFirst.mockResolvedValue(null)
+    const items = await resolveDocumentCodingItems({
+      workspaceId: "w1", vendorName: null, category: null, codingSource: "ai", codedAt: new Date("2026-06-15"), lineCount: 0,
+    })
+    expect(items).toHaveLength(1)
   })
 })
