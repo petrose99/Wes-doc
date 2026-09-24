@@ -558,47 +558,47 @@ model FieldSuggestion {
 }
 
 model Document {
-  id                      String                   @id @default(uuid()) @db.Uuid
-  workspaceId             String                   @map("workspace_id") @db.Uuid
-  fileId                  String                   @map("file_id") @db.Uuid
-  templateId              String?                  @map("template_id") @db.Uuid
-  templateVersionId       String?                  @map("template_version_id") @db.Uuid
-  source                  String
+  id                                      String                   @id @default(uuid()) @db.Uuid
+  workspaceId                             String                   @map("workspace_id") @db.Uuid
+  fileId                                  String                   @map("file_id") @db.Uuid
+  templateId                              String?                  @map("template_id") @db.Uuid
+  templateVersionId                       String?                  @map("template_version_id") @db.Uuid
+  source                                  String
   /// The sender's address, set only when source is "email" — carries the "who emailed this in"
   /// fact from InboundEmailIntake forward onto the resulting Document, so a terminal failure can
   /// be reported back to the workspace ("a document emailed by X couldn't be processed") without
   /// joining back through the intake log by timing. Null for every other intake channel.
-  sourceEmail             String?                  @map("source_email")
+  sourceEmail                             String?                  @map("source_email")
   /// The sender's WhatsApp number, set only when source is "whatsapp" — same shape and purpose
   /// as sourceEmail, carried forward from WhatsAppIntake. Null for every other intake channel.
-  sourceWhatsapp          String?                  @map("source_whatsapp")
-  status                  String                   @default("received")
-  filename                String
-  mimeType                String                   @map("mime_type")
-  sizeBytes               Int                      @map("size_bytes")
-  sha256                  String
-  storageKey              String?                  @map("storage_key")
-  pageRange               String?                  @map("page_range")
-  parentDocumentId        String?                  @map("parent_document_id") @db.Uuid
-  splitStatus             String?                  @map("split_status")
+  sourceWhatsapp                          String?                  @map("source_whatsapp")
+  status                                  String                   @default("received")
+  filename                                String
+  mimeType                                String                   @map("mime_type")
+  sizeBytes                               Int                      @map("size_bytes")
+  sha256                                  String
+  storageKey                              String?                  @map("storage_key")
+  pageRange                               String?                  @map("page_range")
+  parentDocumentId                        String?                  @map("parent_document_id") @db.Uuid
+  splitStatus                             String?                  @map("split_status")
   /// Canonical document type set by the classification pass (invoice, receipt, bank_statement, …).
   /// Null for legacy documents that pre-date classification; resolveDocType() falls back to
   /// template.code for those.
-  docType                 String?                  @map("doc_type")
-  receivedAt              DateTime                 @default(now()) @map("received_at")
-  fieldSnapshot           Json                     @map("field_snapshot")
-  rawExtraction           Json?                    @map("raw_extraction")
-  reviewedData            Json?                    @map("reviewed_data")
-  confidence              Json?
+  docType                                 String?                  @map("doc_type")
+  receivedAt                              DateTime                 @default(now()) @map("received_at")
+  fieldSnapshot                           Json                     @map("field_snapshot")
+  rawExtraction                           Json?                    @map("raw_extraction")
+  reviewedData                            Json?                    @map("reviewed_data")
+  confidence                              Json?
   /// Per-field source pins: {version, fields: {[key]: Ref}, items: {[arrayKey]: (Ref|null)[]}},
   /// where a Ref is {page, bbox, quote, blockIndex, score}. Written by extraction, cleared per
   /// field on manual edit. Null on documents extracted before provenance existed.
-  provenance              Json?
+  provenance                              Json?
   /// The extraction shape this document was stamped with, so a later run can be diffed against
   /// the previous document of the same shape. SetNull: the diff simply has no predecessor then.
-  shapeId                 String?                  @map("shape_id") @db.Uuid
+  shapeId                                 String?                  @map("shape_id") @db.Uuid
   /// {docType, entity, period} read alongside the extraction, reused by the folder report.
-  classification          Json?
+  classification                          Json?
   /// Coding an AutomationRule (WP11) assigned — account/taxCode/costCentre/project, whatever keys
   /// the matched rule's `actions` set. Separate from fieldSnapshot/reviewedData because this is
   /// classification metadata layered on top of extraction, not a value read off the document
@@ -611,77 +611,85 @@ model Document {
   /// "default_confirmed" (the connection Default, Owner-saved or post-confirmed), or "manual" (a
   /// person picked it in the Detail pane). Both are null for lines coded before this per-line
   /// resolution existed, or when no Default and no supplier rule matched.
-  codingData              Json?                    @map("coding_data")
+  codingData                              Json?                    @map("coding_data")
   /// Who produced codingData: "rule" (automation rule matched), "ai" (coding agent suggested),
   /// "manual" (a person set or confirmed it). Null for documents coded before this column existed.
-  codingSource            String?                  @map("coding_source")
+  codingSource                            String?                  @map("coding_source")
+  /// #430 Screen 1/3 "Leave them": the Owner's explicit decision NOT to correct this posted bill's
+  /// Account after a SupplierAccountRule/Default change flagged it as affected. Per-document, not
+  /// per-rule, and tied to the specific old account it was dismissed for
+  /// (accountCorrectionDismissedFromAccountId) — if the rule's *old* account later changes again
+  /// (a second correction on top of a first), the dismissal no longer matches and the bill
+  /// reappears as affected. Both null until a "Leave them" action runs.
+  accountCorrectionDismissedAt            DateTime?                @map("account_correction_dismissed_at")
+  accountCorrectionDismissedFromAccountId String?                  @map("account_correction_dismissed_from_account_id")
   /// The coding agent's confidence in its suggestion (0–1). Only meaningful when codingSource is
   /// "ai"; null otherwise. High confidence (≥ 0.9) keeps the document touchless; lower lands it
   /// in review with the suggestion pre-filled.
-  codingConfidence        Float?                   @map("coding_confidence")
+  codingConfidence                        Float?                   @map("coding_confidence")
   /// The rule that produced codingData, if any — SetNull so deleting a rule does not silently
   /// misattribute already-coded documents to no rule at all versus a different one.
-  appliedRuleId           String?                  @map("applied_rule_id") @db.Uuid
+  appliedRuleId                           String?                  @map("applied_rule_id") @db.Uuid
   /// The upload batch (one drag of files) this document arrived in, so a folder can be reported on
   /// as a set. Just a grouping key — null for documents uploaded one at a time.
-  uploadBatchId           String?                  @map("upload_batch_id") @db.Uuid
+  uploadBatchId                           String?                  @map("upload_batch_id") @db.Uuid
   /// Timestamped ASR output for a dictation: [{startMs, endMs, text}]. Null for every uploaded
   /// document; the flat text also lands in ocrText, which is what makes a dictation searchable
   /// through the existing chunking/embedding path with no new retrieval code.
-  transcript              Json?
-  transcriptModel         String?                  @map("transcript_model")
+  transcript                              Json?
+  transcriptModel                         String?                  @map("transcript_model")
   /// Set when a person corrected the transcript on the verify screen.
   ///
   /// The transcript is otherwise a faithful record of what the microphone heard. Once it is
   /// editable it stops being only that, and a report drawn from an edited transcript must not be
   /// read as an unedited ASR pass — so the edit is stamped and shown, never silent. Null means
   /// every word is the machine's.
-  transcriptEditedAt      DateTime?                @map("transcript_edited_at")
-  transcriptEditedById    String?                  @map("transcript_edited_by_id") @db.Uuid
+  transcriptEditedAt                      DateTime?                @map("transcript_edited_at")
+  transcriptEditedById                    String?                  @map("transcript_edited_by_id") @db.Uuid
   /// The model's proposed title for a discover-mode dictation (lib/field-suggestions.ts), offered
   /// as a one-click fill on the verify screen. Never applied automatically — filename stays the
   /// source of truth for the title shown until a person accepts this or types their own.
-  suggestedTitle          String?                  @map("suggested_title")
+  suggestedTitle                          String?                  @map("suggested_title")
   /// Agnostic dictation's routing decision (lib/dictation/pipeline.ts): { intent, format,
   /// formatSource, routeScore, routeVia, commands }. Null for anything drafted before this feature,
   /// and for a dictation whose entry point never runs the router/extraction at all. Informational —
   /// nothing downstream currently branches on it being present.
-  dictationRouting        Json?                    @map("dictation_routing")
+  dictationRouting                        Json?                    @map("dictation_routing")
   /// Tri-state override of config.documents.adaptiveExtraction for this document: true/false forces
   /// adaptive line-item discovery on or off regardless of the global flag (set by the "Re-extract
   /// adaptively" action), null defers to the global default. See lib/adaptive-extraction.ts.
-  adaptiveExtraction      Boolean?                 @map("adaptive_extraction")
-  aiQuotaClaimed          Boolean                  @default(false) @map("ai_quota_claimed")
-  searchText              String                   @default("") @map("search_text")
-  ocrText                 String                   @default("") @map("ocr_text")
-  errorCode               String?                  @map("error_code")
-  reviewedAt              DateTime?                @map("reviewed_at")
+  adaptiveExtraction                      Boolean?                 @map("adaptive_extraction")
+  aiQuotaClaimed                          Boolean                  @default(false) @map("ai_quota_claimed")
+  searchText                              String                   @default("") @map("search_text")
+  ocrText                                 String                   @default("") @map("ocr_text")
+  errorCode                               String?                  @map("error_code")
+  reviewedAt                              DateTime?                @map("reviewed_at")
   /// When this document's rows were written into the file's spreadsheet. Null means the sheet
   /// has never seen it, which is what makes the extraction-into-sheet bridge idempotent across
   /// reloads and tabs closed mid-processing.
-  sheetAppliedAt          DateTime?                @map("sheet_applied_at")
+  sheetAppliedAt                          DateTime?                @map("sheet_applied_at")
   /// Touchless-automation readiness: "ready" or "blocked", computed by lib/readiness/evaluate.ts
   /// and persisted by lib/readiness/refresh.ts. Null until first evaluation.
-  readinessStatus         String?                  @map("readiness_status")
+  readinessStatus                         String?                  @map("readiness_status")
   /// Machine-readable blocker list when readinessStatus is "blocked": [{code, detail}].
-  readinessDetail         Json?                    @map("readiness_detail")
+  readinessDetail                         Json?                    @map("readiness_detail")
   /// Timestamp when the document first became "ready". Null if never ready or currently blocked.
-  readyAt                 DateTime?                @map("ready_at")
+  readyAt                                 DateTime?                @map("ready_at")
   /// Pipeline redesign: archive is a separate axis from `status`, not a status value — a document
   /// can be archived at any lifecycle point, and modelling it as a boolean-ish timestamp avoids
   /// rewriting `status` history. Null means not archived. See lib/documents/stages.ts.
-  archivedAt              DateTime?                @map("archived_at")
+  archivedAt                              DateTime?                @map("archived_at")
   /// #207: the bank/financial institution a person has asserted this bank_statement document
   /// belongs to. Assertion is authoritative (#178's rule) — never AI-classified. Null for every
   /// non-statement document and for a statement not yet asserted.
-  institutionId           String?                  @map("institution_id") @db.Uuid
+  institutionId                           String?                  @map("institution_id") @db.Uuid
   /// A reviewer's manual "look at this" flag on the pipeline list, independent of status/confidence.
   /// Attributable like transcriptEdited* below: a flag without a flagger would be half a record.
-  flaggedAt               DateTime?                @map("flagged_at")
-  flaggedById             String?                  @map("flagged_by_id") @db.Uuid
+  flaggedAt                               DateTime?                @map("flagged_at")
+  flaggedById                             String?                  @map("flagged_by_id") @db.Uuid
   /// Free-text reviewer note on the pipeline's split-pane detail view — separate from
   /// reviewedData/codingData, which are both values read off (or coded onto) the document itself.
-  note                    String?
+  note                                    String?
   /// A reviewer's confirmation of whether this bill/invoice has been paid — "paid" | "unpaid".
   /// Null until confirmed. NOT inferred from ledger sync: LedgerTransaction.paymentStatus (Data
   /// Health Phase B) is a provider's own answer for a document already pushed to accounting, which
@@ -689,16 +697,16 @@ model Document {
   /// person's own answer, gathered at review time, and is what
   /// lib/doc-types.ts's isExpenseDocType() requires before an invoice/receipt/purchase_order/
   /// payslip's review task can be approved — see models/review-tasks.ts.
-  paymentStatus           String?                  @map("payment_status")
-  paymentConfirmedAt      DateTime?                @map("payment_confirmed_at")
-  paymentConfirmedById    String?                  @map("payment_confirmed_by_id") @db.Uuid
+  paymentStatus                           String?                  @map("payment_status")
+  paymentConfirmedAt                      DateTime?                @map("payment_confirmed_at")
+  paymentConfirmedById                    String?                  @map("payment_confirmed_by_id") @db.Uuid
   /// #220: terminal manual cancellation of an invoice — independent of the ReviewTask approval
   /// chain and of the ledger sync. Hard-blocked once the document is Synced or Paid (checked in
   /// models/documents.ts::cancelDocument, not enforced at the DB layer). No un-cancel affordance:
   /// once set, these three columns never clear.
-  cancelledAt             DateTime?                @map("cancelled_at")
-  cancelledReason         String?                  @map("cancelled_reason")
-  cancelledById           String?                  @map("cancelled_by_id") @db.Uuid
+  cancelledAt                             DateTime?                @map("cancelled_at")
+  cancelledReason                         String?                  @map("cancelled_reason")
+  cancelledById                           String?                  @map("cancelled_by_id") @db.Uuid
   /// FX conversion into the workspace's base currency, frozen at the time it was applied so a
   /// later shift in the underlying feed does not silently re-price historical documents. Written
   /// after review by lib/fx/apply-to-document.ts once total + currency_code are known:
@@ -712,48 +720,48 @@ model Document {
   ///                       moment of fetch. A 2024 invoice processed in 2026 books at 2024's rate.
   ///   fxRateSource      — which provider supplied it: "frankfurter" / "fastratesapi" /
   ///                       "frankfurter+triangulated" / "identity" (same-currency shortcut).
-  baseCurrencyTotal       Decimal?                 @map("base_currency_total") @db.Decimal(20, 4)
-  fxRate                  Decimal?                 @map("fx_rate") @db.Decimal(20, 10)
-  fxRateAt                DateTime?                @map("fx_rate_at") @db.Date
-  fxRateSource            String?                  @map("fx_rate_source")
-  createdAt               DateTime                 @default(now()) @map("created_at")
-  updatedAt               DateTime                 @updatedAt @map("updated_at")
-  workspace               Workspace                @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  file                    DocumentFile             @relation(fields: [fileId], references: [id], onDelete: Cascade)
-  template                DocumentTemplate?        @relation(fields: [templateId], references: [id], onDelete: SetNull)
-  templateVersion         DocumentTemplateVersion? @relation(fields: [templateVersionId], references: [id], onDelete: SetNull)
-  shape                   ExtractionShape?         @relation(fields: [shapeId], references: [id], onDelete: SetNull)
-  appliedRule             AutomationRule?          @relation(fields: [appliedRuleId], references: [id], onDelete: SetNull)
-  checkResults            DocumentCheckResult[]
-  transcriptEditedBy      User?                    @relation("TranscriptEditor", fields: [transcriptEditedById], references: [id], onDelete: SetNull)
-  flaggedBy               User?                    @relation("DocumentFlagger", fields: [flaggedById], references: [id], onDelete: SetNull)
-  paymentConfirmedBy      User?                    @relation("DocumentPaymentConfirmer", fields: [paymentConfirmedById], references: [id], onDelete: SetNull)
-  cancelledBy             User?                    @relation("DocumentCanceller", fields: [cancelledById], references: [id], onDelete: SetNull)
-  parentDocument          Document?                @relation("DocumentSplit", fields: [parentDocumentId], references: [id], onDelete: SetNull)
-  childDocuments          Document[]               @relation("DocumentSplit")
-  institution             Institution?             @relation(fields: [institutionId], references: [id], onDelete: SetNull)
-  jobs                    DocumentProcessingJob[]
-  auditEvents             DocumentAuditEvent[]
-  chunks                  DocumentChunk[]
-  fieldValues             DocumentFieldValue[]
-  reportDrafts            DocumentReportDraft[]
-  fieldSuggestions        FieldSuggestion[]
-  webhookDeliveries       WebhookDelivery[]
-  integrationPushes       IntegrationPush[]
-  ingestionItems          IngestionItem[]
-  reviewTasks             ReviewTask[]
-  documentMatchesAsSource DocumentMatch[]          @relation("MatchSource")
-  documentMatchesAsTarget DocumentMatch[]          @relation("MatchTarget")
-  paymentRunItems         PaymentRunItem[]
-  invoicePayments         InvoicePayment[]
-  billPayPreference       BillPayPreference?
-  bankMatchesAsStatement  BankMatch[]              @relation("BankMatchStatement")
-  bankMatchesAsMatched    BankMatch[]              @relation("BankMatchMatched")
-  statementLines          StatementLine[]
-  expenseClaimItems       ExpenseClaimItem[]
-  healthCheckResults      HealthCheckResult[]
-  sheetPlacements         DocumentSheetPlacement[]
-  gates                   Gate[]
+  baseCurrencyTotal                       Decimal?                 @map("base_currency_total") @db.Decimal(20, 4)
+  fxRate                                  Decimal?                 @map("fx_rate") @db.Decimal(20, 10)
+  fxRateAt                                DateTime?                @map("fx_rate_at") @db.Date
+  fxRateSource                            String?                  @map("fx_rate_source")
+  createdAt                               DateTime                 @default(now()) @map("created_at")
+  updatedAt                               DateTime                 @updatedAt @map("updated_at")
+  workspace                               Workspace                @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  file                                    DocumentFile             @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  template                                DocumentTemplate?        @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  templateVersion                         DocumentTemplateVersion? @relation(fields: [templateVersionId], references: [id], onDelete: SetNull)
+  shape                                   ExtractionShape?         @relation(fields: [shapeId], references: [id], onDelete: SetNull)
+  appliedRule                             AutomationRule?          @relation(fields: [appliedRuleId], references: [id], onDelete: SetNull)
+  checkResults                            DocumentCheckResult[]
+  transcriptEditedBy                      User?                    @relation("TranscriptEditor", fields: [transcriptEditedById], references: [id], onDelete: SetNull)
+  flaggedBy                               User?                    @relation("DocumentFlagger", fields: [flaggedById], references: [id], onDelete: SetNull)
+  paymentConfirmedBy                      User?                    @relation("DocumentPaymentConfirmer", fields: [paymentConfirmedById], references: [id], onDelete: SetNull)
+  cancelledBy                             User?                    @relation("DocumentCanceller", fields: [cancelledById], references: [id], onDelete: SetNull)
+  parentDocument                          Document?                @relation("DocumentSplit", fields: [parentDocumentId], references: [id], onDelete: SetNull)
+  childDocuments                          Document[]               @relation("DocumentSplit")
+  institution                             Institution?             @relation(fields: [institutionId], references: [id], onDelete: SetNull)
+  jobs                                    DocumentProcessingJob[]
+  auditEvents                             DocumentAuditEvent[]
+  chunks                                  DocumentChunk[]
+  fieldValues                             DocumentFieldValue[]
+  reportDrafts                            DocumentReportDraft[]
+  fieldSuggestions                        FieldSuggestion[]
+  webhookDeliveries                       WebhookDelivery[]
+  integrationPushes                       IntegrationPush[]
+  ingestionItems                          IngestionItem[]
+  reviewTasks                             ReviewTask[]
+  documentMatchesAsSource                 DocumentMatch[]          @relation("MatchSource")
+  documentMatchesAsTarget                 DocumentMatch[]          @relation("MatchTarget")
+  paymentRunItems                         PaymentRunItem[]
+  invoicePayments                         InvoicePayment[]
+  billPayPreference                       BillPayPreference?
+  bankMatchesAsStatement                  BankMatch[]              @relation("BankMatchStatement")
+  bankMatchesAsMatched                    BankMatch[]              @relation("BankMatchMatched")
+  statementLines                          StatementLine[]
+  expenseClaimItems                       ExpenseClaimItem[]
+  healthCheckResults                      HealthCheckResult[]
+  sheetPlacements                         DocumentSheetPlacement[]
+  gates                                   Gate[]
 
   @@unique([fileId, sha256])
   @@index([institutionId])

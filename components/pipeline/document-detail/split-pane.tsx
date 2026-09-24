@@ -359,7 +359,7 @@ export function SplitPane({
  * derive its ordering directly from formFields without SplitPane touching field-nav internals.
  * Exported for #361's `BillSplitPane` (Invoices' Bill shell), which reuses this field-editing
  * form unchanged inside its own composition. */
-export function FieldNavForm({ saveReview, formFields, data, fieldConfidence, provenanceFields, provenanceItems, summaryFields, rationales, checks, workspaceId, documentId, setTarget, po, submitId = "save-review-submit", billMode = false, supplierPaymentTermsDays = null, supplierBankAccountFact = null, lineAccounts = null, accountOptions = [], supplierRuleAccountId = null, accountProviderName = null, accountSupplierName = null, approved = false }: {
+export function FieldNavForm({ saveReview, formFields, data, fieldConfidence, provenanceFields, provenanceItems, summaryFields, rationales, checks, workspaceId, documentId, setTarget, po, submitId = "save-review-submit", billMode = false, supplierPaymentTermsDays = null, supplierBankAccountFact = null, lineAccounts = null, accountOptions = [], supplierRuleAccountId = null, accountProviderName = null, accountSupplierName = null, approved = false, ledgerFact = null }: {
   saveReview: (formData: FormData) => Promise<ActionState<SaveReviewResult | null>>
   formFields: DocumentFieldDefinition[]
   data: Record<string, unknown>
@@ -397,6 +397,10 @@ export function FieldNavForm({ saveReview, formFields, data, fieldConfidence, pr
   /** #429 step 5: gates the pre-approval hint — suppressed once the document is approved (the
    * chosen account already became the supplier's usual; the hint would be stating the past). */
   approved?: boolean
+  /** #430 §Screen 2: `BillSplitPane`'s own `ledger` ("posted"/"paid"/null) — passed straight
+   * through to `LineItemsSection`/`LineItemsEditor`'s `bill` prop, which turns the Account cell
+   * editable only on a document the ledger already has. */
+  ledgerFact?: "posted" | "paid" | null
 }) {
   // #362 §3: located by key, not position — invoice templates key the invoice date `issue_date`
   // (falling back to the generic `date` key other templates use); `due_date` is shared.
@@ -468,7 +472,8 @@ export function FieldNavForm({ saveReview, formFields, data, fieldConfidence, pr
           billMode={billMode && field.key === "line_items"} readOnly={billMode && billReadOnly}
           lineAccounts={field.key === "line_items" ? lineAccounts : null} accountOptions={accountOptions}
           supplierRuleAccountId={supplierRuleAccountId} accountProviderName={accountProviderName}
-          accountSupplierName={accountSupplierName} approved={approved} />
+          accountSupplierName={accountSupplierName} approved={approved}
+          accountLedgerFact={field.key === "line_items" ? ledgerFact : null} accountWorkspaceId={workspaceId} accountDocumentId={documentId} />
         {/* #362: `other_charges` is also `type: "array"` (lib/domains/finance.ts) — gate to
           the `line_items` field so DatesRow/PaymentDetailsLink render once, not once per
           array field. */}
@@ -599,7 +604,8 @@ export function BillSplitPane({
         supplierPaymentTermsDays={supplierSummary?.matched ? supplierSummary.paymentTermsDays : null}
         supplierBankAccountFact={supplierSummary?.matched ? supplierSummary.bankAccountFact : null}
         lineAccounts={lineAccounts} accountOptions={accountOptions} supplierRuleAccountId={supplierRuleAccountId}
-        accountProviderName={accountProviderName} accountSupplierName={accountSupplierName} approved={approvalStatus === "approved"} />
+        accountProviderName={accountProviderName} accountSupplierName={accountSupplierName} approved={approvalStatus === "approved"}
+        ledgerFact={ledger === "posted" || ledger === "paid" ? ledger : null} />
 
       {fxBadge && <div>{fxBadge}</div>}
       {documentMatches}

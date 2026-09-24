@@ -355,6 +355,30 @@ export async function getCategoryAccountMap(workspaceId: string, connectionId: s
   return map
 }
 
+/** Resolves account display names by externalId from the synced chart of accounts (#430 Screen 1
+ * — the review-approval trigger only has ids from `SupplierAccountRule`, unlike the Default-save
+ * trigger which already has the picked account's name in hand). Falls back to the id itself for
+ * any account not found (stale sync, or an id from before the entity existed). */
+export async function resolveAccountNames(connectionId: string, accountExternalIds: string[]): Promise<Record<string, string>> {
+  const ids = Array.from(new Set(accountExternalIds))
+  if (!ids.length) return {}
+  const rows = await prisma.accountingEntity.findMany({
+    where: { connectionId, entityType: "account", externalId: { in: ids } },
+    select: { externalId: true, name: true },
+  })
+  // #430 evaluate re-run finding (P1): this used to fall back to the raw external id itself when the
+  // AccountingEntity lookup missed, which meant callers' own "resolve or format the id" guards
+  // (page.tsx, account-correction-actions.ts) never fired — the raw id always looked "resolved".
+  // Omit the key entirely on a miss so callers' `names[id] ?? formatUnresolvedAccountId(id)` fallback
+  // actually runs.
+  const map: Record<string, string> = {}
+  for (const id of ids) {
+    const name = rows.find((r) => r.externalId === id)?.name
+    if (name) map[id] = name
+  }
+  return map
+}
+
 /** Upserts the push row for (documentId, connectionId): re-pushing after a document edit reuses the
  * same row rather than creating a duplicate bill, per the unique constraint. Resets it to a fresh
  * pending attempt cycle so a push after a previous failure (or success) is a normal retry, not stuck

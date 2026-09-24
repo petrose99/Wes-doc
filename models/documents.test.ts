@@ -21,7 +21,7 @@ vi.mock("@/lib/config", async (importOriginal) => {
   return { default: { ...actual.default, integrations: { ...(actual.default.integrations as object), enabled: true } } }
 })
 
-const { createDocumentFromBuffer, deleteWorkspaceDocuments, documentDataForExport, documentHash, documentSourceFor, getBillAccountPickerData, isSupportedDocumentBuffer, listReadyToPushDocuments, resolveDocumentCodingItems, setDocumentPaymentStatus, stageWhereClause, updateDocumentField, validateDocumentInput } = await import("@/models/documents")
+const { createDocumentFromBuffer, deleteWorkspaceDocuments, dismissAccountCorrectionForDocuments, documentDataForExport, documentHash, documentSourceFor, findAccountCorrectionReminders, findBillsAffectedByAccountChange, getBillAccountPickerData, isSupportedDocumentBuffer, listReadyToPushDocuments, recordAccountCorrectionApplied, resolveDocumentCodingItems, setDocumentPaymentStatus, stageWhereClause, updateDocumentField, validateDocumentInput } = await import("@/models/documents")
 const { prisma } = await import("@/lib/db")
 const { deleteDocumentSource } = await import("@/lib/document-storage")
 const { recordFieldCorrection } = await import("@/models/field-corrections")
@@ -372,6 +372,163 @@ describe("listReadyToPushDocuments", () => {
   })
 })
 
+// #430: correcting posted bills' Accounts — the affected-bills query, "Leave them", and the
+// codingData rewrite after a provider write succeeds.
+describe("findBillsAffectedByAccountChange", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    db.document = { findMany: vi.fn().mockResolvedValue([]) }
+    db.integrationPush = { findMany: vi.fn().mockResolvedValue([]) }
+  })
+
+  it("is a no-op when nothing matches the old account (0 affected)", async () => {
+    db.document.findMany.mockResolvedValue([
+      { id: "d1", filename: "a.pdf", receivedAt: new Date("2026-01-01"), reviewedData: { vendor: "Acme" }, rawExtraction: null, codingData: { items: [{ account_external_id: "acc-other" }] }, paymentStatus: null, baseCurrencyTotal: null, accountCorrectionDismissedAt: null, accountCorrectionDismissedFromAccountId: null },
+    ])
+    db.integrationPush.findMany.mockResolvedValue([{ id: "p1", connectionId: "conn1", documentId: "d1", status: "succeeded" }])
+    const affected = await findBillsAffectedByAccountChange("w1", "conn1", "acc-old")
+    expect(affected).toEqual([])
+  })
+
+  it("finds a posted bill whose codingData.items still carries the old account, with its line indexes", async () => {
+    db.document.findMany.mockResolvedValue([
+      { id: "d1", filename: "a.pdf", receivedAt: new Date("2026-01-01"), reviewedData: { vendor: "Acme Fuels", total: 1240 }, rawExtraction: null, codingData: { items: [{ account_external_id: "acc-old" }, { account_external_id: "acc-other" }] }, paymentStatus: null, baseCurrencyTotal: null, accountCorrectionDismissedAt: null, accountCorrectionDismissedFromAccountId: null },
+    ])
+    db.integrationPush.findMany.mockResolvedValue([{ id: "p1", connectionId: "conn1", documentId: "d1", status: "succeeded", externalBillId: "qb-1" }])
+    const affected = await findBillsAffectedByAccountChange("w1", "conn1", "acc-old")
+    expect(affected).toEqual([{ id: "d1", filename: "a.pdf", vendorName: "Acme Fuels", total: 1240, currencyCode: null, receivedAt: new Date("2026-01-01"), ledgerFact: "posted", externalBillId: "qb-1", lines: [{ index: 0, oldAccountExternalId: "acc-old" }] }])
+  })
+
+  it("reports a paid document (no succeeded push needed) as ledgerFact 'paid'", async () => {
+    db.document.findMany.mockResolvedValue([
+      { id: "d1", filename: "a.pdf", receivedAt: new Date("2026-01-01"), reviewedData: { vendor: "Acme" }, rawExtraction: null, codingData: { items: [{ account_external_id: "acc-old" }] }, paymentStatus: "paid", baseCurrencyTotal: null, accountCorrectionDismissedAt: null, accountCorrectionDismissedFromAccountId: null },
+    ])
+    const affected = await findBillsAffectedByAccountChange("w1", "conn1", "acc-old")
+    expect(affected).toEqual([expect.objectContaining({ id: "d1", ledgerFact: "paid" })])
+  })
+
+  it("excludes a document dismissed via Leave them for this exact old account", async () => {
+    db.document.findMany.mockResolvedValue([
+      { id: "d1", filename: "a.pdf", receivedAt: new Date("2026-01-01"), reviewedData: { vendor: "Acme" }, rawExtraction: null, codingData: { items: [{ account_external_id: "acc-old" }] }, paymentStatus: "paid", baseCurrencyTotal: null, accountCorrectionDismissedAt: new Date(), accountCorrectionDismissedFromAccountId: "acc-old" },
+    ])
+    const affected = await findBillsAffectedByAccountChange("w1", "conn1", "acc-old")
+    expect(affected).toEqual([])
+  })
+
+  it("does NOT exclude a document dismissed for a different old account (a second correction is not silently dropped)", async () => {
+    db.document.findMany.mockResolvedValue([
+      { id: "d1", filename: "a.pdf", receivedAt: new Date("2026-01-01"), reviewedData: { vendor: "Acme" }, rawExtraction: null, codingData: { items: [{ account_external_id: "acc-newer" }] }, paymentStatus: "paid", baseCurrencyTotal: null, accountCorrectionDismissedAt: new Date(), accountCorrectionDismissedFromAccountId: "acc-old" },
+    ])
+    const affected = await findBillsAffectedByAccountChange("w1", "conn1", "acc-newer")
+    expect(affected).toEqual([expect.objectContaining({ id: "d1" })])
+  })
+})
+
+describe("findAccountCorrectionReminders (#430 Screen 3)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    db.document = { findMany: vi.fn().mockResolvedValue([]) }
+    db.integrationPush = { findMany: vi.fn().mockResolvedValue([]) }
+  })
+
+  it("returns nothing when every candidate is already on the rule's current account", async () => {
+    db.document.findMany.mockResolvedValue([
+      { id: "d1", reviewedData: { vendor: "Acme Fuels" }, rawExtraction: null, codingData: { items: [{ account_external_id: "acc-new" }] }, paymentStatus: "paid", accountCorrectionDismissedAt: null, accountCorrectionDismissedFromAccountId: null },
+    ])
+    const reminders = await findAccountCorrectionReminders("w1", "conn1", [{ supplierName: "acme fuels", accountExternalId: "acc-new" }])
+    expect(reminders.size).toBe(0)
+  })
+
+  it("counts distinct documents (not lines) still on the old account, keyed by the rule's normalized supplier name", async () => {
+    db.document.findMany.mockResolvedValue([
+      { id: "d1", reviewedData: { vendor: "Acme Fuels" }, rawExtraction: null, codingData: { items: [{ account_external_id: "acc-old" }, { account_external_id: "acc-old" }] }, paymentStatus: "paid", accountCorrectionDismissedAt: null, accountCorrectionDismissedFromAccountId: null },
+      { id: "d2", reviewedData: { vendor: "Acme Fuels" }, rawExtraction: null, codingData: { items: [{ account_external_id: "acc-old" }] }, paymentStatus: null, accountCorrectionDismissedAt: null, accountCorrectionDismissedFromAccountId: null },
+    ])
+    db.integrationPush.findMany.mockResolvedValue([{ id: "p1", connectionId: "conn1", documentId: "d2", status: "succeeded" }])
+    const reminders = await findAccountCorrectionReminders("w1", "conn1", [{ supplierName: "acme fuels", accountExternalId: "acc-new" }])
+    expect(reminders.get("acme fuels")).toEqual({ oldAccountExternalId: "acc-old", count: 2 })
+  })
+
+  it("matches a document's un-normalized vendor field against the rule's normalized supplierName (regression: raw 'Acme Fuel Co' vs rule-keyed 'acme fuel' silently dropped the reminder)", async () => {
+    db.document.findMany.mockResolvedValue([
+      { id: "d1", reviewedData: { vendor: "Acme Fuel Co" }, rawExtraction: null, codingData: { items: [{ account_external_id: "sundry-expenses" }] }, paymentStatus: "paid", accountCorrectionDismissedAt: null, accountCorrectionDismissedFromAccountId: null },
+    ])
+    const reminders = await findAccountCorrectionReminders("w1", "conn1", [{ supplierName: "acme fuel", accountExternalId: "fuel" }])
+    expect(reminders.get("acme fuel")).toEqual({ oldAccountExternalId: "sundry-expenses", count: 1 })
+  })
+
+  it("excludes a document dismissed via Leave them for this exact old account", async () => {
+    db.document.findMany.mockResolvedValue([
+      { id: "d1", reviewedData: { vendor: "Acme Fuels" }, rawExtraction: null, codingData: { items: [{ account_external_id: "acc-old" }] }, paymentStatus: "paid", accountCorrectionDismissedAt: new Date(), accountCorrectionDismissedFromAccountId: "acc-old" },
+    ])
+    const reminders = await findAccountCorrectionReminders("w1", "conn1", [{ supplierName: "acme fuels", accountExternalId: "acc-new" }])
+    expect(reminders.size).toBe(0)
+  })
+
+  it("ignores a document from a supplier that has no rule in the batch", async () => {
+    db.document.findMany.mockResolvedValue([
+      { id: "d1", reviewedData: { vendor: "Unknown Co" }, rawExtraction: null, codingData: { items: [{ account_external_id: "acc-old" }] }, paymentStatus: "paid", accountCorrectionDismissedAt: null, accountCorrectionDismissedFromAccountId: null },
+    ])
+    const reminders = await findAccountCorrectionReminders("w1", "conn1", [{ supplierName: "acme fuels", accountExternalId: "acc-new" }])
+    expect(reminders.size).toBe(0)
+  })
+})
+
+describe("dismissAccountCorrectionForDocuments (Leave them)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    db.document = { updateMany: vi.fn().mockResolvedValue({ count: 0 }) }
+  })
+
+  it("is a no-op for an empty selection", async () => {
+    await dismissAccountCorrectionForDocuments("w1", [], "acc-old")
+    expect(db.document.updateMany).not.toHaveBeenCalled()
+  })
+
+  it("stamps the dismissal with the old account it was dismissed for", async () => {
+    await dismissAccountCorrectionForDocuments("w1", ["d1", "d2"], "acc-old")
+    expect(db.document.updateMany).toHaveBeenCalledWith({
+      where: { workspaceId: "w1", id: { in: ["d1", "d2"] } },
+      data: { accountCorrectionDismissedAt: expect.any(Date), accountCorrectionDismissedFromAccountId: "acc-old" },
+    })
+  })
+
+  it("is idempotent: re-running on an already-dismissed document just rewrites the same flag", async () => {
+    await dismissAccountCorrectionForDocuments("w1", ["d1"], "acc-old")
+    await dismissAccountCorrectionForDocuments("w1", ["d1"], "acc-old")
+    expect(db.document.updateMany).toHaveBeenCalledTimes(2)
+    for (const call of db.document.updateMany.mock.calls) {
+      expect(call[0].data.accountCorrectionDismissedFromAccountId).toBe("acc-old")
+    }
+  })
+})
+
+describe("recordAccountCorrectionApplied", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    db.document = { findFirst: vi.fn(), update: vi.fn().mockResolvedValue({}) }
+  })
+
+  it("rewrites only the lines that carried the old account, clearing any dismissal", async () => {
+    db.document.findFirst.mockResolvedValue({ codingData: { items: [{ account_external_id: "acc-old", account_source: "supplier" }, { account_external_id: "acc-other", account_source: "supplier" }] } })
+    await recordAccountCorrectionApplied("w1", "d1", "acc-old", "acc-new")
+    expect(db.document.update).toHaveBeenCalledWith({
+      where: { id: "d1" },
+      data: {
+        codingData: { items: [{ account_external_id: "acc-new", account_source: "manual" }, { account_external_id: "acc-other", account_source: "supplier" }] },
+        accountCorrectionDismissedAt: null,
+        accountCorrectionDismissedFromAccountId: null,
+      },
+    })
+  })
+
+  it("does nothing when the document no longer exists", async () => {
+    db.document.findFirst.mockResolvedValue(null)
+    await recordAccountCorrectionApplied("w1", "d1", "acc-old", "acc-new")
+    expect(db.document.update).not.toHaveBeenCalled()
+  })
+})
+
 describe("stageWhereClause null-safety regression", () => {
   // Regression: the original stageWhereClause used NOT: [{ paymentStatus: "paid" }, ...], which
   // is NULL-unsafe (SQL: NOT (col = 'paid') is NULL for NULL rows) — every reviewed document
@@ -539,7 +696,7 @@ describe("learnSupplierAccountRuleFromApproval", () => {
   beforeEach(() => {
     db.document = { findFirst: vi.fn() }
     db.integrationConnection = { findFirst: vi.fn() }
-    db.supplierAccountRule = { upsert: vi.fn() }
+    db.supplierAccountRule = { upsert: vi.fn(), findUnique: vi.fn().mockResolvedValue(null) }
   })
 
   it("upserts a rule keyed on the connection and the normalized supplier for the line with the largest amount", async () => {
@@ -555,6 +712,23 @@ describe("learnSupplierAccountRuleFromApproval", () => {
       create: { workspaceId: "w1", connectionId: "conn1", supplierName: "acme", accountExternalId: "big_acct", lastUsedAt: expect.any(Date) },
       update: { accountExternalId: "big_acct", lastUsedAt: expect.any(Date) },
     })
+  })
+
+  it("returns the old→new change when it retargets an existing rule, and null on a first-time create", async () => {
+    const { learnSupplierAccountRuleFromApproval } = await import("@/models/documents")
+    db.document.findFirst.mockResolvedValue({
+      reviewedData: { vendor: "Acme", line_items: [{ amount: 10 }] },
+      codingData: { items: [{ account_external_id: "new_acct", account_source: "default_guessed" }] },
+    })
+    db.integrationConnection.findFirst.mockResolvedValue({ id: "conn1" })
+    db.supplierAccountRule.findUnique.mockResolvedValueOnce({ accountExternalId: "old_acct" })
+    await expect(learnSupplierAccountRuleFromApproval("w1", "doc1")).resolves.toEqual({ connectionId: "conn1", oldAccountExternalId: "old_acct", newAccountExternalId: "new_acct" })
+
+    db.supplierAccountRule.findUnique.mockResolvedValueOnce(null)
+    await expect(learnSupplierAccountRuleFromApproval("w1", "doc1")).resolves.toBeNull()
+
+    db.supplierAccountRule.findUnique.mockResolvedValueOnce({ accountExternalId: "new_acct" })
+    await expect(learnSupplierAccountRuleFromApproval("w1", "doc1")).resolves.toBeNull()
   })
 
   it("does nothing for a legacy-chain resolution (no account_source)", async () => {

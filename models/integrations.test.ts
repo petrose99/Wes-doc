@@ -1,18 +1,37 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const mockUpdateMany = vi.fn()
+const mockFindMany = vi.fn()
 
 vi.mock("@/lib/db", () => ({
   prisma: {
     integrationConnection: {
       updateMany: (...args: unknown[]) => mockUpdateMany(...args),
     },
+    accountingEntity: {
+      findMany: (...args: unknown[]) => mockFindMany(...args),
+    },
   },
 }))
 
-const { setWorkspaceIntegrationTenant, setWorkspaceIntegrationDefaultAccount } = await import("@/models/integrations")
+const { resolveAccountNames, setWorkspaceIntegrationTenant, setWorkspaceIntegrationDefaultAccount } = await import("@/models/integrations")
 
 beforeEach(() => { vi.clearAllMocks() })
+
+describe("resolveAccountNames", () => {
+  it("omits ids the AccountingEntity lookup misses, rather than falling back to the raw id (#430)", async () => {
+    mockFindMany.mockResolvedValue([{ externalId: "acc-1", name: "Fuel" }])
+    const result = await resolveAccountNames("conn1", ["acc-1", "acc-missing"])
+    expect(result).toEqual({ "acc-1": "Fuel" })
+    expect(result).not.toHaveProperty("acc-missing")
+  })
+
+  it("returns an empty map for an empty id list without querying", async () => {
+    const result = await resolveAccountNames("conn1", [])
+    expect(result).toEqual({})
+    expect(mockFindMany).not.toHaveBeenCalled()
+  })
+})
 
 describe("setWorkspaceIntegrationTenant", () => {
   it("writes the chosen business scoped to the workspace and the sage provider", async () => {

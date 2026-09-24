@@ -14,6 +14,8 @@ import { Panel, Pill } from "@/components/automation/automation-ui"
 import { updateReviewTaskStatusAction } from "@/app/(app)/workspaces/[workspaceId]/review-actions"
 import { moveDocumentsToStageAction, updateDocumentNoteAction } from "@/app/(app)/workspaces/[workspaceId]/pipeline-actions"
 import { postSelectedDocumentsAction } from "@/app/(app)/workspaces/[workspaceId]/post-selected-documents-actions"
+import { checkAffectedByRuleChangeAction, type AffectedByRuleChange } from "@/app/(app)/workspaces/[workspaceId]/account-correction-actions"
+import { AccountCorrectionDialog } from "@/components/integrations/account-correction-dialog"
 import type { ProcessingState } from "@/lib/documents/processing-state"
 import type { ProcessingFact } from "@/lib/documents/processing-fact"
 import type { SupplierSummary } from "@/models/supplier-summary"
@@ -180,6 +182,14 @@ export function BillFooterActions({ workspaceId, documentId, connectionId, mode,
   onDone: () => void
 }): ReactNode {
   const [busy, setBusy] = useState(false)
+  // #430 Screen 1's review-approval trigger: an approval that retargeted a SupplierAccountRule
+  // (learnSupplierAccountRuleFromApproval, inside updateReviewTaskStatusAction) may leave older
+  // bills still posted to the account it replaced — checked once, right after a successful
+  // approve, and shown only if it actually finds any (spec: "no dialog, nothing to show").
+  const [correction, setCorrection] = useState<AffectedByRuleChange | null>(null)
+  const [correctionConnectionId, setCorrectionConnectionId] = useState<string | null>(null)
+  const [correctionOldId, setCorrectionOldId] = useState<string | null>(null)
+  const [correctionNewId, setCorrectionNewId] = useState<string | null>(null)
   if (mode === "read-only") return null
 
   const approve = async () => {
@@ -193,6 +203,16 @@ export function BillFooterActions({ workspaceId, documentId, connectionId, mode,
         toast.warning("Not approved yet. Fill in the missing required fields and pick a document type first.")
       } else {
         toast.success("Approved")
+      }
+      const ruleChange = (result as { data?: { ruleChange?: { connectionId: string; oldAccountExternalId: string; newAccountExternalId: string } | null } }).data?.ruleChange
+      if (ruleChange) {
+        const check = await checkAffectedByRuleChangeAction(workspaceId, ruleChange.connectionId, ruleChange.oldAccountExternalId, ruleChange.newAccountExternalId)
+        if (check.success && check.data) {
+          setCorrection(check.data)
+          setCorrectionConnectionId(ruleChange.connectionId)
+          setCorrectionOldId(ruleChange.oldAccountExternalId)
+          setCorrectionNewId(ruleChange.newAccountExternalId)
+        }
       }
       onDone()
     } catch {
@@ -220,10 +240,26 @@ export function BillFooterActions({ workspaceId, documentId, connectionId, mode,
   }
 
   const disabled = busy || (mode === "approve" && blocked) || (mode === "post" && !connectionId)
-  return <Button type="button" id="save-review-submit" size="sm" disabled={disabled} aria-busy={busy || undefined} onClick={() => void (mode === "approve" ? approve() : post())}>
-    {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />}
-    {mode === "approve" ? (busy ? "Approving…" : "Approve") : (busy ? "Posting…" : "Post")}
-  </Button>
+  return <>
+    <Button type="button" id="save-review-submit" size="sm" disabled={disabled} aria-busy={busy || undefined} onClick={() => void (mode === "approve" ? approve() : post())}>
+      {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />}
+      {mode === "approve" ? (busy ? "Approving…" : "Approve") : (busy ? "Posting…" : "Post")}
+    </Button>
+    {correction && correctionConnectionId && correctionOldId && correctionNewId && (
+      <AccountCorrectionDialog
+        open
+        onClose={() => setCorrection(null)}
+        workspaceId={workspaceId}
+        connectionId={correctionConnectionId}
+        provider={correction.provider}
+        providerLabel={correction.providerLabel}
+        oldAccountExternalId={correctionOldId}
+        oldAccountName={correction.oldAccountName}
+        newAccountExternalId={correctionNewId}
+        newAccountName={correction.newAccountName}
+        bills={correction.bills} />
+    )}
+  </>
 }
 
 /** #361 step 5 (spec §6): Audit + Note, folded into one collapsed-by-default disclosure so the
