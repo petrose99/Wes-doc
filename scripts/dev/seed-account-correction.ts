@@ -17,10 +17,20 @@
 //     ledgerFact `findBillsAffectedByAccountChange` requires.
 import { prisma } from "@/lib/db"
 import { FINANCE_TEMPLATES } from "@/lib/domains/finance"
+import { normalizeSupplierName } from "@/lib/suppliers/normalize"
 import { randomUUID } from "crypto"
 import type { Prisma } from "@/prisma/client"
 
 const INVOICE_FIELDS = FINANCE_TEMPLATES.find((t) => t.code === "invoice")!.fields
+
+// #430: the rule's lookup key must be normalizeSupplierName's output, not the raw display name —
+// learnSupplierAccountRuleFromApproval (models/documents.ts:685) looks the existing rule up by
+// the normalized vendor name, and a rule keyed on the raw "Acme Fuel Co" is invisible to it: the
+// approval creates a *second*, differently-keyed row instead of retargeting this one, so
+// checkAffectedByRuleChangeAction never sees a change and Screen 1's dialog never opens. Found
+// live this session (#430): the two rows coexisted in the dev DB (id 18deb10d.../"Acme Fuel Co"
+// vs e25e18fe.../"acme fuel") after an otherwise-successful approve.
+const SUPPLIER_NAME = normalizeSupplierName("Acme Fuel Co")
 
 const OLD_ACCOUNT_EXTERNAL_ID = "sundry-expenses"
 const OLD_ACCOUNT_NAME = "Sundry Expenses"
@@ -48,8 +58,8 @@ async function main() {
   })
 
   await prisma.supplierAccountRule.upsert({
-    where: { connectionId_supplierName: { connectionId: connection.id, supplierName: "Acme Fuel Co" } },
-    create: { workspaceId, connectionId: connection.id, supplierName: "Acme Fuel Co", accountExternalId: OLD_ACCOUNT_EXTERNAL_ID, lastUsedAt: new Date() },
+    where: { connectionId_supplierName: { connectionId: connection.id, supplierName: SUPPLIER_NAME } },
+    create: { workspaceId, connectionId: connection.id, supplierName: SUPPLIER_NAME, accountExternalId: OLD_ACCOUNT_EXTERNAL_ID, lastUsedAt: new Date() },
     update: { accountExternalId: OLD_ACCOUNT_EXTERNAL_ID, lastUsedAt: new Date() },
   })
 

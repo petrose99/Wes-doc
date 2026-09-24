@@ -39,7 +39,7 @@ async function main() {
     doc = await prisma.document.create({
       data: {
         id: randomUUID(), workspaceId, fileId: file.id, templateId: template.id, templateVersionId: version?.id ?? null,
-        docType: "invoice", source: "seed", status: "reviewed", filename, mimeType: "application/pdf", sizeBytes: 19000,
+        docType: "invoice", source: "seed", status: "reviewed", filename, mimeType: "application/pdf", sizeBytes: 19000, paymentStatus: "unpaid",
         sha256: randomUUID().replace(/-/g, "") + randomUUID().replace(/-/g, ""),
         fieldSnapshot: INVOICE_FIELDS as unknown as Prisma.InputJsonValue, reviewedData: data as Prisma.InputJsonValue, rawExtraction: data as Prisma.InputJsonValue,
         codingData: codingData as Prisma.InputJsonValue, baseCurrencyTotal: 180,
@@ -47,7 +47,7 @@ async function main() {
       },
     })
   } else {
-    doc = await prisma.document.update({ where: { id: doc.id }, data: { status: "reviewed", reviewedData: data as Prisma.InputJsonValue, codingData: codingData as Prisma.InputJsonValue, baseCurrencyTotal: 180 } })
+    doc = await prisma.document.update({ where: { id: doc.id }, data: { status: "reviewed", reviewedData: data as Prisma.InputJsonValue, codingData: codingData as Prisma.InputJsonValue, baseCurrencyTotal: 180, paymentStatus: "unpaid" } })
   }
 
   // Clear any prior task on this doc so re-running the script gives a fresh open task.
