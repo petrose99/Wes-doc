@@ -23,6 +23,8 @@ import {
   syncAccountingEntitiesAction,
 } from "@/app/(app)/workspaces/[workspaceId]/integration-connection-actions"
 import { NativeSelect } from "@/components/ui/native-select"
+import { AccountCorrectionDialog } from "@/components/integrations/account-correction-dialog"
+import { listAffectedBillsAction, type AffectedBillWithCheck } from "@/app/(app)/workspaces/[workspaceId]/account-correction-actions"
 import { Check, Copy, Landmark } from "lucide-react"
 import Nango, { AuthError } from "@nangohq/frontend"
 import { useRouter } from "next/navigation"
@@ -67,6 +69,12 @@ function AccountingConnectionCard({ workspaceId, connection, isOwner, onChanged 
   const [loadingAccounts, setLoadingAccounts] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [disconnectOpen, setDisconnectOpen] = useState(false)
+  // #430 Screen 1: fires after a Default-account save when older bills are still posted to the
+  // account being replaced. `correction` is null until listAffectedBillsAction finds ≥1 row —
+  // the dialog never opens on 0 (spec: "no dialog, nothing to show").
+  const [correction, setCorrection] = useState<{
+    oldAccountExternalId: string; oldAccountName: string; newAccountExternalId: string; newAccountName: string; bills: AffectedBillWithCheck[]
+  } | null>(null)
 
   // Sage's OAuth grant isn't scoped to one business (ADR 0005): the AUTH webhook creates this row
   // with externalTenantId null, and the owner picks one here before the connection is usable —
@@ -100,10 +108,20 @@ function AccountingConnectionCard({ workspaceId, connection, isOwner, onChanged 
   const onSelectAccount = (accountId: string) => {
     const account = accounts?.find((a) => a.id === accountId)
     if (!account) return
+    const oldAccountExternalId = connection.defaultExpenseAccountId
+    const oldAccountName = connection.defaultExpenseAccountName
     startTransition(async () => {
       const res = await setDefaultExpenseAccountAction(workspaceId, connection.id, account.id, account.name)
-      if (res.success) onChanged()
-      else toast.error(res.error || "Could not set the default account")
+      if (!res.success) { toast.error(res.error || "Could not set the default account"); return }
+      onChanged()
+      // #430 Screen 1's trigger: only meaningful when there *was* a prior default (a first-time
+      // pick has nothing already posted to correct) and it actually changed.
+      if (oldAccountExternalId && oldAccountExternalId !== account.id) {
+        const affected = await listAffectedBillsAction(workspaceId, connection.id, oldAccountExternalId)
+        if (affected.success && affected.data && affected.data.length > 0) {
+          setCorrection({ oldAccountExternalId, oldAccountName: oldAccountName || "the old account", newAccountExternalId: account.id, newAccountName: account.name, bills: affected.data })
+        }
+      }
     })
   }
 
@@ -189,6 +207,20 @@ function AccountingConnectionCard({ workspaceId, connection, isOwner, onChanged 
           else toast.error(res.error || "Could not disconnect")
         })}
         onCancel={() => setDisconnectOpen(false)} />
+      {correction && (
+        <AccountCorrectionDialog
+          open
+          onClose={() => setCorrection(null)}
+          workspaceId={workspaceId}
+          connectionId={connection.id}
+          provider={connection.provider}
+          providerLabel={PROVIDER_LABELS[connection.provider] ?? connection.provider}
+          oldAccountExternalId={correction.oldAccountExternalId}
+          oldAccountName={correction.oldAccountName}
+          newAccountExternalId={correction.newAccountExternalId}
+          newAccountName={correction.newAccountName}
+          bills={correction.bills} />
+      )}
     </li>
   )
 }

@@ -677,19 +677,24 @@ export async function getBillAccountPickerData(workspaceId: string, vendorName: 
  * Fire-and-forget like the other approval-signal writers in models/suppliers.ts: a missed rule
  * only costs a future pre-fill, never the approval it rode in on. Skips legacy-chain resolutions
  * (`account_source: null`) — those didn't come from the supplier/Default chain this rule feeds. */
-export async function learnSupplierAccountRuleFromApproval(workspaceId: string, documentId: string): Promise<void> {
+export type SupplierAccountRuleChange = { connectionId: string; oldAccountExternalId: string; newAccountExternalId: string }
+
+/** Returns the old→new account change when this approval retargeted an existing rule (never on a
+ * first-time create), so the caller (#430 Screen 1) can check for bills still posted under the
+ * old account. */
+export async function learnSupplierAccountRuleFromApproval(workspaceId: string, documentId: string): Promise<SupplierAccountRuleChange | null> {
   try {
     const document = await prisma.document.findFirst({
       where: { id: documentId, workspaceId },
       select: { reviewedData: true, codingData: true },
     })
-    if (!document) return
+    if (!document) return null
     const reviewedData = (document.reviewedData as Record<string, unknown> | null) ?? {}
     const vendorName = (typeof reviewedData.vendor === "string" && reviewedData.vendor) || (typeof reviewedData.merchant === "string" && reviewedData.merchant) || null
-    if (!vendorName?.trim()) return
+    if (!vendorName?.trim()) return null
     const coding = (document.codingData as Record<string, unknown> | null) ?? {}
     const items = Array.isArray(coding.items) ? (coding.items as LineAccountRow[]) : []
-    if (!items.length) return
+    if (!items.length) return null
     const lineItems = Array.isArray(reviewedData.line_items) ? (reviewedData.line_items as Array<Record<string, unknown>>) : []
     let bestIndex = -1
     let bestAmount = -Infinity
@@ -698,19 +703,30 @@ export async function learnSupplierAccountRuleFromApproval(workspaceId: string, 
       const amount = typeof lineItems[index]?.amount === "number" ? (lineItems[index].amount as number) : 0
       if (bestIndex === -1 || amount > bestAmount) { bestIndex = index; bestAmount = amount }
     })
-    if (bestIndex === -1) return
+    if (bestIndex === -1) return null
     const accountExternalId = items[bestIndex].account_external_id
-    if (!accountExternalId) return
+    if (!accountExternalId) return null
     const connection = await prisma.integrationConnection.findFirst({ where: { workspaceId, status: "connected" }, select: { id: true } })
-    if (!connection) return
+    if (!connection) return null
     const supplierName = normalizeSupplierName(vendorName)
+    const existing = await prisma.supplierAccountRule.findUnique({
+      where: { connectionId_supplierName: { connectionId: connection.id, supplierName } },
+      select: { accountExternalId: true },
+    })
     await prisma.supplierAccountRule.upsert({
       where: { connectionId_supplierName: { connectionId: connection.id, supplierName } },
       create: { workspaceId, connectionId: connection.id, supplierName, accountExternalId, lastUsedAt: new Date() },
       update: { accountExternalId, lastUsedAt: new Date() },
     })
+    // Only a genuine retarget of an existing rule is a #430 trigger — a first-time create has no
+    // bills posted under "the old account" because there wasn't one.
+    if (existing && existing.accountExternalId && existing.accountExternalId !== accountExternalId) {
+      return { connectionId: connection.id, oldAccountExternalId: existing.accountExternalId, newAccountExternalId: accountExternalId }
+    }
+    return null
   } catch (error) {
     console.error("[documents] failed to learn supplier account rule:", error instanceof Error ? error.message : error)
+    return null
   }
 }
 

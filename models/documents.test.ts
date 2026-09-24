@@ -646,7 +646,7 @@ describe("learnSupplierAccountRuleFromApproval", () => {
   beforeEach(() => {
     db.document = { findFirst: vi.fn() }
     db.integrationConnection = { findFirst: vi.fn() }
-    db.supplierAccountRule = { upsert: vi.fn() }
+    db.supplierAccountRule = { upsert: vi.fn(), findUnique: vi.fn().mockResolvedValue(null) }
   })
 
   it("upserts a rule keyed on the connection and the normalized supplier for the line with the largest amount", async () => {
@@ -662,6 +662,23 @@ describe("learnSupplierAccountRuleFromApproval", () => {
       create: { workspaceId: "w1", connectionId: "conn1", supplierName: "acme", accountExternalId: "big_acct", lastUsedAt: expect.any(Date) },
       update: { accountExternalId: "big_acct", lastUsedAt: expect.any(Date) },
     })
+  })
+
+  it("returns the old→new change when it retargets an existing rule, and null on a first-time create", async () => {
+    const { learnSupplierAccountRuleFromApproval } = await import("@/models/documents")
+    db.document.findFirst.mockResolvedValue({
+      reviewedData: { vendor: "Acme", line_items: [{ amount: 10 }] },
+      codingData: { items: [{ account_external_id: "new_acct", account_source: "default_guessed" }] },
+    })
+    db.integrationConnection.findFirst.mockResolvedValue({ id: "conn1" })
+    db.supplierAccountRule.findUnique.mockResolvedValueOnce({ accountExternalId: "old_acct" })
+    await expect(learnSupplierAccountRuleFromApproval("w1", "doc1")).resolves.toEqual({ connectionId: "conn1", oldAccountExternalId: "old_acct", newAccountExternalId: "new_acct" })
+
+    db.supplierAccountRule.findUnique.mockResolvedValueOnce(null)
+    await expect(learnSupplierAccountRuleFromApproval("w1", "doc1")).resolves.toBeNull()
+
+    db.supplierAccountRule.findUnique.mockResolvedValueOnce({ accountExternalId: "new_acct" })
+    await expect(learnSupplierAccountRuleFromApproval("w1", "doc1")).resolves.toBeNull()
   })
 
   it("does nothing for a legacy-chain resolution (no account_source)", async () => {

@@ -8,7 +8,7 @@ import { refreshDocumentReadiness } from "@/lib/readiness/refresh"
 import { creditSupplierForCleanApproval } from "@/models/suppliers"
 import { getCurrentUser } from "@/lib/auth"
 import { parseTemplateFields } from "@/lib/document-templates"
-import { learnSupplierAccountRuleFromApproval, setDocumentPaymentStatus } from "@/models/documents"
+import { learnSupplierAccountRuleFromApproval, setDocumentPaymentStatus, type SupplierAccountRuleChange } from "@/models/documents"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { prisma } from "@/lib/db"
 import { listApprovalWorkflows, startWorkflowOnReviewTask } from "@/models/approval-workflows"
@@ -38,7 +38,7 @@ export async function createReviewTaskAction(workspaceId: string, documentId: st
   } catch (error) { return { success: false, error: errorMessage(error, "Could not create a review task") } }
 }
 
-export async function updateReviewTaskStatusAction(workspaceId: string, taskId: string, status: string): Promise<ActionState<null>> {
+export async function updateReviewTaskStatusAction(workspaceId: string, taskId: string, status: string): Promise<ActionState<{ ruleChange: SupplierAccountRuleChange | null }>> {
   const user = await getCurrentUser()
   if (!(await requireAccountingMember(workspaceId, user.id))) return { success: false, error: NO_ACCESS }
   const parsed = parseReviewTaskStatus(status)
@@ -50,15 +50,18 @@ export async function updateReviewTaskStatusAction(workspaceId: string, taskId: 
     // meant to measure. Credited before readiness re-runs so this document is judged against the
     // threshold its own approval just earned.
     if (parsed === "approved") await creditSupplierForCleanApproval(workspaceId, task.documentId)
-    if (parsed === "approved") await learnSupplierAccountRuleFromApproval(workspaceId, task.documentId)
+    // #430 Screen 1's other trigger: a retargeted SupplierAccountRule may leave older bills still
+    // posted to the account it replaced — ruleChange carries that back to the client, which
+    // checks listAffectedBillsAction and opens the dialog only if it finds any.
+    const ruleChange = parsed === "approved" ? await learnSupplierAccountRuleFromApproval(workspaceId, task.documentId) : null
     await refreshDocumentReadiness({ workspaceId, documentId: task.documentId })
     if (parsed === "approved") await maybeAutopublish(workspaceId, task.documentId, user.id)
     revalidatePath(paths(workspaceId).review)
-    return { success: true, data: null }
+    return { success: true, data: { ruleChange } }
   } catch (error) { return { success: false, error: errorMessage(error, "Could not update the review task") } }
 }
 
-export async function bulkUpdateReviewTaskStatusAction(workspaceId: string, taskIds: string[], status: string): Promise<ActionState<{ updated: number; blockedTaskIds: string[] }>> {
+export async function bulkUpdateReviewTaskStatusAction(workspaceId: string, taskIds: string[], status: string): Promise<ActionState<{ updated: number; blockedTaskIds: string[]; ruleChanges: SupplierAccountRuleChange[] }>> {
   const user = await getCurrentUser()
   if (!(await requireAccountingMember(workspaceId, user.id))) return { success: false, error: NO_ACCESS }
   const parsed = parseReviewTaskStatus(status)
@@ -71,11 +74,23 @@ export async function bulkUpdateReviewTaskStatusAction(workspaceId: string, task
     const result = await bulkUpdateReviewTaskStatus({ workspaceId, taskIds, status: parsed, actorId: user.id })
     if (parsed === "approved") await Promise.all(result.documentIds.map((documentId) => maybeConfirmAiCoding(workspaceId, documentId, user.id)))
     if (parsed === "approved") await Promise.all(result.documentIds.map((documentId) => creditSupplierForCleanApproval(workspaceId, documentId)))
-    if (parsed === "approved") await Promise.all(result.documentIds.map((documentId) => learnSupplierAccountRuleFromApproval(workspaceId, documentId)))
+    // #430: same trigger as the single-row action, collected across the batch — a batch that
+    // retargets more than one supplier's rule can surface more than one "N bills already posted"
+    // dialog; the client shows them one at a time (deduped by old account below).
+    const changes = parsed === "approved" ? await Promise.all(result.documentIds.map((documentId) => learnSupplierAccountRuleFromApproval(workspaceId, documentId))) : []
+    const seen = new Set<string>()
+    const ruleChanges: SupplierAccountRuleChange[] = []
+    for (const change of changes) {
+      if (!change) continue
+      const key = `${change.connectionId}:${change.oldAccountExternalId}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      ruleChanges.push(change)
+    }
     await Promise.all(result.documentIds.map((documentId) => refreshDocumentReadiness({ workspaceId, documentId })))
     if (parsed === "approved") await Promise.all(result.documentIds.map((documentId) => maybeAutopublish(workspaceId, documentId, user.id)))
     revalidatePath(paths(workspaceId).review)
-    return { success: true, data: { updated: result.updated, blockedTaskIds: result.blockedTaskIds } }
+    return { success: true, data: { updated: result.updated, blockedTaskIds: result.blockedTaskIds, ruleChanges } }
   } catch (error) { return { success: false, error: errorMessage(error, "Could not update the selected review tasks") } }
 }
 

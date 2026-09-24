@@ -19,7 +19,7 @@ import {
   recordAccountCorrectionApplied,
   type AffectedBillRow,
 } from "@/models/documents"
-import { workspaceIntegrationsPlanEnabled } from "@/models/integrations"
+import { resolveAccountNames, workspaceIntegrationsPlanEnabled } from "@/models/integrations"
 import { prisma } from "@/lib/db"
 import { revalidatePath } from "next/cache"
 import { errorMessage, NO_ACCESS, paths, requireMember } from "./action-helpers"
@@ -74,6 +74,42 @@ export async function listAffectedBillsAction(workspaceId: string, connectionId:
     })
   )
   return { success: true, data: withChecks }
+}
+
+/** The review-approval trigger's own check (#430 Screen 1, the "SupplierAccountRule change" half
+ * of the Trigger spec — the Default-save half already has both account names from the picker and
+ * calls `listAffectedBillsAction` directly): resolves the old/new account names alongside the
+ * affected-bills query, and the connection's provider, so the caller can open
+ * `AccountCorrectionDialog` without a second round trip. Returns null (no dialog) on 0 affected. */
+export type AffectedByRuleChange = { provider: string; providerLabel: string; oldAccountName: string; newAccountName: string; bills: AffectedBillWithCheck[] }
+
+const PROVIDER_LABELS: Record<string, string> = { quickbooks: "QuickBooks", xero: "Xero", sage: "Sage" }
+
+export async function checkAffectedByRuleChangeAction(workspaceId: string, connectionId: string, oldAccountExternalId: string, newAccountExternalId: string): Promise<ActionState<AffectedByRuleChange | null>> {
+  const gate = await guard(workspaceId)
+  if ("error" in gate) return { success: false, error: errorMessage(new Error(gate.error), NO_ACCESS) }
+  const connection = await prisma.integrationConnection.findFirst({ where: { id: connectionId, workspaceId }, select: { id: true, provider: true, externalTenantId: true } })
+  if (!connection || !connection.externalTenantId) return { success: true, data: null }
+  const affected = await findBillsAffectedByAccountChange(workspaceId, connectionId, oldAccountExternalId)
+  if (!affected.length) return { success: true, data: null }
+  const [names, withChecks] = await Promise.all([
+    resolveAccountNames(connectionId, [oldAccountExternalId, newAccountExternalId]),
+    Promise.all(affected.map(async (bill): Promise<AffectedBillWithCheck> => {
+      const txnDate = bill.receivedAt.toISOString().slice(0, 10)
+      const refusal = await checkCorrectable(connection.provider, connection.externalTenantId!, connection.id, bill.externalBillId, txnDate)
+      return { ...bill, refusal }
+    })),
+  ])
+  return {
+    success: true,
+    data: {
+      provider: connection.provider,
+      providerLabel: PROVIDER_LABELS[connection.provider] ?? connection.provider,
+      oldAccountName: names[oldAccountExternalId] ?? oldAccountExternalId,
+      newAccountName: names[newAccountExternalId] ?? newAccountExternalId,
+      bills: withChecks,
+    },
+  }
 }
 
 export type UpdateSelectedBillsResult = { documentId: string; status: "updated" | "failed"; error?: string }
