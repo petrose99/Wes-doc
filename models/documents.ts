@@ -509,7 +509,11 @@ export async function findAccountCorrectionReminders(workspaceId: string, connec
     const ledgerFact: "posted" | "paid" | null = doc.paymentStatus === "paid" ? "paid" : succeededByDocumentId.has(doc.id) ? "posted" : null
     if (!ledgerFact) continue
     const reviewedData = (doc.reviewedData as Record<string, unknown> | null) ?? (doc.rawExtraction as Record<string, unknown> | null) ?? {}
-    const vendorName = (typeof reviewedData.vendor === "string" && reviewedData.vendor) || (typeof reviewedData.merchant === "string" && reviewedData.merchant) || null
+    const rawVendorName = (typeof reviewedData.vendor === "string" && reviewedData.vendor) || (typeof reviewedData.merchant === "string" && reviewedData.merchant) || null
+    // Rules are keyed by normalizeSupplierName (SupplierAccountRule.supplierName); the document's
+    // own vendor field is never normalized, so the lookup below must normalize to match — a raw
+    // "Acme Fuel Co" otherwise never finds the rule keyed "acme fuel" and no reminder ever appears.
+    const vendorName = rawVendorName ? normalizeSupplierName(rawVendorName) : null
     const currentAccount = vendorName ? currentAccountBySupplier.get(vendorName) : undefined
     if (!currentAccount) continue
     const coding = (doc.codingData as Record<string, unknown> | null) ?? {}

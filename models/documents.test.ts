@@ -435,25 +435,33 @@ describe("findAccountCorrectionReminders (#430 Screen 3)", () => {
     db.document.findMany.mockResolvedValue([
       { id: "d1", reviewedData: { vendor: "Acme Fuels" }, rawExtraction: null, codingData: { items: [{ account_external_id: "acc-new" }] }, paymentStatus: "paid", accountCorrectionDismissedAt: null, accountCorrectionDismissedFromAccountId: null },
     ])
-    const reminders = await findAccountCorrectionReminders("w1", "conn1", [{ supplierName: "Acme Fuels", accountExternalId: "acc-new" }])
+    const reminders = await findAccountCorrectionReminders("w1", "conn1", [{ supplierName: "acme fuels", accountExternalId: "acc-new" }])
     expect(reminders.size).toBe(0)
   })
 
-  it("counts distinct documents (not lines) still on the old account, keyed by supplier name", async () => {
+  it("counts distinct documents (not lines) still on the old account, keyed by the rule's normalized supplier name", async () => {
     db.document.findMany.mockResolvedValue([
       { id: "d1", reviewedData: { vendor: "Acme Fuels" }, rawExtraction: null, codingData: { items: [{ account_external_id: "acc-old" }, { account_external_id: "acc-old" }] }, paymentStatus: "paid", accountCorrectionDismissedAt: null, accountCorrectionDismissedFromAccountId: null },
       { id: "d2", reviewedData: { vendor: "Acme Fuels" }, rawExtraction: null, codingData: { items: [{ account_external_id: "acc-old" }] }, paymentStatus: null, accountCorrectionDismissedAt: null, accountCorrectionDismissedFromAccountId: null },
     ])
     db.integrationPush.findMany.mockResolvedValue([{ id: "p1", connectionId: "conn1", documentId: "d2", status: "succeeded" }])
-    const reminders = await findAccountCorrectionReminders("w1", "conn1", [{ supplierName: "Acme Fuels", accountExternalId: "acc-new" }])
-    expect(reminders.get("Acme Fuels")).toEqual({ oldAccountExternalId: "acc-old", count: 2 })
+    const reminders = await findAccountCorrectionReminders("w1", "conn1", [{ supplierName: "acme fuels", accountExternalId: "acc-new" }])
+    expect(reminders.get("acme fuels")).toEqual({ oldAccountExternalId: "acc-old", count: 2 })
+  })
+
+  it("matches a document's un-normalized vendor field against the rule's normalized supplierName (regression: raw 'Acme Fuel Co' vs rule-keyed 'acme fuel' silently dropped the reminder)", async () => {
+    db.document.findMany.mockResolvedValue([
+      { id: "d1", reviewedData: { vendor: "Acme Fuel Co" }, rawExtraction: null, codingData: { items: [{ account_external_id: "sundry-expenses" }] }, paymentStatus: "paid", accountCorrectionDismissedAt: null, accountCorrectionDismissedFromAccountId: null },
+    ])
+    const reminders = await findAccountCorrectionReminders("w1", "conn1", [{ supplierName: "acme fuel", accountExternalId: "fuel" }])
+    expect(reminders.get("acme fuel")).toEqual({ oldAccountExternalId: "sundry-expenses", count: 1 })
   })
 
   it("excludes a document dismissed via Leave them for this exact old account", async () => {
     db.document.findMany.mockResolvedValue([
       { id: "d1", reviewedData: { vendor: "Acme Fuels" }, rawExtraction: null, codingData: { items: [{ account_external_id: "acc-old" }] }, paymentStatus: "paid", accountCorrectionDismissedAt: new Date(), accountCorrectionDismissedFromAccountId: "acc-old" },
     ])
-    const reminders = await findAccountCorrectionReminders("w1", "conn1", [{ supplierName: "Acme Fuels", accountExternalId: "acc-new" }])
+    const reminders = await findAccountCorrectionReminders("w1", "conn1", [{ supplierName: "acme fuels", accountExternalId: "acc-new" }])
     expect(reminders.size).toBe(0)
   })
 
@@ -461,7 +469,7 @@ describe("findAccountCorrectionReminders (#430 Screen 3)", () => {
     db.document.findMany.mockResolvedValue([
       { id: "d1", reviewedData: { vendor: "Unknown Co" }, rawExtraction: null, codingData: { items: [{ account_external_id: "acc-old" }] }, paymentStatus: "paid", accountCorrectionDismissedAt: null, accountCorrectionDismissedFromAccountId: null },
     ])
-    const reminders = await findAccountCorrectionReminders("w1", "conn1", [{ supplierName: "Acme Fuels", accountExternalId: "acc-new" }])
+    const reminders = await findAccountCorrectionReminders("w1", "conn1", [{ supplierName: "acme fuels", accountExternalId: "acc-new" }])
     expect(reminders.size).toBe(0)
   })
 })
