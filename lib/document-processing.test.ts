@@ -9,7 +9,7 @@ vi.mock("@/ai/providers/llmProvider", () => ({ requestLLM: vi.fn() }))
 vi.mock("@/lib/mineru", () => ({ parseDocumentWithMineru: vi.fn() }))
 vi.mock("@/lib/document-embedding", () => ({ processEmbedJob: vi.fn() }))
 
-const { buildBatchParts, findConflictingScalarFields, mergeClassification, mergeExtractionPasses, mergeFieldConfidence, mergeProvenancePasses, pageBatches, PERMANENT_ERROR_CODES, processDocumentJob, shouldReassignWorksheet, WORKSHEET_REASSIGN_CONFIDENCE } = await import("@/lib/document-processing")
+const { buildBatchParts, findConflictingScalarFields, mergeClassification, mergeExtractionPasses, mergeFieldConfidence, mergeProvenancePasses, pageBatches, PERMANENT_ERROR_CODES, mayAutoRouteAfterExtraction, processDocumentJob, shouldReassignWorksheet, WORKSHEET_REASSIGN_CONFIDENCE } = await import("@/lib/document-processing")
 const { parseTemplateFields } = await import("@/lib/document-templates")
 const { prisma } = await import("@/lib/db")
 const { processEmbedJob } = await import("@/lib/document-embedding")
@@ -406,5 +406,25 @@ describe("shouldReassignWorksheet", () => {
   it("routes a document with no current worksheet code", () => {
     expect(shouldReassignWorksheet({ codingData: { worksheetSource: "auto" }, classification: confident, currentTemplateCode: null })).toBe(true)
     expect(shouldReassignWorksheet({ codingData: { worksheetSource: "auto" }, classification: confident, currentTemplateCode: undefined })).toBe(true)
+  })
+})
+
+describe("mayAutoRouteAfterExtraction", () => {
+  /** 2026-09-24: a document added on the Invoices queue came back filed as a receipt — the
+   * post-extraction route overruled the queue it was added to. The queue is a human's answer. */
+  it("keeps a document on the type a person put it on", () => {
+    expect(mayAutoRouteAfterExtraction({ codingData: {}, currentTemplateCode: "invoice" })).toBe(false)
+    expect(mayAutoRouteAfterExtraction({ codingData: null, currentTemplateCode: "receipt" })).toBe(false)
+    expect(mayAutoRouteAfterExtraction({ codingData: { worksheetSource: "human" }, currentTemplateCode: "bank_statement" })).toBe(false)
+  })
+
+  it("routes a document whose type an intake channel only guessed", () => {
+    expect(mayAutoRouteAfterExtraction({ codingData: { worksheetSource: "auto" }, currentTemplateCode: "invoice" })).toBe(true)
+  })
+
+  it("routes a document nobody typed", () => {
+    expect(mayAutoRouteAfterExtraction({ codingData: {}, currentTemplateCode: "generic" })).toBe(true)
+    expect(mayAutoRouteAfterExtraction({ codingData: {}, currentTemplateCode: null })).toBe(true)
+    expect(mayAutoRouteAfterExtraction({ codingData: {}, currentTemplateCode: undefined })).toBe(true)
   })
 })
