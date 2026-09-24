@@ -2,17 +2,12 @@ import config from "@/lib/config"
 import { recordSystemAudit } from "@/lib/audit"
 import { prisma } from "@/lib/db"
 import { unscoped } from "@/lib/workspace-scope"
-import { getValidAccessToken, TokenRefreshError } from "@/lib/integration-token-refresh"
 import { NormalizedBill } from "@/lib/integration-bill-mapping"
 import { IntegrationAuthError, IntegrationPermanentError, safeErrorCode } from "@/lib/integrations/errors"
 import * as quickbooks from "@/lib/integrations/quickbooks/client"
 import { toQuickBooksBillBody } from "@/lib/integrations/quickbooks/bill-mapper"
 import * as xero from "@/lib/integrations/xero/client"
 import { toXeroBillBody } from "@/lib/integrations/xero/bill-mapper"
-import * as bigcapital from "@/lib/integrations/bigcapital/client"
-import { toBigcapitalBillBody } from "@/lib/integrations/bigcapital/bill-mapper"
-import { toBigcapitalInvoiceBody } from "@/lib/integrations/bigcapital/invoice-mapper"
-import { type BankStatementPayload, toBigcapitalCashflowBody } from "@/lib/integrations/bigcapital/bank-statement-mapper"
 import { computePushUpdate, PUSH_LEASE_MS, type PushAttemptResult } from "@/lib/integration-push-policy"
 import { preflightPush } from "@/lib/integration-preflight"
 import { createReviewTask } from "@/models/review-tasks"
@@ -49,17 +44,14 @@ export async function claimNextIntegrationPush(now = new Date()): Promise<string
  * throws: a lookup failure (network blip, transient provider error) must not block a push that
  * would otherwise succeed, so this swallows any error and reports "not a duplicate" rather than
  * risk false-blocking every push whenever the lookup itself is flaky. */
-async function ledgerHasDuplicate(provider: string, externalTenantId: string | null, accessToken: string, referenceNumber: string, direction: "payable" | "receivable" = "payable"): Promise<boolean> {
+async function ledgerHasDuplicate(provider: string, externalTenantId: string | null, connectionId: string, referenceNumber: string, direction: "payable" | "receivable" = "payable"): Promise<boolean> {
   if (!externalTenantId) return false
   try {
     switch (provider) {
       case "quickbooks":
-        return await quickbooks.findBillByDocNumber(externalTenantId, accessToken, referenceNumber)
+        return await quickbooks.findBillByDocNumber(externalTenantId, connectionId, referenceNumber)
       case "xero":
-        return await xero.findBillByInvoiceNumber(externalTenantId, accessToken, referenceNumber)
-      case "bigcapital":
-        if (direction === "receivable") return await bigcapital.findInvoiceByReferenceNumber(accessToken, externalTenantId, referenceNumber)
-        return await bigcapital.findBillByReferenceNumber(accessToken, externalTenantId, referenceNumber)
+        return await xero.findBillByInvoiceNumber(externalTenantId, connectionId, referenceNumber)
       default:
         return false
     }
@@ -69,16 +61,16 @@ async function ledgerHasDuplicate(provider: string, externalTenantId: string | n
   }
 }
 
-async function pushToQuickbooks(realmId: string, accessToken: string, bill: NormalizedBill, accountId: string, idempotencyKey: string | null): Promise<{ id: string }> {
-  const vendorRef = await quickbooks.findOrCreateVendor(realmId, accessToken, bill.vendorName)
+async function pushToQuickbooks(realmId: string, connectionId: string, bill: NormalizedBill, accountId: string, idempotencyKey: string | null): Promise<{ id: string }> {
+  const vendorRef = await quickbooks.findOrCreateVendor(realmId, connectionId, bill.vendorName)
   const body = toQuickBooksBillBody(bill, vendorRef, accountId)
-  return quickbooks.createBill(realmId, accessToken, body, idempotencyKey)
+  return quickbooks.createBill(realmId, connectionId, body, idempotencyKey)
 }
 
-async function pushToXero(tenantId: string, accessToken: string, bill: NormalizedBill, accountCode: string, idempotencyKey: string | null): Promise<{ id: string }> {
-  const contactId = await xero.findOrCreateContact(tenantId, accessToken, bill.vendorName)
+async function pushToXero(tenantId: string, connectionId: string, bill: NormalizedBill, accountCode: string, idempotencyKey: string | null): Promise<{ id: string }> {
+  const contactId = await xero.findOrCreateContact(tenantId, connectionId, bill.vendorName)
   const body = toXeroBillBody(bill, contactId, accountCode)
-  return xero.createBill(tenantId, accessToken, body, idempotencyKey)
+  return xero.createBill(tenantId, connectionId, body, idempotencyKey)
 }
 
 /** A7.1: validates the push against the synced AccountingEntity cache and fails CLOSED — a
@@ -109,33 +101,21 @@ async function preflightAgainstCache(push: { workspaceId: string; documentId: st
   throw new IntegrationPermanentError(verdict.errorCode)
 }
 
-async function pushBankStatementToBigcapital(organizationId: string, apiKey: string, payload: BankStatementPayload): Promise<{ count: number; recordKind: string }> {
-  let created = 0
-  for (const txn of payload.transactions) {
-    const body = toBigcapitalCashflowBody(txn, payload.cashflowAccountId, payload.creditAccountId)
-    await bigcapital.createCashflowTransaction(apiKey, organizationId, body)
-    created++
-  }
-  return { count: created, recordKind: "cashflow_batch" }
-}
+/** How often a paused push (connection `needs_reconnect`) is re-checked — a fixed poke interval,
+ * not the exponential backoff curve, since nothing will succeed until a human reconnects. See the
+ * `needs_reconnect` pre-check below. */
+const RECONNECT_POKE_MS = 5 * 60 * 1000
 
-async function pushToBigcapital(organizationId: string, apiKey: string, bill: NormalizedBill, accountId: string, direction: "payable" | "receivable" = "payable"): Promise<{ id: string; recordKind: string }> {
-  if (direction === "receivable") {
-    const [customerId, itemId] = await Promise.all([
-      bigcapital.findOrCreateCustomer(apiKey, organizationId, bill.vendorName),
-      bigcapital.findOrCreateIncomeItem(apiKey, organizationId, accountId),
-    ])
-    const body = toBigcapitalInvoiceBody(bill, customerId, itemId)
-    const created = await bigcapital.createSaleInvoice(apiKey, organizationId, body)
-    return { id: created.id, recordKind: "sale_invoice" }
-  }
-  const [vendorId, itemId] = await Promise.all([
-    bigcapital.findOrCreateVendor(apiKey, organizationId, bill.vendorName),
-    bigcapital.findOrCreateExpenseItem(apiKey, organizationId, accountId),
-  ])
-  const body = toBigcapitalBillBody(bill, vendorId, itemId)
-  const created = await bigcapital.createBill(apiKey, organizationId, body)
-  return { id: created.id, recordKind: "bill" }
+/** Leaves `push` pending without burning an attempt or the lease: used both by the `needs_reconnect`
+ * pre-check and by the mid-attempt `IntegrationAuthError` fallback, so a broken connection never
+ * exhausts MAX_PUSH_ATTEMPTS while a human hasn't yet reconnected (map Notes: "pauses posts, no
+ * attempts burned"). Reconnecting doesn't itself requeue — the existing `nextAttemptAt` poke picks
+ * the push back up within RECONNECT_POKE_MS, same as any other pending row. */
+async function pauseForReconnect(pushId: string, now: Date): Promise<void> {
+  await prisma.integrationPush.update({
+    where: { id: pushId },
+    data: { leaseUntil: null, nextAttemptAt: new Date(now.getTime() + RECONNECT_POKE_MS) },
+  })
 }
 
 /** Attempts one claimed push and records the outcome. Safe to call on a row another driver may also
@@ -156,11 +136,25 @@ export async function attemptIntegrationPush(pushId: string, now = new Date()): 
   if (!push || push.status !== "pending") return
   const connection = push.connection
 
+  // `connection` is nullable (IntegrationConnection.onDelete: SetNull) — the connection was
+  // disconnected out from under an already-queued push. Same terminal branch as any other
+  // disabled connection, just skipping the field reads that need it below.
+  if (!connection) {
+    const update = computePushUpdate(push.attempts, { success: false, errorCode: "integration_connection_disabled", externalBillId: null }, now, true)
+    await prisma.integrationPush.update({ where: { id: push.id }, data: update })
+    return
+  }
+
+  if (connection.status === "needs_reconnect") {
+    await pauseForReconnect(push.id, now)
+    return
+  }
+
   let result: PushAttemptResult
   let forceTerminal = false
 
-  if (connection.status !== "active") {
-    result = { success: false, errorCode: connection.status === "needs_reauth" ? "integration_needs_reauth" : "integration_connection_disabled", externalBillId: null }
+  if (connection.status !== "connected") {
+    result = { success: false, errorCode: "integration_connection_disabled", externalBillId: null }
     forceTerminal = true
   } else {
     const payloadRaw = push.payload as unknown as NormalizedBill & { expenseAccountId?: string; direction?: "payable" | "receivable"; documentType?: string }
@@ -177,42 +171,29 @@ export async function attemptIntegrationPush(pushId: string, now = new Date()): 
         if (payloadRaw.documentType !== "bank_statement") {
           await preflightAgainstCache(push, connection.id, expenseAccountId, bill.vendorName ?? null)
         }
-        const accessToken = await getValidAccessToken(connection.id, now)
-        const isDuplicate = bill.referenceNumber ? await ledgerHasDuplicate(connection.provider, connection.externalTenantId, accessToken, bill.referenceNumber, direction) : false
+        const isDuplicate = bill.referenceNumber ? await ledgerHasDuplicate(connection.provider, connection.externalTenantId, connection.id, bill.referenceNumber, direction) : false
         if (isDuplicate) throw new IntegrationPermanentError("ledger_duplicate")
         let created: { id: string }
         switch (connection.provider) {
           case "quickbooks":
-            created = await pushToQuickbooks(connection.externalTenantId, accessToken, bill, expenseAccountId, push.idempotencyKey)
+            created = await pushToQuickbooks(connection.externalTenantId, connection.id, bill, expenseAccountId, push.idempotencyKey)
             break
           case "xero":
-            created = await pushToXero(connection.externalTenantId, accessToken, bill, expenseAccountId, push.idempotencyKey)
+            created = await pushToXero(connection.externalTenantId, connection.id, bill, expenseAccountId, push.idempotencyKey)
             break
-          case "bigcapital": {
-            if (payloadRaw.documentType === "bank_statement" && Array.isArray((payloadRaw as unknown as BankStatementPayload).transactions)) {
-              const bsPayload = payloadRaw as unknown as BankStatementPayload
-              const bsResult = await pushBankStatementToBigcapital(connection.externalTenantId, accessToken, bsPayload)
-              created = { id: `cashflow_batch_${bsResult.count}` }
-              await prisma.integrationPush.update({ where: { id: push.id }, data: { externalRecordKind: bsResult.recordKind } }).catch(() => {})
-            } else {
-              const bcResult = await pushToBigcapital(connection.externalTenantId, accessToken, bill, expenseAccountId, direction)
-              created = { id: bcResult.id }
-              await prisma.integrationPush.update({ where: { id: push.id }, data: { externalRecordKind: bcResult.recordKind } }).catch(() => {})
-            }
-            break
-          }
           default:
             throw new IntegrationPermanentError(`${connection.provider}_push_not_implemented`)
         }
         result = { success: true, errorCode: null, externalBillId: created.id }
       } catch (error) {
-        if (error instanceof TokenRefreshError) {
-          result = { success: false, errorCode: error.message, externalBillId: null }
-          forceTerminal = error.message === "integration_needs_reauth"
-        } else if (error instanceof IntegrationAuthError) {
-          result = { success: false, errorCode: safeErrorCode(error), externalBillId: null }
-          forceTerminal = true
-          await prisma.integrationConnection.update({ where: { id: connection.id }, data: { status: "needs_reauth" } }).catch(() => {})
+        if (error instanceof IntegrationAuthError) {
+          // Nango's AUTH webhook is the authoritative signal (attemptIntegrationPush never expects
+          // to see this synchronously), but an ordinary proxy 401 can race ahead of it — flip the
+          // row as a fallback and pause exactly like the needs_reconnect pre-check, rather than
+          // burning an attempt on a call that can't succeed until a human reconnects.
+          await prisma.integrationConnection.update({ where: { id: connection.id }, data: { status: "needs_reconnect" } }).catch(() => {})
+          await pauseForReconnect(push.id, now)
+          return
         } else if (error instanceof IntegrationPermanentError) {
           result = { success: false, errorCode: error.code, externalBillId: null }
           forceTerminal = true
@@ -301,24 +282,28 @@ export async function kickIntegrationPushDrain(): Promise<void> {
  * dialog and the connection-failure band are what tell the operator why, never a hidden button. */
 export async function getActiveIntegrationConnectionId(workspaceId: string): Promise<string | null> {
   if (!config.integrations.enabled) return null
-  const connection = await prisma.integrationConnection.findFirst({ where: { workspaceId, status: "active" }, select: { id: true } })
+  const connection = await prisma.integrationConnection.findFirst({ where: { workspaceId, status: "connected" }, select: { id: true } })
   return connection?.id ?? null
 }
 
-export type LedgerBandStatus = "disconnected" | "needs_reauth" | "no_default_account"
+export type LedgerBandStatus = "disconnected" | "needs_reconnect"
 
-/** #281 spec.md §6: the cause behind the queue-scoped connection-failure band — null when a
- * connection is active and has a default account (band hidden), or when integrations are off (no
- * connection is ever expected, so nothing to say). Most-recent connection by `createdAt` mirrors
- * `getActiveIntegrationConnectionId`'s own "the" connection — one workspace, one ledger. */
+/** #281 spec.md §6, widened by #380, narrowed by ADR 0005: the cause behind the queue-scoped
+ * connection-failure band — null only when a connection is connected (band hidden). Integrations
+ * being off no longer suppresses the band: with Bigcapital removed and no ledger connect flow
+ * built yet (a later ticket), "no ledger" is the default state every workspace is in, and the
+ * glossary's rule ("posting is offered nowhere while no ledger is connected; the queue says why
+ * once, above the rows") applies regardless of whether the integrations feature is configured.
+ * The glossary names exactly three connection states — Connected, Needs reconnecting, absent — so
+ * there is no default-account-missing band state; CONTEXT.md.
+ * Most-recent connection by `createdAt` mirrors `getActiveIntegrationConnectionId`'s own "the"
+ * connection — one workspace, one ledger. */
 export async function getLedgerConnectionBandStatus(workspaceId: string): Promise<LedgerBandStatus | null> {
-  if (!config.integrations.enabled) return null
+  if (!config.integrations.enabled) return "disconnected"
   const connection = await prisma.integrationConnection.findFirst({
-    where: { workspaceId }, orderBy: { createdAt: "desc" }, select: { status: true, defaultExpenseAccountId: true },
+    where: { workspaceId }, orderBy: { createdAt: "desc" }, select: { status: true },
   })
   if (!connection) return "disconnected"
-  if (connection.status === "needs_reauth") return "needs_reauth"
-  if (connection.status !== "active") return "disconnected"
-  if (!connection.defaultExpenseAccountId) return "no_default_account"
+  if (connection.status === "needs_reconnect") return "needs_reconnect"
   return null
 }

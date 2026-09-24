@@ -128,7 +128,7 @@ export async function getReviewTaskDetailAction(workspaceId: string, taskId: str
       select: { detail: true, createdAt: true, actor: { select: { name: true, email: true } } },
     }) : Promise.resolve([]),
   ])
-  const activeConnection = connections.find((connection) => connection.status === "active") ?? null
+  const activeConnection = connections.find((connection) => connection.status === "connected") ?? null
   const canPush = task.document.status === "reviewed" && Boolean(activeConnection)
     && isPushableDocument({ docType: task.document.docType, template })
   const supplierValue = values.vendor ?? values.merchant

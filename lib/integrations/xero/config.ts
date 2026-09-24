@@ -1,6 +1,6 @@
-/** Xero OAuth + API endpoints. Unlike QuickBooks, Xero's tenant (organisation) id is not part of
- * the callback — it's fetched from /connections with the fresh access token right after the token
- * exchange (see lib/integrations/xero/client.ts::fetchConnections). */
+/** Xero OAuth + API endpoints. ADR 0005: Nango owns the OAuth app now, so AUTHORIZE/TOKEN/
+ * CONNECTIONS below are dead once step 4 deletes the old connect/callback routes that used them;
+ * XERO_API_BASE stays, it's the accounting API host the proxy forwards onto. */
 
 export const XERO_AUTHORIZE_URL = "https://login.xero.com/identity/connect/authorize"
 export const XERO_TOKEN_URL = "https://identity.xero.com/connect/token"

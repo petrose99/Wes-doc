@@ -62,7 +62,12 @@ The person an Expense claim reimburses: the member who assembled and submitted i
 _Avoid_: Submitter, employee
 
 **Bank Statement**:
-The typed destination for a bank statement. The reviewer asserts the issuing institution; the first statement for that institution becomes its saved layout, and later uploads are checked against it for drift.
+The typed destination for a bank statement. The reviewer asserts the issuing institution; the first statement for that institution becomes its saved layout, and later uploads are checked against it for drift. A Bank Statement is DocuBite's proof that an invoice or receipt was paid outside DocuBite: once a Statement match is confirmed, the document reads Paid and names the statement line as its evidence. It never settles a Payment line — that is the rail's alone. It is never posted; its lines reach the ledger through the ledger's own statement import.
+_Avoid_: bank feed (DocuBite is not one)
+
+**Statement match**:
+A suggested pairing of one debit line on a Bank Statement with an unpaid Invoice or Receipt that has no Payment line: same amount exactly, dated from the document's date up to 60 days after it. It is never confirmed by itself. When one line fits two documents, both are listed and neither is picked. Any member who can approve confirms it (Confirm paid) or dismisses it (Not this). Confirming marks the document Paid, and Undo returns it to Unpaid, from either side, until the document goes onto a Payment line. The queue counts the unconfirmed ones as Payments to confirm.
+_Avoid_: reconciliation, bank match, reconciled (only the ledger reconciles)
 
 **Check**:
 A tri-valued (pass/warn/fail), explainable comparison that states in plain language why a value is flagged, anchored to the field, cell, or row it concerns. "Mismatch" names one Check status, not the category.
@@ -114,7 +119,7 @@ The one email an Approver gets when Approvals reach a stage they can decide: eve
 _Avoid_: Reminder (as the user-facing name), digest, alert, push, notification (as a badge count)
 
 **Post** (verb):
-Sending an approved document's reviewed data to the ledger as a bill, expense or bank transaction, from the queue the document is on — the bulk bar's Post, or Post to ledger for the open row. Only Invoices, Receipts and Bank Statements can be posted; a row is eligible once it is Approved, its category is confirmed, its currency is resolved, and it is not cancelled or already posted. Posting is a Server-confirmed action with a Partial outcome per row. Nothing un-posts: the ledger owns what it holds.
+Sending an approved document's reviewed data to the ledger as a bill or expense, from the queue the document is on — the bulk bar's Post, or Post to ledger for the open row. Only Invoices and Receipts can be posted — a Bank Statement never is; a row is eligible once it is Approved, every line has an Account, its currency is resolved, and it is not cancelled or already posted. Posting is a Server-confirmed action with a Partial outcome per row. Nothing un-posts. A posted bill's Accounts can be corrected from DocuBite where the ledger allows it; everything else about it is the ledger's.
 _Avoid_: push, sync, send to the ledger, export (that is the CSV)
 
 **Posted**:
@@ -126,11 +131,27 @@ The one mark beside a row's processing state that says where the document stands
 _Avoid_: ledger status, sync status, integration state
 
 **Accounting**:
-The connected accounting provider's own page: whether the workspace is connected, when it last synced, its default account, and the way into the ledger. It holds no rows and no work — posting happens on the queues, paying in Bill Pay. Reached directly from the rail's Accounting item, inside Admin › Integrations.
-_Avoid_: Finance (retired name), the ledger (that is what Accounting opens), push list
+The connected accounting provider's own page: which ledger this company is on (QuickBooks, Xero or Sage Accounting), whether the Ledger connection is healthy, when it last synced, its Default account and each supplier's usual account, and the way into the ledger. It holds no rows and no work — posting happens on the queues, paying in Bill Pay. Reached directly from the rail's Accounting item, inside Admin › Integrations. DocuBite hosts no ledger of its own (the in-house ledger was retired, owner, 2026-09-22).
+_Avoid_: Finance (retired name), the ledger (that is what Accounting opens), push list, in-house ledger
+
+**Account** (on a line):
+What a document line is coded to — once a ledger is connected, one of the ledger's own expense accounts; with no ledger, typed text that goes out in the CSV. Pre-filled from the supplier's usual account, otherwise the Default account, and the line says which. Every line carries one; a document's lines can go to different Accounts.
+_Avoid_: Category (as the user-facing word), coding (as a field name), GL code, mapping
+
+**Default account**:
+The ledger account a line gets when its supplier has no usual account yet. Guessed once at connect from the ledger's own standard catch-all account (by exact name, never scored) and shown as Guessed until an Owner saves it or it is named in the company's first post; left blank when no standard name matches. Owner-set, on Accounting.
+_Avoid_: fallback account, catch-all (as a label)
+
+**Supplier account rule**:
+A supplier's usual account: learned when a document from that supplier is approved (the account of its largest line), said once in the Detail pane at the moment it is learned, and listed on Accounting where an Owner can change or forget it. Changing it, or the Default account, changes future posts only; the bills already posted to the old account are offered as a list to correct in the ledger, none ticked.
+_Avoid_: supplier mapping, category mapping, auto-coding
+
+**Ledger connection**:
+The one link between a Company and its accounting provider, made by an Owner from the Accounting page and never more than one per company. It is Connected, Needs reconnecting (the provider stopped honouring it — posts wait, nothing is marked on rows, Owners are told once), or absent (no ledger: posting is offered nowhere and the queue says why once). Switching providers is a disconnect then a connect; disconnecting never un-posts anything. How the connection is held (the OAuth vault behind it) is never named on a screen.
+_Avoid_: Integration (as the user-facing noun), OAuth, token, Nango, sync (for the connection itself)
 
 **Bill Pay**:
-The queue of approved, unpaid invoices and approved, unpaid Expense claims from which payment batches are created. An invoice reaches it only once its processing state is Approved, a claim once it is approved; a row that cannot be paid yet (no bank details for its Payee) stays visible with the reason. A claim row has no terms, no discount, no countdown and no partial payment: its amount is the frozen claim total. A row held by a pending or approved payment batch reads *Scheduled* — still on the queue, not batchable again until the batch is rejected or paid. Amount to pay defaults to the discounted total inside an open discount window, else what is still due; an operator may set a smaller amount (a partial payment) per row.
+The queue of approved, unpaid invoices and approved, unpaid Expense claims from which payment batches are created. An invoice reaches it only once its processing state is Approved, a claim once it is approved; a row that cannot be paid yet (no bank details for its Payee, or a Bank details change waiting for a decision) stays visible with the reason. A claim row has no terms, no discount, no countdown and no partial payment: its amount is the frozen claim total. A row with an open Payment line reads *Scheduled* while its batch is pending or approved and *Sent* once the payment rail accepted it — still on the queue, not batchable again until the line is Withdrawn, Failed or Paid (a partial Paid leaves the rest batchable). Amount to pay defaults to the discounted total inside an open discount window, else what is still due; an operator may set a smaller amount (a partial payment) per row.
 _Avoid_: Payables, payment run (the queue), pay list
 
 **Payee**:
@@ -138,11 +159,39 @@ Who a Bill Pay row and a payment-file line pay: the invoice's Supplier or the Ex
 _Avoid_: Beneficiary (the file's column name, not the concept), vendor (for a person)
 
 **Payment batch**:
-A named set of approved invoices and approved Expense claims, one payer account and one currency, submitted by a member for an owner's decision. Pending approval, then Approved (its payment file can be downloaded), then Paid; or Rejected with a reason at either step until it is marked paid, which releases its invoices to Bill Pay. Whether the file has been downloaded is a fact shown on the batch, not a state. An owner may approve a batch they submitted themselves; the approval is labelled as self-approved, never blocked. A batch never moves money.
+A named set of approved invoices and approved Expense claims, one payer account and one currency, submitted by a member for an owner's decision. Pending approval, then Approved — which hands its lines to the payer account's payment rail (Chaperone, in Lesotho) to be sent one by one — or Rejected with a reason while still pending, which withdraws its lines and releases their rows to Bill Pay. After approval the batch reads as its lines: *Sending n of m*, *Paused — balance too low* (Send remaining once the balance is topped up), and *Settled* when none is left open. An Owner may Withdraw unsent lines at any time after approval; a line the rail already has can't be pulled back. A Payout details change on one of its Payees rejects a pending batch and withdraws that Payee's unsent lines from an approved one. An owner may approve a batch they submitted themselves; the approval is labelled as self-approved, never blocked. DocuBite writes no bank file: the rail moves the money from the workspace's own account.
 _Avoid_: Payment run, remittance (that is the advice sent to the supplier), transfer
 
+**Payment line**:
+One invoice's or claim's row in a Payment batch (a Payee with three invoices in a batch has three lines), carrying a Line reference that never changes, so an invoice or claim has at most one open line and is never paid twice. Each time a row enters a batch it gets a new line; a withdrawn or failed line keeps its identity for good. Queued while its batch is pending or approved and not yet sent, Withdrawn if the batch is rejected or an Owner withdraws it, Sending while the rail has been asked and hasn't answered, Sent once the rail accepted it, then Paid (the rail reported it settled, or an Owner marked it paid by hand with a reason) or Failed (the rail refused or reversed it, or an Owner said so with a reason; its row returns to Bill Pay). A Paid line is a Payment record.
+_Avoid_: Transaction, instruction, payment (unqualified)
+
+**Line reference**:
+The short code ("DB" and eight characters) that names one Payment line, unique in its workspace and never reused. It is the payment ID the payment rail is given — so the same line can never be paid twice however often it is submitted — and leads the reference the Payee sees.
+_Avoid_: Payment reference (ambiguous with the invoice number), transaction id
+
+**Paid twice**:
+The red flag on two Payment lines for the same invoice or claim that both left the account: the rail reporting Paid on a line whose bill had already been paid another way (by hand, or on a later line). It stays until an Owner records the supplier's refund (Returned on one line) or keeps the money as a supplier credit, with a reason.
+_Avoid_: Duplicate payment (that is a Check on invoices), overpaid
+
+**Sending**:
+The Payment line state between Queued and Sent: the rail has been asked to pay it and its answer isn't known yet — in flight, or lost to a timeout. A Sending line is never asked again until a lookup by its Line reference shows the rail doesn't have it; it can't be marked by hand while a lookup can still settle it.
+_Avoid_: Pending, processing, submitted
+
+**Sent**:
+The Payment line state that says the payment rail accepted it and returned its own reference, recorded automatically. It is not proof of payment — the line can still fail — and it cannot be undone.
+_Avoid_: Paid, submitted, processed
+
+**Bank details change**:
+An edit to a Payee's bank, branch code or account number after they were first entered (a new account type or holder name, or the same number reformatted, is not a change). It holds that Payee — no new batch, and any pending or approved batch holding them is rejected — until an Owner acknowledges or rejects it. Acknowledging records who and when and asks for no proof: confirming the account with the supplier is the Owner's responsibility, not DocuBite's. Rejecting restores the last acknowledged details. Several edits before a decision are one change, from the last acknowledged details to the latest; editing back to the acknowledged details ends it. Anyone who edited the change cannot decide it unless no other Owner is left to (then it reads self-acknowledged). A held Payee reads *Bank details changed* wherever it can't be paid. A Payee's first bank details are not a change. Bank details are only ever saved by a person: details read off an invoice or a Bank confirmation are offered to pre-fill, never written, and an invoice whose details differ from those on file fails a Check.
+_Avoid_: Verified account, bank verification, AVS (DocuBite does not verify accounts); "verified" names only supplier trust
+
+**Bank confirmation**:
+The supplier's (or Claimant's) own letter confirming their bank details, optionally attached to a version of those details. It pre-fills them and is shown to the Owner deciding a Bank details change; it never marks the details verified and is never required.
+_Avoid_: Proof of account (as a requirement), verification letter
+
 **Payer account**:
-A named workspace bank account a payment batch is to be paid from — a label that tells the uploader which bank portal the file belongs to. DocuBite never holds the account's credentials and the file never carries its number.
+A named workspace account a payment batch is paid from: the workspace's own account with a payment rail (a Chaperone merchant account, in Lesotho), whose credentials DocuBite keeps sealed. Its country decides which rail pays; a payer account with no rail wired (South Africa, for now) can't pay batches. DocuBite never holds or pools the money.
 _Avoid_: Pay From (Vic's column label is fine on screen; the concept is the payer account), funding source, bank connection
 
 **Payment terms**:
@@ -150,7 +199,7 @@ A supplier's net days and, when offered, an early-payment discount: the percent 
 _Avoid_: Terms code, "2-10-30"
 
 **Payment record**:
-A DocuBite-side fact that an amount was paid against an invoice on a date, by a batch or by hand (Mark as paid). An invoice's paid state is derived from the ledger when it confirms payment, otherwise from its payment records. A payment record can be removed with a reason.
+A DocuBite-side fact that an amount was paid against an invoice on a date: written when a Payment line settles Paid, or by hand (Mark as paid) for a payment made outside DocuBite. An invoice's paid state is derived from the ledger when it confirms payment, otherwise from its payment records. A payment record can be removed with a reason.
 _Avoid_: Mark as paid (the action, not the record), settlement, ledger payment (that is the ledger's own line)
 
 **Company**:
@@ -197,7 +246,7 @@ A Queue screen with no rows, which is one of three different things and says so:
 _Avoid_: welcome tour, onboarding checklist, getting started (the queue is the guide), tourSeen
 
 **Detail pane**:
-The single place a row opens: on desktop a full-width document view — the source document on the left, an editable form on the right — and on a phone the same view full-screen over the queue with the document stacked above the fields. There is one Detail pane per Queue screen and it is the same view whichever queue opened it (Invoices, Exceptions, Approvals, Bill Pay). It is built for the Operator's day: the Status line and the checks summary under it say where the document stands and what is holding it before anything else; every check sits inline at the field or row it concerns; every field is editable and every edit saves at once; coding is a category on each line; the sticky bottom bar holds the one decision. It has no tabs: the approval trail is a block under the status track, and the audit trail and the team note sit behind one History disclosure at the bottom. The pane has one header — the row's name, the Status line, and the pane's controls; the document is introduced once. Secondary and destructive actions (Archive, Cancel, Delete, Send for review) live in the pane's overflow menu, never as header buttons. Leaving the pane is never needed to finish a document; the decision advances to the next row.
+The single place a row opens: on desktop a full-width document view — the source document on the left, an editable form on the right — and on a phone the same view full-screen over the queue with the document stacked above the fields. There is one Detail pane per Queue screen and it is the same view whichever queue opened it (Invoices, Exceptions, Approvals, Bill Pay). It is built for the Operator's day: the Status line and the checks summary under it say where the document stands and what is holding it before anything else; every check sits inline at the field or row it concerns; every field is editable and every edit saves at once; coding is an Account on each line; the sticky bottom bar holds the one decision. It has no tabs: the approval trail is a block under the status track, and the audit trail and the team note sit behind one History disclosure at the bottom. The pane has one header — the row's name, the Status line, and the pane's controls; the document is introduced once. Secondary and destructive actions (Archive, Cancel, Delete, Send for review) live in the pane's overflow menu, never as header buttons. Leaving the pane is never needed to finish a document; the decision advances to the next row.
 _Avoid_: Approval Context (Vic's separate phone screen — DocuBite has one pane), detail sheet, document header (the pane header is the only header)
 
 **Operator's day**:
@@ -267,7 +316,7 @@ The hard limit of 200 MB of stored documents per workspace. It must be disclosed
 _Avoid_: Unlimited storage
 
 **Connected accounting system**:
-An external accounting platform a workspace can connect to today, currently QuickBooks Online, Xero or Bigcapital.
+An external accounting platform a workspace can connect to today, currently QuickBooks Online or Xero.
 _Avoid_: Available integration when the connector is not live
 
 **Planned integration**:
@@ -307,7 +356,7 @@ The Product capability that surfaces scored pipeline, ledger, and tax hygiene so
 _Avoid_: Data correctness guarantee, audit certification
 
 **Integrations & API**:
-The Product capability for sending reviewed data to a connected accounting system (Xero, QuickBooks or Bigcapital) and workspace-scoped external systems through documented API and webhook surfaces.
+The Product capability for sending reviewed data to a connected accounting system (Xero or QuickBooks) and workspace-scoped external systems through documented API and webhook surfaces.
 _Avoid_: Universal integration, available connector when it is only planned
 
 **Capability page**:

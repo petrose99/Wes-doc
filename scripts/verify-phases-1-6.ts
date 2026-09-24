@@ -60,7 +60,7 @@ async function main() {
     console.log("Phase 1 — Money on Decimal columns")
     const connection = await prisma.integrationConnection.create({
       data: {
-        workspaceId, provider: "bigcapital", externalTenantId: "org1", status: "active",
+        workspaceId, provider: "xero", externalTenantId: "org1", status: "active",
         defaultExpenseAccountId: "10",
         accessTokenEnc: "fake", refreshTokenEnc: "fake",
       },
@@ -192,7 +192,7 @@ async function main() {
     // Give the target document a successful IntegrationPush pointing at a matching ledger row.
     await prisma.integrationPush.create({
       data: {
-        workspaceId, connectionId: connection.id, documentId: target.id, provider: "bigcapital",
+        workspaceId, connectionId: connection.id, documentId: target.id, provider: "xero",
         status: "succeeded", externalBillId: "ext-1", externalRecordKind: "bill",
         payload: {},
       },
@@ -204,8 +204,6 @@ async function main() {
         statementLineId: stored[0].id,
       },
     })
-    // Skip Bigcapital POST (needs a live instance) — mock it by monkey-patching. Best: just call
-    // and let the client error be swallowed (close-loop never throws past its own boundary).
     const closeResult = await onBankMatchAccepted({ workspaceId, matchId: match.id })
     const targetAfter = await prisma.document.findUniqueOrThrow({ where: { id: target.id } })
     const ledgerAfter = await prisma.ledgerTransaction.findUniqueOrThrow({ where: { id: ledger.id } })
@@ -217,7 +215,7 @@ async function main() {
       `reconciled=${ledgerAfter.reconciled} source="${ledgerAfter.reconciledSource}"`)
     check("close-loop returned success",
       closeResult.documentUpdated && closeResult.ledgerReconciled,
-      `docUpdated=${closeResult.documentUpdated} ledger=${closeResult.ledgerReconciled} payment=${closeResult.paymentPosted}`)
+      `docUpdated=${closeResult.documentUpdated} ledger=${closeResult.ledgerReconciled}`)
 
     // ---- Phase 6 --------------------------------------------------------------------------------
     console.log("\nPhase 6 — Autonomy slider writes")

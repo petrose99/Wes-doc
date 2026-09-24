@@ -50,9 +50,9 @@ describe("BillPane (#361)", () => {
   })
 
   it("renders the provider link when given one", () => {
-    const html = renderToStaticMarkup(<BillPane document={DOC} providerLink={{ href: "/api/accounting/session?workspaceId=w1", label: "Open in Bigcapital" }} fileHref="/f1" viewer={<div>viewer</div>} form={<div>form</div>} />)
-    expect(html).toContain("Open in Bigcapital")
-    expect(html).toContain("/api/accounting/session?workspaceId=w1")
+    const html = renderToStaticMarkup(<BillPane document={DOC} providerLink={{ href: "https://app.qbo.intuit.com/app/bill?txnId=1", label: "Open in QuickBooks" }} fileHref="/f1" viewer={<div>viewer</div>} form={<div>form</div>} />)
+    expect(html).toContain("Open in QuickBooks")
+    expect(html).toContain("https://app.qbo.intuit.com/app/bill?txnId=1")
   })
 
   it("renders one Open-file control, aria-labelled, not sr-only inside the button (lesson #261)", () => {

@@ -3,6 +3,7 @@
 import { ClipboardCheck, Landmark, Receipt, type LucideIcon } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { adminPaths } from "@/lib/admin/paths"
 
 /** The workspace pulse card. Rendered inside the sidebar in place of the compact icon strip when a
  * person is inside a sheet or a document detail — a room they used to enter with the door closing
@@ -17,9 +18,9 @@ import { usePathname } from "next/navigation"
  * reads "nothing waiting" or "three surfaces want you" without parsing numbers. Zero rows stay
  * present but muted so the workspace shape is constant; only urgency varies.
  *
- * Finance row is only rendered when the ledger integration is enabled deployment-wide. When it
- * isn't, the pulse card omits Finance rather than leaving a placeholder — the workspace
- * genuinely does not have a Finance surface in that deployment. */
+ * Accounting row is only rendered when the ledger integration is enabled deployment-wide. When it
+ * isn't, the pulse card omits Accounting rather than leaving a placeholder — the workspace
+ * genuinely does not have an Accounting surface in that deployment. */
 export function WorkspacePulse({ workspaceId, documentsCount, financeCount, accountingEnabled }: {
   workspaceId: string
   /** pipelineCounts.review — documents waiting for a person to sign off on the extracted fields. */
@@ -37,7 +38,7 @@ export function WorkspacePulse({ workspaceId, documentsCount, financeCount, acco
     { href: `${base}/purchase-orders`, label: "Purchase Orders", icon: ClipboardCheck, count: 0, matches: [`${base}/purchase-orders`] },
     { href: `${base}/receipts`, label: "Receipts", icon: Receipt, count: 0, matches: [`${base}/receipts`] },
     { href: `${base}/bank-statements`, label: "Bank Statements", icon: Landmark, count: 0, matches: [`${base}/bank-statements`] },
-    ...(accountingEnabled ? [{ href: `${base}/finance`, label: "Finance", icon: Landmark, count: financeCount, matches: [`${base}/finance`, `${base}/accounting`] }] : []),
+    ...(accountingEnabled ? [{ href: adminPaths(workspaceId).integrations, label: "Accounting", icon: Landmark, count: financeCount, matches: [adminPaths(workspaceId).integrations, `${base}/accounting`] }] : []),
   ]
 
   const total = rows.reduce((sum, row) => sum + row.count, 0)

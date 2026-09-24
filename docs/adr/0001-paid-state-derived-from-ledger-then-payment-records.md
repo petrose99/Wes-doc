@@ -17,3 +17,7 @@ DocuBite prepares payment files and never moves money, so "paid" was only ever a
 - `BillRow.paymentStatus` grows a `source: "ledger" | "recorded"` alongside the derived state, and the queue pill says "Paid (recorded)" when the ledger has not confirmed.
 - Removing a payment record needs a reason and an audit event; nothing else can flip Paid back to Unpaid.
 - The ledger sync overriding a recorded payment is a counter-metric worth watching (measure, #229 Q17).
+
+## Amendment (#410, ADR 0007)
+
+Batches now settle per Payment line. A line whose batch was Sent and that hasn't settled reads **Sent**, at the same level as Scheduled: after the ledger and payment records, before Unpaid. The precedence above is unchanged. A Paid line writes its payment record; the batch no longer does.

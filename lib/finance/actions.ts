@@ -4,7 +4,7 @@ import { decimalToNumber } from "@/lib/money"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { listAccountingEntities } from "@/models/accounting-entities"
 
-const PROVIDER_LABELS: Record<string, string> = { quickbooks: "QuickBooks", xero: "Xero", bigcapital: "Bigcapital" }
+const PROVIDER_LABELS: Record<string, string> = { quickbooks: "QuickBooks", xero: "Xero" }
 
 /** Validates and describes the finance agent's proposed write actions — never performs one.
  *
@@ -114,11 +114,9 @@ export async function describePushToAccounting(workspaceId: string, documentId: 
   // defaultExpenseAccountId is required, matching PushToAccountingCard's own filter — an active
   // connection with no coding account configured yet can't actually accept a push, so it must not
   // be proposed as one. Every provider gets an explicit label (PROVIDER_LABELS, matching push-to-
-  // accounting-card.tsx) rather than a binary quickbooks/xero guess, now that a bigcapital
-  // connection — auto-provisioned for every workspace — is typically the OLDEST active connection
-  // and would otherwise be silently mislabeled "Xero" in this confirmation text.
+  // accounting-card.tsx) rather than assuming which one is active.
   const connection = await prisma.integrationConnection.findFirst({
-    where: { workspaceId, status: "active", defaultExpenseAccountId: { not: null } },
+    where: { workspaceId, status: "connected", defaultExpenseAccountId: { not: null } },
     orderBy: { createdAt: "asc" },
     select: { id: true, provider: true },
   })

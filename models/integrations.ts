@@ -179,9 +179,8 @@ export async function getDocumentForApi(workspaceId: string, documentId: string)
 
 // --- Accounting connectors (P2): QuickBooks / Xero ---
 
-/** Never selects accessTokenEnc/refreshTokenEnc — write-only outside the push/refresh internals
- * (lib/integration-token-refresh.ts, lib/integration-push.ts), which read them straight off Prisma
- * rather than through this list helper. */
+/** ADR 0005: no access/refresh token ever lives in this table — Nango holds them. Every column here
+ * is safe to select and return as-is. */
 export async function listWorkspaceIntegrationConnections(workspaceId: string) {
   return prisma.integrationConnection.findMany({
     where: { workspaceId },
@@ -193,60 +192,69 @@ export async function listWorkspaceIntegrationConnections(workspaceId: string) {
   })
 }
 
-export async function getWorkspaceIntegrationConnection(workspaceId: string, provider: "quickbooks" | "xero" | "bigcapital") {
+export async function getWorkspaceIntegrationConnection(workspaceId: string, provider: "quickbooks" | "xero" | "sage") {
   return prisma.integrationConnection.findFirst({
     where: { workspaceId, provider },
     select: {
-      id: true, provider: true, externalTenantId: true, tenantName: true, status: true,
+      id: true, provider: true, providerConfigKey: true, externalTenantId: true, tenantName: true, status: true,
       defaultExpenseAccountId: true, defaultExpenseAccountName: true, createdAt: true,
     },
   })
 }
 
-/** Upserts the connection created/refreshed by the OAuth callback. Tokens arrive pre-encrypted
- * (the callback route calls encryptSecret before this ever sees them) so this layer never handles
- * plaintext secrets, matching createWorkspaceWebhookEndpoint's shape. */
-export async function upsertWorkspaceIntegrationConnection(
-  workspaceId: string,
-  input: {
-    provider: "quickbooks" | "xero" | "bigcapital"
-    externalTenantId: string
-    tenantName: string | null
-    accessTokenEnc: string
-    refreshTokenEnc: string
-    accessTokenExpiresAt: Date
-    refreshTokenExpiresAt: Date | null
-    scope: string | null
-    createdById: string
-  }
-) {
+/** Finds a connection by its id alone (the id Nango calls back with in a webhook is DocuBite's
+ * own `connectionId`, minted at session-creation — see connect-session route — but the webhook
+ * carries no workspaceId, so this is the one lookup in this file not scoped by it). */
+export async function getIntegrationConnectionById(connectionId: string) {
+  return prisma.integrationConnection.findUnique({
+    where: { id: connectionId },
+    select: { id: true, workspaceId: true, provider: true, providerConfigKey: true, status: true, createdById: true },
+  })
+}
+
+/** Creates the row on the Nango `AUTH` webhook's `operation: "creation", success: true` event
+ * (ADR 0005) — the webhook is the trigger; DocuBite never marks itself connected off the
+ * frontend's resolved promise. `id` is the same `connectionId` DocuBite minted at session-creation
+ * (connect-session route) and Nango echoes back unchanged, so no separate Nango-id column exists.
+ * A retry/redelivery of the same webhook is an upsert, not a duplicate-key error. */
+export async function createIntegrationConnectionFromNango(input: {
+  connectionId: string
+  workspaceId: string
+  provider: "quickbooks" | "xero" | "sage"
+  providerConfigKey: string
+  externalTenantId: string | null
+  tenantName: string | null
+  createdById: string | null
+}) {
   return prisma.integrationConnection.upsert({
-    where: { workspaceId_provider: { workspaceId, provider: input.provider } },
+    where: { id: input.connectionId },
     create: {
-      workspaceId,
+      id: input.connectionId,
+      workspaceId: input.workspaceId,
       provider: input.provider,
+      providerConfigKey: input.providerConfigKey,
       externalTenantId: input.externalTenantId,
       tenantName: input.tenantName,
-      accessTokenEnc: input.accessTokenEnc,
-      refreshTokenEnc: input.refreshTokenEnc,
-      accessTokenExpiresAt: input.accessTokenExpiresAt,
-      refreshTokenExpiresAt: input.refreshTokenExpiresAt,
-      scope: input.scope,
-      status: "active",
+      status: "connected",
       createdById: input.createdById,
     },
-    update: {
-      externalTenantId: input.externalTenantId,
-      tenantName: input.tenantName,
-      accessTokenEnc: input.accessTokenEnc,
-      refreshTokenEnc: input.refreshTokenEnc,
-      accessTokenExpiresAt: input.accessTokenExpiresAt,
-      refreshTokenExpiresAt: input.refreshTokenExpiresAt,
-      scope: input.scope,
-      status: "active",
-    },
-    select: { id: true, provider: true },
+    update: { status: "connected", externalTenantId: input.externalTenantId, tenantName: input.tenantName },
+    select: { id: true, workspaceId: true, provider: true, status: true },
   })
+}
+
+/** Flips a connection to `needs_reconnect` (Nango `AUTH` webhook `operation: "refresh"`,
+ * `success: false`, or a synchronous `IntegrationAuthError` off a live proxy call — ADR 0005).
+ * Returns whether this call is the transition INTO the broken state (previous status was
+ * `connected`) so the caller can send the Owner email once per break, not on every redelivery of
+ * an already-`needs_reconnect` webhook. Returns null if the connection no longer exists (already
+ * disconnected). */
+export async function markIntegrationConnectionNeedsReconnect(connectionId: string): Promise<{ isNewBreak: boolean; workspaceId: string } | null> {
+  const existing = await prisma.integrationConnection.findUnique({ where: { id: connectionId }, select: { status: true, workspaceId: true } })
+  if (!existing) return null
+  const isNewBreak = existing.status !== "needs_reconnect"
+  if (isNewBreak) await prisma.integrationConnection.update({ where: { id: connectionId }, data: { status: "needs_reconnect" } })
+  return { isNewBreak, workspaceId: existing.workspaceId }
 }
 
 export async function setWorkspaceIntegrationDefaultAccount(
@@ -261,8 +269,26 @@ export async function setWorkspaceIntegrationDefaultAccount(
   if (!res.count) throw new Error("integration_connection_not_found")
 }
 
-/** Disconnects (deletes) a connection. Cascades to its IntegrationPush rows (onDelete: Cascade in
- * the schema) — a pending push against a connection that no longer exists has nothing to push to. */
+/** Sage has no `connection_config` tenant field (ADR 0005): the AUTH webhook creates its row with
+ * `externalTenantId: null`, and the connect flow's own in-page "Choose a business" step (a
+ * `GET /businesses` proxy call, listBusinesses in lib/integrations/sage/client.ts) fills it in
+ * here once the owner picks one. */
+export async function setWorkspaceIntegrationTenant(
+  workspaceId: string,
+  connectionId: string,
+  tenant: { externalTenantId: string; tenantName: string }
+) {
+  const res = await prisma.integrationConnection.updateMany({
+    where: { id: connectionId, workspaceId, provider: "sage" },
+    data: { externalTenantId: tenant.externalTenantId, tenantName: tenant.tenantName },
+  })
+  if (!res.count) throw new Error("integration_connection_not_found")
+}
+
+/** Disconnects (deletes) a connection: Nango-side revocation is the caller's job (lib/nango.ts's
+ * deleteConnection) before this runs. Per ADR 0005 its IntegrationPush/LedgerTransaction rows keep
+ * their `connectionId` as a nullable, now-dangling FK (onDelete: SetNull, not Cascade) — they are
+ * the audit trail of what was actually posted/synced and must survive a disconnect. */
 export async function deleteWorkspaceIntegrationConnection(workspaceId: string, connectionId: string) {
   const res = await prisma.integrationConnection.deleteMany({ where: { id: connectionId, workspaceId } })
   if (!res.count) throw new Error("integration_connection_not_found")
@@ -332,7 +358,7 @@ export async function getCategoryAccountMap(workspaceId: string, connectionId: s
  * behind stale state. */
 export async function upsertWorkspaceIntegrationPush(
   workspaceId: string,
-  input: { connectionId: string; documentId: string; provider: "quickbooks" | "xero" | "bigcapital"; payload: object; createdById: string | null }
+  input: { connectionId: string; documentId: string; provider: "quickbooks" | "xero"; payload: object; createdById: string | null }
 ) {
   return prisma.integrationPush.upsert({
     where: { documentId_connectionId: { documentId: input.documentId, connectionId: input.connectionId } },

@@ -1,5 +1,16 @@
 ## Phase brief: CLOSE
 
+**Backend steps close on review, not on readers.** Before the surface
+triage below (skip it entirely if the ticket had no surface step): run the
+`code-review` skill against `WAYFINDER_BASE_BRANCH` — both axes, Standards
+(`CODING_STANDARDS.md` + the smell baseline) and Spec (the ticket body and
+its hand-off plan) — as its parallel sub-agents; fix every P0 and P1 in
+place at the lowest ponytail rung, re-run `vitest` for the touched paths
+and `tsc --noEmit`; a P1 that outgrows the session is handed off by name.
+Write `review: P0=<n> P1=<n> findings=<path>` on the report's `scores:`
+line; the hook refuses `gh issue close` on a ticket that touched backend
+code without `review: P0=0 P1=0`. Then run the full `vitest` once.
+
 Read the hand-off: the raw scores are on it and the untriaged finding lists
 are in the files it points to under `## Raw findings (untriaged)`
 (`<scratch>/readers-r1/*.md` — the measure session records, it does not

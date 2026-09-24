@@ -1287,27 +1287,28 @@ model WebhookDelivery {
   @@map("webhook_deliveries")
 }
 
-/// A connected accounting provider (P2): one QuickBooks or Xero connection per workspace. Tokens
-/// are AES-GCM-sealed (lib/secret-crypto.ts), exactly like WebhookEndpoint.secretEnc, and never
-/// selected in a list query — see models/integrations.ts. `defaultExpenseAccountId`/Name is the one
-/// expense account every pushed bill's line items are coded to (scope: one account per connection,
-/// no per-line mapping). `status` moves to "needs_reauth" when a refresh fails with an auth-shaped
-/// error (lib/integration-token-refresh.ts), which is what the settings UI and the push affordance
-/// both check before attempting a push.
+/// A connected accounting provider (P2): one QuickBooks, Xero or Sage connection per workspace.
+/// Per ADR 0005, Nango owns the OAuth token entirely — DocuBite stores no access/refresh token and
+/// never talks to the provider's token endpoint. `providerConfigKey` is Nango's integration id
+/// (`quickbooks`/`xero`/`sage`); `id` doubles as the Nango `connectionId` (minted by DocuBite at
+/// session-creation, passed straight through — see lib/nango.ts), so no separate column is needed.
+/// `externalTenantId`/`tenantName` are still written by DocuBite itself (read off Nango's
+/// `connection_config` for QuickBooks/Xero, or a Sage `GET /businesses` call for Sage — Nango never
+/// interprets Sage's business id). `defaultExpenseAccountId`/Name is the one expense account every
+/// pushed bill's line items are coded to (scope: one account per connection, no per-line mapping).
+/// `status` is `connected` | `needs_reconnect`, flipped only by the Nango `AUTH` webhook (or,
+/// synchronously as a fallback, by an `IntegrationAuthError` off a live proxy call) — see
+/// app/api/webhooks/nango/route.ts and lib/integration-push.ts's attemptIntegrationPush.
 model IntegrationConnection {
   id                        String                   @id @default(uuid()) @db.Uuid
   workspaceId               String                   @map("workspace_id") @db.Uuid
   provider                  String
+  providerConfigKey         String                   @map("provider_config_key")
   externalTenantId          String?                  @map("external_tenant_id")
   tenantName                String?                  @map("tenant_name")
-  accessTokenEnc            String                   @map("access_token_enc")
-  refreshTokenEnc           String                   @map("refresh_token_enc")
-  accessTokenExpiresAt      DateTime?                @map("access_token_expires_at")
-  refreshTokenExpiresAt     DateTime?                @map("refresh_token_expires_at")
-  scope                     String?
   defaultExpenseAccountId   String?                  @map("default_expense_account_id")
   defaultExpenseAccountName String?                  @map("default_expense_account_name")
-  status                    String                   @default("active")
+  status                    String                   @default("connected")
   createdById               String?                  @map("created_by_id") @db.Uuid
   createdAt                 DateTime                 @default(now()) @map("created_at")
   updatedAt                 DateTime                 @updatedAt @map("updated_at")
@@ -1332,7 +1333,7 @@ model IntegrationConnection {
 model IntegrationPush {
   id                 String                @id @default(uuid()) @db.Uuid
   workspaceId        String                @map("workspace_id") @db.Uuid
-  connectionId       String                @map("connection_id") @db.Uuid
+  connectionId       String?               @map("connection_id") @db.Uuid
   documentId         String                @map("document_id") @db.Uuid
   provider           String
   payload            Json
@@ -1353,7 +1354,7 @@ model IntegrationPush {
   updatedAt          DateTime              @updatedAt @map("updated_at")
   completedAt        DateTime?             @map("completed_at")
   workspace          Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  connection         IntegrationConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  connection         IntegrationConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
   document           Document              @relation(fields: [documentId], references: [id], onDelete: Cascade)
   createdBy          User?                 @relation("IntegrationPushCreator", fields: [createdById], references: [id], onDelete: SetNull)
 
@@ -2203,7 +2204,7 @@ model CategoryNature {
 model LedgerTransaction {
   id                String                @id @default(uuid()) @db.Uuid
   workspaceId       String                @map("workspace_id") @db.Uuid
-  connectionId      String                @map("connection_id") @db.Uuid
+  connectionId      String?               @map("connection_id") @db.Uuid
   externalId        String                @map("external_id")
   /// "bill" | "expense" | "bank_transaction"
   kind              String
@@ -2231,7 +2232,7 @@ model LedgerTransaction {
   paymentStatus     String?               @map("payment_status")
   syncedAt          DateTime              @map("synced_at")
   workspace         Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  connection        IntegrationConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  connection        IntegrationConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
 
   @@unique([connectionId, kind, externalId])
   @@index([workspaceId, kind, txnDate])

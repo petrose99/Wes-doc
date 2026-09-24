@@ -1,9 +1,11 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex">
+<link rel="preload" as="image" href="shots/01-intake.webp" fetchpriority="high" media="(min-width: 701px)">
+<link rel="preload" as="image" href="shots/01-intake-720.webp" fetchpriority="high" media="(max-width: 700px)">
 <title>DocuBite Walkthrough</title>
 <style>
-  @font-face { font-family: "Inter"; font-weight: 400; src: url("/fonts/Inter/Inter-Regular.otf") format("opentype"); font-display: swap; }
-  @font-face { font-family: "Inter"; font-weight: 500; src: url("/fonts/Inter/Inter-Medium.otf") format("opentype"); font-display: swap; }
-  @font-face { font-family: "Inter"; font-weight: 600; src: url("/fonts/Inter/Inter-SemiBold.otf") format("opentype"); font-display: swap; }
+  @font-face { font-family: "Inter"; font-weight: 400; src: url("fonts/Inter-Regular.woff2") format("woff2"); font-display: swap; }
+  @font-face { font-family: "Inter"; font-weight: 500; src: url("fonts/Inter-Medium.woff2") format("woff2"); font-display: swap; }
+  @font-face { font-family: "Inter"; font-weight: 600; src: url("fonts/Inter-SemiBold.woff2") format("woff2"); font-display: swap; }
   :root {
     --ground: #EEF2F0;
     --card: #FFFFFF;
@@ -63,10 +65,11 @@
   .frame .chrome i { width: 9px; height: 9px; border-radius: 50%; background: var(--line); display: block; }
   .shot { position: relative; aspect-ratio: 1440 / 900; border-radius: 6px; overflow: hidden; background: #fff; max-width: 100%; }
   @supports not (aspect-ratio: 1 / 1) { .shot::before { content: ""; display: block; padding-top: 62.5%; } }
-  .shot img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; opacity: 1; transition: opacity .35s ease; }
-  .shot img.swap { opacity: 0; }
+  .shot img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; opacity: 0; transition: opacity .2s ease; background-size: cover; background-position: center; }
+  .shot img.was { opacity: 1; z-index: 1; }
+  .shot img.on { opacity: 1; z-index: 2; transition: none; }
   .spot {
-    position: absolute; border-radius: 8px; pointer-events: none;
+    position: absolute; z-index: 3; border-radius: 8px; pointer-events: none;
     box-shadow: 0 0 0 2px var(--ring), 0 0 0 9999px var(--dim);
     transition: left .55s cubic-bezier(.16,1,.3,1), top .55s cubic-bezier(.16,1,.3,1),
                 width .55s cubic-bezier(.16,1,.3,1), height .55s cubic-bezier(.16,1,.3,1), opacity .3s ease;
@@ -79,7 +82,7 @@
   .stage.end .spot { opacity: 0; }
 
   .card {
-    position: absolute; z-index: 2; width: min(380px, calc(100% - 24px));
+    position: absolute; z-index: 4; width: min(380px, calc(100% - 24px));
     background: var(--card); color: var(--ink); border-radius: 12px; padding: 16px 18px;
     box-shadow: var(--shadow); border: 1px solid var(--line);
     transition: left .55s cubic-bezier(.16,1,.3,1), top .55s cubic-bezier(.16,1,.3,1), opacity .3s ease;
@@ -89,7 +92,7 @@
   .card .tag { display: inline-block; margin-bottom: 8px; font-size: 11.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
 
   .end-card {
-    position: absolute; inset: 0; z-index: 3; display: none; align-items: center; justify-content: center; padding: 24px;
+    position: absolute; inset: 0; z-index: 5; display: none; align-items: center; justify-content: center; padding: 24px;
     background: var(--dim);
   }
   .stage.end .end-card { display: flex; }
@@ -148,7 +151,13 @@
     <div class="frame">
       <div class="chrome" aria-hidden="true"><i></i><i></i><i></i></div>
       <div class="shot">
-        <img id="shot" src="shots/01-intake.png" alt="" width="1440" height="900" decoding="async">
+        <img class="on" alt="" width="1440" height="900" fetchpriority="high" style="background-image:url(data:image/webp;base64,UklGRlAAAABXRUJQVlA4IEQAAADwAwCdASogABQAPt1cpkyopSOiMAgBEBuJaQDNhBrHNDa3YFDrJtfAAKu7197pz/Y2O3jTF+wWd5WNOCWZGbQNr2f4AA==)">
+        <img alt="" width="1440" height="900" decoding="async" style="background-image:url(data:image/webp;base64,UklGRkgAAABXRUJQVlA4IDwAAACQAwCdASogABQAPt1iq08opSQiKAqpEBuJaQDO7BWEj3EdV62gAP7w5g1jOMEmHPPrDZ9X2cTomrgSKAA=)">
+        <img alt="" width="1440" height="900" decoding="async" style="background-image:url(data:image/webp;base64,UklGRlIAAABXRUJQVlA4IEYAAABwAwCdASogABQAPtVYoUyoJSMiMAwBABqJZwDQGCzZ3Hk78PAA/vEH4YsViKeTq1s/qyQcGKbwcLZxwyqdYoqr5kz66ZAA)">
+        <img alt="" width="1440" height="900" decoding="async" style="background-image:url(data:image/webp;base64,UklGRj4AAABXRUJQVlA4IDIAAAAwAwCdASogABQAPt1kqU+opaOiKAqpEBuJaQAATGH8qEzAAP7xP6gqdM9giOPaUQAAAA==)">
+        <img alt="" width="1440" height="900" decoding="async" style="background-image:url(data:image/webp;base64,UklGRkIAAABXRUJQVlA4IDYAAADwAgCdASogABQAPt1kqU+opSOiKAqpEBuJaQAAS4uGAAD+8T+roZWz4sFKrPDn0ddokngAAAA=)">
+        <img alt="" width="1440" height="900" decoding="async" style="background-image:url(data:image/webp;base64,UklGRkYAAABXRUJQVlA4IDoAAADwAgCdASogABQAPt1orFEopaQiqAgBEBuJaQAAP9BcAAD+8OWXH8zvOqOpeo1bD81h7CaDQGzUQcAA)">
+        <img alt="" width="1440" height="900" decoding="async" style="background-image:url(data:image/webp;base64,UklGRkgAAABXRUJQVlA4IDwAAABwAwCdASogABQAPt1mqFAopaOiqAqpEBuJaQAAPgDcCoTc1wQA/vDlie4YbjKgKsXNXrcVuTotfBMAAAA=)">
         <div class="spot" id="spot"></div>
         <div class="card" id="card" role="region" aria-live="polite">
           <span class="tag" id="cardTag"></span>
@@ -194,38 +203,55 @@
 <script>
   // Hotspots are percentages of the 1440×900 capture.
   const steps = [
-    { img: "shots/01-intake.png", tag: "1 · Intake",
+    { img: "shots/01-intake.webp", tag: "1 · Intake",
       title: "Drop the month's invoices in.",
       body: "Upload a batch, or forward them to the workspace's email address. Each file is typed on the way in — invoice, purchase order, receipt, bank statement.",
       spot: { l: 35.5, t: 36.5, w: 29, h: 14 } },
-    { img: "shots/02-invoices.png", tag: "2 · Invoices queue",
+    { img: "shots/02-invoices.webp", tag: "2 · Invoices queue",
       title: "Every invoice lands in one queue, already read.",
       body: "Supplier, number and amount are lifted off the document. A green underline means the field was read with high confidence; the state column tells you what still needs a person.",
       spot: { l: 4.5, t: 15, w: 95.2, h: 20.5 } },
-    { img: "shots/03-review.png", tag: "3 · Review",
+    { img: "shots/03-review.webp", tag: "3 · Review",
       title: "Fields sit beside the source page.",
       body: "Correct anything in place and it becomes a rule for next time. When it looks right, approve — no re-keying into a spreadsheet.",
       spot: { l: 73.5, t: 41.5, w: 26, h: 53 } },
-    { img: "shots/04-exceptions.png", tag: "4 · Checks",
+    { img: "shots/04-exceptions.webp", tag: "4 · Checks",
       title: "Checks explain themselves.",
       body: "Duplicates, line items that don't add up, missing VAT numbers — each one is a sentence, not an error code, with the invoice it belongs to.",
       spot: { l: 20.5, t: 9.5, w: 34, h: 13.5 } },
-    { img: "shots/05-approvals.png", tag: "5 · Approvals",
+    { img: "shots/05-approvals.webp", tag: "5 · Approvals",
       title: "Routed to the right person, with the variance in front of them.",
       body: "Invoice approvals, PO mismatches and expense claims each have their own queue. A PO variance shows the amount and the percentage before anyone signs.",
       spot: { l: 4.5, t: 15.9, w: 95.2, h: 6.9 } },
-    { img: "shots/06-payments.png", tag: "6 · Bill pay",
+    { img: "shots/06-payments.webp", tag: "6 · Bill pay",
       title: "What's due, by age, in Maloti.",
       body: "Open invoices are bucketed by how overdue they are. Tick the ones to pay and DocuBite builds the payment run from the account you choose.",
       spot: { l: 4.5, t: 0.4, w: 95.2, h: 7.6 } },
-    { img: "shots/07-close.png", tag: "7 · Month-end close",
+    { img: "shots/07-close.webp", tag: "7 · Month-end close",
       title: "Close the month from a checklist.",
       body: "Bank reconciliation, AP aging, accruals and the VAT workpaper are computed for the period. Sign each item off, then lock it.",
       spot: { l: 28.7, t: 27.5, w: 59, h: 42 } },
   ];
 
   const $ = (id) => document.getElementById(id);
-  const stage = $("stage"), shot = $("shot"), spot = $("spot"), card = $("card");
+  const stage = $("stage"), spot = $("spot"), card = $("card");
+  const shots = Array.from(document.querySelectorAll(".shot img"));
+  // One image at a time, in step order, the current step first: on a slow link seven parallel
+  // downloads share the pipe and the first screenshot lands last (12s at 400kbps). Phones get
+  // the 720px variant (a third of the bytes); the inline blurred placeholder shows meanwhile.
+  const narrow = matchMedia("(max-width: 700px)").matches;
+  const srcOf = (s) => narrow ? s.img.replace(".webp", "-720.webp") : s.img;
+  const started = new Set();
+  function fetchShot(n) {
+    if (n >= steps.length || started.has(n)) return false;
+    started.add(n); shots[n].src = srcOf(steps[n]); return true;
+  }
+  const prioritise = (n) => shots.forEach((im, k) => { im.fetchPriority = k === n ? "high" : "low"; });
+  function pump() {
+    const n = steps.findIndex((_, k) => !started.has(k));
+    if (n < 0) return;
+    fetchShot(n); shots[n].addEventListener("load", pump, { once: true }); shots[n].addEventListener("error", pump, { once: true });
+  }
   const dots = $("dots");
   let i = 0;
   let loadToken = 0;
@@ -265,18 +291,26 @@
       ' <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 3 5 5-5 5"/></svg>');
     if (end) return;
     const s = steps[i];
-    if (shot.getAttribute("src") !== s.img) {
-      // Swap directly and fade in on the element's own load event; a token guards against an
-      // earlier, slower load finishing after a later step was chosen.
+    const next = shots[i];
+    prioritise(i); fetchShot(i);
+    if (!next.classList.contains("on")) {
+      // Every screenshot is already in the DOM: switching is a class toggle, not a load. The
+      // outgoing shot stays underneath until the incoming one has decoded, so the frame is
+      // never blank; a token guards against a slow load finishing after a later step was chosen.
       const token = ++loadToken;
-      shot.classList.add("swap");
-      shot.src = s.img;
-      const reveal = () => { if (token === loadToken) shot.classList.remove("swap"); };
-      if (shot.complete && shot.naturalWidth) reveal();
-      else { shot.onload = reveal; shot.onerror = reveal; }
-      setTimeout(reveal, 4000); // never leave the frame blank on a stalled connection
+      // Keep whatever is actually on screen underneath — the last *decoded* shot, which on a
+      // slow link is not always the last *selected* one (stepping twice while a shot is still
+      // downloading left the frame blank).
+      const ready = (im) => im.complete && im.naturalWidth > 0;
+      const prev = shots.find((im) => im.classList.contains("on") && ready(im)) || shots.find((im) => im.classList.contains("was") && ready(im));
+      shots.forEach((im) => im.classList.remove("on", "was"));
+      if (prev && prev !== next) prev.classList.add("was");
+      next.classList.add("on");
+      const settle = () => { if (token === loadToken && prev) prev.classList.remove("was"); };
+      if (next.complete && next.naturalWidth) settle();
+      else { next.onload = settle; next.onerror = settle; setTimeout(settle, 4000); }
     }
-    shot.alt = `DocuBite screen: ${s.title}`;
+    shots.forEach((im, n) => { im.alt = n === i ? `DocuBite screen: ${s.title}` : ""; });
     Object.assign(spot.style, { left: s.spot.l + "%", top: s.spot.t + "%", width: s.spot.w + "%", height: s.spot.h + "%" });
     $("cardTag").textContent = s.tag; $("cardTitle").textContent = s.title; $("cardBody").textContent = s.body;
     $("mTag").textContent = s.tag; $("mTitle").textContent = s.title; $("mBody").textContent = s.body;
@@ -290,8 +324,27 @@
     if (e.key === "ArrowRight") { e.preventDefault(); go(i >= total ? 0 : i + 1); }
     if (e.key === "ArrowLeft") { e.preventDefault(); go(i - 1); }
   });
-  // Preload the rest so steps don't flash.
-  steps.slice(1).forEach((s) => { const im = new Image(); im.src = s.img; });
+  fetchShot(0); shots[0].addEventListener("load", pump, { once: true }); shots[0].addEventListener("error", pump, { once: true });
   render();
+  // ?debug — an on-screen readout of what this browser did, for when "the frame is empty" cannot
+  // be reproduced from the server side. Nothing is sent anywhere.
+  if (/[?&]debug\b/.test(location.search)) {
+    const errors = [];
+    addEventListener("error", (e) => errors.push((e.message || String(e)) + (e.filename ? " @" + e.lineno : "")));
+    shots.forEach((im, n) => im.addEventListener("error", () => errors.push("img " + (n + 1) + " failed: " + im.src)));
+    const box = document.createElement("pre");
+    box.style.cssText = "position:fixed;left:0;right:0;bottom:0;z-index:99;max-height:45vh;overflow:auto;margin:0;padding:8px;background:#000;color:#0f0;font:11px/1.35 monospace;white-space:pre-wrap;word-break:break-all";
+    document.body.appendChild(box);
+    const t0 = performance.now();
+    setInterval(() => {
+      box.textContent = [
+        "t=" + ((performance.now() - t0) / 1000).toFixed(1) + "s  step " + (i + 1) + "  viewport " + innerWidth + "x" + innerHeight + (narrow ? " (phone variant)" : " (desktop variant)"),
+        "UA " + navigator.userAgent,
+        "online " + navigator.onLine + "  webp-css " + CSS.supports("background-image", "url(data:image/webp;base64,)") + "  fonts " + document.fonts.status,
+        ...shots.map((im, n) => (n + 1) + " " + (im.classList.contains("on") ? "ON " : im.classList.contains("was") ? "was" : "   ") + " src=" + (im.getAttribute("src") || "-").split("/").pop() + " complete=" + im.complete + " natural=" + im.naturalWidth + "x" + im.naturalHeight + " opacity=" + getComputedStyle(im).opacity + " box=" + Math.round(im.getBoundingClientRect().width) + "x" + Math.round(im.getBoundingClientRect().height)),
+        "errors: " + (errors.length ? errors.join(" | ") : "none"),
+      ].join("\n");
+    }, 500);
+  }
 </script>
 </body></html>

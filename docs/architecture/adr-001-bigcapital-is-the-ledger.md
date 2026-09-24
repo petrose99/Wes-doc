@@ -1,7 +1,9 @@
 # ADR-001: Bigcapital is DocuBite's internal ledger
 
 Date: 2026-09-09
-Status: Accepted
+Status: Superseded 2026-09-22 (#380, map #376) — Bigcapital's data was ruled
+demo-only and the whole integration was deleted; DocuBite hosts no ledger of
+its own. Kept as a historical record; do not build against it.
 
 ## Decision
 

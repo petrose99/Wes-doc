@@ -1,5 +1,5 @@
 #!/bin/bash
-# PreToolUse hook (Read, Skill, Bash). Silent unless the wayfinder driver set
+# PreToolUse hook (Read, Skill, Bash, Write, Edit, Agent). Silent unless the wayfinder driver set
 # WAYFINDER_CTX_FILE for this session. Denies the tool calls that map #226's
 # logs showed cost the most for the least — deterministically, so the brief's
 # prose rules do not have to be obeyed to hold:
@@ -15,6 +15,20 @@
 #      router and names the skills. Same for impeccable's routing menu.
 #   5. `impeccable shape` after spec-done — the pre-build sub-command; the
 #      later phases use polish/critique/audit, which stay allowed.
+#   6. Path-based design gate: an Edit/Write of a rendering file (app/** or
+#      components/**, .tsx/.css, not tests) is refused until this session
+#      has read craft-floor.md (Read, or Bash cat/sed of it). Backend paths
+#      (lib/, models/, prisma/, worker/, app/api/**, *actions.ts) are never
+#      gated — the files decide what a step owes, not the ticket's title.
+#   7. Backend floor (CODING_STANDARDS.md): a `git commit` whose staged diff
+#      changes lib/, models/ or worker/ logic (.ts, not tests) without a
+#      .test.ts in the same commit is refused unless the subject carries
+#      `no-test: <reason>`; `gh issue close` on a ticket whose commits touched
+#      backend code is refused without `review: P0=0 P1=0` on the report.
+#   8. Build phase: the measure-phase readers' skills (evaluate, include,
+#      impeccable critique/audit) are refused — phases/build.md says the gate
+#      steps run no critique/evaluate, and #380's G2 session ignored that at
+#      ~6K of skill text plus six re-scoring agents (2026-09-22).
 [ -n "${WAYFINDER_CTX_FILE:-}" ] || exit 0
 IN="$(cat)"
 python3 - "$IN" <<'PY'
@@ -31,6 +45,14 @@ MENU = "AUTOPILOT: impeccable's routing menu is not needed — the phase brief n
 DEVSRV = "DEV SERVER: one command brings up everything a round needs — `node .impeccable/live/dev.mjs start <ws>` starts the heap-capped Next dev server on :3000 AND the impeccable live-server on :8400 (the in-page detector), waits until both answer, and preps the workspace (jurisdiction etc.). `dev.mjs stop` stops both; `status` shows the ports. Never start either by hand: `npm run dev`, nohup, setsid, disown, trailing `&`, `impeccable live-server` and per-ticket livesrv/start-live-server scripts all die with the turn, hang it, or are denied by the sandbox."
 ROUND = "ROUND SCRIPT: a ticket's round script only lists states and the clicks between them — it imports `round`/`roundArgs` from scripts/wayfinder-autopilot/capture-round.mjs and uses the shared probes on `s` (focusIs, visible, hidden, count(selector, within), dialog, waitFor, probe, uniqueFile, tabWalk, press). Own probe code (document.activeElement reads, hand-rolled focus/visible/count helpers, argv parsing) is where #266 lost two sessions to harness bugs; the shared ones are tested. See the header of capture-round.mjs."
 def is_router(p): return "skills/intent/SKILL.md" in p or "skills/intent/intent/SKILL.md" in p
+MEASURE_SKILLS = re.compile(r"(autopilot/skills/(evaluate|include)\.md|skills/(evaluate|include)/SKILL\.md|impeccable/reference/(critique|audit)\.md)")
+BUILD_ONLY = "BUILD PHASE: critique, evaluate, audit and include are the measure session's readers (phases/build.md: no critique, no evaluate, no include readers in any gate step). This phase runs the round script, gate.mjs and the detector, fixes what they list, and ends at `milestone: build-done`; the scores come from the next phase, on its own budget."
+def measure_skill(p): return os.environ.get("WAYFINDER_PHASE", "") == "build" and bool(MEASURE_SKILLS.search(p))
+# The same drift through a subagent: #380's G2 launched six scoring agents
+# ("critique + evaluate", "re-score after fix", "correct-polarity critique"),
+# each a fresh 20K+ context, chasing numbers the measure phase produces once.
+SCORING = re.compile(r"\b(critique|evaluate|heuristic|nielsen|ux health|health score|re-?scor\w*|scor(e|ing) (the|two|these|both|this))\b", re.I)
+BUILD_AGENT = "BUILD PHASE: no scoring agents here — critique/evaluate readers run in the measure session (phases/measure.md), once, on a fresh budget, and the close session decides on their output. A build-phase Agent is for a bounded read-only search or a fix; the gate's evidence is gate.mjs + detector counts, not heuristic scores."
 def spec_done():
     try: return "milestone: spec-done" in open(hand).read()
     except Exception: return False
@@ -44,6 +66,23 @@ def handoff_lines(text=None):
     except Exception: return 0
 hmax = int(os.environ.get("WAYFINDER_HANDOFF_MAX_LINES", "80"))
 def too_long(n): return f"HAND-OFF TOO LONG: {hand} would be {n} lines (limit {hmax}). It is a state file, not a log: keep the `milestone:` lines, the `step:` plan (a done step is one line, no notes under it), an Artifacts list of paths, Open findings as a pointer to <scratch>/close.md, and the exact next step. Delete every '(this session)' / '## G2 notes' narrative; move anything worth keeping into a file in the scratch folder and link it. Then retry."
+# Path-based design gate (#376, 2026-09-22). The spec brief classifies each
+# build step `surface|backend` from its paths; this is the half the hook can
+# hold deterministically. craft-floor.md read → flag file beside the ctx file.
+CRAFT = "impeccable/reference/craft-floor.md"
+def craft_flag(): return ctx + ".craft-floor"
+def mark_craft():
+    try: open(craft_flag(), "w").write("1")
+    except Exception: pass
+def craft_read():
+    return os.path.exists(craft_flag())
+def is_render_path(p):
+    p = os.path.relpath(os.path.abspath(p), os.getcwd()) if p else ""
+    if p.startswith("../"): return False
+    if not re.match(r"^(app|components)/.*\.(tsx|css)$", p): return False
+    if re.search(r"\.test\.tsx$|/api/|actions\.ts$", p): return False
+    return True
+DESIGN = "DESIGN GATE: {p} renders (app/** or components/**), so this step is `kind: surface` and owes the design pass before its first edit: read `.claude/skills/impeccable/reference/craft-floor.md` whole (it is short) and the Intent digests the spec's Action Summary named (fortify for the states, articulate for the words — the *Skill files* list in the system prompt). Backend paths (lib/, models/, prisma/, worker/, app/api/**, *actions.ts) are not gated. Then retry the edit."
 # Closing-bar gate. #327 and #328 closed with `close-critique=n/a` and no
 # detector run: a single-session task that changed rendered files treated
 # the bar as optional. A `gh issue close` of this session's ticket is refused
@@ -79,6 +118,18 @@ def closing_bar(c):
         if r.returncode != 0:
             errs = [l for l in r.stdout.splitlines() if "error TS" in l]
             deny(f"TYPE-CHECK: `tsc --noEmit` reports {len(errs)} error(s); ticket #{t} touched TypeScript ({', '.join(code[:4])}{' …' if len(code) > 4 else ''}) and closes only on a clean tree — even errors another ticket left: fix them or hand off with the list. First errors:\n" + "\n".join(errs[:8]))
+    # Review gate (CODING_STANDARDS.md, 2026-09-22): a ticket whose commits
+    # touched backend logic closes only once /code-review ran and its P0/P1
+    # count is zero on the report's `scores:` line.
+    backend = sorted(f for f in files if re.match(r"^(lib|models|worker|prisma)/.*\.(ts|prisma|sql)$", f) and not f.endswith(".test.ts"))
+    if backend:
+        rep = os.path.join(root, "docs", "wayfinder-reports", m, f"{t}.md")
+        line = ""
+        try: line = next((l for l in open(rep) if l.startswith("scores:")), "")
+        except Exception: pass
+        rv = re.search(r"review:\s*P0=(\d+)\s+P1=(\d+)", line)
+        if not rv or rv.group(1) != "0" or rv.group(2) != "0":
+            deny(f"REVIEW GATE: ticket #{t} touched backend code ({', '.join(backend[:4])}{' …' if len(backend) > 4 else ''}) and closes only after the `code-review` skill ran against `{base or 'the base branch'}` with every P0 and P1 fixed: the report {rep} needs `review: P0=0 P1=0 findings=<path>` on its `scores:` line. Found: {line.strip() or 'no scores: line'}.")
     # Infra gate (lanes, 2026-09-21): #361 widened `turbopack.root` in
     # next.config.ts to get round a lane defect and would have landed it. A
     # ticket closes only while the project's infra files match the integration
@@ -104,12 +155,14 @@ def closing_bar(c):
     deny(f"CLOSING BAR: ticket #{t} changed rendered files ({', '.join(ui[:5])}{' …' if len(ui) > 5 else ''}), so it closes only at the bar: the report {rep} needs a `scores:` line with integer close-critique >= 30 (every heuristic >= 3) and close-evaluate >= 80, produced by the critique/evaluate readers on a capture round with the in-page detector cleared. Found: {line.strip() or 'no scores: line'}. Run phases/measure.md then close.md (a small ticket does both in this session), write the line, then close — or hand off with `Autopilot: continue —`.")
 if tool == "Bash":
     c = inp.get("command", "")
+    if CRAFT in c and re.search(r"\b(cat|sed|head|tail|less|awk)\b", c): mark_craft()
     # A background command plus "I'll wait for the notification" ends a
     # headless session (#266 session 26 lost a capture round this way; #253
     # before it). Run it in the foreground with a timeout instead.
     if inp.get("run_in_background"):
         deny("NO BACKGROUND COMMANDS: a headless session ends the moment a turn has no tool call, and everything it started dies with it. Run this in the foreground (`timeout` up to 600000 ms) and read its result in the same turn; a long capture round is one foreground call, not a wait.")
     if is_router(c): deny(ROUTER)
+    if measure_skill(c) and re.search(r"\b(cat|sed|head|tail|less|awk|grep|rg)\b", c): deny(BUILD_ONLY)
     # A capture round without a long tool timeout gets backgrounded by the
     # harness at 2 min, and the session then polls the task file turn after
     # turn (#270 G2 r1: sleep/echo/while-ps loops at 40K a turn).
@@ -123,6 +176,16 @@ if tool == "Bash":
     if re.search(r"impeccable\s+live-server|livesrv\d*\.mjs|start-live-server|\.impeccable/bin/", c):
         deny(DEVSRV)
     closing_bar(c)
+    if re.search(r"\bgit\b[^|;&]*\bcommit\b", c) and not re.search(r"no-test:", c):
+        try: staged = subprocess.run(["git", "diff", "--cached", "--name-only"], capture_output=True, text=True).stdout.split()
+        except Exception: staged = []
+        if not staged and re.search(r"\s-a\b|--all\b", c):
+            try: staged = subprocess.run(["git", "diff", "--name-only"], capture_output=True, text=True).stdout.split()
+            except Exception: staged = []
+        logic = [f for f in staged if re.match(r"^(lib|models|worker)/.*\.ts$", f) and not f.endswith(".test.ts")]
+        tests = [f for f in staged if f.endswith((".test.ts", ".test.tsx"))]
+        if logic and not tests:
+            deny(f"TESTS TRAVEL WITH CODE (CODING_STANDARDS.md §12): this commit changes {', '.join(logic[:4])}{' …' if len(logic) > 4 else ''} and no .test.ts. Write the seam's test red first and stage it with the change; for a pure deletion or a mechanical rename put `no-test: <reason>` in the commit subject.")
     if hand and re.search(r"\bgit\b[^|;&]*\bcommit\b", c):
         n = handoff_lines()
         if n > hmax: deny(too_long(n))
@@ -130,9 +193,15 @@ if tool == "Bash":
     if cont and "impeccable/reference/shape.md" in c and spec_done():
         deny("CONTINUATION: `impeccable shape` is the pre-build sub-command and the spec phase already ran it. Read craft-floor.md by range and the sub-command this phase needs (polish, critique, audit, clarify, adapt).")
     sys.exit(0)
+if tool in ("Agent", "Task"):
+    if os.environ.get("WAYFINDER_PHASE", "") == "build" and SCORING.search(inp.get("description", "") + " " + inp.get("prompt", "")):
+        deny(BUILD_AGENT)
+    sys.exit(0)
 if tool == "Read":
     p = inp.get("file_path", ""); ranged = "limit" in inp or "offset" in inp
+    if CRAFT in p: mark_craft(); sys.exit(0)
     if is_router(p): deny(ROUTER)
+    if measure_skill(p): deny(BUILD_ONLY)
     if "impeccable/reference/routing.md" in p: deny(MENU)
     if cont and "impeccable/reference/shape.md" in p and spec_done():
         deny("CONTINUATION: `impeccable shape` is the pre-build sub-command and the spec phase already ran it. Read craft-floor.md by range and the sub-command this phase needs (polish, critique, audit, clarify, adapt).")
@@ -155,6 +224,8 @@ if tool == "Read":
         if lines > mx:
             deny(f"READ BY RANGE: {os.path.basename(p)} is {lines} lines. Whole-file reads are the largest avoidable cost in these sessions (each is re-read on every later turn). Run `grep -n <symbol|heading> {p}` first, then Read with offset+limit for just the lines you need (or `sed -n a,bp`). Files under {mx} lines may be read whole.")
     sys.exit(0)
+if tool in ("Write", "Edit") and is_render_path(inp.get("file_path", "")) and not craft_read():
+    deny(DESIGN.format(p=os.path.relpath(os.path.abspath(inp.get("file_path", "")), os.getcwd())))
 if tool in ("Write", "Edit") and hand and os.path.abspath(inp.get("file_path", "")) == os.path.abspath(hand):
     if tool == "Write": n = handoff_lines(inp.get("content", ""))
     else:

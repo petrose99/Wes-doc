@@ -9,9 +9,12 @@
 set -uo pipefail
 PRE="${1:-}"
 EXCL=()
-# check-ignore reports a `dir/` pattern for a path *inside* the dir, not the dir
-ignored_dir() { git check-ignore -q "$1/probe" 2>/dev/null; }
-for p in .scratch .impeccable/live; do
+# check-ignore reports a `dir/` pattern for a path *inside* the dir, not the
+# dir — and in a lane the dir is a symlink (LANE_LINKS), where the probe path
+# is "beyond a symbolic link" and only the dir itself answers (2026-09-22, #380:
+# every hard-cap WIP commit in the lane was refused with "paths are ignored").
+ignored_dir() { git check-ignore -q "$1" 2>/dev/null || git check-ignore -q "$1/probe" 2>/dev/null; }
+for p in .scratch .scratch[0-9]* .impeccable/live; do
   ignored_dir "$p" || EXCL+=(":!$p")
 done
 for d in docs/wayfinder-reports/*/logs; do

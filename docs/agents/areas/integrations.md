@@ -2,26 +2,28 @@
 
 Shipped by #329 (Accounting connector picker; demotes Bigcapital to a
 provider beside QuickBooks/Xero, execution of #292's ledger-stance
-decision). Mode: Operate. Decisions live on #292, #226; do not re-decide
-here. Provider-link parity (#332) and first-run framing (#333) are open
-decision tickets, not code gaps.
+decision). #380 (map #376) then deleted Bigcapital entirely — its data was
+demo-only — so QuickBooks and Xero are the only accounting providers left.
+Mode: Operate. Decisions live on #292, #226, #376; do not re-decide here.
+Provider-link parity (#332) and first-run framing (#333) are open decision
+tickets, not code gaps.
 
 ## Routes
 `app/(app)/workspaces/[workspaceId]/admin/integrations/page.tsx` — server
-component, gathers `accountingProviders` (which of
-quickbooks/xero/bigcapital are configured on this deployment) and
-`connections` (this workspace's `IntegrationConnection` rows), passes to
-the client `IntegrationsManager`. Same page also owns API Keys and
-Webhooks (unrelated sections, same component file).
+component, gathers `accountingProviders` (which of quickbooks/xero are
+configured on this deployment) and `connections` (this workspace's
+`IntegrationConnection` rows), passes to the client `IntegrationsManager`.
+Same page also owns API Keys and Webhooks (unrelated sections, same
+component file).
 
 ## Primitives — use these, never a bespoke one beside them (B4)
 - `components/integrations/integrations-manager.tsx`: `IntegrationsManager`
   (top-level, all three sections) and `AccountingConnectionCard` (one
   provider row: Sync accounts, default-expense-account picker, Disconnect,
   provider-specific destination link where one exists).
-- `PROVIDER_LABELS` (`quickbooks`/`xero`/`bigcapital` → display name) is
-  duplicated once, deliberately, in `lib/finance/actions.ts` (module-private
-  there, can't import a client component) — keep both in sync by hand if a
+- `PROVIDER_LABELS` (`quickbooks`/`xero` → display name) is duplicated
+  once, deliberately, in `lib/finance/actions.ts` (module-private there,
+  can't import a client component) — keep both in sync by hand if a
   provider is ever renamed or added.
 - `components/ui/confirm-dialog.tsx` `ConfirmDialog` gates Disconnect
   (consequence-first, H5). Escape and a visible Cancel both close without
@@ -32,16 +34,17 @@ Webhooks (unrelated sections, same component file).
   provider connection exists (any status) — added #329 close, H8. Don't
   revert to always-on prose; it competes with the status change on
   Authorising/Needs-reconnect states.
-- Only Bigcapital has a destination link (`Open in Bigcapital` →
-  `/api/accounting/session`) — QuickBooks/Xero have no equivalent route in
-  this codebase (spec §1.3, named trade-off, decision ticket #332).
+- Neither provider has a destination link (`Open in <provider>`) in this
+  codebase — the one Bigcapital had (`/api/accounting/session`) was
+  deleted with it in #380 (spec §1.3, named trade-off, decision ticket
+  #332).
 
 ## Data and actions
 `app/(app)/workspaces/[workspaceId]/integration-connection-actions.ts`
 (disconnect, list expense accounts, set default account, sync accounting
-entities — all workspace-owner-gated server-side). Bigcapital OAuth/status:
-`app/(app)/workspaces/[workspaceId]/accounting-actions.ts`
-(`getBigcapitalStatusAction`, `repairBigcapitalConnectionAction`).
+entities — all workspace-owner-gated server-side). No separate
+provider-specific OAuth/status action file remains — QuickBooks and Xero
+both use the shared connect flow (see `lib/integrations/`).
 
 ## States
 not-connected · authorising (spinner, `aria-live="polite"`, no controls

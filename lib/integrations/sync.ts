@@ -1,8 +1,6 @@
 import { prisma } from "@/lib/db"
-import { getValidAccessToken } from "@/lib/integration-token-refresh"
 import * as quickbooks from "@/lib/integrations/quickbooks/client"
 import * as xero from "@/lib/integrations/xero/client"
-import * as bigcapital from "@/lib/integrations/bigcapital/client"
 import { Prisma } from "@/prisma/client"
 
 /** WP1.5: pulls the chart of accounts, vendor list, and tax rates from the connection's provider
@@ -17,8 +15,7 @@ export async function syncAccountingEntities(connectionId: string): Promise<void
   })
   if (!connection.externalTenantId) throw new Error("integration_connection_not_ready")
 
-  const accessToken = await getValidAccessToken(connection.id)
-  const rows = await fetchProviderEntities(connection.provider, connection.externalTenantId, accessToken)
+  const rows = await fetchProviderEntities(connection.provider, connection.externalTenantId, connection.id)
 
   const syncedAt = new Date()
   await prisma.$transaction([
@@ -40,24 +37,22 @@ export async function syncAccountingEntities(connectionId: string): Promise<void
 
 type SyncRow = { entityType: "account" | "vendor" | "tax_rate"; externalId: string; code: string | null; name: string; active: boolean; raw: unknown }
 
-function fetchProviderEntities(provider: string, externalTenantId: string, accessToken: string): Promise<SyncRow[]> {
+function fetchProviderEntities(provider: string, externalTenantId: string, connectionId: string): Promise<SyncRow[]> {
   switch (provider) {
     case "quickbooks":
-      return fetchQuickBooksEntities(externalTenantId, accessToken)
+      return fetchQuickBooksEntities(externalTenantId, connectionId)
     case "xero":
-      return fetchXeroEntities(externalTenantId, accessToken)
-    case "bigcapital":
-      return fetchBigcapitalEntities(externalTenantId, accessToken)
+      return fetchXeroEntities(externalTenantId, connectionId)
     default:
       throw new Error(`unsupported_integration_provider_${provider}`)
   }
 }
 
-async function fetchQuickBooksEntities(realmId: string, accessToken: string): Promise<SyncRow[]> {
+async function fetchQuickBooksEntities(realmId: string, connectionId: string): Promise<SyncRow[]> {
   const [accounts, vendors, taxCodes] = await Promise.all([
-    quickbooks.listAccounts(realmId, accessToken),
-    quickbooks.listVendors(realmId, accessToken),
-    quickbooks.listTaxCodes(realmId, accessToken),
+    quickbooks.listAccounts(realmId, connectionId),
+    quickbooks.listVendors(realmId, connectionId),
+    quickbooks.listTaxCodes(realmId, connectionId),
   ])
   return [
     ...accounts.map((a): SyncRow => ({ entityType: "account", externalId: a.id, code: null, name: a.name, active: a.active, raw: a })),
@@ -66,24 +61,11 @@ async function fetchQuickBooksEntities(realmId: string, accessToken: string): Pr
   ]
 }
 
-/** Bigcapital's connection carries an API key (never rotated by getValidAccessToken — see
- * models/bigcapital.ts) rather than an OAuth access token, and no separate tax-rate list yet. */
-async function fetchBigcapitalEntities(organizationId: string, apiKey: string): Promise<SyncRow[]> {
-  const [accounts, vendors] = await Promise.all([
-    bigcapital.listAccounts(apiKey, organizationId),
-    bigcapital.listVendors(apiKey, organizationId),
-  ])
-  return [
-    ...accounts.map((a): SyncRow => ({ entityType: "account", externalId: a.id, code: null, name: a.name, active: a.active, raw: a })),
-    ...vendors.map((v): SyncRow => ({ entityType: "vendor", externalId: v.id, code: null, name: v.name, active: v.active, raw: v })),
-  ]
-}
-
-async function fetchXeroEntities(tenantId: string, accessToken: string): Promise<SyncRow[]> {
+async function fetchXeroEntities(tenantId: string, connectionId: string): Promise<SyncRow[]> {
   const [accounts, contacts, taxRates] = await Promise.all([
-    xero.listAccounts(tenantId, accessToken),
-    xero.listContacts(tenantId, accessToken),
-    xero.listTaxRates(tenantId, accessToken),
+    xero.listAccounts(tenantId, connectionId),
+    xero.listContacts(tenantId, connectionId),
+    xero.listTaxRates(tenantId, connectionId),
   ])
   return [
     ...accounts.map((a): SyncRow => ({ entityType: "account", externalId: a.code, code: a.code, name: a.name, active: a.active, raw: a })),

@@ -8,11 +8,11 @@ import { HowItWorksButton } from "@/components/shell/how-it-works"
 import { ApprovalEmailsControl } from "@/components/shell/approval-emails"
 import { RailWidthControl } from "@/components/shell/rail-width-control"
 import { SignOutButton } from "@/components/shell/sign-out-button"
-import { accountPaths } from "@/lib/admin/paths"
+import { accountPaths, adminPaths } from "@/lib/admin/paths"
 import { toRailWidth } from "@/lib/rail-width"
 import { getCurrentUser } from "@/lib/auth"
-import config from "@/lib/config"
 import { getWorkspaceMembership, getWorkspacesForUser } from "@/models/workspaces"
+import { anyAccountingProviderEnabled } from "@/lib/finance/provider-flags"
 
 export const dynamic = "force-dynamic"
 
@@ -77,7 +77,7 @@ export default async function AccountPage({ params }: { params: Promise<{ worksp
           { label: "Receipts", href: `/workspaces/${workspaceId}/receipts` },
           { label: "Bank Statements", href: `/workspaces/${workspaceId}/bank-statements` },
           { label: "Archive", href: `/workspaces/${workspaceId}/library` },
-          ...(config.integrations.bigcapital.enabled ? [{ label: "Finance", href: `/workspaces/${workspaceId}/finance` }] : []),
+          ...(anyAccountingProviderEnabled() ? [{ label: "Accounting", href: adminPaths(workspaceId).integrations }] : []),
         ].map((item) => <li key={item.href}>
           <Link href={item.href} className="flex min-h-12 items-center justify-between gap-2 py-2 text-sm font-medium text-slate-900 hover:text-emerald-700">
             {item.label}

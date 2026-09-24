@@ -1,6 +1,5 @@
 import { isCategoryConfirmed, isPushableDocument } from "@/lib/doc-types"
 import { normalizeBillFromDocument, BillMappingError } from "@/lib/integration-bill-mapping"
-import { extractBankStatementPayload } from "@/lib/integrations/bigcapital/bank-statement-mapper"
 import { attemptIntegrationPush, kickIntegrationPushDrain } from "@/lib/integration-push"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { prisma } from "@/lib/db"
@@ -21,7 +20,7 @@ async function enqueuePush(
   if (!isPushableDocument(document)) return false
   if (!isCategoryConfirmed((document.codingData as Record<string, unknown> | null))) return false
 
-  const connection = await prisma.integrationConnection.findFirst({ where: { workspaceId, status: "active" }, orderBy: { createdAt: "asc" } })
+  const connection = await prisma.integrationConnection.findFirst({ where: { workspaceId, status: "connected" }, orderBy: { createdAt: "asc" } })
   if (!connection) return false
 
   const existingPush = await prisma.integrationPush.findFirst({ where: { workspaceId, documentId: document.id, connectionId: connection.id }, select: { id: true } })
@@ -45,23 +44,16 @@ async function enqueuePush(
     const [mappings, inferredMap] = await Promise.all([listCategoryAccountMappings(workspaceId, connection.id), getCategoryAccountMap(workspaceId, connection.id)])
     resolvedAccountId = resolveCategoryAccount(mappings, category, inferredMap, connection.defaultExpenseAccountId)
   }
-  const documentType = coding.documentType === "expense" || coding.documentType === "sale" || coding.documentType === "bank_statement" ? coding.documentType : "expense"
-  let payload: object
-  if (documentType === "bank_statement" && (connection.provider as string) === "bigcapital") {
-    const cashflowAccountId = resolvedAccountId ?? connection.defaultExpenseAccountId
-    if (!cashflowAccountId) return false
-    payload = extractBankStatementPayload(document.id, reviewedData, cashflowAccountId, connection.defaultExpenseAccountId!)
-  } else {
-    const fxOverride = workspaceBase && (document.baseCurrencyTotal ?? null) !== null
-      ? { total: Number(document.baseCurrencyTotal), currencyCode: workspaceBase }
-      : null
-    const bill = normalizeBillFromDocument({ documentId: document.id, filename: document.filename, templateCode: document.template?.code ?? null, reviewedData, fxOverride })
-    const direction: "payable" | "receivable" = documentType === "sale" ? "receivable" : "payable"
-    payload = { ...bill, documentType, direction, ...(resolvedAccountId ? { expenseAccountId: resolvedAccountId } : {}), ...(category ? { category } : {}) }
-  }
+  const documentType = coding.documentType === "expense" || coding.documentType === "sale" ? coding.documentType : "expense"
+  const fxOverride = workspaceBase && (document.baseCurrencyTotal ?? null) !== null
+    ? { total: Number(document.baseCurrencyTotal), currencyCode: workspaceBase }
+    : null
+  const bill = normalizeBillFromDocument({ documentId: document.id, filename: document.filename, templateCode: document.template?.code ?? null, reviewedData, fxOverride })
+  const direction: "payable" | "receivable" = documentType === "sale" ? "receivable" : "payable"
+  const payload = { ...bill, documentType, direction, ...(resolvedAccountId ? { expenseAccountId: resolvedAccountId } : {}), ...(category ? { category } : {}) }
 
   const push = await upsertWorkspaceIntegrationPush(workspaceId, {
-    connectionId: connection.id, documentId: document.id, provider: connection.provider as "quickbooks" | "xero" | "bigcapital", payload, createdById: actorId,
+    connectionId: connection.id, documentId: document.id, provider: connection.provider as "quickbooks" | "xero", payload, createdById: actorId,
   })
   await recordSystemAudit({ workspaceId, documentId: document.id, type: auditType })
   await attemptIntegrationPush(push.id)

@@ -9,16 +9,16 @@ import { ActionState } from "@/lib/actions"
 import { recordDocumentAudit } from "@/lib/audit"
 import { getCurrentUser } from "@/lib/auth"
 import config from "@/lib/config"
-import { getValidAccessToken, TokenRefreshError } from "@/lib/integration-token-refresh"
 import { listExpenseAccounts as listQuickbooksAccounts } from "@/lib/integrations/quickbooks/client"
 import { listExpenseAccounts as listXeroAccounts } from "@/lib/integrations/xero/client"
-import { listAccounts as listBigcapitalAccounts } from "@/lib/integrations/bigcapital/client"
+import { listBusinesses as listSageBusinesses } from "@/lib/integrations/sage/client"
 import { syncAccountingEntities } from "@/lib/integrations/sync"
 import { syncLedgerTransactions } from "@/lib/health/sync"
 import {
   deleteWorkspaceIntegrationConnection,
   listWorkspaceIntegrationConnections,
   setWorkspaceIntegrationDefaultAccount,
+  setWorkspaceIntegrationTenant,
   workspaceIntegrationsPlanEnabled,
 } from "@/models/integrations"
 import { prisma } from "@/lib/db"
@@ -49,26 +49,19 @@ export async function listExpenseAccountsAction(workspaceId: string, connectionI
       select: { id: true, provider: true, externalTenantId: true },
     })
     if (!connection || !connection.externalTenantId) return { success: false, error: "That connection no longer exists" }
-    const accessToken = await getValidAccessToken(connection.id)
     let accounts: { id: string; name: string }[]
     switch (connection.provider) {
       case "quickbooks":
-        accounts = await listQuickbooksAccounts(connection.externalTenantId, accessToken)
+        accounts = await listQuickbooksAccounts(connection.externalTenantId, connection.id)
         break
       case "xero":
-        accounts = (await listXeroAccounts(connection.externalTenantId, accessToken)).map((a) => ({ id: a.code, name: a.name }))
-        break
-      case "bigcapital":
-        accounts = await listBigcapitalAccounts(accessToken, connection.externalTenantId)
+        accounts = (await listXeroAccounts(connection.externalTenantId, connection.id)).map((a) => ({ id: a.code, name: a.name }))
         break
       default:
         return { success: false, error: "Unsupported accounting provider" }
     }
     return { success: true, data: accounts }
   } catch (error) {
-    if (error instanceof TokenRefreshError && error.message === "integration_needs_reauth") {
-      return { success: false, error: "This connection needs to be reconnected before its accounts can be listed" }
-    }
     return { success: false, error: errorMessage(error, "Could not list expense accounts") }
   }
 }
@@ -100,9 +93,6 @@ export async function syncAccountingEntitiesAction(workspaceId: string, connecti
     revalidatePath(paths(workspaceId).integrations)
     return { success: true }
   } catch (error) {
-    if (error instanceof TokenRefreshError && error.message === "integration_needs_reauth") {
-      return { success: false, error: "This connection needs to be reconnected before it can be synced" }
-    }
     return { success: false, error: errorMessage(error, "Could not sync accounts") }
   }
 }
@@ -122,10 +112,37 @@ export async function syncLedgerTransactionsAction(workspaceId: string, connecti
     revalidatePath(`/workspaces/${workspaceId}/health`)
     return { success: true, data: { synced } }
   } catch (error) {
-    if (error instanceof TokenRefreshError && error.message === "integration_needs_reauth") {
-      return { success: false, error: "This connection needs to be reconnected before its ledger can be synced" }
-    }
     return { success: false, error: errorMessage(error, "Could not sync ledger transactions") }
+  }
+}
+
+/** Sage's own in-page "Choose a business" step, right after auth (ADR 0005): Sage's OAuth grant
+ * isn't scoped to one business, so unlike QuickBooks/Xero's `connection_config` tenant, the pick
+ * happens here rather than off the AUTH webhook. An empty list is a named dead end, not an error —
+ * the caller renders "create one in Sage first" rather than a retry. */
+export async function listSageBusinessesAction(workspaceId: string, connectionId: string): Promise<ActionState<{ id: string; name: string }[]>> {
+  const gate = await guardIntegrations(workspaceId)
+  if ("error" in gate) return { success: false, error: errorMessage(new Error(gate.error), NO_ACCESS) }
+  try {
+    const connection = await prisma.integrationConnection.findFirst({ where: { id: connectionId, workspaceId, provider: "sage" }, select: { id: true } })
+    if (!connection) return { success: false, error: "That connection no longer exists" }
+    const businesses = await listSageBusinesses(connectionId)
+    return { success: true, data: businesses }
+  } catch (error) {
+    return { success: false, error: errorMessage(error, "Could not load Sage businesses") }
+  }
+}
+
+export async function confirmSageBusinessAction(workspaceId: string, connectionId: string, businessId: string, businessName: string): Promise<ActionState> {
+  const gate = await guardIntegrations(workspaceId)
+  if ("error" in gate) return { success: false, error: errorMessage(new Error(gate.error), NO_ACCESS) }
+  try {
+    await setWorkspaceIntegrationTenant(workspaceId, connectionId, { externalTenantId: businessId, tenantName: businessName })
+    await recordDocumentAudit({ workspaceId, actorId: gate.userId, type: "integration_tenant_selected", detail: { connectionId, businessId } })
+    revalidatePath(paths(workspaceId).integrations)
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: errorMessage(error, "Could not confirm the business") }
   }
 }
 

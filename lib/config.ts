@@ -77,8 +77,7 @@ const envSchema = z.object({
   // "https://<account-id>.r2.cloudflarestorage.com". Setting it changes two things in
   // lib/document-storage.ts — requests go path-style, and the SSE-KMS header is dropped, since KMS
   // is an AWS service that R2 rejects outright and R2 encrypts at rest with nothing to ask for.
-  // (Note the deliberately different name from S3_ENDPOINT in the compose files: that one belongs
-  // to bigcapital-server and points at its MinIO. Two unrelated things, two names.)
+  // (Note the deliberately different name from S3_ENDPOINT in the compose files, which is unrelated.)
   //
   // STORAGE_REGION is "auto" for R2, which signs against that rather than a geographic region.
   //
@@ -216,29 +215,19 @@ const envSchema = z.object({
   // current key, and a value sealed under the old key is re-encrypted lazily on its next write.
   SECRETS_ENCRYPTION_KEY: z.string().optional(),
   SECRETS_ENCRYPTION_KEY_PREVIOUS: z.string().optional(),
-  // Accounting connectors (P2): push a reviewed invoice/receipt to QuickBooks or Xero as a bill.
-  // Each provider is its own gate (client id + secret + the master SECRETS_ENCRYPTION_KEY), so a
-  // deployment can configure one, both, or neither without touching the other's card in the UI.
-  QUICKBOOKS_CLIENT_ID: z.string().optional(),
-  QUICKBOOKS_CLIENT_SECRET: z.string().optional(),
-  // "sandbox" talks to Intuit's sandbox company; "production" to a real one. Sandbox by default so
-  // an unconfigured deployment can never accidentally write a real bill.
-  QUICKBOOKS_ENVIRONMENT: z.enum(["sandbox", "production"]).default("sandbox"),
-  XERO_CLIENT_ID: z.string().optional(),
-  XERO_CLIENT_SECRET: z.string().optional(),
-  // Bigcapital: no OAuth client — every workspace gets an auto-provisioned, isolated organization on
-  // a self-hosted (or hosted) Bigcapital instance, authenticated with a per-org API key instead of a
-  // redirect flow. Defaults to a local self-hosted instance so dev/staging work with zero setup;
-  // production points this at the real deployment.
-  BIGCAPITAL_API_BASE: z.string().url().default("http://localhost:4000"),
-  BIGCAPITAL_WEBAPP_URL: z.string().url().default("http://localhost:4001"),
-  // A deliberate second gate ON TOP OF the master encryption key. Unlike QuickBooks/Xero (each
-  // needing its own client id/secret before it turns on), a bare SECRETS_ENCRYPTION_KEY says
-  // nothing about wanting Bigcapital specifically — plenty of deployments will set it only for
-  // webhooks/API keys. Without this flag, every one of those would silently start signing up real
-  // Bigcapital accounts and provisioning organizations for every new workspace, with no way to opt
-  // out short of disabling the whole integrations surface. Off by default.
-  BIGCAPITAL_ENABLED: z.enum(["true", "false"]).default("false"),
+  // Accounting connectors (P2): push a reviewed invoice/receipt to QuickBooks, Xero or Sage as a
+  // bill. ADR 0005: Nango owns the OAuth app and every provider token — DocuBite never holds
+  // QuickBooks/Xero/Sage client credentials, only Nango's own secret key. One gate for all three
+  // providers (which `providerConfigKey`s Nango has configured on its side is Nango's concern, not
+  // ours); a deployment with no NANGO_SECRET_KEY sees the whole accounting surface dark.
+  NANGO_SECRET_KEY: z.string().optional(),
+  // Verifies the `X-Nango-Signature` header on inbound webhook deliveries (plain SHA-256 HMAC of
+  // the raw body, per Nango's docs — no timestamp field, unlike lib/webhook-signature.ts's own
+  // Stripe-style scheme for DocuBite's outbound webhooks). Distinct from NANGO_SECRET_KEY: Nango
+  // issues webhook signing as its own secret, shown alongside the webhook URL in its dashboard.
+  NANGO_WEBHOOK_SECRET: z.string().optional(),
+  // Nango's own API host; overridable for self-hosted/EU deployments.
+  NANGO_HOST: z.string().url().default("https://api.nango.dev"),
   // Inbound email intake (WP13). Shipped dark on purpose: built and tested against recorded
   // provider fixtures, but with no inbound DNS/provider (Postmark inbound, SES) provisioned yet.
   // The route refuses everything with no secret configured — the same fail-closed shape as
@@ -448,28 +437,13 @@ const config = {
     enabled: Boolean(env.SECRETS_ENCRYPTION_KEY),
     encryptionKey: env.SECRETS_ENCRYPTION_KEY || "",
     encryptionKeyPrevious: env.SECRETS_ENCRYPTION_KEY_PREVIOUS || "",
-    // Accounting connectors. Each `enabled` also requires the master encryption key — without it
-    // there is nowhere safe to store the OAuth tokens, so the card stays hidden even if a client
-    // id/secret pair is set.
-    quickbooks: {
-      enabled: Boolean(env.SECRETS_ENCRYPTION_KEY && env.QUICKBOOKS_CLIENT_ID && env.QUICKBOOKS_CLIENT_SECRET),
-      clientId: env.QUICKBOOKS_CLIENT_ID || "",
-      clientSecret: env.QUICKBOOKS_CLIENT_SECRET || "",
-      environment: env.QUICKBOOKS_ENVIRONMENT,
-    },
-    xero: {
-      enabled: Boolean(env.SECRETS_ENCRYPTION_KEY && env.XERO_CLIENT_ID && env.XERO_CLIENT_SECRET),
-      clientId: env.XERO_CLIENT_ID || "",
-      clientSecret: env.XERO_CLIENT_SECRET || "",
-    },
-    // Bigcapital: no OAuth client id/secret — every workspace gets an auto-provisioned, isolated
-    // organization instead, authenticated with a per-org API key. `enabled` requires BOTH the
-    // master encryption key AND an explicit BIGCAPITAL_ENABLED=true — see that var's comment above
-    // for why the encryption key alone isn't a safe enough signal for this one.
-    bigcapital: {
-      enabled: Boolean(env.SECRETS_ENCRYPTION_KEY) && env.BIGCAPITAL_ENABLED === "true",
-      apiBase: env.BIGCAPITAL_API_BASE.replace(/\/+$/, ""),
-      webappUrl: env.BIGCAPITAL_WEBAPP_URL.replace(/\/+$/, ""),
+    // Accounting connectors (ADR 0005: Nango owns the OAuth app and token for all three). One gate
+    // for the whole surface — no per-provider client id/secret, since DocuBite never holds one.
+    nango: {
+      enabled: Boolean(env.NANGO_SECRET_KEY),
+      secretKey: env.NANGO_SECRET_KEY || "",
+      webhookSecret: env.NANGO_WEBHOOK_SECRET || "",
+      host: env.NANGO_HOST,
     },
   },
 } as const

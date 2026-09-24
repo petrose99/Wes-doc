@@ -3,9 +3,17 @@ import { AlertTriangle } from "lucide-react"
 import type { LedgerBandStatus } from "@/lib/integration-push"
 
 const COPY: Record<LedgerBandStatus, string> = {
-  disconnected: "Ledger disconnected — posts are waiting.",
-  needs_reauth: "Ledger needs reauthorization — posts are waiting.",
-  no_default_account: "Ledger has no default account set — posts are waiting.",
+  disconnected: "No ledger connected — posts are waiting.",
+  needs_reconnect: "Ledger needs reconnecting — posts are waiting.",
+}
+
+/** "disconnected" now also covers the (post-#380) default case of never having had a
+ * connection — "Reconnect" would misstate that, so it gets the same "Connect" label the
+ * Finance/Accounting page's own button uses (#380's one-term rule: connect the ledger,
+ * once, in one word). "needs_reconnect" did have a connection, so "Reconnect" still fits. */
+const LINK_LABEL: Record<LedgerBandStatus, string> = {
+  disconnected: "Connect",
+  needs_reconnect: "Reconnect",
 }
 
 /** #281 spec.md §6: the queue-scoped connection-failure band — same structural family as
@@ -25,7 +33,7 @@ export function ConnectionBand({ status, workspaceId, isOwner }: {
     {isOwner
       ? <Link href={`/workspaces/${workspaceId}/admin/integrations`}
           className="shrink-0 rounded-sm font-medium underline decoration-amber-400 underline-offset-2 hover:text-amber-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-1">
-          Reconnect
+          {LINK_LABEL[status]}
         </Link>
       : <span className="shrink-0 text-amber-700">Ask an owner</span>}
   </div>

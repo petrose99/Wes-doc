@@ -14,15 +14,18 @@ import {
   setWebhookEndpointStatusAction,
 } from "@/app/(app)/workspaces/[workspaceId]/integrations-actions"
 import {
+  confirmSageBusinessAction,
   disconnectIntegrationAction,
   listExpenseAccountsAction,
+  listSageBusinessesAction,
   setDefaultExpenseAccountAction,
   syncAccountingEntitiesAction,
 } from "@/app/(app)/workspaces/[workspaceId]/integration-connection-actions"
-import { getBigcapitalStatusAction, repairBigcapitalConnectionAction } from "@/app/(app)/workspaces/[workspaceId]/accounting-actions"
-import { Check, Copy, Loader2 } from "lucide-react"
+import { NativeSelect } from "@/components/ui/native-select"
+import { Check, Copy, Landmark } from "lucide-react"
+import Nango, { AuthError } from "@nangohq/frontend"
 import { useRouter } from "next/navigation"
-import { useEffect, useRef, useState, useTransition } from "react"
+import { useEffect, useState, useTransition } from "react"
 import { toast } from "sonner"
 
 type ApiKey = { id: string; name: string; keyPrefix: string; lastUsedAt: Date | null; revokedAt: Date | null; createdAt: Date }
@@ -41,8 +44,13 @@ type IntegrationConnection = {
 }
 
 // Kept in sync with lib/finance/actions.ts's copy (that module can't import client components) —
-// this is the only client-side fork; both list the same three providers.
-const PROVIDER_LABELS: Record<string, string> = { quickbooks: "QuickBooks", xero: "Xero", bigcapital: "Bigcapital" }
+// this is the only client-side fork; both list the same providers.
+const PROVIDER_LABELS: Record<string, string> = { quickbooks: "QuickBooks", xero: "Xero", sage: "Sage" }
+const PROVIDER_TILES: { provider: string; description: string; live: boolean }[] = [
+  { provider: "quickbooks", description: "QuickBooks Online", live: true },
+  { provider: "xero", description: "Xero", live: true },
+  { provider: "sage", description: "Sage Business Cloud Accounting", live: false },
+]
 
 /** One connected-provider card: shows tenant/status, a default-expense-account picker (fetched live
  * from the provider on demand — the chart of accounts isn't cached), and Disconnect. */
@@ -56,6 +64,18 @@ function AccountingConnectionCard({ workspaceId, connection, isOwner, onChanged 
   const [accounts, setAccounts] = useState<{ id: string; name: string }[] | null>(null)
   const [loadingAccounts, setLoadingAccounts] = useState(false)
   const [disconnectOpen, setDisconnectOpen] = useState(false)
+
+  // Sage's OAuth grant isn't scoped to one business (ADR 0005): the AUTH webhook creates this row
+  // with externalTenantId null, and the owner picks one here before the connection is usable —
+  // an empty account/sync UI underneath would be misleading until that pick is made.
+  if (connection.provider === "sage" && !connection.externalTenantId) {
+    return (
+      <li className="rounded-md border border-hairline px-3 py-2">
+        <span className="font-medium">{PROVIDER_LABELS[connection.provider] ?? connection.provider}</span>
+        <SageBusinessPicker workspaceId={workspaceId} connectionId={connection.id} onChosen={onChanged} />
+      </li>
+    )
+  }
 
   const loadAccounts = () => {
     setLoadingAccounts(true)
@@ -83,9 +103,9 @@ function AccountingConnectionCard({ workspaceId, connection, isOwner, onChanged 
         <span className="min-w-0 basis-full sm:basis-auto">
           <span className="font-medium">{PROVIDER_LABELS[connection.provider] ?? connection.provider}</span>{" "}
           <span className="text-xs text-slate-600">{connection.tenantName || connection.externalTenantId}</span>
-          {connection.status === "needs_reauth" && <span className="ml-2 text-xs text-red-600">needs reconnect</span>}
+          {connection.status === "needs_reconnect" && <span className="ml-2 text-xs font-medium text-amber-700">needs reconnect</span>}
         </span>
-        {isOwner && connection.status === "active" && (
+        {isOwner && connection.status === "connected" && (
           <Button type="button" size="sm" variant="ghost" disabled={pending}
             onClick={() => startTransition(async () => {
               const res = await syncAccountingEntitiesAction(workspaceId, connection.id)
@@ -95,19 +115,6 @@ function AccountingConnectionCard({ workspaceId, connection, isOwner, onChanged 
             Sync accounts
           </Button>
         )}
-        {/* #329: only Bigcapital has a session/deep-link destination route today
-         * (/api/accounting/session — reused from accounting-dashboard.tsx). QuickBooks/Xero have
-         * none in this codebase yet; adding one for them is separate scope, left as fog. */}
-        {connection.status === "active" && connection.provider === "bigcapital" && (
-          <a
-            className="text-sm font-medium text-emerald-700 hover:underline"
-            href={`/api/accounting/session?workspaceId=${workspaceId}`}
-            target="_blank"
-            rel="noreferrer"
-          >
-            Open in Bigcapital
-          </a>
-        )}
         {isOwner && (
           <Button type="button" size="sm" variant="ghost" disabled={pending}
             onClick={() => setDisconnectOpen(true)}>
@@ -115,12 +122,12 @@ function AccountingConnectionCard({ workspaceId, connection, isOwner, onChanged 
           </Button>
         )}
       </div>
-      {isOwner && connection.status === "active" && (
+      {isOwner && connection.status === "connected" && (
         <p className={connection.lastSyncedAt ? "mt-1 text-xs text-slate-600" : "mt-1 text-xs font-medium text-slate-700"}>
           {connection.lastSyncedAt ? `Accounts last synced ${connection.lastSyncedAt.toLocaleString()}` : "Accounts not yet synced"}
         </p>
       )}
-      {isOwner && connection.status === "active" && (
+      {isOwner && connection.status === "connected" && (
         <div className="mt-2 flex items-center gap-2 text-xs">
           <Label htmlFor={`account-${connection.id}`} className="shrink-0 text-slate-600">Default expense account</Label>
           {accounts === null ? (
@@ -128,25 +135,30 @@ function AccountingConnectionCard({ workspaceId, connection, isOwner, onChanged 
               {connection.defaultExpenseAccountName || (loadingAccounts ? "Loading…" : "Choose account")}
             </Button>
           ) : (
-            <select
+            <NativeSelect
               id={`account-${connection.id}`}
-              className="rounded border px-2 py-1 text-xs"
+              className="h-7 w-auto py-0 text-xs"
               defaultValue={connection.defaultExpenseAccountId ?? ""}
               disabled={pending}
               onChange={(e) => onSelectAccount(e.target.value)}
             >
               <option value="" disabled>Select an account</option>
               {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-            </select>
+            </NativeSelect>
           )}
         </div>
+      )}
+      {isOwner && connection.status === "connected" && !connection.defaultExpenseAccountId && (
+        <p className="mt-1 text-xs font-medium text-amber-700">
+          Set a default expense account so pushed items have somewhere to post.
+        </p>
       )}
       <ConfirmDialog
         open={disconnectOpen}
         destructive
         busy={pending}
         title={`Disconnect ${PROVIDER_LABELS[connection.provider] ?? connection.provider}?`}
-        description="New pushes to this provider will stop. Existing ledger records will not be removed."
+        description="Existing ledger records stay posted. Future pushes stop until you reconnect, and category/account mappings will be forgotten."
         confirmLabel={pending ? "Disconnecting…" : "Disconnect provider"}
         onConfirm={() => startTransition(async () => {
           const res = await disconnectIntegrationAction(workspaceId, connection.id)
@@ -155,6 +167,144 @@ function AccountingConnectionCard({ workspaceId, connection, isOwner, onChanged 
         })}
         onCancel={() => setDisconnectOpen(false)} />
     </li>
+  )
+}
+
+/** Sage's in-page "Choose a business" step (ADR 0005, #383): loads automatically once the card
+ * mounts (the connection already exists — Sage's AUTH webhook fired, it just has no tenant yet),
+ * and treats an empty list as a named dead end with a way out rather than an error. */
+function SageBusinessPicker({ workspaceId, connectionId, onChosen }: {
+  workspaceId: string
+  connectionId: string
+  onChosen: () => void
+}) {
+  const [pending, startTransition] = useTransition()
+  const [businesses, setBusinesses] = useState<{ id: string; name: string }[] | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    listSageBusinessesAction(workspaceId, connectionId).then((res) => {
+      if (cancelled) return
+      if (res.success) setBusinesses(res.data ?? [])
+      else setLoadError(res.error || "Could not load Sage businesses")
+    })
+    return () => { cancelled = true }
+  }, [workspaceId, connectionId])
+
+  const choose = (id: string, name: string) =>
+    startTransition(async () => {
+      const res = await confirmSageBusinessAction(workspaceId, connectionId, id, name)
+      if (res.success) onChosen()
+      else toast.error(res.error || "Could not confirm the business")
+    })
+
+  if (loadError) return <p className="mt-1 text-xs text-red-600">{loadError}</p>
+  if (businesses === null) return <p className="mt-1 text-xs text-slate-600">Loading businesses…</p>
+  if (businesses.length === 0) {
+    return <p className="mt-1 text-xs text-slate-700">No businesses found on this Sage account — create one in Sage first.</p>
+  }
+  return (
+    <div className="mt-1">
+      <p className="text-xs text-slate-600">Choose a business</p>
+      <ul className="mt-1 flex flex-wrap gap-2">
+        {businesses.map((b) => (
+          <li key={b.id}>
+            <Button type="button" size="sm" variant="outline" disabled={pending} onClick={() => choose(b.id, b.name)}>
+              {b.name}
+            </Button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+/** One provider tile's Connect affordance and its handshake states (state inventory from #383's
+ * resolution): popup-blocked and provider-error keep the same button so the owner can retry
+ * in place; a closed-early handshake reverts to idle without an error tone (the owner chose to
+ * back out, that is not a failure). The AUTH webhook, not this promise resolving, is what marks
+ * the connection `connected` — `onConnected` only asks the page to refresh and pick that up. */
+function ProviderConnectTile({ workspaceId, provider, onConnected }: {
+  workspaceId: string
+  provider: string
+  onConnected: () => void
+}) {
+  const label = PROVIDER_LABELS[provider] ?? provider
+  const [phase, setPhase] = useState<"idle" | "connecting" | "popup-blocked" | "error" | "delayed">("idle")
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  const connect = async () => {
+    setPhase("connecting")
+    try {
+      const res = await fetch("/api/integrations/connect-session", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ workspaceId, providerConfigKey: provider }),
+      })
+      if (!res.ok) {
+        setErrorMessage(`${label} couldn't connect — try again or use a different account.`)
+        setPhase("error")
+        return
+      }
+      const { token } = (await res.json()) as { token: string }
+      await new Nango({ connectSessionToken: token }).auth(provider)
+      // Handshake resolved on the provider's side; the AUTH webhook still has to land before the
+      // connection shows as connected, so keep the "connecting" label and let the refresh catch it.
+      onConnected()
+      setTimeout(onConnected, 1500)
+      // If the webhook never lands (dropped, slow, misconfigured), don't leave the tile stuck on
+      // "Connecting…" forever with no way out — after a longer wait, offer a manual recheck instead
+      // of silence. `onConnected`'s router.refresh() will have already unmounted/re-rendered this
+      // tile as connected by then if the webhook did land, so this only fires on the stuck path.
+      setTimeout(() => setPhase((p) => (p === "connecting" ? "delayed" : p)), 12000)
+    } catch (error) {
+      const type = error instanceof AuthError ? error.type : undefined
+      if (type === "blocked_by_browser") {
+        setPhase("popup-blocked")
+      } else if (type === "window_closed") {
+        toast("Connect cancelled")
+        setPhase("idle")
+      } else {
+        setErrorMessage(`${label} couldn't connect — try again or use a different account.`)
+        setPhase("error")
+      }
+    }
+  }
+
+  if (phase === "connecting") return <span className="mt-auto text-xs text-slate-600">Connecting…</span>
+  if (phase === "delayed") {
+    // The provider round-trip finished but the AUTH webhook hasn't landed after a while — give the
+    // owner a way out instead of leaving "Connecting…" up forever with no escape (H1/H9).
+    return (
+      <span className="mt-auto flex flex-col gap-1">
+        <span className="text-xs text-slate-600">Still finishing up — this can take a minute.</span>
+        <Button type="button" variant="link" size="sm" className="h-auto justify-start p-0 text-emerald-700" onClick={onConnected}>
+          Check again
+        </Button>
+      </span>
+    )
+  }
+  if (phase === "popup-blocked") {
+    return (
+      <span className="mt-auto flex flex-col gap-1">
+        <span className="text-xs text-red-600">Connect was blocked — allow pop-ups for this site and try again.</span>
+        <Button type="button" variant="link" size="sm" className="h-auto justify-start p-0 text-emerald-700" onClick={connect}>Try again</Button>
+      </span>
+    )
+  }
+  if (phase === "error") {
+    return (
+      <span className="mt-auto flex flex-col gap-1">
+        <span className="text-xs text-red-600">{errorMessage}</span>
+        <Button type="button" variant="link" size="sm" className="h-auto justify-start p-0 text-emerald-700" onClick={connect}>Try again</Button>
+      </span>
+    )
+  }
+  return (
+    <Button type="button" variant="link" size="sm" className="mt-auto h-auto justify-start p-0 text-emerald-700" onClick={connect}>
+      Connect
+    </Button>
   )
 }
 
@@ -186,103 +336,8 @@ function SecretReveal({ label, value, onDone }: { label: string; value: string; 
   )
 }
 
-/** Bigcapital's not-connected/needs-reconnect row: no OAuth redirect exists for it (it provisions
- * via a background job, not a redirect), so Connect/Reconnect call `repairBigcapitalConnectionAction`
- * directly and then poll `getBigcapitalStatusAction` for the job to resolve, rather than navigating
- * away like QuickBooks/Xero do. Polling stops on unmount, on a connection appearing, or after ~15
- * attempts (30s) — spec.md §1 state 2, B5. */
-function BigcapitalRow({ workspaceId, isOwner, initialJob, onChanged }: {
-  workspaceId: string
-  isOwner: boolean
-  // Read fresh on page load (server component) so a reload lands correctly in Authorising… without
-  // needing the client poll to have survived — spec.md §1 state 2/3, "tab closed and reopened".
-  initialJob: { status: string; errorCode: string | null } | null
-  onChanged: () => void
-}) {
-  const [authorising, setAuthorising] = useState(initialJob?.status === "pending")
-  // A job exists but didn't resolve to a connection (error/failed) — same "not_started" collapse
-  // as a fresh workspace, just with the reconnect label per preflight's states table.
-  const needsReconnect = Boolean(initialJob) && initialJob?.status !== "pending"
-  const [pending, setPending] = useState(false)
-  const pollAttempts = useRef(0)
-  const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  useEffect(() => {
-    if (initialJob?.status === "pending") poll()
-    return () => { if (pollTimer.current) clearTimeout(pollTimer.current) }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  const poll = () => {
-    pollTimer.current = setTimeout(async () => {
-      pollAttempts.current += 1
-      const { connection, job } = await getBigcapitalStatusAction(workspaceId)
-      if (connection) {
-        setAuthorising(false)
-        onChanged()
-        return
-      }
-      if (job?.status && job.status !== "pending") {
-        setAuthorising(false)
-        toast.error(`Could not connect Bigcapital — ${job.errorCode ? job.errorCode.replaceAll("_", " ") : "unknown error"}`)
-        onChanged()
-        return
-      }
-      if (pollAttempts.current >= 15) {
-        setAuthorising(false)
-        toast.error("Couldn't confirm the connection — refresh to check")
-        return
-      }
-      poll()
-    }, 2000)
-  }
-
-  const connect = () => {
-    setPending(true)
-    ;(async () => {
-      const res = await repairBigcapitalConnectionAction(workspaceId)
-      setPending(false)
-      if (res.success) {
-        pollAttempts.current = 0
-        setAuthorising(true)
-        poll()
-      } else {
-        toast.error(res.error || "Could not connect Bigcapital")
-      }
-    })()
-  }
-
-  if (authorising) {
-    return (
-      <li className="flex items-center justify-between rounded-md border border-hairline px-3 py-2">
-        <span className="font-medium">{PROVIDER_LABELS.bigcapital}</span>
-        <span role="status" aria-live="polite" className="flex items-center gap-1.5 text-xs text-slate-600">
-          <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-          Authorising…
-        </span>
-      </li>
-    )
-  }
-
-  return (
-    <li className="flex items-center justify-between rounded-md border border-hairline px-3 py-2">
-      <span className="min-w-0">
-        <span className="font-medium">{PROVIDER_LABELS.bigcapital}</span>
-        {needsReconnect && <span className="ml-2 text-xs text-red-600">needs reconnect</span>}
-      </span>
-      {isOwner ? (
-        <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={connect}>
-          {needsReconnect ? "Reconnect" : "Connect"}
-        </Button>
-      ) : (
-        <span className="text-xs text-slate-600">{needsReconnect ? "Bigcapital · needs reconnect" : "Not connected"}</span>
-      )}
-    </li>
-  )
-}
-
 export function IntegrationsManager({
-  workspaceId, isOwner, eventTypes, apiKeys, endpoints, deliveries, accountingProviders, connections, bigcapitalJob,
+  workspaceId, isOwner, eventTypes, apiKeys, endpoints, deliveries, nangoEnabled, connections,
 }: {
   workspaceId: string
   isOwner: boolean
@@ -290,11 +345,8 @@ export function IntegrationsManager({
   apiKeys: ApiKey[]
   endpoints: Endpoint[]
   deliveries: Delivery[]
-  accountingProviders: { quickbooks: boolean; xero: boolean; bigcapital: boolean }
+  nangoEnabled: boolean
   connections: IntegrationConnection[]
-  // Only meaningful when there's no bigcapital connection yet — a pending/failed provisioning job,
-  // read fresh on page load. See BigcapitalRow.
-  bigcapitalJob: { status: string; errorCode: string | null } | null
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
@@ -317,7 +369,7 @@ export function IntegrationsManager({
     setSelectedEvents((prev) => (prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]))
 
   const connectionsByProvider = new Map(connections.map((c) => [c.provider, c]))
-  const anyProviderConfigured = accountingProviders.quickbooks || accountingProviders.xero || accountingProviders.bigcapital
+  const anyProviderConfigured = nangoEnabled
   const hasAnyConnection = connections.length > 0
 
   return (
@@ -330,54 +382,47 @@ export function IntegrationsManager({
             <CardDescription>
               {hasAnyConnection
                 ? "Push a reviewed invoice or receipt as a bill to your connected system."
-                : "Connect QuickBooks, Xero or Bigcapital to push a reviewed invoice or receipt as a bill. Already use one of these to run your books? Pick that one — DocuBite posts to whichever you connect, nothing changes which system stays your ledger of record."}
+                : "Connect QuickBooks or Xero to push a reviewed invoice or receipt as a bill. Already use one of these to run your books? Pick that one — DocuBite posts to whichever you connect, nothing changes which system stays your ledger of record."}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <ul className="space-y-2 text-sm">
-              {(["quickbooks", "xero", "bigcapital"] as const)
-                .filter((provider) => accountingProviders[provider])
-                .map((provider) => {
-                  const connection = connectionsByProvider.get(provider)
-                  if (connection) {
-                    return (
-                      <AccountingConnectionCard
-                        key={provider}
-                        workspaceId={workspaceId}
-                        connection={connection}
-                        isOwner={isOwner}
-                        onChanged={() => router.refresh()}
-                      />
-                    )
-                  }
-                  if (provider === "bigcapital") {
-                    return (
-                      <BigcapitalRow
-                        key={provider}
-                        workspaceId={workspaceId}
-                        isOwner={isOwner}
-                        initialJob={bigcapitalJob}
-                        onChanged={() => router.refresh()}
-                      />
-                    )
-                  }
-                  return (
-                    <li key={provider} className="flex items-center justify-between rounded-md border border-hairline px-3 py-2">
-                      <span className="font-medium">{PROVIDER_LABELS[provider]}</span>
-                      {isOwner ? (
-                        <a
-                          className="text-sm font-medium text-emerald-700 hover:underline"
-                          href={`/api/integrations/${provider}/connect?workspaceId=${workspaceId}`}
-                        >
-                          Connect
-                        </a>
+            {hasAnyConnection ? (
+              <ul className="space-y-2 text-sm">
+                {(["quickbooks", "xero", "sage"] as const)
+                  .filter((provider) => connectionsByProvider.has(provider))
+                  .map((provider) => (
+                    <AccountingConnectionCard
+                      key={provider}
+                      workspaceId={workspaceId}
+                      connection={connectionsByProvider.get(provider)!}
+                      isOwner={isOwner}
+                      onChanged={() => router.refresh()}
+                    />
+                  ))}
+              </ul>
+            ) : (
+              <ul className="grid gap-3 sm:grid-cols-3">
+                {PROVIDER_TILES.map(({ provider, description, live }) => (
+                  <li
+                    key={provider}
+                    className={`flex flex-col gap-2 rounded-md border border-hairline p-4 ${live ? "" : "opacity-60"}`}
+                  >
+                    <Landmark className="h-5 w-5 text-slate-500" aria-hidden />
+                    <span className="font-medium">{PROVIDER_LABELS[provider]}</span>
+                    <span className="text-xs text-slate-600">{description}</span>
+                    {live ? (
+                      isOwner ? (
+                        <ProviderConnectTile workspaceId={workspaceId} provider={provider} onConnected={() => router.refresh()} />
                       ) : (
-                        <span className="text-xs text-slate-600">Not connected</span>
-                      )}
-                    </li>
-                  )
-                })}
-            </ul>
+                        <span className="mt-auto text-xs text-slate-600">Not connected</span>
+                      )
+                    ) : (
+                      <span className="mt-auto text-xs text-slate-500">Coming soon</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
           </CardContent>
         </Card>
       )}

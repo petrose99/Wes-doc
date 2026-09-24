@@ -52,7 +52,7 @@ export const SOLUTIONS: Solution[] = [
     icon: Users,
     title: "The workspace-per-client AP your bookkeeping practice already runs on",
     description: "Each client gets their own workspace with its own inbound email address, its own supplier registry, its own approval workflows, and its own ledger connection. Suppliers email invoices straight in — you review, approve, and push, without lifting them out of Outlook first.",
-    fields: ["Per-client workspace + inbound email", "Per-client supplier registry + payment terms", "Per-client approval workflows", "Per-client ledger connection (QuickBooks / Xero / Bigcapital)", "Programmatic API for practice integrations"],
+    fields: ["Per-client workspace + inbound email", "Per-client supplier registry + payment terms", "Per-client approval workflows", "Per-client ledger connection (QuickBooks / Xero)", "Programmatic API for practice integrations"],
     points: [
       { title: "Client-scoped inbound email", text: "<token>@inbound.docubite.app per workspace, allowlisted to the client's real senders. Nothing else gets in. Your practice inbox stops being an unfiled AP queue." },
       { title: "The AP loop, per client", text: "Same coding, checks, matching, approvals and sync — configured per client so a small trader gets a plain workflow and a growing SME gets thresholded approvals. Change one client's rules without touching anyone else's." },
