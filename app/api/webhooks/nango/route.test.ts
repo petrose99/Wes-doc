@@ -22,6 +22,9 @@ vi.mock("@/models/integrations", () => ({
 const resolveOwnerRecipients = vi.fn().mockResolvedValue(["owner@x.com"])
 vi.mock("@/models/reminders", () => ({ resolveOwnerRecipients: (...args: unknown[]) => resolveOwnerRecipients(...args) }))
 
+const syncAccountingEntities = vi.fn().mockResolvedValue(undefined)
+vi.mock("@/lib/integrations/sync", () => ({ syncAccountingEntities: (...args: unknown[]) => syncAccountingEntities(...args) }))
+
 const { POST } = await import("@/app/api/webhooks/nango/route")
 
 function webhookRequest(body: unknown) {
@@ -38,6 +41,7 @@ beforeEach(() => {
   getConnectionConfig.mockResolvedValue({})
   markIntegrationConnectionNeedsReconnect.mockResolvedValue(null)
   resolveOwnerRecipients.mockResolvedValue(["owner@x.com"])
+  syncAccountingEntities.mockResolvedValue(undefined)
 })
 
 describe("POST /api/webhooks/nango", () => {
@@ -66,9 +70,12 @@ describe("POST /api/webhooks/nango", () => {
       connectionId: "conn-1", workspaceId: "ws-1", provider: "quickbooks", providerConfigKey: "quickbooks",
       externalTenantId: "realm-1", tenantName: "Acme", createdById: null,
     })
+    // #429: chart sync (and the Default-account guess) fires right after a successful creation
+    // once a tenant is known.
+    expect(syncAccountingEntities).toHaveBeenCalledWith("conn-1")
   })
 
-  it("skips the connection_config lookup for sage, which has no tenant field", async () => {
+  it("skips the connection_config lookup for sage, which has no tenant field, and does not sync yet (#429)", async () => {
     await POST(webhookRequest({
       type: "auth", operation: "creation", success: true,
       connectionId: "conn-2", providerConfigKey: "sage",
@@ -76,6 +83,19 @@ describe("POST /api/webhooks/nango", () => {
     }))
     expect(getConnectionConfig).not.toHaveBeenCalled()
     expect(createIntegrationConnectionFromNango).toHaveBeenCalledWith(expect.objectContaining({ externalTenantId: null, tenantName: null }))
+    // Sage has no tenant at this point (ADR 0005) — its sync happens off confirmSageBusinessAction.
+    expect(syncAccountingEntities).not.toHaveBeenCalled()
+  })
+
+  it("still returns ok when the chart sync fails (#429) — the connection is validly created either way", async () => {
+    getConnectionConfig.mockResolvedValue({ realmId: "realm-1", tenantName: "Acme" })
+    syncAccountingEntities.mockRejectedValue(new Error("provider_unavailable"))
+    const response = await POST(webhookRequest({
+      type: "auth", operation: "creation", success: true,
+      connectionId: "conn-1", providerConfigKey: "quickbooks",
+      endUser: { endUserId: "ws-1" },
+    }))
+    expect(response.status).toBe(200)
   })
 
   it("rejects a creation with no endUserId", async () => {

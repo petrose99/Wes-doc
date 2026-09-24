@@ -25,7 +25,15 @@ describe("normalizeBillFromDocument", () => {
     expect(bill.dueDate).toBe("2026-08-31")
     expect(bill.total).toBe(42.5)
     expect(bill.lineItems).toHaveLength(2)
-    expect(bill.lineItems[0]).toEqual({ description: "Widget", quantity: 2, unitPrice: 20, amount: 40 })
+    expect(bill.lineItems[0]).toEqual({ description: "Widget", quantity: 2, unitPrice: 20, amount: 40, accountExternalId: null })
+  })
+
+  it("threads codingData.items[i].account_external_id onto the matching line, by index (#429)", () => {
+    const bill = normalizeBillFromDocument(makeDoc({
+      lineAccounts: [{ account_external_id: "acc-widget" }, { account_external_id: "acc-tax" }],
+    }))
+    expect(bill.lineItems[0].accountExternalId).toBe("acc-widget")
+    expect(bill.lineItems[1].accountExternalId).toBe("acc-tax")
   })
 
   it("reads merchant/receipt fields for a receipt, with no due date", () => {
@@ -41,12 +49,12 @@ describe("normalizeBillFromDocument", () => {
 
   it("synthesizes one line item covering the total when line_items is empty", () => {
     const bill = normalizeBillFromDocument(makeDoc({ reviewedData: { vendor: "Acme", total: 99, line_items: [] } }))
-    expect(bill.lineItems).toEqual([{ description: "Total", quantity: 1, unitPrice: 99, amount: 99 }])
+    expect(bill.lineItems).toEqual([{ description: "Total", quantity: 1, unitPrice: 99, amount: 99, accountExternalId: null }])
   })
 
   it("synthesizes one line item when line_items is missing entirely", () => {
     const bill = normalizeBillFromDocument(makeDoc({ reviewedData: { vendor: "Acme", total: 50 } }))
-    expect(bill.lineItems).toEqual([{ description: "Total", quantity: 1, unitPrice: 50, amount: 50 }])
+    expect(bill.lineItems).toEqual([{ description: "Total", quantity: 1, unitPrice: 50, amount: 50, accountExternalId: null }])
   })
 
   it("falls back to 'Unknown vendor' when no vendor/merchant is present", () => {

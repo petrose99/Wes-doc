@@ -3,6 +3,7 @@ import { getConnectionConfig, verifyWebhookSignature } from "@/lib/nango"
 import { sendReminderEmail } from "@/lib/email"
 import { createIntegrationConnectionFromNango, markIntegrationConnectionNeedsReconnect } from "@/models/integrations"
 import { resolveOwnerRecipients } from "@/models/reminders"
+import { syncAccountingEntities } from "@/lib/integrations/sync"
 
 /** ADR 0005 step 3: the one authoritative signal for a connection's `connected`/`needs_reconnect`
  * state — DocuBite never marks itself connected off the frontend's resolved promise (#379). Nango
@@ -92,6 +93,19 @@ export async function POST(request: Request): Promise<Response> {
       tenantName,
       createdById: null,
     })
+    // #429: chart sync (and the Default-account guess it drives) right after Nango reports
+    // success — Sage has no tenant yet at this point (ADR 0005), so its sync happens off
+    // confirmSageBusinessAction instead, once a business is chosen. A sync failure here must not
+    // fail the webhook: the connection is still validly created, and the Default row's surface
+    // shows the retry state (spec "Backend changes" point 1) rather than the webhook 500ing and
+    // Nango redelivering a creation that already happened.
+    if (externalTenantId) {
+      try {
+        await syncAccountingEntities(connectionId)
+      } catch {
+        // left for the Default row's retry state; nothing else to do with a webhook response.
+      }
+    }
     return new Response("ok", { status: 200 })
   }
 

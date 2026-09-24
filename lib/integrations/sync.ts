@@ -1,17 +1,22 @@
 import { prisma } from "@/lib/db"
 import * as quickbooks from "@/lib/integrations/quickbooks/client"
 import * as xero from "@/lib/integrations/xero/client"
+import { guessQuickBooksDefaultAccount } from "@/lib/integrations/quickbooks/default-account-guess"
+import { guessXeroDefaultAccount } from "@/lib/integrations/xero/default-account-guess"
 import { Prisma } from "@/prisma/client"
 
 /** WP1.5: pulls the chart of accounts, vendor list, and tax rates from the connection's provider
  * and upserts them as AccountingEntity rows — the local cache the rules UI's account picker
  * (WP1.6) reads from, so it never needs a live provider round-trip on page render. Any row from a
  * prior sync that the provider no longer returns is marked inactive rather than deleted: a rule
- * already pointing at a retired account should keep showing what it points at, not go blank. */
+ * already pointing at a retired account should keep showing what it points at, not go blank.
+ * #429: also guesses the connection's Default expense account off the freshly-synced chart, but
+ * only while `defaultExpenseAccountGuessed` is still true — once an Owner has confirmed a Default
+ * (or a post has), a re-sync must not silently swap it out from under them. */
 export async function syncAccountingEntities(connectionId: string): Promise<void> {
   const connection = await prisma.integrationConnection.findUniqueOrThrow({
     where: { id: connectionId },
-    select: { id: true, workspaceId: true, provider: true, externalTenantId: true },
+    select: { id: true, workspaceId: true, provider: true, externalTenantId: true, defaultExpenseAccountGuessed: true },
   })
   if (!connection.externalTenantId) throw new Error("integration_connection_not_ready")
 
@@ -33,6 +38,27 @@ export async function syncAccountingEntities(connectionId: string): Promise<void
       data: { active: false },
     }),
   ])
+
+  if (connection.defaultExpenseAccountGuessed) {
+    const guess = guessDefaultAccount(connection.provider, rows)
+    if (guess) {
+      await prisma.integrationConnection.update({
+        where: { id: connection.id },
+        data: { defaultExpenseAccountId: guess.externalId, defaultExpenseAccountName: guess.name, defaultExpenseAccountGuessed: true },
+      })
+    }
+  }
+}
+
+function guessDefaultAccount(provider: string, rows: SyncRow[]): SyncRow | null {
+  switch (provider) {
+    case "quickbooks":
+      return guessQuickBooksDefaultAccount(rows)
+    case "xero":
+      return guessXeroDefaultAccount(rows)
+    default:
+      return null
+  }
 }
 
 type SyncRow = { entityType: "account" | "vendor" | "tax_rate"; externalId: string; code: string | null; name: string; active: boolean; raw: unknown }

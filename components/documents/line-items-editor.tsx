@@ -1,19 +1,118 @@
 "use client"
 
 import type { DocumentItemFieldDefinition } from "@/lib/document-templates"
+import { formatUnresolvedAccountId, type LineAccountRow } from "@/lib/finance/line-account-resolution"
+import type { AccountOption } from "@/models/documents"
 import type { Ref } from "@/lib/provenance"
 import type { LineMatch } from "@/lib/matching/line-match"
 import { CheckGlyph, RationalePopover } from "@/components/pipeline/document-detail/rationale-popover"
 import type { FieldCheck } from "@/components/pipeline/document-detail/check-types"
 import { Breakdown, breakdownFor, formatAmount, formatQuantity, LineStatusPill, MatchGlyph, type BreakdownCell } from "@/components/documents/po-compare"
-import { Crosshair, Plus, Trash2 } from "lucide-react"
+import { checkDocumentAccountCorrectableAction, updateDocumentLineAccountsAction, type AccountCorrectionRefusal } from "@/app/(app)/workspaces/[workspaceId]/account-correction-actions"
+import { Crosshair, Loader2, Plus, Trash2 } from "lucide-react"
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 
-/** #362 §2: the read-only ledger-account chip — always "—" until #356 wires a derived/coded
- * account onto the line. A plain `<span>`, never a button: clicking it is #356's job, and B1
- * forbids shipping a dead control before that lands. */
+/** #430 §Screen 2: the refusal-reason sentence, the same plain-words vocabulary as Screen 1's
+ * dialog rows (`components/integrations/account-correction-dialog.tsx`) — one copy source, read
+ * here and there, never re-derived. */
+function accountCorrectionRefusalSentence(refusal: AccountCorrectionRefusal): string {
+  if (refusal.code === "book_closed") return `Books closed for this period — update in ${refusal.provider} directly.`
+  if (refusal.code === "period_locked") return `Locked period in ${refusal.provider} — update in ${refusal.provider} directly.`
+  if (refusal.code === "paid") return `Paid in ${refusal.provider} — this line can't be changed through DocuBite.`
+  if (refusal.code === "voided") return `Voided in ${refusal.provider} — this line can't be changed through DocuBite.`
+  return `Could not find this bill in ${refusal.provider}.`
+}
+
+/** #362 §2 / #429: the read-only ledger-account chip — still used for Class/Customer:Job (no
+ * capability to derive those from yet) and as the pre-#429/unconnected fallback for Account
+ * itself. A plain `<span>`, never a button: nothing here writes a class/job onto the line. */
 function LedgerAccountChip({ label }: { label: string | null }) {
   return <span className="inline-flex max-w-full items-center truncate rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-600">{label ?? "—"}</span>
+}
+
+/** #429: the per-line Account cell — spec §A. A native `<select>` (the spec's own wording),
+ * pre-selected to the line's resolved account, with the provenance sentence in words underneath
+ * (never a badge alone) and, pre-approval, the "becomes the usual account" hint. Disabled: the
+ * account chain resolves automatically per document (one account for every line,
+ * `lib/finance/line-account-resolution.ts`'s documented scope) and this ticket's backend added no
+ * per-line override write path — an enabled control with nothing to submit it to is exactly the
+ * dead control `LedgerAccountChip`'s old comment (B1) warned against shipping. Changing the
+ * account is the Accounting page's Default editor (spec §B/§C), not this cell. */
+function LineAccountCell({ row, accountOptions, supplierRuleAccountId, providerName, supplierName, approved, editable = false, pendingValue, onChange, locked = null }: {
+  row: LineAccountRow | null
+  accountOptions: AccountOption[]
+  supplierRuleAccountId: string | null
+  providerName: string | null
+  supplierName: string | null
+  approved: boolean
+  /** #430 §Screen 2: on a posted/paid bill's line, the Account cell is the one editable field —
+   * everything else in this pane stays read-only (spec: "keeps only the Account field editable per
+   * line"). `false` (the pre-#430 default) keeps the disabled chip-select every other caller and
+   * every other field in this row still uses. */
+  editable?: boolean
+  /** The person's not-yet-saved pick for this line, or `undefined` when unchanged. */
+  pendingValue?: string
+  onChange?: (value: string) => void
+  /** #430 §Screen 2 "locked" state: the provider pre-check already knows this bill can't be
+   * changed (books closed / paid / voided) — the Account control itself disables with the reason,
+   * before the person tries and fails. */
+  locked?: AccountCorrectionRefusal | null
+}) {
+  if (!row) return <LedgerAccountChip label={null} />
+  const accountId = row.account_external_id
+  // #430 fix: the previous fallback-option check was gated on a lookup that could only be truthy
+  // when the account was *already* found in accountOptions — exactly the case it doesn't need to
+  // handle. That made the injected <option> dead code: whenever the coded account was missing
+  // from the synced chart (archived, or dropped from the provider), the select silently fell
+  // back to "— No account —" and the bill's real coded account vanished from view. Inject
+  // directly off `accountId`; label with the id itself when no synced name is available, rather
+  // than showing nothing.
+  const missingAccountOption = accountId && !accountOptions.some((option) => option.externalId === accountId) ? accountId : null
+  const optionLabel = (option: AccountOption) => (option.code ? `${option.code} — ${option.name}` : option.name)
+  const supplier = supplierName?.trim() || "This supplier"
+  let provenance: string
+  if (!accountId) {
+    provenance = "No account — needs an Account"
+  } else if (row.account_source === "supplier") {
+    provenance = `${supplier}'s usual`
+  } else if (row.account_archived_fallback) {
+    provenance = `Default · ${supplier}'s usual is archived${providerName ? ` in ${providerName}` : ""}`
+  } else if (row.account_source === "default_guessed") {
+    provenance = "Default · guessed"
+  } else if (row.account_source === "default_confirmed") {
+    provenance = "Default"
+  } else {
+    provenance = "Account"
+  }
+  // #429 spec §A: shown only pre-approval, only when this line's account would change what
+  // `learnSupplierAccountRuleFromApproval` (models/documents.ts) writes for this vendor.
+  const showHint = !approved && !!accountId && accountId !== supplierRuleAccountId
+  if (editable) {
+    const selected = pendingValue ?? accountId ?? ""
+    const dirty = pendingValue !== undefined && pendingValue !== (accountId ?? "")
+    return <div className="min-w-0 space-y-0.5">
+      <select disabled={!!locked} value={selected} onChange={(event) => onChange?.(event.target.value)}
+        aria-label={`Account${dirty ? " (unsaved)" : ""}`}
+        aria-readonly={!!locked}
+        className={`w-full min-w-0 truncate rounded-md border bg-white px-2 py-1 text-xs font-medium text-slate-800 focus:outline-none focus:ring-1 focus:ring-inset focus:ring-emerald-500 disabled:cursor-default disabled:bg-slate-50 disabled:text-slate-600 disabled:opacity-100 ${dirty ? "border-amber-400" : "border-slate-200"}`}>
+        <option value="">— No account —</option>
+        {missingAccountOption && <option value={missingAccountOption}>{formatUnresolvedAccountId(missingAccountOption)}</option>}
+        {accountOptions.map((option) => <option key={option.externalId} value={option.externalId}>{optionLabel(option)}</option>)}
+      </select>
+      {locked ? <p className="text-[11px] font-medium text-red-700">{accountCorrectionRefusalSentence(locked)}</p>
+        : <p className={`truncate text-[11px] ${!accountId ? "font-medium text-red-700" : "text-slate-500"}`}>{provenance}</p>}
+    </div>
+  }
+  return <div className="min-w-0 space-y-0.5">
+    <select disabled value={accountId ?? ""} aria-label="Account"
+      className="w-full min-w-0 truncate rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-600 disabled:cursor-default disabled:opacity-100">
+      <option value="">— No account —</option>
+      {missingAccountOption && <option value={missingAccountOption}>{formatUnresolvedAccountId(missingAccountOption)}</option>}
+      {accountOptions.map((option) => <option key={option.externalId} value={option.externalId}>{optionLabel(option)}</option>)}
+    </select>
+    <p className={`truncate text-[11px] ${!accountId ? "font-medium text-red-700" : "text-slate-500"}`}>{provenance}</p>
+    {showHint && <p className="text-[11px] text-emerald-700">Becomes {supplier}&rsquo;s usual when approved</p>}
+  </div>
 }
 
 // #362 §5: Class/Customer:Job columns reuse `LedgerAccountChip` directly (same inert-span
@@ -36,7 +135,24 @@ function PoLineMatchChip({ state }: { state: PoLineMatchState }) {
 /** #362 §2: the Bill-only footer — a pure function of the `amount` column already in memory
  * (B2: no round trip), checked against the document's own extracted total. Optional so every
  * other `LineItemsEditor` caller (Receipts, generic FieldRow) is unaffected. */
-export type BillLineItemsTotals = { extractedTotal: number | null; currency: string | null }
+export type BillLineItemsTotals = {
+  extractedTotal: number | null
+  currency: string | null
+  /** #429: per-line resolved accounts (`codingData.items`), in row order — `null`/absent renders
+   * the pre-#429 empty chip (unconnected workspace, or a document not yet coded). */
+  accounts?: LineAccountRow[] | null
+  accountOptions?: AccountOption[]
+  supplierRuleAccountId?: string | null
+  providerName?: string | null
+  supplierName?: string | null
+  approved?: boolean
+  /** #430 §Screen 2: `posted`/`paid` turns the Account cell into the single editable field on an
+   * otherwise-locked row (spec: "on a document whose ledger fact is posted or paid"). `null`/absent
+   * (not yet pushed, or unconnected) keeps every line at #429's disabled chip-select. */
+  ledgerFact?: "posted" | "paid" | null
+  workspaceId?: string
+  documentId?: string
+}
 
 type Row = { id: number; values: Record<string, unknown> }
 
@@ -138,6 +254,36 @@ export function LineItemsEditor({ fieldKey, itemFields, initialRows, provenanceI
   const [amounts, setAmounts] = useState<Record<number, number>>(() => Object.fromEntries(rows.map((row) => [row.id, parseAmount(row.values.amount)])))
   const footerTotal = bill ? Object.values(amounts).reduce((sum, n) => sum + n, 0) : null
   const mismatch = bill && bill.extractedTotal !== null && footerTotal !== null && Math.abs(footerTotal - bill.extractedTotal) > 0.005
+
+  // #430 §Screen 2: the single-row Account-only edit on a Posted/Paid bill. Pending picks live
+  // here (keyed by row index, not id — the account rows array is index-aligned) until "Update in
+  // {Provider}" resends the bill; `refusal` is set either by the mount-time pre-check (before the
+  // person tries) or by the update action's own `status: "refused"` answer (the ledger's own
+  // write-time refusal — spec's "write-time refusal gets the same treatment").
+  const [pendingAccounts, setPendingAccounts] = useState<Map<number, string>>(new Map())
+  const [updateState, setUpdateState] = useState<"idle" | "loading">("idle")
+  const [updateError, setUpdateError] = useState<string | null>(null)
+  const [refusal, setRefusal] = useState<AccountCorrectionRefusal | null>(null)
+  useEffect(() => {
+    if (!bill?.ledgerFact || !bill.workspaceId || !bill.documentId) return
+    let cancelled = false
+    checkDocumentAccountCorrectableAction(bill.workspaceId, bill.documentId).then((result) => {
+      if (!cancelled && result.success) setRefusal(result.data ?? null)
+    })
+    return () => { cancelled = true }
+  }, [bill?.ledgerFact, bill?.workspaceId, bill?.documentId])
+  const setPendingAccount = (index: number, value: string) => setPendingAccounts((current) => { const next = new Map(current); next.set(index, value); return next })
+  const submitAccountUpdate = async () => {
+    if (!bill?.workspaceId || !bill?.documentId || pendingAccounts.size === 0) return
+    setUpdateState("loading")
+    setUpdateError(null)
+    const changes = [...pendingAccounts].map(([index, newAccountExternalId]) => ({ index, newAccountExternalId }))
+    const result = await updateDocumentLineAccountsAction(bill.workspaceId, bill.documentId, changes)
+    setUpdateState("idle")
+    if (!result.success || !result.data) { setUpdateError(result.error ?? "Could not update this bill"); return }
+    if (result.data.status === "refused") { setRefusal(result.data.reason); return }
+    setPendingAccounts(new Map())
+  }
 
   const addRow = () => setRows((current) => [...current, { id: (current.at(-1)?.id ?? -1) + 1, values: {} }])
   const removeRow = (id: number) => {
@@ -265,6 +411,28 @@ export function LineItemsEditor({ fieldKey, itemFields, initialRows, provenanceI
     <span className="tabular-nums font-medium text-slate-700">{formatAmount(footerTotal, bill.currency)}</span>
   </div>
 
+  // #430 §Screen 2: appears only once a person has picked a different Account on a Posted/Paid
+  // line (`pendingAccounts.size > 0`) — the control that resends the bill, spec line 138's "only
+  // the account changes; amounts and VAT stay as posted" reassurance underneath it.
+  const providerLabel = bill?.providerName || "the ledger"
+  const accountUpdateBar = bill?.ledgerFact && pendingAccounts.size > 0 && <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-emerald-200 bg-emerald-50/60 px-2.5 py-1.5 text-xs">
+    <div className="min-w-0">
+      <p className="font-medium text-emerald-900">Only the account changes; amounts and VAT stay as posted.</p>
+      {updateError && <p role="alert" className="mt-0.5 text-red-700">{updateError} <button type="button" onClick={submitAccountUpdate} className="font-medium underline underline-offset-2 hover:no-underline">Retry</button></p>}
+    </div>
+    <div className="flex items-center gap-1.5">
+      <button type="button" onClick={() => { setPendingAccounts(new Map()); setUpdateError(null) }} disabled={updateState === "loading"}
+        className="inline-flex min-h-8 items-center rounded-md border border-slate-300 bg-white px-3 text-xs font-medium text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 disabled:opacity-60">
+        Discard changes
+      </button>
+      <button type="button" onClick={submitAccountUpdate} disabled={updateState === "loading"}
+        className="inline-flex min-h-8 items-center gap-1 rounded-md bg-emerald-700 px-3 text-xs font-semibold text-white hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-1 disabled:opacity-60">
+        {updateState === "loading" && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
+        Update in {providerLabel}
+      </button>
+    </div>
+  </div>
+
   // No overflow-hidden on the frame: the check popover and the hidden descriptions live inside
   // the cells, and a ring draws the frame so the table sits flush with no border to inset from.
   if (!wide) {
@@ -287,7 +455,7 @@ export function LineItemsEditor({ fieldKey, itemFields, initialRows, provenanceI
             </div>
             {bill && <div className="flex flex-wrap items-center gap-1.5 px-2">
               <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Account</span>
-              <LedgerAccountChip label={null} />
+              <LineAccountCell row={bill?.accounts?.[index] ?? null} accountOptions={bill?.accountOptions ?? []} supplierRuleAccountId={bill?.supplierRuleAccountId ?? null} providerName={bill?.providerName ?? null} supplierName={bill?.supplierName ?? null} approved={bill?.approved ?? false} editable={!!bill?.ledgerFact} pendingValue={pendingAccounts.get(index)} onChange={(value) => setPendingAccount(index, value)} locked={refusal} />
               <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">PO match</span>
               <PoLineMatchChip state="none" />
             </div>}
@@ -306,6 +474,7 @@ export function LineItemsEditor({ fieldKey, itemFields, initialRows, provenanceI
       </ul>
       {addRowButton}
       {billFooter}
+      {accountUpdateBar}
     </div>
   }
 
@@ -338,7 +507,7 @@ export function LineItemsEditor({ fieldKey, itemFields, initialRows, provenanceI
           const line = lineByRow.get(index) ?? null
           return <tr key={row.id} className="group even:bg-slate-50/50 hover:bg-emerald-50/40">
             {columns.map((item) => <td key={item.key} className="border-b border-slate-100 p-0 align-top">{renderCell(row, index, item, line)}</td>)}
-            {bill && <td className="border-b border-slate-100 px-2 py-1.5 align-top"><LedgerAccountChip label={null} /></td>}
+            {bill && <td className="border-b border-slate-100 px-2 py-1.5 align-top"><LineAccountCell row={bill?.accounts?.[index] ?? null} accountOptions={bill?.accountOptions ?? []} supplierRuleAccountId={bill?.supplierRuleAccountId ?? null} providerName={bill?.providerName ?? null} supplierName={bill?.supplierName ?? null} approved={bill?.approved ?? false} editable={!!bill?.ledgerFact} pendingValue={pendingAccounts.get(index)} onChange={(value) => setPendingAccount(index, value)} locked={refusal} /></td>}
             {bill && <td className="border-b border-slate-100 px-2 py-1.5 align-top"><PoLineMatchChip state="none" /></td>}
             {bill && classJob && <td className="border-b border-slate-100 px-2 py-1.5 align-top"><LedgerAccountChip label={null} /></td>}
             {bill && classJob && <td className="border-b border-slate-100 px-2 py-1.5 align-top"><LedgerAccountChip label={null} /></td>}
@@ -350,5 +519,6 @@ export function LineItemsEditor({ fieldKey, itemFields, initialRows, provenanceI
     </table>
     {addRowButton}
     {billFooter}
+    {accountUpdateBar}
   </div>
 }

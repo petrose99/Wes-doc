@@ -61,15 +61,19 @@ async function ledgerHasDuplicate(provider: string, externalTenantId: string | n
   }
 }
 
-async function pushToQuickbooks(realmId: string, connectionId: string, bill: NormalizedBill, accountId: string, idempotencyKey: string | null): Promise<{ id: string }> {
+// #429: accountId/accountCode are no longer threaded into the bill body — each line now carries
+// its own resolved accountExternalId (lib/integration-bill-mapping.ts's NormalizedLineItem), read
+// directly by the mapper. The caller still passes expenseAccountId through for the preflight cache
+// check below (does *a* resolved account exist in the synced chart at all).
+async function pushToQuickbooks(realmId: string, connectionId: string, bill: NormalizedBill, idempotencyKey: string | null): Promise<{ id: string }> {
   const vendorRef = await quickbooks.findOrCreateVendor(realmId, connectionId, bill.vendorName)
-  const body = toQuickBooksBillBody(bill, vendorRef, accountId)
+  const body = toQuickBooksBillBody(bill, vendorRef)
   return quickbooks.createBill(realmId, connectionId, body, idempotencyKey)
 }
 
-async function pushToXero(tenantId: string, connectionId: string, bill: NormalizedBill, accountCode: string, idempotencyKey: string | null): Promise<{ id: string }> {
+async function pushToXero(tenantId: string, connectionId: string, bill: NormalizedBill, idempotencyKey: string | null): Promise<{ id: string }> {
   const contactId = await xero.findOrCreateContact(tenantId, connectionId, bill.vendorName)
-  const body = toXeroBillBody(bill, contactId, accountCode)
+  const body = toXeroBillBody(bill, contactId)
   return xero.createBill(tenantId, connectionId, body, idempotencyKey)
 }
 
@@ -176,10 +180,10 @@ export async function attemptIntegrationPush(pushId: string, now = new Date()): 
         let created: { id: string }
         switch (connection.provider) {
           case "quickbooks":
-            created = await pushToQuickbooks(connection.externalTenantId, connection.id, bill, expenseAccountId, push.idempotencyKey)
+            created = await pushToQuickbooks(connection.externalTenantId, connection.id, bill, push.idempotencyKey)
             break
           case "xero":
-            created = await pushToXero(connection.externalTenantId, connection.id, bill, expenseAccountId, push.idempotencyKey)
+            created = await pushToXero(connection.externalTenantId, connection.id, bill, push.idempotencyKey)
             break
           default:
             throw new IntegrationPermanentError(`${connection.provider}_push_not_implemented`)

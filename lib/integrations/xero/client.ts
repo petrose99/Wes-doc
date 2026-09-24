@@ -1,5 +1,6 @@
 import { nangoProxy } from "@/lib/nango"
 import { XERO_API_BASE } from "@/lib/integrations/xero/config"
+import { IntegrationPermanentError } from "@/lib/integrations/errors"
 
 /** Thin wrappers around the Xero Accounting API, called through Nango's proxy (ADR 0005: Nango
  * owns the OAuth app, token refresh, and tenant discovery — `getConnectionConfig` in lib/nango.ts
@@ -26,15 +27,17 @@ export async function listExpenseAccounts(tenantId: string, connectionId: string
   return (result.Accounts ?? []).map((a) => ({ code: a.Code, name: a.Name }))
 }
 
-export type XeroSyncedAccount = { code: string; name: string; active: boolean }
+export type XeroSyncedAccount = { code: string; name: string; active: boolean; accountClass: string }
 export type XeroSyncedContact = { id: string; name: string; active: boolean }
 export type XeroSyncedTaxRate = { name: string; active: boolean }
 
 /** All accounts (any class, any status) for WP1.5's chart-of-accounts sync — Xero has no
- * server-side pagination for /Accounts (unlike /Contacts), so this is a single request. */
+ * server-side pagination for /Accounts (unlike /Contacts), so this is a single request.
+ * `accountClass` rides along so #429's Default-account guess can tell an EXPENSE account from any
+ * other kind without a second round-trip. */
 export async function listAccounts(tenantId: string, connectionId: string): Promise<XeroSyncedAccount[]> {
-  const result = await apiRequest<{ Accounts?: Array<{ Code?: string; Name: string; Status: string }> }>(tenantId, connectionId, "/Accounts")
-  return (result.Accounts ?? []).filter((a) => a.Code).map((a) => ({ code: a.Code as string, name: a.Name, active: a.Status === "ACTIVE" }))
+  const result = await apiRequest<{ Accounts?: Array<{ Code?: string; Name: string; Status: string; Class: string }> }>(tenantId, connectionId, "/Accounts")
+  return (result.Accounts ?? []).filter((a) => a.Code).map((a) => ({ code: a.Code as string, name: a.Name, active: a.Status === "ACTIVE", accountClass: a.Class }))
 }
 
 /** Every contact flagged as a supplier. /Contacts pages at 100 rows via the `page` query param;
@@ -103,6 +106,73 @@ export async function voidBill(tenantId: string, connectionId: string, invoiceId
     method: "POST",
     body: JSON.stringify({ Status: "VOIDED" }),
   })
+}
+
+// ---- #430: correcting posted bills' Accounts -----------------------------------------------
+
+/** Xero's org-wide period lock dates: `PeriodLockDate` (general ledger lock, any role) and
+ * `EndOfYearLockDate` (year-end lock, advisor-only override) from `/Organisation`. A bill dated on
+ * or before whichever is later and set is in a locked period and Xero refuses any edit to it. */
+export async function getOrganisationLockDates(tenantId: string, connectionId: string): Promise<{ periodLockDate: string | null; endOfYearLockDate: string | null }> {
+  const result = await apiRequest<{ Organisations?: Array<{ PeriodLockDate?: string; EndOfYearLockDate?: string }> }>(tenantId, connectionId, "/Organisation")
+  const org = result.Organisations?.[0]
+  return { periodLockDate: org?.PeriodLockDate ?? null, endOfYearLockDate: org?.EndOfYearLockDate ?? null }
+}
+
+/** The full invoice row this correction path needs: Status/AmountPaid to tell paid from unpaid,
+ * and the current LineItems so the update can resend every line unchanged except the AccountCode
+ * the caller is correcting (Xero deletes any line omitted from an update, per the spec's design
+ * approach — every line must ride along). */
+async function getInvoiceForCorrection(tenantId: string, connectionId: string, invoiceId: string): Promise<{ id: string; status: string; amountPaid: number; total: number; lineItems: XeroLineItem[] }> {
+  const result = await apiRequest<{ Invoices?: Array<{ InvoiceID: string; Status: string; AmountPaid?: number; Total?: number; LineItems?: XeroLineItem[] }> }>(tenantId, connectionId, `/Invoices/${invoiceId}`)
+  const invoice = result.Invoices?.[0]
+  if (!invoice) throw new IntegrationPermanentError("bill_not_found")
+  return { id: invoice.InvoiceID, status: invoice.Status, amountPaid: invoice.AmountPaid ?? 0, total: invoice.Total ?? 0, lineItems: invoice.LineItems ?? [] }
+}
+
+export type XeroBillCorrectionCheck =
+  | { offered: true }
+  | { offered: false; reason: "period_locked" | "voided" }
+
+/** Screen 1/Screen 2's pre-check: is this bill's AccountCode still changeable? Per the spec's
+ * design approach, Xero offers the correction on paid bills too (AccountCode is on Xero's
+ * editable-on-paid field list) — only a locked period or an already-voided invoice refuses it. */
+export async function checkXeroBillCorrectable(tenantId: string, connectionId: string, invoiceId: string, txnDate: string): Promise<XeroBillCorrectionCheck> {
+  const [lockDates, invoice] = await Promise.all([
+    getOrganisationLockDates(tenantId, connectionId),
+    getInvoiceForCorrection(tenantId, connectionId, invoiceId),
+  ])
+  const lockedThrough = [lockDates.periodLockDate, lockDates.endOfYearLockDate].filter((d): d is string => Boolean(d)).sort().pop() ?? null
+  if (lockedThrough && txnDate <= lockedThrough) return { offered: false, reason: "period_locked" }
+  if (invoice.status === "VOIDED" || invoice.status === "DELETED") return { offered: false, reason: "voided" }
+  return { offered: true }
+}
+
+/** Resends every current line of a posted bill with `accountCodeByLineIndex` swapped in for the
+ * corrected lines' `AccountCode` — Xero's update semantics delete any line omitted from the
+ * request, so every line must ride along even though only the account is changing. No SyncToken
+ * equivalent for Xero (per the spec's Engineering questions), so the one retry re-reads the
+ * invoice's current line set and resends it rather than comparing a version stamp. */
+export async function updateBillAccounts(tenantId: string, connectionId: string, invoiceId: string, accountCodeByLineIndex: Map<number, string>): Promise<void> {
+  const attempt = async (): Promise<void> => {
+    const invoice = await getInvoiceForCorrection(tenantId, connectionId, invoiceId)
+    const lineItems = invoice.lineItems.map((item, index) => {
+      const newAccountCode = accountCodeByLineIndex.get(index)
+      return newAccountCode ? { ...item, AccountCode: newAccountCode } : item
+    })
+    await apiRequest(tenantId, connectionId, `/Invoices/${invoiceId}`, {
+      method: "POST",
+      body: JSON.stringify({ LineItems: lineItems }),
+    })
+  }
+  try {
+    await attempt()
+  } catch (err) {
+    // Same rationale as the QuickBooks client: a permanent (400-shaped) failure is retried once
+    // against a freshly re-read line set; an auth failure is never retried.
+    if (!(err instanceof IntegrationPermanentError)) throw err
+    await attempt()
+  }
 }
 
 // ---- Phase B: ledger sync ----------------------------------------------------------------------

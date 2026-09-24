@@ -187,7 +187,7 @@ export async function listWorkspaceIntegrationConnections(workspaceId: string) {
     orderBy: { createdAt: "asc" },
     select: {
       id: true, provider: true, externalTenantId: true, tenantName: true, status: true,
-      defaultExpenseAccountId: true, defaultExpenseAccountName: true, createdAt: true,
+      defaultExpenseAccountId: true, defaultExpenseAccountName: true, defaultExpenseAccountGuessed: true, createdAt: true,
     },
   })
 }
@@ -257,6 +257,9 @@ export async function markIntegrationConnectionNeedsReconnect(connectionId: stri
   return { isNewBreak, workspaceId: existing.workspaceId }
 }
 
+// #429: an Owner picking the Default account here — same as a post confirming it — is the
+// signal that ends the "Guessed" state; a later chart re-sync must not silently swap it back
+// out from under them (see lib/integrations/sync.ts).
 export async function setWorkspaceIntegrationDefaultAccount(
   workspaceId: string,
   connectionId: string,
@@ -264,7 +267,7 @@ export async function setWorkspaceIntegrationDefaultAccount(
 ) {
   const res = await prisma.integrationConnection.updateMany({
     where: { id: connectionId, workspaceId },
-    data: { defaultExpenseAccountId: account.id, defaultExpenseAccountName: account.name },
+    data: { defaultExpenseAccountId: account.id, defaultExpenseAccountName: account.name, defaultExpenseAccountGuessed: false },
   })
   if (!res.count) throw new Error("integration_connection_not_found")
 }
@@ -348,6 +351,30 @@ export async function getCategoryAccountMap(workspaceId: string, connectionId: s
     if (category && accountId && !(category in map)) {
       map[category] = accountId
     }
+  }
+  return map
+}
+
+/** Resolves account display names by externalId from the synced chart of accounts (#430 Screen 1
+ * — the review-approval trigger only has ids from `SupplierAccountRule`, unlike the Default-save
+ * trigger which already has the picked account's name in hand). Falls back to the id itself for
+ * any account not found (stale sync, or an id from before the entity existed). */
+export async function resolveAccountNames(connectionId: string, accountExternalIds: string[]): Promise<Record<string, string>> {
+  const ids = Array.from(new Set(accountExternalIds))
+  if (!ids.length) return {}
+  const rows = await prisma.accountingEntity.findMany({
+    where: { connectionId, entityType: "account", externalId: { in: ids } },
+    select: { externalId: true, name: true },
+  })
+  // #430 evaluate re-run finding (P1): this used to fall back to the raw external id itself when the
+  // AccountingEntity lookup missed, which meant callers' own "resolve or format the id" guards
+  // (page.tsx, account-correction-actions.ts) never fired — the raw id always looked "resolved".
+  // Omit the key entirely on a miss so callers' `names[id] ?? formatUnresolvedAccountId(id)` fallback
+  // actually runs.
+  const map: Record<string, string> = {}
+  for (const id of ids) {
+    const name = rows.find((r) => r.externalId === id)?.name
+    if (name) map[id] = name
   }
   return map
 }

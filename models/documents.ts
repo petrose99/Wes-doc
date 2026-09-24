@@ -10,13 +10,17 @@ import { projectDocumentFields } from "@/lib/field-projection"
 import { LOW_CONFIDENCE, PIPELINE_STAGES, type PipelineStage } from "@/lib/documents/stages"
 import { applyFxToDocument } from "@/lib/fx/apply-to-document"
 import { normalizeBillFromDocument } from "@/lib/integration-bill-mapping"
+import { resolveDocumentLineAccounts, resolveLineAccount, usesLegacyAccountChain, type LineAccountRow } from "@/lib/finance/line-account-resolution"
+import { normalizeSupplierName } from "@/lib/suppliers/normalize"
 import { unscoped } from "@/lib/workspace-scope"
 import type { DocumentProvenance } from "@/lib/provenance"
 import { replaceDocumentFieldValues } from "@/models/document-field-values"
 import { recordCodingCorrection } from "@/models/coding-corrections"
 import { recordFieldCorrection } from "@/models/field-corrections"
 import { resetSupplierStreak } from "@/models/suppliers"
-import { listWorkspaceIntegrationPushes } from "@/models/integrations"
+import { listWorkspaceIntegrationPushes, getCategoryAccountMap } from "@/models/integrations"
+import { listCategoryAccountMappings, resolveCategoryAccount } from "@/models/category-account-mappings"
+import { listAccountingEntities } from "@/models/accounting-entities"
 import { getDocumentPaymentStatuses } from "@/models/ledger-payments"
 import { emitWorkspaceEvent } from "@/lib/webhooks"
 import { resolveDuplicateGatesAgainst } from "@/lib/gates/duplicate"
@@ -417,6 +421,174 @@ export async function listReadyToPushDocuments(workspaceId: string, connectionId
   return { documents: results, droppedCount }
 }
 
+export type AffectedBillLineChange = { index: number; oldAccountExternalId: string }
+
+export type AffectedBillRow = {
+  id: string
+  filename: string
+  vendorName: string
+  total: number
+  currencyCode: string | null
+  receivedAt: Date
+  /** "paid" when Document.paymentStatus is "paid" (documentStage's own precedence — a paid bill
+   * is reported paid regardless of push status); otherwise "posted" (a succeeded push exists). A
+   * bill can only be affected at all if one of these is true — see the where-clause below. */
+  ledgerFact: "posted" | "paid"
+  externalBillId: string | null
+  /** Every line on this document whose codingData.items[].account_external_id still matches the
+   * old account — the "N lines → {new account}" Change-column count, and the index set
+   * updateSelectedBillAccountsAction resends to the provider. */
+  lines: AffectedBillLineChange[]
+}
+
+/** Screen 1's "N bills already posted" query (#430) — reviewed documents on `connectionId` whose
+ * `codingData.items` still carries `oldAccountExternalId` on at least one line, and whose ledger
+ * fact (`lib/documents/stages.ts` precedence) is posted or paid. Excludes a document the Owner has
+ * already dismissed via "Leave them" for this exact old account (`accountCorrectionDismissedAt` +
+ * `accountCorrectionDismissedFromAccountId`) — a *later* correction (a different old account) is
+ * not excluded, since dismissing one correction doesn't dismiss the next.
+ *
+ * Filters in JS rather than a Prisma JSON-path query: `codingData.items` is a JSON array and the
+ * match is "does any element have this key/value", which Prisma's JSON filters don't express
+ * portably — the candidate set (reviewed + succeeded-push-to-this-connection OR paid) is already
+ * small per workspace, so an in-process filter is simplest and matches listReadyToPushDocuments's
+ * existing pattern of filtering pushed documents in JS. */
+export async function findBillsAffectedByAccountChange(workspaceId: string, connectionId: string, oldAccountExternalId: string): Promise<AffectedBillRow[]> {
+  const [pushes, candidates] = await Promise.all([
+    listWorkspaceIntegrationPushes(workspaceId),
+    prisma.document.findMany({
+      where: { workspaceId, status: "reviewed", codingData: { not: Prisma.JsonNull } },
+      select: { id: true, filename: true, receivedAt: true, reviewedData: true, rawExtraction: true, codingData: true, paymentStatus: true, baseCurrencyTotal: true, accountCorrectionDismissedAt: true, accountCorrectionDismissedFromAccountId: true },
+    }),
+  ])
+  const succeededByDocumentId = new Map(pushes.filter((p) => p.connectionId === connectionId && p.status === "succeeded").map((p) => [p.documentId, p]))
+  const results: AffectedBillRow[] = []
+  for (const doc of candidates) {
+    const push = succeededByDocumentId.get(doc.id)
+    const ledgerFact: "posted" | "paid" | null = doc.paymentStatus === "paid" ? "paid" : push ? "posted" : null
+    if (!ledgerFact) continue
+    if (doc.accountCorrectionDismissedAt && doc.accountCorrectionDismissedFromAccountId === oldAccountExternalId) continue
+    const coding = (doc.codingData as Record<string, unknown> | null) ?? {}
+    const items = Array.isArray(coding.items) ? (coding.items as Array<{ account_external_id?: string | null }>) : []
+    const lines: AffectedBillLineChange[] = []
+    items.forEach((item, index) => { if (item.account_external_id === oldAccountExternalId) lines.push({ index, oldAccountExternalId }) })
+    if (!lines.length) continue
+    const reviewedData = (doc.reviewedData as Record<string, unknown> | null) ?? (doc.rawExtraction as Record<string, unknown> | null) ?? {}
+    const vendorName = (typeof reviewedData.vendor === "string" && reviewedData.vendor) || (typeof reviewedData.merchant === "string" && reviewedData.merchant) || "Unknown supplier"
+    const total = doc.baseCurrencyTotal !== null ? Number(doc.baseCurrencyTotal) : (typeof reviewedData.total === "number" ? reviewedData.total : 0)
+    const currencyCode = typeof reviewedData.currency_code === "string" ? reviewedData.currency_code : null
+    results.push({ id: doc.id, filename: doc.filename, vendorName, total, currencyCode, receivedAt: doc.receivedAt, ledgerFact, externalBillId: push?.externalBillId ?? null, lines })
+  }
+  return results
+}
+
+export type AccountCorrectionReminder = { oldAccountExternalId: string; count: number }
+
+/** Screen 3's per-rule reminder (#430) — `SupplierAccountRule` stores only the *current* account,
+ * not what it used to be, so a reminder can't be read off the rule row directly. Instead this
+ * derives it from the same fact `findBillsAffectedByAccountChange` already reads: a posted/paid
+ * document's `codingData.items[].account_external_id` that no longer matches the rule's current
+ * account is, definitionally, still on some old account. Batches one candidate scan across every
+ * rule on the connection (reused precedent from that function) rather than one query per rule —
+ * this runs on every load of the Supplier accounts table. Picks the most-affected old account per
+ * supplier if more than one is present (rare: would need two corrections stacked before either was
+ * resolved); "Leave them"/an update naturally shrinks that set on the next load. */
+export async function findAccountCorrectionReminders(workspaceId: string, connectionId: string, rules: { supplierName: string; accountExternalId: string }[]): Promise<Map<string, AccountCorrectionReminder>> {
+  if (!rules.length) return new Map()
+  const [pushes, candidates] = await Promise.all([
+    listWorkspaceIntegrationPushes(workspaceId),
+    prisma.document.findMany({
+      where: { workspaceId, status: "reviewed", codingData: { not: Prisma.JsonNull } },
+      select: { id: true, reviewedData: true, rawExtraction: true, codingData: true, paymentStatus: true, accountCorrectionDismissedAt: true, accountCorrectionDismissedFromAccountId: true },
+    }),
+  ])
+  const succeededByDocumentId = new Map(pushes.filter((p) => p.connectionId === connectionId && p.status === "succeeded").map((p) => [p.documentId, p]))
+  const currentAccountBySupplier = new Map(rules.map((r) => [r.supplierName, r.accountExternalId]))
+  const docIdsBySupplierAndOldAccount = new Map<string, Map<string, Set<string>>>()
+  for (const doc of candidates) {
+    const ledgerFact: "posted" | "paid" | null = doc.paymentStatus === "paid" ? "paid" : succeededByDocumentId.has(doc.id) ? "posted" : null
+    if (!ledgerFact) continue
+    const reviewedData = (doc.reviewedData as Record<string, unknown> | null) ?? (doc.rawExtraction as Record<string, unknown> | null) ?? {}
+    const rawVendorName = (typeof reviewedData.vendor === "string" && reviewedData.vendor) || (typeof reviewedData.merchant === "string" && reviewedData.merchant) || null
+    // Rules are keyed by normalizeSupplierName (SupplierAccountRule.supplierName); the document's
+    // own vendor field is never normalized, so the lookup below must normalize to match — a raw
+    // "Acme Fuel Co" otherwise never finds the rule keyed "acme fuel" and no reminder ever appears.
+    const vendorName = rawVendorName ? normalizeSupplierName(rawVendorName) : null
+    const currentAccount = vendorName ? currentAccountBySupplier.get(vendorName) : undefined
+    if (!currentAccount) continue
+    const coding = (doc.codingData as Record<string, unknown> | null) ?? {}
+    const items = Array.isArray(coding.items) ? (coding.items as Array<{ account_external_id?: string | null }>) : []
+    for (const item of items) {
+      const oldAccount = item.account_external_id
+      if (!oldAccount || oldAccount === currentAccount) continue
+      if (doc.accountCorrectionDismissedAt && doc.accountCorrectionDismissedFromAccountId === oldAccount) continue
+      let bySupplier = docIdsBySupplierAndOldAccount.get(vendorName!)
+      if (!bySupplier) { bySupplier = new Map(); docIdsBySupplierAndOldAccount.set(vendorName!, bySupplier) }
+      let docIds = bySupplier.get(oldAccount)
+      if (!docIds) { docIds = new Set(); bySupplier.set(oldAccount, docIds) }
+      docIds.add(doc.id)
+    }
+  }
+  const result = new Map<string, AccountCorrectionReminder>()
+  for (const [supplierName, byOldAccount] of docIdsBySupplierAndOldAccount) {
+    let best: { oldAccountExternalId: string; count: number } | null = null
+    for (const [oldAccountExternalId, docIds] of byOldAccount) {
+      if (!best || docIds.size > best.count) best = { oldAccountExternalId, count: docIds.size }
+    }
+    if (best) result.set(supplierName, best)
+  }
+  return result
+}
+
+/** Screen 1/3's "Leave them" (#430) — marks the given documents as resolved-without-updating for
+ * this specific old account, so `findBillsAffectedByAccountChange` stops surfacing them until (if
+ * ever) a further correction targets a different old account. Idempotent: re-running on an
+ * already-dismissed document just rewrites the same flag. */
+export async function dismissAccountCorrectionForDocuments(workspaceId: string, documentIds: string[], oldAccountExternalId: string): Promise<void> {
+  if (!documentIds.length) return
+  await prisma.document.updateMany({
+    where: { workspaceId, id: { in: documentIds } },
+    data: { accountCorrectionDismissedAt: new Date(), accountCorrectionDismissedFromAccountId: oldAccountExternalId },
+  })
+}
+
+/** Screen 1/2's "Update N bills in {Provider}" (#430) — stamps the corrected account onto every
+ * matching line of `codingData.items` (account_source becomes "manual": a person, via the Owner's
+ * bulk action or the Detail pane, chose this) and clears any prior dismissal for this document,
+ * since a successful update supersedes a "Leave them" decision. Called once per document AFTER the
+ * provider write has already succeeded (lib/integrations/{quickbooks,xero}/client.ts's
+ * updateBillAccounts) — this only updates DocuBite's own record of the fact. */
+export async function recordAccountCorrectionApplied(workspaceId: string, documentId: string, oldAccountExternalId: string, newAccountExternalId: string): Promise<void> {
+  const doc = await prisma.document.findFirst({ where: { id: documentId, workspaceId }, select: { codingData: true } })
+  if (!doc) return
+  const coding = (doc.codingData as Record<string, unknown> | null) ?? {}
+  const items = Array.isArray(coding.items) ? (coding.items as Array<Record<string, unknown>>) : []
+  const nextItems = items.map((item) => (item.account_external_id === oldAccountExternalId ? { ...item, account_external_id: newAccountExternalId, account_source: "manual" } : item))
+  await prisma.document.update({
+    where: { id: documentId },
+    data: { codingData: { ...coding, items: nextItems } as Prisma.InputJsonValue, accountCorrectionDismissedAt: null, accountCorrectionDismissedFromAccountId: null },
+  })
+}
+
+/** Screen 2's single-document Detail-pane Account edit (#430) — unlike `recordAccountCorrectionApplied`
+ * (which retargets every line still on one old account, for the list/rule path), this writes each
+ * line's account independently by index, since a person editing one bill by hand may pick a
+ * different new account per line. Called once, after the provider write has already succeeded, and
+ * never writes a `SupplierAccountRule` — this path is scoped to the one bill (spec §Screen 2: "This
+ * path never teaches the Supplier rule"). */
+export async function recordDocumentLineAccountsCorrected(workspaceId: string, documentId: string, changes: { index: number; newAccountExternalId: string }[]): Promise<void> {
+  const doc = await prisma.document.findFirst({ where: { id: documentId, workspaceId }, select: { codingData: true } })
+  if (!doc) return
+  const coding = (doc.codingData as Record<string, unknown> | null) ?? {}
+  const items = Array.isArray(coding.items) ? (coding.items as Array<Record<string, unknown>>) : []
+  const byIndex = new Map(changes.map((c) => [c.index, c.newAccountExternalId]))
+  const nextItems = items.map((item, index) => (byIndex.has(index) ? { ...item, account_external_id: byIndex.get(index), account_source: "manual" } : item))
+  await prisma.document.update({
+    where: { id: documentId },
+    data: { codingData: { ...coding, items: nextItems } as Prisma.InputJsonValue },
+  })
+}
+
 /** Which of the given documents currently have a queued/processing DocumentProcessingJob — what
  * the pipeline Inbox tab's inline spinner (documentStage's `hasActiveJob`) is driven by. */
 export async function activeJobDocumentIds(workspaceId: string, documentIds: string[]): Promise<Set<string>> {
@@ -476,6 +648,182 @@ function asScalarString(value: unknown): string | null {
   return null
 }
 
+/** #429: resolves each reviewed line's ledger account once, at the point Save review runs — the
+ * same "human confirms this document" trigger the pre-#429 category chain ran at. Null when there
+ * is no connected accounting connection (nothing to resolve against yet); the resulting rows are
+ * stamped onto `codingData.items`, read back by the Detail pane, the push actions (as
+ * `lineAccounts`), and the queue eligibility check. A document coded before the connection existed
+ * (`usesLegacyAccountChain`) keeps resolving through the pre-connection CategoryAccountMapping
+ * chain rather than a supplier-rule/Default chain that didn't exist when it was coded. */
+export async function resolveDocumentCodingItems(input: {
+  workspaceId: string
+  vendorName: string | null
+  category: string | null
+  codingSource: string | null
+  codedAt: Date
+  lineCount: number
+}): Promise<LineAccountRow[] | null> {
+  if (!config.integrations.enabled) return null
+  const connection = await prisma.integrationConnection.findFirst({
+    where: { workspaceId: input.workspaceId, status: "connected" },
+    select: { id: true, createdAt: true, defaultExpenseAccountId: true, defaultExpenseAccountGuessed: true },
+  })
+  if (!connection) return null
+  const lineCount = Math.max(input.lineCount, 1)
+  if (usesLegacyAccountChain(input.codingSource, input.codedAt, connection.createdAt)) {
+    if (!connection.defaultExpenseAccountId) return null
+    const [mappings, inferredMap] = await Promise.all([
+      listCategoryAccountMappings(input.workspaceId, connection.id),
+      getCategoryAccountMap(input.workspaceId, connection.id),
+    ])
+    const accountExternalId = resolveCategoryAccount(mappings, input.category, inferredMap, connection.defaultExpenseAccountId)
+    return resolveDocumentLineAccounts(lineCount, { accountExternalId, accountSource: null })
+  }
+  const normalizedVendor = input.vendorName ? normalizeSupplierName(input.vendorName) : ""
+  const rule = normalizedVendor
+    ? await prisma.supplierAccountRule.findFirst({ where: { connectionId: connection.id, supplierName: normalizedVendor }, select: { accountExternalId: true } })
+    : null
+  // #429 archived-account fallback: a supplier rule or the connection Default can point at an
+  // AccountingEntity a person later deactivated in the provider. Check both candidates' activity
+  // in one query rather than trusting either id blindly.
+  const candidateIds = [rule?.accountExternalId, connection.defaultExpenseAccountId].filter((id): id is string => Boolean(id))
+  const activeAccounts = candidateIds.length
+    ? await prisma.accountingEntity.findMany({ where: { connectionId: connection.id, entityType: "account", externalId: { in: candidateIds }, active: true }, select: { externalId: true } })
+    : []
+  const activeIds = new Set(activeAccounts.map((account) => account.externalId))
+  const ruleAccountId = rule?.accountExternalId ?? null
+  const ruleAccountActive = ruleAccountId ? activeIds.has(ruleAccountId) : false
+  const ruleArchivedFallback = Boolean(ruleAccountId) && !ruleAccountActive
+  // An archived Default is not "fall back further" — there is nothing left to fall back to — so
+  // it resolves like no Default at all, and the existing "every line has an Account" eligibility
+  // check (lib/integration-push-selection.ts) blocks posting the same way a missing Default does.
+  const defaultAccountId = connection.defaultExpenseAccountId && activeIds.has(connection.defaultExpenseAccountId)
+    ? connection.defaultExpenseAccountId
+    : null
+  const resolution = resolveLineAccount({
+    supplierRuleAccountId: ruleAccountActive ? ruleAccountId : null,
+    defaultAccountId,
+    defaultAccountGuessed: connection.defaultExpenseAccountGuessed,
+  })
+  const rows = resolveDocumentLineAccounts(lineCount, resolution)
+  return ruleArchivedFallback ? rows.map((row) => ({ ...row, account_archived_fallback: true })) : rows
+}
+
+export type AccountOption = { externalId: string; code: string | null; name: string }
+
+// #429: same map as lib/finance/actions.ts's push-copy PROVIDER_LABELS and
+// components/integrations/integrations-manager.tsx's connect-flow one — every provider gets an
+// explicit label, duplicated per call site rather than shared, matching that existing precedent.
+const PROVIDER_LABELS: Record<string, string> = { quickbooks: "QuickBooks", xero: "Xero", sage: "Sage" }
+
+/** #429 step 5: everything the Detail pane's per-line Account `<select>` needs beyond what
+ * `codingData.items` (the resolved rows) already carries — the pickable chart of accounts, the
+ * vendor's existing `SupplierAccountRule` account (so the pane can tell "this line already
+ * matches Acme's usual" from "picking this becomes Acme's usual"), and the provider's display
+ * name for the archived-account/chart-sync copy. `null` when integrations are off or the
+ * workspace has no connected provider — the caller renders the plain (non-bill) table in that
+ * case, same guard as `resolveDocumentCodingItems`. */
+export async function getBillAccountPickerData(workspaceId: string, vendorName: string | null): Promise<{
+  accountOptions: AccountOption[]
+  supplierRuleAccountId: string | null
+  providerName: string | null
+} | null> {
+  if (!config.integrations.enabled) return null
+  const connection = await prisma.integrationConnection.findFirst({ where: { workspaceId, status: "connected" }, select: { id: true, provider: true } })
+  if (!connection) return null
+  const normalizedVendor = vendorName ? normalizeSupplierName(vendorName) : ""
+  const [entities, rule] = await Promise.all([
+    listAccountingEntities(workspaceId, "account"),
+    normalizedVendor
+      ? prisma.supplierAccountRule.findFirst({ where: { connectionId: connection.id, supplierName: normalizedVendor }, select: { accountExternalId: true } })
+      : Promise.resolve(null),
+  ])
+  return {
+    accountOptions: entities.map((entity) => ({ externalId: entity.externalId, code: entity.code, name: entity.name })),
+    supplierRuleAccountId: rule?.accountExternalId ?? null,
+    providerName: PROVIDER_LABELS[connection.provider] ?? connection.provider,
+  }
+}
+
+/** #429: learns a supplier's usual expense account when a document is approved — the account
+ * resolved onto the line with the largest amount (they are currently all the same account, per
+ * resolveLineAccount's one-account-per-document scope, but this reads amounts rather than
+ * assuming that so it keeps working if that scope ever loosens). Upserts
+ * `SupplierAccountRule[connectionId, supplierName]`, refreshing `lastUsedAt` on every re-approval
+ * of the same supplier so "Forget" (Accounting page) always deletes a genuinely stale row.
+ * Fire-and-forget like the other approval-signal writers in models/suppliers.ts: a missed rule
+ * only costs a future pre-fill, never the approval it rode in on. Skips legacy-chain resolutions
+ * (`account_source: null`) — those didn't come from the supplier/Default chain this rule feeds. */
+export type SupplierAccountRuleChange = { connectionId: string; oldAccountExternalId: string; newAccountExternalId: string }
+
+/** Returns the old→new account change when this approval retargeted an existing rule (never on a
+ * first-time create), so the caller (#430 Screen 1) can check for bills still posted under the
+ * old account. */
+export async function learnSupplierAccountRuleFromApproval(workspaceId: string, documentId: string): Promise<SupplierAccountRuleChange | null> {
+  try {
+    const document = await prisma.document.findFirst({
+      where: { id: documentId, workspaceId },
+      select: { reviewedData: true, codingData: true },
+    })
+    if (!document) return null
+    const reviewedData = (document.reviewedData as Record<string, unknown> | null) ?? {}
+    const vendorName = (typeof reviewedData.vendor === "string" && reviewedData.vendor) || (typeof reviewedData.merchant === "string" && reviewedData.merchant) || null
+    if (!vendorName?.trim()) return null
+    const coding = (document.codingData as Record<string, unknown> | null) ?? {}
+    const items = Array.isArray(coding.items) ? (coding.items as LineAccountRow[]) : []
+    if (!items.length) return null
+    const lineItems = Array.isArray(reviewedData.line_items) ? (reviewedData.line_items as Array<Record<string, unknown>>) : []
+    let bestIndex = -1
+    let bestAmount = -Infinity
+    items.forEach((item, index) => {
+      if (!item.account_external_id || !item.account_source) return
+      const amount = typeof lineItems[index]?.amount === "number" ? (lineItems[index].amount as number) : 0
+      if (bestIndex === -1 || amount > bestAmount) { bestIndex = index; bestAmount = amount }
+    })
+    if (bestIndex === -1) return null
+    const accountExternalId = items[bestIndex].account_external_id
+    if (!accountExternalId) return null
+    const connection = await prisma.integrationConnection.findFirst({ where: { workspaceId, status: "connected" }, select: { id: true } })
+    if (!connection) return null
+    const supplierName = normalizeSupplierName(vendorName)
+    const existing = await prisma.supplierAccountRule.findUnique({
+      where: { connectionId_supplierName: { connectionId: connection.id, supplierName } },
+      select: { accountExternalId: true },
+    })
+    await prisma.supplierAccountRule.upsert({
+      where: { connectionId_supplierName: { connectionId: connection.id, supplierName } },
+      create: { workspaceId, connectionId: connection.id, supplierName, accountExternalId, lastUsedAt: new Date() },
+      update: { accountExternalId, lastUsedAt: new Date() },
+    })
+    // Only a genuine retarget of an existing rule is a #430 trigger — a first-time create has no
+    // bills posted under "the old account" because there wasn't one.
+    if (existing && existing.accountExternalId && existing.accountExternalId !== accountExternalId) {
+      return { connectionId: connection.id, oldAccountExternalId: existing.accountExternalId, newAccountExternalId: accountExternalId }
+    }
+    return null
+  } catch (error) {
+    console.error("[documents] failed to learn supplier account rule:", error instanceof Error ? error.message : error)
+    return null
+  }
+}
+
+/** #429: bumps `lastUsedAt` when a push actually posts using a supplier's learned account, so
+ * "Forget" on the Accounting page judges staleness by real use, not just how long ago the rule
+ * was learned. Only bumps when the pushed account still matches the rule's account — a document
+ * whose vendor no longer matches this rule (renamed, or the rule was retargeted) should not keep
+ * a stale rule looking fresh. Fire-and-forget, same rationale as the writers above. */
+export async function touchSupplierAccountRuleUsage(workspaceId: string, connectionId: string, vendorName: string | null, accountExternalId: string | null): Promise<void> {
+  if (!vendorName?.trim() || !accountExternalId) return
+  try {
+    await prisma.supplierAccountRule.updateMany({
+      where: { workspaceId, connectionId, supplierName: normalizeSupplierName(vendorName), accountExternalId },
+      data: { lastUsedAt: new Date() },
+    })
+  } catch (error) {
+    console.error("[documents] failed to bump supplier account rule usage:", error instanceof Error ? error.message : error)
+  }
+}
+
 export async function updateDocumentReview(input: { workspaceId: string; documentId: string; reviewedData: Record<string, unknown>; actorId: string }) {
   const document = await getWorkspaceDocument(input.workspaceId, input.documentId)
   if (!document) throw new Error("document_not_found")
@@ -491,7 +839,16 @@ export async function updateDocumentReview(input: { workspaceId: string; documen
   // the classifier wasn't confident about (`categoryConfirmed` never set true) would stay
   // unpushable forever (`isCategoryConfirmed`, read by readiness/autopublish/integration push).
   const newlyConfirmedCategory = hasDirectionField(resolveDocType(document)) && coding.categoryConfirmed !== true
-  const nextCoding = newlyConfirmedCategory ? { ...coding, categoryConfirmed: true } : null
+  const vendorName = (typeof reviewedData.vendor === "string" && reviewedData.vendor) || (typeof reviewedData.merchant === "string" && reviewedData.merchant) || null
+  const category = typeof coding.account === "string" ? coding.account : null
+  const lineCount = Array.isArray(reviewedData.line_items) ? reviewedData.line_items.length : 0
+  const items = await resolveDocumentCodingItems({
+    workspaceId: input.workspaceId, vendorName, category, codingSource: document.codingSource, codedAt: document.receivedAt, lineCount,
+  })
+  const codingUpdates: Record<string, unknown> = {}
+  if (newlyConfirmedCategory) codingUpdates.categoryConfirmed = true
+  if (items) codingUpdates.items = items
+  const nextCoding = Object.keys(codingUpdates).length ? { ...coding, ...codingUpdates } : null
   // Re-project the structured spine from the values a human signed off on. Source is "manual"
   // because these are now reviewed values, but the per-field scores are carried over from the
   // extraction rather than being reset to 1: a bulk "mark reviewed" does not mean somebody read

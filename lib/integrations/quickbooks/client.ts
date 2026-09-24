@@ -1,6 +1,7 @@
 import { nangoProxy } from "@/lib/nango"
 import { quickbooksCompanyBase } from "@/lib/integrations/quickbooks/config"
 import { quickbooksApiError } from "@/lib/integrations/quickbooks/errors"
+import { IntegrationPermanentError } from "@/lib/integrations/errors"
 
 /** Thin wrappers around the QuickBooks Online Accounting API, called through Nango's proxy (ADR
  * 0005: Nango owns the OAuth app and token refresh, `lib/nango.ts` is the only module that talks to
@@ -50,15 +51,18 @@ async function paginatedQuery<Row>(realmId: string, connectionId: string, queryW
   }
 }
 
-export type QuickBooksSyncedAccount = { id: string; name: string; active: boolean }
+export type QuickBooksSyncedAccount = { id: string; name: string; active: boolean; accountType: string }
 export type QuickBooksSyncedVendor = { id: string; name: string; active: boolean }
 export type QuickBooksSyncedTaxCode = { id: string; name: string; active: boolean }
 
 /** All active accounts of any type, for WP1.5's chart-of-accounts sync — distinct from
- * listExpenseAccounts above, which stays scoped to the default-account picker's narrower need. */
+ * listExpenseAccounts above, which stays scoped to the default-account picker's narrower need.
+ * `accountType` rides along (not selected by listExpenseAccounts, which already filters
+ * server-side) so #429's Default-account guess can tell an Expense account from any other kind
+ * without a second round-trip. */
 export async function listAccounts(realmId: string, connectionId: string): Promise<QuickBooksSyncedAccount[]> {
-  const rows = await paginatedQuery<{ Id: string; Name: string; Active: boolean }>(realmId, connectionId, "select Id, Name, Active from Account where Active = true", "Account")
-  return rows.map((row) => ({ id: row.Id, name: row.Name, active: row.Active }))
+  const rows = await paginatedQuery<{ Id: string; Name: string; Active: boolean; AccountType: string }>(realmId, connectionId, "select Id, Name, Active, AccountType from Account where Active = true", "Account")
+  return rows.map((row) => ({ id: row.Id, name: row.Name, active: row.Active, accountType: row.AccountType }))
 }
 
 export async function listVendors(realmId: string, connectionId: string): Promise<QuickBooksSyncedVendor[]> {
@@ -131,6 +135,79 @@ export async function voidBill(realmId: string, connectionId: string, billId: st
     method: "POST",
     body: JSON.stringify({ Id: ref.id, SyncToken: ref.syncToken }),
   })
+}
+
+// ---- #430: correcting posted bills' Accounts -----------------------------------------------
+
+/** The full bill row this correction path needs: Id/SyncToken for the update write, Balance/
+ * TotalAmt to tell paid from unpaid (QBO has no boolean "Paid" field — a Bill is paid when its
+ * Balance has dropped to 0), and the current Line array so the update can resend every line
+ * (amount, description, tax) unchanged except the AccountRef the caller is correcting. */
+async function getBillForCorrection(realmId: string, connectionId: string, billId: string): Promise<{ id: string; syncToken: string; balance: number; totalAmt: number; lines: QbLine[] }> {
+  const query = `select Id, SyncToken, Balance, TotalAmt, Line from Bill where Id = '${escapeQbQuery(billId)}'`
+  const result = await apiRequest<{ QueryResponse?: { Bill?: Array<{ Id: string; SyncToken: string; Balance?: number; TotalAmt?: number; Line?: QbLine[] }> } }>(realmId, connectionId, `/query?query=${encodeURIComponent(query)}`)
+  const bill = result.QueryResponse?.Bill?.[0]
+  if (!bill) throw quickbooksApiError(404, "bill_not_found")
+  return { id: bill.Id, syncToken: bill.SyncToken, balance: bill.Balance ?? 0, totalAmt: bill.TotalAmt ?? 0, lines: bill.Line ?? [] }
+}
+
+/** QuickBooks' company-wide books-closed date (`AccountingInfoPrefs.BookCloseDate` on
+ * `/preferences`) — a bill dated on or before this date is in a closed period and QBO refuses any
+ * edit to it. `null` when the company has never set one (nothing is closed). */
+export async function getBookCloseDate(realmId: string, connectionId: string): Promise<string | null> {
+  const result = await apiRequest<{ Preferences?: { AccountingInfoPrefs?: { BookCloseDate?: string } } }>(realmId, connectionId, "/preferences")
+  return result.Preferences?.AccountingInfoPrefs?.BookCloseDate ?? null
+}
+
+export type QuickBooksBillCorrectionCheck =
+  | { offered: true }
+  | { offered: false; reason: "book_closed" | "paid" }
+
+/** Screen 1/Screen 2's pre-check: is this bill's Account still changeable? Conservative per the
+ * spec's Engineering questions — a paid QBO bill is refused until sandbox verification proves the
+ * payment link survives an account-only resend; a bill dated on/before the books-closed date is
+ * refused because QBO itself would reject the write. */
+export async function checkQuickBooksBillCorrectable(realmId: string, connectionId: string, billId: string, txnDate: string): Promise<QuickBooksBillCorrectionCheck> {
+  const [bookCloseDate, bill] = await Promise.all([
+    getBookCloseDate(realmId, connectionId),
+    getBillForCorrection(realmId, connectionId, billId),
+  ])
+  if (bookCloseDate && txnDate <= bookCloseDate) return { offered: false, reason: "book_closed" }
+  if (bill.balance <= 0 && bill.totalAmt > 0) return { offered: false, reason: "paid" }
+  return { offered: true }
+}
+
+/** Resends every current line of a posted bill with `accountRefByLineIndex` swapped in for the
+ * corrected lines' `AccountRef.value` — QBO's full-update semantics null out any field omitted
+ * from the request, so every line must ride along even though only the account is changing (per
+ * the spec's "account only, nothing else" design approach: amounts/descriptions are read back
+ * from QBO immediately before the write, never taken from a stale local copy). One stale-token
+ * retry: if the write is rejected as a conflicting SyncToken, this re-reads the bill once more and
+ * retries with the fresh token before giving up. */
+export async function updateBillAccounts(realmId: string, connectionId: string, billId: string, accountRefByLineIndex: Map<number, string>): Promise<void> {
+  const attempt = async (): Promise<void> => {
+    const bill = await getBillForCorrection(realmId, connectionId, billId)
+    const line = bill.lines.map((l, index) => {
+      const newAccount = accountRefByLineIndex.get(index)
+      if (!newAccount || !l.AccountBasedExpenseLineDetail?.AccountRef) return l
+      return { ...l, AccountBasedExpenseLineDetail: { ...l.AccountBasedExpenseLineDetail, AccountRef: { value: newAccount } } }
+    })
+    await apiRequest(realmId, connectionId, "/bill", {
+      method: "POST",
+      body: JSON.stringify({ Id: bill.id, SyncToken: bill.syncToken, sparse: false, Line: line }),
+    })
+  }
+  try {
+    await attempt()
+  } catch (err) {
+    // QBO has no distinct "stale SyncToken" status — it comes back as the same http_400 any bad
+    // request shape does (lib/nango.ts's classifyHttpStatus drops the body a Fault payload would
+    // disambiguate with). Per the spec's Engineering questions, the write path retries once,
+    // re-reading the bill fresh, for exactly this shape of failure; an auth failure is never
+    // retried — reconnecting is a person's job, not a second identical write.
+    if (!(err instanceof IntegrationPermanentError)) throw err
+    await attempt()
+  }
 }
 
 // ---- Phase B: ledger sync ----------------------------------------------------------------------

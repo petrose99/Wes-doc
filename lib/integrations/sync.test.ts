@@ -67,4 +67,52 @@ describe("syncAccountingEntities", () => {
       where: { connectionId_entityType_externalId: { connectionId: "c2", entityType: "tax_rate", externalId: "Standard rate" } },
     }))
   })
+
+  it("guesses the Default account off the freshly-synced chart when still guessed (#429)", async () => {
+    db.integrationConnection = {
+      findUniqueOrThrow: vi.fn().mockResolvedValue({ id: "c1", workspaceId: "w1", provider: "quickbooks", externalTenantId: "realm1", defaultExpenseAccountGuessed: true }),
+      update: vi.fn(),
+    }
+    vi.mocked(quickbooks.listAccounts).mockResolvedValue([
+      { id: "a1", name: "Office supplies", active: true, accountType: "Expense" },
+      { id: "a2", name: "Uncategorized Expense", active: true, accountType: "Expense" },
+    ])
+    vi.mocked(quickbooks.listVendors).mockResolvedValue([])
+    vi.mocked(quickbooks.listTaxCodes).mockResolvedValue([])
+
+    await syncAccountingEntities("c1")
+
+    expect(db.integrationConnection.update).toHaveBeenCalledWith({
+      where: { id: "c1" },
+      data: { defaultExpenseAccountId: "a2", defaultExpenseAccountName: "Uncategorized Expense", defaultExpenseAccountGuessed: true },
+    })
+  })
+
+  it("does not overwrite an Owner-confirmed Default on re-sync (#429)", async () => {
+    db.integrationConnection = {
+      findUniqueOrThrow: vi.fn().mockResolvedValue({ id: "c1", workspaceId: "w1", provider: "quickbooks", externalTenantId: "realm1", defaultExpenseAccountGuessed: false }),
+      update: vi.fn(),
+    }
+    vi.mocked(quickbooks.listAccounts).mockResolvedValue([{ id: "a2", name: "Uncategorized Expense", active: true, accountType: "Expense" }])
+    vi.mocked(quickbooks.listVendors).mockResolvedValue([])
+    vi.mocked(quickbooks.listTaxCodes).mockResolvedValue([])
+
+    await syncAccountingEntities("c1")
+
+    expect(db.integrationConnection.update).not.toHaveBeenCalled()
+  })
+
+  it("leaves the Default null when no account matches the catch-all name (#429)", async () => {
+    db.integrationConnection = {
+      findUniqueOrThrow: vi.fn().mockResolvedValue({ id: "c1", workspaceId: "w1", provider: "quickbooks", externalTenantId: "realm1", defaultExpenseAccountGuessed: true }),
+      update: vi.fn(),
+    }
+    vi.mocked(quickbooks.listAccounts).mockResolvedValue([{ id: "a1", name: "Office supplies", active: true, accountType: "Expense" }])
+    vi.mocked(quickbooks.listVendors).mockResolvedValue([])
+    vi.mocked(quickbooks.listTaxCodes).mockResolvedValue([])
+
+    await syncAccountingEntities("c1")
+
+    expect(db.integrationConnection.update).not.toHaveBeenCalled()
+  })
 })
