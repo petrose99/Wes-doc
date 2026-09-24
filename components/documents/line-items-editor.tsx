@@ -60,7 +60,14 @@ function LineAccountCell({ row, accountOptions, supplierRuleAccountId, providerN
 }) {
   if (!row) return <LedgerAccountChip label={null} />
   const accountId = row.account_external_id
-  const account = accountId ? accountOptions.find((option) => option.externalId === accountId) ?? null : null
+  // #430 fix: the previous fallback-option check was gated on a lookup that could only be truthy
+  // when the account was *already* found in accountOptions — exactly the case it doesn't need to
+  // handle. That made the injected <option> dead code: whenever the coded account was missing
+  // from the synced chart (archived, or dropped from the provider), the select silently fell
+  // back to "— No account —" and the bill's real coded account vanished from view. Inject
+  // directly off `accountId`; label with the id itself when no synced name is available, rather
+  // than showing nothing.
+  const missingAccountOption = accountId && !accountOptions.some((option) => option.externalId === accountId) ? accountId : null
   const optionLabel = (option: AccountOption) => (option.code ? `${option.code} — ${option.name}` : option.name)
   const supplier = supplierName?.trim() || "This supplier"
   let provenance: string
@@ -89,7 +96,7 @@ function LineAccountCell({ row, accountOptions, supplierRuleAccountId, providerN
         aria-readonly={!!locked}
         className={`w-full min-w-0 truncate rounded-md border bg-white px-2 py-1 text-xs font-medium text-slate-800 focus:outline-none focus:ring-1 focus:ring-inset focus:ring-emerald-500 disabled:cursor-default disabled:bg-slate-50 disabled:text-slate-600 disabled:opacity-100 ${dirty ? "border-amber-400" : "border-slate-200"}`}>
         <option value="">— No account —</option>
-        {account && !accountOptions.some((option) => option.externalId === account.externalId) && <option value={account.externalId}>{optionLabel(account)}</option>}
+        {missingAccountOption && <option value={missingAccountOption}>{missingAccountOption}</option>}
         {accountOptions.map((option) => <option key={option.externalId} value={option.externalId}>{optionLabel(option)}</option>)}
       </select>
       {locked ? <p className="text-[11px] font-medium text-red-700">{accountCorrectionRefusalSentence(locked)}</p>
@@ -100,7 +107,7 @@ function LineAccountCell({ row, accountOptions, supplierRuleAccountId, providerN
     <select disabled value={accountId ?? ""} aria-label="Account"
       className="w-full min-w-0 truncate rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-600 disabled:cursor-default disabled:opacity-100">
       <option value="">— No account —</option>
-      {account && !accountOptions.some((option) => option.externalId === account.externalId) && <option value={account.externalId}>{optionLabel(account)}</option>}
+      {missingAccountOption && <option value={missingAccountOption}>{missingAccountOption}</option>}
       {accountOptions.map((option) => <option key={option.externalId} value={option.externalId}>{optionLabel(option)}</option>)}
     </select>
     <p className={`truncate text-[11px] ${!accountId ? "font-medium text-red-700" : "text-slate-500"}`}>{provenance}</p>
