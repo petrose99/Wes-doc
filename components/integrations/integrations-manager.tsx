@@ -138,11 +138,11 @@ function AccountingConnectionCard({ workspaceId, connection, isOwner, onChanged 
         </p>
       )}
       {isOwner && connection.status === "connected" && (
-        <div className="mt-2 flex items-center gap-2 text-xs">
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
           <Label htmlFor={`account-${connection.id}`} className="shrink-0 text-slate-600">Default expense account</Label>
           {accounts === null ? (
             loadingAccounts ? (
-              <span className="text-slate-600">Reading your chart of accounts…</span>
+              <span className="text-slate-600" aria-live="polite">Reading your chart of accounts…</span>
             ) : loadError ? (
               <span className="text-amber-700">
                 {loadError} <button type="button" className="font-medium underline underline-offset-2" onClick={loadAccounts}>Try again</button>
