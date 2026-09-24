@@ -13,7 +13,7 @@ import { getCurrentUser } from "@/lib/auth"
 import config from "@/lib/config"
 import { BillMappingError, normalizeBillFromDocument } from "@/lib/integration-bill-mapping"
 import { attemptIntegrationPush, getActiveIntegrationConnectionId, kickIntegrationPushDrain } from "@/lib/integration-push"
-import { getWorkspaceDocument, listReadyToPushDocuments } from "@/models/documents"
+import { getWorkspaceDocument, listReadyToPushDocuments, touchSupplierAccountRuleUsage } from "@/models/documents"
 import { upsertWorkspaceIntegrationPush, workspaceIntegrationsPlanEnabled } from "@/models/integrations"
 import { prisma } from "@/lib/db"
 import { revalidatePath } from "next/cache"
@@ -89,6 +89,9 @@ export async function pushDocumentToConnection(
   // cleared, so it never sits open once the ledger holds the document.
   if (updated?.status === "succeeded") {
     await prisma.reviewTask.updateMany({ where: { workspaceId, documentId, reason: "push_preflight", status: { in: ["open", "in_review"] } }, data: { status: "approved", resolvedAt: new Date() } })
+    const vendorName = (typeof reviewedData.vendor === "string" && reviewedData.vendor) || (typeof reviewedData.merchant === "string" && reviewedData.merchant) || null
+    const usedAccountExternalId = codingItems?.[0]?.account_external_id ?? null
+    await touchSupplierAccountRuleUsage(workspaceId, connection.id, vendorName, usedAccountExternalId)
   }
   return { status: updated?.status ?? "pending", errorCode: updated?.errorCode ?? null }
 }

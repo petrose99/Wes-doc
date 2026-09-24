@@ -403,6 +403,10 @@ describe("resolveDocumentCodingItems", () => {
   beforeEach(() => {
     db.integrationConnection = { findFirst: vi.fn() }
     db.supplierAccountRule = { findFirst: vi.fn() }
+    // Default: whatever account id is asked about comes back active, so the pre-existing tests
+    // below (written before the #429 archived-account fallback) keep exercising the ordinary
+    // supplier-rule/Default chain, not the fallback path. The fallback has its own describe block.
+    db.accountingEntity = { findMany: vi.fn((args: { where: { externalId: { in: string[] } } }) => Promise.resolve(args.where.externalId.in.map((externalId: string) => ({ externalId })))) }
   })
 
   it("resolves nothing when the workspace has no connected accounting connection", async () => {
@@ -458,5 +462,97 @@ describe("resolveDocumentCodingItems", () => {
       workspaceId: "w1", vendorName: null, category: null, codingSource: "ai", codedAt: new Date("2026-06-15"), lineCount: 0,
     })
     expect(items).toHaveLength(1)
+  })
+
+  describe("archived-account fallback (#429)", () => {
+    it("falls back to the Default and flags the row when the matched supplier rule's account is archived", async () => {
+      db.integrationConnection.findFirst.mockResolvedValue({
+        id: "conn1", createdAt: new Date("2026-01-01"), defaultExpenseAccountId: "default_1", defaultExpenseAccountGuessed: false,
+      })
+      db.supplierAccountRule.findFirst.mockResolvedValue({ accountExternalId: "acme_usual" })
+      db.accountingEntity.findMany.mockResolvedValue([{ externalId: "default_1" }]) // acme_usual not active
+      const items = await resolveDocumentCodingItems({
+        workspaceId: "w1", vendorName: "Acme", category: null, codingSource: "ai", codedAt: new Date("2026-06-15"), lineCount: 1,
+      })
+      expect(items).toEqual([{ account_external_id: "default_1", account_source: "default_confirmed", account_archived_fallback: true }])
+    })
+
+    it("resolves no account at all when the connection's Default itself is archived and there is no rule", async () => {
+      db.integrationConnection.findFirst.mockResolvedValue({
+        id: "conn1", createdAt: new Date("2026-01-01"), defaultExpenseAccountId: "default_1", defaultExpenseAccountGuessed: false,
+      })
+      db.supplierAccountRule.findFirst.mockResolvedValue(null)
+      db.accountingEntity.findMany.mockResolvedValue([]) // default_1 not active
+      const items = await resolveDocumentCodingItems({
+        workspaceId: "w1", vendorName: "New Vendor", category: null, codingSource: "ai", codedAt: new Date("2026-06-15"), lineCount: 1,
+      })
+      expect(items).toEqual([{ account_external_id: null, account_source: null }])
+    })
+  })
+})
+
+describe("learnSupplierAccountRuleFromApproval", () => {
+  beforeEach(() => {
+    db.document = { findFirst: vi.fn() }
+    db.integrationConnection = { findFirst: vi.fn() }
+    db.supplierAccountRule = { upsert: vi.fn() }
+  })
+
+  it("upserts a rule keyed on the connection and the normalized supplier for the line with the largest amount", async () => {
+    const { learnSupplierAccountRuleFromApproval } = await import("@/models/documents")
+    db.document.findFirst.mockResolvedValue({
+      reviewedData: { vendor: "ACME Ltd.", line_items: [{ amount: 10 }, { amount: 90 }] },
+      codingData: { items: [{ account_external_id: "small_acct", account_source: "default_guessed" }, { account_external_id: "big_acct", account_source: "default_guessed" }] },
+    })
+    db.integrationConnection.findFirst.mockResolvedValue({ id: "conn1" })
+    await learnSupplierAccountRuleFromApproval("w1", "doc1")
+    expect(db.supplierAccountRule.upsert).toHaveBeenCalledWith({
+      where: { connectionId_supplierName: { connectionId: "conn1", supplierName: "acme" } },
+      create: { workspaceId: "w1", connectionId: "conn1", supplierName: "acme", accountExternalId: "big_acct", lastUsedAt: expect.any(Date) },
+      update: { accountExternalId: "big_acct", lastUsedAt: expect.any(Date) },
+    })
+  })
+
+  it("does nothing for a legacy-chain resolution (no account_source)", async () => {
+    const { learnSupplierAccountRuleFromApproval } = await import("@/models/documents")
+    db.document.findFirst.mockResolvedValue({
+      reviewedData: { vendor: "Acme", line_items: [{ amount: 10 }] },
+      codingData: { items: [{ account_external_id: "legacy_acct", account_source: null }] },
+    })
+    await learnSupplierAccountRuleFromApproval("w1", "doc1")
+    expect(db.integrationConnection.findFirst).not.toHaveBeenCalled()
+    expect(db.supplierAccountRule.upsert).not.toHaveBeenCalled()
+  })
+
+  it("does nothing when the document has no vendor name", async () => {
+    const { learnSupplierAccountRuleFromApproval } = await import("@/models/documents")
+    db.document.findFirst.mockResolvedValue({
+      reviewedData: { line_items: [{ amount: 10 }] },
+      codingData: { items: [{ account_external_id: "acct", account_source: "default_guessed" }] },
+    })
+    await learnSupplierAccountRuleFromApproval("w1", "doc1")
+    expect(db.supplierAccountRule.upsert).not.toHaveBeenCalled()
+  })
+})
+
+describe("touchSupplierAccountRuleUsage", () => {
+  beforeEach(() => {
+    db.supplierAccountRule = { updateMany: vi.fn() }
+  })
+
+  it("bumps lastUsedAt for the matching rule", async () => {
+    const { touchSupplierAccountRuleUsage } = await import("@/models/documents")
+    await touchSupplierAccountRuleUsage("w1", "conn1", "ACME Ltd.", "acct_1")
+    expect(db.supplierAccountRule.updateMany).toHaveBeenCalledWith({
+      where: { workspaceId: "w1", connectionId: "conn1", supplierName: "acme", accountExternalId: "acct_1" },
+      data: { lastUsedAt: expect.any(Date) },
+    })
+  })
+
+  it("does nothing without a vendor name or account", async () => {
+    const { touchSupplierAccountRuleUsage } = await import("@/models/documents")
+    await touchSupplierAccountRuleUsage("w1", "conn1", null, "acct_1")
+    await touchSupplierAccountRuleUsage("w1", "conn1", "Acme", null)
+    expect(db.supplierAccountRule.updateMany).not.toHaveBeenCalled()
   })
 })

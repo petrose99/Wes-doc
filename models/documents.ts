@@ -514,12 +514,93 @@ export async function resolveDocumentCodingItems(input: {
   const rule = normalizedVendor
     ? await prisma.supplierAccountRule.findFirst({ where: { connectionId: connection.id, supplierName: normalizedVendor }, select: { accountExternalId: true } })
     : null
+  // #429 archived-account fallback: a supplier rule or the connection Default can point at an
+  // AccountingEntity a person later deactivated in the provider. Check both candidates' activity
+  // in one query rather than trusting either id blindly.
+  const candidateIds = [rule?.accountExternalId, connection.defaultExpenseAccountId].filter((id): id is string => Boolean(id))
+  const activeAccounts = candidateIds.length
+    ? await prisma.accountingEntity.findMany({ where: { connectionId: connection.id, entityType: "account", externalId: { in: candidateIds }, active: true }, select: { externalId: true } })
+    : []
+  const activeIds = new Set(activeAccounts.map((account) => account.externalId))
+  const ruleAccountId = rule?.accountExternalId ?? null
+  const ruleAccountActive = ruleAccountId ? activeIds.has(ruleAccountId) : false
+  const ruleArchivedFallback = Boolean(ruleAccountId) && !ruleAccountActive
+  // An archived Default is not "fall back further" — there is nothing left to fall back to — so
+  // it resolves like no Default at all, and the existing "every line has an Account" eligibility
+  // check (lib/integration-push-selection.ts) blocks posting the same way a missing Default does.
+  const defaultAccountId = connection.defaultExpenseAccountId && activeIds.has(connection.defaultExpenseAccountId)
+    ? connection.defaultExpenseAccountId
+    : null
   const resolution = resolveLineAccount({
-    supplierRuleAccountId: rule?.accountExternalId ?? null,
-    defaultAccountId: connection.defaultExpenseAccountId,
+    supplierRuleAccountId: ruleAccountActive ? ruleAccountId : null,
+    defaultAccountId,
     defaultAccountGuessed: connection.defaultExpenseAccountGuessed,
   })
-  return resolveDocumentLineAccounts(lineCount, resolution)
+  const rows = resolveDocumentLineAccounts(lineCount, resolution)
+  return ruleArchivedFallback ? rows.map((row) => ({ ...row, account_archived_fallback: true })) : rows
+}
+
+/** #429: learns a supplier's usual expense account when a document is approved — the account
+ * resolved onto the line with the largest amount (they are currently all the same account, per
+ * resolveLineAccount's one-account-per-document scope, but this reads amounts rather than
+ * assuming that so it keeps working if that scope ever loosens). Upserts
+ * `SupplierAccountRule[connectionId, supplierName]`, refreshing `lastUsedAt` on every re-approval
+ * of the same supplier so "Forget" (Accounting page) always deletes a genuinely stale row.
+ * Fire-and-forget like the other approval-signal writers in models/suppliers.ts: a missed rule
+ * only costs a future pre-fill, never the approval it rode in on. Skips legacy-chain resolutions
+ * (`account_source: null`) — those didn't come from the supplier/Default chain this rule feeds. */
+export async function learnSupplierAccountRuleFromApproval(workspaceId: string, documentId: string): Promise<void> {
+  try {
+    const document = await prisma.document.findFirst({
+      where: { id: documentId, workspaceId },
+      select: { reviewedData: true, codingData: true },
+    })
+    if (!document) return
+    const reviewedData = (document.reviewedData as Record<string, unknown> | null) ?? {}
+    const vendorName = (typeof reviewedData.vendor === "string" && reviewedData.vendor) || (typeof reviewedData.merchant === "string" && reviewedData.merchant) || null
+    if (!vendorName?.trim()) return
+    const coding = (document.codingData as Record<string, unknown> | null) ?? {}
+    const items = Array.isArray(coding.items) ? (coding.items as LineAccountRow[]) : []
+    if (!items.length) return
+    const lineItems = Array.isArray(reviewedData.line_items) ? (reviewedData.line_items as Array<Record<string, unknown>>) : []
+    let bestIndex = -1
+    let bestAmount = -Infinity
+    items.forEach((item, index) => {
+      if (!item.account_external_id || !item.account_source) return
+      const amount = typeof lineItems[index]?.amount === "number" ? (lineItems[index].amount as number) : 0
+      if (bestIndex === -1 || amount > bestAmount) { bestIndex = index; bestAmount = amount }
+    })
+    if (bestIndex === -1) return
+    const accountExternalId = items[bestIndex].account_external_id
+    if (!accountExternalId) return
+    const connection = await prisma.integrationConnection.findFirst({ where: { workspaceId, status: "connected" }, select: { id: true } })
+    if (!connection) return
+    const supplierName = normalizeSupplierName(vendorName)
+    await prisma.supplierAccountRule.upsert({
+      where: { connectionId_supplierName: { connectionId: connection.id, supplierName } },
+      create: { workspaceId, connectionId: connection.id, supplierName, accountExternalId, lastUsedAt: new Date() },
+      update: { accountExternalId, lastUsedAt: new Date() },
+    })
+  } catch (error) {
+    console.error("[documents] failed to learn supplier account rule:", error instanceof Error ? error.message : error)
+  }
+}
+
+/** #429: bumps `lastUsedAt` when a push actually posts using a supplier's learned account, so
+ * "Forget" on the Accounting page judges staleness by real use, not just how long ago the rule
+ * was learned. Only bumps when the pushed account still matches the rule's account — a document
+ * whose vendor no longer matches this rule (renamed, or the rule was retargeted) should not keep
+ * a stale rule looking fresh. Fire-and-forget, same rationale as the writers above. */
+export async function touchSupplierAccountRuleUsage(workspaceId: string, connectionId: string, vendorName: string | null, accountExternalId: string | null): Promise<void> {
+  if (!vendorName?.trim() || !accountExternalId) return
+  try {
+    await prisma.supplierAccountRule.updateMany({
+      where: { workspaceId, connectionId, supplierName: normalizeSupplierName(vendorName), accountExternalId },
+      data: { lastUsedAt: new Date() },
+    })
+  } catch (error) {
+    console.error("[documents] failed to bump supplier account rule usage:", error instanceof Error ? error.message : error)
+  }
 }
 
 export async function updateDocumentReview(input: { workspaceId: string; documentId: string; reviewedData: Record<string, unknown>; actorId: string }) {

@@ -8,7 +8,7 @@ import { refreshDocumentReadiness } from "@/lib/readiness/refresh"
 import { creditSupplierForCleanApproval } from "@/models/suppliers"
 import { getCurrentUser } from "@/lib/auth"
 import { parseTemplateFields } from "@/lib/document-templates"
-import { setDocumentPaymentStatus } from "@/models/documents"
+import { learnSupplierAccountRuleFromApproval, setDocumentPaymentStatus } from "@/models/documents"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { prisma } from "@/lib/db"
 import { listApprovalWorkflows, startWorkflowOnReviewTask } from "@/models/approval-workflows"
@@ -50,6 +50,7 @@ export async function updateReviewTaskStatusAction(workspaceId: string, taskId: 
     // meant to measure. Credited before readiness re-runs so this document is judged against the
     // threshold its own approval just earned.
     if (parsed === "approved") await creditSupplierForCleanApproval(workspaceId, task.documentId)
+    if (parsed === "approved") await learnSupplierAccountRuleFromApproval(workspaceId, task.documentId)
     await refreshDocumentReadiness({ workspaceId, documentId: task.documentId })
     if (parsed === "approved") await maybeAutopublish(workspaceId, task.documentId, user.id)
     revalidatePath(paths(workspaceId).review)
@@ -70,6 +71,7 @@ export async function bulkUpdateReviewTaskStatusAction(workspaceId: string, task
     const result = await bulkUpdateReviewTaskStatus({ workspaceId, taskIds, status: parsed, actorId: user.id })
     if (parsed === "approved") await Promise.all(result.documentIds.map((documentId) => maybeConfirmAiCoding(workspaceId, documentId, user.id)))
     if (parsed === "approved") await Promise.all(result.documentIds.map((documentId) => creditSupplierForCleanApproval(workspaceId, documentId)))
+    if (parsed === "approved") await Promise.all(result.documentIds.map((documentId) => learnSupplierAccountRuleFromApproval(workspaceId, documentId)))
     await Promise.all(result.documentIds.map((documentId) => refreshDocumentReadiness({ workspaceId, documentId })))
     if (parsed === "approved") await Promise.all(result.documentIds.map((documentId) => maybeAutopublish(workspaceId, documentId, user.id)))
     revalidatePath(paths(workspaceId).review)
@@ -218,6 +220,7 @@ export async function decideReviewTaskStageAction(workspaceId: string, taskId: s
   try {
     const task = await decideReviewTaskStage({ workspaceId, taskId, decision, actorId: user.id, actorRole: membership.role === "owner" ? "owner" : "member", note: note ?? null })
     if (task.status === "approved") await maybeConfirmAiCoding(workspaceId, task.documentId, user.id)
+    if (task.status === "approved") await learnSupplierAccountRuleFromApproval(workspaceId, task.documentId)
     await refreshDocumentReadiness({ workspaceId, documentId: task.documentId })
     if (task.status === "approved") await maybeAutopublish(workspaceId, task.documentId, user.id)
     revalidatePath(paths(workspaceId).review)

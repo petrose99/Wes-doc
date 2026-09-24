@@ -15,6 +15,12 @@ export type LineAccountResolution = {
 export type LineAccountRow = {
   account_external_id: string | null
   account_source: LineAccountSource | null
+  /** #429: set when a matched supplier rule's account is no longer an active AccountingEntity —
+   * the caller (models/documents.ts's resolveDocumentCodingItems) fell back to the connection
+   * Default instead of the archived rule, and the surface layer flags that fallback rather than
+   * showing it as an ordinary Default resolution. Never set by the pure functions below, which
+   * have no account-activity data to know this from; the DB-touching orchestration adds it. */
+  account_archived_fallback?: boolean
 }
 
 /** Resolves the ONE account every line of a document takes (scope: one account per document, not
