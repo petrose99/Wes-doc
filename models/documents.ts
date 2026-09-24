@@ -421,6 +421,97 @@ export async function listReadyToPushDocuments(workspaceId: string, connectionId
   return { documents: results, droppedCount }
 }
 
+export type AffectedBillLineChange = { index: number; oldAccountExternalId: string }
+
+export type AffectedBillRow = {
+  id: string
+  filename: string
+  vendorName: string
+  total: number
+  currencyCode: string | null
+  receivedAt: Date
+  /** "paid" when Document.paymentStatus is "paid" (documentStage's own precedence — a paid bill
+   * is reported paid regardless of push status); otherwise "posted" (a succeeded push exists). A
+   * bill can only be affected at all if one of these is true — see the where-clause below. */
+  ledgerFact: "posted" | "paid"
+  externalBillId: string | null
+  /** Every line on this document whose codingData.items[].account_external_id still matches the
+   * old account — the "N lines → {new account}" Change-column count, and the index set
+   * updateSelectedBillAccountsAction resends to the provider. */
+  lines: AffectedBillLineChange[]
+}
+
+/** Screen 1's "N bills already posted" query (#430) — reviewed documents on `connectionId` whose
+ * `codingData.items` still carries `oldAccountExternalId` on at least one line, and whose ledger
+ * fact (`lib/documents/stages.ts` precedence) is posted or paid. Excludes a document the Owner has
+ * already dismissed via "Leave them" for this exact old account (`accountCorrectionDismissedAt` +
+ * `accountCorrectionDismissedFromAccountId`) — a *later* correction (a different old account) is
+ * not excluded, since dismissing one correction doesn't dismiss the next.
+ *
+ * Filters in JS rather than a Prisma JSON-path query: `codingData.items` is a JSON array and the
+ * match is "does any element have this key/value", which Prisma's JSON filters don't express
+ * portably — the candidate set (reviewed + succeeded-push-to-this-connection OR paid) is already
+ * small per workspace, so an in-process filter is simplest and matches listReadyToPushDocuments's
+ * existing pattern of filtering pushed documents in JS. */
+export async function findBillsAffectedByAccountChange(workspaceId: string, connectionId: string, oldAccountExternalId: string): Promise<AffectedBillRow[]> {
+  const [pushes, candidates] = await Promise.all([
+    listWorkspaceIntegrationPushes(workspaceId),
+    prisma.document.findMany({
+      where: { workspaceId, status: "reviewed", codingData: { not: Prisma.JsonNull } },
+      select: { id: true, filename: true, receivedAt: true, reviewedData: true, rawExtraction: true, codingData: true, paymentStatus: true, baseCurrencyTotal: true, accountCorrectionDismissedAt: true, accountCorrectionDismissedFromAccountId: true },
+    }),
+  ])
+  const succeededByDocumentId = new Map(pushes.filter((p) => p.connectionId === connectionId && p.status === "succeeded").map((p) => [p.documentId, p]))
+  const results: AffectedBillRow[] = []
+  for (const doc of candidates) {
+    const push = succeededByDocumentId.get(doc.id)
+    const ledgerFact: "posted" | "paid" | null = doc.paymentStatus === "paid" ? "paid" : push ? "posted" : null
+    if (!ledgerFact) continue
+    if (doc.accountCorrectionDismissedAt && doc.accountCorrectionDismissedFromAccountId === oldAccountExternalId) continue
+    const coding = (doc.codingData as Record<string, unknown> | null) ?? {}
+    const items = Array.isArray(coding.items) ? (coding.items as Array<{ account_external_id?: string | null }>) : []
+    const lines: AffectedBillLineChange[] = []
+    items.forEach((item, index) => { if (item.account_external_id === oldAccountExternalId) lines.push({ index, oldAccountExternalId }) })
+    if (!lines.length) continue
+    const reviewedData = (doc.reviewedData as Record<string, unknown> | null) ?? (doc.rawExtraction as Record<string, unknown> | null) ?? {}
+    const vendorName = (typeof reviewedData.vendor === "string" && reviewedData.vendor) || (typeof reviewedData.merchant === "string" && reviewedData.merchant) || "Unknown supplier"
+    const total = doc.baseCurrencyTotal !== null ? Number(doc.baseCurrencyTotal) : (typeof reviewedData.total === "number" ? reviewedData.total : 0)
+    const currencyCode = typeof reviewedData.currency_code === "string" ? reviewedData.currency_code : null
+    results.push({ id: doc.id, filename: doc.filename, vendorName, total, currencyCode, receivedAt: doc.receivedAt, ledgerFact, externalBillId: push?.externalBillId ?? null, lines })
+  }
+  return results
+}
+
+/** Screen 1/3's "Leave them" (#430) — marks the given documents as resolved-without-updating for
+ * this specific old account, so `findBillsAffectedByAccountChange` stops surfacing them until (if
+ * ever) a further correction targets a different old account. Idempotent: re-running on an
+ * already-dismissed document just rewrites the same flag. */
+export async function dismissAccountCorrectionForDocuments(workspaceId: string, documentIds: string[], oldAccountExternalId: string): Promise<void> {
+  if (!documentIds.length) return
+  await prisma.document.updateMany({
+    where: { workspaceId, id: { in: documentIds } },
+    data: { accountCorrectionDismissedAt: new Date(), accountCorrectionDismissedFromAccountId: oldAccountExternalId },
+  })
+}
+
+/** Screen 1/2's "Update N bills in {Provider}" (#430) — stamps the corrected account onto every
+ * matching line of `codingData.items` (account_source becomes "manual": a person, via the Owner's
+ * bulk action or the Detail pane, chose this) and clears any prior dismissal for this document,
+ * since a successful update supersedes a "Leave them" decision. Called once per document AFTER the
+ * provider write has already succeeded (lib/integrations/{quickbooks,xero}/client.ts's
+ * updateBillAccounts) — this only updates DocuBite's own record of the fact. */
+export async function recordAccountCorrectionApplied(workspaceId: string, documentId: string, oldAccountExternalId: string, newAccountExternalId: string): Promise<void> {
+  const doc = await prisma.document.findFirst({ where: { id: documentId, workspaceId }, select: { codingData: true } })
+  if (!doc) return
+  const coding = (doc.codingData as Record<string, unknown> | null) ?? {}
+  const items = Array.isArray(coding.items) ? (coding.items as Array<Record<string, unknown>>) : []
+  const nextItems = items.map((item) => (item.account_external_id === oldAccountExternalId ? { ...item, account_external_id: newAccountExternalId, account_source: "manual" } : item))
+  await prisma.document.update({
+    where: { id: documentId },
+    data: { codingData: { ...coding, items: nextItems } as Prisma.InputJsonValue, accountCorrectionDismissedAt: null, accountCorrectionDismissedFromAccountId: null },
+  })
+}
+
 /** Which of the given documents currently have a queued/processing DocumentProcessingJob — what
  * the pipeline Inbox tab's inline spinner (documentStage's `hasActiveJob`) is driven by. */
 export async function activeJobDocumentIds(workspaceId: string, documentIds: string[]): Promise<Set<string>> {
