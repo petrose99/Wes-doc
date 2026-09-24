@@ -62,7 +62,12 @@ The person an Expense claim reimburses: the member who assembled and submitted i
 _Avoid_: Submitter, employee
 
 **Bank Statement**:
-The typed destination for a bank statement. The reviewer asserts the issuing institution; the first statement for that institution becomes its saved layout, and later uploads are checked against it for drift.
+The typed destination for a bank statement. The reviewer asserts the issuing institution; the first statement for that institution becomes its saved layout, and later uploads are checked against it for drift. A Bank Statement is DocuBite's proof that an invoice or receipt was paid outside DocuBite: once a Statement match is confirmed, the document reads Paid and names the statement line as its evidence. It never settles a Payment line — that is the rail's alone. It is never posted; its lines reach the ledger through the ledger's own statement import.
+_Avoid_: bank feed (DocuBite is not one)
+
+**Statement match**:
+A suggested pairing of one debit line on a Bank Statement with an unpaid Invoice or Receipt that has no Payment line: same amount exactly, dated from the document's date up to 60 days after it. It is never confirmed by itself. When one line fits two documents, both are listed and neither is picked. Any member who can approve confirms it (Confirm paid) or dismisses it (Not this). Confirming marks the document Paid, and Undo returns it to Unpaid, from either side, until the document goes onto a Payment line. The queue counts the unconfirmed ones as Payments to confirm.
+_Avoid_: reconciliation, bank match, reconciled (only the ledger reconciles)
 
 **Check**:
 A tri-valued (pass/warn/fail), explainable comparison that states in plain language why a value is flagged, anchored to the field, cell, or row it concerns. "Mismatch" names one Check status, not the category.
@@ -114,7 +119,7 @@ The one email an Approver gets when Approvals reach a stage they can decide: eve
 _Avoid_: Reminder (as the user-facing name), digest, alert, push, notification (as a badge count)
 
 **Post** (verb):
-Sending an approved document's reviewed data to the ledger as a bill, expense or bank transaction, from the queue the document is on — the bulk bar's Post, or Post to ledger for the open row. Only Invoices, Receipts and Bank Statements can be posted; a row is eligible once it is Approved, every line has an Account, its currency is resolved, and it is not cancelled or already posted. Posting is a Server-confirmed action with a Partial outcome per row. Nothing un-posts. A posted bill's Accounts can be corrected from DocuBite where the ledger allows it; everything else about it is the ledger's.
+Sending an approved document's reviewed data to the ledger as a bill or expense, from the queue the document is on — the bulk bar's Post, or Post to ledger for the open row. Only Invoices and Receipts can be posted — a Bank Statement never is; a row is eligible once it is Approved, every line has an Account, its currency is resolved, and it is not cancelled or already posted. Posting is a Server-confirmed action with a Partial outcome per row. Nothing un-posts. A posted bill's Accounts can be corrected from DocuBite where the ledger allows it; everything else about it is the ledger's.
 _Avoid_: push, sync, send to the ledger, export (that is the CSV)
 
 **Posted**:
