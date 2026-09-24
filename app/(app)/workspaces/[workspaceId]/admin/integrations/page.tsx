@@ -6,6 +6,7 @@ import { SupplierAccountsTable } from "@/components/settings/supplier-accounts-t
 import { getAdminContext } from "@/lib/admin/context"
 import { resolveAccountOptions } from "@/lib/automation/account-options"
 import config from "@/lib/config"
+import { formatUnresolvedAccountId } from "@/lib/finance/line-account-resolution"
 import { WEBHOOK_EVENT_TYPES } from "@/lib/webhooks"
 import { getLastSyncedAt, listAccountingEntities, listAccountingEntitiesIncludingInactive } from "@/models/accounting-entities"
 import { listCategoryAccountMappings } from "@/models/category-account-mappings"
@@ -66,8 +67,12 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ w
     const byRule = await findAccountCorrectionReminders(workspaceId, activeConnection.id, supplierRules)
     const oldAccountIds = Array.from(new Set(Array.from(byRule.values()).map((r) => r.oldAccountExternalId)))
     const names = oldAccountIds.length ? await resolveAccountNames(activeConnection.id, oldAccountIds) : {}
+    // #430 evaluate re-run finding (P2): when the provider name lookup can't resolve an id (dropped
+    // from the synced chart), this used to fall back to the raw external id verbatim in the reminder
+    // copy ("... still on sundry-expenses"). Format it the same way as the Screen 2 fallback option
+    // (line-items-editor.tsx) rather than leaking the internal identifier.
     reminders = Object.fromEntries(
-      Array.from(byRule.entries()).map(([supplierName, r]) => [supplierName, { ...r, oldAccountName: names[r.oldAccountExternalId] ?? r.oldAccountExternalId }])
+      Array.from(byRule.entries()).map(([supplierName, r]) => [supplierName, { ...r, oldAccountName: names[r.oldAccountExternalId] ?? formatUnresolvedAccountId(r.oldAccountExternalId) }])
     )
   }
 

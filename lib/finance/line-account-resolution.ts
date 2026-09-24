@@ -58,3 +58,11 @@ export function resolveDocumentLineAccounts(lineCount: number, resolution: LineA
   const row: LineAccountRow = { account_external_id: resolution.accountExternalId, account_source: resolution.accountSource }
   return Array.from({ length: Math.max(lineCount, 0) }, () => ({ ...row }))
 }
+
+/** #430 evaluate re-run finding (P2): several #430 surfaces (Screen 1/3's reminder row and Review
+ * dialog, Screen 2's fallback Account option) fall back to a raw provider `externalId` when a name
+ * lookup can't resolve one — an archived or since-deleted account. Rather than leaking that internal
+ * identifier verbatim into UI copy, format it as a readable, honestly-labeled placeholder. */
+export function formatUnresolvedAccountId(id: string): string {
+  return `${id.replace(/[-_]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())} (not synced)`
+}

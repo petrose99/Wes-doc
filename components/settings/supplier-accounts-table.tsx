@@ -8,6 +8,7 @@ import {
 } from "@/app/(app)/workspaces/[workspaceId]/account-correction-actions"
 import { AccountCorrectionDialog } from "@/components/integrations/account-correction-dialog"
 import { Input } from "@/components/ui/input"
+import { formatUnresolvedAccountId } from "@/lib/finance/line-account-resolution"
 import type { SupplierAccountRuleRow } from "@/models/supplier-account-rules"
 import { useMemo, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
@@ -109,7 +110,7 @@ export function SupplierAccountsTable({ workspaceId, connectionId, rules, accoun
                 <td className="py-2">
                   {account?.archived
                     ? <>{defaultAccountName ?? account.label} <span className="text-slate-600">({rule.supplierName}&rsquo;s account was archived in {providerLabel})</span></>
-                    : (account?.label ?? rule.accountExternalId)}
+                    : (account?.label ?? formatUnresolvedAccountId(rule.accountExternalId))}
                   {isOwner && reminder && (
                     <p className="mt-1 text-xs text-amber-700">
                       {reminder.count} posted bill{reminder.count === 1 ? "" : "s"} still on {reminder.oldAccountName} ·{" "}

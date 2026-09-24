@@ -10,6 +10,7 @@ import { ActionState } from "@/lib/actions"
 import { recordDocumentAudit } from "@/lib/audit"
 import { getCurrentUser } from "@/lib/auth"
 import config from "@/lib/config"
+import { formatUnresolvedAccountId } from "@/lib/finance/line-account-resolution"
 import { IntegrationPermanentError } from "@/lib/integrations/errors"
 import { checkQuickBooksBillCorrectable, updateBillAccounts as updateQuickBooksBillAccounts } from "@/lib/integrations/quickbooks/client"
 import { checkXeroBillCorrectable, updateBillAccounts as updateXeroBillAccounts } from "@/lib/integrations/xero/client"
@@ -106,8 +107,11 @@ export async function checkAffectedByRuleChangeAction(workspaceId: string, conne
     data: {
       provider: connection.provider,
       providerLabel: PROVIDER_LABELS[connection.provider] ?? connection.provider,
-      oldAccountName: names[oldAccountExternalId] ?? oldAccountExternalId,
-      newAccountName: names[newAccountExternalId] ?? newAccountExternalId,
+      // #430 evaluate re-run finding (P2): don't leak a raw external id into the Review dialog copy
+      // when the name lookup can't resolve it — format it the same way as the page.tsx reminder row
+      // and line-items-editor.tsx's Screen 2 fallback option.
+      oldAccountName: names[oldAccountExternalId] ?? formatUnresolvedAccountId(oldAccountExternalId),
+      newAccountName: names[newAccountExternalId] ?? formatUnresolvedAccountId(newAccountExternalId),
       bills: withChecks,
     },
   }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { resolveDocumentLineAccounts, resolveLineAccount, usesLegacyAccountChain } from "./line-account-resolution"
+import { formatUnresolvedAccountId, resolveDocumentLineAccounts, resolveLineAccount, usesLegacyAccountChain } from "./line-account-resolution"
 
 describe("resolveLineAccount", () => {
   it("prefers the supplier rule over the Default", () => {
@@ -58,5 +58,16 @@ describe("resolveDocumentLineAccounts", () => {
   it("returns an empty array for zero or negative line counts", () => {
     expect(resolveDocumentLineAccounts(0, { accountExternalId: "acc-1", accountSource: "supplier" })).toEqual([])
     expect(resolveDocumentLineAccounts(-1, { accountExternalId: "acc-1", accountSource: "supplier" })).toEqual([])
+  })
+})
+
+describe("formatUnresolvedAccountId", () => {
+  it("title-cases a hyphenated or underscored id and marks it explicitly unsynced", () => {
+    expect(formatUnresolvedAccountId("sundry-expenses")).toBe("Sundry Expenses (not synced)")
+    expect(formatUnresolvedAccountId("office_supplies")).toBe("Office Supplies (not synced)")
+  })
+
+  it("leaves a single-word id capitalized with no double-spacing", () => {
+    expect(formatUnresolvedAccountId("fuel")).toBe("Fuel (not synced)")
   })
 })

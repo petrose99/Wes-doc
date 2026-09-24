@@ -1,7 +1,7 @@
 "use client"
 
 import type { DocumentItemFieldDefinition } from "@/lib/document-templates"
-import type { LineAccountRow } from "@/lib/finance/line-account-resolution"
+import { formatUnresolvedAccountId, type LineAccountRow } from "@/lib/finance/line-account-resolution"
 import type { AccountOption } from "@/models/documents"
 import type { Ref } from "@/lib/provenance"
 import type { LineMatch } from "@/lib/matching/line-match"
@@ -68,11 +68,6 @@ function LineAccountCell({ row, accountOptions, supplierRuleAccountId, providerN
   // directly off `accountId`; label with the id itself when no synced name is available, rather
   // than showing nothing.
   const missingAccountOption = accountId && !accountOptions.some((option) => option.externalId === accountId) ? accountId : null
-  // #430 evaluate re-run finding (P2): the injected fallback option above used to render the raw
-  // `accountId` slug verbatim next to formatted peers ("6000 — General Expenses"). We have no
-  // synced name for it (that's why it's missing from `accountOptions`), so title-case the slug and
-  // mark it explicitly unsynced rather than presenting an internal identifier as if it were a label.
-  const missingAccountLabel = (id: string) => `${id.replace(/[-_]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())} (not synced)`
   const optionLabel = (option: AccountOption) => (option.code ? `${option.code} — ${option.name}` : option.name)
   const supplier = supplierName?.trim() || "This supplier"
   let provenance: string
@@ -101,7 +96,7 @@ function LineAccountCell({ row, accountOptions, supplierRuleAccountId, providerN
         aria-readonly={!!locked}
         className={`w-full min-w-0 truncate rounded-md border bg-white px-2 py-1 text-xs font-medium text-slate-800 focus:outline-none focus:ring-1 focus:ring-inset focus:ring-emerald-500 disabled:cursor-default disabled:bg-slate-50 disabled:text-slate-600 disabled:opacity-100 ${dirty ? "border-amber-400" : "border-slate-200"}`}>
         <option value="">— No account —</option>
-        {missingAccountOption && <option value={missingAccountOption}>{missingAccountLabel(missingAccountOption)}</option>}
+        {missingAccountOption && <option value={missingAccountOption}>{formatUnresolvedAccountId(missingAccountOption)}</option>}
         {accountOptions.map((option) => <option key={option.externalId} value={option.externalId}>{optionLabel(option)}</option>)}
       </select>
       {locked ? <p className="text-[11px] font-medium text-red-700">{accountCorrectionRefusalSentence(locked)}</p>
@@ -112,7 +107,7 @@ function LineAccountCell({ row, accountOptions, supplierRuleAccountId, providerN
     <select disabled value={accountId ?? ""} aria-label="Account"
       className="w-full min-w-0 truncate rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-600 disabled:cursor-default disabled:opacity-100">
       <option value="">— No account —</option>
-      {missingAccountOption && <option value={missingAccountOption}>{missingAccountLabel(missingAccountOption)}</option>}
+      {missingAccountOption && <option value={missingAccountOption}>{formatUnresolvedAccountId(missingAccountOption)}</option>}
       {accountOptions.map((option) => <option key={option.externalId} value={option.externalId}>{optionLabel(option)}</option>)}
     </select>
     <p className={`truncate text-[11px] ${!accountId ? "font-medium text-red-700" : "text-slate-500"}`}>{provenance}</p>
