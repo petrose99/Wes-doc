@@ -512,6 +512,25 @@ export async function recordAccountCorrectionApplied(workspaceId: string, docume
   })
 }
 
+/** Screen 2's single-document Detail-pane Account edit (#430) — unlike `recordAccountCorrectionApplied`
+ * (which retargets every line still on one old account, for the list/rule path), this writes each
+ * line's account independently by index, since a person editing one bill by hand may pick a
+ * different new account per line. Called once, after the provider write has already succeeded, and
+ * never writes a `SupplierAccountRule` — this path is scoped to the one bill (spec §Screen 2: "This
+ * path never teaches the Supplier rule"). */
+export async function recordDocumentLineAccountsCorrected(workspaceId: string, documentId: string, changes: { index: number; newAccountExternalId: string }[]): Promise<void> {
+  const doc = await prisma.document.findFirst({ where: { id: documentId, workspaceId }, select: { codingData: true } })
+  if (!doc) return
+  const coding = (doc.codingData as Record<string, unknown> | null) ?? {}
+  const items = Array.isArray(coding.items) ? (coding.items as Array<Record<string, unknown>>) : []
+  const byIndex = new Map(changes.map((c) => [c.index, c.newAccountExternalId]))
+  const nextItems = items.map((item, index) => (byIndex.has(index) ? { ...item, account_external_id: byIndex.get(index), account_source: "manual" } : item))
+  await prisma.document.update({
+    where: { id: documentId },
+    data: { codingData: { ...coding, items: nextItems } as Prisma.InputJsonValue },
+  })
+}
+
 /** Which of the given documents currently have a queued/processing DocumentProcessingJob — what
  * the pipeline Inbox tab's inline spinner (documentStage's `hasActiveJob`) is driven by. */
 export async function activeJobDocumentIds(workspaceId: string, documentIds: string[]): Promise<Set<string>> {

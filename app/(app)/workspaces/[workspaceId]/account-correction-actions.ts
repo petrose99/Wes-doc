@@ -17,9 +17,10 @@ import {
   dismissAccountCorrectionForDocuments,
   findBillsAffectedByAccountChange,
   recordAccountCorrectionApplied,
+  recordDocumentLineAccountsCorrected,
   type AffectedBillRow,
 } from "@/models/documents"
-import { resolveAccountNames, workspaceIntegrationsPlanEnabled } from "@/models/integrations"
+import { listWorkspaceIntegrationPushes, resolveAccountNames, workspaceIntegrationsPlanEnabled } from "@/models/integrations"
 import { prisma } from "@/lib/db"
 import { revalidatePath } from "next/cache"
 import { errorMessage, NO_ACCESS, paths, requireMember } from "./action-helpers"
@@ -160,6 +161,50 @@ export async function updateSelectedBillAccountsAction(
   }
   revalidatePath(paths(workspaceId).integrations)
   return { success: true, data: results }
+}
+
+export type UpdateDocumentAccountsOutcome =
+  | { status: "updated"; provider: string }
+  | { status: "refused"; reason: AccountCorrectionRefusal }
+
+/** Screen 2's single-document Detail-pane "Update in {Provider}" (#430 step 4) — resolves the
+ * document's own succeeded push (there is exactly one accounting connection per bill; no
+ * `oldAccountExternalId` concept here, since a person may retarget several lines to different
+ * accounts in one edit), pre-checks correctability the same way Screen 1 does, resends every line
+ * with only the changed ones' Account replaced, and — on success — records the new account per
+ * line by index (`recordDocumentLineAccountsCorrected`, never `recordAccountCorrectionApplied`:
+ * this path doesn't retarget by matching an old account, and never touches a `SupplierAccountRule`
+ * per spec §Screen 2). */
+export async function updateDocumentLineAccountsAction(
+  workspaceId: string,
+  documentId: string,
+  changes: { index: number; newAccountExternalId: string }[]
+): Promise<ActionState<UpdateDocumentAccountsOutcome>> {
+  const gate = await guard(workspaceId)
+  if ("error" in gate) return { success: false, error: errorMessage(new Error(gate.error), NO_ACCESS) }
+  if (!changes.length) return { success: false, error: "Nothing to update" }
+  const pushes = await listWorkspaceIntegrationPushes(workspaceId, documentId)
+  const succeeded = pushes.find((p) => p.status === "succeeded" && p.connectionId)
+  if (!succeeded || !succeeded.externalBillId || !succeeded.connectionId) return { success: false, error: "This bill hasn't been posted to an accounting connection" }
+  const connection = await prisma.integrationConnection.findFirst({ where: { id: succeeded.connectionId, workspaceId }, select: { id: true, provider: true, externalTenantId: true } })
+  if (!connection || !connection.externalTenantId) return { success: false, error: "That connection no longer exists" }
+  const document = await prisma.document.findFirst({ where: { id: documentId, workspaceId }, select: { receivedAt: true } })
+  if (!document) return { success: false, error: "Document not found" }
+  const refusal = await checkCorrectable(connection.provider, connection.externalTenantId, connection.id, succeeded.externalBillId, document.receivedAt.toISOString())
+  if (refusal) return { success: true, data: { status: "refused", reason: refusal } }
+  const accountRefByLineIndex = new Map(changes.map((c) => [c.index, c.newAccountExternalId]))
+  try {
+    if (connection.provider === "quickbooks") await updateQuickBooksBillAccounts(connection.externalTenantId, connection.id, succeeded.externalBillId, accountRefByLineIndex)
+    else if (connection.provider === "xero") await updateXeroBillAccounts(connection.externalTenantId, connection.id, succeeded.externalBillId, accountRefByLineIndex)
+    else return { success: false, error: "Unsupported accounting provider" }
+    await recordDocumentLineAccountsCorrected(workspaceId, documentId, changes)
+    await recordDocumentAudit({ workspaceId, actorId: gate.userId, documentId, type: "ledger_account_corrected", detail: { connectionId: connection.id, changes } })
+    revalidatePath(paths(workspaceId).integrations)
+    return { success: true, data: { status: "updated", provider: connection.provider } }
+  } catch (error) {
+    const stale = error instanceof IntegrationPermanentError
+    return { success: false, error: stale ? "Something changed here first — reload and try again" : errorMessage(error, "Could not update this bill") }
+  }
 }
 
 /** Screen 1's "Leave them" / Screen 3's row-level "Leave them" text action — a real decision, not
