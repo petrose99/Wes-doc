@@ -9,9 +9,13 @@ const DOC = "684033b8-ae7c-449f-a53a-b0185c868609"
 const { out, only, widths } = roundArgs()
 
 await round({ out, base: `http://localhost:3000/workspaces/${WS}`, only, ...(widths ? { widths } : {}) }, async ({ width, base, state, keyboard }) => {
-  await state("01-detail-pane-account", `${base}/documents/${DOC}?full=1`, async (page, s) => {
+  // #429: the per-line Account cell only renders in the Invoices queue's embedded pane
+  // (BillSplitPane, `embedded && queueTitle === "Invoices"` in documents/[documentId]/page.tsx) —
+  // `?full=1` intentionally keeps the pre-#259 standalone shell with no Account cell. The route
+  // that opens the queue with this document selected is /invoices/<id> (no ?full=1).
+  await state("01-detail-pane-account", `${base}/invoices/${DOC}`, async (page, s) => {
     await page.waitForTimeout(2500)
-    await s.snap("", "full-mode invoice detail, per-line Account cell")
+    await s.snap("", "Invoices queue, pane open, per-line Account cell")
     const select = page.locator("select[aria-label='Account']").first()
     if (await s.visible(select, 8000)) {
       await select.scrollIntoViewIfNeeded()
