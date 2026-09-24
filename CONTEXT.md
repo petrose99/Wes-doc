@@ -114,7 +114,7 @@ The one email an Approver gets when Approvals reach a stage they can decide: eve
 _Avoid_: Reminder (as the user-facing name), digest, alert, push, notification (as a badge count)
 
 **Post** (verb):
-Sending an approved document's reviewed data to the ledger as a bill, expense or bank transaction, from the queue the document is on — the bulk bar's Post, or Post to ledger for the open row. Only Invoices, Receipts and Bank Statements can be posted; a row is eligible once it is Approved, its category is confirmed, its currency is resolved, and it is not cancelled or already posted. Posting is a Server-confirmed action with a Partial outcome per row. Nothing un-posts: the ledger owns what it holds.
+Sending an approved document's reviewed data to the ledger as a bill, expense or bank transaction, from the queue the document is on — the bulk bar's Post, or Post to ledger for the open row. Only Invoices, Receipts and Bank Statements can be posted; a row is eligible once it is Approved, every line has an Account, its currency is resolved, and it is not cancelled or already posted. Posting is a Server-confirmed action with a Partial outcome per row. Nothing un-posts. A posted bill's Accounts can be corrected from DocuBite where the ledger allows it; everything else about it is the ledger's.
 _Avoid_: push, sync, send to the ledger, export (that is the CSV)
 
 **Posted**:
@@ -126,8 +126,20 @@ The one mark beside a row's processing state that says where the document stands
 _Avoid_: ledger status, sync status, integration state
 
 **Accounting**:
-The connected accounting provider's own page: which ledger this company is on (QuickBooks, Xero or Sage Accounting), whether the Ledger connection is healthy, when it last synced, its default account and the guessed category mappings, and the way into the ledger. It holds no rows and no work — posting happens on the queues, paying in Bill Pay. Reached directly from the rail's Accounting item, inside Admin › Integrations. DocuBite hosts no ledger of its own (the in-house ledger was retired, owner, 2026-09-22).
+The connected accounting provider's own page: which ledger this company is on (QuickBooks, Xero or Sage Accounting), whether the Ledger connection is healthy, when it last synced, its Default account and each supplier's usual account, and the way into the ledger. It holds no rows and no work — posting happens on the queues, paying in Bill Pay. Reached directly from the rail's Accounting item, inside Admin › Integrations. DocuBite hosts no ledger of its own (the in-house ledger was retired, owner, 2026-09-22).
 _Avoid_: Finance (retired name), the ledger (that is what Accounting opens), push list, in-house ledger
+
+**Account** (on a line):
+What a document line is coded to — once a ledger is connected, one of the ledger's own expense accounts; with no ledger, typed text that goes out in the CSV. Pre-filled from the supplier's usual account, otherwise the Default account, and the line says which. Every line carries one; a document's lines can go to different Accounts.
+_Avoid_: Category (as the user-facing word), coding (as a field name), GL code, mapping
+
+**Default account**:
+The ledger account a line gets when its supplier has no usual account yet. Guessed once at connect from the ledger's own standard catch-all account (by exact name, never scored) and shown as Guessed until an Owner saves it or it is named in the company's first post; left blank when no standard name matches. Owner-set, on Accounting.
+_Avoid_: fallback account, catch-all (as a label)
+
+**Supplier account rule**:
+A supplier's usual account: learned when a document from that supplier is approved (the account of its largest line), said once in the Detail pane at the moment it is learned, and listed on Accounting where an Owner can change or forget it. Changing it, or the Default account, changes future posts only; the bills already posted to the old account are offered as a list to correct in the ledger, none ticked.
+_Avoid_: supplier mapping, category mapping, auto-coding
 
 **Ledger connection**:
 The one link between a Company and its accounting provider, made by an Owner from the Accounting page and never more than one per company. It is Connected, Needs reconnecting (the provider stopped honouring it — posts wait, nothing is marked on rows, Owners are told once), or absent (no ledger: posting is offered nowhere and the queue says why once). Switching providers is a disconnect then a connect; disconnecting never un-posts anything. How the connection is held (the OAuth vault behind it) is never named on a screen.
@@ -229,7 +241,7 @@ A Queue screen with no rows, which is one of three different things and says so:
 _Avoid_: welcome tour, onboarding checklist, getting started (the queue is the guide), tourSeen
 
 **Detail pane**:
-The single place a row opens: on desktop a full-width document view — the source document on the left, an editable form on the right — and on a phone the same view full-screen over the queue with the document stacked above the fields. There is one Detail pane per Queue screen and it is the same view whichever queue opened it (Invoices, Exceptions, Approvals, Bill Pay). It is built for the Operator's day: the Status line and the checks summary under it say where the document stands and what is holding it before anything else; every check sits inline at the field or row it concerns; every field is editable and every edit saves at once; coding is a category on each line; the sticky bottom bar holds the one decision. It has no tabs: the approval trail is a block under the status track, and the audit trail and the team note sit behind one History disclosure at the bottom. The pane has one header — the row's name, the Status line, and the pane's controls; the document is introduced once. Secondary and destructive actions (Archive, Cancel, Delete, Send for review) live in the pane's overflow menu, never as header buttons. Leaving the pane is never needed to finish a document; the decision advances to the next row.
+The single place a row opens: on desktop a full-width document view — the source document on the left, an editable form on the right — and on a phone the same view full-screen over the queue with the document stacked above the fields. There is one Detail pane per Queue screen and it is the same view whichever queue opened it (Invoices, Exceptions, Approvals, Bill Pay). It is built for the Operator's day: the Status line and the checks summary under it say where the document stands and what is holding it before anything else; every check sits inline at the field or row it concerns; every field is editable and every edit saves at once; coding is an Account on each line; the sticky bottom bar holds the one decision. It has no tabs: the approval trail is a block under the status track, and the audit trail and the team note sit behind one History disclosure at the bottom. The pane has one header — the row's name, the Status line, and the pane's controls; the document is introduced once. Secondary and destructive actions (Archive, Cancel, Delete, Send for review) live in the pane's overflow menu, never as header buttons. Leaving the pane is never needed to finish a document; the decision advances to the next row.
 _Avoid_: Approval Context (Vic's separate phone screen — DocuBite has one pane), detail sheet, document header (the pane header is the only header)
 
 **Operator's day**:
