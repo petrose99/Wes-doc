@@ -12,6 +12,11 @@ export type NormalizedLineItem = {
   quantity: number
   unitPrice: number
   amount: number
+  /** #429: the ledger account this line posts to, resolved supplier rule → connection Default
+   * (lib/finance/line-account-resolution.ts) and carried on Document.codingData.items per line.
+   * Null when no rule and no Default have resolved yet — a line in that state is a mapping error
+   * at push time (BillMappingError), not a silent post to nothing. */
+  accountExternalId: string | null
 }
 
 export type NormalizedBill = {
@@ -43,19 +48,29 @@ function asCurrencyCode(value: unknown): string | null {
   return code && /^[A-Z]{3}$/.test(code) ? code : null
 }
 
-function normalizeLineItems(raw: unknown, total: number): NormalizedLineItem[] {
+/** `lineAccounts[i]` is Document.codingData.items[i] (#429) — same array, same index, as the raw
+ * `line_items` rows this function reads, matched BEFORE the zero-amount filter below so a filtered
+ * row never shifts a later row onto the wrong account. Optional: a document coded before #429, or
+ * with no connection to resolve against, has no items array, so every line's accountExternalId is
+ * null (bill-mapper.ts / xero's mapper refuse a post with a null account, per spec). */
+function normalizeLineItems(raw: unknown, total: number, lineAccounts?: Array<{ account_external_id: string | null } | undefined>): NormalizedLineItem[] {
   const rows = Array.isArray(raw) ? (raw as ReviewedLineItem[]) : []
   const items = rows
-    .map((row) => {
+    .map((row, index) => {
       const amount = asNumber(row.amount) ?? 0
       const quantity = asNumber(row.quantity) ?? 1
       const unitPrice = asNumber(row.unit_price) ?? (quantity ? amount / quantity : amount)
-      return { description: asString(row.description) ?? "Line item", quantity, unitPrice, amount }
+      const accountExternalId = lineAccounts?.[index]?.account_external_id ?? null
+      return { description: asString(row.description) ?? "Line item", quantity, unitPrice, amount, accountExternalId }
     })
     .filter((item) => item.amount !== 0 || item.description !== "Line item")
   // No usable line items — synthesize one that covers the whole total, so the provider's bill body
-  // (which requires at least one line) always has something to post.
-  if (!items.length) return [{ description: "Total", quantity: 1, unitPrice: total, amount: total }]
+  // (which requires at least one line) always has something to post. No single line to key off of
+  // for its account, so this synthesized line falls back to the first resolved account, if any.
+  if (!items.length) {
+    const fallbackAccountExternalId = lineAccounts?.find((row) => row?.account_external_id)?.account_external_id ?? null
+    return [{ description: "Total", quantity: 1, unitPrice: total, amount: total, accountExternalId: fallbackAccountExternalId }]
+  }
   return items
 }
 
@@ -111,6 +126,11 @@ export function normalizeBillFromDocument(input: {
   templateCode: string | null
   reviewedData: Record<string, unknown>
   fxOverride?: { total: number; currencyCode: string } | null
+  /** #429: Document.codingData.items — one row per line_items row, same index, carrying the
+   * account each line resolved to (lib/finance/line-account-resolution.ts). Omitted for a
+   * document with no per-line resolution yet (pre-#429, or no connection) — every line's
+   * accountExternalId is then null. */
+  lineAccounts?: Array<{ account_external_id: string | null } | undefined> | null
 }): NormalizedBill {
   const data = input.reviewedData
   const vendorName = asString(data.vendor) ?? asString(data.merchant) ?? "Unknown vendor"
@@ -128,7 +148,7 @@ export function normalizeBillFromDocument(input: {
   // lines so they sum exactly to the converted header total. Without the scaling step the
   // reconciler would try to close a 20%+ gap in one-cent-per-line increments, which either loops
   // for thousands of lines or produces obviously-wrong per-line amounts.
-  const rawItems = normalizeLineItems(data.line_items, extractedTotal)
+  const rawItems = normalizeLineItems(data.line_items, extractedTotal, input.lineAccounts ?? undefined)
   const ratio = extractedTotal !== 0 ? total / extractedTotal : 1
   const scaledItems = rawItems.map((item) => ({ ...item, unitPrice: item.unitPrice * ratio, amount: item.amount * ratio }))
   const lineItems = reconcileLineItemRounding(scaledItems, total, currencyCode)
