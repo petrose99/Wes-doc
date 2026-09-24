@@ -1,0 +1,11 @@
+import pkg from "../../prisma/client/index.js";
+const { PrismaClient } = pkg;
+const prisma = new PrismaClient();
+const ws = "af91555d-7450-4b21-a8ac-73db092617c8";
+const conn = await prisma.integrationConnection.findMany({ where: { workspaceId: ws } });
+const acct = await prisma.accountingEntity.findMany({ where: { workspaceId: ws } });
+const rules = await prisma.supplierAccountRule.findMany({ where: { workspaceId: ws } });
+console.log("connections", conn.length, conn.map(c => c.provider));
+console.log("accounts", acct.length, acct.map(a => `${a.name}(${a.isActive ?? a.active})`));
+console.log("rules", rules.length, rules.map(r => r.matchText ?? r.supplierName));
+await prisma.$disconnect();
