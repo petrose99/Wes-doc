@@ -187,7 +187,7 @@ export async function listWorkspaceIntegrationConnections(workspaceId: string) {
     orderBy: { createdAt: "asc" },
     select: {
       id: true, provider: true, externalTenantId: true, tenantName: true, status: true,
-      defaultExpenseAccountId: true, defaultExpenseAccountName: true, createdAt: true,
+      defaultExpenseAccountId: true, defaultExpenseAccountName: true, defaultExpenseAccountGuessed: true, createdAt: true,
     },
   })
 }
@@ -257,6 +257,9 @@ export async function markIntegrationConnectionNeedsReconnect(connectionId: stri
   return { isNewBreak, workspaceId: existing.workspaceId }
 }
 
+// #429: an Owner picking the Default account here — same as a post confirming it — is the
+// signal that ends the "Guessed" state; a later chart re-sync must not silently swap it back
+// out from under them (see lib/integrations/sync.ts).
 export async function setWorkspaceIntegrationDefaultAccount(
   workspaceId: string,
   connectionId: string,
@@ -264,7 +267,7 @@ export async function setWorkspaceIntegrationDefaultAccount(
 ) {
   const res = await prisma.integrationConnection.updateMany({
     where: { id: connectionId, workspaceId },
-    data: { defaultExpenseAccountId: account.id, defaultExpenseAccountName: account.name },
+    data: { defaultExpenseAccountId: account.id, defaultExpenseAccountName: account.name, defaultExpenseAccountGuessed: false },
   })
   if (!res.count) throw new Error("integration_connection_not_found")
 }

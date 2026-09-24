@@ -8,6 +8,15 @@ export const listAccountingEntities = cache(async (workspaceId: string, entityTy
   orderBy: { name: "asc" },
 }))
 
+/** Same as listAccountingEntities but including inactive rows — a prior sync marked an account
+ * inactive once the provider stopped returning it (an archive at the provider). The Supplier
+ * accounts table (#429) needs this to tell an archived supplier account's row apart from a live
+ * one, which listAccountingEntities's active-only filter would otherwise hide entirely. */
+export const listAccountingEntitiesIncludingInactive = cache(async (workspaceId: string, entityType: "account" | "vendor" | "tax_rate") => prisma.accountingEntity.findMany({
+  where: { workspaceId, entityType },
+  orderBy: { name: "asc" },
+}))
+
 /** The most recent sync across every entity type for this workspace's connection, or null if it
  * has never been synced — the settings card's "last synced" timestamp.
  *

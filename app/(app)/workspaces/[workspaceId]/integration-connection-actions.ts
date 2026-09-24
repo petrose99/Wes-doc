@@ -21,6 +21,7 @@ import {
   setWorkspaceIntegrationTenant,
   workspaceIntegrationsPlanEnabled,
 } from "@/models/integrations"
+import { deleteSupplierAccountRule } from "@/models/supplier-account-rules"
 import { prisma } from "@/lib/db"
 import { revalidatePath } from "next/cache"
 import { errorMessage, NO_ACCESS, paths, requireMember } from "./action-helpers"
@@ -152,6 +153,21 @@ export async function confirmSageBusinessAction(workspaceId: string, connectionI
     return { success: true }
   } catch (error) {
     return { success: false, error: errorMessage(error, "Could not confirm the business") }
+  }
+}
+
+/** Accounting page's "Forget" — deletes a supplier's learned account outright (#429 / ADR 0011);
+ * the next approval re-learns fresh rather than resurrecting a stale pick. */
+export async function forgetSupplierAccountRuleAction(workspaceId: string, connectionId: string, ruleId: string): Promise<ActionState> {
+  const gate = await guardIntegrations(workspaceId)
+  if ("error" in gate) return { success: false, error: errorMessage(new Error(gate.error), NO_ACCESS) }
+  try {
+    await deleteSupplierAccountRule(workspaceId, connectionId, ruleId)
+    await recordDocumentAudit({ workspaceId, actorId: gate.userId, type: "integration_supplier_account_forgotten", detail: { connectionId, ruleId } })
+    revalidatePath(paths(workspaceId).integrations)
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: errorMessage(error, "Could not forget this supplier's account") }
   }
 }
 
