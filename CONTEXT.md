@@ -45,7 +45,19 @@ A second intake channel beside the inbound address: one WhatsApp Business number
 _Avoid_: Chatbot, WhatsApp bot (there is no conversation, only intake + one acknowledgement)
 
 **Invoice**:
-The typed destination for a bill received from a supplier. Absorbs the former Documents/Bills surface; aging is a filter chip and a saved view here, and paying an approved invoice happens on Bill Pay, not on this queue.
+The typed destination for a bill received from a supplier. Absorbs the former Documents/Bills surface; aging is a filter chip and a saved view here, and paying an approved invoice happens on Bill Pay, not on this queue. Credit notes live here too, under their own type.
+
+**Credit note**:
+A supplier's document that reduces what the company owes that supplier. It is its own document type in the Invoices destination, reviewed, approved and posted like an invoice. Its amount is always positive: the type says it is a credit, never a minus sign.
+_Avoid_: Vendor credit, credit memo (the ledgers' names), negative invoice, refund (money back is a different thing)
+
+**Credit allocation**:
+Part of a Credit note applied to one invoice of the same supplier, which lowers that invoice's amount due. A Credit note can be split across several invoices, and an invoice can take several credits. It is not a Payment record and never creates or touches a Payment line. An invoice's amount due is its total less its Payment records and Credit allocations; one covered by credit alone reads Credited, never Paid.
+_Avoid_: Credit payment, offset, applied payment
+
+**Supplier credit**:
+The part of a Credit note not yet allocated to any invoice. It stays with that supplier until a person allocates it.
+_Avoid_: Credit balance (ambiguous with a ledger balance), store credit
 
 **Purchase Order**:
 The typed destination for a purchase order, paired with Invoices for matching and cumulative line-item comparison against what has already been invoiced against it.
@@ -201,7 +213,7 @@ The short code ("DB" and eight characters) that names one Payment line, unique i
 _Avoid_: Payment reference (ambiguous with the invoice number), transaction id
 
 **Paid twice**:
-The red flag on two Payment lines for the same invoice or claim that both left the account: the rail reporting Paid on a line whose bill had already been paid another way (by hand, or on a later line). It stays until an Owner records the supplier's refund (Returned on one line) or keeps the money as a supplier credit, with a reason.
+The red flag on two Payment lines for the same invoice or claim that both left the account: the rail reporting Paid on a line whose bill had already been paid another way (by hand, or on a later line). It stays until an Owner records the supplier's refund (Returned on one line) or keeps the money as a Supplier credit, with a reason.
 _Avoid_: Duplicate payment (that is a Check on invoices), overpaid
 
 **Sending**:
