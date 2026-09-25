@@ -206,6 +206,10 @@ _Avoid_: Mark as paid (the action, not the record), settlement, ledger payment (
 The user-facing name for a team workspace in Admin and the switcher: one legal or financial entity with its own currency, tax jurisdiction, suppliers, ledger and members. "Workspace" is the storage and address term and never appears on a screen as the thing a person belongs to: a screen says Company, Personal, or drops the noun ("here", "this company"). The auto-created personal workspace is shown as Personal, never as a company.
 _Avoid_: Entity (Vic's word), tenant, client (that is who the company belongs to), workspace (on screen), team workspace
 
+**Company currency**:
+The one currency — LSL or ZAR — a company's amounts, approval and automation limits, totals and ledger postings are expressed in; a document in another currency is converted into it. Set from the company's country when the company is created, and taken from the connected ledger's home currency if the Owner accepts it; it can change only until the company's first posted bill or first payment batch, after which it is locked. A tax jurisdiction's currency is the currency its returns are filed in, not the company currency. Written as its ISO code (LSL 1,234.50), never a symbol.
+_Avoid_: Base currency (the storage term), home currency (that is the ledger's), reporting currency, functional currency
+
 **Organization**:
 A named group of companies an accountant or finance team runs under one login. Belonging to an organization never by itself opens any of its companies; access to each company is granted separately, with its own role. A company can only be removed from its organization from another company: the pane caption "Switch to another company to remove this one." is the one place that rule is said, and no other surface offers the action.
 _Avoid_: Firm (the derived workspace mode), account, tenant
