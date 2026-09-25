@@ -135,8 +135,12 @@ The connected accounting provider's own page: which ledger this company is on (Q
 _Avoid_: Finance (retired name), the ledger (that is what Accounting opens), push list, in-house ledger
 
 **Account** (on a line):
-What a document line is coded to — once a ledger is connected, one of the ledger's own expense accounts; with no ledger, typed text that goes out in the CSV. Pre-filled from the supplier's usual account, otherwise the Default account, and the line says which. Every line carries one; a document's lines can go to different Accounts.
+What a document line is coded to — once a ledger is connected, one of the ledger's own expense accounts; with no ledger, typed text that goes out in the CSV. Pre-filled from the supplier's usual account, otherwise the Default account, and the line says which. Every line carries one; a document's lines can go to different Accounts. A line coded to an Item shows its Item's account instead, which the person sees but does not choose.
 _Avoid_: Category (as the user-facing word), coding (as a field name), GL code, mapping
+
+**Item** (on a line):
+One of the ledger's own products or services that a line is coded to instead of an Account; a line is coded to one or the other, never both. The line posts to the Item's account, and a posted Item line's account is changed only by changing its Item in the ledger. A line gets its Item from the supplier's product code or description being paired with that Item on an earlier approved bill, from the supplier's code equalling the Item's code, or from a person — never from a guessed resemblance. Offered only where the ledger and its plan take item lines.
+_Avoid_: product, SKU, stock item, inventory (as the generic word), service line
 
 **Default account**:
 The ledger account a line gets when its supplier has no usual account yet. Guessed once at connect from the ledger's own standard catch-all account (by exact name, never scored) and shown as Guessed until an Owner saves it or it is named in the company's first post; left blank when no standard name matches. Owner-set, on Accounting.
