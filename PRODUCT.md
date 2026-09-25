@@ -8,7 +8,7 @@ web
 
 ## Users
 
-The primary authenticated user is a finance lead or bookkeeper at a small or midsize business who reviews roughly 50–500 documents per month and needs to move extracted work toward a ledger. A secondary user is an accountant managing repeatable workflows for multiple clients. This audience is inferred from the existing product context and Wayfinder map and should be validated with real users.
+Three audiences share the authenticated workspace. A finance lead or bookkeeper at a small or midsize business reviews roughly 50–500 documents per month and moves extracted work toward a ledger. A larger company runs an AP team of several reviewers at higher volume, with approvals that pass between people and a CFO who approves by amount. An accounting firm works the same queues for many client companies, lives in the client's ledger (QuickBooks Online or Xero) and speaks its vocabulary. All three work in Lesotho or South Africa, where the supplier's document is a (tax) invoice. The SMB audience is inferred from product context; the larger-company and accounting-firm audiences are the owner's statement (2026-09-25, #466). None is validated with real users yet.
 
 ## Product Purpose
 

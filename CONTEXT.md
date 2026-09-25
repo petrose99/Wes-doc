@@ -45,7 +45,12 @@ A second intake channel beside the inbound address: one WhatsApp Business number
 _Avoid_: Chatbot, WhatsApp bot (there is no conversation, only intake + one acknowledgement)
 
 **Invoice**:
-The typed destination for a bill received from a supplier. Absorbs the former Documents/Bills surface; aging is a filter chip and a saved view here, and paying an approved invoice happens on Bill Pay, not on this queue. Credit notes live here too, under their own type.
+The typed destination for what a supplier sends the company to be paid or credited, and the name of its main document type. Absorbs the former Documents/Bills surface; aging is a filter chip and a saved view here, and paying an approved invoice happens on Bill Pay, not on this queue. Credit notes live here too: the queue's Type facet reads Invoice or Credit note, and the Open view shows both.
+_Avoid_: Bills (as the destination's name — "invoice" is the word the company's VAT law, its CFO and its accounting firm use; the ledgers' "bill" names only their own record), supplier documents, payables
+
+**Bill**:
+The ledger's own record of a posted invoice — what QuickBooks and Xero call it. Used only when speaking of that record ("posted to Xero as a bill") and inside the proper name Bill Pay; the document in DocuBite is an invoice or a credit note, never a bill.
+_Avoid_: bill for a document still in DocuBite
 
 **Credit note**:
 A supplier's document that reduces what the company owes that supplier. It is its own document type in the Invoices destination, reviewed, approved and posted like an invoice. Its amount is always positive: the type says it is a credit, never a minus sign.
@@ -163,7 +168,7 @@ The one email an Approver gets when Approvals reach a stage they can decide: eve
 _Avoid_: Reminder (as the user-facing name), digest, alert, push, notification (as a badge count)
 
 **Post** (verb):
-Sending an approved document's reviewed data to the ledger as a bill or expense, from the queue the document is on — the bulk bar's Post, or Post to ledger for the open row. Only Invoices and Receipts can be posted — a Bank Statement never is; a row is eligible once it is Approved, every line has an Account, its currency is resolved, and it is not cancelled or already posted. Posting is a Server-confirmed action with a Partial outcome per row. Nothing un-posts. A posted bill's Accounts can be corrected from DocuBite where the ledger allows it; everything else about it is the ledger's.
+Sending an approved document's reviewed data to the ledger as a bill or expense, from the queue the document is on — the bulk bar's Post, or Post to ledger for the open row. Only Invoices and Receipts can be posted — a Bank Statement never is; a row is eligible once it is Approved, every line has an Account, its currency is resolved, and it is not cancelled or already posted. Posting is a Server-confirmed action with a Partial outcome per row. Nothing un-posts. A posted invoice's Accounts can be corrected from DocuBite where the ledger allows it; everything else about it is the ledger's.
 _Avoid_: push, sync, send to the ledger, export (that is the CSV)
 
 **Posted**:
