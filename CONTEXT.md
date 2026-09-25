@@ -143,8 +143,30 @@ The ledger account a line gets when its supplier has no usual account yet. Guess
 _Avoid_: fallback account, catch-all (as a label)
 
 **Supplier account rule**:
-A supplier's usual account: learned when a document from that supplier is approved (the account of its largest line), said once in the Detail pane at the moment it is learned, and listed on Accounting where an Owner can change or forget it. Changing it, or the Default account, changes future posts only; the bills already posted to the old account are offered as a list to correct in the ledger, none ticked.
+A supplier's usual account: learned when a document from that supplier is approved (the account of its largest line, together with that line's Tax code and Tracking and the bill's Location — the Tax code pre-fills only on a line kept on that account; Customer and Billable are never learned), said once in the Detail pane at the moment it is learned, and listed on Accounting where an Owner can change or forget it. Changing it, or the Default account, changes future posts only; when the account changes, the bills already posted to the old account are offered as a list to correct in the ledger, none ticked.
 _Avoid_: supplier mapping, category mapping, auto-coding
+
+**Tax code** (on a line):
+The ledger's own purchase tax code a line is posted with. It is pre-filled from the ledger's default for the line's Account and always sent when the bill is posted, so the ledger never picks one silently. Once a bill is posted, DocuBite never changes its tax codes; correcting an Account sends each line's existing tax code back unchanged.
+_Avoid_: tax rate, VAT type, TaxType (as user-facing words)
+
+**Tax basis**:
+Whether a bill's line amounts include VAT, exclude VAT, or carry none. It is read from the document (which extracted total the lines add up to), can be changed by the person coding the bill, and is sent with the bill so the ledger works out the VAT itself.
+_Avoid_: line amount type, inclusive/exclusive flag
+
+**Tracking**:
+Up to two values on a line that analyse spend, each taken from one of the ledger's tracking categories and labelled with the ledger's own name for it ("Class" in QuickBooks, whatever the company named it in Xero). A line with no tracking category available shows no Tracking at all, rather than a disabled field.
+_Avoid_: class (as the generic term), dimension, cost centre, tag
+
+**Location** (on a bill):
+The QuickBooks location a whole bill belongs to. It is set once per bill, because QuickBooks accepts it only on the bill and never on a line. Xero has no Location.
+_Avoid_: department, branch
+
+**Customer** and **Billable** (on a line):
+The QuickBooks customer or job a line's cost is for, and whether that cost is to be billed on to them. Billable needs a Customer. Xero bills carry neither.
+_Avoid_: job, project, rebill, recharge
+
+A bill already posted before one of these fields existed, or before the ledger offered it, keeps it blank ("not set when posted"). Nothing is back-filled into the ledger, and no correction is offered.
 
 **Ledger connection**:
 The one link between a Company and its accounting provider, made by an Owner from the Accounting page and never more than one per company. It is Connected, Needs reconnecting (the provider stopped honouring it — posts wait, nothing is marked on rows, Owners are told once), or absent (no ledger: posting is offered nowhere and the queue says why once). Switching providers is a disconnect then a connect; disconnecting never un-posts anything. How the connection is held (the OAuth vault behind it) is never named on a screen.

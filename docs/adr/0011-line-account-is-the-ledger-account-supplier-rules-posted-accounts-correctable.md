@@ -15,3 +15,4 @@ Charting planned to guess "category → account mappings" at connect time. But D
 - Post eligibility becomes "every line has an Account".
 - Xero and QuickBooks updates must resend every line (Xero deletes lines that are left out; QuickBooks sets missing fields to null).
 - Before building Sage correction, confirm which Sage API reaches a South African business.
+- Tax codes and Tracking are now set on create, and supplier rules learn them with the Account (ADR 0014). A correction still sends each line's existing tax code back unchanged.
