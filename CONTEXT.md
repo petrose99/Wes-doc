@@ -60,8 +60,7 @@ The part of a Credit note not yet allocated to any invoice. It stays with that s
 _Avoid_: Credit balance (ambiguous with a ledger balance), store credit
 
 **Purchase Order**:
-The typed destination for a purchase order, paired with Invoices for matching and cumulative line-item comparison against what has already been invoiced against it. It is compared with invoices only: nothing records what was delivered against it.
-_Avoid_: 3-way match, goods received, GRN (DocuBite keeps no delivery record: neither ledger has one)
+The typed destination for a purchase order, paired with Invoices for matching and cumulative line-item comparison against what has already been invoiced against it.
 
 **Receipt**:
 The typed destination for a receipt. Absorbs expense-claim creation as an action on selected rows rather than as its own destination: Add to claim on the bulk bar (and the pane's overflow for one row) opens a dialog in place, and the claim itself is read and submitted from the receipt's Approval tab. A receipt's own processing state is about its review; whether it sits in a claim is a separate fact, shown in the Claim column.

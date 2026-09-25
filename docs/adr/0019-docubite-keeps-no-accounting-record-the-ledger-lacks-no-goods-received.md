@@ -1,6 +1,6 @@
 # DocuBite keeps no accounting record the ledger has no home for; there is no goods received and no 3-way match
 
-**Status: proposed** (owner, 2026-09-25). This waits on #472, which asks how Ramp, Zahara and Vic.ai get goods received on QBO and Xero. It becomes accepted, or is reversed, on #453's Q7.
+**Status: rejected** (owner, 2026-09-25, #453 Q7). After the research in #472, the owner chose to record goods received in DocuBite, the way Ramp and Zahara do on QBO and Xero, overriding "DocuBite doesn't do what the ledger doesn't support" for this one case. The decision that replaces this one is recorded when #453 closes. One correction to what follows: QBO now has in-app Item Receipts (2026-08); the API has no ItemReceipt entity, and PO lines carry a read-only `Line.Received`.
 
 The Ramp Bill Pay map (#445) set out to build a 3-way match: PO · goods received · bill. Neither ledger DocuBite posts to has a home for goods received. QuickBooks Online has Purchase Orders but no receiving object (the Item Receipt is QuickBooks Desktop only; online, receiving *is* the Bill), and Xero's Purchase Orders carry only a billed status. A goods-received quantity kept in DocuBite would make DocuBite a second system of record: stock-desk data with nowhere to go, which someone keeps current by hand. The owner ruled it out (#453, 2026-09-25): **DocuBite doesn't do what the ledger doesn't support.**
 
