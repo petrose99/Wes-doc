@@ -108,12 +108,32 @@ A named, reusable filter/sort/column configuration on a list screen. System view
 A single unit of pending work surfaced in a Next-action queue — a document awaiting review or a match awaiting confirmation. An approval awaiting a decision is an Approval, not a work item; it is worked by an Approver, not an assignee.
 
 **Approval**:
-A run started on an invoice by a person — or an Expense claim once submitted — moving through the stages of an approval flow until it is approved, rejected, or sent back for review. An invoice nobody has started an approval on is under review, not awaiting approval.
+A run started on an invoice or Credit note by a person — or an Expense claim once submitted — moving through its Route until it is approved, rejected, or sent back for review. An invoice nobody has started an approval on is under review, not awaiting approval. An Approval never approves itself: when no stage applies or nobody on a stage can decide, the company's Owners decide it.
 _Avoid_: Review task (the storage record), sign-off (as the umbrella term)
 
 **Approver**:
-The person who can decide the current stage of an Approval — a stage's named approver, or any owner where the stage names nobody. Distinct from an assignee, who works a review.
+The person who can decide the current stage of an Approval — a stage's named approver still in the company whose Approval limit covers the amount, their Delegate, or any owner where the stage names nobody or nobody named can cover it. The person who started the run is never its Approver, except in a company with a single Owner, where the decision is Self-approved. Distinct from an assignee, who works a review.
 _Avoid_: Reviewer (that is who prepares the row), assignee
+
+**Condition** (on a stage):
+What makes a stage of an approval flow apply to a given bill — its supplier, an Account on any of its lines, its amount (total including tax in the company currency, from and optionally up to), or its type (Invoice, Credit note, Expense claim). Values of one kind are alternatives; different kinds must all hold. A stage with no Condition applies to every bill. An unknown amount makes every amount Condition hold. Shown as "Applies when".
+_Avoid_: approval rule, rule (that is the Supplier account rule), policy, trigger
+
+**Route**:
+The stages one Approval takes: those whose Conditions held when it started, with who decides each. Fixed when the run starts — a later change to the flow applies only to Approvals started after it, or to this one once it is sent back and restarted. Who may decide is read at the moment of deciding (Approval limits, Delegations, who has left).
+_Avoid_: chain, path, workflow (that is the pipeline)
+
+**Approval limit**:
+The largest amount, in the company currency, a member may approve. Set by an Owner per person; blank means no limit, and Owners have none. It caps every decision the person makes, including as a Delegate. Its number is never converted.
+_Avoid_: spend limit, authority limit, threshold (that is a stage's amount Condition)
+
+**Delegation**:
+A dated hand-over of one person's approvals to another member of the company — set by the person or by an Owner, always with an end no more than 30 days after its start, ended early by either. The **Delegate** decides the Delegator's stages within the Delegate's own Approval limit, while the Delegator keeps deciding too; Approval notices go to the Delegate, and each decision records who decided for whom. A Delegate's own Delegation does not pass on what they hold for someone else.
+_Avoid_: proxy, substitute, out of office (as the term)
+
+**Self-approved**:
+The mark on a stage decided by the person who started the run, allowed only in a company with a single Owner.
+_Avoid_: auto-approved (nothing is)
 
 **Ready to Approve**:
 The personal system view on the Approvals destination: every Approval whose current stage the signed-in person can decide — invoices, PO mismatches and submitted Expense claims alike — including rows that are not yet eligible, shown with the reason. The badge on the rail counts this view and nothing else.
