@@ -17,7 +17,7 @@ Invoices, Purchase Orders, Receipts, Bank Statements, Exceptions, Approvals, and
 _Avoid_: Archive (as a destination), Library, permanent record, Attachments
 
 **Search**:
-The one cross-type lookup: a Queue screen whose rows are every document in the workspace that matches what was typed — any type, any processing state, archived included — with nothing listed until something is typed. Its rows open in the Detail pane in place; a typed row also offers to open on its own queue, which is a hop that carries Origin context. Documents of a type that has no queue of its own (contracts, delivery notes, payslips, tax forms, other) are found and opened here and nowhere else. Reached from the rail and, on desktop, the `/` key.
+The one cross-type lookup: a Queue screen whose rows are every document in the workspace that matches what was typed — any type, any processing state, archived included — with nothing listed until something is typed. Its rows open in the Detail pane in place; a typed row also offers to open on its own queue, which is a hop that carries Origin context. Documents of a type that has no queue of its own (contracts, delivery notes, payslips, tax forms, other) are found and opened here and nowhere else, except that a Delivery note also shows on the Purchase Order it is suggested against, and in the Purchase Orders view Delivery notes to confirm. Reached from the rail and, on desktop, the `/` key.
 _Avoid_: Docu Search, Ask AI, global search (as a user-facing name), scope
 
 **Closed**:
@@ -100,6 +100,18 @@ _Avoid_: Bypass, force approve
 **Fully invoiced**:
 A Purchase Order whose every line has been invoiced to at least its ordered quantity. Derived, never set by hand.
 _Avoid_: Closed PO, consumed
+
+**Goods received**:
+The quantity of a Purchase Order line recorded as delivered, compared only for suppliers marked Goods received required. It comes from a Delivery note a person has confirmed against the PO, or from a person's own entry, and it names which. It is kept in DocuBite only: neither ledger takes it.
+_Avoid_: Receipt, item receipt (QuickBooks' name), GRN
+
+**Delivery note**:
+The supplier's document that evidences Goods received. It is captured like any document, and its quantities count only once a person confirms them against a Purchase Order.
+_Avoid_: Delivery receipt, GRN, proof of delivery
+
+**3-way match**:
+Comparing an invoice line against its Line match and that PO line's Goods received. It applies only to suppliers marked Goods received required; every other invoice is compared with its PO alone.
+_Avoid_: Three-way matching against a receipt (a Receipt is proof of spend, not delivery)
 
 **Saved view**:
 A named, reusable filter/sort/column configuration on a list screen. System views are seeded per screen and are not editable or deletable; a user can duplicate one into an editable, optionally shared, view.
