@@ -126,6 +126,10 @@ _Avoid_: push, sync, send to the ledger, export (that is the CSV)
 The Ledger mark that a document's post reached the ledger, with the date it did. It is read from the post itself, never from the ledger's later payment sync, and it moves the row into Closed. A posted document that the ledger later confirms paid reads Paid instead.
 _Avoid_: Synced, Pushed, Transferred
 
+**Source file**:
+The file a document came in as — the PDF or image taken in at intake — or, for a document split out of a larger file, only its own pages. It is what DocuBite **attaches** to the bill in the ledger after a post, so the ledger bill carries its evidence. A source file the ledger can't take (too large, or a type it refuses) stays in DocuBite and the bill says so.
+_Avoid_: Attachment (that is an email's), PDF (photos are source files too), Document (the storage primitive, not something users name), supporting document
+
 **Ledger mark**:
 The one mark beside a row's processing state that says where the document stands with the ledger: Posting… (the post is queued and retrying), Posted, Post failed (the post was refused for a reason the row can fix — the row then also reads Needs attention with that reason as an open check), or Paid. A ledger problem that is not the row's — the ledger is disconnected or has no default account — never marks rows; it is said once, above the queue, while posts are waiting.
 _Avoid_: ledger status, sync status, integration state
