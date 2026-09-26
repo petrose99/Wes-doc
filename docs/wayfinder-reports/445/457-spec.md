@@ -103,8 +103,10 @@ Skills: Intent `specify` · `fortify` · `articulate` · `include`; Impeccable `
   labels "Country", "Company currency"), used by both forms; `buildCountryList`/
   `buildCurrencyList` leave both forms.
 - Country: Lesotho, South Africa (only). Default: the detected country if LS/ZA, else South
-  Africa. Currency: LS → LSL (default) / ZAR; ZA → ZAR shown as the select's only option, disabled,
-  with hint "Companies in South Africa use ZAR." LS hint: "LSL and ZAR are pegged 1:1. You can
+  Africa. Currency: LS → LSL (default) / ZAR; ZA → static text "ZAR" + `<input type="hidden"
+  name="baseCurrency" value="ZAR">` (never a disabled select — it drops out of FormData), with
+  hint "Companies in South Africa use ZAR." The `|| "US"`/`|| "USD"` fallbacks
+  (`new-workspace-form.tsx:85-89,139-140`, `companies-queue.tsx:303-304`) go. LS hint: "LSL and ZAR are pegged 1:1. You can
   change it until the first bill is posted." Changing country resets the currency to its default.
 - The hints are `aria-describedby` on the currency select. Server refusal (§1 codes) shows as the
   form's existing error line with the values kept.
@@ -124,7 +126,8 @@ Row data (added to `CompanyDetailRow` in `lib/admin/companies.ts`): `lock`, `unp
   0 → "No unposted documents need re-converting."
 - Buttons "Change to ZAR" (primary, not destructive) and "Cancel". Busy: "Changing…", both
   disabled.
-- Success: dialog closes, focus returns to the opener, toast "Company currency changed to ZAR."
+- Success: dialog closes, focus returns to the opener, toast "Company currency changed to ZAR. 14 documents
+  re-converted." (count from the server; 0 → no second sentence)
   then the caller refreshes: in Companies, `CompanyDetail` gets an `onChanged` prop from
   `loadDetail` that calls the queue's `afterMutation(row.id)` (`companies-queue.tsx:221` — push +
   `router.refresh()`, the refreshed rows remount the pane so its client-loaded detail reloads,
@@ -148,8 +151,11 @@ under the tenant row, `text-sm`, only for QuickBooks/Xero with status connected:
     ZAR" opening §5.3 (`restoreFocusTo` the button).
   - non-Owner, unlocked, allowed → "Ask an Owner to change the company currency."
   - locked, or the ledger currency not allowed for the country (e.g. USD, or LSL for a ZA
-    company) → "Bills won't post until they match. Change the home currency in Xero, or contact
-    support." (QuickBooks: "home currency"; Xero: "base currency" in this sentence.)
+    company) → "Bills won't post until they match. Xero doesn't let you change its base
+    currency, so connect a Xero organisation kept in LSL, or contact support." (QuickBooks: "home
+    currency" / "company"). **Deviation from the #446 copy** ("Change the home currency in Xero"):
+    Xero's base currency and QBO's home currency cannot be changed once set, so the owner's line
+    pointed at an impossible fix (Intent honesty anti-pattern, critic #12). Flagged on the ticket.
 - The mismatch line uses the amber warning tone already used by "needs reconnect"; icon + text,
   never colour alone.
 
@@ -157,7 +163,9 @@ under the tenant row, `text-sm`, only for QuickBooks/Xero with status connected:
 S1 new-company form, LS selected (LSL/ZAR) · S2 Add company dialog, ZA (ZAR fixed + hint) ·
 S3 Currency row Owner unlocked (Change) · S4 Change dialog open (count 14) · S5 row locked (bill) ·
 S6 row as Member (plain) · S7 card mismatch Owner (Switch) · S8 card mismatch non-Owner · S9 card
-locked · S10 card couldn't-read. Seed: `scripts/dev/seed-457.ts <state>` (G1).
+locked · S10 an amount surface (a queue row showing `LSL 1,234.50` beside a USD supplier
+document). The couldn't-read and support-list card lines are covered by the
+`ledgerCurrencyOutcome` unit test (§9.6), not captured. Seed: `scripts/dev/seed-457.ts <state>` (G1).
 
 ## 7. Accessibility (`include`)
 Change/Switch are `<button>`s with visible text; dialog focus lands on "Change to ZAR"
@@ -170,3 +178,45 @@ targets ≥ 24px (44px below md).
 Every server action has a caller (B1); no `window.confirm`; client files import nothing from
 `models/*` (constants in `lib/geo/company-currency.ts`); `revalidatePath` + `router.refresh` on
 every mutation; admin vocabulary says "company", never "workspace".
+
+## 9. Spec-critic reconciliation (binding; overrides §1–§7 where they differ)
+1. **Recorded lock (step 1).** Additive columns `Workspace.currencyLockedAt DateTime?`,
+   `currencyLockCause String?` (`bill` | `bank_statement` | `payment_batch`),
+   `currencyLockProvider String?`. Set once (only when null) by `recordCurrencyLock(workspaceId,
+   cause, provider?, at)`: called on a push's success in `attemptIntegrationPush` (step 3) and on
+   PaymentRun create (step 1, in the PaymentRun create model fn). `getCurrencyLock` reads the
+   columns; the migration (step 2) backfills them from the earliest succeeded push / PaymentRun.
+   Deleting a push or batch never reopens the lock.
+2. **Lock copy by cause:** "locked since the first bill was posted to Xero on 12 Sep 2026" ·
+   "…the first bank statement was posted to Xero on …" · "…the first payment batch was created
+   on …". Every succeeded push kind locks.
+3. **Change serialisation (step 1).** `changeCompanyCurrency` takes `SELECT … FOR UPDATE` on the
+   Workspace row, re-reads the lock, and refuses `company_currency_push_in_flight` while any
+   IntegrationPush of the workspace is `pending` with `leaseUntil > now`. Dialog line: "A bill is
+   being posted right now. Try again in a minute." (button stays enabled).
+4. **Re-queue after a change (step 3 wires it into step 1's fn).**
+   `requeueLedgerCurrencyFailures(workspaceId)`: pushes `failed` with `errorCode =
+   "ledger_currency_differs"` → `pending`, attempts 0, `nextAttemptAt` now, fresh idempotency key;
+   their open `push_preflight` review tasks resolved. Returned count `requeued` goes into the audit
+   and the dialog: "3 bills waiting on the ledger currency will be posted again." (0 → omitted).
+5. **Check scope (step 3).** `checkLedgerCurrency` runs for every push kind, bank statements
+   included. Before each push a stored read ≤ 60 s old is reused (Xero 60 calls/min/tenant);
+   older → fresh read.
+6. **Outcome as a pure fn (step 5, client-safe).** `lib/integrations/ledger-currency-outcome.ts`
+   `ledgerCurrencyOutcome({ provider, ledgerCurrency, companyCurrency, country, locked, isOwner })`
+   → `none | unread | switch | ask_owner | blocked`; tested for all five plus a support-list company
+   (country US, currency USD, `allowedCurrencies` [] → `blocked`, never a throw). The Currency
+   row for such a company shows `USD · locked since …` with no control.
+7. **Migration (step 2).** Selection uses `getCurrencyLock` (push OR payment batch) — a locked
+   company goes to the support list. The audit row `company_currency_migrated` is written in the
+   update transaction with `noticePending: true`; a second pass sends pending notices and clears
+   the flag, so a crash between update and email is recovered on re-run. Notice copy uses the
+   target currency: "Currency changed to ZAR. Check your approval limits; they were set in USD."
+8. **Re-conversion rate date (step 1).** Re-running `applyFxToDocument` after a change keeps the
+   document's existing rate date (a USD document goes USD→ZAR at that date's rate, then the
+   peg); tested so unposted USD documents do not drift.
+9. **Focus after Switch (step 5).** On success the card's mismatch line (and its Switch button)
+   unmounts; `onChanged` then focuses the card's provider name (`tabIndex={-1}`). In Companies,
+   focus returns to Change if still rendered, else to the pane heading.
+10. **One label.** The row `dt`, the Companies table column (`companies-queue.tsx:232`) and both
+    forms say "Company currency".

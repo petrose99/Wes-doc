@@ -54,6 +54,7 @@ New: `company-country-currency-fields.tsx` (shared by the two forms — prevents
 | Ledger currency | connect → push (Owner changes it in Xero) | fresh read before each push; mismatch → Check fails, no post |
 | Ledger currency | read fails | push retried, never posts on a guess; card says couldn't read |
 | Unposted count | dialog open → submit | count re-computed server-side; toast states the actual count |
+| Queued push | queued before a Change, attempted after | the Check reads the company currency at attempt time, not from the payload; a push racing the Change is harmless (1:1 peg) and itself locks the company |
 | Migration | re-run | idempotent via audit row; locked companies untouched |
 
 ## C — Coverage
@@ -64,7 +65,21 @@ New: `company-country-currency-fields.tsx` (shared by the two forms — prevents
 | dialog | idle, busy, error, locked-since | toast + refresh | Cancel/Esc | consequence copy | title names target | alert line |
 | card line | null, equal, differs×3 outcomes | text | — | no post | fact + outcome | outcome says the fix |
 
-## D — Spec critic (opus): see below
+## D — Spec critic (opus, `logs/scratch-457/critic.md`): 27/40, ~70, 4 P1 as first written
+| H | critique self / critic / reconciled | evaluate worst self / critic / reconciled | Spec change |
+|---|---|---|---|
+| H1 | 4 / 3 / 4 | 1 / 2 / 1 | pane refresh via `afterMutation` remount (§5.3) |
+| H2 | 3 / 3 / 3 | 0 / 1 / 1 | — |
+| H3 | 3 / 3 / 3 | 0 / 3 / 1 | re-queue ledger-currency failures on change (§9.4) |
+| H4 | 3 / 2 / 3 | 0 / 2 / 1 | one label "Company currency"; focus text fixed; toast count (§9.10, §7, §5.3) |
+| H5 | 4 / 2 / 4 | 0 / 3 / 1 | hidden ZAR input (§5.1); FOR UPDATE + in-flight refusal (§9.3); recorded lock (§9.1); all push kinds checked (§9.5) |
+| H6 | 3 / 3 / 3 | 0 / 1 / 1 | — |
+| H7 | 3 / 3 / 3 | 1 / 1 / 1 | — |
+| H8 | 3 / 3 / 3 | 0 / 0 / 0 | — |
+| H9 | 3 / 2 / 3 | 1 / 3 / 1 | honest blocked copy (§5.4 deviation); support-list state (§9.6) |
+| H10 | 3 / 3 / 3 | 1 / 1 / 1 | — |
+Reconciled: 32/40 (two 4s), worst-issue sum 9, P0 0 · P1 0, verdict Clean, health ≈ 85.
+Sizing: 5 build steps + G1–G3; 10 captured states (S10 = amount surface; unread/support-list lines unit-tested). Within limits.
 
 ## E — evaluate prediction
 | H | Worst issue still permitted | Sev |
@@ -79,4 +94,4 @@ New: `company-country-currency-fields.tsx` (shared by the two forms — prevents
 | H8 | card line adds a row when unread (intended) | 0 |
 | H9 | generic network failure copy | 1 |
 | H10 | lock rule taught only in the LS hint and the lock reason | 1 |
-Sum 4 · P0 0 · P1 0. Walkthroughs: create LS company (4 steps pass) · Owner switches to ZAR from card (3 pass) · Member sees mismatch, knows to ask (1 pass) · Owner of locked company reads why (1 pass). Anti-patterns: none (no pre-selection beyond the country default, no hidden cost — count shown). Verdict Clean. Predicted critique 34 (H1 4, H5 4, rest 3).
+Self sum 4 (superseded by D: reconciled 9) · P0 0 · P1 0. Walkthroughs: create LS company (4 steps pass) · Owner switches to ZAR from card (3 pass) · Member sees mismatch, knows to ask (1 pass) · Owner of locked company reads why (1 pass). Anti-patterns: none (no pre-selection beyond the country default, no hidden cost — count shown). Verdict Clean. Predicted critique 34 (H1 4, H5 4, rest 3).
