@@ -8,6 +8,8 @@ import { batchEligibility, isOnBillPay, type BatchEligibility } from "@/lib/paym
 import { formatTerms, hasDiscountTerms, openDiscountWindow, type DiscountWindow, type PaymentTerms } from "@/lib/payments/terms"
 import { remainingDue } from "@/lib/payments/paid-state"
 import { agingBucket } from "@/lib/bills/due-date"
+import { getSupplierCreditAvailable } from "@/models/credits"
+import { normalizeSupplierName } from "@/lib/suppliers/normalize"
 
 /** #229 Q7/Q10 (#251): the Bill Pay queue — one row per Approved, uncancelled, not-fully-paid
  * invoice, carrying its supplier's Payment terms, the open discount window, the operator's
@@ -29,6 +31,9 @@ export type BillPayBillRow = {
   /** True when the operator set Pay From on this row; false when it is the workspace default. */
   payFromChosen: boolean
   hasBankAccount: boolean
+  /** Live credit available with this row's supplier — 0 when none (#463 Step 3; the Payee
+   * subtitle render is #465's job). */
+  supplierCreditAvailable: number
   eligibility: BatchEligibility
   /** Scheduled while a pending/approved batch holds the row; the batch's id lets the row link. */
   scheduledBatch: { id: string; name: string | null; status: string } | null
@@ -88,12 +93,14 @@ export async function listBillPay(input: { workspaceId: string; asOf?: Date; fac
     paidState: bill.paidState.state,
   }))
   const ids = onQueue.map((bill) => bill.documentId)
-  const [preferences, batchItems] = ids.length === 0 ? [[], []] : await Promise.all([
+  const supplierKeys = onQueue.map((bill) => bill.supplier).filter((s): s is string => Boolean(s))
+  const [preferences, batchItems, creditAvailableBySupplier] = ids.length === 0 ? [[], [], new Map<string, number>()] : await Promise.all([
     prisma.billPayPreference.findMany({ where: { workspaceId: input.workspaceId, documentId: { in: ids } }, select: { documentId: true, amountToPay: true, payFromAccountId: true } }),
     prisma.paymentRunItem.findMany({
       where: { workspaceId: input.workspaceId, documentId: { in: ids }, active: true, run: { status: { in: ["pending_approval", "approved", "draft", "sent"] } } },
       select: { documentId: true, run: { select: { id: true, name: true, status: true } } },
     }),
+    getSupplierCreditAvailable(input.workspaceId, supplierKeys),
   ])
   const preferenceByDoc = new Map(preferences.map((p) => [p.documentId, p]))
   const batchByDoc = new Map(batchItems.filter((i) => i.documentId).map((i) => [i.documentId!, i.run]))
@@ -109,8 +116,10 @@ export async function listBillPay(input: { workspaceId: string; asOf?: Date; fac
     const chosen = preference?.payFromAccountId ? accountById.get(preference.payFromAccountId) ?? null : null
     const payFrom = chosen ?? defaultPayerAccount
     const hasBankAccount = supplierHasBankAccount(supplier)
+    const supplierCreditAvailable = bill.supplier ? creditAvailableBySupplier.get(normalizeSupplierName(bill.supplier)) ?? 0 : 0
     return {
       kind: "bill", bill, terms, termsLabel: formatTerms(terms), discount, due, amountToPayOverride, amountToPay, payFrom, payFromChosen: chosen !== null, hasBankAccount,
+      supplierCreditAvailable,
       eligibility: batchEligibility({ hasBankAccount, paidState: bill.paidState.state, amountToPay, hasSupplier: !!bill.supplierId, hasPayerAccount: payFrom !== null }),
       scheduledBatch: batchByDoc.get(bill.documentId) ?? null,
     }

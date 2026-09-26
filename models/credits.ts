@@ -229,6 +229,25 @@ export async function getSupplierCreditAvailable(workspaceId: string, supplierKe
   return result
 }
 
+/** Live (not removed) allocation amounts against a batch of invoice documents, keyed by
+ * invoiceId — feeds `derivePaidState`'s `allocations` input (Step 3) wherever a bill row's paid
+ * state is computed. */
+export async function getLiveAllocationsByInvoice(workspaceId: string, invoiceIds: string[]): Promise<Map<string, Array<{ amount: number }>>> {
+  const result = new Map<string, Array<{ amount: number }>>()
+  if (invoiceIds.length === 0) return result
+  const rows = await prisma.creditAllocation.findMany({
+    where: { workspaceId, invoiceId: { in: invoiceIds }, removedAt: null },
+    select: { invoiceId: true, amount: true },
+  })
+  for (const row of rows) {
+    const amount = decimalToNumber(row.amount) ?? 0
+    const list = result.get(row.invoiceId) ?? []
+    list.push({ amount })
+    result.set(row.invoiceId, list)
+  }
+  return result
+}
+
 /** Q9: called from `models/review-tasks.ts` the moment a credit note's review task resolves to
  * "approved" — proposes against the workspace's open invoices for the same supplier and, on an
  * exact match, allocates automatically (actor = the approver). A no-op for anything that isn't a

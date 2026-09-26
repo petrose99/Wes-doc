@@ -23,6 +23,8 @@ beforeEach(() => {
   // ADR 0001 (#251): live Payment records and live batch membership feed the derived paid state.
   db.invoicePayment = { findMany: vi.fn().mockResolvedValue([]) }
   db.paymentRunItem = { findMany: vi.fn().mockResolvedValue([]) }
+  // #463 Step 3: live credit allocations feed the "credited" paid state.
+  db.creditAllocation = { findMany: vi.fn().mockResolvedValue([]) }
 })
 
 describe("listWorkspaceBills", () => {

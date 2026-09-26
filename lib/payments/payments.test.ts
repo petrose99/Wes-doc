@@ -34,7 +34,7 @@ describe("payment terms (#229 Q5)", () => {
 })
 
 describe("derived paid state (ADR 0001)", () => {
-  const base = { ledgerStatus: null, ledgerPaidAmount: null, total: 500, records: [], batchStatus: null as null }
+  const base = { ledgerStatus: null, ledgerPaidAmount: null, total: 500, records: [], allocations: [], batchStatus: null as null }
   it("ledger wins when it confirms", () => {
     expect(derivePaidState({ ...base, ledgerStatus: "paid", ledgerPaidAmount: 500, records: [{ amount: 10 }] })).toMatchObject({ state: "paid", source: "ledger", label: "Paid" })
     expect(derivePaidState({ ...base, ledgerStatus: "reconciled" }).state).toBe("paid")
@@ -49,6 +49,11 @@ describe("derived paid state (ADR 0001)", () => {
     expect(derivePaidState({ ...base, batchStatus: "approved" }).state).toBe("scheduled")
     expect(derivePaidState({ ...base, batchStatus: "rejected" }).state).toBe("unpaid")
     expect(derivePaidState({ ...base, batchStatus: "paid" }).state).toBe("unpaid")
+  })
+  it("credit alone reads as Credited, never Paid (#463 Q7/ADR 0017)", () => {
+    expect(derivePaidState({ ...base, allocations: [{ amount: 500 }] })).toMatchObject({ state: "credited", label: "Credited", allocatedAmount: 500, recordedAmount: 0 })
+    expect(derivePaidState({ ...base, records: [{ amount: 200 }], allocations: [{ amount: 100 }] })).toMatchObject({ state: "partially_paid", paidAmount: 300 })
+    expect(derivePaidState({ ...base, records: [{ amount: 500 }], allocations: [{ amount: 100 }] })).toMatchObject({ state: "paid", source: "recorded", label: "Paid (recorded)" })
   })
   it("remaining due is in cents", () => {
     expect(remainingDue(100, 33.33)).toBe(66.67)

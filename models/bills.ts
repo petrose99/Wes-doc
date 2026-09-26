@@ -7,6 +7,7 @@ import { normalizeSupplierName } from "@/lib/suppliers/normalize"
 import type { PoLinkKind } from "@/lib/matching/po-link"
 import { summarizeInvoicePoLinks, type InvoicePoSummary } from "@/models/po-matching"
 import { derivePaidState, type DerivedPaidState } from "@/lib/payments/paid-state"
+import { getLiveAllocationsByInvoice } from "@/models/credits"
 import { LIVE_BATCH_STATUSES, type BatchStatus } from "@/lib/payments/batch-status"
 import { decimalToNumber } from "@/lib/money"
 import { processingState, PROCESSING_STATES, type ProcessingState } from "@/lib/documents/processing-state"
@@ -180,7 +181,7 @@ export async function listWorkspaceBills(input: {
   if (!documents.length) return { bills: [], summary: emptySummary() }
 
   const documentIds = documents.map((d) => d.id)
-  const [paymentStatuses, openCheckTasks, suppliers, latestReviewTasks, touchlessEvents, openEscalations, paymentRecords, batchItems] = await Promise.all([
+  const [paymentStatuses, openCheckTasks, suppliers, latestReviewTasks, touchlessEvents, openEscalations, paymentRecords, batchItems, allocationsByInvoice] = await Promise.all([
     getDocumentPaymentStatuses(input.workspaceId, documentIds),
     prisma.reviewTask.findMany({
       where: { workspaceId: input.workspaceId, documentId: { in: documentIds }, reason: "check_failed", status: { in: ["open", "in_review"] } },
@@ -214,6 +215,9 @@ export async function listWorkspaceBills(input: {
       where: { workspaceId: input.workspaceId, documentId: { in: documentIds }, active: true, run: { status: { in: [...LIVE_BATCH_STATUSES] } } },
       select: { documentId: true, run: { select: { status: true } } },
     }),
+    // #463 Step 3: live credit allocations against these documents as invoices — a credit note's
+    // own id never appears here (only as creditNoteId), so its row falls through with none.
+    getLiveAllocationsByInvoice(input.workspaceId, documentIds),
   ])
   const recordsByDoc = new Map<string, Array<{ amount: number }>>()
   for (const record of paymentRecords) {
@@ -290,7 +294,11 @@ export async function listWorkspaceBills(input: {
       paidAt: paymentRow?.syncedAt ?? null,
       paidState: derivePaidState({
         ledgerStatus: paymentRow?.paymentStatus ?? null, ledgerPaidAmount: paymentRow?.paidAmount ?? null, total,
-        records: recordsByDoc.get(doc.id) ?? [], batchStatus: batchStatusByDoc.get(doc.id) ?? null,
+        records: recordsByDoc.get(doc.id) ?? [],
+        // A credit note is never itself allocated-against — it only ever appears as the
+        // creditNoteId side (Q14: no paid state of its own).
+        allocations: isCreditNote ? [] : allocationsByInvoice.get(doc.id) ?? [],
+        batchStatus: batchStatusByDoc.get(doc.id) ?? null,
       }),
       status: doc.status,
       reviewedAt: doc.reviewedAt,
