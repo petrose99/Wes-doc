@@ -79,7 +79,7 @@ export function CategoryAccountMappingTable({ workspaceId, connectionId, mapping
           </table>
         )}
 
-        {mappings.length === 0 && <p className="text-sm text-slate-600">No mappings configured yet. Categories will use the default expense account.</p>}
+        {mappings.length === 0 && <p className="max-w-[65ch] text-sm text-slate-600">No mappings configured yet. Categories will use the default expense account.</p>}
 
         {isOwner && (
           <div className="flex flex-wrap items-end gap-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3">

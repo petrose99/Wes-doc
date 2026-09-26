@@ -85,7 +85,7 @@ function LedgerCurrencyLine({ workspaceId, connection, isOwner, company, onChang
   })
   if (outcome === "none") return null
   if (outcome === "unread") {
-    return <p className="mt-1 text-sm text-slate-600">{`Couldn't read ${provider}'s currency yet. It's checked again before each bill is posted.`}</p>
+    return <p className="mt-1 max-w-[65ch] text-sm text-slate-600">{`Couldn't read ${provider}'s currency yet. It's checked again before each bill is posted.`}</p>
   }
   const ledger = connection.ledgerCurrency!
   const qbo = connection.provider === "quickbooks"
@@ -643,7 +643,7 @@ export function IntegrationsManager({
                   {eventTypes.map((type) => (
                     <label key={type} className="flex items-center gap-2 text-xs">
                       <input type="checkbox" checked={selectedEvents.includes(type)} onChange={() => toggleEvent(type)} />
-                      <span className="font-mono">{type}</span>
+                      <span className="min-w-0 break-all font-mono">{type}</span>
                     </label>
                   ))}
                 </div>

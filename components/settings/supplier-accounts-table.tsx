@@ -27,7 +27,8 @@ export type SupplierAccountReminder = { oldAccountExternalId: string; oldAccount
  * or `loc:‹id›`; inactive rows included so an archived code still reads by name. */
 export type CodingLabel = { label: string; active: boolean; categoryName?: string }
 
-const joinAnd = (items: string[]) => new Intl.ListFormat("en", { type: "conjunction" }).format(items)
+// House copy has no serial comma ("Tax code, Class and Location"); Intl.ListFormat "en" adds one.
+const joinAnd = (items: string[]) => items.length < 2 ? items.join("") : `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`
 
 /** The rule's held Tax code, Tracking and Location, in that order, as `{name, value, stale}` parts. */
 function heldParts(rule: SupplierAccountRuleRow, codingLabels: Record<string, CodingLabel>, trackingCategories: { id: string; name: string }[]) {
@@ -179,7 +180,7 @@ export function SupplierAccountsTable({ workspaceId, connectionId, rules, accoun
                       {parts.map((part, i) => (
                         <span key={i}>
                           {i > 0 && " · "}
-                          <span className="whitespace-nowrap">{part.name}: {part.value}</span>
+                          <span className="sm:whitespace-nowrap">{part.name}: {part.value}</span>
                           {part.stale && ` (no longer in ${providerLabel} — not pre-filled)`}
                         </span>
                       ))}
