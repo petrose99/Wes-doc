@@ -92,6 +92,35 @@ export async function nangoProxy<T>(
   return (await response.json()) as T
 }
 
+/** Same proxy as `nangoProxy`, for a provider call whose body is the raw file bytes rather than
+ * JSON — Xero's attachment upload (`PUT .../Attachments/{fileName}` with the file as the body) and
+ * QBO's multipart attach both need this: `content-type` is caller-supplied (the file's own mime
+ * type, or `multipart/form-data; boundary=...`) instead of the hard-coded `application/json` above,
+ * and the request body is the buffer verbatim, never JSON-stringified. The response is still JSON
+ * (every provider returns attachment metadata, not bytes), so the return type and error handling
+ * match `nangoProxy` exactly. */
+export async function nangoProxyBinary<T>(
+  connectionId: string, providerConfigKey: string, path: string, body: Buffer, contentType: string,
+  init?: Omit<RequestInit, "body" | "headers">,
+  classify: (status: number, body: string) => Error = classifyHttpStatus,
+): Promise<T> {
+  const response = await fetch(`${config.integrations.nango.host}/proxy${path}`, {
+    ...init,
+    method: init?.method ?? "POST",
+    body: new Uint8Array(body),
+    headers: {
+      authorization: authHeader(),
+      "connection-id": connectionId,
+      "provider-config-key": providerConfigKey,
+      accept: "application/json",
+      "content-type": contentType,
+    },
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  })
+  if (!response.ok) throw classify(response.status, await response.text().catch(() => ""))
+  return (await response.json()) as T
+}
+
 /** Verifies the `X-Nango-Signature` header Nango sends on every webhook delivery: a plain
  * SHA-256 HMAC (hex) of the raw request body under `NANGO_WEBHOOK_SECRET` — no timestamp field, so
  * unlike lib/webhook-signature.ts's outbound scheme there is no independent replay window here;
