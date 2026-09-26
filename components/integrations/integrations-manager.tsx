@@ -22,10 +22,11 @@ import {
   setDefaultExpenseAccountAction,
   syncAccountingEntitiesAction,
 } from "@/app/(app)/workspaces/[workspaceId]/integration-connection-actions"
+import { backfillAttachSourceFilesAction, countBackfillableAttachmentsAction } from "@/app/(app)/workspaces/[workspaceId]/integration-attach-actions"
 import { NativeSelect } from "@/components/ui/native-select"
 import { AccountCorrectionDialog } from "@/components/integrations/account-correction-dialog"
 import { listAffectedBillsAction, type AffectedBillWithCheck } from "@/app/(app)/workspaces/[workspaceId]/account-correction-actions"
-import { AlertTriangle, Check, Copy, Landmark } from "lucide-react"
+import { AlertTriangle, Check, Copy, Landmark, Loader2 } from "lucide-react"
 import Nango, { AuthError } from "@nangohq/frontend"
 import { useRouter } from "next/navigation"
 import { useEffect, useRef, useState, useTransition } from "react"
@@ -462,6 +463,46 @@ function SecretReveal({ label, value, onDone }: { label: string; value: string; 
   )
 }
 
+/** #450/#462 Surface 3: the one-time Owner back-fill for bills posted before the attach feature
+ * existed. Count-first (the button itself names N — spec §3), hidden entirely at 0 so an owner
+ * with nothing to back-fill never sees a dead control; the outcome ("Queued N attaches.") replaces
+ * the button once run, matching `backfillAttachSourceFilesAction`'s idempotent one-shot contract. */
+function BackfillAttachControl({ workspaceId }: { workspaceId: string }) {
+  const [count, setCount] = useState<number | null>(null)
+  const [queued, setQueued] = useState<number | null>(null)
+  const [running, setRunning] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    void countBackfillableAttachmentsAction(workspaceId).then((res) => {
+      if (!cancelled && res.success && res.data) setCount(res.data.count)
+    })
+    return () => { cancelled = true }
+  }, [workspaceId])
+
+  if (count === null || count === 0) return null
+
+  const run = async () => {
+    setRunning(true)
+    try {
+      const res = await backfillAttachSourceFilesAction(workspaceId)
+      if (res.success && res.data) setQueued(res.data.queued)
+      else toast.error(res.error ?? "Could not back-fill source-file attaches")
+    } finally {
+      setRunning(false)
+    }
+  }
+
+  return <div className="mt-3">
+    {queued === null
+      ? <Button type="button" size="sm" variant="outline" disabled={running} onClick={() => void run()}>
+          {running ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" aria-hidden /> : null}
+          Attach source files to {count} bill{count === 1 ? "" : "s"} already posted
+        </Button>
+      : <p role="status" className="text-sm text-slate-600">Queued {queued} attach{queued === 1 ? "" : "es"}.</p>}
+  </div>
+}
+
 export function IntegrationsManager({
   workspaceId, isOwner, eventTypes, apiKeys, endpoints, deliveries, nangoEnabled, connections, company,
 }: {
@@ -528,7 +569,9 @@ export function IntegrationsManager({
                     />
                   ))}
               </ul>
-            ) : (
+            ) : null}
+            {hasAnyConnection && isOwner && <BackfillAttachControl workspaceId={workspaceId} />}
+            {!hasAnyConnection && (
               <ul className="grid gap-3 sm:grid-cols-3">
                 {PROVIDER_TILES.map(({ provider, description, live }) => (
                   <li

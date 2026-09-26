@@ -8,7 +8,7 @@ import { StageIndicator, type StageStep } from "@/components/pipeline/document-d
 import { useFieldNav } from "@/components/pipeline/document-detail/use-field-nav"
 import { updateDocumentNoteAction } from "@/app/(app)/workspaces/[workspaceId]/pipeline-actions"
 import { PaneDocumentContext, useRegisterDocumentActions, type RegisteredDocument } from "@/components/queue/document-actions-menu"
-import { BillHistoryDisclosure, BillPane, BillReadOnlyContext, BillStatusTrack, DatesRow, PaymentDetailsLink, SupplierCard, useBillReadOnly, type BillPaneProviderLink } from "@/components/pipeline/document-detail/bill-pane"
+import { BillHistoryDisclosure, BillPane, BillReadOnlyContext, BillStatusTrack, DatesRow, PaymentDetailsLink, SupplierCard, useBillReadOnly, type BillPaneProviderLink, type DocumentAttachment } from "@/components/pipeline/document-detail/bill-pane"
 import type { SupplierSummary } from "@/models/supplier-summary"
 import type { AccountOption } from "@/models/documents"
 import type { LineAccountRow } from "@/lib/finance/line-account-resolution"
@@ -506,6 +506,7 @@ export function BillSplitPane({
   saveReview, note, auditEvents, header, rationales, checks, fxBadge, documentMatches, po = null,
   providerLink, state, fact, ledger, openCheckCodes, paidAt, blockedByCheck, escalated, approvalStatus, rejectedByActor, openReviewTaskId,
   supplierSummary, lineAccounts = null, accountOptions = [], supplierRuleAccountId = null, accountProviderName = null, accountSupplierName = null,
+  attachment = null, canPush = false, isOwner = false,
 }: {
   workspaceId: string
   source: SourceDocument
@@ -558,6 +559,12 @@ export function BillSplitPane({
   accountProviderName?: string | null
   /** #429 step 5: the vendor name, for the "Acme's usual"/"Becomes Acme's usual…" copy. */
   accountSupplierName?: string | null
+  /** #462 Surface 2: the source-file attach row for this document, `canPush` (gates Retry
+   * attaching, same eligibility as the Post button itself) and `isOwner` (gates the reconnect
+   * link) — all server-computed by the caller, same pattern as `ledger`/`paidAt`. */
+  attachment?: DocumentAttachment
+  canPush?: boolean
+  isOwner?: boolean
 }) {
   const [target, setTarget] = useState<ProvenanceTarget | null>(initialTarget)
   const router = useRouter()
@@ -586,9 +593,10 @@ export function BillSplitPane({
   <BillPane document={document} providerLink={providerLink} fileHref={fileHref}
     viewer={<SourceViewer source={source} target={target} />}
     form={<div className="space-y-4 p-4">
-      <BillStatusTrack workspaceId={workspaceId} openReviewTaskId={openReviewTaskId} state={state} fact={fact} ledger={ledger}
+      <BillStatusTrack workspaceId={workspaceId} documentId={header.documentId} openReviewTaskId={openReviewTaskId} state={state} fact={fact} ledger={ledger}
         openCheckCodes={openCheckCodes} cancelledReason={header.cancelledReason} paidAt={paidAt} blockedByCheck={blockedByCheck}
-        escalated={escalated} approvalStatus={approvalStatus} rejectedByActor={rejectedByActor} onDone={() => router.refresh()} />
+        escalated={escalated} approvalStatus={approvalStatus} rejectedByActor={rejectedByActor} onDone={() => router.refresh()}
+        attachment={attachment} canPush={canPush} isOwner={isOwner} />
 
       {(missingRequiredFields.length > 0 || conflictingLabels.length > 0) && <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm text-indigo-700">
         {missingRequiredFields.length > 0 && <p>Missing required fields: <strong>{missingRequiredFields.join(", ")}</strong></p>}
