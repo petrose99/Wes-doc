@@ -98,10 +98,11 @@ export async function nangoProxy<T>(
  * type, or `multipart/form-data; boundary=...`) instead of the hard-coded `application/json` above,
  * and the request body is the buffer verbatim, never JSON-stringified. The response is still JSON
  * (every provider returns attachment metadata, not bytes), so the return type and error handling
- * match `nangoProxy` exactly. */
+ * match `nangoProxy` exactly. `init.headers` (e.g. Xero's `xero-tenant-id`) merges in like
+ * `nangoProxy` does; `contentType` always wins over anything the same name in `init.headers`. */
 export async function nangoProxyBinary<T>(
   connectionId: string, providerConfigKey: string, path: string, body: Buffer, contentType: string,
-  init?: Omit<RequestInit, "body" | "headers">,
+  init?: Omit<RequestInit, "body">,
   classify: (status: number, body: string) => Error = classifyHttpStatus,
 ): Promise<T> {
   const response = await fetch(`${config.integrations.nango.host}/proxy${path}`, {
@@ -113,6 +114,7 @@ export async function nangoProxyBinary<T>(
       "connection-id": connectionId,
       "provider-config-key": providerConfigKey,
       accept: "application/json",
+      ...(init?.headers || {}),
       "content-type": contentType,
     },
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),

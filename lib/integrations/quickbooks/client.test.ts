@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { createBill, findBillByDocNumber, getCompanyInfo, getPreferences, listAccounts, listClasses, listCustomers, listDepartments, listItems, listTaxCodes, voidBill } from "@/lib/integrations/quickbooks/client"
+import { attachFile, createBill, findBillByDocNumber, getCompanyInfo, getPreferences, listAccounts, listAttachments, listClasses, listCustomers, listDepartments, listItems, listTaxCodes, voidBill } from "@/lib/integrations/quickbooks/client"
 
 const jsonReply = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } })
 
@@ -124,6 +124,50 @@ describe("createBill read-back", () => {
   it("reads missing totals as null", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ Bill: { Id: "42" } }))
     await expect(createBill("realm1", "conn1", {}, null)).resolves.toEqual({ id: "42", totalTax: null, total: null, warnings: [] })
+  })
+})
+
+describe("listAttachments", () => {
+  const originalFetch = global.fetch
+  beforeEach(() => { vi.stubGlobal("fetch", vi.fn()) })
+  afterEach(() => { global.fetch = originalFetch })
+
+  it("maps Attachable rows to attachmentId/fileName and queries by AttachableRef.EntityRef.value", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ QueryResponse: { Attachable: [{ Id: "a1", FileName: "invoice.pdf" }] } }))
+    await expect(listAttachments("realm1", "token1", "42")).resolves.toEqual([{ attachmentId: "a1", fileName: "invoice.pdf" }])
+    const url = decodeURIComponent(vi.mocked(fetch).mock.calls[0][0] as string)
+    expect(url).toContain("AttachableRef.EntityRef.value = '42'")
+  })
+
+  it("returns an empty array when the bill has no attachments", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ QueryResponse: {} }))
+    await expect(listAttachments("realm1", "token1", "42")).resolves.toEqual([])
+  })
+})
+
+describe("attachFile", () => {
+  const originalFetch = global.fetch
+  beforeEach(() => { vi.stubGlobal("fetch", vi.fn()) })
+  afterEach(() => { global.fetch = originalFetch })
+
+  it("POSTs a multipart body with the file metadata linking to the Bill and the file bytes, and returns the attachment id", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ AttachableResponse: [{ Attachable: { Id: "a1", FileName: "invoice.pdf" } }] }))
+    const result = await attachFile("realm1", "conn1", "42", { buffer: Buffer.from("file-bytes"), contentType: "application/pdf", fileName: "invoice.pdf" })
+    expect(result).toEqual({ attachmentId: "a1", fileName: "invoice.pdf" })
+
+    const [url, init] = vi.mocked(fetch).mock.calls[0]
+    expect(url).toContain("/upload")
+    const headers = (init as RequestInit).headers as Record<string, string>
+    expect(headers["content-type"]).toMatch(/^multipart\/form-data; boundary=/)
+    const bodyText = Buffer.from((init as RequestInit).body as Uint8Array).toString("utf8")
+    expect(bodyText).toContain('"EntityRef":{"type":"Bill","value":"42"}')
+    expect(bodyText).toContain("file-bytes")
+    expect(bodyText).toContain('filename="invoice.pdf"')
+  })
+
+  it("throws on a non-2xx upload response", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response("", { status: 500 }))
+    await expect(attachFile("realm1", "conn1", "42", { buffer: Buffer.from("x"), contentType: "application/pdf", fileName: "x.pdf" })).rejects.toThrow()
   })
 })
 

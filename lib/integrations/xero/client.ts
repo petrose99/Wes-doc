@@ -1,6 +1,7 @@
-import { nangoProxy } from "@/lib/nango"
+import { nangoProxy, nangoProxyBinary } from "@/lib/nango"
 import { XERO_API_BASE } from "@/lib/integrations/xero/config"
 import { IntegrationPermanentError } from "@/lib/integrations/errors"
+import { xeroApiError } from "@/lib/integrations/xero/errors"
 
 /** Thin wrappers around the Xero Accounting API, called through Nango's proxy (ADR 0005: Nango
  * owns the OAuth app, token refresh, and tenant discovery — `getConnectionConfig` in lib/nango.ts
@@ -131,6 +132,34 @@ export async function voidBill(tenantId: string, connectionId: string, invoiceId
     method: "POST",
     body: JSON.stringify({ Status: "VOIDED" }),
   })
+}
+
+// ---- #461/ADR 0016: attaching the Source file to a posted bill ----------------------------
+
+export type XeroAttachment = { attachmentId: string; fileName: string }
+
+/** Lists an invoice's existing attachments — the attach module calls this before every upload
+ * attempt to find a fixed-filename match (never attached twice) and to know the current count
+ * (Xero's 10-files-a-bill ceiling, discoverable only here, not statically). */
+export async function listAttachments(tenantId: string, connectionId: string, invoiceId: string): Promise<XeroAttachment[]> {
+  const result = await apiRequest<{ Attachments?: Array<{ AttachmentID: string; FileName: string }> }>(tenantId, connectionId, `/Invoices/${invoiceId}/Attachments`)
+  return (result.Attachments ?? []).map((a) => ({ attachmentId: a.AttachmentID, fileName: a.FileName }))
+}
+
+/** Uploads `file` onto the invoice via Xero's documented `PUT Invoices/{id}/Attachments/{FileName}`
+ * — the file name is part of the path (not a form field), `content-type` is the file's own mime
+ * type, and the body is the file bytes verbatim (nangoProxyBinary, not nangoProxy). Xero replaces
+ * an existing attachment of the same name rather than erroring, so a retry that raced a previous
+ * success is harmless (ADR 0016). Throws exactly like createBill on any non-2xx response. */
+export async function attachFile(tenantId: string, connectionId: string, invoiceId: string, file: { buffer: Buffer; contentType: string; fileName: string }): Promise<XeroAttachment> {
+  const path = `${XERO_API_BASE}/Invoices/${invoiceId}/Attachments/${encodeURIComponent(file.fileName)}`
+  const result = await nangoProxyBinary<{ Attachments: Array<{ AttachmentID: string; FileName: string }> }>(
+    connectionId, PROVIDER_CONFIG_KEY, path, file.buffer, file.contentType,
+    { method: "PUT", headers: { "xero-tenant-id": tenantId } },
+    xeroApiError,
+  )
+  const attachment = result.Attachments[0]
+  return { attachmentId: attachment.AttachmentID, fileName: attachment.FileName }
 }
 
 // ---- #430: correcting posted bills' Accounts -----------------------------------------------

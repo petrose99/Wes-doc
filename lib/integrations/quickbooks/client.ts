@@ -1,4 +1,5 @@
-import { nangoProxy } from "@/lib/nango"
+import { randomUUID } from "crypto"
+import { nangoProxy, nangoProxyBinary } from "@/lib/nango"
 import { quickbooksCompanyBase } from "@/lib/integrations/quickbooks/config"
 import { quickbooksApiError } from "@/lib/integrations/quickbooks/errors"
 import { IntegrationPermanentError } from "@/lib/integrations/errors"
@@ -190,6 +191,53 @@ export async function voidBill(realmId: string, connectionId: string, billId: st
     method: "POST",
     body: JSON.stringify({ Id: ref.id, SyncToken: ref.syncToken }),
   })
+}
+
+// ---- #461/ADR 0016: attaching the Source file to a posted bill ----------------------------
+
+export type QuickBooksAttachment = { attachmentId: string; fileName: string }
+
+/** Lists a Bill's existing attachments — the attach module calls this before every upload attempt
+ * to find a fixed-filename match (never attached twice). QBO's Attachable entity links back to the
+ * Bill via AttachableRef.EntityRef.value, queried the same way findBillByDocNumber queries Bill. */
+export async function listAttachments(realmId: string, connectionId: string, billId: string): Promise<QuickBooksAttachment[]> {
+  const query = `select Id, FileName from Attachable where AttachableRef.EntityRef.value = '${escapeQbQuery(billId)}'`
+  const result = await apiRequest<{ QueryResponse?: { Attachable?: Array<{ Id: string; FileName: string }> } }>(realmId, connectionId, `/query?query=${encodeURIComponent(query)}`)
+  return (result.QueryResponse?.Attachable ?? []).map((a) => ({ attachmentId: a.Id, fileName: a.FileName }))
+}
+
+/** Builds the multipart/form-data body QBO's single-call `/upload` endpoint requires: a
+ * `file_metadata_01` JSON part carrying the AttachableRef that links the upload straight to the
+ * Bill (no separate link step, unlike Xero's file-in-path PUT), and a `file_content_01` part with
+ * the file bytes. Buffers, not strings, throughout so binary content survives untouched. */
+function buildQuickBooksUploadBody(boundary: string, billId: string, file: { buffer: Buffer; contentType: string; fileName: string }): Buffer {
+  const metadata = JSON.stringify({ AttachableRef: [{ EntityRef: { type: "Bill", value: billId } }] })
+  const head = Buffer.from(
+    `--${boundary}\r\n` +
+    `Content-Disposition: form-data; name="file_metadata_01"\r\n` +
+    `Content-Type: application/json\r\n\r\n` +
+    `${metadata}\r\n` +
+    `--${boundary}\r\n` +
+    `Content-Disposition: form-data; name="file_content_01"; filename="${file.fileName}"\r\n` +
+    `Content-Type: ${file.contentType}\r\n\r\n`,
+  )
+  const tail = Buffer.from(`\r\n--${boundary}--\r\n`)
+  return Buffer.concat([head, file.buffer, tail])
+}
+
+/** Uploads `file` and links it to the Bill in one call, QBO's documented `POST /upload` — unlike
+ * Xero there is no separate link step and no idempotency token (commented deviation, CODING_
+ * STANDARDS #3: the attach module's fixed-filename + listAttachments match stands in for one).
+ * Throws exactly like createBill on any non-2xx response. */
+export async function attachFile(realmId: string, connectionId: string, billId: string, file: { buffer: Buffer; contentType: string; fileName: string }): Promise<QuickBooksAttachment> {
+  const boundary = `docubite-${randomUUID()}`
+  const body = buildQuickBooksUploadBody(boundary, billId, file)
+  const result = await nangoProxyBinary<{ AttachableResponse: Array<{ Attachable: { Id: string; FileName: string } }> }>(
+    connectionId, PROVIDER_CONFIG_KEY, `${quickbooksCompanyBase(realmId)}/upload`, body, `multipart/form-data; boundary=${boundary}`,
+    { method: "POST" }, quickbooksApiError,
+  )
+  const attachable = result.AttachableResponse[0].Attachable
+  return { attachmentId: attachable.Id, fileName: attachable.FileName }
 }
 
 // ---- #430: correcting posted bills' Accounts -----------------------------------------------
