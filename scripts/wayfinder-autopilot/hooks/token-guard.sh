@@ -102,6 +102,7 @@ def closing_bar(c):
         try: return subprocess.run(a, capture_output=True, text=True).stdout
         except Exception: return ""
     root = sh("git", "rev-parse", "--show-toplevel").strip()
+    base = os.environ.get("WAYFINDER_BASE_BRANCH", "")
     # only this ticket's own commits count: a range or the working tree would
     # pick up the other tickets interleaved on the branch
     # a ticket's commit names it in the subject as the thing being worked
@@ -140,7 +141,6 @@ def closing_bar(c):
     # next.config.ts to get round a lane defect and would have landed it. A
     # ticket closes only while the project's infra files match the integration
     # branch the driver started on — a change there is a ticket of its own.
-    base = os.environ.get("WAYFINDER_BASE_BRANCH", "")
     if base:
         infra = [f for f in sh("git", "diff", "--name-only", base, "--", "next.config.ts", "tsconfig.json", "package.json", "package-lock.json", "prisma/schema.prisma", ".claude/settings.json").split()
                  if not re.search(r"\b(schema|migration|dependency|package|config)\b", os.environ.get("WAYFINDER_TICKET_TITLE", ""), re.I)]
