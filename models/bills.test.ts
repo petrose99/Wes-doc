@@ -215,4 +215,21 @@ describe("listWorkspaceBills", () => {
       expect(res.bills.map((r) => r.documentId)).toEqual([state])
     }
   })
+
+  it("includes credit-note rows alongside invoices, with null due/aging/po (#463)", async () => {
+    db.document.findMany.mockResolvedValue([
+      { id: "inv1", filename: "invoice.pdf", status: "reviewed", reviewedAt: new Date(), docType: "invoice", template: { code: "invoice" }, reviewedData: { vendor: "Acme", total: 100 } },
+      { id: "cn1", filename: "credit.pdf", status: "reviewed", reviewedAt: new Date(), docType: "credit_note", template: { code: "credit_note" }, reviewedData: { vendor: "Acme", total: 20, credited_invoice_number: "INV-1" } },
+    ])
+    const res = await listWorkspaceBills({ workspaceId: "w1" })
+    expect(res.bills).toHaveLength(2)
+    const creditRow = res.bills.find((b) => b.documentId === "cn1")
+    expect(creditRow?.docType).toBe("credit_note")
+    expect(creditRow?.extractedDueDate).toBeNull()
+    expect(creditRow?.dueDate).toBeNull()
+    expect(creditRow?.agingBucket).toBeNull()
+    expect(creditRow?.po.kind).toBeNull()
+    const invoiceRow = res.bills.find((b) => b.documentId === "inv1")
+    expect(invoiceRow?.docType).toBe("invoice")
+  })
 })
