@@ -158,7 +158,7 @@ describe("document templates", () => {
       expect(lineItems).toBeDefined()
       expect(lineItems!.type).toBe("array")
       const itemKeys = lineItems!.itemFields!.map((f) => f.key)
-      expect(itemKeys).toEqual(["description", "quantity", "unit_price", "amount"])
+      expect(itemKeys).toEqual(["description", "quantity", "unit_price", "amount", "item_code"])
     })
 
     it("invoice template includes line_items with structured item fields", () => {
@@ -169,7 +169,7 @@ describe("document templates", () => {
       expect(lineItems).toBeDefined()
       expect(lineItems!.type).toBe("array")
       const itemKeys = lineItems!.itemFields!.map((f) => f.key)
-      expect(itemKeys).toEqual(["description", "quantity", "unit_price", "amount"])
+      expect(itemKeys).toEqual(["description", "quantity", "unit_price", "amount", "item_code"])
     })
 
     it("marks invoice and receipt total fields as last-page summaries", () => {

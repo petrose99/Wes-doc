@@ -33,6 +33,7 @@ const { attemptIntegrationPush, getLedgerConnectionBandStatus } = await import("
 const { IntegrationAuthError } = await import("./integrations/errors")
 const db = (await import("@/lib/db")) as unknown as { prisma: Record<string, any> }
 const quickbooks = (await import("./integrations/quickbooks/client")) as unknown as Record<string, any>
+const xero = (await import("./integrations/xero/client")) as unknown as Record<string, any>
 const ledger = (await import("./integrations/ledger-currency")) as unknown as Record<string, any>
 const companyCurrency = (await import("@/models/company-currency")) as unknown as Record<string, any>
 const capabilities = (await import("./integrations/ledger-capabilities")) as unknown as Record<string, any>
@@ -309,6 +310,39 @@ describe("attemptIntegrationPush — post read-back (ADR 0014)", () => {
     await expect(attemptIntegrationPush("push-1", now)).resolves.toBeUndefined()
     expect(prisma.integrationPush.update).toHaveBeenCalledTimes(1)
     expect(prisma.integrationPush.update.mock.calls[0][0].data).toMatchObject({ status: "succeeded" })
+  })
+})
+
+describe("attemptIntegrationPush — Xero item-code-stripped warning (#459)", () => {
+  const itemPush = () => makePush({
+    connection: { ...makePush().connection, provider: "xero" },
+    payload: { ...makePush().payload, lineItems: [{ itemExternalId: "i1" }] },
+  })
+  beforeEach(() => { entities.loadLineCodingContext.mockReset() })
+
+  it("treats a Xero Warning that strips an ItemCode as a failed post, not succeeded-with-warning", async () => {
+    xero.createBill.mockResolvedValueOnce({ id: "bill-1", totalTax: null, total: null, warnings: ["Item code has been removed."] })
+    const prisma = makePrisma(itemPush())
+    db.prisma = prisma
+
+    await attemptIntegrationPush("push-1", now)
+
+    const update = prisma.integrationPush.update.mock.calls[0][0]
+    expect(update.data.status).toBe("failed")
+    expect(update.data.errorCode).toBe("xero_item_code_stripped")
+    // Close review P1: the bill genuinely posted at Xero (wrong-shaped) before the warning was
+    // read — losing its id here would make the bad bill unfindable, so a failed push keeps it.
+    expect(update.data.externalBillId).toBe("bill-1")
+  })
+
+  it("still succeeds on an unrelated Xero warning", async () => {
+    xero.createBill.mockResolvedValueOnce({ id: "bill-1", totalTax: null, total: null, warnings: ["Some other notice."] })
+    const prisma = makePrisma(itemPush())
+    db.prisma = prisma
+
+    await attemptIntegrationPush("push-1", now)
+
+    expect(prisma.integrationPush.update.mock.calls[0][0].data.status).toBe("succeeded")
   })
 })
 

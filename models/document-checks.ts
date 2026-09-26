@@ -63,7 +63,7 @@ export async function runDeterministicChecks(input: { workspaceId: string; docum
   try {
     const document = await prisma.document.findFirst({
       where: { id: input.documentId, workspaceId: input.workspaceId },
-      select: { id: true, templateId: true, reviewedData: true, mimeType: true, ocrText: true, docType: true, institutionId: true, template: { select: { code: true } } },
+      select: { id: true, templateId: true, reviewedData: true, codingData: true, mimeType: true, ocrText: true, docType: true, institutionId: true, template: { select: { code: true } } },
     })
     if (!document) return
     const docType = resolveDocType(document)
@@ -95,7 +95,7 @@ export async function runDeterministicChecks(input: { workspaceId: string; docum
     // #206: cumulative PO/invoice line-consumption, only meaningful once this invoice is matched
     // to a PO (lib/matching engine's po_to_invoice edge).
     if (map.lineItems) {
-      const poConsumption = await checkPoLineConsumptionAgainstMatchedPo(input.workspaceId, document.id, map.lineItems, values)
+      const poConsumption = await checkPoLineConsumptionAgainstMatchedPo(input.workspaceId, document.id, map.lineItems, values, document.codingData)
       if (poConsumption) results.push(poConsumption)
     }
 
@@ -321,13 +321,13 @@ async function checkStatementDriftAgainstInstitution(workspaceId: string, instit
  * its line items plus every sibling invoice already matched to the same PO, and hands the pooled
  * consumption to the pure checker. Skips silently when the invoice has no PO match yet — the
  * check only makes sense once matching has run. */
-async function checkPoLineConsumptionAgainstMatchedPo(workspaceId: string, documentId: string, lineItemsKey: string, currentValues: Record<string, unknown>): Promise<CheckResult | null> {
+async function checkPoLineConsumptionAgainstMatchedPo(workspaceId: string, documentId: string, lineItemsKey: string, currentValues: Record<string, unknown>, currentCodingData: unknown): Promise<CheckResult | null> {
   try {
     // #228 Q11: only a *compared* link counts — confirmed by hand, or the matcher's guess when
     // the invoice cites the same PO number. A suggestion compares nothing; a rejected link is gone.
     const candidates = await prisma.documentMatch.findMany({
       where: { workspaceId, matchType: "po_to_invoice", targetId: documentId, status: { not: REJECTED_MATCH_STATUS } },
-      select: { id: true, sourceId: true, status: true, confidence: true, lineAssignments: true, source: { select: { reviewedData: true, rawExtraction: true } } },
+      select: { id: true, sourceId: true, status: true, confidence: true, lineAssignments: true, source: { select: { reviewedData: true, rawExtraction: true, codingData: true } } },
     })
     const invoicePoNumber = asString(currentValues.po_number) ?? asString(currentValues.purchase_order_number)
     const ranked = rankPoLinks(candidates.map((row) => {
@@ -337,23 +337,23 @@ async function checkPoLineConsumptionAgainstMatchedPo(workspaceId: string, docum
     })).filter((link) => isComparedLink(link.kind))
     const match = ranked[0]
     if (!match) return null
-    const poLineItems = parseLineItemsForConsumption(match.poValues[lineItemsKey])
+    const poLineItems = parseLineItemsForConsumption(match.poValues[lineItemsKey], match.row.source.codingData)
     if (!poLineItems.length) return null
 
     // Only siblings that are themselves *compared* against this PO consume its lines — a merely
     // suggested link on another invoice must not push this one over the allowance.
     const siblingMatches = await prisma.documentMatch.findMany({ where: { workspaceId, matchType: "po_to_invoice", sourceId: match.row.sourceId, targetId: { not: documentId }, status: { not: REJECTED_MATCH_STATUS } }, select: { targetId: true, status: true } })
     const siblingStatus = new Map(siblingMatches.map((s) => [s.targetId, s.status]))
-    const siblings = siblingMatches.length ? await prisma.document.findMany({ where: { workspaceId, id: { in: siblingMatches.map((s) => s.targetId) } }, select: { id: true, filename: true, reviewedData: true } }) : []
+    const siblings = siblingMatches.length ? await prisma.document.findMany({ where: { workspaceId, id: { in: siblingMatches.map((s) => s.targetId) } }, select: { id: true, filename: true, reviewedData: true, codingData: true } }) : []
 
-    const invoiceLineItems: PoLineConsumptionInput["invoiceLineItems"] = parseLineItemsForConsumption(currentValues[lineItemsKey]).map((item, rowIndex) => ({ documentId, rowIndex, ...item }))
+    const invoiceLineItems: PoLineConsumptionInput["invoiceLineItems"] = parseLineItemsForConsumption(currentValues[lineItemsKey], currentCodingData).map((item, rowIndex) => ({ documentId, rowIndex, ...item }))
     const siblingLabels: Record<string, string> = {}
     for (const sibling of siblings) {
       const values = (sibling.reviewedData ?? {}) as Record<string, unknown>
       const siblingKind = poLinkKind({ status: siblingStatus.get(sibling.id) ?? "pending", invoicePoNumber: asString(values.po_number) ?? asString(values.purchase_order_number), poNumber: match.poNumber })
       if (!isComparedLink(siblingKind)) continue
       siblingLabels[sibling.id] = asString(values.invoice_number) ?? sibling.filename
-      invoiceLineItems.push(...parseLineItemsForConsumption(values[lineItemsKey]).map((item, rowIndex) => ({ documentId: sibling.id, rowIndex, ...item })))
+      invoiceLineItems.push(...parseLineItemsForConsumption(values[lineItemsKey], sibling.codingData).map((item, rowIndex) => ({ documentId: sibling.id, rowIndex, ...item })))
     }
 
     const [workspace, config] = await Promise.all([
@@ -381,11 +381,19 @@ async function checkPoLineConsumptionAgainstMatchedPo(workspaceId: string, docum
   }
 }
 
-function parseLineItemsForConsumption(value: unknown): Array<{ description: string | null; quantity: number | null; unitPrice: number | null }> {
+/** #459: `itemExternalId` comes from `codingData.items[index].item_external_id`, index-aligned
+ * with the reviewed line items (see `resolveDocumentCodingItems`'s `lineItems` param) — the raw
+ * extraction never carries an item id itself. A document with no coding yet (or fewer coded rows
+ * than line items) resolves those rows to no item, same as before this wiring existed. */
+function parseLineItemsForConsumption(value: unknown, codingData?: unknown): Array<{ description: string | null; quantity: number | null; unitPrice: number | null; itemExternalId?: string | null }> {
   if (!Array.isArray(value)) return []
-  return value.map((item) => {
+  const coding = codingData && typeof codingData === "object" ? (codingData as Record<string, unknown>) : null
+  const codingItems = coding && Array.isArray(coding.items) ? (coding.items as unknown[]) : []
+  return value.map((item, index) => {
     const row = item as Record<string, unknown> | null
-    return { description: asString(row?.description), quantity: asNumber(row?.quantity), unitPrice: asNumber(row?.unit_price) }
+    const codingRow = codingItems[index] as Record<string, unknown> | null | undefined
+    const itemExternalId = typeof codingRow?.item_external_id === "string" ? codingRow.item_external_id : null
+    return { description: asString(row?.description), quantity: asNumber(row?.quantity), unitPrice: asNumber(row?.unit_price), itemExternalId }
   })
 }
 

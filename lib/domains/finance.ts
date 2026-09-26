@@ -32,6 +32,7 @@ export const FINANCE_TEMPLATES = [
         { key: "quantity", label: "Quantity", type: "number", instruction: "Quantity billed", required: false },
         { key: "unit_price", label: "Unit price", type: "number", instruction: "Price per unit before tax", required: false },
         { key: "amount", label: "Amount", type: "number", instruction: "Line total", required: false },
+        { key: "item_code", label: "Item code", type: "string", instruction: "The supplier's own product or item code printed on this line, exactly as shown. Leave blank if none is printed — do not infer or invent one.", required: false },
       ] },
       // Must come AFTER line_items — findArrayField picks the first array field, and line_items
       // is the primary one for adaptive discovery and sheet projection.
@@ -61,6 +62,7 @@ export const FINANCE_TEMPLATES = [
         { key: "quantity", label: "Quantity", type: "number", instruction: "Quantity purchased", required: false },
         { key: "unit_price", label: "Unit price", type: "number", instruction: "Price per unit before tax", required: false },
         { key: "amount", label: "Amount", type: "number", instruction: "Line total", required: false },
+        { key: "item_code", label: "Item code", type: "string", instruction: "The supplier's own product or item code printed on this line, exactly as shown. Leave blank if none is printed — do not infer or invent one.", required: false },
       ] },
       { key: "total", label: "Total", type: "number", instruction: "Amount paid including taxes", required: true, mergeStrategy: "last", retrievalHints: ["total", "amount paid", "grand total", "balance due", "amount due"], negative: "not the subtotal, not tax alone, not the tendered amount alone, not any change given" },
     ],
@@ -135,6 +137,7 @@ export const FINANCE_OPTIONAL_TEMPLATES = [
         { key: "quantity", label: "Quantity", type: "number", instruction: "Quantity ordered", required: false },
         { key: "unit_price", label: "Unit price", type: "number", instruction: "Price per unit", required: false },
         { key: "amount", label: "Amount", type: "number", instruction: "Line total", required: false },
+        { key: "item_code", label: "Item code", type: "string", instruction: "The supplier's own product or item code printed on this line, exactly as shown. Leave blank if none is printed — do not infer or invent one.", required: false },
       ] },
     ],
   },

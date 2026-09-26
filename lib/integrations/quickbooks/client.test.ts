@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { createBill, findBillByDocNumber, getCompanyInfo, getPreferences, listAccounts, listClasses, listCustomers, listDepartments, listTaxCodes, voidBill } from "@/lib/integrations/quickbooks/client"
+import { createBill, findBillByDocNumber, getCompanyInfo, getPreferences, listAccounts, listClasses, listCustomers, listDepartments, listItems, listTaxCodes, voidBill } from "@/lib/integrations/quickbooks/client"
 
 const jsonReply = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } })
 
@@ -175,5 +175,18 @@ describe("reference reads for line coding", () => {
     vi.mocked(fetch).mockResolvedValueOnce(jsonReply({ QueryResponse: { Department: [{ Id: "d1", FullyQualifiedName: "Cape Town", Active: true }] } }))
     await expect(listDepartments("realm1", "token1")).resolves.toEqual([{ id: "d1", name: "Cape Town", active: true }])
     expect(queryOf(0)).toContain("from Department")
+  })
+
+  it("listItems drops a service item with no purchase account and maps the tracked-inventory flag", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonReply({ QueryResponse: { Item: [
+      { Id: "1", Sku: "SKU1", Name: "Widget", Type: "Inventory", Active: true, AssetAccountRef: { value: "a1" }, PurchaseTaxCodeRef: { value: "t1" } },
+      { Id: "2", Name: "Consulting", Type: "Service", Active: true, ExpenseAccountRef: { value: "a2" } },
+      { Id: "3", Name: "Sales only", Type: "Service", Active: true },
+    ] } }))
+    await expect(listItems("realm1", "token1")).resolves.toEqual([
+      { id: "1", code: "SKU1", name: "Widget", itemType: "Inventory", trackedInventory: true, active: true, accountExternalId: "a1", taxCodeExternalId: "t1" },
+      { id: "2", code: null, name: "Consulting", itemType: "Service", trackedInventory: false, active: true, accountExternalId: "a2", taxCodeExternalId: null },
+    ])
+    expect(queryOf(0)).toContain("from Item")
   })
 })

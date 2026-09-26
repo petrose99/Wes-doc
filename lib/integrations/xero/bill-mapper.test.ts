@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import { toXeroBillBody } from "@/lib/integrations/xero/bill-mapper"
 import { BillMappingError, type NormalizedBill } from "@/lib/integration-bill-mapping"
 
-const noCoding = { taxCode: null, tracking: [], customer: null, billable: false }
+const noCoding = { taxCode: null, tracking: [], customer: null, billable: false, itemExternalId: null }
 
 const bill: NormalizedBill = {
   taxBasis: "none", location: null, subtotal: null, taxTotal: null,
@@ -53,8 +53,26 @@ describe("toXeroBillBody", () => {
     expect(toXeroBillBody(bill, "c1").LineItems[0]).not.toHaveProperty("Tracking")
   })
 
-  it("refuses a line with no resolved account", () => {
+  it("refuses a line with no resolved account and no item (#459: widened guard)", () => {
     const missing: NormalizedBill = { ...bill, lineItems: [{ description: "Widget", quantity: 1, unitPrice: 40, amount: 40, accountExternalId: null, ...noCoding }] }
     expect(() => toXeroBillBody(missing, "c1")).toThrow(BillMappingError)
+  })
+
+  it("#459: an item line sends ItemCode alongside AccountCode (Xero resolves the account read-only)", () => {
+    const itemLine: NormalizedBill = {
+      ...bill,
+      lineItems: [{ description: "Widget", quantity: 3, unitPrice: 10, amount: 30, accountExternalId: "a1", ...noCoding, itemExternalId: "i1" }],
+    }
+    const body = toXeroBillBody(itemLine, "c1")
+    expect(body.LineItems[0]).toMatchObject({ ItemCode: "i1", AccountCode: "a1", Quantity: 3, UnitAmount: 10 })
+  })
+
+  it("#459: an item line with no account still posts (item-only guard)", () => {
+    const itemLine: NormalizedBill = {
+      ...bill,
+      lineItems: [{ description: "Widget", quantity: 1, unitPrice: 40, amount: 40, accountExternalId: null, ...noCoding, itemExternalId: "i1" }],
+    }
+    expect(() => toXeroBillBody(itemLine, "c1")).not.toThrow()
+    expect(toXeroBillBody(itemLine, "c1").LineItems[0]).not.toHaveProperty("AccountCode")
   })
 })

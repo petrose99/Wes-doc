@@ -82,6 +82,19 @@ describe("updateBillAccounts", () => {
     expect(body).toEqual({ LineItems: [{ ...line, AccountCode: "NEW" }] })
   })
 
+  it("#459: never touches an item line's ItemCode — only AccountCode is swapped", async () => {
+    const itemLine = { Description: "Widget", ItemCode: "i1", AccountCode: "OLD", Quantity: 3, UnitAmount: 10 }
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(jsonResponse({ Invoices: [{ InvoiceID: "abc", Status: "AUTHORISED", AmountPaid: 0, Total: 100, LineItems: [itemLine] }] }))
+      .mockResolvedValueOnce(jsonResponse({ Invoices: [{ InvoiceID: "abc" }] }))
+
+    await updateBillAccounts("tenant1", "token1", "abc", new Map([[0, "NEW"]]))
+
+    const body = JSON.parse((vi.mocked(fetch).mock.calls[1][1] as RequestInit).body as string)
+    expect(body).toEqual({ LineItems: [{ ...itemLine, AccountCode: "NEW" }] })
+    expect(body.LineItems[0].ItemCode).toBe("i1")
+  })
+
   it("retries once, re-reading the invoice, on a permanent write failure", async () => {
     vi.mocked(fetch)
       .mockResolvedValueOnce(readResponse())

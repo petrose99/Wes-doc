@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest"
 import { inferTaxBasis, resolveBillCoding, resolveLineCoding, type CodingReferences, type CodingRule } from "@/lib/finance/line-coding"
 import type { LedgerCapabilities } from "@/lib/integrations/ledger-capabilities"
 
-const caps: LedgerCapabilities = { vat: true, tracking: [{ id: "region", name: "Region" }], location: true, customer: true, billable: true }
+const caps: LedgerCapabilities = { vat: true, tracking: [{ id: "region", name: "Region" }], location: true, customer: true, billable: true, itemLines: false }
 const refs: CodingReferences = {
-  taxCodes: new Set(["INPUT", "EXEMPT"]),
+  taxCodes: new Set(["INPUT", "EXEMPT", "ITEM"]),
   trackingOptions: new Set(["region:north", "region:south"]),
   locations: new Set(["loc1"]),
 }
@@ -73,6 +73,12 @@ describe("resolveLineCoding", () => {
   })
   it("a ledger with VAT off gets no Tax code", () => {
     expect(resolveLineCoding({ ...base, capabilities: { ...caps, vat: false }, line: { account_external_id: "acme_usual" } })).toMatchObject({ tax_code: null, tax_code_source: null })
+  })
+  it("#459: an item's own tax code wins over the supplier rule and the account default", () => {
+    expect(resolveLineCoding({ ...base, itemTaxCode: "ITEM", line: { account_external_id: "acme_usual" } })).toMatchObject({ tax_code: "ITEM", tax_code_source: "item" })
+  })
+  it("#459: falls through to the supplier rule when the item's tax code isn't a valid reference", () => {
+    expect(resolveLineCoding({ ...base, itemTaxCode: "GONE", line: { account_external_id: "acme_usual" } })).toMatchObject({ tax_code: "INPUT", tax_code_source: "supplier" })
   })
 })
 

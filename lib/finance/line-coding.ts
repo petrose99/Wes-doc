@@ -9,7 +9,7 @@ import { amountTolerance } from "@/lib/checks/types"
 import type { LedgerCapabilities } from "@/lib/integrations/ledger-capabilities"
 
 export type TaxBasis = "inclusive" | "exclusive" | "none"
-export type TaxCodeSource = "account_default" | "supplier" | "manual"
+export type TaxCodeSource = "account_default" | "supplier" | "manual" | "item"
 export type TrackingSelection = { category_id: string; option_id: string }
 
 /** What `codingData.items[i]` carries beyond its Account (snake_case, as LineAccountRow). */
@@ -43,9 +43,13 @@ export type CodingReferences = {
   taxCodes: ReadonlySet<string>
   trackingOptions: ReadonlySet<string>
   locations: ReadonlySet<string>
+  /** #459: active items keyed by externalId, with the `trackedInventory` flag `item_quantity_needed`
+   * reads — inactive/vanished items are left out, same convention as taxCodes/locations, so "not in
+   * this map" alone tells `item_not_in_ledger` apart from "in the ledger but inactive". */
+  items: ReadonlyMap<string, { trackedInventory: boolean }>
 }
 
-type ReferenceRow = { entityType: string; externalId: string; parentExternalId: string | null; forPurchases: boolean | null; active?: boolean }
+type ReferenceRow = { entityType: string; externalId: string; parentExternalId: string | null; forPurchases: boolean | null; active?: boolean; trackedInventory?: boolean | null }
 
 /** The ledger's synced AccountingEntity rows as the references a bill can use now — inactive rows
  * (kept for their names) are left out. */
@@ -55,6 +59,7 @@ export function codingReferencesFrom(entities: ReferenceRow[]): CodingReferences
     taxCodes: new Set(active("tax_rate").filter((code) => code.forPurchases === true).map((code) => code.externalId)),
     trackingOptions: new Set(active("tracking_option").map((option) => `${option.parentExternalId}:${option.externalId}`)),
     locations: new Set(active("location").map((location) => location.externalId)),
+    items: new Map(active("item").map((item) => [item.externalId, { trackedInventory: item.trackedInventory === true }])),
   }
 }
 
@@ -82,6 +87,9 @@ export function resolveLineCoding(input: {
   accountDefaults: Record<string, string | null | undefined>
   capabilities: LedgerCapabilities | null
   references: CodingReferences
+  /** #459: the resolved item's own purchase tax code, when the line is coded to an Item — wins
+   * over the supplier rule and the account default. */
+  itemTaxCode?: string | null
 }): LineCoding {
   const { line, prior, rule, capabilities, references } = input
   const account = line.account_external_id
@@ -93,6 +101,7 @@ export function resolveLineCoding(input: {
     tax_code_source = "manual"
   } else if (capabilities?.vat !== false) {
     const candidates: [string | null | undefined, TaxCodeSource][] = [
+      [input.itemTaxCode ?? null, "item"],
       [onRuleAccount ? rule?.taxCodeExternalId : null, "supplier"],
       [account ? input.accountDefaults[account] : null, "account_default"],
     ]

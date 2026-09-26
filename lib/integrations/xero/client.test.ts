@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { createBill, findBillByInvoiceNumber, listAccounts, listTaxRates, listTrackingCategories, voidBill } from "@/lib/integrations/xero/client"
+import { createBill, findBillByInvoiceNumber, listAccounts, listItems, listTaxRates, listTrackingCategories, voidBill } from "@/lib/integrations/xero/client"
 
 const jsonReply = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } })
 
@@ -95,6 +95,18 @@ describe("reference reads for line coding", () => {
     await expect(listTaxRates("tenant1", "token1")).resolves.toEqual([
       { taxType: "INPUT2", name: "15% GST on Expenses", percent: 15, canApplyToExpenses: true, active: true },
       { taxType: "OUTPUT", name: "Sales Tax", percent: 10, canApplyToExpenses: false, active: false },
+    ])
+  })
+
+  it("listItems drops a non-purchased item and maps the tracked-inventory flag", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonReply({ Items: [
+      { ItemID: "i1", Code: "SKU1", Name: "Widget", IsPurchased: true, IsTrackedAsInventory: true, Status: "ACTIVE", PurchaseDetails: { AccountCode: "310", TaxType: "INPUT2" } },
+      { ItemID: "i2", Name: "Consulting", IsPurchased: true, IsTrackedAsInventory: false, Status: "ACTIVE", PurchaseDetails: { AccountCode: "400" } },
+      { ItemID: "i3", Name: "Sales only", IsPurchased: false },
+    ] }))
+    await expect(listItems("tenant1", "token1")).resolves.toEqual([
+      { id: "i1", code: "SKU1", name: "Widget", itemType: "tracked", trackedInventory: true, active: true, accountExternalId: "310", taxCodeExternalId: "INPUT2" },
+      { id: "i2", code: null, name: "Consulting", itemType: "untracked", trackedInventory: false, active: true, accountExternalId: "400", taxCodeExternalId: null },
     ])
   })
 

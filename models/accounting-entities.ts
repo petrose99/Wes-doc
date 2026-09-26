@@ -8,7 +8,7 @@ import { parseLedgerCapabilities } from "@/lib/integrations/ledger-capabilities"
 import { decimalToNumber } from "@/lib/money"
 import type { Prisma } from "@/prisma/client"
 
-export type AccountingEntityType = "account" | "vendor" | "tax_rate" | "tracking_option" | "location" | "customer"
+export type AccountingEntityType = "account" | "vendor" | "tax_rate" | "tracking_option" | "location" | "customer" | "item"
 
 export const listAccountingEntities = cache(async (workspaceId: string, entityType: AccountingEntityType) => prisma.accountingEntity.findMany({
   where: { workspaceId, entityType, active: true },
@@ -62,11 +62,14 @@ export async function loadLineCodingContext(
 ): Promise<LineCodingContext | null> {
   if (!capabilities) return null
   const entities = await prisma.accountingEntity.findMany({
-    where: { workspaceId, connectionId: connection.id, entityType: { in: ["tax_rate", "tracking_option", "location"] } },
-    select: { entityType: true, externalId: true, parentExternalId: true, forPurchases: true, active: true, name: true, taxRatePercent: true },
+    where: { workspaceId, connectionId: connection.id, entityType: { in: ["tax_rate", "tracking_option", "location", "item"] } },
+    select: { entityType: true, externalId: true, parentExternalId: true, forPurchases: true, active: true, name: true, taxRatePercent: true, trackedInventory: true },
   })
   const names: Record<string, string> = Object.fromEntries(capabilities.tracking.map((category) => [category.id, category.name]))
   for (const option of entities.filter((entity) => entity.entityType === "tracking_option")) names[`${option.parentExternalId}:${option.externalId}`] = option.name
+  // #459: item names too — checkLineCoding's item_not_in_ledger/item_quantity_needed name the item
+  // by externalId the same way tracking names it by category:option.
+  for (const item of entities.filter((entity) => entity.entityType === "item")) names[item.externalId] = item.name
   const taxRates = Object.fromEntries(entities.filter((entity) => entity.entityType === "tax_rate").map((code) => [code.externalId, decimalToNumber(code.taxRatePercent)]))
   return { provider: connection.provider, capabilities, references: codingReferencesFrom(entities), taxRates, names }
 }

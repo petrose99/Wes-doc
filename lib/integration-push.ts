@@ -148,6 +148,14 @@ async function gateLineCoding(push: { workspaceId: string; documentId: string },
 
 const QUICKBOOKS_FEATURE_NOT_SUPPORTED = "QuickBooks turned down a field this plan doesn't offer. Sync accounts, then check the bill."
 
+/** #459: matches a Xero Warning saying an ItemCode was dropped (build-time substring fallback per
+ * spec — Xero's exact wording is verified against the sandbox/docs at build; a warning mentioning
+ * both "Item" and "code" is treated as this case either way). */
+function itemCodeStrippedWarning(message: string): boolean {
+  const lower = message.toLowerCase()
+  return lower.includes("item") && lower.includes("code")
+}
+
 /** How often a paused push (connection `needs_reconnect`) is re-checked — a fixed poke interval,
  * not the exponential backoff curve, since nothing will succeed until a human reconnects. See the
  * `needs_reconnect` pre-check below. */
@@ -239,6 +247,12 @@ export async function attemptIntegrationPush(pushId: string, now = new Date()): 
           default:
             throw new IntegrationPermanentError(`${connection.provider}_push_not_implemented`)
         }
+        // #459: a Xero Warning that strips an ItemCode silently turned an item line into an
+        // account line at the ledger — never-silently-drop-data means that's a failed post, not
+        // a succeeded-with-warning, even though Xero itself returned 200 and an InvoiceID.
+        if (connection.provider === "xero" && bill.lineItems.some((line) => line.itemExternalId) && created.warnings.some(itemCodeStrippedWarning)) {
+          throw new IntegrationPermanentError("xero_item_code_stripped", created.id)
+        }
         result = { success: true, errorCode: null, externalBillId: created.id }
         readBack = ledgerReadBackChecks(connection.provider, bill, created)
       } catch (error) {
@@ -251,7 +265,10 @@ export async function attemptIntegrationPush(pushId: string, now = new Date()): 
           await pauseForReconnect(push.id, now)
           return
         } else if (error instanceof IntegrationPermanentError) {
-          result = { success: false, errorCode: error.code, externalBillId: null }
+          // #459: usually null (the provider never created anything), but xero_item_code_stripped
+          // carries the id of the bill that DID post at the provider before the warning was read —
+          // keep it so a person can find and fix it, never silently dropping the only handle to it.
+          result = { success: false, errorCode: error.code, externalBillId: error.externalId ?? null }
           forceTerminal = true
         } else {
           result = { success: false, errorCode: safeErrorCode(error), externalBillId: null }

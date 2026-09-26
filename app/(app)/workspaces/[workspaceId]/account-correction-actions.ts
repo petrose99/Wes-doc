@@ -19,8 +19,10 @@ import {
   findBillsAffectedByAccountChange,
   recordAccountCorrectionApplied,
   recordDocumentLineAccountsCorrected,
+  setDocumentLineToAccount,
   type AffectedBillRow,
 } from "@/models/documents"
+import { refreshLineCodingChecks } from "@/models/document-checks"
 import { listWorkspaceIntegrationPushes, resolveAccountNames, workspaceIntegrationsPlanEnabled } from "@/models/integrations"
 import { prisma } from "@/lib/db"
 import { revalidatePath } from "next/cache"
@@ -141,6 +143,13 @@ export async function updateSelectedBillAccountsAction(
   for (const documentId of documentIds) {
     const bill = byId.get(documentId)
     if (!bill || !bill.externalBillId) { results.push({ documentId, status: "failed", error: "Bill not found" }); continue }
+    // #459: findBillsAffectedByAccountChange already excludes item lines from `bill.lines` — a
+    // document whose only affected lines were item lines has none left here, so it is never
+    // silently skipped: it surfaces as its own failed row instead.
+    if (!bill.lines.length) {
+      results.push({ documentId, status: "failed", error: `coded to an item — change it in ${PROVIDER_LABELS[connection.provider] ?? connection.provider}` })
+      continue
+    }
     const accountRefByLineIndex = new Map(bill.lines.map((line) => [line.index, newAccountExternalId]))
     try {
       if (connection.provider === "quickbooks") {
@@ -216,23 +225,41 @@ export async function updateDocumentLineAccountsAction(
   const resolved = await resolveDocumentPushConnection(workspaceId, documentId)
   if ("error" in resolved) return { success: false, error: resolved.error }
   const { connection, externalBillId } = resolved
-  const document = await prisma.document.findFirst({ where: { id: documentId, workspaceId }, select: { receivedAt: true } })
+  const document = await prisma.document.findFirst({ where: { id: documentId, workspaceId }, select: { receivedAt: true, codingData: true } })
   if (!document) return { success: false, error: "Document not found" }
   const refusal = await checkCorrectable(connection.provider, connection.externalTenantId, connection.id, externalBillId, document.receivedAt.toISOString())
   if (refusal) return { success: true, data: { status: "refused", reason: refusal } }
-  const accountRefByLineIndex = new Map(changes.map((c) => [c.index, c.newAccountExternalId]))
+  // #459: an item line's account is the Item's own — it is never retargeted through this dialog.
+  const coding = (document.codingData as Record<string, unknown> | null) ?? {}
+  const items = Array.isArray(coding.items) ? (coding.items as Array<{ account_source?: string | null }>) : []
+  const changesExcludingItems = changes.filter((c) => items[c.index]?.account_source !== "item")
+  if (!changesExcludingItems.length) return { success: false, error: `coded to an item — change it in ${PROVIDER_LABELS[connection.provider] ?? connection.provider}` }
+  const accountRefByLineIndex = new Map(changesExcludingItems.map((c) => [c.index, c.newAccountExternalId]))
   try {
     if (connection.provider === "quickbooks") await updateQuickBooksBillAccounts(connection.externalTenantId, connection.id, externalBillId, accountRefByLineIndex)
     else if (connection.provider === "xero") await updateXeroBillAccounts(connection.externalTenantId, connection.id, externalBillId, accountRefByLineIndex)
     else return { success: false, error: "Unsupported accounting provider" }
-    await recordDocumentLineAccountsCorrected(workspaceId, documentId, changes)
-    await recordDocumentAudit({ workspaceId, actorId: gate.userId, documentId, type: "ledger_account_corrected", detail: { connectionId: connection.id, changes } })
+    await recordDocumentLineAccountsCorrected(workspaceId, documentId, changesExcludingItems)
+    await recordDocumentAudit({ workspaceId, actorId: gate.userId, documentId, type: "ledger_account_corrected", detail: { connectionId: connection.id, changes: changesExcludingItems } })
     revalidatePath(paths(workspaceId).integrations)
     return { success: true, data: { status: "updated", provider: connection.provider } }
   } catch (error) {
     const stale = error instanceof IntegrationPermanentError
     return { success: false, error: stale ? "Something changed here first — reload and try again" : errorMessage(error, "Could not update this bill") }
   }
+}
+
+/** #459's `item_lines_not_supported` Check action — "Code to the item's account instead". Owner-
+ * gated like every other action here; never automatic (spec: only when the person chooses it). The
+ * item's account is already the line's `account_external_id` (step 2), so this only clears the item
+ * fields; the Check clears immediately since `refreshLineCodingChecks` re-runs after the write. */
+export async function setLineToAccountAction(workspaceId: string, documentId: string, lineIndex: number): Promise<ActionState> {
+  const gate = await guard(workspaceId)
+  if ("error" in gate) return { success: false, error: errorMessage(new Error(gate.error), NO_ACCESS) }
+  await setDocumentLineToAccount(workspaceId, documentId, lineIndex)
+  await refreshLineCodingChecks(workspaceId, documentId)
+  revalidatePath(paths(workspaceId).integrations)
+  return { success: true }
 }
 
 /** Screen 1's "Leave them" / Screen 3's row-level "Leave them" text action — a real decision, not

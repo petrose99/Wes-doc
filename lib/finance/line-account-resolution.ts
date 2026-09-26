@@ -5,7 +5,7 @@
  * by the caller and passed in as `legacyAccountId` — this module only picks which chain applies
  * and shapes the per-line result; it never talks to Prisma or a provider. */
 
-export type LineAccountSource = "supplier" | "default_guessed" | "default_confirmed"
+export type LineAccountSource = "supplier" | "default_guessed" | "default_confirmed" | "item" | "manual"
 
 export type LineAccountResolution = {
   accountExternalId: string | null

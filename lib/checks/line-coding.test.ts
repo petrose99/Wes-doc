@@ -1,16 +1,16 @@
 import { describe, expect, it } from "vitest"
-import { checkLineCoding, firstLineCodingFail, ledgerReadBackChecks, lineCodingInputFromBill, lineCodingInputFromDocument, type LineCodingInput } from "@/lib/checks/line-coding"
+import { checkLineCoding, firstLineCodingFail, LINE_CODING_FALLBACK_TEXT, ledgerReadBackChecks, lineCodingInputFromBill, lineCodingInputFromDocument, type LineCodingInput } from "@/lib/checks/line-coding"
 
-const ON = { vat: true, tracking: [{ id: "class", name: "Class" }], location: true, customer: true, billable: true }
+const ON = { vat: true, tracking: [{ id: "class", name: "Class" }], location: true, customer: true, billable: true, itemLines: true }
 
 function input(over: Partial<LineCodingInput> = {}, line: Partial<LineCodingInput["lines"][number]> = {}, bill: Partial<LineCodingInput["bill"]> = {}): LineCodingInput {
   return {
     provider: "quickbooks",
     capabilities: ON,
-    references: { taxCodes: new Set(["TAX15"]), trackingOptions: new Set(["class:c1"]), locations: new Set(["loc1"]) },
+    references: { taxCodes: new Set(["TAX15"]), trackingOptions: new Set(["class:c1"]), locations: new Set(["loc1"]), items: new Map([["item1", { trackedInventory: false }]]) },
     taxRates: { TAX15: 15 },
-    names: { class: "Class", "class:c1": "Retail", "class:c9": "Wholesale" },
-    lines: [{ amount: 100, tax_code: "TAX15", tracking: [{ category_id: "class", option_id: "c1" }], customer: null, billable: false, ...line }],
+    names: { class: "Class", "class:c1": "Retail", "class:c9": "Wholesale", item1: "Widget" },
+    lines: [{ amount: 100, tax_code: "TAX15", tracking: [{ category_id: "class", option_id: "c1" }], customer: null, billable: false, item_external_id: null, quantity: 1, ...line }],
     bill: { location: null, tax_basis: "exclusive", tax_total: 15, currency: "ZAR", ...bill },
     ...over,
   }
@@ -98,13 +98,50 @@ describe("checkLineCoding", () => {
   })
 })
 
+describe("item lines (#459)", () => {
+  it("item_lines_not_supported: the ledger's plan can't take item lines", () => {
+    const result = only(input({ capabilities: { ...ON, itemLines: false } }, { item_external_id: "item1" }))
+    expect(result).toMatchObject({ checkCode: "item_lines_not_supported", message: "QuickBooks can't take item lines" })
+    expect(result.detail).toMatchObject({ actionCode: "code_to_item_account" })
+  })
+
+  it("a held item is fine when the ledger's plan supports item lines", () => {
+    expect(codes(input({}, { item_external_id: "item1" }))).toEqual([])
+  })
+
+  it("item_not_in_ledger: the item was never synced, or has gone inactive", () => {
+    const result = only(input({}, { item_external_id: "gone" }))
+    expect(result).toMatchObject({ checkCode: "item_not_in_ledger", message: "That item isn't in QuickBooks" })
+  })
+
+  it("item_not_in_ledger names the item when it's known", () => {
+    const value = input({ references: { taxCodes: new Set(["TAX15"]), trackingOptions: new Set(["class:c1"]), locations: new Set(["loc1"]), items: new Map() } }, { item_external_id: "item1" })
+    expect(only(value).message).toBe("Widget isn't in QuickBooks")
+  })
+
+  it("item_quantity_needed: a tracked-inventory item with no quantity", () => {
+    const value = input({ references: { taxCodes: new Set(["TAX15"]), trackingOptions: new Set(["class:c1"]), locations: new Set(["loc1"]), items: new Map([["item1", { trackedInventory: true }]]) } }, { item_external_id: "item1", quantity: 0 })
+    expect(only(value)).toMatchObject({ checkCode: "item_quantity_needed", message: "Quantity needed for Widget" })
+  })
+
+  it("a service item with no quantity is never a fail", () => {
+    expect(codes(input({}, { item_external_id: "item1", quantity: 0 }))).toEqual([])
+  })
+
+  it("every item check code has a LINE_CODING_FALLBACK_TEXT entry", () => {
+    expect(LINE_CODING_FALLBACK_TEXT.item_lines_not_supported).toBeTruthy()
+    expect(LINE_CODING_FALLBACK_TEXT.item_not_in_ledger).toBeTruthy()
+    expect(LINE_CODING_FALLBACK_TEXT.item_quantity_needed).toBeTruthy()
+  })
+})
+
 describe("line coding inputs", () => {
   it("reads a document's coding rows beside its reviewed lines", () => {
     const value = lineCodingInputFromDocument({
-      codingData: { location: "loc1", tax_basis: "exclusive", items: [{ account_external_id: "a", tax_code: "TAX15", tracking: [{ category_id: "class", option_id: "c1" }], customer: null, billable: false }] },
-      reviewedData: { tax_total: 15, currency_code: "ZAR", line_items: [{ amount: 100 }] },
+      codingData: { location: "loc1", tax_basis: "exclusive", items: [{ account_external_id: "a", tax_code: "TAX15", tracking: [{ category_id: "class", option_id: "c1" }], customer: null, billable: false, item_external_id: "item1" }] },
+      reviewedData: { tax_total: 15, currency_code: "ZAR", line_items: [{ amount: 100, quantity: 2 }] },
     })
-    expect(value).toEqual({ lines: [{ amount: 100, tax_code: "TAX15", tracking: [{ category_id: "class", option_id: "c1" }], customer: null, billable: false }], bill: { location: "loc1", tax_basis: "exclusive", tax_total: 15, currency: "ZAR" } })
+    expect(value).toEqual({ lines: [{ amount: 100, tax_code: "TAX15", tracking: [{ category_id: "class", option_id: "c1" }], customer: null, billable: false, item_external_id: "item1", quantity: 2 }], bill: { location: "loc1", tax_basis: "exclusive", tax_total: 15, currency: "ZAR" } })
   })
 
   it("a document with no coding rows has nothing to check", () => {
@@ -114,9 +151,9 @@ describe("line coding inputs", () => {
   it("reads a snapshot's coding back into the same shape", () => {
     const value = lineCodingInputFromBill({
       taxBasis: "inclusive", location: null, taxTotal: 15, currencyCode: "ZAR",
-      lineItems: [{ amount: 115, taxCode: "TAX15", tracking: [{ categoryId: "class", categoryName: "Class", optionId: "c1", optionName: "Retail" }], customer: null, billable: false }],
+      lineItems: [{ amount: 115, taxCode: "TAX15", tracking: [{ categoryId: "class", categoryName: "Class", optionId: "c1", optionName: "Retail" }], customer: null, billable: false, itemExternalId: "item1", quantity: 2 }],
     })
-    expect(value).toEqual({ lines: [{ amount: 115, tax_code: "TAX15", tracking: [{ category_id: "class", option_id: "c1" }], customer: null, billable: false }], bill: { location: null, tax_basis: "inclusive", tax_total: 15, currency: "ZAR" } })
+    expect(value).toEqual({ lines: [{ amount: 115, tax_code: "TAX15", tracking: [{ category_id: "class", option_id: "c1" }], customer: null, billable: false, item_external_id: "item1", quantity: 2 }], bill: { location: null, tax_basis: "inclusive", tax_total: 15, currency: "ZAR" } })
   })
 })
 

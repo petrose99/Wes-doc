@@ -92,6 +92,20 @@ describe("updateBillAccounts", () => {
     expect(body.Line[0].AccountBasedExpenseLineDetail).toEqual({ ...coded, AccountRef: { value: "NEW" } })
   })
 
+  it("#459: never touches an item line's ItemRef — a correction only swaps AccountRef lines", async () => {
+    const itemDetail = { ItemRef: { value: "i1" }, Qty: 1, UnitPrice: 40 }
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(jsonResponse({ QueryResponse: { Bill: [{ Id: "1", SyncToken: "3", Balance: 100, TotalAmt: 100, Line: [{ Amount: 40, ItemBasedExpenseLineDetail: itemDetail }, { Amount: 60, AccountBasedExpenseLineDetail: { AccountRef: { value: "OLD" } } }] }] } }))
+      .mockResolvedValueOnce(jsonResponse({ Bill: { Id: "1" } }))
+
+    await updateBillAccounts("realm1", "token1", "1", new Map([[0, "NEW"], [1, "NEW2"]]))
+
+    const body = JSON.parse((vi.mocked(fetch).mock.calls[1][1] as RequestInit).body as string)
+    expect(body.Line[0].ItemBasedExpenseLineDetail).toEqual(itemDetail)
+    expect(body.Line[0]).not.toHaveProperty("AccountBasedExpenseLineDetail")
+    expect(body.Line[1].AccountBasedExpenseLineDetail).toEqual({ AccountRef: { value: "NEW2" } })
+  })
+
   it("retries once, re-reading the bill, on a permanent (stale-shaped) write failure", async () => {
     vi.mocked(fetch)
       .mockResolvedValueOnce(readResponse())

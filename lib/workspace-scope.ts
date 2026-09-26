@@ -74,6 +74,8 @@ export const WORKSPACE_SCOPED_MODELS = new Set([
   // #429 supplier usual-account rules; guarded from #458 on, when they started carrying the full
   // coding set.
   "SupplierAccountRule",
+  // #459 supplier usual-item pairings, mirrors SupplierAccountRule.
+  "SupplierItemPairing",
   // Data Health Phase B: bill/expense/bank-transaction ledger sync.
   "LedgerTransaction",
   // Dext-parity WP2.1/WP2.3: bank + supplier statement reconciliation.

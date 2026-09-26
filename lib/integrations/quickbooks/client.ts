@@ -105,6 +105,28 @@ export async function listCustomers(realmId: string, connectionId: string): Prom
   return rows.map((row) => ({ id: row.Id, name: row.DisplayName, active: row.Active }))
 }
 
+export type QuickBooksSyncedItem = {
+  id: string; code: string | null; name: string; itemType: string; trackedInventory: boolean; active: boolean
+  accountExternalId: string | null; taxCodeExternalId: string | null
+}
+
+/** Only items purchasable on a bill: a Service item with neither an ExpenseAccountRef nor an
+ * AssetAccountRef is sales-only and is dropped, mirroring the tax-code `forPurchases` filter above. */
+export async function listItems(realmId: string, connectionId: string): Promise<QuickBooksSyncedItem[]> {
+  type Wire = {
+    Id: string; Sku?: string; Name: string; Type: string; Active: boolean
+    ExpenseAccountRef?: { value: string }; AssetAccountRef?: { value: string }; PurchaseTaxCodeRef?: { value: string }
+  }
+  const rows = await paginatedQuery<Wire>(realmId, connectionId, "select * from Item where Active = true", "Item")
+  return rows
+    .filter((row) => row.ExpenseAccountRef || row.AssetAccountRef)
+    .map((row) => ({
+      id: row.Id, code: row.Sku ?? null, name: row.Name, itemType: row.Type, trackedInventory: row.Type === "Inventory",
+      active: row.Active, accountExternalId: row.ExpenseAccountRef?.value ?? row.AssetAccountRef?.value ?? null,
+      taxCodeExternalId: row.PurchaseTaxCodeRef?.value ?? null,
+    }))
+}
+
 /** Finds a vendor by exact DisplayName, or creates one. No fuzzy dedup — an exact match or a new
  * vendor, per scope. */
 export async function findOrCreateVendor(realmId: string, connectionId: string, name: string): Promise<string> {

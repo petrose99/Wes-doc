@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import { toQuickBooksBillBody } from "@/lib/integrations/quickbooks/bill-mapper"
 import { BillMappingError, type NormalizedBill } from "@/lib/integration-bill-mapping"
 
-const noCoding = { taxCode: null, tracking: [], customer: null, billable: false }
+const noCoding = { taxCode: null, tracking: [], customer: null, billable: false, itemExternalId: null }
 
 const bill: NormalizedBill = {
   taxBasis: "none", location: null, subtotal: null, taxTotal: null,
@@ -65,7 +65,47 @@ describe("toQuickBooksBillBody", () => {
     expect(plain.Line[0].AccountBasedExpenseLineDetail).toEqual({ AccountRef: { value: "a1" } })
   })
 
-  it("refuses a line with no resolved account", () => {
+  it("refuses a line with no resolved account and no item (#459: widened guard)", () => {
+    const missing: NormalizedBill = { ...bill, lineItems: [{ description: "Widget", quantity: 1, unitPrice: 40, amount: 40, accountExternalId: null, ...noCoding }] }
+    expect(() => toQuickBooksBillBody(missing, "v1")).toThrow(BillMappingError)
+  })
+
+  it("#459: an item line uses ItemBasedExpenseLineDetail with no AccountRef", () => {
+    const itemLine: NormalizedBill = {
+      ...bill,
+      lineItems: [{ description: "Widget", quantity: 3, unitPrice: 10, amount: 30, accountExternalId: null, ...noCoding, itemExternalId: "i1" }],
+    }
+    const body = toQuickBooksBillBody(itemLine, "v1")
+    expect(body.Line[0].DetailType).toBe("ItemBasedExpenseLineDetail")
+    expect(body.Line[0].ItemBasedExpenseLineDetail).toEqual({ ItemRef: { value: "i1" }, Qty: 3, UnitPrice: 10 })
+    expect(body.Line[0]).not.toHaveProperty("AccountBasedExpenseLineDetail")
+  })
+
+  it("#459: a service/non-inventory item with no extracted quantity posts 1 x the amount (ADR 0015)", () => {
+    const itemLine: NormalizedBill = {
+      ...bill,
+      lineItems: [{ description: "Consulting", quantity: 1, unitPrice: 40, amount: 40, accountExternalId: null, ...noCoding, itemExternalId: "i2" }],
+    }
+    const body = toQuickBooksBillBody(itemLine, "v1")
+    expect(body.Line[0].ItemBasedExpenseLineDetail).toMatchObject({ Qty: 1, UnitPrice: 40 })
+  })
+
+  it("#459: an item line still carries TaxCodeRef, ClassRef, CustomerRef and BillableStatus", () => {
+    const itemLine: NormalizedBill = {
+      ...bill,
+      lineItems: [{
+        description: "Widget", quantity: 1, unitPrice: 40, amount: 40, accountExternalId: null,
+        taxCode: "TX20", tracking: [{ categoryId: "class", categoryName: "Class", optionId: "cl1", optionName: "Retail" }],
+        customer: "cu1", billable: true, itemExternalId: "i1",
+      }],
+    }
+    const body = toQuickBooksBillBody({ ...itemLine, taxBasis: "exclusive" }, "v1")
+    expect(body.Line[0].ItemBasedExpenseLineDetail).toMatchObject({
+      TaxCodeRef: { value: "TX20" }, ClassRef: { value: "cl1" }, CustomerRef: { value: "cu1" }, BillableStatus: "Billable",
+    })
+  })
+
+  it("#459: a line with neither account nor item still refuses (widened guard)", () => {
     const missing: NormalizedBill = { ...bill, lineItems: [{ description: "Widget", quantity: 1, unitPrice: 40, amount: 40, accountExternalId: null, ...noCoding }] }
     expect(() => toQuickBooksBillBody(missing, "v1")).toThrow(BillMappingError)
   })

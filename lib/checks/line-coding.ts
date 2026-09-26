@@ -19,22 +19,22 @@ export type LineCodingInput = {
   taxRates: Record<string, number | null>
   /** Display names: a Tracking category by its id, an option by `category:option`. */
   names: Record<string, string>
-  lines: { amount: number; tax_code: string | null; tracking: TrackingSelection[]; customer: string | null; billable: boolean }[]
+  lines: { amount: number; tax_code: string | null; tracking: TrackingSelection[]; customer: string | null; billable: boolean; item_external_id: string | null; quantity: number }[]
   bill: { location: string | null; tax_basis: TaxBasis | null; tax_total: number | null; currency: string | null }
 }
 
 export const LINE_CODING_CHECK_CODES = [
   "vat_off_in_quickbooks", "tax_code_not_in_ledger", "tax_code_missing", "tracking_off_in_ledger", "tracking_option_not_in_ledger",
   "ledger_has_no_location", "ledger_cannot_take_customer", "billable_off_in_quickbooks", "billable_needs_customer",
-  "tax_basis_unclear", "vat_mismatch_invoice",
+  "tax_basis_unclear", "vat_mismatch_invoice", "item_lines_not_supported", "item_not_in_ledger", "item_quantity_needed",
 ] as const
 
 export function checkLineCoding(input: LineCodingInput): CheckResult[] {
   const { capabilities: cap, references, lines, bill } = input
   const ledger = PROVIDER_LABELS[input.provider] ?? input.provider
   const results: CheckResult[] = []
-  const fail = (checkCode: (typeof LINE_CODING_CHECK_CODES)[number], message: string, text: string, fields: string[]) =>
-    results.push({ checkCode, status: "fail", message, fields, detail: { text } })
+  const fail = (checkCode: (typeof LINE_CODING_CHECK_CODES)[number], message: string, text: string, fields: string[], extraDetail?: Record<string, unknown>) =>
+    results.push({ checkCode, status: "fail", message, fields, detail: { text, ...extraDetail } })
   const linesWhere = (field: string, test: (line: LineCodingInput["lines"][number]) => boolean) =>
     lines.flatMap((line, index) => (test(line) ? [`line_items[${index}].${field}`] : []))
 
@@ -70,6 +70,31 @@ export function checkLineCoding(input: LineCodingInput): CheckResult[] {
   const orphaned = linesWhere("billable", (line) => line.billable && !line.customer)
   if (orphaned.length) fail("billable_needs_customer", "Billable needs a Customer", "Save review to clear Billable.", orphaned)
 
+  // #459: item lines, always a fail (never a silent post to nothing) — never mutually exclusive
+  // with the coding checks above, since an item line can still carry a Tax code/Tracking of its own.
+  if (!cap.itemLines) {
+    const held = linesWhere("item_external_id", (line) => Boolean(line.item_external_id))
+    if (held.length) {
+      // #460 (UI, out of scope here): the bound action clears the item and keeps the item's own
+      // account, via setLineToAccount — never automatic.
+      fail("item_lines_not_supported", `${ledger} can't take item lines`, "Code this line to an account instead, or upgrade the plan and sync accounts.", held,
+        { actionLabel: "Code to the item's account instead", actionCode: "code_to_item_account" })
+    }
+  } else {
+    const gone = lines.find((line) => line.item_external_id && !references.items.has(line.item_external_id))
+    if (gone) {
+      const item = input.names[gone.item_external_id as string] ?? "That item"
+      fail("item_not_in_ledger", `${item} isn't in ${ledger}`, `Restore ${item} in ${ledger} and sync accounts, or save review to code this line to an account instead.`,
+        linesWhere("item_external_id", (line) => Boolean(line.item_external_id) && !references.items.has(line.item_external_id as string)))
+    }
+    const needsQuantity = lines.find((line) => line.item_external_id && references.items.get(line.item_external_id)?.trackedInventory && !line.quantity)
+    if (needsQuantity) {
+      const item = input.names[needsQuantity.item_external_id as string] ?? "that item"
+      fail("item_quantity_needed", `Quantity needed for ${item}`, `Enter the quantity for ${item} on this line, then save review.`,
+        linesWhere("item_external_id", (line) => Boolean(line.item_external_id) && references.items.get(line.item_external_id as string)?.trackedInventory === true && !line.quantity))
+    }
+  }
+
   if (!bill.tax_basis) {
     fail("tax_basis_unclear", "Tax basis unclear", "Check the subtotal, VAT and total on the document match its lines, then save review.", ["subtotal", "tax_total", "total"])
   } else if (cap.vat && bill.tax_basis !== "none" && bill.tax_total !== null) {
@@ -104,6 +129,9 @@ export const LINE_CODING_FALLBACK_TEXT: Record<(typeof LINE_CODING_CHECK_CODES)[
   billable_needs_customer: "Save review to clear Billable.",
   tax_basis_unclear: "Check the subtotal, VAT and total on the document match its lines, then save review.",
   vat_mismatch_invoice: "Check the VAT on the document, and each line's account's tax code in your ledger.",
+  item_lines_not_supported: "Code this line to an account instead, or upgrade the plan and sync accounts.",
+  item_not_in_ledger: "Restore that item in your ledger and sync accounts, or save review to code this line to an account instead.",
+  item_quantity_needed: "Enter the quantity for that item on this line, then save review.",
   ledger_vat_differs: "Open the bill in your ledger and check each line's tax code against the invoice.",
   ledger_warnings: "Open the bill in your ledger and check what it flagged.",
 }
@@ -147,6 +175,8 @@ export function lineCodingInputFromDocument(doc: { codingData: unknown; reviewed
     tracking: asTracking(item?.tracking),
     customer: asString(item?.customer),
     billable: item?.billable === true,
+    item_external_id: asString(item?.item_external_id),
+    quantity: asNumber(reviewedLines[index]?.quantity) ?? 0,
   }))
   const basis = coding.tax_basis
   return {
@@ -172,7 +202,7 @@ export function firstLineCodingFail(context: Omit<LineCodingInput, "lines" | "bi
 /** The snapshot path: the persisted push payload (NormalizedBill) read back into the same shape. */
 export function lineCodingInputFromBill(bill: {
   taxBasis: TaxBasis | null; location: string | null; taxTotal: number | null; currencyCode: string | null
-  lineItems: { amount: number; taxCode: string | null; tracking: { categoryId: string; optionId: string }[]; customer: string | null; billable: boolean }[]
+  lineItems: { amount: number; taxCode: string | null; tracking: { categoryId: string; optionId: string }[]; customer: string | null; billable: boolean; itemExternalId: string | null; quantity: number }[]
 }): Pick<LineCodingInput, "lines" | "bill"> {
   return {
     lines: bill.lineItems.map((line) => ({
@@ -181,6 +211,8 @@ export function lineCodingInputFromBill(bill: {
       tracking: line.tracking.map((t) => ({ category_id: t.categoryId, option_id: t.optionId })),
       customer: line.customer,
       billable: line.billable,
+      item_external_id: line.itemExternalId,
+      quantity: line.quantity,
     })),
     bill: { location: bill.location, tax_basis: bill.taxBasis, tax_total: bill.taxTotal, currency: bill.currencyCode },
   }

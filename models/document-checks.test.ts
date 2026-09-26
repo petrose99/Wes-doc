@@ -35,7 +35,7 @@ describe("refreshLineCodingChecks", () => {
   it("persists a firing line-coding code as fail and flips the rest back to pass", async () => {
     const { refreshLineCodingChecks } = await import("@/models/document-checks")
     db.document = { findFirst: vi.fn().mockResolvedValue({ id: "d1", codingData: { tax_basis: "none", items: [{ account_external_id: "a", tax_code: null, tracking: [] }] }, reviewedData: { line_items: [{ amount: 10 }] } }) }
-    db.integrationConnection = { findFirst: vi.fn().mockResolvedValue({ id: "c1", provider: "xero", ledgerCapabilities: { vat: true, tracking: [], location: false, customer: false, billable: false } }) }
+    db.integrationConnection = { findFirst: vi.fn().mockResolvedValue({ id: "c1", provider: "xero", ledgerCapabilities: { vat: true, tracking: [], location: false, customer: false, billable: false, itemLines: false } }) }
     db.accountingEntity = { findMany: vi.fn().mockResolvedValue([]) }
     db.documentCheckResult = { upsert: vi.fn(), updateMany: vi.fn() }
     await refreshLineCodingChecks("ws1", "d1")
@@ -202,5 +202,43 @@ describe("runDeterministicChecks", () => {
     expect(db.documentCheckResult.upsert).not.toHaveBeenCalledWith(expect.objectContaining({
       where: { documentId_checkCode: { documentId: "d1", checkCode: "vat_number_format" } },
     }))
+  })
+})
+
+describe("checkPoLineConsumptionAgainstMatchedPo item-first wiring (#459)", () => {
+  it("resolves an invoice line to its PO line by item_external_id even when the descriptions don't match", async () => {
+    // Both PO lines describe generic "Widget" text so a description-similarity guess alone would
+    // land on the wrong line (or none); only the shared item_external_id disambiguates it. This is
+    // the regression for the close review's P0: codingData.items[].item_external_id must actually
+    // reach the line-match engine from runDeterministicChecks, not just from its own unit test.
+    db.document = {
+      findFirst: vi.fn().mockResolvedValue({
+        id: "d1", templateId: "t1", template: { code: "invoice" },
+        reviewedData: { vendor: "Acme", invoice_number: "INV-1", line_items: [{ description: "Widget", quantity: 2, unit_price: 10 }] },
+        codingData: { items: [{ item_external_id: "item-b" }] },
+      }),
+      findMany: vi.fn().mockResolvedValue([]),
+    }
+    db.documentMatch = {
+      findMany: vi.fn()
+        .mockResolvedValueOnce([{
+          id: "m1", sourceId: "po1", status: "confirmed", confidence: 1, lineAssignments: null,
+          source: {
+            reviewedData: { po_number: "PO-1", line_items: [{ description: "Widget", quantity: 5, unit_price: 10 }, { description: "Widget", quantity: 5, unit_price: 10 }] },
+            rawExtraction: null,
+            codingData: { items: [{ item_external_id: "item-a" }, { item_external_id: "item-b" }] },
+          },
+        }])
+        .mockResolvedValueOnce([]),
+    }
+    db.workspace = { findUnique: vi.fn().mockResolvedValue({ poQuantityTolerancePercent: 5 }) }
+    db.workspaceAutomationConfig = { findUnique: vi.fn().mockResolvedValue(null) }
+
+    await runDeterministicChecks({ workspaceId: "w1", documentId: "d1" })
+
+    const call = db.documentCheckResult.upsert.mock.calls.find((args: unknown[]) => (args[0] as { create: { checkCode: string } }).create.checkCode === "po_line_consumption")
+    expect(call).toBeDefined()
+    const detail = call[0].create.detail as { lines: Array<{ poLineIndex: number | null }> }
+    expect(detail.lines[0].poLineIndex).toBe(1)
   })
 })
