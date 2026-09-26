@@ -57,9 +57,9 @@ export type LineMatch = {
 }
 
 export type LineMatchInput = {
-  poLineItems: Array<{ description: string | null; quantity: number | null; unitPrice: number | null }>
+  poLineItems: Array<{ description: string | null; quantity: number | null; unitPrice: number | null; itemExternalId?: string | null }>
   /** Every line item from every invoice matched to this PO, including the one under review. */
-  invoiceLineItems: Array<{ documentId: string; rowIndex: number; description: string | null; quantity: number | null; unitPrice: number | null }>
+  invoiceLineItems: Array<{ documentId: string; rowIndex: number; description: string | null; quantity: number | null; unitPrice: number | null; itemExternalId?: string | null }>
   currentDocumentId: string
   /** Quantity allowance over the ordered quantity, as a percent (5 = 5 % over is still fine). */
   quantityTolerancePercent: number
@@ -84,6 +84,31 @@ export function bestPoLineIndex(description: string | null, poDescriptions: Arra
   return { index: bestIndex, similarity: bestIndex === null ? seen : bestScore }
 }
 
+/** #459 / ADR 0015 step 5: an Item is a stronger signal than description similarity, but only when
+ * unambiguous. Exactly one PO line sharing the invoice line's Item wins outright (similarity 1,
+ * bypassing the threshold). Zero or multiple candidates fall through to the description scan, but
+ * two *different* Items never pair even at high similarity — a wrong Item pairing moves ledger
+ * stock value, so any PO line whose Item conflicts with the invoice line's Item is excluded from
+ * that scan entirely. */
+function bestPoLineIndexForItem(
+  description: string | null,
+  itemExternalId: string | null | undefined,
+  poLineItems: LineMatchInput["poLineItems"],
+): { index: number | null; similarity: number | null } {
+  if (itemExternalId) {
+    const candidates = poLineItems.reduce<number[]>((acc, line, index) => {
+      if (line.itemExternalId === itemExternalId) acc.push(index)
+      return acc
+    }, [])
+    if (candidates.length === 1) return { index: candidates[0], similarity: 1 }
+  }
+  const eligible = poLineItems
+    .map((line, index) => ({ line, index }))
+    .filter(({ line }) => !(itemExternalId && line.itemExternalId && line.itemExternalId !== itemExternalId))
+  const result = bestPoLineIndex(description, eligible.map(({ line }) => line.description))
+  return result.index === null ? result : { index: eligible[result.index].index, similarity: result.similarity }
+}
+
 function round(value: number, places = 1): number {
   const factor = 10 ** places
   return Math.round(value * factor) / factor
@@ -100,7 +125,7 @@ function resolveAssignment(input: LineMatchInput, item: LineMatchInput["invoiceL
     const index = typeof assigned === "number" && assigned >= 0 && assigned < poDescriptions.length ? assigned : null
     return { index, similarity: index === null ? null : tokenSetRatio(item.description, poDescriptions[index]), assigned: true }
   }
-  const guess = bestPoLineIndex(item.description, poDescriptions)
+  const guess = bestPoLineIndexForItem(item.description, item.itemExternalId, input.poLineItems)
   return { ...guess, assigned: false }
 }
 
