@@ -7,10 +7,11 @@ import {
   type AffectedByRuleChange,
 } from "@/app/(app)/workspaces/[workspaceId]/account-correction-actions"
 import { AccountCorrectionDialog } from "@/components/integrations/account-correction-dialog"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { Input } from "@/components/ui/input"
 import { formatUnresolvedAccountId } from "@/lib/finance/line-account-resolution"
 import type { SupplierAccountRuleRow } from "@/models/supplier-account-rules"
-import { useMemo, useState, useTransition } from "react"
+import { useEffect, useMemo, useRef, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 
@@ -22,10 +23,33 @@ const FILTER_THRESHOLD = 20
  * fetch just to render "still on {old account name}". */
 export type SupplierAccountReminder = { oldAccountExternalId: string; oldAccountName: string; count: number }
 
+/** #458 §6 — one synced reference a rule can hold, keyed `tax:‹id›`, `track:‹categoryId›:‹optionId›`
+ * or `loc:‹id›`; inactive rows included so an archived code still reads by name. */
+export type CodingLabel = { label: string; active: boolean; categoryName?: string }
+
+const joinAnd = (items: string[]) => new Intl.ListFormat("en", { type: "conjunction" }).format(items)
+
+/** The rule's held Tax code, Tracking and Location, in that order, as `{name, value, stale}` parts. */
+function heldParts(rule: SupplierAccountRuleRow, codingLabels: Record<string, CodingLabel>, trackingCategories: { id: string; name: string }[]) {
+  const part = (name: string, key: string, id: string) => {
+    const ref = codingLabels[key]
+    return { name, value: ref?.label ?? formatUnresolvedAccountId(id), stale: !ref?.active }
+  }
+  return [
+    ...(rule.taxCodeExternalId ? [part("Tax code", `tax:${rule.taxCodeExternalId}`, rule.taxCodeExternalId)] : []),
+    ...rule.tracking.map((t) => {
+      const key = `track:${t.categoryId}:${t.optionId}`
+      const category = codingLabels[key]?.categoryName ?? trackingCategories.find((c) => c.id === t.categoryId)?.name ?? "Tracking"
+      return part(category, key, t.optionId)
+    }),
+    ...(rule.locationExternalId ? [part("Location", `loc:${rule.locationExternalId}`, rule.locationExternalId)] : []),
+  ]
+}
+
 /** Accounting page's learned-supplier table (#429 / ADR 0011): one row per supplier whose account
  * was learned from an approved document's largest line. Layout follows
  * CategoryAccountMappingTable's precedent (native table, no new component for the filter box). */
-export function SupplierAccountsTable({ workspaceId, connectionId, rules, accountLabels, defaultAccountName, providerLabel, isOwner, reminders }: {
+export function SupplierAccountsTable({ workspaceId, connectionId, rules, accountLabels, defaultAccountName, providerLabel, isOwner, reminders, codingLabels, trackingCategories, hasLocation }: {
   workspaceId: string
   connectionId: string
   rules: SupplierAccountRuleRow[]
@@ -38,6 +62,10 @@ export function SupplierAccountsTable({ workspaceId, connectionId, rules, accoun
   /** #430 Screen 3 reminders, keyed by supplierName. Empty/absent for a supplier with nothing
    * outstanding — most rows, most of the time. */
   reminders: Record<string, SupplierAccountReminder>
+  codingLabels: Record<string, CodingLabel>
+  /** The ledger's own Tracking categories (its capabilities), for the copy and a nameless option. */
+  trackingCategories: { id: string; name: string }[]
+  hasLocation: boolean
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
@@ -62,25 +90,59 @@ export function SupplierAccountsTable({ workspaceId, connectionId, rules, accoun
     [rules, filter],
   )
 
-  const forget = (ruleId: string, supplierName: string) => startTransition(async () => {
-    const res = await forgetSupplierAccountRuleAction(workspaceId, connectionId, ruleId)
-    if (res.success) { toast.success(`Forgot ${supplierName}'s usual account`); router.refresh() }
-    else toast.error(res.error || "Could not forget this supplier's account")
+  const [confirm, setConfirm] = useState<SupplierAccountRuleRow | null>(null)
+  const [forgetError, setForgetError] = useState<string | null>(null)
+  const openerRef = useRef<HTMLButtonElement | null>(null)
+  // Set on a successful Forget: once the refreshed rules drop that row, focus moves to the Forget at
+  // the same visible index (the next row), else the last row's, else the intro or the empty text.
+  const pendingFocusRef = useRef<{ ruleId: string; index: number } | null>(null)
+
+  useEffect(() => {
+    const pendingFocus = pendingFocusRef.current
+    if (!pendingFocus || rules.some((r) => r.id === pendingFocus.ruleId)) return
+    pendingFocusRef.current = null
+    const target = visible[pendingFocus.index] ?? visible[visible.length - 1]
+    const id = target ? `forget-rule-${target.id}` : rules.length ? "supplier-accounts-intro" : "supplier-accounts-empty"
+    document.getElementById(id)?.focus()
+  }, [rules, visible])
+
+  const forget = (rule: SupplierAccountRuleRow) => startTransition(async () => {
+    setForgetError(null)
+    let res: Awaited<ReturnType<typeof forgetSupplierAccountRuleAction>>
+    try {
+      res = await forgetSupplierAccountRuleAction(workspaceId, connectionId, rule.id)
+    } catch {
+      setForgetError("Couldn't reach DocuBite. Check your connection and try again.")
+      return
+    }
+    if (!res.success) { setForgetError(`Couldn't forget it. ${res.error || "Could not forget this supplier's usual account"}`); return }
+    toast.success(`Forgot ${rule.supplierName}'s usual account`)
+    pendingFocusRef.current = { ruleId: rule.id, index: visible.findIndex((r) => r.id === rule.id) }
+    setConfirm(null)
+    router.refresh()
   })
+
+  const categoryNames = trackingCategories.map((c) => c.name)
+  const tracking = categoryNames.length ? joinAnd(categoryNames) : null
 
   if (rules.length === 0) {
     return (
-      <p className="text-sm text-slate-600">
-        Supplier accounts fill in as documents get approved — the account of the largest line becomes that supplier's usual.
+      <p id="supplier-accounts-empty" tabIndex={-1} className="text-sm text-slate-600 outline-none">
+        Supplier accounts fill in as documents get approved — the account of the largest line becomes that
+        supplier&rsquo;s usual, with its Tax code{tracking && ` and ${tracking}`}.
       </p>
     )
   }
 
+  const confirmParts = confirm ? heldParts(confirm, codingLabels, trackingCategories).map((p) => p.name) : []
+  const confirmAccount = confirm ? (accountLabels[confirm.accountExternalId]?.label ?? formatUnresolvedAccountId(confirm.accountExternalId)) : ""
+
   return (
     <div className="space-y-3">
-      <p className="max-w-prose text-sm text-slate-600">
-        Learned from each supplier&rsquo;s most recently approved document. Forget removes the rule;
-        the next approval for that supplier learns a new one.
+      <p id="supplier-accounts-intro" tabIndex={-1} className="max-w-prose text-sm text-slate-600 outline-none">
+        The account of the largest line on a supplier&rsquo;s most recently approved document, with that
+        line&rsquo;s Tax code{tracking && `, ${tracking}`}{hasLocation && " and the bill\u2019s Location"}. The Tax code is
+        pre-filled only on lines kept on that account. Forget a supplier to learn it again from their next approval.
       </p>
       {rules.length > FILTER_THRESHOLD && (
         <Input
@@ -104,6 +166,7 @@ export function SupplierAccountsTable({ workspaceId, connectionId, rules, accoun
           {visible.map((rule) => {
             const account = accountLabels[rule.accountExternalId]
             const reminder = reminders[rule.supplierName]
+            const parts = heldParts(rule, codingLabels, trackingCategories)
             return (
               <tr key={rule.id} className="border-b border-hairline-soft last:border-0 align-top">
                 <td className="py-2">{rule.supplierName}</td>
@@ -111,6 +174,17 @@ export function SupplierAccountsTable({ workspaceId, connectionId, rules, accoun
                   {account?.archived
                     ? <>{defaultAccountName ?? account.label} <span className="text-slate-600">({rule.supplierName}&rsquo;s account was archived in {providerLabel})</span></>
                     : (account?.label ?? formatUnresolvedAccountId(rule.accountExternalId))}
+                  {parts.length > 0 && (
+                    <p className="mt-0.5 text-xs text-slate-600">
+                      {parts.map((part, i) => (
+                        <span key={i}>
+                          {i > 0 && " · "}
+                          <span className="whitespace-nowrap">{part.name}: {part.value}</span>
+                          {part.stale && ` (no longer in ${providerLabel} — not pre-filled)`}
+                        </span>
+                      ))}
+                    </p>
+                  )}
                   {isOwner && reminder && (
                     <p className="mt-1 text-xs text-amber-700">
                       {reminder.count} posted bill{reminder.count === 1 ? "" : "s"} still on {reminder.oldAccountName} ·{" "}
@@ -128,7 +202,8 @@ export function SupplierAccountsTable({ workspaceId, connectionId, rules, accoun
                 <td className="py-2 text-slate-600">{rule.lastUsedAt.toLocaleDateString()}</td>
                 {isOwner && (
                   <td className="py-2">
-                    <button type="button" disabled={pending} onClick={() => forget(rule.id, rule.supplierName)}
+                    <button type="button" id={`forget-rule-${rule.id}`} aria-label={`Forget ${rule.supplierName}'s usual account`} disabled={pending}
+                      onClick={(e) => { openerRef.current = e.currentTarget; setForgetError(null); setConfirm(rule) }}
                       className="rounded px-1.5 py-1 text-xs font-medium text-slate-600 underline-offset-2 transition-colors hover:text-red-800 hover:underline">
                       Forget
                     </button>
@@ -142,6 +217,21 @@ export function SupplierAccountsTable({ workspaceId, connectionId, rules, accoun
           )}
         </tbody>
       </table>
+      {confirm && (
+        <ConfirmDialog
+          open
+          destructive
+          busy={pending}
+          title={`Forget ${confirm.supplierName}'s usual account?`}
+          description={`DocuBite stops pre-filling ${confirmAccount}${confirmParts.length ? ` and its ${joinAnd(confirmParts)}` : ""} for ${confirm.supplierName}. Bills already posted don't change. Their next approved document learns it again.`}
+          confirmLabel="Forget"
+          onConfirm={() => forget(confirm)}
+          onCancel={() => { setConfirm(null); setForgetError(null) }}
+          restoreFocusTo={openerRef}
+        >
+          {forgetError ? <p role="alert" className="text-sm text-red-700">{forgetError}</p> : undefined}
+        </ConfirmDialog>
+      )}
       {review && (
         <AccountCorrectionDialog
           open

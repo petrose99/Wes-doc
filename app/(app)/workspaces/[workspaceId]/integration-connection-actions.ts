@@ -167,7 +167,7 @@ export async function forgetSupplierAccountRuleAction(workspaceId: string, conne
     revalidatePath(paths(workspaceId).integrations)
     return { success: true }
   } catch (error) {
-    return { success: false, error: errorMessage(error, "Could not forget this supplier's account") }
+    return { success: false, error: errorMessage(error, "Could not forget this supplier's usual account") }
   }
 }
 
