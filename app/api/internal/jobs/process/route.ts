@@ -2,6 +2,7 @@ import config from "@/lib/config"
 import { processDocumentJob, processNextQueuedDocumentJob } from "@/lib/document-processing"
 import { drainWebhookDeliveries } from "@/lib/webhook-delivery"
 import { drainIntegrationPushes } from "@/lib/integration-push"
+import { drainIntegrationAttaches } from "@/lib/integration-attach"
 import { syncDueLedgerConnections } from "@/lib/health/sync"
 import { runDueHealthChecks } from "@/models/health"
 import { sendDueReminders } from "@/models/reminders"
@@ -21,12 +22,15 @@ export async function POST(request: Request) {
     // that one queue and not also claim a document job. The cron (empty body) drains ALL THREE
     // queues, so no cron reconfiguration was needed to start delivering webhooks, and none is
     // needed now to start pushing to accounting connectors either.
-    const body = await request.json().catch(() => ({})) as { jobId?: string; drainWebhooks?: boolean; drainIntegrationPushes?: boolean; drainApprovalNotices?: boolean }
+    const body = await request.json().catch(() => ({})) as { jobId?: string; drainWebhooks?: boolean; drainIntegrationPushes?: boolean; drainIntegrationAttaches?: boolean; drainApprovalNotices?: boolean }
     // Run every independent drain concurrently rather than one after another — they touch separate
     // tables and have no ordering dependency.
-    const [webhookDeliveries, integrationPushes, reminders, approvalNotices, ledgerSyncs, healthChecksRun] = await Promise.all([
+    const [webhookDeliveries, integrationPushes, integrationAttaches, reminders, approvalNotices, ledgerSyncs, healthChecksRun] = await Promise.all([
       drainWebhookDeliveries(),
       drainIntegrationPushes(),
+      // #461: the source-file attach queue, drained alongside the push queue it follows — no
+      // separate cron wiring needed, same reasoning as every other queue on this route.
+      drainIntegrationAttaches(),
       // Dext-parity Phase 3 WP3.4: reminders are cheap and self-rate-limiting (isReminderDue is
       // what actually decides whether anything sends), so this drains on every hit exactly like
       // the queues above — no separate cron wiring needed for reminders to start going out.
@@ -44,8 +48,8 @@ export async function POST(request: Request) {
     ])
     let jobId: string | null = null
     if (body.jobId) { await processDocumentJob(body.jobId); jobId = body.jobId }
-    else if (!body.drainWebhooks && !body.drainIntegrationPushes) jobId = await processNextQueuedDocumentJob()
-    return Response.json({ processed: Boolean(jobId), jobId, webhookDeliveries, integrationPushes, reminders, approvalNotices, ledgerSyncs, healthChecksRun })
+    else if (!body.drainWebhooks && !body.drainIntegrationPushes && !body.drainIntegrationAttaches) jobId = await processNextQueuedDocumentJob()
+    return Response.json({ processed: Boolean(jobId), jobId, webhookDeliveries, integrationPushes, integrationAttaches, reminders, approvalNotices, ledgerSyncs, healthChecksRun })
   } catch (error) {
     // Logged rather than swallowed: this route has no caller watching stdout except the drain
     // cron, so without this the only visibility into a failure is Vercel's function logs — and

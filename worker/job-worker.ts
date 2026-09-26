@@ -2,6 +2,7 @@ import { sweepOldProductEvents } from "@/lib/analytics"
 import { processNextQueuedDocumentJob } from "@/lib/document-processing"
 import { processNextWebhookDelivery } from "@/lib/webhook-delivery"
 import { drainIntegrationPushes } from "@/lib/integration-push"
+import { drainIntegrationAttaches } from "@/lib/integration-attach"
 import { syncDueLedgerConnections } from "@/lib/health/sync"
 import { runDueHealthChecks } from "@/models/health"
 import { sendDueReminders } from "@/models/reminders"
@@ -44,15 +45,18 @@ async function run() {
     // sendDueReminders answers {reviewTasks, expenseClaims} where the rest answer a count, so it is
     // reduced to one here. An object is always truthy: left as-is it would report work on every
     // idle tick and, worse, keep `didWork` permanently true so the loop never slept.
-    const [integrationPushes, reminders, ledgerSyncs, healthChecks] = await Promise.all([
+    const [integrationPushes, integrationAttaches, reminders, ledgerSyncs, healthChecks] = await Promise.all([
       drainIntegrationPushes().catch((error) => { console.error("Integration push drain failed", error instanceof Error ? error.message : "unknown_error"); return 0 }),
+      // #461: the source-file attach queue, drained alongside the push queue it follows.
+      drainIntegrationAttaches().catch((error) => { console.error("Integration attach drain failed", error instanceof Error ? error.message : "unknown_error"); return 0 }),
       sendDueReminders().then(({ reviewTasks, expenseClaims }) => reviewTasks + expenseClaims)
         .catch((error) => { console.error("Reminder drain failed", error instanceof Error ? error.message : "unknown_error"); return 0 }),
       syncDueLedgerConnections().catch((error) => { console.error("Ledger sync failed", error instanceof Error ? error.message : "unknown_error"); return 0 }),
       runDueHealthChecks().catch((error) => { console.error("Health checks failed", error instanceof Error ? error.message : "unknown_error"); return 0 }),
     ])
-    const drainedCount = integrationPushes + reminders + ledgerSyncs + healthChecks
+    const drainedCount = integrationPushes + integrationAttaches + reminders + ledgerSyncs + healthChecks
     if (integrationPushes) console.log("Pushed to integrations", integrationPushes)
+    if (integrationAttaches) console.log("Attached source files", integrationAttaches)
     if (reminders) console.log("Sent reminders", reminders)
     if (ledgerSyncs) console.log("Synced ledger connections", ledgerSyncs)
     if (healthChecks) console.log("Ran health checks", healthChecks)

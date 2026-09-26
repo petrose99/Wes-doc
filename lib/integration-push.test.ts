@@ -5,10 +5,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 // database, a real provider account, or a network call.
 vi.mock("@/lib/db", () => ({ prisma: {} }))
 vi.mock("@/prisma/client", () => ({ Prisma: {}, PrismaClient: vi.fn() }))
-vi.mock("@/lib/config", () => ({ default: { app: { baseURL: "https://app.test" }, aws: { internalWorkerSecret: "s" }, integrations: { enabled: true } } }))
+vi.mock("@/lib/config", () => ({ default: { app: { baseURL: "https://app.test" }, aws: { internalWorkerSecret: "s" }, integrations: { enabled: true }, storage: { endpoint: "", accessKeyId: "", secretAccessKey: "", bucket: "b", region: "us-east-1" } } }))
 vi.mock("@/lib/audit", () => ({ recordSystemAudit: vi.fn().mockResolvedValue(undefined) }))
 vi.mock("@/lib/webhooks", () => ({ emitAccountsPayableEvent: vi.fn().mockResolvedValue({ queued: 0 }) }))
 vi.mock("@/lib/webhook-delivery", () => ({ kickWebhookDrain: vi.fn().mockResolvedValue(undefined) }))
+// #461: integration-push.ts now enqueues the source-file attach on success — mocked so this test
+// file stays a pure test of the push control flow, not the attach module's.
+vi.mock("@/lib/integration-attach", () => ({ enqueueAttachmentForPush: vi.fn().mockResolvedValue(undefined) }))
 vi.mock("@/lib/integration-preflight", () => ({ preflightPush: vi.fn().mockReturnValue({ ok: true }) }))
 vi.mock("@/models/review-tasks", () => ({ createReviewTask: vi.fn().mockResolvedValue(undefined) }))
 vi.mock("@/lib/integrations/quickbooks/client", () => ({

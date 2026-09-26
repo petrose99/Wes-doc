@@ -66,6 +66,7 @@ model User {
   createdApiKeys                    WorkspaceApiKey[]           @relation("ApiKeyCreator")
   createdIntegrationConnections     IntegrationConnection[]     @relation("IntegrationConnectionCreator")
   createdIntegrationPushes          IntegrationPush[]           @relation("IntegrationPushCreator")
+  createdIntegrationAttachments     IntegrationAttachment[]     @relation("IntegrationAttachmentCreator")
   productEvents                     ProductEvent[]              @relation("ProductEventActor")
   assignedReviewTasks               ReviewTask[]                @relation("ReviewTaskAssignee")
   createdReviewTasks                ReviewTask[]                @relation("ReviewTaskCreator")
@@ -220,6 +221,7 @@ model Workspace {
   webhookDeliveries          WebhookDelivery[]
   integrationConnections     IntegrationConnection[]
   integrationPushes          IntegrationPush[]
+  integrationAttachments     IntegrationAttachment[]
   integrationProvisionJobs   IntegrationProvisionJob[]
   bigcapitalAccount          BigcapitalAccount?
   bigcapitalMemberAccounts   BigcapitalMemberAccount[]
@@ -767,6 +769,7 @@ model Document {
   fieldSuggestions                        FieldSuggestion[]
   webhookDeliveries                       WebhookDelivery[]
   integrationPushes                       IntegrationPush[]
+  integrationAttachments                  IntegrationAttachment[]
   ingestionItems                          IngestionItem[]
   reviewTasks                             ReviewTask[]
   documentMatchesAsSource                 DocumentMatch[]          @relation("MatchSource")
@@ -1366,6 +1369,7 @@ model IntegrationConnection {
   workspace                    Workspace                @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   createdBy                    User?                    @relation("IntegrationConnectionCreator", fields: [createdById], references: [id], onDelete: SetNull)
   pushes                       IntegrationPush[]
+  attachments                  IntegrationAttachment[]
   accountingEntities           AccountingEntity[]
   ledgerTransactions           LedgerTransaction[]
   categoryAccountMappings      CategoryAccountMapping[]
@@ -1410,11 +1414,51 @@ model IntegrationPush {
   connection         IntegrationConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
   document           Document               @relation(fields: [documentId], references: [id], onDelete: Cascade)
   createdBy          User?                  @relation("IntegrationPushCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  attachment         IntegrationAttachment?
 
   @@unique([documentId, connectionId])
   @@index([status, nextAttemptAt])
   @@index([workspaceId, createdAt])
   @@map("integration_pushes")
+}
+
+/// #461/ADR 0016: attaches the posted bill's Source file at the provider, queued as its own row
+/// after the IntegrationPush that created the bill succeeds — never in the push's own transaction,
+/// since attaching is a separate provider call with its own failure modes (auth pause, permanent
+/// type/size/count rejection, retryable transient errors) that must not roll back or re-attempt the
+/// post itself. Modelled field-for-field on IntegrationPush (same claim/attempt/drain trio, see
+/// lib/integration-attach.ts / lib/integration-attach-policy.ts). @@unique([pushId]) is the "never
+/// attached twice" invariant: enqueue is an upsert-or-skip, never a second row per push.
+model IntegrationAttachment {
+  id                  String                 @id @default(uuid()) @db.Uuid
+  workspaceId         String                 @map("workspace_id") @db.Uuid
+  pushId              String                 @unique @map("push_id") @db.Uuid
+  connectionId        String?                @map("connection_id") @db.Uuid
+  documentId          String                 @map("document_id") @db.Uuid
+  provider            String
+  /// Fixed once at enqueue (fixedAttachFilename of the Document's filename) and never recomputed —
+  /// every attempt matches the provider's listAttachments against this exact name, which is what
+  /// makes a retry after a crash between upload and record-write safe (never attached twice).
+  fileName            String                 @map("file_name")
+  status              String                 @default("pending")
+  attempts            Int                    @default(0)
+  nextAttemptAt       DateTime               @default(now()) @map("next_attempt_at")
+  leaseUntil          DateTime?              @map("lease_until")
+  externalAttachmentId String?               @map("external_attachment_id")
+  errorCode           String?                @map("error_code")
+  createdById         String?                @map("created_by_id") @db.Uuid
+  createdAt           DateTime               @default(now()) @map("created_at")
+  updatedAt           DateTime               @updatedAt @map("updated_at")
+  completedAt         DateTime?              @map("completed_at")
+  workspace           Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  push                IntegrationPush        @relation(fields: [pushId], references: [id], onDelete: Cascade)
+  connection          IntegrationConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+  document            Document               @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  createdBy           User?                  @relation("IntegrationAttachmentCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([status, nextAttemptAt])
+  @@index([workspaceId, createdAt])
+  @@map("integration_attachments")
 }
 
 /// Bigcapital, unlike QuickBooks/Xero, has no OAuth app to connect through — every workspace gets
