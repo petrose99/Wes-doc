@@ -3,7 +3,7 @@ import { track } from "@/lib/analytics"
 import { auditEventData, getRequestAuditContext, recordDocumentAudit } from "@/lib/audit"
 import { SUPPLIER_FIELD_BY_TEMPLATE } from "@/lib/automation/rules"
 import config from "@/lib/config"
-import { hasDirectionField, isPushableDocument, PaidStatus, resolveDocType, type DocType } from "@/lib/doc-types"
+import { DOC_TYPE_SPECS, hasDirectionField, isPushableDocument, PaidStatus, resolveDocType, type DocType } from "@/lib/doc-types"
 import { findMissingRequiredFields, parseTemplateFields, validateDocumentValues } from "@/lib/document-templates"
 import { deleteDocumentSource, documentBlocksKey, documentStorageKey, putDocumentSource } from "@/lib/document-storage"
 import { projectDocumentFields } from "@/lib/field-projection"
@@ -11,16 +11,20 @@ import { LOW_CONFIDENCE, PIPELINE_STAGES, type PipelineStage } from "@/lib/docum
 import { applyFxToDocument } from "@/lib/fx/apply-to-document"
 import { normalizeBillFromDocument } from "@/lib/integration-bill-mapping"
 import { resolveDocumentLineAccounts, resolveLineAccount, usesLegacyAccountChain, type LineAccountRow } from "@/lib/finance/line-account-resolution"
+import { codingReferencesFrom, inferTaxBasis, resolveBillCoding, resolveLineCoding, type BillCoding, type CodingRule, type LineCoding } from "@/lib/finance/line-coding"
+import { parseLedgerCapabilities } from "@/lib/integrations/ledger-capabilities"
 import { normalizeSupplierName } from "@/lib/suppliers/normalize"
 import { unscoped } from "@/lib/workspace-scope"
 import type { DocumentProvenance } from "@/lib/provenance"
 import { replaceDocumentFieldValues } from "@/models/document-field-values"
 import { recordCodingCorrection } from "@/models/coding-corrections"
 import { recordFieldCorrection } from "@/models/field-corrections"
+import { refreshLineCodingChecks } from "@/models/document-checks"
 import { resetSupplierStreak } from "@/models/suppliers"
 import { listWorkspaceIntegrationPushes, getCategoryAccountMap } from "@/models/integrations"
 import { listCategoryAccountMappings, resolveCategoryAccount } from "@/models/category-account-mappings"
 import { listAccountingEntities } from "@/models/accounting-entities"
+import { parseRuleTracking } from "@/models/supplier-account-rules"
 import { getDocumentPaymentStatuses } from "@/models/ledger-payments"
 import { emitWorkspaceEvent } from "@/lib/webhooks"
 import { resolveDuplicateGatesAgainst } from "@/lib/gates/duplicate"
@@ -655,7 +659,11 @@ function asScalarString(value: unknown): string | null {
  * stamped onto `codingData.items`, read back by the Detail pane, the push actions (as
  * `lineAccounts`), and the queue eligibility check. A document coded before the connection existed
  * (`usesLegacyAccountChain`) keeps resolving through the pre-connection CategoryAccountMapping
- * chain rather than a supplier-rule/Default chain that didn't exist when it was coded. */
+ * chain rather than a supplier-rule/Default chain that didn't exist when it was coded.
+ * ADR 0014: each row then gets the rest of its coding (Tax code, Tracking) and the bill its
+ * Location and Tax basis (lib/finance/line-coding.ts), stamped onto `codingData` the same way. */
+export type CodingItem = LineAccountRow & LineCoding
+
 export async function resolveDocumentCodingItems(input: {
   workspaceId: string
   vendorName: string | null
@@ -663,35 +671,65 @@ export async function resolveDocumentCodingItems(input: {
   codingSource: string | null
   codedAt: Date
   lineCount: number
-}): Promise<LineAccountRow[] | null> {
+  /** The document's codingData before this Save review — manual coding values are kept from it. */
+  priorCoding?: Record<string, unknown>
+  /** The reviewed amounts the Tax basis is inferred from. */
+  amounts?: Parameters<typeof inferTaxBasis>[0]
+}): Promise<{ items: CodingItem[]; bill: BillCoding } | null> {
   if (!config.integrations.enabled) return null
   const connection = await prisma.integrationConnection.findFirst({
     where: { workspaceId: input.workspaceId, status: "connected" },
-    select: { id: true, createdAt: true, defaultExpenseAccountId: true, defaultExpenseAccountGuessed: true },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, createdAt: true, defaultExpenseAccountId: true, defaultExpenseAccountGuessed: true, ledgerCapabilities: true },
   })
   if (!connection) return null
   const lineCount = Math.max(input.lineCount, 1)
-  if (usesLegacyAccountChain(input.codingSource, input.codedAt, connection.createdAt)) {
-    if (!connection.defaultExpenseAccountId) return null
-    const [mappings, inferredMap] = await Promise.all([
-      listCategoryAccountMappings(input.workspaceId, connection.id),
-      getCategoryAccountMap(input.workspaceId, connection.id),
-    ])
-    const accountExternalId = resolveCategoryAccount(mappings, input.category, inferredMap, connection.defaultExpenseAccountId)
-    return resolveDocumentLineAccounts(lineCount, { accountExternalId, accountSource: null })
-  }
+  const legacy = usesLegacyAccountChain(input.codingSource, input.codedAt, connection.createdAt)
+  if (legacy && !connection.defaultExpenseAccountId) return null
   const normalizedVendor = input.vendorName ? normalizeSupplierName(input.vendorName) : ""
-  const rule = normalizedVendor
-    ? await prisma.supplierAccountRule.findFirst({ where: { connectionId: connection.id, supplierName: normalizedVendor }, select: { accountExternalId: true } })
-    : null
+  // The ledger's active references in one read: the accounts (activity + default Tax code), and the
+  // Tax codes, Tracking options and Locations a line or bill may be pre-filled with.
+  const [ruleRow, entities] = await Promise.all([
+    !legacy && normalizedVendor
+      ? prisma.supplierAccountRule.findFirst({ where: { workspaceId: input.workspaceId, connectionId: connection.id, supplierName: normalizedVendor }, select: { accountExternalId: true, taxCodeExternalId: true, tracking: true, locationExternalId: true } })
+      : null,
+    prisma.accountingEntity.findMany({
+      where: { workspaceId: input.workspaceId, connectionId: connection.id, active: true, entityType: { in: ["account", "tax_rate", "tracking_option", "location"] } },
+      select: { entityType: true, externalId: true, parentExternalId: true, forPurchases: true, defaultTaxCode: true },
+    }),
+  ])
+  const rule: CodingRule | null = ruleRow ? { accountExternalId: ruleRow.accountExternalId, taxCodeExternalId: ruleRow.taxCodeExternalId ?? null, tracking: parseRuleTracking(ruleRow.tracking), locationExternalId: ruleRow.locationExternalId ?? null } : null
+  const of = (type: string) => entities.filter((entity) => entity.entityType === type)
+  const references = codingReferencesFrom(entities)
+  const accountDefaults = Object.fromEntries(of("account").map((account) => [account.externalId, account.defaultTaxCode]))
+  const capabilities = parseLedgerCapabilities(connection.ledgerCapabilities)
+  const prior = input.priorCoding ?? {}
+  const priorItems = Array.isArray(prior.items) ? (prior.items as Partial<LineCoding>[]) : []
+  const rows = legacy
+    ? await resolveLegacyLineAccounts(input.workspaceId, connection.id, input.category, connection.defaultExpenseAccountId as string, lineCount)
+    : resolveCurrentLineAccounts(connection, rule, new Set(Object.keys(accountDefaults)), lineCount)
+  const items = rows.map((row, index) => ({ ...row, ...resolveLineCoding({ line: row, prior: priorItems[index] ?? null, rule, accountDefaults, capabilities, references }) }))
+  const bill = resolveBillCoding({ prior: prior as Partial<BillCoding>, rule, capabilities, references, inferredBasis: input.amounts ? inferTaxBasis(input.amounts) : null })
+  return { items, bill }
+}
+
+async function resolveLegacyLineAccounts(workspaceId: string, connectionId: string, category: string | null, defaultAccountId: string, lineCount: number): Promise<LineAccountRow[]> {
+  const [mappings, inferredMap] = await Promise.all([
+    listCategoryAccountMappings(workspaceId, connectionId),
+    getCategoryAccountMap(workspaceId, connectionId),
+  ])
+  const accountExternalId = resolveCategoryAccount(mappings, category, inferredMap, defaultAccountId)
+  return resolveDocumentLineAccounts(lineCount, { accountExternalId, accountSource: null })
+}
+
+function resolveCurrentLineAccounts(
+  connection: { defaultExpenseAccountId: string | null; defaultExpenseAccountGuessed: boolean },
+  rule: CodingRule | null,
+  activeIds: Set<string>,
+  lineCount: number,
+): LineAccountRow[] {
   // #429 archived-account fallback: a supplier rule or the connection Default can point at an
-  // AccountingEntity a person later deactivated in the provider. Check both candidates' activity
-  // in one query rather than trusting either id blindly.
-  const candidateIds = [rule?.accountExternalId, connection.defaultExpenseAccountId].filter((id): id is string => Boolean(id))
-  const activeAccounts = candidateIds.length
-    ? await prisma.accountingEntity.findMany({ where: { connectionId: connection.id, entityType: "account", externalId: { in: candidateIds }, active: true }, select: { externalId: true } })
-    : []
-  const activeIds = new Set(activeAccounts.map((account) => account.externalId))
+  // AccountingEntity a person later deactivated in the provider — never trust either id blindly.
   const ruleAccountId = rule?.accountExternalId ?? null
   const ruleAccountActive = ruleAccountId ? activeIds.has(ruleAccountId) : false
   const ruleArchivedFallback = Boolean(ruleAccountId) && !ruleAccountActive
@@ -730,13 +768,13 @@ export async function getBillAccountPickerData(workspaceId: string, vendorName: 
   providerName: string | null
 } | null> {
   if (!config.integrations.enabled) return null
-  const connection = await prisma.integrationConnection.findFirst({ where: { workspaceId, status: "connected" }, select: { id: true, provider: true } })
+  const connection = await prisma.integrationConnection.findFirst({ where: { workspaceId, status: "connected" }, orderBy: { createdAt: "asc" }, select: { id: true, provider: true } })
   if (!connection) return null
   const normalizedVendor = vendorName ? normalizeSupplierName(vendorName) : ""
   const [entities, rule] = await Promise.all([
     listAccountingEntities(workspaceId, "account"),
     normalizedVendor
-      ? prisma.supplierAccountRule.findFirst({ where: { connectionId: connection.id, supplierName: normalizedVendor }, select: { accountExternalId: true } })
+      ? prisma.supplierAccountRule.findFirst({ where: { workspaceId, connectionId: connection.id, supplierName: normalizedVendor }, select: { accountExternalId: true } })
       : Promise.resolve(null),
   ])
   return {
@@ -771,7 +809,7 @@ export async function learnSupplierAccountRuleFromApproval(workspaceId: string, 
     const vendorName = (typeof reviewedData.vendor === "string" && reviewedData.vendor) || (typeof reviewedData.merchant === "string" && reviewedData.merchant) || null
     if (!vendorName?.trim()) return null
     const coding = (document.codingData as Record<string, unknown> | null) ?? {}
-    const items = Array.isArray(coding.items) ? (coding.items as LineAccountRow[]) : []
+    const items = Array.isArray(coding.items) ? (coding.items as Partial<CodingItem>[]) : []
     if (!items.length) return null
     const lineItems = Array.isArray(reviewedData.line_items) ? (reviewedData.line_items as Array<Record<string, unknown>>) : []
     let bestIndex = -1
@@ -782,22 +820,32 @@ export async function learnSupplierAccountRuleFromApproval(workspaceId: string, 
       if (bestIndex === -1 || amount > bestAmount) { bestIndex = index; bestAmount = amount }
     })
     if (bestIndex === -1) return null
-    const accountExternalId = items[bestIndex].account_external_id
+    const best = items[bestIndex]
+    const accountExternalId = best.account_external_id
     if (!accountExternalId) return null
-    const connection = await prisma.integrationConnection.findFirst({ where: { workspaceId, status: "connected" }, select: { id: true } })
+    const connection = await prisma.integrationConnection.findFirst({ where: { workspaceId, status: "connected" }, orderBy: { createdAt: "asc" }, select: { id: true } })
     if (!connection) return null
     const supplierName = normalizeSupplierName(vendorName)
     const existing = await prisma.supplierAccountRule.findUnique({
       where: { connectionId_supplierName: { connectionId: connection.id, supplierName } },
       select: { accountExternalId: true },
     })
+    // ADR 0014: the rule learns the whole usual set — Account, Tax code, Tracking, Location — but
+    // never Customer or Billable, which belong to one job, not to the supplier.
+    const set = {
+      accountExternalId,
+      taxCodeExternalId: best.tax_code ?? null,
+      tracking: (best.tracking ?? []).map((t) => ({ categoryId: t.category_id, optionId: t.option_id })),
+      locationExternalId: typeof coding.location === "string" ? coding.location : null,
+    }
     await prisma.supplierAccountRule.upsert({
       where: { connectionId_supplierName: { connectionId: connection.id, supplierName } },
-      create: { workspaceId, connectionId: connection.id, supplierName, accountExternalId, lastUsedAt: new Date() },
-      update: { accountExternalId, lastUsedAt: new Date() },
+      create: { workspaceId, connectionId: connection.id, supplierName, ...set, lastUsedAt: new Date() },
+      update: { ...set, lastUsedAt: new Date() },
     })
-    // Only a genuine retarget of an existing rule is a #430 trigger — a first-time create has no
-    // bills posted under "the old account" because there wasn't one.
+    // Only a genuine retarget of an existing rule's Account is a #430 trigger — a first-time create
+    // has no bills posted under "the old account" because there wasn't one, and a new Tax code,
+    // Tracking or Location on the same Account offers no correction (ADR 0011 corrects Accounts).
     if (existing && existing.accountExternalId && existing.accountExternalId !== accountExternalId) {
       return { connectionId: connection.id, oldAccountExternalId: existing.accountExternalId, newAccountExternalId: accountExternalId }
     }
@@ -843,12 +891,19 @@ export async function updateDocumentReview(input: { workspaceId: string; documen
   const vendorName = (typeof reviewedData.vendor === "string" && reviewedData.vendor) || (typeof reviewedData.merchant === "string" && reviewedData.merchant) || null
   const category = typeof coding.account === "string" ? coding.account : null
   const lineCount = Array.isArray(reviewedData.line_items) ? reviewedData.line_items.length : 0
-  const items = await resolveDocumentCodingItems({
-    workspaceId: input.workspaceId, vendorName, category, codingSource: document.codingSource, codedAt: document.receivedAt, lineCount,
+  const checkFields = DOC_TYPE_SPECS[resolveDocType(document)].checkFields ?? {}
+  const amountOf = (key: string | undefined) => (key && typeof reviewedData[key] === "number" ? (reviewedData[key] as number) : null)
+  const amounts = {
+    lines: Array.isArray(reviewedData.line_items) ? (reviewedData.line_items as Array<Record<string, unknown> | null>).map((line) => (typeof line?.amount === "number" ? line.amount : 0)) : [],
+    subtotal: amountOf(checkFields.subtotal), taxTotal: amountOf(checkFields.taxTotal), total: amountOf(checkFields.total),
+    currency: asScalarString(checkFields.currency ? reviewedData[checkFields.currency] : null),
+  }
+  const coded = await resolveDocumentCodingItems({
+    workspaceId: input.workspaceId, vendorName, category, codingSource: document.codingSource, codedAt: document.receivedAt, lineCount, priorCoding: coding, amounts,
   })
   const codingUpdates: Record<string, unknown> = {}
   if (newlyConfirmedCategory) codingUpdates.categoryConfirmed = true
-  if (items) codingUpdates.items = items
+  if (coded) Object.assign(codingUpdates, coded.bill, { items: coded.items })
   const nextCoding = Object.keys(codingUpdates).length ? { ...coding, ...codingUpdates } : null
   // Re-project the structured spine from the values a human signed off on. Source is "manual"
   // because these are now reviewed values, but the per-field scores are carried over from the
@@ -873,6 +928,9 @@ export async function updateDocumentReview(input: { workspaceId: string; documen
     oldValues: (document.reviewedData as Record<string, unknown> | null) ?? (document.rawExtraction as Record<string, unknown> | null) ?? {},
     newValues: reviewedData,
   })
+  // After the commit: the refresh reads the coding Save review just wrote, and a ledger read must
+  // never hold the review transaction open. It never throws.
+  await refreshLineCodingChecks(input.workspaceId, document.id)
   // Human review is the key integration trigger — a reviewed document is what a connector pushes.
   if (webhookQueued) await kickWebhookDrain()
   // FX conversion runs AFTER the review commit rather than inside it: a network fetch to

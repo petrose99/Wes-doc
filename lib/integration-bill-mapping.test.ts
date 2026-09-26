@@ -25,7 +25,7 @@ describe("normalizeBillFromDocument", () => {
     expect(bill.dueDate).toBe("2026-08-31")
     expect(bill.total).toBe(42.5)
     expect(bill.lineItems).toHaveLength(2)
-    expect(bill.lineItems[0]).toEqual({ description: "Widget", quantity: 2, unitPrice: 20, amount: 40, accountExternalId: null })
+    expect(bill.lineItems[0]).toEqual({ description: "Widget", quantity: 2, unitPrice: 20, amount: 40, accountExternalId: null, taxCode: null, tracking: [], customer: null, billable: false })
   })
 
   it("threads codingData.items[i].account_external_id onto the matching line, by index (#429)", () => {
@@ -34,6 +34,43 @@ describe("normalizeBillFromDocument", () => {
     }))
     expect(bill.lineItems[0].accountExternalId).toBe("acc-widget")
     expect(bill.lineItems[1].accountExternalId).toBe("acc-tax")
+  })
+
+  it("snapshots each line's coding with Tracking names resolved, and the bill's (ADR 0014)", () => {
+    const bill = normalizeBillFromDocument(makeDoc({
+      lineAccounts: [
+        { account_external_id: "a", tax_code: "TAX15", tracking: [{ category_id: "class", option_id: "c1" }], customer: "cus1", billable: true },
+        { account_external_id: "a", tax_code: null, tracking: [], customer: null, billable: false },
+      ],
+      billCoding: { location: "loc1", tax_basis: "inclusive" },
+      names: { class: "Class", "class:c1": "Retail" },
+    }))
+    expect(bill.lineItems[0]).toMatchObject({ taxCode: "TAX15", tracking: [{ categoryId: "class", categoryName: "Class", optionId: "c1", optionName: "Retail" }], customer: "cus1", billable: true })
+    expect(bill.lineItems[1]).toMatchObject({ taxCode: null, tracking: [], customer: null, billable: false })
+    expect(bill).toMatchObject({ taxBasis: "inclusive", location: "loc1", subtotal: null, taxTotal: null })
+  })
+
+  it("an uncoded document snapshots no Tax basis and no Location", () => {
+    expect(normalizeBillFromDocument(makeDoc())).toMatchObject({ taxBasis: null, location: null })
+  })
+
+  it("exclusive: lines reconcile to the subtotal, not the total", () => {
+    const bill = normalizeBillFromDocument(makeDoc({
+      reviewedData: { vendor: "Acme", subtotal: 100, tax_total: 15, total: 115, line_items: [{ description: "A", amount: 33.333 }, { description: "B", amount: 66.667 }] },
+      billCoding: { tax_basis: "exclusive" },
+    }))
+    expect(bill).toMatchObject({ total: 115, subtotal: 100, taxTotal: 15, taxBasis: "exclusive" })
+    expect(bill.lineItems.reduce((sum, l) => sum + l.amount, 0)).toBeCloseTo(100, 2)
+  })
+
+  it("exclusive with no lines synthesizes one line of the subtotal", () => {
+    const bill = normalizeBillFromDocument(makeDoc({ reviewedData: { vendor: "Acme", subtotal: 100, tax_total: 15, total: 115 }, billCoding: { tax_basis: "exclusive" } }))
+    expect(bill.lineItems).toMatchObject([{ description: "Total", amount: 100 }])
+  })
+
+  it("scales the subtotal and VAT with the total under fxOverride", () => {
+    const bill = normalizeBillFromDocument(makeDoc({ reviewedData: { vendor: "Acme", subtotal: 100, tax_total: 15, total: 115, currency_code: "EUR" }, fxOverride: { total: 230, currencyCode: "ZAR" } }))
+    expect(bill).toMatchObject({ subtotal: 200, taxTotal: 30 })
   })
 
   it("reads merchant/receipt fields for a receipt, with no due date", () => {
@@ -49,12 +86,12 @@ describe("normalizeBillFromDocument", () => {
 
   it("synthesizes one line item covering the total when line_items is empty", () => {
     const bill = normalizeBillFromDocument(makeDoc({ reviewedData: { vendor: "Acme", total: 99, line_items: [] } }))
-    expect(bill.lineItems).toEqual([{ description: "Total", quantity: 1, unitPrice: 99, amount: 99, accountExternalId: null }])
+    expect(bill.lineItems).toEqual([{ description: "Total", quantity: 1, unitPrice: 99, amount: 99, accountExternalId: null, taxCode: null, tracking: [], customer: null, billable: false }])
   })
 
   it("synthesizes one line item when line_items is missing entirely", () => {
     const bill = normalizeBillFromDocument(makeDoc({ reviewedData: { vendor: "Acme", total: 50 } }))
-    expect(bill.lineItems).toEqual([{ description: "Total", quantity: 1, unitPrice: 50, amount: 50, accountExternalId: null }])
+    expect(bill.lineItems).toEqual([{ description: "Total", quantity: 1, unitPrice: 50, amount: 50, accountExternalId: null, taxCode: null, tracking: [], customer: null, billable: false }])
   })
 
   it("falls back to 'Unknown vendor' when no vendor/merchant is present", () => {

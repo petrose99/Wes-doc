@@ -14,6 +14,8 @@ import { getCurrentUser } from "@/lib/auth"
 import config from "@/lib/config"
 import { resolveSelectionEligibility } from "@/lib/integration-push-selection"
 import { workspaceIntegrationsPlanEnabled } from "@/models/integrations"
+import { loadLineCodingContext } from "@/models/accounting-entities"
+import { firstLineCodingFail } from "@/lib/checks/line-coding"
 import { prisma } from "@/lib/db"
 import { revalidatePath } from "next/cache"
 import { errorMessage, NO_ACCESS, requireMember } from "./action-helpers"
@@ -32,11 +34,14 @@ export async function postSelectedDocumentsAction(
   if (!(await requireMember(workspaceId, user.id))) return { success: false, error: NO_ACCESS }
   if (!(await workspaceIntegrationsPlanEnabled(workspaceId))) return { success: false, error: errorMessage(new Error("integrations_plan_required"), NO_ACCESS) }
 
-  const [workspace, docs, succeededPushes] = await Promise.all([
+  const [workspace, docs, succeededPushes, connection] = await Promise.all([
     prisma.workspace.findUnique({ where: { id: workspaceId }, select: { baseCurrency: true } }),
     prisma.document.findMany({ where: { id: { in: documentIds }, workspaceId }, select: { id: true, status: true, docType: true, codingData: true, reviewedData: true, rawExtraction: true, baseCurrencyTotal: true, cancelledAt: true } }),
     prisma.integrationPush.findMany({ where: { workspaceId, connectionId, documentId: { in: documentIds }, status: "succeeded" }, select: { documentId: true } }),
+    prisma.integrationConnection.findFirst({ where: { id: connectionId, workspaceId }, select: { id: true, provider: true, ledgerCapabilities: true } }),
   ])
+  // Fresh, never the persisted Check rows: a sync since Save review may have changed what the ledger takes.
+  const codingContext = connection ? await loadLineCodingContext(workspaceId, connection) : null
   const workspaceBase = workspace?.baseCurrency ? workspace.baseCurrency.toUpperCase() : null
   const alreadyPostedIds = new Set(succeededPushes.map((push) => push.documentId))
   const docById = new Map(docs.map((doc) => [doc.id, doc]))
@@ -50,7 +55,7 @@ export async function postSelectedDocumentsAction(
     const docCurrency = ((reviewedData as { currency_code?: unknown }).currency_code as string | undefined)?.toUpperCase() ?? null
     const eligibility = resolveSelectionEligibility(
       { status: doc.status, docType: doc.docType, codingData: doc.codingData as Record<string, unknown> | null, baseCurrencyTotal: doc.baseCurrencyTotal, cancelledAt: doc.cancelledAt },
-      { alreadyPosted: alreadyPostedIds.has(doc.id), workspaceBase, docCurrency }
+      { alreadyPosted: alreadyPostedIds.has(doc.id), workspaceBase, docCurrency, lineCodingFail: firstLineCodingFail(codingContext, doc)?.message ?? null }
     )
     if (!eligibility.eligible) { results.push({ documentId, status: "ineligible", error: eligibility.reason }); continue }
     eligibleIds.add(documentId)

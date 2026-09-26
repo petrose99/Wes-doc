@@ -216,7 +216,7 @@ A supplier's usual account: learned when a document from that supplier is approv
 _Avoid_: supplier mapping, category mapping, auto-coding
 
 **Tax code** (on a line):
-The ledger's own purchase tax code a line is posted with. It is pre-filled from the ledger's default for the line's Account and always sent when the bill is posted, so the ledger never picks one silently. Once a bill is posted, DocuBite never changes its tax codes; correcting an Account sends each line's existing tax code back unchanged.
+The ledger's own purchase tax code a line is posted with. It is pre-filled from the supplier's usual Tax code when the line keeps the supplier's usual account, otherwise the ledger's default for the line's Account, and always sent when the bill is posted, so the ledger never picks one silently. Once a bill is posted, DocuBite never changes its tax codes; correcting an Account sends each line's existing tax code back unchanged.
 _Avoid_: tax rate, VAT type, TaxType (as user-facing words)
 
 **Tax basis**:

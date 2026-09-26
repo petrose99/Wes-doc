@@ -7,6 +7,9 @@ vi.mock("@/lib/document-storage", () => ({ documentStorageKey: vi.fn(), document
 vi.mock("@/lib/analytics", () => ({ track: vi.fn() }))
 vi.mock("@/models/document-field-values", () => ({ replaceDocumentFieldValues: vi.fn() }))
 vi.mock("@/models/field-corrections", () => ({ recordFieldCorrection: vi.fn().mockResolvedValue(undefined) }))
+vi.mock("@/models/document-checks", () => ({ refreshLineCodingChecks: vi.fn() }))
+vi.mock("@/lib/fx/apply-to-document", () => ({ applyFxToDocument: vi.fn().mockResolvedValue(undefined) }))
+vi.mock("@/lib/automation/autopublish", () => ({ syncOnApproval: vi.fn().mockResolvedValue(undefined) }))
 vi.mock("@/models/integrations", async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>()
   return { ...actual, getCategoryAccountMap: vi.fn().mockResolvedValue({}) }
@@ -21,11 +24,12 @@ vi.mock("@/lib/config", async (importOriginal) => {
   return { default: { ...actual.default, integrations: { ...(actual.default.integrations as object), enabled: true } } }
 })
 
-const { createDocumentFromBuffer, deleteWorkspaceDocuments, dismissAccountCorrectionForDocuments, documentDataForExport, documentHash, documentSourceFor, findAccountCorrectionReminders, findBillsAffectedByAccountChange, getBillAccountPickerData, isSupportedDocumentBuffer, listReadyToPushDocuments, recordAccountCorrectionApplied, resolveDocumentCodingItems, setDocumentPaymentStatus, stageWhereClause, updateDocumentField, validateDocumentInput } = await import("@/models/documents")
+const { createDocumentFromBuffer, deleteWorkspaceDocuments, dismissAccountCorrectionForDocuments, documentDataForExport, documentHash, documentSourceFor, findAccountCorrectionReminders, findBillsAffectedByAccountChange, getBillAccountPickerData, isSupportedDocumentBuffer, listReadyToPushDocuments, recordAccountCorrectionApplied, resolveDocumentCodingItems, setDocumentPaymentStatus, stageWhereClause, updateDocumentField, updateDocumentReview, validateDocumentInput } = await import("@/models/documents")
 const { prisma } = await import("@/lib/db")
 const { deleteDocumentSource } = await import("@/lib/document-storage")
 const { recordFieldCorrection } = await import("@/models/field-corrections")
 const { listAccountingEntities } = await import("@/models/accounting-entities")
+const { refreshLineCodingChecks } = await import("@/models/document-checks")
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = prisma as any
@@ -248,6 +252,30 @@ describe("updateDocumentField field-correction recording", () => {
   it("does not record a correction when the value is unchanged", async () => {
     await updateDocumentField({ workspaceId: "w1", documentId: "d1", fieldKey: "vendor", value: "Acme In", actorId: "u1" })
     expect(vi.mocked(recordFieldCorrection)).not.toHaveBeenCalled()
+  })
+})
+
+describe("updateDocumentReview line-coding Checks (ADR 0014)", () => {
+  it("re-judges the document's coding against the ledger after Save review commits", async () => {
+    vi.clearAllMocks()
+    const order: string[] = []
+    db.document = {
+      findFirst: vi.fn().mockResolvedValue({
+        id: "d1", workspaceId: "w1", status: "needs_review", fieldSnapshot: [{ key: "vendor", label: "Supplier", type: "string", required: true }],
+        reviewedData: null, rawExtraction: { vendor: "Acme" }, codingData: { documentType: "expense" }, codingSource: null, receivedAt: new Date(),
+        confidence: {}, provenance: null, fileId: "f1", filename: "a.pdf", template: { code: "invoice" },
+      }),
+      update: vi.fn(async () => { order.push("review committed"); return { id: "d1", filename: "a.pdf", status: "reviewed", receivedAt: new Date(), reviewedData: { vendor: "Acme" }, confidence: {} } }),
+    }
+    db.documentAuditEvent = { create: vi.fn() }
+    db.webhookEndpoint = { findMany: vi.fn().mockResolvedValue([]) }
+    db.webhookDelivery = { createMany: vi.fn() }
+    db.integrationConnection = { findFirst: vi.fn().mockResolvedValue(null) }
+    db.$transaction = vi.fn((fn: (tx: unknown) => unknown) => fn(db))
+    vi.mocked(refreshLineCodingChecks).mockImplementation(async () => { order.push("refreshed") })
+    await updateDocumentReview({ workspaceId: "w1", documentId: "d1", reviewedData: { vendor: "Acme" }, actorId: "u1" })
+    expect(refreshLineCodingChecks).toHaveBeenCalledWith("w1", "d1")
+    expect(order).toEqual(["review committed", "refreshed"])
   })
 })
 
@@ -562,18 +590,61 @@ describe("stageWhereClause null-safety regression", () => {
 // cover only the orchestration: no connection → null, legacy documents route through
 // CategoryAccountMapping, current documents route through the supplier-rule/Default chain.
 describe("resolveDocumentCodingItems", () => {
+  type ResolveInput = Parameters<typeof resolveDocumentCodingItems>[0]
+  // The account part of each row — the pre-ADR-0014 assertions below read only that.
+  const resolveItems = async (input: ResolveInput) => (await resolveDocumentCodingItems(input))?.items.map(({ account_external_id, account_source, account_archived_fallback }) => ({ account_external_id, account_source, account_archived_fallback })) ?? null
+  const account = (externalId: string, defaultTaxCode: string | null = null) => ({ entityType: "account", externalId, parentExternalId: null, forPurchases: null, defaultTaxCode })
   beforeEach(() => {
     db.integrationConnection = { findFirst: vi.fn() }
     db.supplierAccountRule = { findFirst: vi.fn() }
-    // Default: whatever account id is asked about comes back active, so the pre-existing tests
-    // below (written before the #429 archived-account fallback) keep exercising the ordinary
-    // supplier-rule/Default chain, not the fallback path. The fallback has its own describe block.
-    db.accountingEntity = { findMany: vi.fn((args: { where: { externalId: { in: string[] } } }) => Promise.resolve(args.where.externalId.in.map((externalId: string) => ({ externalId })))) }
+    // Default: the accounts the tests below name are active, so the pre-existing tests (written
+    // before the #429 archived-account fallback) keep exercising the ordinary supplier-rule/Default
+    // chain, not the fallback path. The fallback has its own describe block.
+    db.accountingEntity = { findMany: vi.fn().mockResolvedValue([account("default_1"), account("acme_usual")]) }
+  })
+
+  describe("coding set (ADR 0014)", () => {
+    const connection = { id: "conn1", createdAt: new Date("2026-01-01"), defaultExpenseAccountId: "default_1", defaultExpenseAccountGuessed: false, ledgerCapabilities: { vat: true, tracking: [{ id: "region", name: "Region" }], location: true, customer: true, billable: true } }
+    const references = [
+      account("default_1", "EXEMPT"), account("acme_usual", "EXEMPT"),
+      { entityType: "tax_rate", externalId: "INPUT", parentExternalId: null, forPurchases: true, defaultTaxCode: null },
+      { entityType: "tax_rate", externalId: "OUTPUT", parentExternalId: null, forPurchases: false, defaultTaxCode: null },
+      { entityType: "tax_rate", externalId: "EXEMPT", parentExternalId: null, forPurchases: true, defaultTaxCode: null },
+      { entityType: "tracking_option", externalId: "north", parentExternalId: "region", forPurchases: null, defaultTaxCode: null },
+      { entityType: "location", externalId: "loc1", parentExternalId: null, forPurchases: null, defaultTaxCode: null },
+    ]
+    const input: ResolveInput = {
+      workspaceId: "w1", vendorName: "Acme", category: null, codingSource: "ai", codedAt: new Date("2026-06-15"), lineCount: 2,
+      priorCoding: { items: [{ tax_code: "ZERO", tax_code_source: "manual", customer: "cust1", billable: true }] },
+      amounts: { lines: [40, 60], subtotal: 100, taxTotal: 15, total: 115, currency: "ZAR" },
+    }
+
+    it("pre-fills the supplier's Tax code, Tracking and Location, keeps a manual value, infers the basis", async () => {
+      db.integrationConnection.findFirst.mockResolvedValue(connection)
+      db.supplierAccountRule.findFirst.mockResolvedValue({ accountExternalId: "acme_usual", taxCodeExternalId: "INPUT", tracking: [{ categoryId: "region", optionId: "north" }], locationExternalId: "loc1" })
+      db.accountingEntity.findMany.mockResolvedValue(references)
+      const result = await resolveDocumentCodingItems(input)
+      expect(db.accountingEntity.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ workspaceId: "w1", connectionId: "conn1", active: true }) }))
+      expect(result?.items).toEqual([
+        { account_external_id: "acme_usual", account_source: "supplier", tax_code: "ZERO", tax_code_source: "manual", tracking: [{ category_id: "region", option_id: "north" }], customer: "cust1", billable: true },
+        { account_external_id: "acme_usual", account_source: "supplier", tax_code: "INPUT", tax_code_source: "supplier", tracking: [{ category_id: "region", option_id: "north" }], customer: null, billable: false },
+      ])
+      expect(result?.bill).toEqual({ location: "loc1", location_source: "supplier", tax_basis: "exclusive", tax_basis_source: "inferred" })
+    })
+
+    it("with no rule, lines take the Account's default Tax code and nothing else", async () => {
+      db.integrationConnection.findFirst.mockResolvedValue(connection)
+      db.supplierAccountRule.findFirst.mockResolvedValue(null)
+      db.accountingEntity.findMany.mockResolvedValue(references)
+      const result = await resolveDocumentCodingItems({ ...input, priorCoding: {} })
+      expect(result?.items[1]).toMatchObject({ account_external_id: "default_1", tax_code: "EXEMPT", tax_code_source: "account_default", tracking: [] })
+      expect(result?.bill.location).toBeNull()
+    })
   })
 
   it("resolves nothing when the workspace has no connected accounting connection", async () => {
     db.integrationConnection.findFirst.mockResolvedValue(null)
-    const items = await resolveDocumentCodingItems({
+    const items = await resolveItems({
       workspaceId: "w1", vendorName: "Acme", category: "software", codingSource: null, codedAt: new Date("2026-01-01"), lineCount: 2,
     })
     expect(items).toBeNull()
@@ -583,7 +654,7 @@ describe("resolveDocumentCodingItems", () => {
     db.integrationConnection.findFirst.mockResolvedValue({
       id: "conn1", createdAt: new Date("2026-06-01"), defaultExpenseAccountId: "default_1", defaultExpenseAccountGuessed: false,
     })
-    const items = await resolveDocumentCodingItems({
+    const items = await resolveItems({
       workspaceId: "w1", vendorName: "Acme", category: "software", codingSource: "ai", codedAt: new Date("2026-01-01"), lineCount: 2,
     })
     expect(db.supplierAccountRule.findFirst).not.toHaveBeenCalled()
@@ -598,7 +669,7 @@ describe("resolveDocumentCodingItems", () => {
       id: "conn1", createdAt: new Date("2026-01-01"), defaultExpenseAccountId: "default_1", defaultExpenseAccountGuessed: true,
     })
     db.supplierAccountRule.findFirst.mockResolvedValue({ accountExternalId: "acme_usual" })
-    const items = await resolveDocumentCodingItems({
+    const items = await resolveItems({
       workspaceId: "w1", vendorName: "Acme Holdings", category: null, codingSource: "ai", codedAt: new Date("2026-06-15"), lineCount: 1,
     })
     expect(items).toEqual([{ account_external_id: "acme_usual", account_source: "supplier" }])
@@ -609,7 +680,7 @@ describe("resolveDocumentCodingItems", () => {
       id: "conn1", createdAt: new Date("2026-01-01"), defaultExpenseAccountId: "default_1", defaultExpenseAccountGuessed: true,
     })
     db.supplierAccountRule.findFirst.mockResolvedValue(null)
-    const items = await resolveDocumentCodingItems({
+    const items = await resolveItems({
       workspaceId: "w1", vendorName: "New Vendor", category: null, codingSource: "ai", codedAt: new Date("2026-06-15"), lineCount: 1,
     })
     expect(items).toEqual([{ account_external_id: "default_1", account_source: "default_guessed" }])
@@ -620,7 +691,7 @@ describe("resolveDocumentCodingItems", () => {
       id: "conn1", createdAt: new Date("2026-01-01"), defaultExpenseAccountId: "default_1", defaultExpenseAccountGuessed: true,
     })
     db.supplierAccountRule.findFirst.mockResolvedValue(null)
-    const items = await resolveDocumentCodingItems({
+    const items = await resolveItems({
       workspaceId: "w1", vendorName: null, category: null, codingSource: "ai", codedAt: new Date("2026-06-15"), lineCount: 0,
     })
     expect(items).toHaveLength(1)
@@ -632,8 +703,8 @@ describe("resolveDocumentCodingItems", () => {
         id: "conn1", createdAt: new Date("2026-01-01"), defaultExpenseAccountId: "default_1", defaultExpenseAccountGuessed: false,
       })
       db.supplierAccountRule.findFirst.mockResolvedValue({ accountExternalId: "acme_usual" })
-      db.accountingEntity.findMany.mockResolvedValue([{ externalId: "default_1" }]) // acme_usual not active
-      const items = await resolveDocumentCodingItems({
+      db.accountingEntity.findMany.mockResolvedValue([account("default_1")]) // acme_usual not active
+      const items = await resolveItems({
         workspaceId: "w1", vendorName: "Acme", category: null, codingSource: "ai", codedAt: new Date("2026-06-15"), lineCount: 1,
       })
       expect(items).toEqual([{ account_external_id: "default_1", account_source: "default_confirmed", account_archived_fallback: true }])
@@ -645,7 +716,7 @@ describe("resolveDocumentCodingItems", () => {
       })
       db.supplierAccountRule.findFirst.mockResolvedValue(null)
       db.accountingEntity.findMany.mockResolvedValue([]) // default_1 not active
-      const items = await resolveDocumentCodingItems({
+      const items = await resolveItems({
         workspaceId: "w1", vendorName: "New Vendor", category: null, codingSource: "ai", codedAt: new Date("2026-06-15"), lineCount: 1,
       })
       expect(items).toEqual([{ account_external_id: null, account_source: null }])
@@ -709,9 +780,28 @@ describe("learnSupplierAccountRuleFromApproval", () => {
     await learnSupplierAccountRuleFromApproval("w1", "doc1")
     expect(db.supplierAccountRule.upsert).toHaveBeenCalledWith({
       where: { connectionId_supplierName: { connectionId: "conn1", supplierName: "acme" } },
-      create: { workspaceId: "w1", connectionId: "conn1", supplierName: "acme", accountExternalId: "big_acct", lastUsedAt: expect.any(Date) },
-      update: { accountExternalId: "big_acct", lastUsedAt: expect.any(Date) },
+      create: { workspaceId: "w1", connectionId: "conn1", supplierName: "acme", accountExternalId: "big_acct", taxCodeExternalId: null, tracking: [], locationExternalId: null, lastUsedAt: expect.any(Date) },
+      update: { accountExternalId: "big_acct", taxCodeExternalId: null, tracking: [], locationExternalId: null, lastUsedAt: expect.any(Date) },
     })
+  })
+
+  it("learns the largest line's Tax code and Tracking and the bill's Location — never Customer or Billable", async () => {
+    const { learnSupplierAccountRuleFromApproval } = await import("@/models/documents")
+    db.document.findFirst.mockResolvedValue({
+      reviewedData: { vendor: "Acme", line_items: [{ amount: 90 }] },
+      codingData: {
+        location: "loc1",
+        items: [{ account_external_id: "acct", account_source: "supplier", tax_code: "INPUT", tax_code_source: "manual", tracking: [{ category_id: "region", option_id: "north" }], customer: "cust1", billable: true }],
+      },
+    })
+    db.integrationConnection.findFirst.mockResolvedValue({ id: "conn1" })
+    // Same Account, different Tax code: the row updates but no correction is offered.
+    db.supplierAccountRule.findUnique.mockResolvedValueOnce({ accountExternalId: "acct" })
+    await expect(learnSupplierAccountRuleFromApproval("w1", "doc1")).resolves.toBeNull()
+    const set = { accountExternalId: "acct", taxCodeExternalId: "INPUT", tracking: [{ categoryId: "region", optionId: "north" }], locationExternalId: "loc1" }
+    const call = db.supplierAccountRule.upsert.mock.calls[0][0]
+    expect(call.update).toEqual({ ...set, lastUsedAt: expect.any(Date) })
+    expect(call.create).toEqual({ workspaceId: "w1", connectionId: "conn1", supplierName: "acme", ...set, lastUsedAt: expect.any(Date) })
   })
 
   it("returns the old→new change when it retargets an existing rule, and null on a first-time create", async () => {

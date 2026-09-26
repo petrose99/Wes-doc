@@ -31,6 +31,32 @@ const receiptDocument = (reviewedData: Record<string, unknown>) => ({
   id: "d1", templateId: "t1", reviewedData, template: { code: "receipt" },
 })
 
+describe("refreshLineCodingChecks", () => {
+  it("persists a firing line-coding code as fail and flips the rest back to pass", async () => {
+    const { refreshLineCodingChecks } = await import("@/models/document-checks")
+    db.document = { findFirst: vi.fn().mockResolvedValue({ id: "d1", codingData: { tax_basis: "none", items: [{ account_external_id: "a", tax_code: null, tracking: [] }] }, reviewedData: { line_items: [{ amount: 10 }] } }) }
+    db.integrationConnection = { findFirst: vi.fn().mockResolvedValue({ id: "c1", provider: "xero", ledgerCapabilities: { vat: true, tracking: [], location: false, customer: false, billable: false } }) }
+    db.accountingEntity = { findMany: vi.fn().mockResolvedValue([]) }
+    db.documentCheckResult = { upsert: vi.fn(), updateMany: vi.fn() }
+    await refreshLineCodingChecks("ws1", "d1")
+    expect(db.documentCheckResult.upsert).toHaveBeenCalledWith(expect.objectContaining({ create: expect.objectContaining({ checkCode: "tax_code_missing", status: "fail" }) }))
+    const cleared = db.documentCheckResult.updateMany.mock.calls[0][0]
+    expect(cleared.data).toEqual({ status: "pass" })
+    expect(cleared.where.checkCode.in).not.toContain("tax_code_missing")
+    expect(cleared.where.checkCode.in).toContain("tax_basis_unclear")
+    // Same connection the coding and autopublish pick (oldest connected), never an unordered one.
+    expect(db.integrationConnection.findFirst).toHaveBeenCalledWith(expect.objectContaining({ orderBy: { createdAt: "asc" } }))
+  })
+
+  it("does nothing before the ledger's capabilities are read", async () => {
+    const { refreshLineCodingChecks } = await import("@/models/document-checks")
+    db.document = { findFirst: vi.fn().mockResolvedValue({ id: "d1", codingData: { items: [{ tax_code: null }] }, reviewedData: {} }) }
+    db.integrationConnection = { findFirst: vi.fn().mockResolvedValue({ id: "c1", provider: "xero", ledgerCapabilities: null }) }
+    await refreshLineCodingChecks("ws1", "d1")
+    expect(db.documentCheckResult.upsert).not.toHaveBeenCalled()
+  })
+})
+
 describe("runDeterministicChecks", () => {
   it("does nothing for a template with no check field map", async () => {
     db.document = { findFirst: vi.fn().mockResolvedValue({ id: "d1", templateId: "t1", reviewedData: {}, template: { code: "generic" } }), findMany: vi.fn() }

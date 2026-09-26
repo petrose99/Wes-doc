@@ -27,17 +27,18 @@ export async function listExpenseAccounts(tenantId: string, connectionId: string
   return (result.Accounts ?? []).map((a) => ({ code: a.Code, name: a.Name }))
 }
 
-export type XeroSyncedAccount = { code: string; name: string; active: boolean; accountClass: string }
+export type XeroSyncedAccount = { code: string; name: string; active: boolean; accountClass: string; taxType: string | null }
 export type XeroSyncedContact = { id: string; name: string; active: boolean }
-export type XeroSyncedTaxRate = { name: string; active: boolean }
+/** `taxType` is the rate's stable key — what a bill line's TaxType is set from. */
+export type XeroSyncedTaxRate = { taxType: string; name: string; percent: number; canApplyToExpenses: boolean; active: boolean }
 
 /** All accounts (any class, any status) for WP1.5's chart-of-accounts sync — Xero has no
  * server-side pagination for /Accounts (unlike /Contacts), so this is a single request.
  * `accountClass` rides along so #429's Default-account guess can tell an EXPENSE account from any
  * other kind without a second round-trip. */
 export async function listAccounts(tenantId: string, connectionId: string): Promise<XeroSyncedAccount[]> {
-  const result = await apiRequest<{ Accounts?: Array<{ Code?: string; Name: string; Status: string; Class: string }> }>(tenantId, connectionId, "/Accounts")
-  return (result.Accounts ?? []).filter((a) => a.Code).map((a) => ({ code: a.Code as string, name: a.Name, active: a.Status === "ACTIVE", accountClass: a.Class }))
+  const result = await apiRequest<{ Accounts?: Array<{ Code?: string; Name: string; Status: string; Class: string; TaxType?: string }> }>(tenantId, connectionId, "/Accounts")
+  return (result.Accounts ?? []).filter((a) => a.Code).map((a) => ({ code: a.Code as string, name: a.Name, active: a.Status === "ACTIVE", accountClass: a.Class, taxType: a.TaxType ?? null }))
 }
 
 /** Every contact flagged as a supplier. /Contacts pages at 100 rows via the `page` query param;
@@ -57,8 +58,8 @@ export async function listContacts(tenantId: string, connectionId: string): Prom
 }
 
 export async function listTaxRates(tenantId: string, connectionId: string): Promise<XeroSyncedTaxRate[]> {
-  const result = await apiRequest<{ TaxRates?: Array<{ Name: string; Status: string }> }>(tenantId, connectionId, "/TaxRates")
-  return (result.TaxRates ?? []).map((rate) => ({ name: rate.Name, active: rate.Status === "ACTIVE" }))
+  const result = await apiRequest<{ TaxRates?: Array<{ Name: string; TaxType: string; Status: string; EffectiveRate?: number; CanApplyToExpenses?: boolean }> }>(tenantId, connectionId, "/TaxRates")
+  return (result.TaxRates ?? []).map((rate) => ({ taxType: rate.TaxType, name: rate.Name, percent: rate.EffectiveRate ?? 0, canApplyToExpenses: rate.CanApplyToExpenses === true, active: rate.Status === "ACTIVE" }))
 }
 
 /** Finds a contact by exact Name, or creates one. No fuzzy dedup, per scope. */
@@ -85,15 +86,18 @@ export async function findBillByInvoiceNumber(tenantId: string, connectionId: st
 }
 
 /** Creates the bill (an ACCPAY invoice). `body` is the exact shape from
- * lib/integrations/xero/bill-mapper.ts. */
-export async function createBill(tenantId: string, connectionId: string, body: unknown, idempotencyKey?: string | null): Promise<{ id: string }> {
-  const created = await apiRequest<{ Invoices: Array<{ InvoiceID: string }> }>(tenantId, connectionId, "/Invoices", {
+ * lib/integrations/xero/bill-mapper.ts. ADR 0014: returns the VAT, total and warnings Xero sent
+ * back so the push can compare them with the invoice. */
+export async function createBill(tenantId: string, connectionId: string, body: unknown, idempotencyKey?: string | null): Promise<{ id: string; totalTax: number | null; total: number | null; warnings: string[] }> {
+  const created = await apiRequest<{ Invoices: Array<{ InvoiceID: string; TotalTax?: number; Total?: number; Warnings?: Array<{ Message?: string }> }> }>(tenantId, connectionId, "/Invoices", {
     method: "POST",
     body: JSON.stringify(body),
     // A7.2: Xero dedupes on this for 24h — a retry after a timeout can't double-create the bill.
     ...(idempotencyKey ? { headers: { "Idempotency-Key": idempotencyKey } } : {}),
   })
-  return { id: created.Invoices[0].InvoiceID }
+  const invoice = created.Invoices[0]
+  const warnings = (invoice.Warnings ?? []).flatMap((w) => (w.Message ? [w.Message] : []))
+  return { id: invoice.InvoiceID, totalTax: invoice.TotalTax ?? null, total: invoice.Total ?? null, warnings }
 }
 
 /** Voids a bill (an ACCPAY invoice) — Xero has no separate delete endpoint for invoices, only a
@@ -126,6 +130,21 @@ export async function getBaseCurrency(tenantId: string, connectionId: string): P
   const code = result.Organisations?.[0]?.BaseCurrency
   if (!code) throw new Error("ledger_currency_missing")
   return code
+}
+
+export type XeroTrackingCategory = { id: string; name: string; status: string; options: Array<{ id: string; name: string; status: string }> }
+
+/** Every tracking category with its options, archived ones included, in Xero's own order — the
+ * ledger capabilities keep the first two ACTIVE ones (Xero allows two on a line). */
+export async function listTrackingCategories(tenantId: string, connectionId: string): Promise<XeroTrackingCategory[]> {
+  type Wire = { TrackingCategoryID: string; Name: string; Status: string; Options?: Array<{ TrackingOptionID: string; Name: string; Status: string }> }
+  const result = await apiRequest<{ TrackingCategories?: Wire[] }>(tenantId, connectionId, "/TrackingCategories?includeArchived=true")
+  return (result.TrackingCategories ?? []).map((c) => ({
+    id: c.TrackingCategoryID,
+    name: c.Name,
+    status: c.Status,
+    options: (c.Options ?? []).map((o) => ({ id: o.TrackingOptionID, name: o.Name, status: o.Status })),
+  }))
 }
 
 /** The full invoice row this correction path needs: Status/AmountPaid to tell paid from unpaid,

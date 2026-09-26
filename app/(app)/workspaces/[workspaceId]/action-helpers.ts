@@ -3,6 +3,7 @@
 // workspace-actions.ts need them. Extracting them here is the only way to share them.
 import { requireWorkspaceRole } from "@/models/workspaces"
 import { revalidatePath } from "next/cache"
+import { LINE_CODING_FALLBACK_TEXT } from "@/lib/checks/line-coding"
 
 /** `documents` is only the detail-page prefix — there is no document list page; the sheet is
  * the view of that data, so document mutations revalidate the file's `sheet`. */
@@ -83,6 +84,14 @@ const BILLING_MESSAGES: Record<string, string> = {
   // provider and both currencies by name.
   ledger_currency_differs: "Your ledger keeps its books in a different currency from this company.",
   ledger_currency_unreadable: "Couldn't read your ledger's currency yet. It's checked again before each bill is posted.",
+  // lib/integrations/ledger-capabilities.ts: the ledger didn't say whether VAT is on, so nothing is
+  // posted until it does.
+  ledger_capabilities_unreadable: "Couldn't read your ledger's VAT and tracking settings yet. Nothing is posted until they can be read; it tries again shortly.",
+  // Line coding Checks (lib/checks/line-coding.ts) as push errors; the review task itself names
+  // the ledger, the category and the option — this fallback only has the code, so its wording is
+  // LINE_CODING_FALLBACK_TEXT, not a re-typed copy (a past copy-paste let the two drift).
+  ...LINE_CODING_FALLBACK_TEXT,
+  quickbooks_feature_not_supported: "QuickBooks turned down a field this plan doesn't offer. Sync accounts, then check the bill.",
 }
 
 export const errorMessage = (error: unknown, fallback: string) => {

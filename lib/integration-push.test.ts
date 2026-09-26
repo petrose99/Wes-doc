@@ -13,17 +13,20 @@ vi.mock("@/lib/integration-preflight", () => ({ preflightPush: vi.fn().mockRetur
 vi.mock("@/models/review-tasks", () => ({ createReviewTask: vi.fn().mockResolvedValue(undefined) }))
 vi.mock("@/lib/integrations/quickbooks/client", () => ({
   findOrCreateVendor: vi.fn().mockResolvedValue("vendor-1"),
-  createBill: vi.fn().mockResolvedValue({ id: "bill-1" }),
+  createBill: vi.fn().mockResolvedValue({ id: "bill-1", totalTax: null, total: null, warnings: [] }),
   findBillByDocNumber: vi.fn().mockResolvedValue(false),
 }))
 vi.mock("@/lib/integrations/quickbooks/bill-mapper", () => ({ toQuickBooksBillBody: vi.fn().mockReturnValue({}) }))
 vi.mock("@/lib/integrations/xero/client", () => ({
   findOrCreateContact: vi.fn().mockResolvedValue("contact-1"),
-  createBill: vi.fn().mockResolvedValue({ id: "bill-1" }),
+  createBill: vi.fn().mockResolvedValue({ id: "bill-1", totalTax: null, total: null, warnings: [] }),
   findBillByInvoiceNumber: vi.fn().mockResolvedValue(false),
 }))
 vi.mock("@/lib/integrations/xero/bill-mapper", () => ({ toXeroBillBody: vi.fn().mockReturnValue({}) }))
 vi.mock("@/lib/integrations/ledger-currency", () => ({ LEDGER_CURRENCY_REUSE_MS: 60_000, readLedgerCurrency: vi.fn().mockResolvedValue("USD") }))
+vi.mock("@/lib/integrations/ledger-capabilities", () => ({ LEDGER_CAPABILITIES_REUSE_MS: 86_400_000, readLedgerCapabilities: vi.fn() }))
+vi.mock("@/models/accounting-entities", () => ({ loadLineCodingContext: vi.fn() }))
+vi.mock("@/models/document-checks", () => ({ recordLedgerReadBack: vi.fn().mockResolvedValue(undefined) }))
 vi.mock("@/models/company-currency", () => ({ readCompanyCurrencyForPush: vi.fn().mockResolvedValue("USD"), recordCurrencyLock: vi.fn().mockResolvedValue(undefined) }))
 
 const { attemptIntegrationPush, getLedgerConnectionBandStatus } = await import("./integration-push")
@@ -32,7 +35,11 @@ const db = (await import("@/lib/db")) as unknown as { prisma: Record<string, any
 const quickbooks = (await import("./integrations/quickbooks/client")) as unknown as Record<string, any>
 const ledger = (await import("./integrations/ledger-currency")) as unknown as Record<string, any>
 const companyCurrency = (await import("@/models/company-currency")) as unknown as Record<string, any>
+const capabilities = (await import("./integrations/ledger-capabilities")) as unknown as Record<string, any>
+const entities = (await import("@/models/accounting-entities")) as unknown as Record<string, any>
+const { IntegrationPermanentError, IntegrationRetryableError } = await import("./integrations/errors")
 const reviewTasks = (await import("@/models/review-tasks")) as unknown as Record<string, any>
+const documentChecks = (await import("@/models/document-checks")) as unknown as Record<string, any>
 
 const now = new Date("2026-09-22T12:00:00.000Z")
 
@@ -195,6 +202,113 @@ describe("attemptIntegrationPush — ledger currency (ADR 0013)", () => {
     db.prisma = prisma
     await attemptIntegrationPush("push-1", now)
     expect(companyCurrency.recordCurrencyLock).toHaveBeenCalledWith("w1", "bank_statement", "quickbooks", now, prisma)
+  })
+})
+
+describe("attemptIntegrationPush — line coding (ADR 0014)", () => {
+  const caps = { vat: true, tracking: [], location: false, customer: true, billable: false }
+  const context = { provider: "quickbooks", capabilities: caps, references: { taxCodes: new Set(["TAX"]), trackingOptions: new Set(), locations: new Set() }, taxRates: {}, names: {} }
+  const coded = (line: Record<string, unknown> = {}) => makePush({
+    payload: {
+      ...makePush().payload, taxBasis: "exclusive", location: null, taxTotal: null,
+      lineItems: [{ amount: 100, taxCode: null, tracking: [], customer: null, billable: false, ...line }],
+    },
+  })
+
+  beforeEach(() => {
+    capabilities.readLedgerCapabilities.mockReset().mockResolvedValue(caps)
+    entities.loadLineCodingContext.mockReset().mockImplementation(async (_ws: string, _c: unknown, read: unknown) => ({ ...context, capabilities: read }))
+    quickbooks.createBill.mockReset().mockResolvedValue({ id: "bill-1", totalTax: null, total: null, warnings: [] })
+    reviewTasks.createReviewTask.mockClear()
+  })
+
+  it("refuses a bill whose lines the ledger can't take: terminal, one review task naming the Check, nothing posted", async () => {
+    const prisma = makePrisma(coded())
+    db.prisma = prisma
+    await attemptIntegrationPush("push-1", now)
+    expect(capabilities.readLedgerCapabilities).toHaveBeenCalledWith(expect.objectContaining({ id: "conn-1", workspaceId: "w1" }), now, 86_400_000)
+    const update = prisma.integrationPush.update.mock.calls[0][0]
+    expect(update.data.status).toBe("failed")
+    expect(update.data.errorCode).toBe("tax_code_missing")
+    expect(reviewTasks.createReviewTask).toHaveBeenCalledWith(expect.objectContaining({ reason: "push_preflight", detail: expect.stringMatching(/^tax_code_missing: /) }))
+    expect(quickbooks.createBill).not.toHaveBeenCalled()
+  })
+
+  it("posts a bill the ledger can take", async () => {
+    const prisma = makePrisma(coded({ taxCode: "TAX" }))
+    db.prisma = prisma
+    await attemptIntegrationPush("push-1", now)
+    expect(prisma.integrationPush.update.mock.calls[0][0].data).toMatchObject({ status: "succeeded" })
+  })
+
+  it("leaves the push pending when the ledger's settings can't be read, never posting it", async () => {
+    capabilities.readLedgerCapabilities.mockRejectedValueOnce(new IntegrationRetryableError("ledger_capabilities_unreadable"))
+    const prisma = makePrisma(coded({ taxCode: "TAX" }))
+    db.prisma = prisma
+    await attemptIntegrationPush("push-1", now)
+    const update = prisma.integrationPush.update.mock.calls[0][0]
+    expect(update.data.status).toBe("pending")
+    expect(update.data.errorCode).toBe("ledger_capabilities_unreadable")
+    expect(quickbooks.createBill).not.toHaveBeenCalled()
+  })
+
+  it("skips the gate for a snapshot taken before line coding existed", async () => {
+    const prisma = makePrisma(makePush())
+    db.prisma = prisma
+    await attemptIntegrationPush("push-1", now)
+    expect(capabilities.readLedgerCapabilities).not.toHaveBeenCalled()
+    expect(prisma.integrationPush.update.mock.calls[0][0].data).toMatchObject({ status: "succeeded" })
+  })
+
+  it("on a 5030, re-reads the ledger fresh and names the Check that now fails", async () => {
+    capabilities.readLedgerCapabilities.mockResolvedValueOnce(caps).mockResolvedValueOnce({ ...caps, vat: false })
+    quickbooks.createBill.mockRejectedValueOnce(new IntegrationPermanentError("quickbooks_feature_not_supported"))
+    const prisma = makePrisma(coded({ taxCode: "TAX" }))
+    db.prisma = prisma
+    await attemptIntegrationPush("push-1", now)
+    expect(capabilities.readLedgerCapabilities).toHaveBeenLastCalledWith(expect.anything(), now, 0)
+    expect(prisma.integrationPush.update.mock.calls[0][0].data.errorCode).toBe("vat_off_in_quickbooks")
+    expect(reviewTasks.createReviewTask).toHaveBeenCalledWith(expect.objectContaining({ detail: expect.stringMatching(/^vat_off_in_quickbooks: /) }))
+  })
+
+  it("on a 5030 the fresh read can't explain, fails terminal with a review task", async () => {
+    quickbooks.createBill.mockRejectedValueOnce(new IntegrationPermanentError("quickbooks_feature_not_supported"))
+    const prisma = makePrisma(coded({ taxCode: "TAX" }))
+    db.prisma = prisma
+    await attemptIntegrationPush("push-1", now)
+    const update = prisma.integrationPush.update.mock.calls[0][0]
+    expect(update.data.status).toBe("failed")
+    expect(update.data.errorCode).toBe("quickbooks_feature_not_supported")
+    expect(reviewTasks.createReviewTask).toHaveBeenCalledWith(expect.objectContaining({ detail: expect.stringMatching(/^quickbooks_feature_not_supported: /) }))
+  })
+})
+
+describe("attemptIntegrationPush — post read-back (ADR 0014)", () => {
+  const readBackPush = () => makePush({ payload: { ...makePush().payload, taxBasis: "exclusive", taxTotal: 20, lineItems: [] } })
+  // No coding context: the push gate has nothing to judge, so these cases reach the ledger.
+  beforeEach(() => { entities.loadLineCodingContext.mockReset() })
+
+  it("writes the ledger's warn Checks after the push is marked posted", async () => {
+    quickbooks.createBill.mockResolvedValueOnce({ id: "bill-1", totalTax: 19, total: 119, warnings: [] })
+    const prisma = makePrisma(readBackPush())
+    prisma.integrationPush.update.mockImplementation(async () => {
+      expect(documentChecks.recordLedgerReadBack).not.toHaveBeenCalled()
+      return {}
+    })
+    db.prisma = prisma
+    await attemptIntegrationPush("push-1", now)
+    expect(prisma.integrationPush.update.mock.calls[0][0].data).toMatchObject({ status: "succeeded" })
+    expect(documentChecks.recordLedgerReadBack).toHaveBeenCalledWith("w1", "d1", [expect.objectContaining({ checkCode: "ledger_vat_differs", status: "warn" })])
+  })
+
+  it("keeps the push posted when writing the read-back fails", async () => {
+    quickbooks.createBill.mockResolvedValueOnce({ id: "bill-1", totalTax: 19, total: 119, warnings: [] })
+    documentChecks.recordLedgerReadBack.mockRejectedValueOnce(new Error("db down"))
+    const prisma = makePrisma(readBackPush())
+    db.prisma = prisma
+    await expect(attemptIntegrationPush("push-1", now)).resolves.toBeUndefined()
+    expect(prisma.integrationPush.update).toHaveBeenCalledTimes(1)
+    expect(prisma.integrationPush.update.mock.calls[0][0].data).toMatchObject({ status: "succeeded" })
   })
 })
 

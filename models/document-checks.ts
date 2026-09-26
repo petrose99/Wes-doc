@@ -28,6 +28,8 @@ import type { CheckResult } from "@/lib/checks/types"
 import { checkVatNumber } from "@/lib/checks/vat-number"
 import { prisma } from "@/lib/db"
 import { createReviewTask } from "@/models/review-tasks"
+import { checkLineCoding, LINE_CODING_CHECK_CODES, lineCodingInputFromDocument } from "@/lib/checks/line-coding"
+import { loadLineCodingContext } from "@/models/accounting-entities"
 import { emitAccountsPayableEvent } from "@/lib/webhooks"
 import { kickWebhookDrain } from "@/lib/webhook-delivery"
 import { getTaxProfile } from "@/models/tax-profiles"
@@ -38,7 +40,7 @@ import { Prisma } from "@/prisma/client"
  * call): a wrong total or a knowingly-reingested file are not judgment calls, everything else
  * (a statement's own rounding, a rate mismatch, a plausible near-dupe) is worth a look, not a
  * block. "duplicate" is fail only for its exact-match branch — see runDeterministicChecks. */
-const FAIL_BY_DEFAULT = new Set(["invoice_arithmetic", "bank_detail_change"])
+const FAIL_BY_DEFAULT = new Set<string>(["invoice_arithmetic", "bank_detail_change", ...LINE_CODING_CHECK_CODES])
 
 function asNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null
@@ -200,9 +202,68 @@ export async function runDeterministicChecks(input: { workspaceId: string; docum
     }
 
     for (const result of results) await persistCheckResult(input.workspaceId, document.id, result)
+    await refreshLineCodingChecks(input.workspaceId, document.id)
   } catch (error) {
     console.error("[checks] failed to run deterministic checks:", error instanceof Error ? error.message : error)
   }
+}
+
+type LineCodingDocument = { id: string; codingData: unknown; reviewedData: unknown }
+
+/** ADR 0014: re-judges a document's coding against the ledger it would post to and persists the
+ * result — every firing code a fail, every earlier fail that no longer fires flipped to pass, so a
+ * fix clears the Check. Runs after extraction, after Save review, and after every Sync accounts
+ * (the connection variant). Never throws past the caller. */
+export async function refreshLineCodingChecks(workspaceId: string, documentId: string): Promise<void> {
+  try {
+    const [document, connection] = await Promise.all([
+      prisma.document.findFirst({ where: { id: documentId, workspaceId }, select: { id: true, codingData: true, reviewedData: true } }),
+      prisma.integrationConnection.findFirst({ where: { workspaceId, status: "connected" }, orderBy: { createdAt: "asc" }, select: { id: true, provider: true, ledgerCapabilities: true } }),
+    ])
+    if (document && connection) await persistLineCodingChecks(workspaceId, connection, [document])
+  } catch (error) {
+    console.error("[checks] line coding refresh failed:", error instanceof Error ? error.message : error)
+  }
+}
+
+/** The connection's reviewed, not-yet-posted documents, after a sync changed what the ledger takes. */
+export async function refreshLineCodingChecksForConnection(workspaceId: string, connectionId: string): Promise<void> {
+  try {
+    const connection = await prisma.integrationConnection.findFirst({ where: { id: connectionId, workspaceId }, select: { id: true, provider: true, ledgerCapabilities: true } })
+    if (!connection) return
+    const posted = await prisma.integrationPush.findMany({ where: { workspaceId, connectionId, status: "succeeded" }, select: { documentId: true } })
+    const documents = await prisma.document.findMany({
+      where: { workspaceId, status: "reviewed", id: { notIn: posted.map((push) => push.documentId) } },
+      select: { id: true, codingData: true, reviewedData: true },
+    })
+    await persistLineCodingChecks(workspaceId, connection, documents)
+  } catch (error) {
+    console.error("[checks] line coding refresh for connection failed:", error instanceof Error ? error.message : error)
+  }
+}
+
+type LineCodingConnection = { id: string; provider: string; ledgerCapabilities: Prisma.JsonValue | null }
+
+async function persistLineCodingChecks(workspaceId: string, connection: LineCodingConnection, documents: LineCodingDocument[]): Promise<void> {
+  const context = await loadLineCodingContext(workspaceId, connection)
+  if (!context) return
+  for (const document of documents) {
+    const input = lineCodingInputFromDocument(document)
+    if (!input) continue
+    const results = checkLineCoding({ ...context, ...input })
+    for (const result of results) await persistCheckResult(workspaceId, document.id, result)
+    const firing = new Set(results.map((result) => result.checkCode))
+    await prisma.documentCheckResult.updateMany({
+      where: { workspaceId, documentId: document.id, status: { not: "pass" }, checkCode: { in: LINE_CODING_CHECK_CODES.filter((code) => !firing.has(code)) } },
+      data: { status: "pass" },
+    })
+  }
+}
+
+/** ADR 0014: the post read-back's warn Checks (lib/checks/line-coding.ts ledgerReadBackChecks),
+ * written after the push is marked posted. */
+export async function recordLedgerReadBack(workspaceId: string, documentId: string, results: CheckResult[]): Promise<void> {
+  for (const result of results) await persistCheckResult(workspaceId, documentId, result)
 }
 
 async function persistCheckResult(workspaceId: string, documentId: string, result: CheckResult): Promise<void> {

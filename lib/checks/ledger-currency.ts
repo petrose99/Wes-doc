@@ -1,6 +1,6 @@
 import type { CheckResult } from "@/lib/checks/types"
 
-const PROVIDER_LABELS: Record<string, string> = { quickbooks: "QuickBooks", xero: "Xero", sage: "Sage" }
+export const PROVIDER_LABELS: Record<string, string> = { quickbooks: "QuickBooks", xero: "Xero", sage: "Sage" }
 
 export type LedgerCurrencyInput = { provider: string; ledgerCurrency: string; companyCurrency: string }
 

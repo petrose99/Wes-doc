@@ -70,6 +70,18 @@ describe("updateBillAccounts", () => {
     expect(body).toEqual({ LineItems: [{ Description: "Fuel", AccountCode: "NEW" }] })
   })
 
+  it("resends each line's TaxType and Tracking untouched when only the account changes (ADR 0014)", async () => {
+    const line = { Description: "Fuel", AccountCode: "OLD", TaxType: "INPUT2", Tracking: [{ Name: "Region", Option: "North" }] }
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(jsonResponse({ Invoices: [{ InvoiceID: "abc", Status: "AUTHORISED", AmountPaid: 0, Total: 100, LineItems: [line] }] }))
+      .mockResolvedValueOnce(jsonResponse({ Invoices: [{ InvoiceID: "abc" }] }))
+
+    await updateBillAccounts("tenant1", "token1", "abc", new Map([[0, "NEW"]]))
+
+    const body = JSON.parse((vi.mocked(fetch).mock.calls[1][1] as RequestInit).body as string)
+    expect(body).toEqual({ LineItems: [{ ...line, AccountCode: "NEW" }] })
+  })
+
   it("retries once, re-reading the invoice, on a permanent write failure", async () => {
     vi.mocked(fetch)
       .mockResolvedValueOnce(readResponse())

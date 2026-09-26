@@ -71,6 +71,9 @@ export const WORKSPACE_SCOPED_MODELS = new Set([
   "FieldCorrection",
   // Dext-parity WP1.5: chart-of-accounts/vendor/tax-rate sync.
   "AccountingEntity",
+  // #429 supplier usual-account rules; guarded from #458 on, when they started carrying the full
+  // coding set.
+  "SupplierAccountRule",
   // Data Health Phase B: bill/expense/bank-transaction ledger sync.
   "LedgerTransaction",
   // Dext-parity WP2.1/WP2.3: bank + supplier statement reconciliation.

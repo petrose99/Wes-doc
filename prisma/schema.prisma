@@ -620,7 +620,12 @@ model Document {
   /// "default_confirmed" (the connection Default, Owner-saved or post-confirmed), or "manual" (a
   /// person picked it in the Detail pane). Both are null for lines coded before this per-line
   /// resolution existed, or when no Default and no supplier rule matched.
-  codingData                              Json?                    @map("coding_data")
+  /// ADR 0014 (lib/finance/line-coding.ts): each item also carries `tax_code` + `tax_code_source`
+  /// ("supplier" | "account_default" | "manual" | null), `tracking` ([{category_id, option_id}],
+  /// ≤ 2), `customer` and `billable`; the bill carries `location` + `location_source` and
+  /// `tax_basis` ("inclusive" | "exclusive" | "none" | null) + `tax_basis_source` ("inferred" |
+  /// "manual"). Non-manual values are re-derived on every Save review.
+  codingData                             Json?                    @map("coding_data")
   /// Who produced codingData: "rule" (automation rule matched), "ai" (coding agent suggested),
   /// "manual" (a person set or confirmed it). Null for documents coded before this column existed.
   codingSource                            String?                  @map("coding_source")
@@ -1345,7 +1350,12 @@ model IntegrationConnection {
   /// failed. A push is refused while it differs from the Company currency (ADR 0013).
   ledgerCurrency               String?                  @map("ledger_currency")
   ledgerCurrencyReadAt         DateTime?                @map("ledger_currency_read_at")
-  createdById                  String?                  @map("created_by_id") @db.Uuid
+  /// What the ledger's plan and settings can take on a bill — VAT, Tracking, Location, Customer,
+  /// Billable (lib/integrations/ledger-capabilities.ts, ADR 0014). Read on connect and every sync;
+  /// null until read. A held value it can't take fails a blocking Check.
+  ledgerCapabilities           Json?                    @map("ledger_capabilities")
+  ledgerCapabilitiesReadAt     DateTime?                @map("ledger_capabilities_read_at")
+  createdById                 String?                  @map("created_by_id") @db.Uuid
   createdAt                    DateTime                 @default(now()) @map("created_at")
   updatedAt                    DateTime                 @updatedAt @map("updated_at")
   workspace                    Workspace                @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -2173,16 +2183,25 @@ model AccountingEntity {
   id           String                @id @default(uuid()) @db.Uuid
   workspaceId  String                @map("workspace_id") @db.Uuid
   connectionId String                @map("connection_id") @db.Uuid
-  /// "account" | "vendor" | "tax_rate"
-  entityType   String                @map("entity_type")
-  externalId   String                @map("external_id")
-  code         String?
-  name         String
-  active       Boolean               @default(true)
-  raw          Json?
-  syncedAt     DateTime              @map("synced_at")
-  workspace    Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  connection   IntegrationConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  /// "account" | "vendor" | "tax_rate" | "tracking_option" | "location" | "customer"
+  entityType       String                @map("entity_type")
+  externalId       String                @map("external_id")
+  code             String?
+  name             String
+  active           Boolean               @default(true)
+  raw              Json?
+  syncedAt         DateTime              @map("synced_at")
+  /// tracking_option only: the Tracking category (Xero) or "class" (QuickBooks) it belongs to.
+  parentExternalId String?               @map("parent_external_id")
+  parentName       String?               @map("parent_name")
+  /// tax_rate only: the purchase rate, and whether the code may be used on a bill at all — only
+  /// forPurchases codes are ever offered or pre-filled.
+  taxRatePercent   Decimal?              @map("tax_rate_percent") @db.Decimal(7, 4)
+  forPurchases     Boolean?              @map("for_purchases")
+  /// account only: the Tax code the ledger applies to this account by default.
+  defaultTaxCode   String?               @map("default_tax_code")
+  workspace        Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  connection       IntegrationConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
 
   @@unique([connectionId, entityType, externalId])
   @@index([workspaceId, entityType, name])
@@ -2220,6 +2239,11 @@ model SupplierAccountRule {
   connectionId      String                @map("connection_id") @db.Uuid
   supplierName      String                @map("supplier_name")
   accountExternalId String                @map("account_external_id")
+  /// #458 (ADR 0014): the rest of the usual set learned with the Account — never Customer or
+  /// Billable, which belong to one bill. `tracking` is [{ categoryId, optionId }].
+  taxCodeExternalId  String?              @map("tax_code_external_id")
+  tracking           Json?
+  locationExternalId String?              @map("location_external_id")
   lastUsedAt        DateTime              @map("last_used_at")
   createdAt         DateTime              @default(now()) @map("created_at")
   updatedAt         DateTime              @updatedAt @map("updated_at")

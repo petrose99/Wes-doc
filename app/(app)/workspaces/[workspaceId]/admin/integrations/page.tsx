@@ -7,6 +7,8 @@ import { getAdminContext } from "@/lib/admin/context"
 import { resolveAccountOptions } from "@/lib/automation/account-options"
 import config from "@/lib/config"
 import { formatUnresolvedAccountId } from "@/lib/finance/line-account-resolution"
+import { parseLedgerCapabilities } from "@/lib/integrations/ledger-capabilities"
+import { decimalToNumber } from "@/lib/money"
 import { WEBHOOK_EVENT_TYPES } from "@/lib/webhooks"
 import { getLastSyncedAt, listAccountingEntities, listAccountingEntitiesIncludingInactive } from "@/models/accounting-entities"
 import { listCategoryAccountMappings } from "@/models/category-account-mappings"
@@ -15,7 +17,7 @@ import { findAccountCorrectionReminders } from "@/models/documents"
 import { listWorkspaceApiKeys, listWorkspaceIntegrationConnections, listWorkspaceWebhookDeliveries, listWorkspaceWebhookEndpoints, resolveAccountNames } from "@/models/integrations"
 import { listLibraryFacets } from "@/models/library-facets"
 import { listSupplierAccountRules } from "@/models/supplier-account-rules"
-import type { SupplierAccountReminder } from "@/components/settings/supplier-accounts-table"
+import type { CodingLabel, SupplierAccountReminder } from "@/components/settings/supplier-accounts-table"
 
 export const dynamic = "force-dynamic"
 
@@ -53,20 +55,35 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ w
   const connectionsWithSync = await Promise.all(connections.map(async (connection) => ({ ...connection, lastSyncedAt: await getLastSyncedAt(workspaceId, connection.id) })))
 
   const activeConnection = connections.find((c) => c.status === "connected")
-  const [mappings, entities, facets, allAccountEntities, supplierRules] = activeConnection
+  const [mappings, entities, facets, allAccountEntities, supplierRules, taxCodes, trackingOptions, locations] = activeConnection
     ? await Promise.all([
         listCategoryAccountMappings(workspaceId, activeConnection.id),
         listAccountingEntities(workspaceId, "account"),
         listLibraryFacets(workspaceId),
-        listAccountingEntitiesIncludingInactive(workspaceId, "account"),
+        listAccountingEntitiesIncludingInactive(workspaceId, activeConnection.id, "account"),
         listSupplierAccountRules(workspaceId, activeConnection.id),
+        listAccountingEntitiesIncludingInactive(workspaceId, activeConnection.id, "tax_rate"),
+        listAccountingEntitiesIncludingInactive(workspaceId, activeConnection.id, "tracking_option"),
+        listAccountingEntitiesIncludingInactive(workspaceId, activeConnection.id, "location"),
       ])
-    : [[], [], null, [], []]
+    : [[], [], null, [], [], [], [], []]
   const accountOptions = resolveAccountOptions(entities.map((e) => ({ code: e.externalId ?? e.code, name: e.name })))
   const categories = facets ? facets.categories.map((c) => c.value) : []
   const accountLabels = Object.fromEntries(
     allAccountEntities.map((e) => [e.externalId, { label: e.code ? `${e.code} — ${e.name}` : e.name, archived: !e.active }])
   )
+
+  // #458 §6: the rest of each rule's set, named for the table's detail line — inactive included, so
+  // a code or option since archived in the ledger still reads by name ("no longer in …").
+  const capabilities = parseLedgerCapabilities(activeConnection?.ledgerCapabilities)
+  const codingLabels: Record<string, CodingLabel> = Object.fromEntries([
+    ...taxCodes.map((code) => {
+      const percent = decimalToNumber(code.taxRatePercent)
+      return [`tax:${code.externalId}`, { label: percent != null && !code.name.includes("%") ? `${code.name} (${percent}%)` : code.name, active: code.active }]
+    }),
+    ...trackingOptions.map((option) => [`track:${option.parentExternalId}:${option.externalId}`, { label: option.name, active: option.active, categoryName: option.parentName ?? undefined }]),
+    ...locations.map((location) => [`loc:${location.externalId}`, { label: location.name, active: location.active }]),
+  ])
 
   // #430 Screen 3 — one reminder per supplier still carrying posted/paid bills on an account other
   // than its rule's current one. Resolved to names here (server component, same pattern as
@@ -107,7 +124,7 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ w
         : <p className="text-sm text-slate-600">Connect a ledger to map categories to its accounts.</p>}
     </Panel>
 
-    <Panel title="Supplier accounts" note="Each supplier's usual account, learned from approved documents. Forget one to re-learn it fresh from the next approval.">
+    <Panel title="Supplier accounts" note="Each supplier's usual account, learned from approved documents.">
       {activeConnection
         ? <SupplierAccountsTable
             workspaceId={workspaceId}
@@ -118,6 +135,9 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ w
             providerLabel={PROVIDER_LABELS[activeConnection.provider] ?? activeConnection.provider}
             isOwner={owner}
             reminders={reminders}
+            codingLabels={codingLabels}
+            trackingCategories={capabilities?.tracking ?? []}
+            hasLocation={capabilities?.location ?? false}
           />
         : <p className="text-sm text-slate-600">{"Connect a ledger to see suppliers' usual accounts."}</p>}
     </Panel>

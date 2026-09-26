@@ -1,11 +1,17 @@
 import config from "@/lib/config"
 import { recordSystemAudit } from "@/lib/audit"
 import { prisma } from "@/lib/db"
+import type { Prisma } from "@/prisma/client"
 import { unscoped } from "@/lib/workspace-scope"
 import { NormalizedBill } from "@/lib/integration-bill-mapping"
 import { IntegrationAuthError, IntegrationPermanentError, IntegrationRetryableError, safeErrorCode } from "@/lib/integrations/errors"
 import { checkLedgerCurrency } from "@/lib/checks/ledger-currency"
 import { LEDGER_CURRENCY_REUSE_MS, readLedgerCurrency } from "@/lib/integrations/ledger-currency"
+import { checkLineCoding, ledgerReadBackChecks, lineCodingInputFromBill } from "@/lib/checks/line-coding"
+import type { CheckResult } from "@/lib/checks/types"
+import { recordLedgerReadBack } from "@/models/document-checks"
+import { LEDGER_CAPABILITIES_REUSE_MS, readLedgerCapabilities } from "@/lib/integrations/ledger-capabilities"
+import { loadLineCodingContext } from "@/models/accounting-entities"
 import { readCompanyCurrencyForPush, recordCurrencyLock } from "@/models/company-currency"
 import * as quickbooks from "@/lib/integrations/quickbooks/client"
 import { toQuickBooksBillBody } from "@/lib/integrations/quickbooks/bill-mapper"
@@ -47,7 +53,7 @@ export async function claimNextIntegrationPush(now = new Date()): Promise<string
  * throws: a lookup failure (network blip, transient provider error) must not block a push that
  * would otherwise succeed, so this swallows any error and reports "not a duplicate" rather than
  * risk false-blocking every push whenever the lookup itself is flaky. */
-async function ledgerHasDuplicate(provider: string, externalTenantId: string | null, connectionId: string, referenceNumber: string, direction: "payable" | "receivable" = "payable"): Promise<boolean> {
+async function ledgerHasDuplicate(provider: string, externalTenantId: string | null, connectionId: string, referenceNumber: string): Promise<boolean> {
   if (!externalTenantId) return false
   try {
     switch (provider) {
@@ -68,13 +74,15 @@ async function ledgerHasDuplicate(provider: string, externalTenantId: string | n
 // its own resolved accountExternalId (lib/integration-bill-mapping.ts's NormalizedLineItem), read
 // directly by the mapper. The caller still passes expenseAccountId through for the preflight cache
 // check below (does *a* resolved account exist in the synced chart at all).
-async function pushToQuickbooks(realmId: string, connectionId: string, bill: NormalizedBill, idempotencyKey: string | null): Promise<{ id: string }> {
+type CreatedBill = Awaited<ReturnType<typeof quickbooks.createBill>>
+
+async function pushToQuickbooks(realmId: string, connectionId: string, bill: NormalizedBill, idempotencyKey: string | null): Promise<CreatedBill> {
   const vendorRef = await quickbooks.findOrCreateVendor(realmId, connectionId, bill.vendorName)
   const body = toQuickBooksBillBody(bill, vendorRef)
   return quickbooks.createBill(realmId, connectionId, body, idempotencyKey)
 }
 
-async function pushToXero(tenantId: string, connectionId: string, bill: NormalizedBill, idempotencyKey: string | null): Promise<{ id: string }> {
+async function pushToXero(tenantId: string, connectionId: string, bill: NormalizedBill, idempotencyKey: string | null): Promise<CreatedBill> {
   const contactId = await xero.findOrCreateContact(tenantId, connectionId, bill.vendorName)
   const body = toXeroBillBody(bill, contactId)
   return xero.createBill(tenantId, connectionId, body, idempotencyKey)
@@ -124,6 +132,22 @@ async function gateLedgerCurrency(push: { workspaceId: string; documentId: strin
   if (check.status === "fail") await failPreflight(push, check.checkCode, String(check.detail?.text))
 }
 
+type GateConnection = { id: string; provider: string; externalTenantId: string | null; ledgerCapabilities: Prisma.JsonValue | null; ledgerCapabilitiesReadAt: Date | null }
+
+/** ADR 0014: nothing posts a line coding the ledger can't take — the same Check as the document's,
+ * run over the snapshot against the ledger's capabilities read now (a stored read up to a day old;
+ * `reuseMs` 0 after a 5030). An unreadable capability read throws retryable: never posted on a
+ * guess. A snapshot taken before line coding existed carries no taxBasis and is not judged. */
+async function gateLineCoding(push: { workspaceId: string; documentId: string }, connection: GateConnection, bill: NormalizedBill & { documentType?: string }, now: Date, reuseMs = LEDGER_CAPABILITIES_REUSE_MS): Promise<void> {
+  if (bill.documentType === "bank_statement" || bill.taxBasis === undefined) return
+  const capabilities = await readLedgerCapabilities({ ...connection, workspaceId: push.workspaceId }, now, reuseMs)
+  const context = await loadLineCodingContext(push.workspaceId, connection, capabilities)
+  const fail = context && checkLineCoding({ ...context, ...lineCodingInputFromBill(bill) })[0]
+  if (fail) await failPreflight(push, fail.checkCode, String(fail.detail?.text))
+}
+
+const QUICKBOOKS_FEATURE_NOT_SUPPORTED = "QuickBooks turned down a field this plan doesn't offer. Sync accounts, then check the bill."
+
 /** How often a paused push (connection `needs_reconnect`) is re-checked — a fixed poke interval,
  * not the exponential backoff curve, since nothing will succeed until a human reconnects. See the
  * `needs_reconnect` pre-check below. */
@@ -152,6 +176,7 @@ export async function attemptIntegrationPush(pushId: string, now = new Date()): 
         select: {
           id: true, provider: true, status: true, externalTenantId: true,
           defaultExpenseAccountId: true, ledgerCurrency: true, ledgerCurrencyReadAt: true,
+          ledgerCapabilities: true, ledgerCapabilitiesReadAt: true,
         },
       },
     },
@@ -175,13 +200,13 @@ export async function attemptIntegrationPush(pushId: string, now = new Date()): 
 
   let result: PushAttemptResult
   let forceTerminal = false
+  let readBack: CheckResult[] = []
 
   if (connection.status !== "connected") {
     result = { success: false, errorCode: "integration_connection_disabled", externalBillId: null }
     forceTerminal = true
   } else {
-    const payloadRaw = push.payload as unknown as NormalizedBill & { expenseAccountId?: string; direction?: "payable" | "receivable"; documentType?: string }
-    const direction = payloadRaw.direction ?? (payloadRaw.documentType === "sale" ? "receivable" : "payable")
+    const payloadRaw = push.payload as unknown as NormalizedBill & { expenseAccountId?: string; documentType?: string }
     const expenseAccountId = payloadRaw.expenseAccountId ?? connection.defaultExpenseAccountId
     if (!connection.externalTenantId || !expenseAccountId) {
       result = { success: false, errorCode: "integration_default_account_not_configured", externalBillId: null }
@@ -190,17 +215,23 @@ export async function attemptIntegrationPush(pushId: string, now = new Date()): 
       try {
         const bill = { ...payloadRaw, currencyCode: payloadRaw.currencyCode ?? null }
         await gateLedgerCurrency(push, connection, now)
+        await gateLineCoding(push, connection, bill, now)
         // A7.1: bill-shaped pushes are validated against the entity cache before any provider
         // call; bank-statement batches carry no vendor/expense-account pair to validate.
         if (payloadRaw.documentType !== "bank_statement") {
           await preflightAgainstCache(push, connection.id, expenseAccountId, bill.vendorName ?? null)
         }
-        const isDuplicate = bill.referenceNumber ? await ledgerHasDuplicate(connection.provider, connection.externalTenantId, connection.id, bill.referenceNumber, direction) : false
+        const isDuplicate = bill.referenceNumber ? await ledgerHasDuplicate(connection.provider, connection.externalTenantId, connection.id, bill.referenceNumber) : false
         if (isDuplicate) throw new IntegrationPermanentError("ledger_duplicate")
-        let created: { id: string }
+        let created: CreatedBill
         switch (connection.provider) {
           case "quickbooks":
-            created = await pushToQuickbooks(connection.externalTenantId, connection.id, bill, push.idempotencyKey)
+            created = await pushToQuickbooks(connection.externalTenantId, connection.id, bill, push.idempotencyKey).catch(async (error) => {
+              if (!(error instanceof IntegrationPermanentError) || error.code !== "quickbooks_feature_not_supported") throw error
+              // The plan turned down a field: a fresh read names the Check that explains it, when one does.
+              await gateLineCoding(push, connection, bill, now, 0).catch((gateError) => { if (gateError instanceof IntegrationPermanentError) throw gateError })
+              return failPreflight(push, error.code, QUICKBOOKS_FEATURE_NOT_SUPPORTED)
+            })
             break
           case "xero":
             created = await pushToXero(connection.externalTenantId, connection.id, bill, push.idempotencyKey)
@@ -209,6 +240,7 @@ export async function attemptIntegrationPush(pushId: string, now = new Date()): 
             throw new IntegrationPermanentError(`${connection.provider}_push_not_implemented`)
         }
         result = { success: true, errorCode: null, externalBillId: created.id }
+        readBack = ledgerReadBackChecks(connection.provider, bill, created)
       } catch (error) {
         if (error instanceof IntegrationAuthError) {
           // Nango's AUTH webhook is the authoritative signal (attemptIntegrationPush never expects
@@ -238,6 +270,13 @@ export async function attemptIntegrationPush(pushId: string, now = new Date()): 
   })
 
   if (result.success) {
+    // Written only once the push is marked posted, and never able to undo that: the bill is in the
+    // ledger, so a failed write here is logged rather than sending the push back to retry.
+    if (readBack.length) {
+      await recordLedgerReadBack(push.workspaceId, push.documentId, readBack).catch((error) => {
+        console.error("[integration-push] ledger read-back check write failed:", error instanceof Error ? error.message : error)
+      })
+    }
     await recordSystemAudit({
       workspaceId: push.workspaceId,
       type: "integration_push_succeeded",
