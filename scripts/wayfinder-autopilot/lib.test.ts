@@ -186,3 +186,46 @@ describe("frontier", () => {
     expect(sh("SKIP[35]=1; frontier | tr '\\n' ' '")).toBe("30 36")
   })
 })
+
+describe("lane_open", () => {
+  // #462: the spec session wrote its preflight to the scratch path the brief
+  // names (this checkout's logs dir); later sessions wrote captures, reader
+  // scores and close.md to the same relative path inside the lane — and the
+  // lane's removal at landing took them. The lane's logs dir is now a link to
+  // this checkout's, so either spelling lands in the folder that outlives it.
+  const git = (cwd: string, ...a: string[]) => execFileSync("git", a, { cwd, stdio: "pipe", encoding: "utf8" })
+  function repo() {
+    git(dir, "init", "-q", "-b", "main")
+    git(dir, "config", "user.email", "t@t")
+    git(dir, "config", "user.name", "t")
+    writeFileSync(path.join(dir, ".gitignore"), "docs/wayfinder-reports/*/logs/\ndocs/wayfinder-reports/*/logs\n")
+    git(dir, "add", ".")
+    git(dir, "commit", "-qm", "init")
+  }
+  const open = (n: number) =>
+    sh(`LANE_MODE=worktree BASE_BRANCH=main LANE_CLONES="" LANE_LINKS="" LOGS="$OUT/logs"; mkdir -p "$LOGS"; lane_open ${n}`)
+
+  it("links the lane's logs dir to this checkout's, so relative scratch writes outlive the lane", () => {
+    repo()
+    const wt = open(7)
+    expect(wt).toBe(path.join(dir, "lanes", `${MAP}-7`))
+    mkdirSync(path.join(wt, `docs/wayfinder-reports/${MAP}/logs/scratch-7`), { recursive: true })
+    writeFileSync(path.join(wt, `docs/wayfinder-reports/${MAP}/logs/scratch-7/close.md`), "x\n")
+    expect(git(wt, "status", "--porcelain")).toBe("")
+    git(dir, "worktree", "remove", "--force", wt)
+    expect(execFileSync("cat", [path.join(dir, `docs/wayfinder-reports/${MAP}/logs/scratch-7/close.md`)], { encoding: "utf8" })).toBe("x\n")
+  })
+
+  it("links an existing lane that predates the link on its next open", () => {
+    repo()
+    const wt = open(8)
+    execFileSync("rm", [path.join(wt, `docs/wayfinder-reports/${MAP}/logs`)])
+    open(8)
+    writeFileSync(path.join(wt, `docs/wayfinder-reports/${MAP}/logs/probe.txt`), "y")
+    expect(execFileSync("cat", [path.join(dir, `docs/wayfinder-reports/${MAP}/logs/probe.txt`)], { encoding: "utf8" })).toBe("y")
+  })
+
+  it("leaves this checkout alone outside lane mode", () => {
+    expect(sh(`LOGS="$OUT/logs"; lane_open 9`)).toBe(dir)
+  })
+})

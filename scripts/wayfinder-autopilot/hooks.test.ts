@@ -127,6 +127,21 @@ describe("token-guard: skills and routers", () => {
     expect(pre("Agent", { description: "critique the queue", prompt: "run critique" }, { WAYFINDER_PHASE: "measure" }).deny).toBeUndefined()
   })
 
+  it.each(["close", "build", "measure", "single"])("refuses a whole lessons read in the %s phase and allows the append path", (phase) => {
+    const env = { WAYFINDER_PHASE: phase }
+    const big = path.join(dir, "lessons.md")
+    writeFileSync(big, "- l\n".repeat(150))
+    expect(pre("Read", { file_path: big }, env).deny).toMatch(/LESSONS/)
+    expect(pre("Bash", { command: "cat scripts/wayfinder-autopilot/lessons.md" }, env).deny).toMatch(/LESSONS/)
+    expect(pre("Read", { file_path: big, offset: 130, limit: 20 }, env).deny).toBeUndefined()
+    for (const command of [
+      "wc -l scripts/wayfinder-autopilot/lessons.md",
+      "tail -n 20 .claude/wayfinder-autopilot/lessons.md",
+      'grep -n "capture" scripts/wayfinder-autopilot/lessons.md',
+      "cat >> scripts/wayfinder-autopilot/lessons.md <<'EOF'\n- [surface] x\nEOF",
+    ]) expect(pre("Bash", { command }, env).deny).toBeUndefined()
+  })
+
   it("refuses a whole lessons read in the spec phase", () => {
     expect(pre("Bash", { command: "cat scripts/wayfinder-autopilot/lessons.md" }, { WAYFINDER_PHASE: "spec" }).deny).toMatch(/LESSONS/)
     expect(pre("Bash", { command: "node scripts/wayfinder-autopilot/lessons.mjs --kind surface" }, { WAYFINDER_PHASE: "spec" }).deny).toBeUndefined()
