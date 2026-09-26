@@ -620,7 +620,12 @@ model Document {
   /// "default_confirmed" (the connection Default, Owner-saved or post-confirmed), or "manual" (a
   /// person picked it in the Detail pane). Both are null for lines coded before this per-line
   /// resolution existed, or when no Default and no supplier rule matched.
-  codingData                              Json?                    @map("coding_data")
+  /// ADR 0014 (lib/finance/line-coding.ts): each item also carries `tax_code` + `tax_code_source`
+  /// ("supplier" | "account_default" | "manual" | null), `tracking` ([{category_id, option_id}],
+  /// ≤ 2), `customer` and `billable`; the bill carries `location` + `location_source` and
+  /// `tax_basis` ("inclusive" | "exclusive" | "none" | null) + `tax_basis_source` ("inferred" |
+  /// "manual"). Non-manual values are re-derived on every Save review.
+  codingData                             Json?                    @map("coding_data")
   /// Who produced codingData: "rule" (automation rule matched), "ai" (coding agent suggested),
   /// "manual" (a person set or confirmed it). Null for documents coded before this column existed.
   codingSource                            String?                  @map("coding_source")
