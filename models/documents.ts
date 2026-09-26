@@ -475,10 +475,20 @@ export async function findBillsAffectedByAccountChange(workspaceId: string, conn
     if (!ledgerFact) continue
     if (doc.accountCorrectionDismissedAt && doc.accountCorrectionDismissedFromAccountId === oldAccountExternalId) continue
     const coding = (doc.codingData as Record<string, unknown> | null) ?? {}
-    const items = Array.isArray(coding.items) ? (coding.items as Array<{ account_external_id?: string | null }>) : []
+    const items = Array.isArray(coding.items) ? (coding.items as Array<{ account_external_id?: string | null; account_source?: string | null }>) : []
     const lines: AffectedBillLineChange[] = []
-    items.forEach((item, index) => { if (item.account_external_id === oldAccountExternalId) lines.push({ index, oldAccountExternalId }) })
-    if (!lines.length) continue
+    let matchedAnyLine = false
+    items.forEach((item, index) => {
+      if (item.account_external_id !== oldAccountExternalId) return
+      matchedAnyLine = true
+      // #459: an item line's account is the Item's own account, never a rule's/Default's — it is
+      // never retargeted this way, so it is excluded from `lines` (nothing to resend for it); the
+      // document still surfaces below rather than vanishing, since it IS affected by this old
+      // account somewhere on the bill — the caller (updateSelectedBillAccountsAction) refuses it as
+      // its own failed row when `lines` ends up empty.
+      if (item.account_source !== "item") lines.push({ index, oldAccountExternalId })
+    })
+    if (!matchedAnyLine) continue
     const reviewedData = (doc.reviewedData as Record<string, unknown> | null) ?? (doc.rawExtraction as Record<string, unknown> | null) ?? {}
     const vendorName = (typeof reviewedData.vendor === "string" && reviewedData.vendor) || (typeof reviewedData.merchant === "string" && reviewedData.merchant) || "Unknown supplier"
     const total = doc.baseCurrencyTotal !== null ? Number(doc.baseCurrencyTotal) : (typeof reviewedData.total === "number" ? reviewedData.total : 0)
@@ -523,10 +533,12 @@ export async function findAccountCorrectionReminders(workspaceId: string, connec
     const currentAccount = vendorName ? currentAccountBySupplier.get(vendorName) : undefined
     if (!currentAccount) continue
     const coding = (doc.codingData as Record<string, unknown> | null) ?? {}
-    const items = Array.isArray(coding.items) ? (coding.items as Array<{ account_external_id?: string | null }>) : []
+    const items = Array.isArray(coding.items) ? (coding.items as Array<{ account_external_id?: string | null; account_source?: string | null }>) : []
     for (const item of items) {
       const oldAccount = item.account_external_id
-      if (!oldAccount || oldAccount === currentAccount) continue
+      // #459: same guard as findBillsAffectedByAccountChange — an item line is never "affected" by
+      // a supplier rule's account retarget.
+      if (!oldAccount || oldAccount === currentAccount || item.account_source === "item") continue
       if (doc.accountCorrectionDismissedAt && doc.accountCorrectionDismissedFromAccountId === oldAccount) continue
       let bySupplier = docIdsBySupplierAndOldAccount.get(vendorName!)
       if (!bySupplier) { bySupplier = new Map(); docIdsBySupplierAndOldAccount.set(vendorName!, bySupplier) }
@@ -582,6 +594,24 @@ export async function recordAccountCorrectionApplied(workspaceId: string, docume
  * different new account per line. Called once, after the provider write has already succeeded, and
  * never writes a `SupplierAccountRule` — this path is scoped to the one bill (spec §Screen 2: "This
  * path never teaches the Supplier rule"). */
+/** #459's `item_lines_not_supported` action — "code to the item's account instead". The item's
+ * account is already sitting in `account_external_id` (step 2's resolution), so this only clears
+ * the item fields and marks the account a person's choice now, via the Check's action, never
+ * automatic. `account_external_id` itself is left untouched. Caller re-runs
+ * `refreshLineCodingChecks` after this so the Check clears immediately. */
+export async function setDocumentLineToAccount(workspaceId: string, documentId: string, lineIndex: number): Promise<void> {
+  const doc = await prisma.document.findFirst({ where: { id: documentId, workspaceId }, select: { codingData: true } })
+  if (!doc) return
+  const coding = (doc.codingData as Record<string, unknown> | null) ?? {}
+  const items = Array.isArray(coding.items) ? (coding.items as Array<Record<string, unknown>>) : []
+  if (!items[lineIndex]) return
+  const nextItems = items.map((item, index) => (index === lineIndex ? { ...item, item_external_id: null, item_source: null, account_source: "manual" } : item))
+  await prisma.document.update({
+    where: { id: documentId },
+    data: { codingData: { ...coding, items: nextItems } as Prisma.InputJsonValue },
+  })
+}
+
 export async function recordDocumentLineAccountsCorrected(workspaceId: string, documentId: string, changes: { index: number; newAccountExternalId: string }[]): Promise<void> {
   const doc = await prisma.document.findFirst({ where: { id: documentId, workspaceId }, select: { codingData: true } })
   if (!doc) return

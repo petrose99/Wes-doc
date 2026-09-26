@@ -25,6 +25,9 @@ export type NormalizedLineItem = {
   tracking: { categoryId: string; categoryName: string; optionId: string; optionName: string }[]
   customer: string | null
   billable: boolean
+  /** #459: the item this line resolved to (item-line-resolution.ts), carried on codingData.items
+   * per line same as accountExternalId — null for an ordinary account line. */
+  itemExternalId: string | null
 }
 
 export type NormalizedBill = {
@@ -67,11 +70,11 @@ function asCurrencyCode(value: unknown): string | null {
  * row never shifts a later row onto the wrong account. Optional: a document coded before #429, or
  * with no connection to resolve against, has no items array, so every line's accountExternalId is
  * null (bill-mapper.ts / xero's mapper refuse a post with a null account, per spec). */
-type CodingRow = { account_external_id: string | null } & Partial<LineCoding>
+type CodingRow = { account_external_id: string | null; item_external_id?: string | null } & Partial<LineCoding>
 
 function lineCoding(row: CodingRow | undefined, names: Record<string, string>) {
   const tracking = (row?.tracking ?? []).map((t) => ({ categoryId: t.category_id, categoryName: names[t.category_id] ?? t.category_id, optionId: t.option_id, optionName: names[`${t.category_id}:${t.option_id}`] ?? t.option_id }))
-  return { accountExternalId: row?.account_external_id ?? null, taxCode: row?.tax_code ?? null, tracking, customer: row?.customer ?? null, billable: row?.billable === true }
+  return { accountExternalId: row?.account_external_id ?? null, taxCode: row?.tax_code ?? null, tracking, customer: row?.customer ?? null, billable: row?.billable === true, itemExternalId: row?.item_external_id ?? null }
 }
 
 function normalizeLineItems(raw: unknown, total: number, lineAccounts: Array<CodingRow | undefined> | undefined, names: Record<string, string>): NormalizedLineItem[] {

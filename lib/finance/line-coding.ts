@@ -43,9 +43,13 @@ export type CodingReferences = {
   taxCodes: ReadonlySet<string>
   trackingOptions: ReadonlySet<string>
   locations: ReadonlySet<string>
+  /** #459: active items keyed by externalId, with the `trackedInventory` flag `item_quantity_needed`
+   * reads — inactive/vanished items are left out, same convention as taxCodes/locations, so "not in
+   * this map" alone tells `item_not_in_ledger` apart from "in the ledger but inactive". */
+  items: ReadonlyMap<string, { trackedInventory: boolean }>
 }
 
-type ReferenceRow = { entityType: string; externalId: string; parentExternalId: string | null; forPurchases: boolean | null; active?: boolean }
+type ReferenceRow = { entityType: string; externalId: string; parentExternalId: string | null; forPurchases: boolean | null; active?: boolean; trackedInventory?: boolean | null }
 
 /** The ledger's synced AccountingEntity rows as the references a bill can use now — inactive rows
  * (kept for their names) are left out. */
@@ -55,6 +59,7 @@ export function codingReferencesFrom(entities: ReferenceRow[]): CodingReferences
     taxCodes: new Set(active("tax_rate").filter((code) => code.forPurchases === true).map((code) => code.externalId)),
     trackingOptions: new Set(active("tracking_option").map((option) => `${option.parentExternalId}:${option.externalId}`)),
     locations: new Set(active("location").map((location) => location.externalId)),
+    items: new Map(active("item").map((item) => [item.externalId, { trackedInventory: item.trackedInventory === true }])),
   }
 }
 
