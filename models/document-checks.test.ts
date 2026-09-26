@@ -35,7 +35,7 @@ describe("refreshLineCodingChecks", () => {
   it("persists a firing line-coding code as fail and flips the rest back to pass", async () => {
     const { refreshLineCodingChecks } = await import("@/models/document-checks")
     db.document = { findFirst: vi.fn().mockResolvedValue({ id: "d1", codingData: { tax_basis: "none", items: [{ account_external_id: "a", tax_code: null, tracking: [] }] }, reviewedData: { line_items: [{ amount: 10 }] } }) }
-    db.integrationConnection = { findFirst: vi.fn().mockResolvedValue({ id: "c1", provider: "xero", ledgerCapabilities: { vat: true, tracking: [], location: false, customer: false, billable: false } }) }
+    db.integrationConnection = { findFirst: vi.fn().mockResolvedValue({ id: "c1", provider: "xero", ledgerCapabilities: { vat: true, tracking: [], location: false, customer: false, billable: false, itemLines: false } }) }
     db.accountingEntity = { findMany: vi.fn().mockResolvedValue([]) }
     db.documentCheckResult = { upsert: vi.fn(), updateMany: vi.fn() }
     await refreshLineCodingChecks("ws1", "d1")

@@ -24,7 +24,7 @@ vi.mock("@/lib/config", async (importOriginal) => {
   return { default: { ...actual.default, integrations: { ...(actual.default.integrations as object), enabled: true } } }
 })
 
-const { createDocumentFromBuffer, deleteWorkspaceDocuments, dismissAccountCorrectionForDocuments, documentDataForExport, documentHash, documentSourceFor, findAccountCorrectionReminders, findBillsAffectedByAccountChange, getBillAccountPickerData, isSupportedDocumentBuffer, listReadyToPushDocuments, recordAccountCorrectionApplied, resolveDocumentCodingItems, setDocumentPaymentStatus, stageWhereClause, updateDocumentField, updateDocumentReview, validateDocumentInput } = await import("@/models/documents")
+const { createDocumentFromBuffer, deleteWorkspaceDocuments, dismissAccountCorrectionForDocuments, documentDataForExport, documentHash, documentSourceFor, findAccountCorrectionReminders, findBillsAffectedByAccountChange, getBillAccountPickerData, isSupportedDocumentBuffer, listReadyToPushDocuments, recordAccountCorrectionApplied, resolveDocumentCodingItems, setDocumentLineToAccount, setDocumentPaymentStatus, stageWhereClause, updateDocumentField, updateDocumentReview, validateDocumentInput } = await import("@/models/documents")
 const { prisma } = await import("@/lib/db")
 const { deleteDocumentSource } = await import("@/lib/document-storage")
 const { recordFieldCorrection } = await import("@/models/field-corrections")
@@ -499,6 +499,74 @@ describe("findAccountCorrectionReminders (#430 Screen 3)", () => {
     ])
     const reminders = await findAccountCorrectionReminders("w1", "conn1", [{ supplierName: "acme fuels", accountExternalId: "acc-new" }])
     expect(reminders.size).toBe(0)
+  })
+
+  it("#459: never counts an item-sourced line as a reminder (its account is the Item's own)", async () => {
+    db.document.findMany.mockResolvedValue([
+      { id: "d1", reviewedData: { vendor: "Acme Fuels" }, rawExtraction: null, codingData: { items: [{ account_external_id: "acc-old", account_source: "item" }] }, paymentStatus: "paid", accountCorrectionDismissedAt: null, accountCorrectionDismissedFromAccountId: null },
+    ])
+    const reminders = await findAccountCorrectionReminders("w1", "conn1", [{ supplierName: "acme fuels", accountExternalId: "acc-new" }])
+    expect(reminders.size).toBe(0)
+  })
+})
+
+describe("findBillsAffectedByAccountChange — item lines (#459)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    db.document = { findMany: vi.fn().mockResolvedValue([]) }
+    db.integrationPush = { findMany: vi.fn().mockResolvedValue([]) }
+  })
+
+  it("still surfaces the document (the old account is present) but excludes the item-sourced line from `lines`", async () => {
+    db.document.findMany.mockResolvedValue([
+      { id: "d1", filename: "a.pdf", receivedAt: new Date("2026-01-01"), reviewedData: { vendor: "Acme" }, rawExtraction: null, codingData: { items: [{ account_external_id: "acc-old", account_source: "item" }] }, paymentStatus: "paid", baseCurrencyTotal: null, accountCorrectionDismissedAt: null, accountCorrectionDismissedFromAccountId: null },
+    ])
+    const affected = await findBillsAffectedByAccountChange("w1", "conn1", "acc-old")
+    expect(affected).toEqual([expect.objectContaining({ id: "d1", lines: [] })])
+  })
+
+  it("includes a non-item line alongside an excluded item-sourced one", async () => {
+    db.document.findMany.mockResolvedValue([
+      { id: "d1", filename: "a.pdf", receivedAt: new Date("2026-01-01"), reviewedData: { vendor: "Acme" }, rawExtraction: null, codingData: { items: [{ account_external_id: "acc-old", account_source: "item" }, { account_external_id: "acc-old" }] }, paymentStatus: "paid", baseCurrencyTotal: null, accountCorrectionDismissedAt: null, accountCorrectionDismissedFromAccountId: null },
+    ])
+    const affected = await findBillsAffectedByAccountChange("w1", "conn1", "acc-old")
+    expect(affected).toEqual([expect.objectContaining({ id: "d1", lines: [{ index: 1, oldAccountExternalId: "acc-old" }] })])
+  })
+})
+
+describe("setDocumentLineToAccount (#459)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    db.document = { findFirst: vi.fn(), update: vi.fn() }
+  })
+
+  it("is a no-op when the document doesn't exist in this workspace", async () => {
+    db.document.findFirst.mockResolvedValue(null)
+    await setDocumentLineToAccount("w1", "d1", 0)
+    expect(db.document.update).not.toHaveBeenCalled()
+  })
+
+  it("is a no-op when the line index is out of range", async () => {
+    db.document.findFirst.mockResolvedValue({ codingData: { items: [{ account_external_id: "acc-1" }] } })
+    await setDocumentLineToAccount("w1", "d1", 5)
+    expect(db.document.update).not.toHaveBeenCalled()
+  })
+
+  it("clears item_external_id/item_source and sets account_source to manual on the given line only, leaving account_external_id untouched", async () => {
+    db.document.findFirst.mockResolvedValue({
+      codingData: { items: [
+        { account_external_id: "item-acc", item_external_id: "item-1", item_source: "pairing", account_source: "item" },
+        { account_external_id: "other-acc", item_external_id: "item-2", item_source: "pairing", account_source: "item" },
+      ] },
+    })
+    await setDocumentLineToAccount("w1", "d1", 0)
+    expect(db.document.update).toHaveBeenCalledWith({
+      where: { id: "d1" },
+      data: { codingData: { items: [
+        { account_external_id: "item-acc", item_external_id: null, item_source: null, account_source: "manual" },
+        { account_external_id: "other-acc", item_external_id: "item-2", item_source: "pairing", account_source: "item" },
+      ] } },
+    })
   })
 })
 
