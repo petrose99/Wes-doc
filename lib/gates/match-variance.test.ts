@@ -13,8 +13,11 @@ const documentMatchFindFirst = vi.fn()
 const documentMatchFindMany = vi.fn()
 const automationConfigFindUnique = vi.fn()
 
+const workspaceFindUnique = vi.fn(async () => ({ baseCurrency: "ZAR" }))
+
 vi.mock("@/lib/db", () => ({
   prisma: {
+    workspace: { findUnique: workspaceFindUnique },
     gate: { findUnique: gateFindUnique, findMany: gateFindMany, update: gateUpdate },
     document: { findUnique: documentFindUnique },
     documentMatch: { findFirst: documentMatchFindFirst, findMany: documentMatchFindMany },
@@ -42,6 +45,7 @@ import type { GateContext, GateVerdict } from "@/lib/gates/types"
 
 const baseCtx = (over: Partial<GateContext["document"]> = {}): GateContext => ({
   workspaceId: "w1",
+  baseCurrency: "ZAR",
   documentId: "inv-1",
   document: {
     id: "inv-1",
@@ -180,16 +184,16 @@ describe("match-variance runner", () => {
     expect(v.payload?.grnTotal).toBe(110_000)
   })
 
-  it("payload floor.currency falls back to the document's baseCurrency when the setting doesn't pin one", async () => {
+  it("payload floor.currency falls back to the Company currency when the setting doesn't pin one", async () => {
     const bigRunner = createMatchVarianceGateRunner({
       findMatchLinks: async () => ({ poDocumentId: "po-1", poTotal: 100_000 }),
       getTolerance: async () => ({ percent: 0.02, floor: { amount: 500 } }),
     })
     const ctx = baseCtx({ fieldSnapshot: { total: 110_000 } })
-    ;(ctx.document as Record<string, unknown>).baseCurrency = "ZAR"
+    ctx.baseCurrency = "LSL"
     const v = await bigRunner.run(ctx)
     if (!v.blocked) throw new Error()
-    expect((v.payload as { floor: { currency: string } }).floor.currency).toBe("ZAR")
+    expect((v.payload as { floor: { currency: string } }).floor.currency).toBe("LSL")
   })
 
   it("payload floor.currency uses the setting's currency when pinned, ignoring the workspace's base", async () => {
@@ -198,7 +202,6 @@ describe("match-variance runner", () => {
       getTolerance: async () => ({ percent: 0.02, floor: { amount: 500, currency: "GBP" } }),
     })
     const ctx = baseCtx({ fieldSnapshot: { total: 110_000 } })
-    ;(ctx.document as Record<string, unknown>).baseCurrency = "ZAR"
     const v = await bigRunner.run(ctx)
     if (!v.blocked) throw new Error()
     expect((v.payload as { floor: { currency: string } }).floor.currency).toBe("GBP")

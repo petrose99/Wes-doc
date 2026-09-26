@@ -16,6 +16,7 @@ import {
   removeWorkspaceFromOrganization,
   renameOrganization,
 } from "@/models/organizations"
+import { changeCompanyCurrency } from "@/models/company-currency"
 import { getWorkspaceMembership } from "@/models/workspaces"
 
 /** #285 spec §2 gating rule. Header writes (create organization, add, move) need *owner of the
@@ -177,6 +178,26 @@ export async function removeCompanyFromOrganizationAction(workspaceId: string, t
     await removeWorkspaceFromOrganization(targetId, user.id)
     revalidate(workspaceId)
     return { success: true, data: { workspaceId: target.id, name: target.name } }
+  } catch (error) { return { success: false, error: code(error, "failed") } }
+}
+
+/** #457 spec §1, §9.3. Owner of the target company only; the target is the route workspace itself
+ * (Admin › Integrations' Switch) or a company in the route's organization (Companies pane). The
+ * lock, the pair and a push in flight are re-checked under the row lock in the model; each refusal
+ * is a named code (`company_currency_*`, mapped in action-helpers.ts). */
+export async function changeCompanyCurrencyAction(workspaceId: string, companyId: string, currency: string): Promise<ActionState<{ count: number }>> {
+  const user = await getCurrentUser()
+  if (companyId !== workspaceId) {
+    const [route, target] = await Promise.all([headFor(workspaceId), headFor(companyId)])
+    if (!route?.organizationId || target?.organizationId !== route.organizationId) return { success: false, error: "not_found" }
+  }
+  if ((await roleOn(companyId, user.id)) !== "owner") return { success: false, error: "owner_required" }
+  try {
+    const result = await changeCompanyCurrency(companyId, currency.trim().toUpperCase(), user.id)
+    revalidate(workspaceId)
+    revalidatePath(`${adminPaths(workspaceId).companies}/${companyId}`)
+    revalidatePath(adminPaths(companyId).integrations)
+    return { success: true, data: result }
   } catch (error) { return { success: false, error: code(error, "failed") } }
 }
 

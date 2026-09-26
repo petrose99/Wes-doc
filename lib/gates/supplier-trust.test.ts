@@ -12,8 +12,11 @@ const gateUpdate = vi.fn()
 const documentFindUnique = vi.fn()
 const automationConfigFindUnique = vi.fn()
 
+const workspaceFindUnique = vi.fn(async () => ({ baseCurrency: "ZAR" }))
+
 vi.mock("@/lib/db", () => ({
   prisma: {
+    workspace: { findUnique: workspaceFindUnique },
     supplier: { findUnique: supplierFindUnique, update: supplierUpdate },
     gate: { findUnique: gateFindUnique, findMany: gateFindMany, update: gateUpdate },
     document: { findUnique: documentFindUnique },
@@ -40,6 +43,7 @@ import type { GateContext } from "@/lib/gates/types"
 
 const baseCtx = (over: Partial<GateContext["document"]> = {}): GateContext => ({
   workspaceId: "w1",
+  baseCurrency: "ZAR",
   documentId: "inv-1",
   document: {
     id: "inv-1",
@@ -165,7 +169,7 @@ describe("createSupplierTrustGateRunner", () => {
         normalizedKey: "acme",
         supplierId: "s1",
         threshold: 500,
-        currency: "USD",
+        currency: "ZAR",
         invoiceTotal: 5000,
       },
     })
@@ -198,11 +202,11 @@ describe("createSupplierTrustGateRunner", () => {
       getThreshold: async () => ({ amount: 500 }),
     })
     const ctx = baseCtx({ fieldSnapshot: { vendor: "Acme Ltd", total: 5000 } })
-    ;(ctx.document as unknown as { baseCurrency: string }).baseCurrency = "ZAR"
+    ctx.baseCurrency = "LSL"
     const verdict = await runner.run(ctx)
     expect(verdict).toMatchObject({
       blocked: true,
-      payload: expect.objectContaining({ currency: "ZAR", threshold: 500 }),
+      payload: expect.objectContaining({ currency: "LSL", threshold: 500 }),
     })
   })
 
@@ -212,7 +216,6 @@ describe("createSupplierTrustGateRunner", () => {
       getThreshold: async () => ({ amount: 500, currency: "EUR" }),
     })
     const ctx = baseCtx({ fieldSnapshot: { vendor: "Acme Ltd", total: 5000 } })
-    ;(ctx.document as unknown as { baseCurrency: string }).baseCurrency = "ZAR"
     const verdict = await runner.run(ctx)
     expect(verdict).toMatchObject({
       blocked: true,

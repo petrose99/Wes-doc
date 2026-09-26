@@ -23,6 +23,7 @@
 
 import { prisma } from "@/lib/db"
 import { resolveGate } from "@/lib/gates/actions"
+import { getCompanyCurrency } from "@/models/company-currency"
 import type { GateContext, GateRunner, GateVerdict } from "./types"
 import type { Prisma, PrismaClient, Gate, Document } from "@/prisma/client"
 
@@ -173,8 +174,7 @@ export function createConfidenceBandGateRunner(deps: ConfidenceBandDeps): GateRu
 
       if (overall >= band.min) return { blocked: false }
 
-      const baseCurrency =
-        (ctx.document as Partial<Document> & { baseCurrency?: string | null }).baseCurrency ?? "USD"
+      const baseCurrency = ctx.baseCurrency
       return {
         blocked: true,
         severity: "soft",
@@ -240,6 +240,7 @@ export async function reevaluateConfidenceBandForDocument(
     workspaceId: input.workspaceId,
     documentId: input.documentId,
     document: doc as GateContext["document"],
+    baseCurrency: await getCompanyCurrency(input.workspaceId, client),
   })
   if (!verdict.blocked) {
     await resolveGate(

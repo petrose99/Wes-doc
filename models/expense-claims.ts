@@ -10,6 +10,7 @@ import type { DocumentClaimFacts, DocumentClaimView, DraftClaimOption, AddToClai
 import type { ApprovalActor, ApprovalStageInfo } from "@/models/approvals"
 import { getDefaultApprovalFlow } from "@/models/approval-defaults"
 import { sumReceiptTotals } from "@/lib/claims/totals"
+import { getCompanyCurrency } from "@/models/company-currency"
 import { prisma } from "@/lib/db"
 import { processingState } from "@/lib/documents/processing-state"
 import { cache } from "react"
@@ -225,12 +226,7 @@ export async function submitExpenseClaim(input: { workspaceId: string; claimId: 
   // member may have claimed one of these documents elsewhere since it was added to this draft.
   await validateClaimableDocuments(input.workspaceId, claim.items.map((item) => item.documentId), undefined, claim.id)
 
-  const totals = sumReceiptTotals(
-    claim.items.map((item) => {
-      const values = (item.document.reviewedData ?? item.document.rawExtraction ?? {}) as Record<string, unknown>
-      return { amount: asNumber(values.total), currencyCode: asString(values.currency_code) }
-    }),
-  )
+  const totals = sumReceiptTotals(claim.items.map((item) => receiptAmount(item.document)), await getCompanyCurrency(input.workspaceId))
   if (totals.mixed) throw new Error("expense_claim_mixed_currency")
   if (totals.missing === claim.items.length) throw new Error("expense_claim_no_amounts")
   const total = totals.total
@@ -408,8 +404,9 @@ export async function listMyDraftClaims(workspaceId: string, actorId: string): P
     orderBy: { createdAt: "desc" },
     take: 50,
   })
+  const companyCurrency = await getCompanyCurrency(workspaceId)
   return claims.map((claim) => {
-    const totals = sumReceiptTotals(claim.items.map((item) => receiptAmount(item.document)))
+    const totals = sumReceiptTotals(claim.items.map((item) => receiptAmount(item.document)), companyCurrency)
     return { id: claim.id, name: claimName(claim), receiptCount: claim.items.length, total: totals.total, currencyCode: totals.currencyCode, mixed: totals.mixed }
   })
 }
@@ -488,7 +485,7 @@ async function buildClaimFacts(claim: LoadedClaim, actor: ApprovalActor): Promis
     const values = (item.document.reviewedData ?? item.document.rawExtraction ?? {}) as Record<string, unknown>
     return { documentId: item.documentId, itemId: item.id, merchant: merchantOf(values), amount: asNumber(values.total), currencyCode: asString(values.currency_code), date: asString(values.date) ?? asString(values.issued_at) }
   })
-  const live = sumReceiptTotals(receipts)
+  const live = sumReceiptTotals(receipts, await getCompanyCurrency(claim.workspaceId))
   const frozen = claim.status !== "draft" && claim.total != null
   const total = frozen ? Number(claim.total) : live.total
   const currencyCode = frozen ? claim.currencyCode : live.currencyCode

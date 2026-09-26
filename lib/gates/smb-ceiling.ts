@@ -31,6 +31,7 @@ import { prisma } from "@/lib/db"
 import { writeAuditEvent, AuditEventType } from "@/lib/audit"
 import { resolveGate } from "@/lib/gates/actions"
 import { getWorkspaceMode, type WorkspaceMode } from "@/models/workspaces"
+import { getCompanyCurrency } from "@/models/company-currency"
 import type { GateContext, GateRunner, GateVerdict } from "./types"
 import type { Prisma, PrismaClient, Document } from "@/prisma/client"
 
@@ -45,7 +46,6 @@ export const SMB_CEILING_AMOUNT = 10_000
 
 export type SmbCeilingDeps = {
   getMode(workspaceId: string): Promise<WorkspaceMode>
-  getBaseCurrency(workspaceId: string): Promise<string>
 }
 
 type FieldSnapshot = Record<string, unknown>
@@ -93,7 +93,7 @@ export function createSmbCeilingGateRunner(deps: SmbCeilingDeps): GateRunner {
       const mode = await deps.getMode(ctx.workspaceId)
       if (mode !== "smb") return { blocked: false }
 
-      const baseCurrency = await deps.getBaseCurrency(ctx.workspaceId)
+      const baseCurrency = ctx.baseCurrency
 
       // v1 does not convert currencies. A bill that pins a foreign currency is silent-passed
       // with a warn — the alternative (compare foreign-denominated totals to a base-currency
@@ -121,21 +121,10 @@ export function createSmbCeilingGateRunner(deps: SmbCeilingDeps): GateRunner {
   }
 }
 
-async function getWorkspaceBaseCurrency(
-  workspaceId: string,
-  client: PrismaLike = prisma,
-): Promise<string> {
-  const row = await client.workspace.findUnique({
-    where: { id: workspaceId },
-    select: { baseCurrency: true },
-  })
-  return row?.baseCurrency ?? "USD"
-}
 
 /** The runner registered into gateRegistry. */
 export const smbCeilingGateRunner: GateRunner = createSmbCeilingGateRunner({
   getMode: (workspaceId) => getWorkspaceMode(workspaceId),
-  getBaseCurrency: (workspaceId) => getWorkspaceBaseCurrency(workspaceId),
 })
 
 /** Called when the first Reviewer is added (mode flip smb → firm). Every open smb-ceiling
@@ -184,6 +173,7 @@ export async function reevaluateOpenSmbCeilingGatesForWorkspace(
     },
   })
   if (bills.length === 0) return { blocked: 0 }
+  const baseCurrency = await getCompanyCurrency(workspaceId, client)
 
   let blocked = 0
   for (const bill of bills) {
@@ -201,6 +191,7 @@ export async function reevaluateOpenSmbCeilingGatesForWorkspace(
       workspaceId,
       documentId: bill.id,
       document: bill as GateContext["document"],
+      baseCurrency,
     })
     if (!verdict.blocked) continue
 

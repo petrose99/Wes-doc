@@ -18,6 +18,14 @@ function toLock(row: { currencyLockedAt: Date | null; currencyLockCause: string 
   return { locked: true, cause: (row.currencyLockCause ?? "bill") as CurrencyLockCause, provider: row.currencyLockProvider, at: row.currencyLockedAt }
 }
 
+/** The Company currency — gates, claim totals and notices use it; never a USD fallback. A missing
+ * workspace throws (a gate run skips that runner rather than judge in USD). */
+export async function getCompanyCurrency(workspaceId: string, client: Client = prisma): Promise<string> {
+  const row = await client.workspace.findUnique({ where: { id: workspaceId }, select: { baseCurrency: true } })
+  if (!row) throw new Error("workspace_not_found")
+  return row.baseCurrency
+}
+
 export async function getCurrencyLock(workspaceId: string, client: Client = prisma): Promise<CurrencyLock> {
   return toLock(await client.workspace.findUniqueOrThrow({ where: { id: workspaceId }, select: lockSelect }))
 }

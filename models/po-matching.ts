@@ -4,6 +4,7 @@
 import { auditEventData, getRequestAuditContext, recordDocumentAudit } from "@/lib/audit"
 import { prisma } from "@/lib/db"
 import { matchVarianceGateRunner, MATCH_VARIANCE_GATE_TYPE, reevaluateMatchVarianceForDocument } from "@/lib/gates/match-variance"
+import { getCompanyCurrency } from "@/models/company-currency"
 import type { GateContext } from "@/lib/gates/types"
 import { writeAuditEvent } from "@/lib/audit"
 import { countMismatchGlyphs, parseLineAssignments, type LineMatch } from "@/lib/matching/line-match"
@@ -210,7 +211,7 @@ async function reevaluateGateAfterMatchChange(workspaceId: string, invoiceId: st
   if (existing?.state === "blocked") { await reevaluateMatchVarianceForDocument({ workspaceId, documentId: invoiceId }); return }
   const doc = await prisma.document.findUnique({ where: { id: invoiceId }, select: { id: true, workspaceId: true, docType: true, fieldSnapshot: true, reviewedData: true, rawExtraction: true, receivedAt: true } })
   if (!doc) return
-  const ctx: GateContext = { workspaceId, documentId: invoiceId, document: doc as GateContext["document"] }
+  const ctx: GateContext = { workspaceId, documentId: invoiceId, document: doc as GateContext["document"], baseCurrency: await getCompanyCurrency(workspaceId) }
   const verdict = await matchVarianceGateRunner.run(ctx)
   if (!verdict.blocked) return
   const row = await prisma.gate.upsert({

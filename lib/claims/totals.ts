@@ -14,8 +14,9 @@ export type ClaimTotals = {
  * Float addition never drifts. Used to freeze a claim's total on submit and to show the
  * Approval-tab draft total and the S2 dialog footer — never recomputed ad hoc elsewhere (lesson
  * #250 H8: single functions, never two computations). Currency is never summed across codes: a
- * `mixed` draft lists `byCurrency` instead of one total and cannot submit (spec §2). */
-export function sumReceiptTotals(receipts: ReceiptForTotal[]): ClaimTotals {
+ * `mixed` draft lists `byCurrency` instead of one total and cannot submit (spec §2). A receipt
+ * with no extracted currency counts in the Company currency. */
+export function sumReceiptTotals(receipts: ReceiptForTotal[], companyCurrency: string): ClaimTotals {
   const byCurrencyCents = new Map<string, number>()
   let missing = 0
   for (const receipt of receipts) {
@@ -23,7 +24,7 @@ export function sumReceiptTotals(receipts: ReceiptForTotal[]): ClaimTotals {
       missing += 1
       continue
     }
-    const code = receipt.currencyCode ?? "USD"
+    const code = receipt.currencyCode ?? companyCurrency
     byCurrencyCents.set(code, (byCurrencyCents.get(code) ?? 0) + toCents(receipt.amount))
   }
   const byCurrency = [...byCurrencyCents.entries()].map(([currencyCode, cents]) => ({ currencyCode, total: fromCents(cents) }))

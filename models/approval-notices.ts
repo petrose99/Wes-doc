@@ -280,7 +280,7 @@ export async function sendApprovalNotices(now: Date = new Date()): Promise<{ sen
  * stamps noticeLastSentAt (a send-back must not delay the starter's next reached notice). */
 export async function sendSentBackNotice(input: {
   workspaceId: string; workspaceName: string; taskId: string; documentId: string; createdById: string | null
-  actorId: string; actorName: string; reason: string; supplier: string | null; invoiceNumber: string | null; amount: number | null; currency: string | null
+  actorId: string; actorName: string; reason: string; supplier: string | null; invoiceNumber: string | null; amount: number | null; currency: string
 }): Promise<void> {
   if (!isEmailConfigured()) return
   if (!input.createdById || input.createdById === input.actorId) return
@@ -290,7 +290,7 @@ export async function sendSentBackNotice(input: {
   ])
   if (!membership || !user || !user.approvalNoticeEmails || !user.emailVerified) return
 
-  const row: ApprovalNoticeRow = { kind: "sent_back", supplier: input.supplier, invoiceNumber: input.invoiceNumber, amount: input.amount, currency: input.currency ?? "USD", url: link(input.workspaceId, input.documentId), waitingDays: 0 }
+  const row: ApprovalNoticeRow = { kind: "sent_back", supplier: input.supplier, invoiceNumber: input.invoiceNumber, amount: input.amount, currency: input.currency, url: link(input.workspaceId, input.documentId), waitingDays: 0 }
   const { signStopToken } = await import("@/lib/notices/stop-token")
   const stopToken = signStopToken(input.createdById, input.workspaceId)
   const stopUrl = stopPageUrl(stopToken)
@@ -316,7 +316,7 @@ export async function notifySentBack(input: { workspaceId: string; documentId: s
     if (!isEmailConfigured()) return
     if (!input.createdById || input.createdById === input.actorId) return
     const [workspace, actor, document] = await Promise.all([
-      prisma.workspace.findUnique({ where: { id: input.workspaceId }, select: { name: true } }),
+      prisma.workspace.findUnique({ where: { id: input.workspaceId }, select: { name: true, baseCurrency: true } }),
       prisma.user.findUnique({ where: { id: input.actorId }, select: { name: true, email: true } }),
       prisma.document.findUnique({ where: { id: input.documentId }, select: { reviewedData: true } }),
     ])
@@ -326,7 +326,7 @@ export async function notifySentBack(input: { workspaceId: string; documentId: s
       workspaceId: input.workspaceId, workspaceName: workspace.name, taskId: input.taskId, documentId: input.documentId,
       createdById: input.createdById, actorId: input.actorId, actorName: actor?.name?.trim() || actor?.email || "Someone", reason: input.reason,
       supplier: asString(values.vendor) ?? asString(values.merchant), invoiceNumber: asString(values.invoice_number),
-      amount: asNumber(values.total) ?? asNumber(values.amount), currency: asString(values.currency_code),
+      amount: asNumber(values.total) ?? asNumber(values.amount), currency: asString(values.currency_code) ?? workspace.baseCurrency,
     })
   } catch (error) {
     console.warn("[approval-notices] sent-back notice failed:", error instanceof Error ? error.message : error)
