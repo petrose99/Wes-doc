@@ -408,6 +408,9 @@ while [ "$n" -lt "$MAX" ]; do
     close)   SESSION_EFFORT="${EFFORT_CLOSE:-$EFFORT}" ;;
     *)       SESSION_EFFORT="${EFFORT_SINGLE:-$EFFORT}" ;;
   esac
+  # EFFORT_CHEAP (optional): a single-session ticket routed to MODEL_CHEAP
+  # (research, polish) runs at this effort instead of EFFORT_SINGLE.
+  if [ -z "$PHASE" ] && [ -n "${EFFORT_CHEAP:-}" ] && [ "$MODEL" = "$MODEL_CHEAP" ] && [ "$MODEL_CHEAP" != "$MODEL_STRONG" ]; then SESSION_EFFORT="$EFFORT_CHEAP"; fi
   if hard_ticket "$T"; then SESSION_EFFORT="$EFFORT_HARD"; HARD=" · hard ($(sessions_on "$T") sessions on this phase)"; fi
   echo "=== [$n/$MAX] #$T — $TT  [${MODEL:-default model}${SESSION_EFFORT:+ · $SESSION_EFFORT}${PHASE:+ · phase: $PHASE}$HARD]"
   if [ "$DRY" = 1 ]; then SKIP[$T]=1; continue; fi
