@@ -271,7 +271,9 @@ progress_mark() {   # a fingerprint of "did this session move the work": HEAD + 
 # ran 747 turns/221M tokens in one session; its continuation from a hand-off
 # took 262/38M. The phase is read off the hand-off file's `milestone:` lines,
 # so the runner keeps no state and a re-run resumes where the file says.
-PHASED_TITLE_RE="${PHASED_TITLE_RE:-^Build }"
+# `Build:` too — map #445 titles every build that way, and all of them ran
+# unphased (one session doing spec→close, measure never on MODEL_MEASURE).
+PHASED_TITLE_RE="${PHASED_TITLE_RE:-^Build[: ]}"
 # A phase never moves backwards. The hand-off file is rewritten by every
 # session and one build session dropped the `milestone: spec-done` line, so
 # the driver read "spec" again and re-ran a finished phase (#259, 11:55). The

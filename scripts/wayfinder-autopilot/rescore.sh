@@ -23,17 +23,18 @@ while read -r t; do
   echo "rescore #$t — $why"
   [ "$DRY" = 1 ] && continue
   h="$OUT/$t.handoff.md"
-  if [ -f "$h" ] && grep -Eq '^milestone: (build-done|measured)' "$h"; then
+  if [ -f "$h" ] && grep -Eq '^milestone: (build-done|measured|closed)' "$h"; then
     # Phased: back to measure. Every milestone from `measured` on goes (the
     # readers run again on today's code) and `build-done` stands in its place
-    # when a build session never wrote it (#328); the driver's high-water mark
+    # when a build session never wrote it (#328, and #396's hand-off that
+    # only said `closed`); the driver's high-water mark
     # is lowered with it — phase_of never moves backwards on its own.
     python3 - "$h" <<'PY'
 import sys; p = sys.argv[1]; out = []; done = cut = False
 for ln in open(p):
     if ln.startswith("milestone:"):
         if cut: continue
-        if ln.strip() == "milestone: measured":
+        if ln.strip() in ("milestone: measured", "milestone: closed"):
             cut = True
             if not done: out.append("milestone: build-done\n")
             continue
