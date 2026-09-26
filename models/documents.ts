@@ -12,6 +12,7 @@ import { applyFxToDocument } from "@/lib/fx/apply-to-document"
 import { normalizeBillFromDocument } from "@/lib/integration-bill-mapping"
 import { resolveDocumentLineAccounts, resolveLineAccount, usesLegacyAccountChain, type LineAccountRow } from "@/lib/finance/line-account-resolution"
 import { codingReferencesFrom, inferTaxBasis, resolveBillCoding, resolveLineCoding, type BillCoding, type CodingRule, type LineCoding } from "@/lib/finance/line-coding"
+import { normalizeItemMatchKey, resolveItemLine, type ItemOption, type ItemPairing, type ItemSource } from "@/lib/finance/item-line-resolution"
 import { parseLedgerCapabilities } from "@/lib/integrations/ledger-capabilities"
 import { normalizeSupplierName } from "@/lib/suppliers/normalize"
 import { unscoped } from "@/lib/workspace-scope"
@@ -662,7 +663,7 @@ function asScalarString(value: unknown): string | null {
  * chain rather than a supplier-rule/Default chain that didn't exist when it was coded.
  * ADR 0014: each row then gets the rest of its coding (Tax code, Tracking) and the bill its
  * Location and Tax basis (lib/finance/line-coding.ts), stamped onto `codingData` the same way. */
-export type CodingItem = LineAccountRow & LineCoding
+export type CodingItem = LineAccountRow & LineCoding & { item_external_id: string | null; item_source: ItemSource | null }
 
 export async function resolveDocumentCodingItems(input: {
   workspaceId: string
@@ -675,6 +676,9 @@ export async function resolveDocumentCodingItems(input: {
   priorCoding?: Record<string, unknown>
   /** The reviewed amounts the Tax basis is inferred from. */
   amounts?: Parameters<typeof inferTaxBasis>[0]
+  /** #459: each line's item_code/description, for item resolution (pairing/code-match). Index-
+   * aligned with `lineCount`; a missing entry resolves to no item. */
+  lineItems?: Array<{ item_code: string | null; description: string | null } | null>
 }): Promise<{ items: CodingItem[]; bill: BillCoding } | null> {
   if (!config.integrations.enabled) return null
   const connection = await prisma.integrationConnection.findFirst({
@@ -689,26 +693,49 @@ export async function resolveDocumentCodingItems(input: {
   const normalizedVendor = input.vendorName ? normalizeSupplierName(input.vendorName) : ""
   // The ledger's active references in one read: the accounts (activity + default Tax code), and the
   // Tax codes, Tracking options and Locations a line or bill may be pre-filled with.
-  const [ruleRow, entities] = await Promise.all([
+  const [ruleRow, entities, pairingRows] = await Promise.all([
     !legacy && normalizedVendor
       ? prisma.supplierAccountRule.findFirst({ where: { workspaceId: input.workspaceId, connectionId: connection.id, supplierName: normalizedVendor }, select: { accountExternalId: true, taxCodeExternalId: true, tracking: true, locationExternalId: true } })
       : null,
     prisma.accountingEntity.findMany({
-      where: { workspaceId: input.workspaceId, connectionId: connection.id, active: true, entityType: { in: ["account", "tax_rate", "tracking_option", "location"] } },
-      select: { entityType: true, externalId: true, parentExternalId: true, forPurchases: true, defaultTaxCode: true },
+      where: { workspaceId: input.workspaceId, connectionId: connection.id, active: true, entityType: { in: ["account", "tax_rate", "tracking_option", "location", "item"] } },
+      select: { entityType: true, externalId: true, parentExternalId: true, forPurchases: true, defaultTaxCode: true, code: true, purchaseAccountExternalId: true, trackedInventory: true },
     }),
+    !legacy && normalizedVendor
+      ? prisma.supplierItemPairing.findMany({ where: { workspaceId: input.workspaceId, connectionId: connection.id, supplierName: normalizedVendor }, select: { matchKey: true, itemExternalId: true } })
+      : [],
   ])
   const rule: CodingRule | null = ruleRow ? { accountExternalId: ruleRow.accountExternalId, taxCodeExternalId: ruleRow.taxCodeExternalId ?? null, tracking: parseRuleTracking(ruleRow.tracking), locationExternalId: ruleRow.locationExternalId ?? null } : null
   const of = (type: string) => entities.filter((entity) => entity.entityType === type)
   const references = codingReferencesFrom(entities)
   const accountDefaults = Object.fromEntries(of("account").map((account) => [account.externalId, account.defaultTaxCode]))
   const capabilities = parseLedgerCapabilities(connection.ledgerCapabilities)
+  const itemOptions: ItemOption[] = of("item")
+    .filter((item): item is typeof item & { purchaseAccountExternalId: string } => Boolean(item.purchaseAccountExternalId))
+    .map((item) => ({ externalId: item.externalId, code: item.code, accountExternalId: item.purchaseAccountExternalId, taxCodeExternalId: item.defaultTaxCode, trackedInventory: item.trackedInventory === true, active: true }))
+  const pairings: ItemPairing[] = pairingRows.map((row) => ({ matchKey: row.matchKey, itemExternalId: row.itemExternalId }))
   const prior = input.priorCoding ?? {}
-  const priorItems = Array.isArray(prior.items) ? (prior.items as Partial<LineCoding>[]) : []
+  const priorItems = Array.isArray(prior.items) ? (prior.items as Partial<LineCoding & { item_external_id: string | null; item_source: ItemSource | null }>[]) : []
   const rows = legacy
     ? await resolveLegacyLineAccounts(input.workspaceId, connection.id, input.category, connection.defaultExpenseAccountId as string, lineCount)
     : resolveCurrentLineAccounts(connection, rule, new Set(Object.keys(accountDefaults)), lineCount)
-  const items = rows.map((row, index) => ({ ...row, ...resolveLineCoding({ line: row, prior: priorItems[index] ?? null, rule, accountDefaults, capabilities, references }) }))
+  const lineItems = input.lineItems ?? []
+  const items = rows.map((row, index) => {
+    const priorItem = priorItems[index] ?? null
+    const lineItem = lineItems[index] ?? null
+    const itemResolution = resolveItemLine({
+      itemCode: lineItem?.item_code ?? null,
+      description: lineItem?.description ?? null,
+      prior: priorItem ? { item_external_id: priorItem.item_external_id ?? null, item_source: (priorItem.item_source as ItemSource | null) ?? null } : null,
+      pairings,
+      items: itemOptions,
+    })
+    const line = itemResolution.itemExternalId
+      ? { ...row, account_external_id: itemResolution.accountExternalId, account_source: "item" as const }
+      : row
+    const coding = resolveLineCoding({ line, prior: priorItem, rule, accountDefaults, capabilities, references, itemTaxCode: itemResolution.taxCodeExternalId })
+    return { ...line, ...coding, item_external_id: itemResolution.itemExternalId, item_source: itemResolution.itemSource }
+  })
   const bill = resolveBillCoding({ prior: prior as Partial<BillCoding>, rule, capabilities, references, inferredBasis: input.amounts ? inferTaxBasis(input.amounts) : null })
   return { items, bill }
 }
@@ -815,7 +842,9 @@ export async function learnSupplierAccountRuleFromApproval(workspaceId: string, 
     let bestIndex = -1
     let bestAmount = -Infinity
     items.forEach((item, index) => {
-      if (!item.account_external_id || !item.account_source) return
+      // #459: the rule learns from the largest *account* line only — an item line's account is the
+      // item's own account, not a chosen expense account, so it never wins the rule's account.
+      if (!item.account_external_id || !item.account_source || item.account_source === "item") return
       const amount = typeof lineItems[index]?.amount === "number" ? (lineItems[index].amount as number) : 0
       if (bestIndex === -1 || amount > bestAmount) { bestIndex = index; bestAmount = amount }
     })
@@ -843,6 +872,22 @@ export async function learnSupplierAccountRuleFromApproval(workspaceId: string, 
       create: { workspaceId, connectionId: connection.id, supplierName, ...set, lastUsedAt: new Date() },
       update: { ...set, lastUsedAt: new Date() },
     })
+    // #459: learn a supplier item pairing for every line that resolved to an item — never a manual
+    // pick (no picker exists until #460) and never a line that stayed an account line.
+    await Promise.all(items.map((item, index) => {
+      if (item.item_source !== "pairing" && item.item_source !== "code_match") return null
+      if (!item.item_external_id) return null
+      const line = lineItems[index] ?? null
+      const itemCode = typeof line?.item_code === "string" ? line.item_code : null
+      const description = typeof line?.description === "string" ? line.description : null
+      const matchKey = normalizeItemMatchKey(itemCode, description)
+      if (!matchKey) return null
+      return prisma.supplierItemPairing.upsert({
+        where: { connectionId_supplierName_matchKey: { connectionId: connection.id, supplierName, matchKey } },
+        create: { workspaceId, connectionId: connection.id, supplierName, matchKey, itemExternalId: item.item_external_id, lastUsedAt: new Date() },
+        update: { itemExternalId: item.item_external_id, lastUsedAt: new Date() },
+      })
+    }))
     // Only a genuine retarget of an existing rule's Account is a #430 trigger — a first-time create
     // has no bills posted under "the old account" because there wasn't one, and a new Tax code,
     // Tracking or Location on the same Account offers no correction (ADR 0011 corrects Accounts).
@@ -898,8 +943,14 @@ export async function updateDocumentReview(input: { workspaceId: string; documen
     subtotal: amountOf(checkFields.subtotal), taxTotal: amountOf(checkFields.taxTotal), total: amountOf(checkFields.total),
     currency: asScalarString(checkFields.currency ? reviewedData[checkFields.currency] : null),
   }
+  const lineItems = Array.isArray(reviewedData.line_items)
+    ? (reviewedData.line_items as Array<Record<string, unknown> | null>).map((line) => ({
+        item_code: typeof line?.item_code === "string" ? line.item_code : null,
+        description: typeof line?.description === "string" ? line.description : null,
+      }))
+    : []
   const coded = await resolveDocumentCodingItems({
-    workspaceId: input.workspaceId, vendorName, category, codingSource: document.codingSource, codedAt: document.receivedAt, lineCount, priorCoding: coding, amounts,
+    workspaceId: input.workspaceId, vendorName, category, codingSource: document.codingSource, codedAt: document.receivedAt, lineCount, priorCoding: coding, amounts, lineItems,
   })
   const codingUpdates: Record<string, unknown> = {}
   if (newlyConfirmedCategory) codingUpdates.categoryConfirmed = true

@@ -9,7 +9,7 @@ import { amountTolerance } from "@/lib/checks/types"
 import type { LedgerCapabilities } from "@/lib/integrations/ledger-capabilities"
 
 export type TaxBasis = "inclusive" | "exclusive" | "none"
-export type TaxCodeSource = "account_default" | "supplier" | "manual"
+export type TaxCodeSource = "account_default" | "supplier" | "manual" | "item"
 export type TrackingSelection = { category_id: string; option_id: string }
 
 /** What `codingData.items[i]` carries beyond its Account (snake_case, as LineAccountRow). */
@@ -82,6 +82,9 @@ export function resolveLineCoding(input: {
   accountDefaults: Record<string, string | null | undefined>
   capabilities: LedgerCapabilities | null
   references: CodingReferences
+  /** #459: the resolved item's own purchase tax code, when the line is coded to an Item — wins
+   * over the supplier rule and the account default. */
+  itemTaxCode?: string | null
 }): LineCoding {
   const { line, prior, rule, capabilities, references } = input
   const account = line.account_external_id
@@ -93,6 +96,7 @@ export function resolveLineCoding(input: {
     tax_code_source = "manual"
   } else if (capabilities?.vat !== false) {
     const candidates: [string | null | undefined, TaxCodeSource][] = [
+      [input.itemTaxCode ?? null, "item"],
       [onRuleAccount ? rule?.taxCodeExternalId : null, "supplier"],
       [account ? input.accountDefaults[account] : null, "account_default"],
     ]
