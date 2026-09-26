@@ -52,6 +52,10 @@ _Avoid_: Bills (as the destination's name — "invoice" is the word the company'
 The ledger's own record of a posted invoice — what QuickBooks and Xero call it. Used only when speaking of that record ("posted to Xero as a bill") and inside the proper name Bill Pay; the document in DocuBite is an invoice or a credit note, never a bill.
 _Avoid_: bill for a document still in DocuBite
 
+**Expense** (the ledger's):
+The ledger's own record of a posted receipt — QuickBooks' Expense, Xero's Spend Money. Used only when speaking of that record ("posted to Xero as an expense"); the document in DocuBite is a receipt. Distinct from an Expense claim, which is DocuBite's bundle of receipts someone paid personally.
+_Avoid_: expense for a document still in DocuBite, Expenses (as a destination)
+
 **Credit note**:
 A supplier's document that reduces what the company owes that supplier. It is its own document type in the Invoices destination, reviewed, approved and posted like an invoice. Its amount is always positive: the type says it is a credit, never a minus sign.
 _Avoid_: Vendor credit, credit memo (the ledgers' names), negative invoice, refund (money back is a different thing)
