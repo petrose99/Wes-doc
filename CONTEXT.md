@@ -301,6 +301,14 @@ _Avoid_: Cash flow, cash forecast, cash position (it shows only what goes out)
 A DocuBite-side fact that an amount was paid against an invoice on a date: written when a Payment line settles Paid, or by hand (Mark as paid) for a payment made outside DocuBite. An invoice's paid state is derived from the ledger when it confirms payment, otherwise from its payment records. A payment record can be removed with a reason.
 _Avoid_: Mark as paid (the action, not the record), settlement, ledger payment (that is the ledger's own line)
 
+**Supplier contact**:
+A person at a supplier whom DocuBite may email: an email address, with a name if one is known. Only Owners add or edit contacts, on Admin › Suppliers, and every change is logged. An email from the ledger's vendor or contact record, or from an invoice, is offered to pre-fill and never written. A contact is never pushed to the ledger. Up to three contacts per supplier can be flagged *Gets remittance advice*. A contact the email provider reports as bouncing reads **Bounced** and is skipped until an Owner edits it.
+_Avoid_: Vendor contact, AP email (as the concept), supplier user (suppliers have no login)
+
+**Remittance advice**:
+The email that tells a supplier which invoices a payment covers: paid date, reference, and each invoice's number, date and amount paid (plus what is still due after a partial payment), any credits applied, and the total, all in the payment's currency. It is sent only from a Payment record, never on Scheduled or Sent, and only when the Owner recording the payment chooses to send it. There is one advice per supplier, per currency, per recording action, and a record is never advised twice. Its state is Queued, Sent, Bounced or Failed. A removed record drops off an advice not yet sent. An advice already sent is corrected only if an Owner chooses to send a correction (ADR 0021).
+_Avoid_: Remittance (unqualified), payment notification, payment confirmation
+
 **Company**:
 The user-facing name for a team workspace in Admin and the switcher: one legal or financial entity with its own currency, tax jurisdiction, suppliers, ledger and members. "Workspace" is the storage and address term and never appears on a screen as the thing a person belongs to: a screen says Company, Personal, or drops the noun ("here", "this company"). The auto-created personal workspace is shown as Personal, never as a company.
 _Avoid_: Entity (Vic's word), tenant, client (that is who the company belongs to), workspace (on screen), team workspace
