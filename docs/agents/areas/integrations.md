@@ -73,11 +73,20 @@ Push-failure toast text for the 11 `checkLineCoding` + 2 `ledgerReadBackChecks` 
 `BILLING_MESSAGES` — a prior copy-paste of this wording between the two files was the #458 close
 review's one P1. Don't re-type any of these 13 strings a second time.
 
+## Owner back-fill control (#462)
+`BackfillAttachControl` (`integrations-manager.tsx`, below the connections list, owner-only):
+count-first button "Attach source files to N bills already posted"
+(`countBackfillableAttachmentsAction`), hidden at 0; becomes "Queued N attaches." after
+`backfillAttachSourceFilesAction`. It's a stock `<Button size="sm">` — its "0px vertical padding"
+detector reading is the shared `sm` variant's own metrics (`components/ui/button.tsx:27`, used
+129x app-wide), not a defect to fix here.
+
 ## Detector residue (report, do not chase)
 App-wide five (see `admin.md`) plus `line-length` ~117ch from the pre-existing
-empty-state provider rows (#457 residue.txt). Gate CLEAN at #329, #457 and #458 (m1/close;
-`residue.txt` for #458 is the same app-wide five + the line-length item, no new residue from the
-supplier table's new columns/dialog).
+empty-state provider rows (#457 residue.txt). Gate CLEAN at #329, #457, #458 and #462 (m1/close;
+`residue.txt` for #462 adds `cramped-padding` and `em-dash-overuse` on the backfill control —
+both the shared `Button size="sm"` metrics and pre-existing page copy respectively, verified
+against source, not new).
 
 ## Capture
 Round script pattern: `docs/wayfinder-reports/226/logs/scratch-329/round-329.mjs`
