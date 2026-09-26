@@ -14,7 +14,7 @@ import { IntegrationPermanentError } from "@/lib/integrations/errors"
 const PROVIDER_CONFIG_KEY = "quickbooks"
 
 async function apiRequest<T>(realmId: string, connectionId: string, path: string, init?: RequestInit): Promise<T> {
-  return nangoProxy<T>(connectionId, PROVIDER_CONFIG_KEY, `${quickbooksCompanyBase(realmId)}${path}`, init)
+  return nangoProxy<T>(connectionId, PROVIDER_CONFIG_KEY, `${quickbooksCompanyBase(realmId)}${path}`, init, quickbooksApiError)
 }
 
 /** Escapes a value for QuickBooks' SQL-like query language single-quoted string literals. */

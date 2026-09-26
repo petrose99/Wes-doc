@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { findBillByDocNumber, getCompanyInfo, getPreferences, listAccounts, listClasses, listCustomers, listDepartments, listTaxCodes, voidBill } from "@/lib/integrations/quickbooks/client"
+import { createBill, findBillByDocNumber, getCompanyInfo, getPreferences, listAccounts, listClasses, listCustomers, listDepartments, listTaxCodes, voidBill } from "@/lib/integrations/quickbooks/client"
 
 const jsonReply = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } })
 
@@ -103,6 +103,11 @@ describe("voidBill", () => {
       .mockResolvedValueOnce(jsonResponse({ QueryResponse: { Bill: [{ Id: "42", SyncToken: "3" }] } }))
       .mockResolvedValueOnce(new Response("", { status: 500 }))
     await expect(voidBill("realm1", "token1", "42")).rejects.toThrow()
+  })
+
+  it("reads QuickBooks' 5030 Fault off the proxy's error body", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ Fault: { Error: [{ code: "5030" }] } }), { status: 400 }))
+    await expect(createBill("realm1", "conn1", {}, null)).rejects.toMatchObject({ code: "quickbooks_feature_not_supported" })
   })
 })
 

@@ -70,8 +70,12 @@ export async function deleteConnection(connectionId: string, providerConfigKey: 
  * transparently. `path` is the provider-API-relative path exactly as today's direct fetch calls
  * built it (e.g. QuickBooks' `/v3/company/{realmId}/query?...`); Nango forwards it unmodified past
  * `/proxy`. Throws the same classified errors as a direct fetch would (401/403 →
- * IntegrationAuthError, etc.) — callers do not need to know they are going through a proxy. */
-export async function nangoProxy<T>(connectionId: string, providerConfigKey: string, path: string, init?: RequestInit): Promise<T> {
+ * IntegrationAuthError, etc.) — callers do not need to know they are going through a proxy. A
+ * provider whose error body changes the verdict (QuickBooks' Fault codes) passes its own `classify`. */
+export async function nangoProxy<T>(
+  connectionId: string, providerConfigKey: string, path: string, init?: RequestInit,
+  classify: (status: number, body: string) => Error = classifyHttpStatus,
+): Promise<T> {
   const response = await fetch(`${config.integrations.nango.host}/proxy${path}`, {
     ...init,
     headers: {
@@ -84,7 +88,7 @@ export async function nangoProxy<T>(connectionId: string, providerConfigKey: str
     },
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   })
-  if (!response.ok) throw classifyHttpStatus(response.status)
+  if (!response.ok) throw classify(response.status, await response.text().catch(() => ""))
   return (await response.json()) as T
 }
 
