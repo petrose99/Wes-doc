@@ -7,6 +7,9 @@ vi.mock("@/lib/document-storage", () => ({ documentStorageKey: vi.fn(), document
 vi.mock("@/lib/analytics", () => ({ track: vi.fn() }))
 vi.mock("@/models/document-field-values", () => ({ replaceDocumentFieldValues: vi.fn() }))
 vi.mock("@/models/field-corrections", () => ({ recordFieldCorrection: vi.fn().mockResolvedValue(undefined) }))
+vi.mock("@/models/document-checks", () => ({ refreshLineCodingChecks: vi.fn() }))
+vi.mock("@/lib/fx/apply-to-document", () => ({ applyFxToDocument: vi.fn().mockResolvedValue(undefined) }))
+vi.mock("@/lib/automation/autopublish", () => ({ syncOnApproval: vi.fn().mockResolvedValue(undefined) }))
 vi.mock("@/models/integrations", async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>()
   return { ...actual, getCategoryAccountMap: vi.fn().mockResolvedValue({}) }
@@ -21,11 +24,12 @@ vi.mock("@/lib/config", async (importOriginal) => {
   return { default: { ...actual.default, integrations: { ...(actual.default.integrations as object), enabled: true } } }
 })
 
-const { createDocumentFromBuffer, deleteWorkspaceDocuments, dismissAccountCorrectionForDocuments, documentDataForExport, documentHash, documentSourceFor, findAccountCorrectionReminders, findBillsAffectedByAccountChange, getBillAccountPickerData, isSupportedDocumentBuffer, listReadyToPushDocuments, recordAccountCorrectionApplied, resolveDocumentCodingItems, setDocumentPaymentStatus, stageWhereClause, updateDocumentField, validateDocumentInput } = await import("@/models/documents")
+const { createDocumentFromBuffer, deleteWorkspaceDocuments, dismissAccountCorrectionForDocuments, documentDataForExport, documentHash, documentSourceFor, findAccountCorrectionReminders, findBillsAffectedByAccountChange, getBillAccountPickerData, isSupportedDocumentBuffer, listReadyToPushDocuments, recordAccountCorrectionApplied, resolveDocumentCodingItems, setDocumentPaymentStatus, stageWhereClause, updateDocumentField, updateDocumentReview, validateDocumentInput } = await import("@/models/documents")
 const { prisma } = await import("@/lib/db")
 const { deleteDocumentSource } = await import("@/lib/document-storage")
 const { recordFieldCorrection } = await import("@/models/field-corrections")
 const { listAccountingEntities } = await import("@/models/accounting-entities")
+const { refreshLineCodingChecks } = await import("@/models/document-checks")
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = prisma as any
@@ -248,6 +252,30 @@ describe("updateDocumentField field-correction recording", () => {
   it("does not record a correction when the value is unchanged", async () => {
     await updateDocumentField({ workspaceId: "w1", documentId: "d1", fieldKey: "vendor", value: "Acme In", actorId: "u1" })
     expect(vi.mocked(recordFieldCorrection)).not.toHaveBeenCalled()
+  })
+})
+
+describe("updateDocumentReview line-coding Checks (ADR 0014)", () => {
+  it("re-judges the document's coding against the ledger after Save review commits", async () => {
+    vi.clearAllMocks()
+    const order: string[] = []
+    db.document = {
+      findFirst: vi.fn().mockResolvedValue({
+        id: "d1", workspaceId: "w1", status: "needs_review", fieldSnapshot: [{ key: "vendor", label: "Supplier", type: "string", required: true }],
+        reviewedData: null, rawExtraction: { vendor: "Acme" }, codingData: { documentType: "expense" }, codingSource: null, receivedAt: new Date(),
+        confidence: {}, provenance: null, fileId: "f1", filename: "a.pdf", template: { code: "invoice" },
+      }),
+      update: vi.fn(async () => { order.push("review committed"); return { id: "d1", filename: "a.pdf", status: "reviewed", receivedAt: new Date(), reviewedData: { vendor: "Acme" }, confidence: {} } }),
+    }
+    db.documentAuditEvent = { create: vi.fn() }
+    db.webhookEndpoint = { findMany: vi.fn().mockResolvedValue([]) }
+    db.webhookDelivery = { createMany: vi.fn() }
+    db.integrationConnection = { findFirst: vi.fn().mockResolvedValue(null) }
+    db.$transaction = vi.fn((fn: (tx: unknown) => unknown) => fn(db))
+    vi.mocked(refreshLineCodingChecks).mockImplementation(async () => { order.push("refreshed") })
+    await updateDocumentReview({ workspaceId: "w1", documentId: "d1", reviewedData: { vendor: "Acme" }, actorId: "u1" })
+    expect(refreshLineCodingChecks).toHaveBeenCalledWith("w1", "d1")
+    expect(order).toEqual(["review committed", "refreshed"])
   })
 })
 

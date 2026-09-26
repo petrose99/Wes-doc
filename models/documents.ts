@@ -19,6 +19,7 @@ import type { DocumentProvenance } from "@/lib/provenance"
 import { replaceDocumentFieldValues } from "@/models/document-field-values"
 import { recordCodingCorrection } from "@/models/coding-corrections"
 import { recordFieldCorrection } from "@/models/field-corrections"
+import { refreshLineCodingChecks } from "@/models/document-checks"
 import { resetSupplierStreak } from "@/models/suppliers"
 import { listWorkspaceIntegrationPushes, getCategoryAccountMap } from "@/models/integrations"
 import { listCategoryAccountMappings, resolveCategoryAccount } from "@/models/category-account-mappings"
@@ -926,6 +927,9 @@ export async function updateDocumentReview(input: { workspaceId: string; documen
     oldValues: (document.reviewedData as Record<string, unknown> | null) ?? (document.rawExtraction as Record<string, unknown> | null) ?? {},
     newValues: reviewedData,
   })
+  // After the commit: the refresh reads the coding Save review just wrote, and a ledger read must
+  // never hold the review transaction open. It never throws.
+  await refreshLineCodingChecks(input.workspaceId, document.id)
   // Human review is the key integration trigger — a reviewed document is what a connector pushes.
   if (webhookQueued) await kickWebhookDrain()
   // FX conversion runs AFTER the review commit rather than inside it: a network fetch to

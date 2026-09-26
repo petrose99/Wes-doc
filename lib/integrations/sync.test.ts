@@ -17,12 +17,14 @@ vi.mock("@/lib/integrations/xero/client", () => ({
   listTrackingCategories: vi.fn(),
 }))
 vi.mock("@/lib/integrations/ledger-capabilities", () => ({ readLedgerCapabilities: vi.fn() }))
+vi.mock("@/models/document-checks", () => ({ refreshLineCodingChecksForConnection: vi.fn() }))
 
 const { syncAccountingEntities } = await import("@/lib/integrations/sync")
 const { readLedgerCapabilities } = await import("@/lib/integrations/ledger-capabilities")
 const { prisma } = await import("@/lib/db")
 const quickbooks = await import("@/lib/integrations/quickbooks/client")
 const xero = await import("@/lib/integrations/xero/client")
+const { refreshLineCodingChecksForConnection } = await import("@/models/document-checks")
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = prisma as any
@@ -76,6 +78,8 @@ describe("syncAccountingEntities", () => {
       where: expect.objectContaining({ connectionId: "c1" }),
       data: { active: false },
     }))
+    // ADR 0014: what the ledger takes may have changed — re-judge its unposted bills' coding.
+    expect(refreshLineCodingChecksForConnection).toHaveBeenCalledWith("w1", "c1")
   })
 
   it("upserts Xero accounts keyed by code, vendors keyed by id, and tax rates keyed by TaxType", async () => {

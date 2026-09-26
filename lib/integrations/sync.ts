@@ -3,6 +3,7 @@ import * as quickbooks from "@/lib/integrations/quickbooks/client"
 import * as xero from "@/lib/integrations/xero/client"
 import { readLedgerCapabilities, type LedgerCapabilities } from "@/lib/integrations/ledger-capabilities"
 import type { AccountingEntityType } from "@/models/accounting-entities"
+import { refreshLineCodingChecksForConnection } from "@/models/document-checks"
 import { guessQuickBooksDefaultAccount } from "@/lib/integrations/quickbooks/default-account-guess"
 import { guessXeroDefaultAccount } from "@/lib/integrations/xero/default-account-guess"
 import { Prisma } from "@/prisma/client"
@@ -53,6 +54,8 @@ export async function syncAccountingEntities(connectionId: string): Promise<void
       })
     }
   }
+  // The fresh capabilities and references may clear, or raise, a coding Check on unposted bills.
+  await refreshLineCodingChecksForConnection(connection.workspaceId, connection.id)
 }
 
 function guessDefaultAccount(provider: string, rows: SyncRow[]): SyncRow | null {
