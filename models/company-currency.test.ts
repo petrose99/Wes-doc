@@ -5,7 +5,10 @@ vi.mock("@/prisma/client", () => ({ Prisma: {}, PrismaClient: vi.fn() }))
 vi.mock("@/lib/audit", () => ({ recordDocumentAudit: vi.fn().mockResolvedValue(undefined) }))
 vi.mock("@/lib/fx/apply-to-document", () => ({ applyFxToDocument: vi.fn().mockResolvedValue({ status: "converted" }) }))
 
+vi.mock("@/lib/integrations/ledger-currency", () => ({ requeueLedgerCurrencyFailures: vi.fn().mockResolvedValue(3) }))
+
 const { changeCompanyCurrency, countUnpostedDocuments, getCurrencyLock, recordCurrencyLock } = await import("@/models/company-currency")
+const { requeueLedgerCurrencyFailures } = await import("@/lib/integrations/ledger-currency")
 const { prisma } = await import("@/lib/db")
 const { recordDocumentAudit } = await import("@/lib/audit")
 const { applyFxToDocument } = await import("@/lib/fx/apply-to-document")
@@ -57,12 +60,13 @@ describe("countUnpostedDocuments", () => {
 
 describe("changeCompanyCurrency", () => {
   it("locks the workspace row, changes the currency, audits it and re-converts every unposted document", async () => {
-    await expect(changeCompanyCurrency("w1", "ZAR", "u1")).resolves.toEqual({ count: 2 })
+    await expect(changeCompanyCurrency("w1", "ZAR", "u1")).resolves.toEqual({ count: 2, requeued: 3 })
 
     expect(db.$queryRaw).toHaveBeenCalled()
     expect(db.workspace.update).toHaveBeenCalledWith({ where: { id: "w1" }, data: { baseCurrency: "ZAR" } })
+    expect(requeueLedgerCurrencyFailures).toHaveBeenCalledWith("w1", expect.any(Date), db)
     expect(recordDocumentAudit).toHaveBeenCalledWith(
-      { workspaceId: "w1", actorId: "u1", type: "company_currency_changed", detail: { from: "LSL", to: "ZAR", count: 2 } },
+      { workspaceId: "w1", actorId: "u1", type: "company_currency_changed", detail: { from: "LSL", to: "ZAR", count: 2, requeued: 3 } },
       db,
     )
     expect(vi.mocked(applyFxToDocument).mock.calls.map((c) => c[0])).toEqual(["d1", "d2"])
@@ -89,7 +93,8 @@ describe("changeCompanyCurrency", () => {
   })
 
   it("is a no-op when the currency is unchanged", async () => {
-    await expect(changeCompanyCurrency("w1", "LSL", "u1")).resolves.toEqual({ count: 0 })
+    await expect(changeCompanyCurrency("w1", "LSL", "u1")).resolves.toEqual({ count: 0, requeued: 0 })
+    expect(requeueLedgerCurrencyFailures).not.toHaveBeenCalled()
     expect(db.workspace.update).not.toHaveBeenCalled()
     expect(recordDocumentAudit).not.toHaveBeenCalled()
   })

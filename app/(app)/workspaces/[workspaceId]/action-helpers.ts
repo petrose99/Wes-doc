@@ -79,6 +79,10 @@ const BILLING_MESSAGES: Record<string, string> = {
   company_currency_not_allowed: "A company in South Africa uses ZAR.",
   company_currency_locked: "Couldn't change it: the company currency is locked because something was already posted in it.",
   company_currency_push_in_flight: "A bill is being posted right now. Try again in a minute.",
+  // Push error codes (lib/integration-push.ts gateLedgerCurrency); the review task carries the
+  // provider and both currencies by name.
+  ledger_currency_differs: "Your ledger keeps its books in a different currency from this company.",
+  ledger_currency_unreadable: "Couldn't read your ledger's currency yet. It's checked again before each bill is posted.",
 }
 
 export const errorMessage = (error: unknown, fallback: string) => {

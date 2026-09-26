@@ -23,11 +23,16 @@ vi.mock("@/lib/integrations/xero/client", () => ({
   findBillByInvoiceNumber: vi.fn().mockResolvedValue(false),
 }))
 vi.mock("@/lib/integrations/xero/bill-mapper", () => ({ toXeroBillBody: vi.fn().mockReturnValue({}) }))
+vi.mock("@/lib/integrations/ledger-currency", () => ({ LEDGER_CURRENCY_REUSE_MS: 60_000, readLedgerCurrency: vi.fn().mockResolvedValue("USD") }))
+vi.mock("@/models/company-currency", () => ({ getCompanyCurrency: vi.fn().mockResolvedValue("USD"), recordCurrencyLock: vi.fn().mockResolvedValue(undefined) }))
 
 const { attemptIntegrationPush, getLedgerConnectionBandStatus } = await import("./integration-push")
 const { IntegrationAuthError } = await import("./integrations/errors")
 const db = (await import("@/lib/db")) as unknown as { prisma: Record<string, any> }
 const quickbooks = (await import("./integrations/quickbooks/client")) as unknown as Record<string, any>
+const ledger = (await import("./integrations/ledger-currency")) as unknown as Record<string, any>
+const companyCurrency = (await import("@/models/company-currency")) as unknown as Record<string, any>
+const reviewTasks = (await import("@/models/review-tasks")) as unknown as Record<string, any>
 
 const now = new Date("2026-09-22T12:00:00.000Z")
 
@@ -49,12 +54,14 @@ function makePush(overrides: Record<string, any> = {}) {
 }
 
 function makePrisma(push: any) {
-  return {
+  const client: Record<string, any> = {
+    $transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn(client)),
     integrationPush: { findUnique: vi.fn().mockResolvedValue(push), update: vi.fn().mockResolvedValue({}) },
     integrationConnection: { update: vi.fn().mockResolvedValue({}), findFirst: vi.fn() },
     accountingEntity: { findMany: vi.fn().mockResolvedValue([]) },
     reviewTask: { findFirst: vi.fn().mockResolvedValue(null) },
   }
+  return client
 }
 
 beforeEach(() => { vi.restoreAllMocks() })
@@ -112,6 +119,82 @@ describe("attemptIntegrationPush", () => {
       where: { id: "push-1" },
       data: { leaseUntil: null, nextAttemptAt: new Date(now.getTime() + 5 * 60 * 1000) },
     })
+  })
+})
+
+describe("attemptIntegrationPush — ledger currency (ADR 0013)", () => {
+  it("reads the ledger currency (reusing a read up to 60 s old) before anything is posted", async () => {
+    const prisma = makePrisma(makePush())
+    db.prisma = prisma
+    await attemptIntegrationPush("push-1", now)
+    expect(ledger.readLedgerCurrency).toHaveBeenCalledWith(expect.objectContaining({ id: "conn-1", workspaceId: "w1", provider: "quickbooks" }), now, 60_000)
+    expect(companyCurrency.getCompanyCurrency).toHaveBeenCalledWith("w1")
+  })
+
+  it("refuses a push whose ledger keeps its books in another currency: terminal, one review task, nothing posted", async () => {
+    ledger.readLedgerCurrency.mockResolvedValueOnce("ZAR")
+    companyCurrency.getCompanyCurrency.mockResolvedValueOnce("LSL")
+    companyCurrency.recordCurrencyLock.mockClear()
+    const prisma = makePrisma(makePush({ connection: { ...makePush().connection, provider: "xero" } }))
+    db.prisma = prisma
+
+    await attemptIntegrationPush("push-1", now)
+
+    const update = prisma.integrationPush.update.mock.calls[0][0]
+    expect(update.data.status).toBe("failed")
+    expect(update.data.errorCode).toBe("ledger_currency_differs")
+    expect(reviewTasks.createReviewTask).toHaveBeenCalledWith(expect.objectContaining({
+      reason: "push_preflight", documentId: "d1",
+      detail: "ledger_currency_differs: Xero keeps its books in ZAR; this company's currency is LSL.",
+    }))
+    expect(companyCurrency.recordCurrencyLock).not.toHaveBeenCalled()
+  })
+
+  it("does not open a second task for the same document while one is open", async () => {
+    ledger.readLedgerCurrency.mockResolvedValueOnce("ZAR")
+    const prisma = makePrisma(makePush())
+    prisma.reviewTask.findFirst.mockResolvedValue({ id: "t1" })
+    db.prisma = prisma
+    reviewTasks.createReviewTask.mockClear()
+    await attemptIntegrationPush("push-1", now)
+    expect(reviewTasks.createReviewTask).not.toHaveBeenCalled()
+  })
+
+  it("leaves a push whose ledger currency can't be read for the backoff to retry, never posting it", async () => {
+    ledger.readLedgerCurrency.mockResolvedValueOnce(null)
+    quickbooks.createBill.mockClear()
+    const prisma = makePrisma(makePush())
+    db.prisma = prisma
+
+    await attemptIntegrationPush("push-1", now)
+
+    const update = prisma.integrationPush.update.mock.calls[0][0]
+    expect(update.data.status).toBe("pending")
+    expect(update.data.errorCode).toBe("ledger_currency_unreadable")
+    expect(quickbooks.createBill).not.toHaveBeenCalled()
+  })
+
+  it("gates bank-statement batches too", async () => {
+    ledger.readLedgerCurrency.mockResolvedValueOnce("ZAR")
+    const prisma = makePrisma(makePush({ payload: { ...makePush().payload, documentType: "bank_statement" } }))
+    db.prisma = prisma
+    await attemptIntegrationPush("push-1", now)
+    expect(prisma.integrationPush.update.mock.calls[0][0].data.errorCode).toBe("ledger_currency_differs")
+  })
+
+  it("records the currency lock with the push's success, in the same transaction", async () => {
+    const prisma = makePrisma(makePush())
+    db.prisma = prisma
+    await attemptIntegrationPush("push-1", now)
+    expect(prisma.$transaction).toHaveBeenCalled()
+    expect(companyCurrency.recordCurrencyLock).toHaveBeenCalledWith("w1", "bill", "quickbooks", now, prisma)
+  })
+
+  it("names a bank statement as the lock's cause when that was the first thing posted", async () => {
+    const prisma = makePrisma(makePush({ payload: { ...makePush().payload, documentType: "bank_statement" } }))
+    db.prisma = prisma
+    await attemptIntegrationPush("push-1", now)
+    expect(companyCurrency.recordCurrencyLock).toHaveBeenCalledWith("w1", "bank_statement", "quickbooks", now, prisma)
   })
 })
 

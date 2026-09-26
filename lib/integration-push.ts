@@ -3,7 +3,10 @@ import { recordSystemAudit } from "@/lib/audit"
 import { prisma } from "@/lib/db"
 import { unscoped } from "@/lib/workspace-scope"
 import { NormalizedBill } from "@/lib/integration-bill-mapping"
-import { IntegrationAuthError, IntegrationPermanentError, safeErrorCode } from "@/lib/integrations/errors"
+import { IntegrationAuthError, IntegrationPermanentError, IntegrationRetryableError, safeErrorCode } from "@/lib/integrations/errors"
+import { checkLedgerCurrency } from "@/lib/checks/ledger-currency"
+import { LEDGER_CURRENCY_REUSE_MS, readLedgerCurrency } from "@/lib/integrations/ledger-currency"
+import { getCompanyCurrency, recordCurrencyLock } from "@/models/company-currency"
 import * as quickbooks from "@/lib/integrations/quickbooks/client"
 import { toQuickBooksBillBody } from "@/lib/integrations/quickbooks/bill-mapper"
 import * as xero from "@/lib/integrations/xero/client"
@@ -94,15 +97,31 @@ async function preflightAgainstCache(push: { workspaceId: string; documentId: st
     return
   }
   if (verdict.ok) return
-  // One open task per document+reason, same dedupe shape as models/document-checks.ts.
+  await failPreflight(push, verdict.errorCode, verdict.message)
+}
+
+/** Opens one `push_preflight` review task for the cause (one open task per document+reason, same
+ * dedupe shape as models/document-checks.ts) and fails the push terminally. */
+async function failPreflight(push: { workspaceId: string; documentId: string }, errorCode: string, message: string): Promise<never> {
   const existing = await prisma.reviewTask.findFirst({
-    where: { workspaceId: push.workspaceId, documentId: push.documentId, reason: "push_preflight", status: { in: ["open", "in_review"] }, detail: { contains: verdict.errorCode } },
+    where: { workspaceId: push.workspaceId, documentId: push.documentId, reason: "push_preflight", status: { in: ["open", "in_review"] }, detail: { contains: errorCode } },
     select: { id: true },
   }).catch(() => null)
   if (!existing) {
-    await createReviewTask({ workspaceId: push.workspaceId, documentId: push.documentId, reason: "push_preflight", detail: `${verdict.errorCode}: ${verdict.message}`, priority: 1, createdById: null }).catch(() => {})
+    await createReviewTask({ workspaceId: push.workspaceId, documentId: push.documentId, reason: "push_preflight", detail: `${errorCode}: ${message}`, priority: 1, createdById: null }).catch(() => {})
   }
-  throw new IntegrationPermanentError(verdict.errorCode)
+  throw new IntegrationPermanentError(errorCode)
+}
+
+/** ADR 0013: nothing is posted into a ledger kept in another currency than the Company's. Every push
+ * kind, bank statements included. An unreadable ledger currency is transient — the backoff retries
+ * it, and nothing is posted meanwhile; a mismatch is terminal until the currency is changed, which
+ * re-queues it (requeueLedgerCurrencyFailures). */
+async function gateLedgerCurrency(push: { workspaceId: string; documentId: string }, connection: { id: string; provider: string; externalTenantId: string | null; ledgerCurrency: string | null; ledgerCurrencyReadAt: Date | null }, now: Date): Promise<void> {
+  const ledgerCurrency = await readLedgerCurrency({ ...connection, workspaceId: push.workspaceId }, now, LEDGER_CURRENCY_REUSE_MS)
+  if (!ledgerCurrency) throw new IntegrationRetryableError("ledger_currency_unreadable")
+  const check = checkLedgerCurrency({ provider: connection.provider, ledgerCurrency, companyCurrency: await getCompanyCurrency(push.workspaceId) })
+  if (check.status === "fail") await failPreflight(push, check.checkCode, String(check.detail?.text))
 }
 
 /** How often a paused push (connection `needs_reconnect`) is re-checked — a fixed poke interval,
@@ -132,7 +151,7 @@ export async function attemptIntegrationPush(pushId: string, now = new Date()): 
       connection: {
         select: {
           id: true, provider: true, status: true, externalTenantId: true,
-          defaultExpenseAccountId: true,
+          defaultExpenseAccountId: true, ledgerCurrency: true, ledgerCurrencyReadAt: true,
         },
       },
     },
@@ -170,6 +189,7 @@ export async function attemptIntegrationPush(pushId: string, now = new Date()): 
     } else {
       try {
         const bill = { ...payloadRaw, currencyCode: payloadRaw.currencyCode ?? null }
+        await gateLedgerCurrency(push, connection, now)
         // A7.1: bill-shaped pushes are validated against the entity cache before any provider
         // call; bank-statement batches carry no vendor/expense-account pair to validate.
         if (payloadRaw.documentType !== "bank_statement") {
@@ -209,7 +229,13 @@ export async function attemptIntegrationPush(pushId: string, now = new Date()): 
   }
 
   const update = computePushUpdate(push.attempts, result, now, forceTerminal)
-  await prisma.integrationPush.update({ where: { id: push.id }, data: update })
+  // The first succeeded push of any kind locks the Company currency (ADR 0013), recorded with the
+  // success itself so a currency change can never slip in between the two.
+  const lockCause = (push.payload as { documentType?: string } | null)?.documentType === "bank_statement" ? "bank_statement" : "bill"
+  await prisma.$transaction(async (tx) => {
+    await tx.integrationPush.update({ where: { id: push.id }, data: update })
+    if (result.success) await recordCurrencyLock(push.workspaceId, lockCause, connection.provider, now, tx)
+  })
 
   if (result.success) {
     await recordSystemAudit({

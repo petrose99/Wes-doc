@@ -4,6 +4,7 @@ import { recordDocumentAudit } from "@/lib/audit"
 import { prisma } from "@/lib/db"
 import { applyFxToDocument } from "@/lib/fx/apply-to-document"
 import { isAllowedPair } from "@/lib/geo/company-currency"
+import { requeueLedgerCurrencyFailures } from "@/lib/integrations/ledger-currency"
 import { Prisma } from "@/prisma/client"
 
 export type CurrencyLockCause = "bill" | "bank_statement" | "payment_batch"
@@ -50,22 +51,24 @@ export async function countUnpostedDocuments(workspaceId: string): Promise<numbe
 /** Owner changes an unlocked company's currency (LS only: LSL ⇄ ZAR). The workspace row is held
  * FOR UPDATE so a concurrent push success or a second change waits; the lock and the pair are
  * re-read under it. A push mid-flight (leased) would post in the old currency, so it refuses.
+ * Pushes refused for a ledger-currency mismatch are re-queued in the same transaction (`requeued`).
  * Unposted documents are re-converted after commit — applyFxToDocument is idempotent and keeps
  * each document's own rate date, so a crash part-way is repaired by the next edit or re-run. */
-export async function changeCompanyCurrency(workspaceId: string, currency: string, actorId: string): Promise<{ count: number }> {
-  const documentIds = await prisma.$transaction(async (tx) => {
+export async function changeCompanyCurrency(workspaceId: string, currency: string, actorId: string): Promise<{ count: number; requeued: number }> {
+  const { documentIds, requeued } = await prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM workspaces WHERE id = ${workspaceId}::uuid FOR UPDATE`
     const workspace = await tx.workspace.findUniqueOrThrow({ where: { id: workspaceId }, select: { country: true, baseCurrency: true, ...lockSelect } })
     if (toLock(workspace).locked) throw new Error("company_currency_locked")
     if (!isAllowedPair(workspace.country, currency)) throw new Error("company_currency_not_allowed")
-    if (workspace.baseCurrency === currency) return []
+    if (workspace.baseCurrency === currency) return { documentIds: [], requeued: 0 }
     if (await tx.integrationPush.count({ where: { workspaceId, status: "pending", leaseUntil: { gt: new Date() } } })) throw new Error("company_currency_push_in_flight")
 
     const documents = await tx.document.findMany({ where: unposted(workspaceId), select: { id: true } })
     await tx.workspace.update({ where: { id: workspaceId }, data: { baseCurrency: currency } })
-    await recordDocumentAudit({ workspaceId, actorId, type: "company_currency_changed", detail: { from: workspace.baseCurrency, to: currency, count: documents.length } }, tx)
-    return documents.map((d) => d.id)
+    const requeued = await requeueLedgerCurrencyFailures(workspaceId, new Date(), tx)
+    await recordDocumentAudit({ workspaceId, actorId, type: "company_currency_changed", detail: { from: workspace.baseCurrency, to: currency, count: documents.length, requeued } }, tx)
+    return { documentIds: documents.map((d) => d.id), requeued }
   })
   for (const id of documentIds) await applyFxToDocument(id)
-  return { count: documentIds.length }
+  return { count: documentIds.length, requeued }
 }

@@ -119,6 +119,15 @@ export async function getOrganisationLockDates(tenantId: string, connectionId: s
   return { periodLockDate: org?.PeriodLockDate ?? null, endOfYearLockDate: org?.EndOfYearLockDate ?? null }
 }
 
+/** The currency the Xero organisation keeps its books in (`BaseCurrency` on `/Organisation`), as
+ * an ISO code. Throws when the provider does not say — a push must never guess. */
+export async function getBaseCurrency(tenantId: string, connectionId: string): Promise<string> {
+  const result = await apiRequest<{ Organisations?: Array<{ BaseCurrency?: string }> }>(tenantId, connectionId, "/Organisation")
+  const code = result.Organisations?.[0]?.BaseCurrency
+  if (!code) throw new Error("ledger_currency_missing")
+  return code
+}
+
 /** The full invoice row this correction path needs: Status/AmountPaid to tell paid from unpaid,
  * and the current LineItems so the update can resend every line unchanged except the AccountCode
  * the caller is correcting (Xero deletes any line omitted from an update, per the spec's design
