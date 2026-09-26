@@ -51,9 +51,13 @@ async function paginatedQuery<Row>(realmId: string, connectionId: string, queryW
   }
 }
 
-export type QuickBooksSyncedAccount = { id: string; name: string; active: boolean; accountType: string }
+export type QuickBooksSyncedAccount = { id: string; name: string; active: boolean; accountType: string; taxCodeId: string | null }
 export type QuickBooksSyncedVendor = { id: string; name: string; active: boolean }
-export type QuickBooksSyncedTaxCode = { id: string; name: string; active: boolean }
+/** Class, Department (Location) and Customer rows — the same three fields each. */
+export type QuickBooksSyncedListItem = QuickBooksSyncedVendor
+/** `forPurchases`: the code carries a purchase rate, so a bill line may use it; `percent` sums
+ * those purchase rates (a code can stack several), null when it has none. */
+export type QuickBooksSyncedTaxCode = { id: string; name: string; active: boolean; forPurchases: boolean; percent: number | null }
 
 /** All active accounts of any type, for WP1.5's chart-of-accounts sync — distinct from
  * listExpenseAccounts above, which stays scoped to the default-account picker's narrower need.
@@ -61,8 +65,8 @@ export type QuickBooksSyncedTaxCode = { id: string; name: string; active: boolea
  * server-side) so #429's Default-account guess can tell an Expense account from any other kind
  * without a second round-trip. */
 export async function listAccounts(realmId: string, connectionId: string): Promise<QuickBooksSyncedAccount[]> {
-  const rows = await paginatedQuery<{ Id: string; Name: string; Active: boolean; AccountType: string }>(realmId, connectionId, "select Id, Name, Active, AccountType from Account where Active = true", "Account")
-  return rows.map((row) => ({ id: row.Id, name: row.Name, active: row.Active, accountType: row.AccountType }))
+  const rows = await paginatedQuery<{ Id: string; Name: string; Active: boolean; AccountType: string; TaxCodeRef?: { value: string } }>(realmId, connectionId, "select Id, Name, Active, AccountType, TaxCodeRef from Account where Active = true", "Account")
+  return rows.map((row) => ({ id: row.Id, name: row.Name, active: row.Active, accountType: row.AccountType, taxCodeId: row.TaxCodeRef?.value ?? null }))
 }
 
 export async function listVendors(realmId: string, connectionId: string): Promise<QuickBooksSyncedVendor[]> {
@@ -71,8 +75,34 @@ export async function listVendors(realmId: string, connectionId: string): Promis
 }
 
 export async function listTaxCodes(realmId: string, connectionId: string): Promise<QuickBooksSyncedTaxCode[]> {
-  const rows = await paginatedQuery<{ Id: string; Name: string; Active: boolean }>(realmId, connectionId, "select Id, Name, Active from TaxCode where Active = true", "TaxCode")
-  return rows.map((row) => ({ id: row.Id, name: row.Name, active: row.Active }))
+  type Wire = { Id: string; Name: string; Active: boolean; PurchaseTaxRateList?: { TaxRateDetail?: Array<{ TaxRateRef: { value: string } }> } }
+  const [codes, rates] = await Promise.all([
+    paginatedQuery<Wire>(realmId, connectionId, "select * from TaxCode where Active = true", "TaxCode"),
+    paginatedQuery<{ Id: string; RateValue?: number }>(realmId, connectionId, "select Id, RateValue from TaxRate", "TaxRate"),
+  ])
+  const percentByRate = new Map(rates.map((rate) => [rate.Id, rate.RateValue ?? 0]))
+  return codes.map((row) => {
+    const purchaseRates = row.PurchaseTaxRateList?.TaxRateDetail ?? []
+    const forPurchases = purchaseRates.length > 0
+    const percent = forPurchases ? purchaseRates.reduce((sum, d) => sum + (percentByRate.get(d.TaxRateRef.value) ?? 0), 0) : null
+    return { id: row.Id, name: row.Name, active: row.Active, forPurchases, percent }
+  })
+}
+
+/** Class and Department use the full "Parent:Child" path as their name — the same label QuickBooks
+ * shows in its own pickers, so a nested Class never reads as its bare leaf. */
+async function listNamedList(realmId: string, connectionId: string, entity: "Class" | "Department"): Promise<QuickBooksSyncedListItem[]> {
+  const rows = await paginatedQuery<{ Id: string; FullyQualifiedName: string; Active: boolean }>(realmId, connectionId, `select Id, FullyQualifiedName, Active from ${entity} where Active = true`, entity)
+  return rows.map((row) => ({ id: row.Id, name: row.FullyQualifiedName, active: row.Active }))
+}
+
+export const listClasses = (realmId: string, connectionId: string) => listNamedList(realmId, connectionId, "Class")
+/** QuickBooks calls a Location a Department in its API. */
+export const listDepartments = (realmId: string, connectionId: string) => listNamedList(realmId, connectionId, "Department")
+
+export async function listCustomers(realmId: string, connectionId: string): Promise<QuickBooksSyncedListItem[]> {
+  const rows = await paginatedQuery<{ Id: string; DisplayName: string; Active: boolean }>(realmId, connectionId, "select Id, DisplayName, Active from Customer where Active = true", "Customer")
+  return rows.map((row) => ({ id: row.Id, name: row.DisplayName, active: row.Active }))
 }
 
 /** Finds a vendor by exact DisplayName, or creates one. No fuzzy dedup — an exact match or a new

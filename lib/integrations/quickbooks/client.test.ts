@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { findBillByDocNumber, getCompanyInfo, getPreferences, listAccounts, voidBill } from "@/lib/integrations/quickbooks/client"
+import { findBillByDocNumber, getCompanyInfo, getPreferences, listAccounts, listClasses, listCustomers, listDepartments, listTaxCodes, voidBill } from "@/lib/integrations/quickbooks/client"
 
 const jsonReply = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } })
 
@@ -33,7 +33,7 @@ describe("listAccounts pagination", () => {
   it("stops after a page shorter than the page size", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ QueryResponse: { Account: [{ Id: "1", Name: "A", Active: true }] } }))
     const accounts = await listAccounts("realm1", "token1")
-    expect(accounts).toEqual([{ id: "1", name: "A", active: true }])
+    expect(accounts).toEqual([{ id: "1", name: "A", active: true, taxCodeId: null }])
     expect(fetch).toHaveBeenCalledTimes(1)
   })
 
@@ -103,5 +103,56 @@ describe("voidBill", () => {
       .mockResolvedValueOnce(jsonResponse({ QueryResponse: { Bill: [{ Id: "42", SyncToken: "3" }] } }))
       .mockResolvedValueOnce(new Response("", { status: 500 }))
     await expect(voidBill("realm1", "token1", "42")).rejects.toThrow()
+  })
+})
+
+describe("reference reads for line coding", () => {
+  const originalFetch = global.fetch
+  beforeEach(() => { vi.stubGlobal("fetch", vi.fn()) })
+  afterEach(() => { global.fetch = originalFetch })
+  const queryOf = (call: number) => decodeURIComponent(vi.mocked(fetch).mock.calls[call][0] as string)
+
+  it("listAccounts carries each account's default Tax code", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonReply({ QueryResponse: { Account: [{ Id: "7", Name: "Fuel", Active: true, AccountType: "Expense", TaxCodeRef: { value: "3" } }] } }))
+    await expect(listAccounts("realm1", "token1")).resolves.toEqual([{ id: "7", name: "Fuel", active: true, accountType: "Expense", taxCodeId: "3" }])
+    expect(queryOf(0)).toContain("TaxCodeRef")
+  })
+
+  it("listTaxCodes marks purchase codes and sums their purchase rates' percent", async () => {
+    vi.mocked(fetch).mockImplementation(async (url) => {
+      const q = decodeURIComponent(url as string)
+      if (q.includes("from TaxRate")) return jsonReply({ QueryResponse: { TaxRate: [{ Id: "r1", RateValue: 15 }, { Id: "r2", RateValue: 0 }] } })
+      return jsonReply({ QueryResponse: { TaxCode: [
+        { Id: "3", Name: "Standard", Active: true, PurchaseTaxRateList: { TaxRateDetail: [{ TaxRateRef: { value: "r1" } }] } },
+        { Id: "4", Name: "Zero", Active: true, PurchaseTaxRateList: { TaxRateDetail: [{ TaxRateRef: { value: "r2" } }] } },
+        { Id: "5", Name: "Sales only", Active: true, PurchaseTaxRateList: { TaxRateDetail: [] } },
+      ] } })
+    })
+    await expect(listTaxCodes("realm1", "token1")).resolves.toEqual([
+      { id: "3", name: "Standard", active: true, forPurchases: true, percent: 15 },
+      { id: "4", name: "Zero", active: true, forPurchases: true, percent: 0 },
+      { id: "5", name: "Sales only", active: true, forPurchases: false, percent: null },
+    ])
+  })
+
+  it("listClasses, listDepartments and listCustomers page through their entity", async () => {
+    const fullPage = Array.from({ length: 200 }, (_, i) => ({ Id: String(i), Name: `C${i}`, FullyQualifiedName: `C${i}`, DisplayName: `C${i}`, Active: true }))
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(jsonReply({ QueryResponse: { Customer: fullPage } }))
+      .mockResolvedValueOnce(jsonReply({ QueryResponse: { Customer: [{ Id: "200", DisplayName: "Last", Active: true }] } }))
+    const customers = await listCustomers("realm1", "token1")
+    expect(customers).toHaveLength(201)
+    expect(customers[200]).toEqual({ id: "200", name: "Last", active: true })
+    expect(queryOf(1)).toContain("startposition 201")
+
+    vi.mocked(fetch).mockReset()
+    vi.mocked(fetch).mockResolvedValueOnce(jsonReply({ QueryResponse: { Class: [{ Id: "c1", FullyQualifiedName: "Retail:North", Active: true }] } }))
+    await expect(listClasses("realm1", "token1")).resolves.toEqual([{ id: "c1", name: "Retail:North", active: true }])
+    expect(queryOf(0)).toContain("from Class")
+
+    vi.mocked(fetch).mockReset()
+    vi.mocked(fetch).mockResolvedValueOnce(jsonReply({ QueryResponse: { Department: [{ Id: "d1", FullyQualifiedName: "Cape Town", Active: true }] } }))
+    await expect(listDepartments("realm1", "token1")).resolves.toEqual([{ id: "d1", name: "Cape Town", active: true }])
+    expect(queryOf(0)).toContain("from Department")
   })
 })

@@ -58,7 +58,7 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ w
         listCategoryAccountMappings(workspaceId, activeConnection.id),
         listAccountingEntities(workspaceId, "account"),
         listLibraryFacets(workspaceId),
-        listAccountingEntitiesIncludingInactive(workspaceId, "account"),
+        listAccountingEntitiesIncludingInactive(workspaceId, activeConnection.id, "account"),
         listSupplierAccountRules(workspaceId, activeConnection.id),
       ])
     : [[], [], null, [], []]

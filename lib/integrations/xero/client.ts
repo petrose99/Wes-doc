@@ -27,17 +27,18 @@ export async function listExpenseAccounts(tenantId: string, connectionId: string
   return (result.Accounts ?? []).map((a) => ({ code: a.Code, name: a.Name }))
 }
 
-export type XeroSyncedAccount = { code: string; name: string; active: boolean; accountClass: string }
+export type XeroSyncedAccount = { code: string; name: string; active: boolean; accountClass: string; taxType: string | null }
 export type XeroSyncedContact = { id: string; name: string; active: boolean }
-export type XeroSyncedTaxRate = { name: string; active: boolean }
+/** `taxType` is the rate's stable key — what a bill line's TaxType is set from. */
+export type XeroSyncedTaxRate = { taxType: string; name: string; percent: number; canApplyToExpenses: boolean; active: boolean }
 
 /** All accounts (any class, any status) for WP1.5's chart-of-accounts sync — Xero has no
  * server-side pagination for /Accounts (unlike /Contacts), so this is a single request.
  * `accountClass` rides along so #429's Default-account guess can tell an EXPENSE account from any
  * other kind without a second round-trip. */
 export async function listAccounts(tenantId: string, connectionId: string): Promise<XeroSyncedAccount[]> {
-  const result = await apiRequest<{ Accounts?: Array<{ Code?: string; Name: string; Status: string; Class: string }> }>(tenantId, connectionId, "/Accounts")
-  return (result.Accounts ?? []).filter((a) => a.Code).map((a) => ({ code: a.Code as string, name: a.Name, active: a.Status === "ACTIVE", accountClass: a.Class }))
+  const result = await apiRequest<{ Accounts?: Array<{ Code?: string; Name: string; Status: string; Class: string; TaxType?: string }> }>(tenantId, connectionId, "/Accounts")
+  return (result.Accounts ?? []).filter((a) => a.Code).map((a) => ({ code: a.Code as string, name: a.Name, active: a.Status === "ACTIVE", accountClass: a.Class, taxType: a.TaxType ?? null }))
 }
 
 /** Every contact flagged as a supplier. /Contacts pages at 100 rows via the `page` query param;
@@ -57,8 +58,8 @@ export async function listContacts(tenantId: string, connectionId: string): Prom
 }
 
 export async function listTaxRates(tenantId: string, connectionId: string): Promise<XeroSyncedTaxRate[]> {
-  const result = await apiRequest<{ TaxRates?: Array<{ Name: string; Status: string }> }>(tenantId, connectionId, "/TaxRates")
-  return (result.TaxRates ?? []).map((rate) => ({ name: rate.Name, active: rate.Status === "ACTIVE" }))
+  const result = await apiRequest<{ TaxRates?: Array<{ Name: string; TaxType: string; Status: string; EffectiveRate?: number; CanApplyToExpenses?: boolean }> }>(tenantId, connectionId, "/TaxRates")
+  return (result.TaxRates ?? []).map((rate) => ({ taxType: rate.TaxType, name: rate.Name, percent: rate.EffectiveRate ?? 0, canApplyToExpenses: rate.CanApplyToExpenses === true, active: rate.Status === "ACTIVE" }))
 }
 
 /** Finds a contact by exact Name, or creates one. No fuzzy dedup, per scope. */

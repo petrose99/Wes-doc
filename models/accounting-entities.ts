@@ -3,7 +3,9 @@
 import { prisma } from "@/lib/db"
 import { cache } from "react"
 
-export const listAccountingEntities = cache(async (workspaceId: string, entityType: "account" | "vendor" | "tax_rate") => prisma.accountingEntity.findMany({
+export type AccountingEntityType = "account" | "vendor" | "tax_rate" | "tracking_option" | "location" | "customer"
+
+export const listAccountingEntities = cache(async (workspaceId: string, entityType: AccountingEntityType) => prisma.accountingEntity.findMany({
   where: { workspaceId, entityType, active: true },
   orderBy: { name: "asc" },
 }))
@@ -11,9 +13,11 @@ export const listAccountingEntities = cache(async (workspaceId: string, entityTy
 /** Same as listAccountingEntities but including inactive rows — a prior sync marked an account
  * inactive once the provider stopped returning it (an archive at the provider). The Supplier
  * accounts table (#429) needs this to tell an archived supplier account's row apart from a live
- * one, which listAccountingEntities's active-only filter would otherwise hide entirely. */
-export const listAccountingEntitiesIncludingInactive = cache(async (workspaceId: string, entityType: "account" | "vendor" | "tax_rate") => prisma.accountingEntity.findMany({
-  where: { workspaceId, entityType },
+ * one, which listAccountingEntities's active-only filter would otherwise hide entirely. Scoped to
+ * one connection: inactive rows outlive a disconnect, and a prior ledger's archived account must
+ * never read as this ledger's. */
+export const listAccountingEntitiesIncludingInactive = cache(async (workspaceId: string, connectionId: string, entityType: AccountingEntityType) => prisma.accountingEntity.findMany({
+  where: { workspaceId, connectionId, entityType },
   orderBy: { name: "asc" },
 }))
 
