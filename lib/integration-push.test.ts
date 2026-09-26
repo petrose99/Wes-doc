@@ -13,19 +13,20 @@ vi.mock("@/lib/integration-preflight", () => ({ preflightPush: vi.fn().mockRetur
 vi.mock("@/models/review-tasks", () => ({ createReviewTask: vi.fn().mockResolvedValue(undefined) }))
 vi.mock("@/lib/integrations/quickbooks/client", () => ({
   findOrCreateVendor: vi.fn().mockResolvedValue("vendor-1"),
-  createBill: vi.fn().mockResolvedValue({ id: "bill-1" }),
+  createBill: vi.fn().mockResolvedValue({ id: "bill-1", totalTax: null, total: null, warnings: [] }),
   findBillByDocNumber: vi.fn().mockResolvedValue(false),
 }))
 vi.mock("@/lib/integrations/quickbooks/bill-mapper", () => ({ toQuickBooksBillBody: vi.fn().mockReturnValue({}) }))
 vi.mock("@/lib/integrations/xero/client", () => ({
   findOrCreateContact: vi.fn().mockResolvedValue("contact-1"),
-  createBill: vi.fn().mockResolvedValue({ id: "bill-1" }),
+  createBill: vi.fn().mockResolvedValue({ id: "bill-1", totalTax: null, total: null, warnings: [] }),
   findBillByInvoiceNumber: vi.fn().mockResolvedValue(false),
 }))
 vi.mock("@/lib/integrations/xero/bill-mapper", () => ({ toXeroBillBody: vi.fn().mockReturnValue({}) }))
 vi.mock("@/lib/integrations/ledger-currency", () => ({ LEDGER_CURRENCY_REUSE_MS: 60_000, readLedgerCurrency: vi.fn().mockResolvedValue("USD") }))
 vi.mock("@/lib/integrations/ledger-capabilities", () => ({ LEDGER_CAPABILITIES_REUSE_MS: 86_400_000, readLedgerCapabilities: vi.fn() }))
 vi.mock("@/models/accounting-entities", () => ({ loadLineCodingContext: vi.fn() }))
+vi.mock("@/models/document-checks", () => ({ recordLedgerReadBack: vi.fn().mockResolvedValue(undefined) }))
 vi.mock("@/models/company-currency", () => ({ readCompanyCurrencyForPush: vi.fn().mockResolvedValue("USD"), recordCurrencyLock: vi.fn().mockResolvedValue(undefined) }))
 
 const { attemptIntegrationPush, getLedgerConnectionBandStatus } = await import("./integration-push")
@@ -38,6 +39,7 @@ const capabilities = (await import("./integrations/ledger-capabilities")) as unk
 const entities = (await import("@/models/accounting-entities")) as unknown as Record<string, any>
 const { IntegrationPermanentError, IntegrationRetryableError } = await import("./integrations/errors")
 const reviewTasks = (await import("@/models/review-tasks")) as unknown as Record<string, any>
+const documentChecks = (await import("@/models/document-checks")) as unknown as Record<string, any>
 
 const now = new Date("2026-09-22T12:00:00.000Z")
 
@@ -216,7 +218,7 @@ describe("attemptIntegrationPush — line coding (ADR 0014)", () => {
   beforeEach(() => {
     capabilities.readLedgerCapabilities.mockReset().mockResolvedValue(caps)
     entities.loadLineCodingContext.mockReset().mockImplementation(async (_ws: string, _c: unknown, read: unknown) => ({ ...context, capabilities: read }))
-    quickbooks.createBill.mockReset().mockResolvedValue({ id: "bill-1" })
+    quickbooks.createBill.mockReset().mockResolvedValue({ id: "bill-1", totalTax: null, total: null, warnings: [] })
     reviewTasks.createReviewTask.mockClear()
   })
 
@@ -236,7 +238,7 @@ describe("attemptIntegrationPush — line coding (ADR 0014)", () => {
     const prisma = makePrisma(coded({ taxCode: "TAX" }))
     db.prisma = prisma
     await attemptIntegrationPush("push-1", now)
-    expect(prisma.integrationPush.update.mock.calls[0][0].data.status).toBe("succeeded")
+    expect(prisma.integrationPush.update.mock.calls[0][0].data).toMatchObject({ status: "succeeded" })
   })
 
   it("leaves the push pending when the ledger's settings can't be read, never posting it", async () => {
@@ -255,7 +257,7 @@ describe("attemptIntegrationPush — line coding (ADR 0014)", () => {
     db.prisma = prisma
     await attemptIntegrationPush("push-1", now)
     expect(capabilities.readLedgerCapabilities).not.toHaveBeenCalled()
-    expect(prisma.integrationPush.update.mock.calls[0][0].data.status).toBe("succeeded")
+    expect(prisma.integrationPush.update.mock.calls[0][0].data).toMatchObject({ status: "succeeded" })
   })
 
   it("on a 5030, re-reads the ledger fresh and names the Check that now fails", async () => {
@@ -278,6 +280,35 @@ describe("attemptIntegrationPush — line coding (ADR 0014)", () => {
     expect(update.data.status).toBe("failed")
     expect(update.data.errorCode).toBe("quickbooks_feature_not_supported")
     expect(reviewTasks.createReviewTask).toHaveBeenCalledWith(expect.objectContaining({ detail: expect.stringMatching(/^quickbooks_feature_not_supported: /) }))
+  })
+})
+
+describe("attemptIntegrationPush — post read-back (ADR 0014)", () => {
+  const readBackPush = () => makePush({ payload: { ...makePush().payload, taxBasis: "exclusive", taxTotal: 20, lineItems: [] } })
+  // No coding context: the push gate has nothing to judge, so these cases reach the ledger.
+  beforeEach(() => { entities.loadLineCodingContext.mockReset() })
+
+  it("writes the ledger's warn Checks after the push is marked posted", async () => {
+    quickbooks.createBill.mockResolvedValueOnce({ id: "bill-1", totalTax: 19, total: 119, warnings: [] })
+    const prisma = makePrisma(readBackPush())
+    prisma.integrationPush.update.mockImplementation(async () => {
+      expect(documentChecks.recordLedgerReadBack).not.toHaveBeenCalled()
+      return {}
+    })
+    db.prisma = prisma
+    await attemptIntegrationPush("push-1", now)
+    expect(prisma.integrationPush.update.mock.calls[0][0].data).toMatchObject({ status: "succeeded" })
+    expect(documentChecks.recordLedgerReadBack).toHaveBeenCalledWith("w1", "d1", [expect.objectContaining({ checkCode: "ledger_vat_differs", status: "warn" })])
+  })
+
+  it("keeps the push posted when writing the read-back fails", async () => {
+    quickbooks.createBill.mockResolvedValueOnce({ id: "bill-1", totalTax: 19, total: 119, warnings: [] })
+    documentChecks.recordLedgerReadBack.mockRejectedValueOnce(new Error("db down"))
+    const prisma = makePrisma(readBackPush())
+    db.prisma = prisma
+    await expect(attemptIntegrationPush("push-1", now)).resolves.toBeUndefined()
+    expect(prisma.integrationPush.update).toHaveBeenCalledTimes(1)
+    expect(prisma.integrationPush.update.mock.calls[0][0].data).toMatchObject({ status: "succeeded" })
   })
 })
 

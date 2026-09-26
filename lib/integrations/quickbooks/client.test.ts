@@ -111,6 +111,22 @@ describe("voidBill", () => {
   })
 })
 
+describe("createBill read-back", () => {
+  const originalFetch = global.fetch
+  beforeEach(() => { vi.stubGlobal("fetch", vi.fn()) })
+  afterEach(() => { global.fetch = originalFetch })
+
+  it("returns the VAT and total QuickBooks computed", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ Bill: { Id: "42", TotalAmt: 120, TxnTaxDetail: { TotalTax: 20 } } }))
+    await expect(createBill("realm1", "conn1", {}, "r1")).resolves.toEqual({ id: "42", totalTax: 20, total: 120, warnings: [] })
+  })
+
+  it("reads missing totals as null", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ Bill: { Id: "42" } }))
+    await expect(createBill("realm1", "conn1", {}, null)).resolves.toEqual({ id: "42", totalTax: null, total: null, warnings: [] })
+  })
+})
+
 describe("reference reads for line coding", () => {
   const originalFetch = global.fetch
   beforeEach(() => { vi.stubGlobal("fetch", vi.fn()) })

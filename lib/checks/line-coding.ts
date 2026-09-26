@@ -6,6 +6,7 @@
  * clean bill returns []; the caller clears any earlier fail. */
 import { PROVIDER_LABELS } from "@/lib/checks/ledger-currency"
 import { amountTolerance, type CheckResult } from "@/lib/checks/types"
+import { formatCurrency } from "@/lib/money"
 import type { CodingReferences, TaxBasis, TrackingSelection } from "@/lib/finance/line-coding"
 import type { LedgerCapabilities } from "@/lib/integrations/ledger-capabilities"
 
@@ -83,6 +84,27 @@ export function checkLineCoding(input: LineCodingInput): CheckResult[] {
         fail("vat_mismatch_invoice", "VAT won't match the invoice", `Check the VAT on the document, and each line's account's tax code in ${ledger}.`, ["tax_total"])
       }
     }
+  }
+  return results
+}
+
+/** ADR 0014: what the ledger said back after a bill posted — its own VAT against the invoice's,
+ * and the first warning it raised. Both are "warn": the bill is already in the ledger, so these
+ * point the reviewer at it rather than block anything. */
+export function ledgerReadBackChecks(
+  provider: string,
+  bill: { taxBasis: TaxBasis | null; taxTotal: number | null; currencyCode: string | null },
+  readBack: { totalTax: number | null; warnings: string[] },
+): CheckResult[] {
+  const ledger = PROVIDER_LABELS[provider] ?? provider
+  const results: CheckResult[] = []
+  const { totalTax } = readBack
+  if (bill.taxBasis && bill.taxBasis !== "none" && bill.taxTotal !== null && totalTax !== null && Math.abs(totalTax - bill.taxTotal) > amountTolerance(bill.currencyCode)) {
+    const message = `${ledger} worked out VAT of ${formatCurrency(totalTax, bill.currencyCode)}; the invoice says ${formatCurrency(bill.taxTotal, bill.currencyCode)}`
+    results.push({ checkCode: "ledger_vat_differs", status: "warn", message, fields: ["tax_total"], detail: { text: `Open the bill in ${ledger} and check each line's tax code against the invoice.` } })
+  }
+  if (readBack.warnings[0]) {
+    results.push({ checkCode: "ledger_warnings", status: "warn", message: `${ledger} flagged this bill: ${readBack.warnings[0]}`, detail: { text: `Open the bill in ${ledger} and check what it flagged.` } })
   }
   return results
 }

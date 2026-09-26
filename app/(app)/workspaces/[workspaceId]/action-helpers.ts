@@ -99,6 +99,8 @@ const BILLING_MESSAGES: Record<string, string> = {
   billable_needs_customer: "Save review to clear Billable.",
   tax_basis_unclear: "Check the subtotal, VAT and total on the document match its lines, then save review.",
   vat_mismatch_invoice: "Check the VAT on the document, and each line's account's tax code in your ledger.",
+  ledger_vat_differs: "Open the bill in your ledger and check each line's tax code against the invoice.",
+  ledger_warnings: "Open the bill in your ledger and check what it flagged.",
   quickbooks_feature_not_supported: "QuickBooks turned down a field this plan doesn't offer. Sync accounts, then check the bill.",
 }
 

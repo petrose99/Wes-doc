@@ -134,13 +134,16 @@ export async function findBillByDocNumber(realmId: string, connectionId: string,
 /** Creates the bill. `body` is the exact shape from lib/integrations/quickbooks/bill-mapper.ts.
  * A7.2: `requestId` rides QuickBooks' `requestid` idempotency param — the same token replayed
  * after a timeout returns the originally created bill instead of creating a second one. */
-export async function createBill(realmId: string, connectionId: string, body: unknown, requestId?: string | null): Promise<{ id: string }> {
+/** ADR 0014: returns the VAT and total QuickBooks computed so the push can compare them with the
+ * invoice. QuickBooks' create response carries no warnings list, so `warnings` is always empty. */
+export async function createBill(realmId: string, connectionId: string, body: unknown, requestId?: string | null): Promise<{ id: string; totalTax: number | null; total: number | null; warnings: string[] }> {
   const path = requestId ? `/bill?requestid=${encodeURIComponent(requestId)}` : "/bill"
-  const created = await apiRequest<{ Bill: { Id: string } }>(realmId, connectionId, path, {
+  const created = await apiRequest<{ Bill: { Id: string; TotalAmt?: number; TxnTaxDetail?: { TotalTax?: number } } }>(realmId, connectionId, path, {
     method: "POST",
     body: JSON.stringify(body),
   })
-  return { id: created.Bill.Id }
+  const bill = created.Bill
+  return { id: bill.Id, totalTax: bill.TxnTaxDetail?.TotalTax ?? null, total: bill.TotalAmt ?? null, warnings: [] }
 }
 
 /** Fetches just the Id/SyncToken QBO's void operation needs — voidBill below can't just send the

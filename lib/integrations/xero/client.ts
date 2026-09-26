@@ -86,15 +86,18 @@ export async function findBillByInvoiceNumber(tenantId: string, connectionId: st
 }
 
 /** Creates the bill (an ACCPAY invoice). `body` is the exact shape from
- * lib/integrations/xero/bill-mapper.ts. */
-export async function createBill(tenantId: string, connectionId: string, body: unknown, idempotencyKey?: string | null): Promise<{ id: string }> {
-  const created = await apiRequest<{ Invoices: Array<{ InvoiceID: string }> }>(tenantId, connectionId, "/Invoices", {
+ * lib/integrations/xero/bill-mapper.ts. ADR 0014: returns the VAT, total and warnings Xero sent
+ * back so the push can compare them with the invoice. */
+export async function createBill(tenantId: string, connectionId: string, body: unknown, idempotencyKey?: string | null): Promise<{ id: string; totalTax: number | null; total: number | null; warnings: string[] }> {
+  const created = await apiRequest<{ Invoices: Array<{ InvoiceID: string; TotalTax?: number; Total?: number; Warnings?: Array<{ Message?: string }> }> }>(tenantId, connectionId, "/Invoices", {
     method: "POST",
     body: JSON.stringify(body),
     // A7.2: Xero dedupes on this for 24h — a retry after a timeout can't double-create the bill.
     ...(idempotencyKey ? { headers: { "Idempotency-Key": idempotencyKey } } : {}),
   })
-  return { id: created.Invoices[0].InvoiceID }
+  const invoice = created.Invoices[0]
+  const warnings = (invoice.Warnings ?? []).flatMap((w) => (w.Message ? [w.Message] : []))
+  return { id: invoice.InvoiceID, totalTax: invoice.TotalTax ?? null, total: invoice.Total ?? null, warnings }
 }
 
 /** Voids a bill (an ACCPAY invoice) — Xero has no separate delete endpoint for invoices, only a

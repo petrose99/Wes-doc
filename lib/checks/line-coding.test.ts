@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { checkLineCoding, firstLineCodingFail, lineCodingInputFromBill, lineCodingInputFromDocument, type LineCodingInput } from "@/lib/checks/line-coding"
+import { checkLineCoding, firstLineCodingFail, ledgerReadBackChecks, lineCodingInputFromBill, lineCodingInputFromDocument, type LineCodingInput } from "@/lib/checks/line-coding"
 
 const ON = { vat: true, tracking: [{ id: "class", name: "Class" }], location: true, customer: true, billable: true }
 
@@ -129,5 +129,25 @@ describe("firstLineCodingFail", () => {
   it("is null with nothing resolved to judge, or before the ledger's capabilities were read", () => {
     expect(firstLineCodingFail(context, { codingData: {}, reviewedData: {} })).toBeNull()
     expect(firstLineCodingFail(null, { codingData: { items: [{ tax_code: null }] }, reviewedData: {} })).toBeNull()
+  })
+})
+
+describe("ledgerReadBackChecks", () => {
+  const bill = { taxBasis: "exclusive" as const, taxTotal: 20, currencyCode: "GBP" }
+  it("warns when the ledger worked out different VAT from the invoice", () => {
+    const [check] = ledgerReadBackChecks("xero", bill, { totalTax: 19, warnings: [] })
+    expect(check).toMatchObject({ checkCode: "ledger_vat_differs", status: "warn", fields: ["tax_total"] })
+    expect(check.message).toMatch(/^Xero worked out VAT of .*19\.00; the invoice says .*20\.00$/)
+  })
+  it("stays quiet within tolerance, with no VAT basis, or when either side didn't say", () => {
+    expect(ledgerReadBackChecks("xero", bill, { totalTax: 20.004, warnings: [] })).toEqual([])
+    expect(ledgerReadBackChecks("xero", { ...bill, taxBasis: "none" }, { totalTax: 0, warnings: [] })).toEqual([])
+    expect(ledgerReadBackChecks("xero", { ...bill, taxTotal: null }, { totalTax: 3, warnings: [] })).toEqual([])
+    expect(ledgerReadBackChecks("quickbooks", bill, { totalTax: null, warnings: [] })).toEqual([])
+  })
+  it("passes on the ledger's first warning", () => {
+    const [check] = ledgerReadBackChecks("xero", bill, { totalTax: 20, warnings: ["Account 400 is archived", "second"] })
+    expect(check).toMatchObject({ checkCode: "ledger_warnings", status: "warn" })
+    expect(check.message).toBe("Xero flagged this bill: Account 400 is archived")
   })
 })

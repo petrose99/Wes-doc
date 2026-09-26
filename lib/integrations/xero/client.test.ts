@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { findBillByInvoiceNumber, listAccounts, listTaxRates, listTrackingCategories, voidBill } from "@/lib/integrations/xero/client"
+import { createBill, findBillByInvoiceNumber, listAccounts, listTaxRates, listTrackingCategories, voidBill } from "@/lib/integrations/xero/client"
 
 const jsonReply = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } })
 
@@ -63,6 +63,22 @@ describe("voidBill", () => {
   it("throws on a non-2xx response, same as createBill", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(new Response("", { status: 500 }))
     await expect(voidBill("tenant1", "token1", "abc")).rejects.toThrow()
+  })
+})
+
+describe("createBill read-back", () => {
+  const originalFetch = global.fetch
+  beforeEach(() => { vi.stubGlobal("fetch", vi.fn()) })
+  afterEach(() => { global.fetch = originalFetch })
+
+  it("returns the ledger's own VAT, total and warnings", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonReply({ Invoices: [{ InvoiceID: "inv1", TotalTax: 20, Total: 120, Warnings: [{ Message: "Account code 400 is archived" }] }] }))
+    await expect(createBill("tenant1", "token1", {}, "k1")).resolves.toEqual({ id: "inv1", totalTax: 20, total: 120, warnings: ["Account code 400 is archived"] })
+  })
+
+  it("reads missing totals as null and no warnings as none", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonReply({ Invoices: [{ InvoiceID: "inv1" }] }))
+    await expect(createBill("tenant1", "token1", {}, null)).resolves.toEqual({ id: "inv1", totalTax: null, total: null, warnings: [] })
   })
 })
 

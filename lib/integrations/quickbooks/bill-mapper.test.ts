@@ -2,10 +2,13 @@ import { describe, expect, it } from "vitest"
 import { toQuickBooksBillBody } from "@/lib/integrations/quickbooks/bill-mapper"
 import { BillMappingError, type NormalizedBill } from "@/lib/integration-bill-mapping"
 
+const noCoding = { taxCode: null, tracking: [], customer: null, billable: false }
+
 const bill: NormalizedBill = {
+  taxBasis: "none", location: null, subtotal: null, taxTotal: null,
   documentId: "d1", filename: "invoice.pdf", vendorName: "Acme", referenceNumber: "INV-1",
   issueDate: "2026-08-01", dueDate: "2026-08-31", total: 40, currencyCode: null,
-  lineItems: [{ description: "Widget", quantity: 1, unitPrice: 40, amount: 40, accountExternalId: "a1" }],
+  lineItems: [{ description: "Widget", quantity: 1, unitPrice: 40, amount: 40, accountExternalId: "a1", ...noCoding }],
 }
 
 describe("toQuickBooksBillBody", () => {
@@ -23,16 +26,47 @@ describe("toQuickBooksBillBody", () => {
     const twoLines: NormalizedBill = {
       ...bill,
       lineItems: [
-        { description: "Widget", quantity: 1, unitPrice: 10, amount: 10, accountExternalId: "a1" },
-        { description: "Gadget", quantity: 1, unitPrice: 30, amount: 30, accountExternalId: "a2" },
+        { description: "Widget", quantity: 1, unitPrice: 10, amount: 10, accountExternalId: "a1", ...noCoding },
+        { description: "Gadget", quantity: 1, unitPrice: 30, amount: 30, accountExternalId: "a2", ...noCoding },
       ],
     }
     const body = toQuickBooksBillBody(twoLines, "v1")
     expect(body.Line.map((line) => line.AccountBasedExpenseLineDetail.AccountRef.value)).toEqual(["a1", "a2"])
   })
 
+  it("maps the Tax basis to GlobalTaxCalculation and lets the ledger compute TotalAmt (ADR 0014)", () => {
+    const coded: NormalizedBill = { ...bill, lineItems: [{ ...bill.lineItems[0], taxCode: "TX20" }] }
+    const inclusive = toQuickBooksBillBody({ ...coded, taxBasis: "inclusive" }, "v1")
+    expect(inclusive.GlobalTaxCalculation).toBe("TaxInclusive")
+    expect(inclusive).not.toHaveProperty("TotalAmt")
+    expect(inclusive.Line[0].AccountBasedExpenseLineDetail.TaxCodeRef).toEqual({ value: "TX20" })
+    const exclusive = toQuickBooksBillBody({ ...coded, taxBasis: "exclusive" }, "v1")
+    expect(exclusive.GlobalTaxCalculation).toBe("TaxExcluded")
+    expect(exclusive).not.toHaveProperty("TotalAmt")
+    const none = toQuickBooksBillBody({ ...coded, taxBasis: "none" }, "v1")
+    expect(none.GlobalTaxCalculation).toBe("NotApplicable")
+    expect(none.TotalAmt).toBe(40)
+    expect(none.Line[0].AccountBasedExpenseLineDetail).not.toHaveProperty("TaxCodeRef")
+  })
+
+  it("carries Class, Customer, billable status per line and Location on the bill", () => {
+    const coded: NormalizedBill = {
+      ...bill, location: "dep1",
+      lineItems: [{ ...bill.lineItems[0], customer: "cu1", billable: true, tracking: [{ categoryId: "class", categoryName: "Class", optionId: "cl1", optionName: "Retail" }] }],
+    }
+    const body = toQuickBooksBillBody(coded, "v1")
+    expect(body.DepartmentRef).toEqual({ value: "dep1" })
+    const detail = body.Line[0].AccountBasedExpenseLineDetail
+    expect(detail.ClassRef).toEqual({ value: "cl1" })
+    expect(detail.CustomerRef).toEqual({ value: "cu1" })
+    expect(detail.BillableStatus).toBe("Billable")
+    const plain = toQuickBooksBillBody(bill, "v1")
+    expect(plain).not.toHaveProperty("DepartmentRef")
+    expect(plain.Line[0].AccountBasedExpenseLineDetail).toEqual({ AccountRef: { value: "a1" } })
+  })
+
   it("refuses a line with no resolved account", () => {
-    const missing: NormalizedBill = { ...bill, lineItems: [{ description: "Widget", quantity: 1, unitPrice: 40, amount: 40, accountExternalId: null }] }
+    const missing: NormalizedBill = { ...bill, lineItems: [{ description: "Widget", quantity: 1, unitPrice: 40, amount: 40, accountExternalId: null, ...noCoding }] }
     expect(() => toQuickBooksBillBody(missing, "v1")).toThrow(BillMappingError)
   })
 })

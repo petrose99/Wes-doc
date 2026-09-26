@@ -7,7 +7,9 @@ import { NormalizedBill } from "@/lib/integration-bill-mapping"
 import { IntegrationAuthError, IntegrationPermanentError, IntegrationRetryableError, safeErrorCode } from "@/lib/integrations/errors"
 import { checkLedgerCurrency } from "@/lib/checks/ledger-currency"
 import { LEDGER_CURRENCY_REUSE_MS, readLedgerCurrency } from "@/lib/integrations/ledger-currency"
-import { checkLineCoding, lineCodingInputFromBill } from "@/lib/checks/line-coding"
+import { checkLineCoding, ledgerReadBackChecks, lineCodingInputFromBill } from "@/lib/checks/line-coding"
+import type { CheckResult } from "@/lib/checks/types"
+import { recordLedgerReadBack } from "@/models/document-checks"
 import { LEDGER_CAPABILITIES_REUSE_MS, readLedgerCapabilities } from "@/lib/integrations/ledger-capabilities"
 import { loadLineCodingContext } from "@/models/accounting-entities"
 import { readCompanyCurrencyForPush, recordCurrencyLock } from "@/models/company-currency"
@@ -72,13 +74,15 @@ async function ledgerHasDuplicate(provider: string, externalTenantId: string | n
 // its own resolved accountExternalId (lib/integration-bill-mapping.ts's NormalizedLineItem), read
 // directly by the mapper. The caller still passes expenseAccountId through for the preflight cache
 // check below (does *a* resolved account exist in the synced chart at all).
-async function pushToQuickbooks(realmId: string, connectionId: string, bill: NormalizedBill, idempotencyKey: string | null): Promise<{ id: string }> {
+type CreatedBill = Awaited<ReturnType<typeof quickbooks.createBill>>
+
+async function pushToQuickbooks(realmId: string, connectionId: string, bill: NormalizedBill, idempotencyKey: string | null): Promise<CreatedBill> {
   const vendorRef = await quickbooks.findOrCreateVendor(realmId, connectionId, bill.vendorName)
   const body = toQuickBooksBillBody(bill, vendorRef)
   return quickbooks.createBill(realmId, connectionId, body, idempotencyKey)
 }
 
-async function pushToXero(tenantId: string, connectionId: string, bill: NormalizedBill, idempotencyKey: string | null): Promise<{ id: string }> {
+async function pushToXero(tenantId: string, connectionId: string, bill: NormalizedBill, idempotencyKey: string | null): Promise<CreatedBill> {
   const contactId = await xero.findOrCreateContact(tenantId, connectionId, bill.vendorName)
   const body = toXeroBillBody(bill, contactId)
   return xero.createBill(tenantId, connectionId, body, idempotencyKey)
@@ -196,6 +200,7 @@ export async function attemptIntegrationPush(pushId: string, now = new Date()): 
 
   let result: PushAttemptResult
   let forceTerminal = false
+  let readBack: CheckResult[] = []
 
   if (connection.status !== "connected") {
     result = { success: false, errorCode: "integration_connection_disabled", externalBillId: null }
@@ -219,7 +224,7 @@ export async function attemptIntegrationPush(pushId: string, now = new Date()): 
         }
         const isDuplicate = bill.referenceNumber ? await ledgerHasDuplicate(connection.provider, connection.externalTenantId, connection.id, bill.referenceNumber, direction) : false
         if (isDuplicate) throw new IntegrationPermanentError("ledger_duplicate")
-        let created: { id: string }
+        let created: CreatedBill
         switch (connection.provider) {
           case "quickbooks":
             created = await pushToQuickbooks(connection.externalTenantId, connection.id, bill, push.idempotencyKey).catch(async (error) => {
@@ -236,6 +241,7 @@ export async function attemptIntegrationPush(pushId: string, now = new Date()): 
             throw new IntegrationPermanentError(`${connection.provider}_push_not_implemented`)
         }
         result = { success: true, errorCode: null, externalBillId: created.id }
+        readBack = ledgerReadBackChecks(connection.provider, bill, created)
       } catch (error) {
         if (error instanceof IntegrationAuthError) {
           // Nango's AUTH webhook is the authoritative signal (attemptIntegrationPush never expects
@@ -265,6 +271,13 @@ export async function attemptIntegrationPush(pushId: string, now = new Date()): 
   })
 
   if (result.success) {
+    // Written only once the push is marked posted, and never able to undo that: the bill is in the
+    // ledger, so a failed write here is logged rather than sending the push back to retry.
+    if (readBack.length) {
+      await recordLedgerReadBack(push.workspaceId, push.documentId, readBack).catch((error) => {
+        console.error("[integration-push] ledger read-back check write failed:", error instanceof Error ? error.message : error)
+      })
+    }
     await recordSystemAudit({
       workspaceId: push.workspaceId,
       type: "integration_push_succeeded",

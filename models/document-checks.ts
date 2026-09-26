@@ -260,6 +260,12 @@ async function persistLineCodingChecks(workspaceId: string, connection: LineCodi
   }
 }
 
+/** ADR 0014: the post read-back's warn Checks (lib/checks/line-coding.ts ledgerReadBackChecks),
+ * written after the push is marked posted. */
+export async function recordLedgerReadBack(workspaceId: string, documentId: string, results: CheckResult[]): Promise<void> {
+  for (const result of results) await persistCheckResult(workspaceId, documentId, result)
+}
+
 async function persistCheckResult(workspaceId: string, documentId: string, result: CheckResult): Promise<void> {
   const status = result.status === "fail" && !FAIL_BY_DEFAULT.has(result.checkCode) && result.checkCode !== "duplicate" ? "warn" : result.status
   const detail = result.detail || result.fields ? { ...(result.detail ?? {}), fields: result.fields ?? [] } : null

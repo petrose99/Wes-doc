@@ -80,6 +80,18 @@ describe("updateBillAccounts", () => {
     })
   })
 
+  it("resends each line's Tax code, Class and Customer untouched when only the account changes (ADR 0014)", async () => {
+    const coded = { AccountRef: { value: "OLD" }, TaxCodeRef: { value: "TX20" }, ClassRef: { value: "cl1" }, CustomerRef: { value: "cu1" }, BillableStatus: "Billable" }
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(jsonResponse({ QueryResponse: { Bill: [{ Id: "1", SyncToken: "3", Balance: 100, TotalAmt: 100, Line: [{ Amount: 100, AccountBasedExpenseLineDetail: coded }] }] } }))
+      .mockResolvedValueOnce(jsonResponse({ Bill: { Id: "1" } }))
+
+    await updateBillAccounts("realm1", "token1", "1", new Map([[0, "NEW"]]))
+
+    const body = JSON.parse((vi.mocked(fetch).mock.calls[1][1] as RequestInit).body as string)
+    expect(body.Line[0].AccountBasedExpenseLineDetail).toEqual({ ...coded, AccountRef: { value: "NEW" } })
+  })
+
   it("retries once, re-reading the bill, on a permanent (stale-shaped) write failure", async () => {
     vi.mocked(fetch)
       .mockResolvedValueOnce(readResponse())
