@@ -131,6 +131,8 @@ export const WORKSPACE_SCOPED_MODELS = new Set([
   "Close",
   "CloseItem",
   "Institution",
+  // #463: credit-note-to-invoice allocations.
+  "CreditAllocation",
 ])
 
 /** Operations that read or mutate an existing row set through a `where`, and so must be scoped.

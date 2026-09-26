@@ -9,6 +9,7 @@ import { auditEventData, getRequestAuditContext } from "@/lib/audit"
 import { prisma } from "@/lib/db"
 import { kickApprovalNoticeDrain } from "@/lib/notices/kick"
 import { notifySentBack } from "@/models/approval-notices"
+import { proposeAllocationOnApproval } from "@/models/credits"
 import { cache } from "react"
 
 export const REVIEW_TASK_STATUSES = ["open", "in_review", "approved", "rejected"] as const
@@ -209,6 +210,9 @@ export async function updateReviewTaskStatus(input: { workspaceId: string; taskI
     prisma.reviewTask.update({ where: { id: task.id }, data: { status: input.status, resolvedAt } }),
     prisma.documentAuditEvent.create({ data: auditEventData({ workspaceId: input.workspaceId, documentId: task.documentId, actorId: input.actorId, type: "review_task_status_changed", detail: { from: task.status, to: input.status } }, context) }),
   ])
+  // Q9: a plain (no-workflow) task resolving to "approved" is one of the two places a credit
+  // note's review task can clear — see decideReviewTaskStage for the workflow-stage counterpart.
+  if (input.status === "approved") await proposeAllocationOnApproval({ workspaceId: input.workspaceId, documentId: task.documentId, actorId: input.actorId })
   return updated
 }
 
@@ -253,6 +257,8 @@ export async function decideReviewTaskStage(input: { workspaceId: string; taskId
     prisma.documentAuditEvent.create({ data: auditEventData({ workspaceId: input.workspaceId, documentId: task.documentId, actorId: input.actorId, type: "review_task_stage_decided", detail: { stageIndex: currentStage.stageIndex, stageName: currentStage.name, decision: input.decision, outcome: result.outcome, ...(note ? { note } : {}) } }, context) }),
   ])
   if (result.outcome === "advance") void kickApprovalNoticeDrain()
+  // Q9: the workflow's last stage clearing — see updateReviewTaskStatus for the plain-task path.
+  if (result.outcome === "approved") await proposeAllocationOnApproval({ workspaceId: input.workspaceId, documentId: task.documentId, actorId: input.actorId })
   return updated
 }
 
