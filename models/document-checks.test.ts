@@ -44,6 +44,8 @@ describe("refreshLineCodingChecks", () => {
     expect(cleared.data).toEqual({ status: "pass" })
     expect(cleared.where.checkCode.in).not.toContain("tax_code_missing")
     expect(cleared.where.checkCode.in).toContain("tax_basis_unclear")
+    // Same connection the coding and autopublish pick (oldest connected), never an unordered one.
+    expect(db.integrationConnection.findFirst).toHaveBeenCalledWith(expect.objectContaining({ orderBy: { createdAt: "asc" } }))
   })
 
   it("does nothing before the ledger's capabilities are read", async () => {

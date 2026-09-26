@@ -218,7 +218,7 @@ export async function refreshLineCodingChecks(workspaceId: string, documentId: s
   try {
     const [document, connection] = await Promise.all([
       prisma.document.findFirst({ where: { id: documentId, workspaceId }, select: { id: true, codingData: true, reviewedData: true } }),
-      prisma.integrationConnection.findFirst({ where: { workspaceId, status: "connected" }, select: { id: true, provider: true, ledgerCapabilities: true } }),
+      prisma.integrationConnection.findFirst({ where: { workspaceId, status: "connected" }, orderBy: { createdAt: "asc" }, select: { id: true, provider: true, ledgerCapabilities: true } }),
     ])
     if (document && connection) await persistLineCodingChecks(workspaceId, connection, [document])
   } catch (error) {

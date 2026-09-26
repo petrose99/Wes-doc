@@ -679,6 +679,7 @@ export async function resolveDocumentCodingItems(input: {
   if (!config.integrations.enabled) return null
   const connection = await prisma.integrationConnection.findFirst({
     where: { workspaceId: input.workspaceId, status: "connected" },
+    orderBy: { createdAt: "asc" },
     select: { id: true, createdAt: true, defaultExpenseAccountId: true, defaultExpenseAccountGuessed: true, ledgerCapabilities: true },
   })
   if (!connection) return null
@@ -767,7 +768,7 @@ export async function getBillAccountPickerData(workspaceId: string, vendorName: 
   providerName: string | null
 } | null> {
   if (!config.integrations.enabled) return null
-  const connection = await prisma.integrationConnection.findFirst({ where: { workspaceId, status: "connected" }, select: { id: true, provider: true } })
+  const connection = await prisma.integrationConnection.findFirst({ where: { workspaceId, status: "connected" }, orderBy: { createdAt: "asc" }, select: { id: true, provider: true } })
   if (!connection) return null
   const normalizedVendor = vendorName ? normalizeSupplierName(vendorName) : ""
   const [entities, rule] = await Promise.all([
@@ -822,7 +823,7 @@ export async function learnSupplierAccountRuleFromApproval(workspaceId: string, 
     const best = items[bestIndex]
     const accountExternalId = best.account_external_id
     if (!accountExternalId) return null
-    const connection = await prisma.integrationConnection.findFirst({ where: { workspaceId, status: "connected" }, select: { id: true } })
+    const connection = await prisma.integrationConnection.findFirst({ where: { workspaceId, status: "connected" }, orderBy: { createdAt: "asc" }, select: { id: true } })
     if (!connection) return null
     const supplierName = normalizeSupplierName(vendorName)
     const existing = await prisma.supplierAccountRule.findUnique({

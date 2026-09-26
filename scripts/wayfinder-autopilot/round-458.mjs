@@ -91,6 +91,19 @@ await round({ out, base: `${W}/${MALUTI}`, only, residue, ...(widths ? { widths 
     await s.snap("", "Forget failed offline: alert inside the open dialog")
   })
 
+  // Close batch c1 (critique H10): the "How pre-filling works" disclosure, opened by keyboard.
+  await state("S8-help-open", page(MALUTI), async (p, s) => {
+    await toTable(p, s)
+    const toggle = p.getByRole("button", { name: "How pre-filling works" })
+    s.probe("help-collapsed", (await toggle.getAttribute("aria-expanded")) === "false" && (await s.count("#supplier-accounts-help")) === 0, "help open or mounted before activation")
+    await toggle.focus()
+    await p.keyboard.press("Enter")
+    const help = p.locator("#supplier-accounts-help")
+    s.probe("help-opens", await s.visible(help) && (await toggle.getAttribute("aria-expanded")) === "true", "Enter did not open the help")
+    s.probe("help-copy", await s.visible(help.getByText(/Tax code and Class/)) && await s.visible(help.getByText(/Location/)), "help does not name the ledger's Class and Location")
+    await s.snap("", "How pre-filling works, open")
+  })
+
   // Deletes one seeded "northside" rule per width; asserts focus lands on the next row's Forget.
   await state("S7-forget-focus", page(MALUTI), async (p, s) => {
     await toTable(p, s)

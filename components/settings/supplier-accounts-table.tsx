@@ -71,6 +71,7 @@ export function SupplierAccountsTable({ workspaceId, connectionId, rules, accoun
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [filter, setFilter] = useState("")
+  const [helpOpen, setHelpOpen] = useState(false)
   const [review, setReview] = useState<{ rule: SupplierAccountRuleRow; reminder: SupplierAccountReminder; data: AffectedByRuleChange } | null>(null)
 
   const openReview = (rule: SupplierAccountRuleRow, reminder: SupplierAccountReminder) => startTransition(async () => {
@@ -145,6 +146,25 @@ export function SupplierAccountsTable({ workspaceId, connectionId, rules, accoun
         line&rsquo;s Tax code{tracking && `, ${tracking}`}{hasLocation && " and the bill\u2019s Location"}. The Tax code is
         pre-filled only on lines kept on that account. Forget a supplier to learn it again from their next approval.
       </p>
+      {/* Contextual help, unmounted while closed — the approval-workflow-form (#253) disclosure precedent. */}
+      <div>
+        <button type="button" aria-expanded={helpOpen} aria-controls="supplier-accounts-help" onClick={() => setHelpOpen((open) => !open)}
+          className="text-left text-sm font-medium text-emerald-700 underline underline-offset-4 hover:text-emerald-800">
+          How pre-filling works
+        </button>
+        {helpOpen && (
+          <ul id="supplier-accounts-help" className="mt-2 max-w-prose list-disc space-y-1 pl-5 text-sm text-slate-600">
+            <li>When a supplier&rsquo;s next document is reviewed, its lines start on the usual account.</li>
+            <li>
+              Lines kept on that account also get the supplier&rsquo;s Tax code{tracking && ` and ${tracking}`}. A line moved
+              to another account gets that account&rsquo;s default Tax code from {providerLabel} instead.
+            </li>
+            {hasLocation && <li>The bill gets the supplier&rsquo;s Location.</li>}
+            <li>A code that is no longer in {providerLabel} is never pre-filled; the line waits for you to pick one.</li>
+            <li>Anything pre-filled can be changed before approval. Each approval updates the supplier&rsquo;s usual set.</li>
+          </ul>
+        )}
+      </div>
       {rules.length > FILTER_THRESHOLD && (
         <Input
           value={filter}
