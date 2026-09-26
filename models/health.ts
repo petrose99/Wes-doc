@@ -59,6 +59,7 @@ async function loadDocuments(workspaceId: string, taxExpectedByDefault: boolean)
     const values = (document.reviewedData ?? {}) as Record<string, unknown>
     const supplierValue = supplierField && typeof values[supplierField] === "string" ? (values[supplierField] as string).trim() || null : null
     const taxField = spec.taxField
+    const totalField = spec.checkFields?.total
     const succeededPush = document.integrationPushes.find((push) => push.status === "succeeded" && push.externalBillId)
     return {
       id: document.id, fileId: document.fileId, filename: document.filename, templateCode,
@@ -69,6 +70,7 @@ async function loadDocuments(workspaceId: string, taxExpectedByDefault: boolean)
       pushedExternalBillId: succeededPush?.externalBillId ?? null,
       extractedTaxTotal: taxField ? asNumber(values[taxField]) : null,
       taxExpected: Boolean(taxField) && taxExpectedByDefault,
+      extractedTotal: totalField ? asNumber(values[totalField]) : null,
       reviewedAt: document.reviewedAt,
       hasAppliedRule: document.appliedRuleId !== null,
     }

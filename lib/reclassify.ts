@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db"
 import { getActiveWorkflowStageState } from "@/models/review-tasks"
 import { getDocumentPaymentStatuses } from "@/models/ledger-payments"
 import { derivePaidState } from "@/lib/payments/paid-state"
+import { getLiveAllocationsByInvoice } from "@/models/credits"
 import { LIVE_BATCH_STATUSES, type BatchStatus } from "@/lib/payments/batch-status"
 import { summarizePoConsumption } from "@/models/po-matching"
 import { decimalToNumber } from "@/lib/money"
@@ -30,13 +31,14 @@ export async function describeMoveIneligibility(
   const stageState = await getActiveWorkflowStageState(workspaceId, documentId)
   if (stageState) return `Can't move ${document.filename} while an approval is pending.`
 
-  const [paymentStatuses, records, batchItems] = await Promise.all([
+  const [paymentStatuses, records, batchItems, allocationsByInvoice] = await Promise.all([
     getDocumentPaymentStatuses(workspaceId, [documentId]),
     prisma.invoicePayment.findMany({ where: { workspaceId, documentId, removedAt: null }, select: { amount: true } }),
     prisma.paymentRunItem.findMany({
       where: { workspaceId, documentId, active: true, run: { status: { in: [...LIVE_BATCH_STATUSES] } } },
       select: { run: { select: { status: true } } },
     }),
+    getLiveAllocationsByInvoice(workspaceId, [documentId]),
   ])
   const paymentRow = paymentStatuses.get(documentId)
   if (paymentRow?.paymentStatus?.toLowerCase() === "posted") return `Can't move ${document.filename} — it's already Posted.`
@@ -47,9 +49,11 @@ export async function describeMoveIneligibility(
     ledgerPaidAmount: paymentRow?.paidAmount ?? null,
     total,
     records: records.map((r) => ({ amount: decimalToNumber(r.amount) ?? 0 })),
+    allocations: allocationsByInvoice.get(documentId) ?? [],
     batchStatus: (batchItems[0]?.run.status as BatchStatus) ?? null,
   })
   if (paidState.state === "paid") return `Can't move ${document.filename} — it's already Paid.`
+  if (paidState.state === "credited") return `Can't move ${document.filename} — it's already Credited.`
 
   if (docType === "purchase_order") {
     const consumption = await summarizePoConsumption(workspaceId, [documentId])

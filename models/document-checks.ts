@@ -22,9 +22,11 @@ import { loadAttachmentRendition } from "@/lib/integration-attach-rendition"
 import { decimalToNumber } from "@/lib/money"
 import { documentStorageKey, readDocumentSource } from "@/lib/document-storage"
 import { resolveSupplier } from "@/lib/suppliers/alias"
-import { normalizeIban } from "@/lib/suppliers/normalize"
+import { normalizeIban, normalizeSupplierName } from "@/lib/suppliers/normalize"
+import { checkNegativeTotal, checkCreditExceedsInvoice, checkCreditNoInvoiceMatch } from "@/lib/checks/negative-total"
+import { loadOpenInvoiceCandidates } from "@/models/credits"
 import { checkStatementBalance } from "@/lib/checks/balance"
-import { findNearDuplicate, type DocumentIdentity } from "@/lib/checks/duplicates"
+import { findNearDuplicate, normalizeInvoiceNumber, type DocumentIdentity } from "@/lib/checks/duplicates"
 import { findMissingStatementPeriods } from "@/lib/checks/statement-periods"
 import { checkTaxConsistency } from "@/lib/checks/tax-consistency"
 import type { CheckResult } from "@/lib/checks/types"
@@ -43,7 +45,7 @@ import { Prisma } from "@/prisma/client"
  * call): a wrong total or a knowingly-reingested file are not judgment calls, everything else
  * (a statement's own rounding, a rate mismatch, a plausible near-dupe) is worth a look, not a
  * block. "duplicate" is fail only for its exact-match branch — see runDeterministicChecks. */
-const FAIL_BY_DEFAULT = new Set<string>(["invoice_arithmetic", "bank_detail_change", ...LINE_CODING_CHECK_CODES])
+const FAIL_BY_DEFAULT = new Set<string>(["invoice_arithmetic", "bank_detail_change", "invoice_negative_total", ...LINE_CODING_CHECK_CODES])
 
 function asNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null
@@ -93,6 +95,10 @@ export async function runDeterministicChecks(input: { workspaceId: string; docum
       if (arithmetic) results.push(arithmetic)
       const lineArithmetic = checkLineItemArithmetic({ currencyCode, lineItems })
       if (lineArithmetic) results.push(lineArithmetic)
+      // Q13/Q19: a negative-total invoice past #463 is a legacy document never converted to a
+      // credit note — see lib/checks/negative-total.ts.
+      const negativeTotal = checkNegativeTotal({ docType, total: asNumber(get("total")) })
+      if (negativeTotal) results.push(negativeTotal)
     }
 
     // #206: cumulative PO/invoice line-consumption, only meaningful once this invoice is matched
@@ -171,9 +177,9 @@ export async function runDeterministicChecks(input: { workspaceId: string; docum
 
     if (map.supplier && map.invoiceNumber && map.total) {
       const totalValue = asNumber(get("total"))
-      // A2.3: infer credit-note-ness deterministically — negative total OR the template's own
-      // documentType is a credit note. Consumers already know the sign; nothing else changes.
-      const isCreditNote = totalValue !== null && totalValue < 0
+      // #463: credit-note-ness is the resolved docType, not the sign — new credit notes are
+      // typed and positive (Step 1); only legacy negative-total invoices still rely on sign.
+      const isCreditNote = docType === "credit_note"
       const identity: DocumentIdentity = {
         documentId: document.id, supplier: asString(get("supplier")), invoiceNumber: asString(get("invoiceNumber")), total: totalValue, currencyCode, isCreditNote,
         fieldKeys: { supplier: map.supplier, invoiceNumber: map.invoiceNumber, total: map.total },
@@ -185,6 +191,27 @@ export async function runDeterministicChecks(input: { workspaceId: string; docum
       // A2.7: per-supplier amount anomaly + round-number spike.
       const anomaly = await checkAmountAnomalyAgainstHistory(input.workspaceId, document.templateId, document.id, identity, map)
       if (anomaly) results.push(anomaly)
+    }
+
+    // Q13: a credit note that cites an invoice number is checked against the workspace's open
+    // invoices for the same supplier — either it's larger than the invoice it reduces, or no such
+    // invoice exists (it stays as standing supplier credit). See lib/checks/negative-total.ts.
+    if (docType === "credit_note" && map.supplier && map.total) {
+      const citedInvoiceNumber = asString(values["credited_invoice_number"])
+      const supplierName = asString(get("supplier"))
+      const creditTotal = asNumber(get("total"))
+      if (citedInvoiceNumber && supplierName && creditTotal !== null) {
+        const candidates = await loadOpenInvoiceCandidates(input.workspaceId)
+        const normalizedSupplier = normalizeSupplierName(supplierName)
+        const normalizedNumber = normalizeInvoiceNumber(citedInvoiceNumber)
+        const match = candidates.find(
+          (candidate) => normalizeInvoiceNumber(candidate.invoiceNumber) === normalizedNumber && normalizeSupplierName(candidate.supplier) === normalizedSupplier,
+        )
+        const creditMatch = match
+          ? checkCreditExceedsInvoice({ creditTotal, invoiceNumber: citedInvoiceNumber, invoiceDue: match.due })
+          : checkCreditNoInvoiceMatch({ invoiceNumber: citedInvoiceNumber, supplier: supplierName })
+        if (creditMatch) results.push(creditMatch)
+      }
     }
 
     // #461: pre-post warn that the source file the connected ledger would attach after posting

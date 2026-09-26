@@ -9,6 +9,7 @@ import { recordDocumentAudit } from "@/lib/audit"
 import config from "@/lib/config"
 import { JurisdictionRequiredError } from "@/lib/jurisdictions/require"
 import { DOC_TYPE_SPECS, isDocType } from "@/lib/doc-types"
+import { normalizeCreditNoteSign } from "@/lib/credits/sign"
 import { describeMoveIneligibility } from "@/lib/reclassify"
 import { processDocumentJob } from "@/lib/document-processing"
 import { sampleDocumentPages } from "@/lib/document-suggest"
@@ -213,7 +214,7 @@ export async function reclassifyDocumentAction(workspaceId: string, documentId: 
   if (!(await requireMember(workspaceId, user.id))) return { success: false, error: NO_ACCESS }
   const document = await prisma.document.findFirst({
     where: { id: documentId, workspaceId },
-    select: { id: true, fileId: true, codingData: true, docType: true },
+    select: { id: true, fileId: true, codingData: true, docType: true, reviewedData: true },
   })
   if (!document) return { success: false, error: "Document not found" }
   if (document.docType) {
@@ -222,11 +223,20 @@ export async function reclassifyDocumentAction(workspaceId: string, documentId: 
   }
   const prev = (document.codingData as Record<string, unknown> | null) ?? {}
   const spec = DOC_TYPE_SPECS[docType]
+  // #463: crossing invoice <-> credit_note stores the printed magnitude either way — the type
+  // carries the direction, not the sign (lib/credits/sign.ts). Reused for both directions since
+  // the transform is the same: drop any existing sign.
+  const crossesCreditLine = (document.docType === "invoice" && docType === "credit_note") ||
+    (document.docType === "credit_note" && docType === "invoice")
+  const reviewedData = crossesCreditLine && document.reviewedData
+    ? (normalizeCreditNoteSign(document.reviewedData as Record<string, unknown>) as Prisma.InputJsonValue)
+    : undefined
   await prisma.document.update({
     where: { id: documentId },
     data: {
       docType,
       codingData: { ...prev, documentType: spec.defaultCategory, documentTypeSource: "human", categoryConfirmed: true } as Prisma.InputJsonValue,
+      ...(reviewedData !== undefined ? { reviewedData } : {}),
     },
   })
   await recordDocumentAudit({

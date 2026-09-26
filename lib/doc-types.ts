@@ -8,6 +8,7 @@
 
 export const DOC_TYPES = [
   "invoice",
+  "credit_note",
   "receipt",
   "bank_statement",
   "purchase_order",
@@ -95,6 +96,44 @@ export const DOC_TYPE_SPECS: Record<DocType, DocTypeSpec> = {
       { key: "supplier_vat_number", hint: "Supplier VAT / tax ID" },
       { key: "payment_iban", hint: "IBAN for payment" },
       { key: "po_number", hint: "Purchase order reference, if any" },
+    ],
+  },
+
+  /** #463: reduces what's owed to a supplier. Never "paid" itself — it's allocated against an
+   * open invoice (lib/credits/allocation.ts) — so it carries no match-candidate/matchRole (not a
+   * PO/receipt match target) and no due_date/po_number (see Step 2/3's Wayfinder spec). */
+  credit_note: {
+    label: "Credit note",
+    defaultCategory: "expense",
+    counterpartyField: "vendor",
+    taxField: "tax_total",
+    amountKeys: {
+      subtotal: "subtotal", taxTotal: "tax_total", shippingTotal: "shipping_total",
+      otherCharges: "other_charges", total: "total", lineItems: "line_items",
+      currency: "currency_code",
+    },
+    checkFields: {
+      supplier: "vendor", invoiceNumber: "invoice_number", date: "issue_date",
+      subtotal: "subtotal", taxTotal: "tax_total", shippingTotal: "shipping_total",
+      otherCharges: "other_charges", total: "total", currency: "currency_code",
+      lineItems: "line_items", supplierVatNumber: "supplier_vat_number",
+      paymentIban: "payment_iban",
+    },
+    canonicalKeys: [
+      { key: "vendor", hint: "Name of the vendor or supplier" },
+      { key: "invoice_number", hint: "Credit note reference number" },
+      { key: "issue_date", hint: "Date the credit note was issued (YYYY-MM-DD)" },
+      { key: "subtotal", hint: "Amount before tax" },
+      { key: "tax_total", hint: "Total tax amount" },
+      { key: "shipping_total", hint: "Shipping/freight charges" },
+      { key: "other_charges", hint: "Any other charges (array of {description, amount})" },
+      { key: "total", hint: "Total amount due" },
+      { key: "currency_code", hint: "ISO 4217 currency code (e.g. USD, EUR)" },
+      { key: "line_items", hint: "Array of {description, quantity, unit_price, amount, item_code}" },
+      { key: "payment_terms", hint: "Payment terms (e.g. Net 30)" },
+      { key: "supplier_vat_number", hint: "Supplier VAT / tax ID" },
+      { key: "payment_iban", hint: "IBAN for payment" },
+      { key: "credited_invoice_number", hint: "Invoice number this credit note refers to" },
     ],
   },
 
@@ -255,6 +294,7 @@ export const DOC_TYPE_SPECS: Record<DocType, DocTypeSpec> = {
 
 const LEGACY_CODE_TO_DOC_TYPE: Record<string, DocType> = {
   invoice: "invoice",
+  credit_note: "credit_note",
   expense: "invoice",
   receipt: "receipt",
   expense_receipt: "receipt",
@@ -268,6 +308,7 @@ const LEGACY_CODE_TO_DOC_TYPE: Record<string, DocType> = {
 
 const DOC_TYPE_TO_LEGACY_CODE: Record<DocType, string> = {
   invoice: "invoice",
+  credit_note: "credit_note",
   receipt: "receipt",
   bank_statement: "bank_statement",
   purchase_order: "purchase_order",
@@ -332,7 +373,7 @@ export function isExpenseDocType(docType: DocType): boolean {
 
 export const EXPENSE_DOC_TYPES: DocType[] = DOC_TYPES.filter((t) => DOC_TYPE_SPECS[t].defaultCategory === "expense")
 
-export const PUSHABLE_DOC_TYPES: DocType[] = ["invoice", "receipt", "bank_statement"]
+export const PUSHABLE_DOC_TYPES: DocType[] = ["invoice", "credit_note", "receipt", "bank_statement"]
 
 export function isPushableDocument(doc: { docType?: string | null; template?: { code: string } | null }): boolean {
   return (PUSHABLE_DOC_TYPES as string[]).includes(resolveDocType(doc))
@@ -345,6 +386,7 @@ export function isPushableDocument(doc: { docType?: string | null; template?: { 
 export type SearchFieldMap = { supplier?: string; number?: string; date?: string; amount?: string }
 export const SEARCH_FIELD_KEYS: Record<DocType, SearchFieldMap> = {
   invoice: { supplier: "vendor", number: "invoice_number", date: "issue_date", amount: "total" },
+  credit_note: { supplier: "vendor", number: "invoice_number", date: "issue_date", amount: "total" },
   receipt: { supplier: "merchant", number: "receipt_number", date: "purchase_date", amount: "total" },
   bank_statement: { supplier: "bank_name", number: "account_number", date: "statement_period_start", amount: "closing_balance" },
   purchase_order: { supplier: "supplier", number: "po_number", date: "order_date", amount: "total" },
@@ -368,6 +410,9 @@ export function isPaidStatus(value: unknown): value is PaidStatus {
  * exactly this reason, and a bank statement or contract has no payment state of its own to confirm.
  * See models/review-tasks.ts for where this actually gates approval. */
 export function isPaymentConfirmationRequired(doc: { docType?: string | null; template?: { code: string } | null }): boolean {
+  // Credit notes are never "paid" themselves — they're allocated (lib/credits/allocation.ts) —
+  // so they never get the paid/unpaid manual-confirm gate, even though they're expense-category.
+  if (resolveDocType(doc) === "credit_note") return false
   return isExpenseDocType(resolveDocType(doc))
 }
 

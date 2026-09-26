@@ -93,6 +93,11 @@ export type CheckDocumentSlice = {
    * not just "this template has no concept of tax" or "this workspace hasn't set up tax at all".
    * Optional for the same reason as pushedExternalBillId. */
   taxExpected?: boolean
+  /** #463: this document's extracted `total` — mirrors extractedTaxTotal exactly, sourced the
+   * same way in models/health.ts. Feeds negative-total-invoices.ts (Q19: a negative-total
+   * invoice never converted to a credit note). Optional for the same reason as
+   * pushedExternalBillId. */
+  extractedTotal?: number | null
   /** Phase D: Document.reviewedAt — when a person resolved this document's review, null if it was
    * never reviewed (auto-published, still pending, or predates review tracking). Optional for the
    * same reason as pushedExternalBillId. */

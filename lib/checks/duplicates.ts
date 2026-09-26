@@ -68,9 +68,13 @@ export function findNearDuplicate(candidate: DocumentIdentity, others: DocumentI
     if (normalizeSupplierName(other.supplier) !== supplier) continue
     if (other.total === null) continue
     const sameAmount = amountsMatch(other.total, total, candidate.currencyCode)
-    // A2.3: a credit note against the same original invoice is NOT a duplicate — signs
-    // opposite or one document flagged as a credit note deliberately relaxes the amount test
-    // to allow a negative counterpart to match to its parent WITHOUT calling the pair a dupe.
+    // A2.3 / #463: a credit note against the same original invoice is NOT a duplicate. New
+    // credit notes are typed and positive (Step 1), so this opposite-sign relaxation now only
+    // matters as the legacy-only safety net for negative-total invoices that were never
+    // converted (Q19) — it still prevents a false "duplicate" warn against their positive
+    // parent. Typed positive credit notes never hit this branch; they're excluded from being
+    // near-dupes of an invoice by template scoping upstream (their own template code, Step 1),
+    // not by sign.
     const oppositeSign = other.total !== null && Math.sign(other.total) !== Math.sign(total) && Math.abs(other.total) === Math.abs(total)
     const creditPair = (candidate.isCreditNote || other.isCreditNote) && oppositeSign
     if (creditPair) continue

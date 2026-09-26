@@ -13,6 +13,8 @@ import {
   matchRoleForDoc,
   isPushableDocument,
   isCategoryConfirmed,
+  isPaymentConfirmationRequired,
+  hasDirectionField,
   EXPENSE_DOC_TYPES,
   PUSHABLE_DOC_TYPES,
   type DocType,
@@ -155,7 +157,7 @@ describe("derived constants", () => {
   })
 
   it("PUSHABLE_DOC_TYPES matches the accounting-push module", () => {
-    expect(PUSHABLE_DOC_TYPES).toEqual(["invoice", "receipt", "bank_statement"])
+    expect(PUSHABLE_DOC_TYPES).toEqual(["invoice", "credit_note", "receipt", "bank_statement"])
   })
 })
 
@@ -182,6 +184,37 @@ describe("isPushableDocument", () => {
   it("works with legacy template codes", () => {
     expect(isPushableDocument({ template: { code: "invoice" } })).toBe(true)
     expect(isPushableDocument({ template: { code: "expense_receipt" } })).toBe(true)
+  })
+})
+
+describe("credit_note doc type (#463)", () => {
+  it("is registered with its own template code, not folded into generic", () => {
+    expect(DOC_TYPES).toContain("credit_note")
+    expect(docTypeToLegacyTemplateCode("credit_note")).toBe("credit_note")
+    expect(legacyTemplateCodeToDocType("credit_note")).toBe("credit_note")
+  })
+
+  it("is expense-category and pushable, like an invoice", () => {
+    expect(DOC_TYPE_SPECS.credit_note.defaultCategory).toBe("expense")
+    expect(PUSHABLE_DOC_TYPES).toContain("credit_note")
+  })
+
+  it("has a credited_invoice_number canonical key distinct from invoice_number", () => {
+    const keys = DOC_TYPE_SPECS.credit_note.canonicalKeys.map((k) => k.key)
+    expect(keys).toContain("credited_invoice_number")
+  })
+
+  it("has no match candidate fields or match role", () => {
+    expect(DOC_TYPE_SPECS.credit_note.matchCandidateFields).toBeUndefined()
+    expect(DOC_TYPE_SPECS.credit_note.matchRole ?? null).toBeNull()
+  })
+
+  it("never requires payment confirmation", () => {
+    expect(isPaymentConfirmationRequired({ docType: "credit_note" })).toBe(false)
+  })
+
+  it("has no direction field", () => {
+    expect(hasDirectionField("credit_note")).toBe(false)
   })
 })
 

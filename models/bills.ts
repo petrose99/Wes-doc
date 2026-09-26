@@ -7,9 +7,11 @@ import { normalizeSupplierName } from "@/lib/suppliers/normalize"
 import type { PoLinkKind } from "@/lib/matching/po-link"
 import { summarizeInvoicePoLinks, type InvoicePoSummary } from "@/models/po-matching"
 import { derivePaidState, type DerivedPaidState } from "@/lib/payments/paid-state"
+import { getLiveAllocationsByInvoice } from "@/models/credits"
 import { LIVE_BATCH_STATUSES, type BatchStatus } from "@/lib/payments/batch-status"
 import { decimalToNumber } from "@/lib/money"
 import { processingState, PROCESSING_STATES, type ProcessingState } from "@/lib/documents/processing-state"
+import { resolveDocType, type DocType } from "@/lib/doc-types"
 
 /** WP-AP2: AP aging / bills cockpit. One row per Document whose template maps to "invoice" — the
  * shape an AP controller expects on day one: supplier, total, due-date (extracted OR inferred
@@ -80,6 +82,10 @@ export type BillRow = {
    * the compared PO's number carrying the number of red glyphs the pane will show, or a dashed
    * suggestion the matcher made that compares nothing until confirmed, or "PO removed". */
   po: BillPoLink
+  /** #463: "invoice" for the vast majority of rows; "credit_note" once credit notes join this
+   * list (its own template code, so it's a real Prisma column, not an inference). A credit-note
+   * row has no due date/aging/PO of its own — see the null-out below. */
+  docType: DocType
 }
 
 export type BillPoLink = {
@@ -162,11 +168,11 @@ export async function listWorkspaceBills(input: {
     where: {
       workspaceId: input.workspaceId,
       status: { notIn: ["received", "queued", "processing", "failed"] },
-      template: { code: "invoice" },
+      template: { code: { in: ["invoice", "credit_note"] } },
     },
     select: {
       id: true, filename: true, status: true, reviewedAt: true, reviewedData: true, confidence: true,
-      cancelledAt: true, cancelledReason: true, receivedAt: true,
+      cancelledAt: true, cancelledReason: true, receivedAt: true, docType: true,
       template: { select: { code: true } },
     },
     orderBy: { receivedAt: "desc" },
@@ -175,7 +181,7 @@ export async function listWorkspaceBills(input: {
   if (!documents.length) return { bills: [], summary: emptySummary() }
 
   const documentIds = documents.map((d) => d.id)
-  const [paymentStatuses, openCheckTasks, suppliers, latestReviewTasks, touchlessEvents, openEscalations, paymentRecords, batchItems] = await Promise.all([
+  const [paymentStatuses, openCheckTasks, suppliers, latestReviewTasks, touchlessEvents, openEscalations, paymentRecords, batchItems, allocationsByInvoice] = await Promise.all([
     getDocumentPaymentStatuses(input.workspaceId, documentIds),
     prisma.reviewTask.findMany({
       where: { workspaceId: input.workspaceId, documentId: { in: documentIds }, reason: "check_failed", status: { in: ["open", "in_review"] } },
@@ -209,6 +215,9 @@ export async function listWorkspaceBills(input: {
       where: { workspaceId: input.workspaceId, documentId: { in: documentIds }, active: true, run: { status: { in: [...LIVE_BATCH_STATUSES] } } },
       select: { documentId: true, run: { select: { status: true } } },
     }),
+    // #463 Step 3: live credit allocations against these documents as invoices — a credit note's
+    // own id never appears here (only as creditNoteId), so its row falls through with none.
+    getLiveAllocationsByInvoice(input.workspaceId, documentIds),
   ])
   const recordsByDoc = new Map<string, Array<{ amount: number }>>()
   for (const record of paymentRecords) {
@@ -247,12 +256,16 @@ export async function listWorkspaceBills(input: {
     const documentDate = asDate(values["issue_date"]) ?? asDate(values["date"])
     const extractedDueDate = asDate(values["due_date"])
     const supplier = supplierName ? supplierByKey.get(normalizeSupplierName(supplierName)) ?? null : null
-    const dueDate = inferDueDate({
+    const docType = resolveDocType({ docType: doc.docType, template: doc.template })
+    // #463: a credit note is never "due" and has no aging clock or PO of its own — it's allocated
+    // against an invoice's due date, not carrying one itself (Q14).
+    const isCreditNote = docType === "credit_note"
+    const dueDate = isCreditNote ? null : inferDueDate({
       extractedDueDate,
       documentDate,
       supplierPaymentTermsDays: supplier?.paymentTermsDays ?? null,
     })
-    const bucket = agingBucket(dueDate, asOf)
+    const bucket = isCreditNote ? null : agingBucket(dueDate, asOf)
     const openChecks = openChecksByDoc.get(doc.id) ?? []
     const paymentRow = paymentStatuses.get(doc.id)
     const latestTask = latestReviewTaskByDoc.get(doc.id)
@@ -281,7 +294,11 @@ export async function listWorkspaceBills(input: {
       paidAt: paymentRow?.syncedAt ?? null,
       paidState: derivePaidState({
         ledgerStatus: paymentRow?.paymentStatus ?? null, ledgerPaidAmount: paymentRow?.paidAmount ?? null, total,
-        records: recordsByDoc.get(doc.id) ?? [], batchStatus: batchStatusByDoc.get(doc.id) ?? null,
+        records: recordsByDoc.get(doc.id) ?? [],
+        // A credit note is never itself allocated-against — it only ever appears as the
+        // creditNoteId side (Q14: no paid state of its own).
+        allocations: isCreditNote ? [] : allocationsByInvoice.get(doc.id) ?? [],
+        batchStatus: batchStatusByDoc.get(doc.id) ?? null,
       }),
       status: doc.status,
       reviewedAt: doc.reviewedAt,
@@ -296,7 +313,8 @@ export async function listWorkspaceBills(input: {
       fieldConfidence: (doc.confidence as Record<string, unknown> | null)?.fieldConfidence as Record<string, number> ?? {},
       touchless: touchlessDocIds.has(doc.id),
       escalated: escalatedDocIds.has(doc.id),
-      po: toBillPoLink(poSummaries.get(doc.id)),
+      po: isCreditNote ? { kind: null, poNumber: null, poDocumentId: null, mismatchCount: 0, confidence: null, suggestionCount: 0, removed: false } : toBillPoLink(poSummaries.get(doc.id)),
+      docType,
     })
   }
 

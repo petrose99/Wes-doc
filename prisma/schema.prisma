@@ -92,6 +92,8 @@ model User {
   paidPaymentBatches                PaymentRun[]                @relation("PaymentBatchPayer")
   recordedInvoicePayments           InvoicePayment[]            @relation("InvoicePaymentRecorder")
   removedInvoicePayments            InvoicePayment[]            @relation("InvoicePaymentRemover")
+  createdCreditAllocations          CreditAllocation[]          @relation("CreditAllocationCreator")
+  removedCreditAllocations          CreditAllocation[]          @relation("CreditAllocationRemover")
   recordedExpenseClaimPayments      ExpenseClaimPayment[]       @relation("ExpenseClaimPaymentRecorder")
   removedExpenseClaimPayments       ExpenseClaimPayment[]       @relation("ExpenseClaimPaymentRemover")
   billPayPreferences                BillPayPreference[]         @relation("BillPayPreferenceEditor")
@@ -265,6 +267,7 @@ model Workspace {
   payerAccounts              PayerAccount[]
   invoicePayments            InvoicePayment[]
   expenseClaimPayments       ExpenseClaimPayment[]
+  creditAllocations          CreditAllocation[]
   billPayPreferences         BillPayPreference[]
   fieldConfigs               WorkspaceFieldConfig[]
   suppliers                  Supplier[]
@@ -776,6 +779,8 @@ model Document {
   documentMatchesAsTarget                 DocumentMatch[]          @relation("MatchTarget")
   paymentRunItems                         PaymentRunItem[]
   invoicePayments                         InvoicePayment[]
+  creditAllocationsAsCreditNote            CreditAllocation[]       @relation("CreditAllocationCreditNote")
+  creditAllocationsAsInvoice               CreditAllocation[]       @relation("CreditAllocationInvoice")
   billPayPreference                       BillPayPreference?
   bankMatchesAsStatement                  BankMatch[]              @relation("BankMatchStatement")
   bankMatchesAsMatched                    BankMatch[]              @relation("BankMatchMatched")
@@ -2820,6 +2825,29 @@ model InvoicePayment {
   @@index([workspaceId, documentId])
   @@index([workspaceId, batchId])
   @@map("invoice_payments")
+}
+
+/// A credit note applied against an invoice — soft-removable, reasoned (mirrors InvoicePayment).
+model CreditAllocation {
+  id            String    @id @default(uuid()) @db.Uuid
+  workspaceId   String    @map("workspace_id") @db.Uuid
+  creditNoteId  String    @map("credit_note_id") @db.Uuid
+  invoiceId     String    @map("invoice_id") @db.Uuid
+  amount        Decimal   @db.Decimal(18, 2)
+  createdById   String?   @map("created_by_id") @db.Uuid
+  removedAt     DateTime? @map("removed_at")
+  removedById   String?   @map("removed_by_id") @db.Uuid
+  removedReason String?   @map("removed_reason")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  creditNote    Document  @relation("CreditAllocationCreditNote", fields: [creditNoteId], references: [id], onDelete: Cascade)
+  invoice       Document  @relation("CreditAllocationInvoice", fields: [invoiceId], references: [id], onDelete: Cascade)
+  createdBy     User?     @relation("CreditAllocationCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  removedBy     User?     @relation("CreditAllocationRemover", fields: [removedById], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, invoiceId])
+  @@index([workspaceId, creditNoteId])
+  @@map("credit_allocations")
 }
 
 /// #229 Q10 (#251): what the operator set on a Bill Pay row before batching it — the inline

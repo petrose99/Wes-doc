@@ -11,7 +11,9 @@ const db = prisma as any
 beforeEach(() => {
   vi.clearAllMocks()
   for (const key of Object.keys(db)) delete db[key]
-  db.$transaction = vi.fn(async (operations: unknown[]) => operations)
+  // Supports both call shapes: an array of pre-built queries (most of this module) and a callback
+  // taking `tx` (models/credits.ts's createCreditAllocation etc., invoked through proposeAllocationOnApproval).
+  db.$transaction = vi.fn(async (arg: unknown) => (typeof arg === "function" ? (arg as (tx: unknown) => unknown)(db) : arg))
   // WP-AP2: default "no push exists" so the payment-status gate still fires under existing
   // tests unless a specific test overrides it to simulate a ledger sync in flight.
   db.integrationPush = { findFirst: vi.fn().mockResolvedValue(null), findMany: vi.fn().mockResolvedValue([]) }
@@ -126,6 +128,26 @@ describe("updateReviewTaskStatus", () => {
     await updateReviewTaskStatus({ workspaceId: "w1", taskId: "t1", status: "in_review", actorId: "u1" })
 
     expect(db.reviewTask.update).toHaveBeenCalledWith({ where: { id: "t1" }, data: { status: "in_review", resolvedAt: null } })
+  })
+
+  it("#463 Q9: proposes and creates a credit allocation when a credit note's task resolves to approved", async () => {
+    db.reviewTask = { findFirst: vi.fn().mockResolvedValue({ id: "t1", documentId: "cn1", status: "open", document: { docType: "contract", paymentStatus: null, template: null } }), update: vi.fn().mockReturnValue("update") }
+    db.documentAuditEvent = { create: vi.fn().mockReturnValue("audit") }
+    db.document = {
+      findFirst: vi.fn()
+        .mockResolvedValueOnce({ id: "cn1", docType: "credit_note", reviewedData: { vendor: "Acme Supplies", total: 300 }, template: null })
+        .mockResolvedValueOnce({ reviewedData: { credited_invoice_number: "INV-100" } })
+        .mockResolvedValueOnce({ id: "cn1", docType: "credit_note", reviewedData: { vendor: "Acme Supplies", total: 300 }, template: null })
+        .mockResolvedValueOnce({ id: "inv1", docType: "invoice", reviewedData: { vendor: "Acme Supplies", total: 300 }, template: null }),
+      findMany: vi.fn().mockResolvedValue([{ id: "inv1", reviewedData: { vendor: "Acme Supplies", total: 300, invoice_number: "INV-100" } }]),
+    }
+    db.creditAllocation = { findMany: vi.fn().mockResolvedValue([]), create: vi.fn().mockResolvedValue({ id: "alloc1" }) }
+    db.paymentRunItem = { findMany: vi.fn().mockResolvedValue([]) }
+    db.invoicePayment = { findMany: vi.fn().mockResolvedValue([]) }
+
+    await updateReviewTaskStatus({ workspaceId: "w1", taskId: "t1", status: "approved", actorId: "u1" })
+
+    expect(db.creditAllocation.create).toHaveBeenCalledWith({ data: expect.objectContaining({ workspaceId: "w1", creditNoteId: "cn1", invoiceId: "inv1", amount: 300 }) })
   })
 })
 

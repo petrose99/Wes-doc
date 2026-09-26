@@ -3,6 +3,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest"
 const findFirst = vi.fn()
 const invoicePaymentFindMany = vi.fn()
 const paymentRunItemFindMany = vi.fn()
+const creditAllocationFindMany = vi.fn()
 const getActiveWorkflowStageState = vi.fn()
 const getDocumentPaymentStatuses = vi.fn()
 const summarizePoConsumption = vi.fn()
@@ -12,6 +13,7 @@ vi.mock("@/lib/db", () => ({
     document: { findFirst },
     invoicePayment: { findMany: invoicePaymentFindMany },
     paymentRunItem: { findMany: paymentRunItemFindMany },
+    creditAllocation: { findMany: creditAllocationFindMany },
   },
 }))
 vi.mock("@/prisma/client", () => ({ Prisma: {}, PrismaClient: vi.fn() }))
@@ -28,6 +30,7 @@ beforeEach(() => {
   findFirst.mockResolvedValue(DOC)
   invoicePaymentFindMany.mockResolvedValue([])
   paymentRunItemFindMany.mockResolvedValue([])
+  creditAllocationFindMany.mockResolvedValue([])
   getActiveWorkflowStageState.mockResolvedValue(null)
   getDocumentPaymentStatuses.mockResolvedValue(new Map())
   summarizePoConsumption.mockResolvedValue(new Map())
@@ -44,6 +47,13 @@ describe("describeMoveIneligibility", () => {
     getDocumentPaymentStatuses.mockResolvedValue(new Map([["doc-1", { paymentStatus: "Posted", paidAmount: 0 }]]))
     const reason = await describeMoveIneligibility("ws-1", "doc-1", "invoice")
     expect(reason).toBe("Can't move invoice.pdf — it's already Posted.")
+  })
+
+  it("blocks a fully-credited invoice, same as a fully-paid one (#463)", async () => {
+    findFirst.mockResolvedValue({ ...DOC, reviewedData: { total: 500 } })
+    creditAllocationFindMany.mockResolvedValue([{ invoiceId: "doc-1", amount: 500 }])
+    const reason = await describeMoveIneligibility("ws-1", "doc-1", "invoice")
+    expect(reason).toBe("Can't move invoice.pdf — it's already Credited.")
   })
 
   it("blocks a purchase order with matched invoices", async () => {

@@ -1,6 +1,7 @@
 import { requestLLM } from "@/ai/providers/llmProvider"
 import { classifyDocument, type ClassificationResult } from "@/lib/classification"
 import { DOC_TYPE_SPECS, DOC_TYPES, isDocType, resolveDocType, docTypeToLegacyTemplateCode, type DocType, type DocCategory } from "@/lib/doc-types"
+import { normalizeCreditNoteSign } from "@/lib/credits/sign"
 import { inferFieldSnapshot, extractFreeFormProvenance } from "@/lib/extraction/infer-schema"
 import { deriveAdaptiveFields } from "@/lib/adaptive-extraction"
 import { track } from "@/lib/analytics"
@@ -672,7 +673,10 @@ export async function processDocumentJob(jobId: string) {
       }).catch(() => {})
     }
 
-    const extraction = freeForm ? Object.assign({}, ...passes) : mergeExtractionPasses(fields, passes)
+    let extraction = freeForm ? Object.assign({}, ...passes) : mergeExtractionPasses(fields, passes)
+    // #463 Q2: a credit note's printed total is sometimes shown negative on the source document —
+    // DocuBite stores the printed magnitude either way; the type carries the direction, not the sign.
+    if (classificationData?.docType === "credit_note") extraction = normalizeCreditNoteSign(extraction)
     const rawFieldConfidence = freeForm ? Object.assign({}, ...confidencePasses) : mergeFieldConfidence(fields, passes, confidencePasses)
     const inferredFields = freeForm ? inferFieldSnapshot(extraction, freeFormSpec) : null
 

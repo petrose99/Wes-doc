@@ -14,7 +14,8 @@ export type BillPayMembershipInput = {
 export function isOnBillPay(input: BillPayMembershipInput): boolean {
   if (input.processingState === "cancelled") return false
   if (input.processingState !== "approved" && input.processingState !== "touchless") return false
-  return input.paidState !== "paid"
+  // #463: a fully-credited invoice is done, same as a fully-paid one — neither belongs on Bill Pay.
+  return input.paidState !== "paid" && input.paidState !== "credited"
 }
 
 export type BatchEligibilityReason = "needs_bank_details" | "scheduled" | "no_amount" | "no_supplier" | "no_payer_account"
