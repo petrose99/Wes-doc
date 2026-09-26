@@ -91,7 +91,10 @@ function normalizeLineItems(raw: unknown, total: number, lineAccounts: Array<Cod
   // (which requires at least one line) always has something to post. No single line to key off of
   // for its coding, so this synthesized line takes the first row with a resolved account, if any.
   if (!items.length) {
-    return [{ description: "Total", quantity: 1, unitPrice: total, amount: total, ...lineCoding(lineAccounts?.find((row) => row?.account_external_id), names) }]
+    // #459: a synthesized whole-bill line has no single line item to attribute an Item to —
+    // falls back to account only, never an item, even if the donor row happened to carry one.
+    const fallback = lineCoding(lineAccounts?.find((row) => row?.account_external_id), names)
+    return [{ description: "Total", quantity: 1, unitPrice: total, amount: total, ...fallback, itemExternalId: null }]
   }
   return items
 }

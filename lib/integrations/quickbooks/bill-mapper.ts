@@ -26,7 +26,24 @@ export function toQuickBooksBillBody(bill: NormalizedBill, vendorRef: string) {
     GlobalTaxCalculation: GLOBAL_TAX[basis],
     ...(basis === "none" ? { TotalAmt: bill.total } : {}),
     Line: bill.lineItems.map((item) => {
-      if (!item.accountExternalId) throw new BillMappingError("line_missing_account")
+      if (!item.accountExternalId && !item.itemExternalId) throw new BillMappingError("line_missing_account")
+      // #459/ADR 0015: an item line has no AccountRef — QuickBooks computes it from the Item.
+      if (item.itemExternalId) {
+        return {
+          Amount: item.amount,
+          DetailType: "ItemBasedExpenseLineDetail",
+          Description: item.description,
+          ItemBasedExpenseLineDetail: {
+            ItemRef: { value: item.itemExternalId },
+            Qty: item.quantity,
+            UnitPrice: item.unitPrice,
+            ...(basis !== "none" && item.taxCode ? { TaxCodeRef: { value: item.taxCode } } : {}),
+            ...(item.tracking[0] ? { ClassRef: { value: item.tracking[0].optionId } } : {}),
+            ...(item.customer ? { CustomerRef: { value: item.customer } } : {}),
+            ...(item.billable ? { BillableStatus: "Billable" } : {}),
+          },
+        }
+      }
       return {
         Amount: item.amount,
         DetailType: "AccountBasedExpenseLineDetail",

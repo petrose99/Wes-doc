@@ -25,12 +25,15 @@ export function toXeroBillBody(bill: NormalizedBill, contactId: string) {
     ...(bill.currencyCode ? { CurrencyCode: bill.currencyCode } : {}),
     LineAmountTypes: LINE_AMOUNT_TYPES[basis],
     LineItems: bill.lineItems.map((item) => {
-      if (!item.accountExternalId) throw new BillMappingError("line_missing_account")
+      if (!item.accountExternalId && !item.itemExternalId) throw new BillMappingError("line_missing_account")
       return {
         Description: item.description,
         Quantity: item.quantity || 1,
         UnitAmount: item.unitPrice,
-        AccountCode: item.accountExternalId,
+        // #459/ADR 0015: an item line still sends AccountCode — it's the Item's own account,
+        // resolved read-only, not the ledger computing it the way QuickBooks does.
+        ...(item.itemExternalId ? { ItemCode: item.itemExternalId } : {}),
+        ...(item.accountExternalId ? { AccountCode: item.accountExternalId } : {}),
         ...(basis !== "none" && item.taxCode ? { TaxType: item.taxCode } : {}),
         ...(item.tracking.length ? { Tracking: item.tracking.map((t) => ({ Name: t.categoryName, Option: t.optionName })) } : {}),
       }
