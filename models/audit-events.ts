@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db"
 import { Prisma } from "@/prisma/client"
 import { DOC_TYPE_SPECS, isDocType } from "@/lib/doc-types"
+import { describeAttachError } from "@/lib/integrations/attach-errors"
 
 /** Human-readable label for a DocumentAuditEvent.type value — the model stores only the raw
  * event string (see prisma/schema.prisma::DocumentAuditEvent), so this is the one place that
@@ -39,6 +40,8 @@ const EVENT_LABELS: Record<string, string> = {
   webhook_endpoint_enabled: "Webhook endpoint enabled",
   webhook_endpoint_deleted: "Webhook endpoint deleted",
   integration_disconnected: "Integration disconnected",
+  integration_attach_succeeded: "Source file attached",
+  integration_attach_failed: "Source file not attached",
   integration_default_account_changed: "Default expense account changed",
   auth_signup: "Account created",
   auth_password_reset_requested: "Password reset requested",
@@ -72,6 +75,14 @@ export function auditEventLabel(type: string, detail?: unknown) {
     const from = fromType && isDocType(fromType) ? DOC_TYPE_SPECS[fromType].label : fromType ?? null
     const to = toType && isDocType(toType) ? DOC_TYPE_SPECS[toType].label : toType ?? null
     if (to) return from ? `Moved to ${to} (was ${from})` : `Moved to ${to}`
+  }
+  // #450/#462: "the full text ... on the Audit tab" — the terminal-failure reason lives only in
+  // `detail.errorCode` (lib/integration-attach.ts), so it's appended here the same way the
+  // reclassify label special-cases on detail above, rather than growing EVENT_LABELS into a
+  // function-valued map for one row.
+  if (type === "integration_attach_failed" && detail && typeof detail === "object") {
+    const { errorCode } = detail as { errorCode?: string }
+    if (errorCode) return `Source file not attached — ${describeAttachError(errorCode)}`
   }
   return EVENT_LABELS[type] ?? type.replaceAll("_", " ").replace(/^./, (c) => c.toUpperCase())
 }

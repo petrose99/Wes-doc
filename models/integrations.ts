@@ -323,6 +323,24 @@ export async function listLatestPushesForDocuments(workspaceId: string, document
   return latest
 }
 
+/** #462: the source-file attach state for a single document's most recent push, for the
+ * StatusLine trailing block — status/attempts/errorCode plus the connection's own status (so a
+ * "waiting on reconnect" state can be told apart from a plain retryable failure). `null` when the
+ * document has never had an attach queued (nothing to show in `trailing`). */
+export async function getDocumentAttachment(workspaceId: string, documentId: string) {
+  return prisma.integrationAttachment.findFirst({
+    where: { workspaceId, documentId },
+    orderBy: { createdAt: "desc" },
+    select: {
+      status: true,
+      attempts: true,
+      errorCode: true,
+      provider: true,
+      connection: { select: { status: true } },
+    },
+  })
+}
+
 export async function listWorkspaceIntegrationPushes(workspaceId: string, documentId?: string) {
   return prisma.integrationPush.findMany({
     where: { workspaceId, ...(documentId ? { documentId } : {}) },

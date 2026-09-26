@@ -4,6 +4,7 @@ const mockUpdateMany = vi.fn()
 const mockFindMany = vi.fn()
 const mockPushCount = vi.fn()
 const mockPushFindMany = vi.fn()
+const mockAttachmentFindFirst = vi.fn()
 const mockEnqueueAttachmentForPush = vi.fn()
 const mockKickIntegrationAttachDrain = vi.fn()
 
@@ -19,6 +20,9 @@ vi.mock("@/lib/db", () => ({
       count: (...args: unknown[]) => mockPushCount(...args),
       findMany: (...args: unknown[]) => mockPushFindMany(...args),
     },
+    integrationAttachment: {
+      findFirst: (...args: unknown[]) => mockAttachmentFindFirst(...args),
+    },
   },
 }))
 
@@ -29,7 +33,7 @@ vi.mock("@/lib/integration-attach", () => ({
 
 const {
   resolveAccountNames, setWorkspaceIntegrationTenant, setWorkspaceIntegrationDefaultAccount,
-  countBackfillableAttachments, queueBackfillAttachments,
+  countBackfillableAttachments, queueBackfillAttachments, getDocumentAttachment,
 } = await import("@/models/integrations")
 
 beforeEach(() => { vi.clearAllMocks() })
@@ -109,5 +113,29 @@ describe("queueBackfillAttachments (#461)", () => {
     const queued = await queueBackfillAttachments("ws1")
     expect(queued).toBe(0)
     expect(mockKickIntegrationAttachDrain).not.toHaveBeenCalled()
+  })
+})
+
+describe("getDocumentAttachment (#462)", () => {
+  it("returns the most recent attach for the document, scoped to the workspace", async () => {
+    mockAttachmentFindFirst.mockResolvedValue({
+      status: "failed", attempts: 5, errorCode: "attach_oversize", provider: "xero",
+      connection: { status: "connected" },
+    })
+    const result = await getDocumentAttachment("ws1", "doc1")
+    expect(result).toEqual({
+      status: "failed", attempts: 5, errorCode: "attach_oversize", provider: "xero",
+      connection: { status: "connected" },
+    })
+    expect(mockAttachmentFindFirst).toHaveBeenCalledWith({
+      where: { workspaceId: "ws1", documentId: "doc1" },
+      orderBy: { createdAt: "desc" },
+      select: { status: true, attempts: true, errorCode: true, provider: true, connection: { select: { status: true } } },
+    })
+  })
+
+  it("returns null when the document has never had an attach queued", async () => {
+    mockAttachmentFindFirst.mockResolvedValue(null)
+    expect(await getDocumentAttachment("ws1", "doc1")).toBeNull()
   })
 })

@@ -88,6 +88,13 @@ gets killed with the parent). Capture with the shared runner:
 exercise a destructive-action confirm dialog, wait ≥2s after opening the pane before opening the ⋯
 menu — the registered-document context populates asynchronously and a fast click sequence finds an
 empty menu (Archive/Flag/Delete all silently absent, not just Delete).
+**Two distinct loading states, wait for both (#462):** the pane's own `.animate-pulse` skeleton
+(`detail-pane.tsx`) is not the only thing that can still be showing when a round snaps — the
+`(app)` route-group's Suspense fallback (`app/(app)/loading.tsx`, a centered `Loader2
+animate-spin`) can still be up too, especially on a slower/heavier doc. A wait that only checks
+`.animate-pulse` gone resolves instantly during that outer fallback (no `.animate-pulse` node
+exists yet), snapping a bare spinner. Wait for both classes absent, and prefer waiting for real
+header content (a status word) to be present over any absence-only check.
 
 ## Detector residue (report, do not chase)
 App-wide four (`ai-color-palette`, `overused-font`, `dark-glow`, `layout-transition`).

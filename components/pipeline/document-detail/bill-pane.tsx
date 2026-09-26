@@ -1,6 +1,7 @@
 "use client"
 
-import { createContext, type ReactNode, useContext, useMemo, useState } from "react"
+import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from "react"
+import Link from "next/link"
 import { CheckCircle2, ChevronDown, ExternalLink, XCircle, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { useRegisterDocumentActions, type RegisteredDocument } from "@/components/queue/document-actions-menu"
@@ -14,7 +15,10 @@ import { Panel, Pill } from "@/components/automation/automation-ui"
 import { updateReviewTaskStatusAction } from "@/app/(app)/workspaces/[workspaceId]/review-actions"
 import { moveDocumentsToStageAction, updateDocumentNoteAction } from "@/app/(app)/workspaces/[workspaceId]/pipeline-actions"
 import { postSelectedDocumentsAction } from "@/app/(app)/workspaces/[workspaceId]/post-selected-documents-actions"
+import { retryAttachingAction } from "@/app/(app)/workspaces/[workspaceId]/integration-attach-actions"
 import { checkAffectedByRuleChangeAction, type AffectedByRuleChange } from "@/app/(app)/workspaces/[workspaceId]/account-correction-actions"
+import { describeAttachError, ATTACH_PROVIDER_LABELS } from "@/lib/integrations/attach-errors"
+import { PERMANENT_ATTACH_ERROR_CODES } from "@/lib/integration-attach-policy"
 import { AccountCorrectionDialog } from "@/components/integrations/account-correction-dialog"
 import type { ProcessingState } from "@/lib/documents/processing-state"
 import type { ProcessingFact } from "@/lib/documents/processing-fact"
@@ -93,7 +97,7 @@ export function BillPane({ document, providerLink, fileHref, viewer, form }: {
  * and the Approval block (§4.3), the one and only place a blocking reason renders. `escalated`
  * has no per-document actor-role query in the row projection (spec: "no new query") so its
  * sentence names the generic waiting party, not a person. */
-export function BillStatusTrack({ workspaceId, openReviewTaskId, state, fact, ledger, openCheckCodes, cancelledReason, paidAt, blockedByCheck, escalated, approvalStatus, rejectedByActor, onDone }: {
+export function BillStatusTrack({ workspaceId, openReviewTaskId, state, fact, ledger, openCheckCodes, cancelledReason, paidAt, blockedByCheck, escalated, approvalStatus, rejectedByActor, onDone, documentId, attachment, canPush, isOwner }: {
   workspaceId: string
   openReviewTaskId: string | null
   state: ProcessingState
@@ -112,6 +116,11 @@ export function BillStatusTrack({ workspaceId, openReviewTaskId, state, fact, le
    * than a second query. */
   rejectedByActor?: string | null
   onDone: () => void
+  /** #462 Surface 2: the source-file attach state, appended after the paid date when both apply. */
+  documentId: string
+  attachment?: DocumentAttachment
+  canPush?: boolean
+  isOwner?: boolean
 }) {
   const [confirmingReject, setConfirmingReject] = useState(false)
   const [rejecting, setRejecting] = useState(false)
@@ -137,7 +146,11 @@ export function BillStatusTrack({ workspaceId, openReviewTaskId, state, fact, le
 
   return <div className="flex flex-col gap-2 border-b border-slate-200 px-3 py-2">
     <StatusLine state={state} fact={fact} ledger={ledger} openCheckCodes={openCheckCodes} cancelledReason={cancelledReason}
-      trailing={paidAt ? <span>· Paid {formatDate(paidAt)}</span> : undefined} />
+      trailing={<>
+        {paidAt && <span>· Paid {formatDate(paidAt)}</span>}
+        <AttachTrailing workspaceId={workspaceId} documentId={documentId} ledger={ledger} attachment={attachment ?? null}
+          canPush={canPush ?? false} isOwner={isOwner ?? false} />
+      </>} />
     {checkCount > 0 && <p role="status" className="text-xs text-slate-600">{checkCount} open check{checkCount === 1 ? "" : "s"}</p>}
     {blockReason && <div className="flex flex-wrap items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
       <span>{blockReason}</span>
@@ -155,6 +168,74 @@ export function BillStatusTrack({ workspaceId, openReviewTaskId, state, fact, le
       onConfirm={() => void reject()}
       onCancel={() => setConfirmingReject(false)} />
   </div>
+}
+
+export type DocumentAttachment = {
+  status: string
+  attempts: number
+  errorCode: string | null
+  provider: string
+  connection: { status: string } | null
+} | null
+
+/** #462 spec Surface 2: the source-file attach state that follows the ledger pill (and, when
+ * paid, the paid date) in `StatusLine`'s trailing slot — the seven-state table from #450's
+ * resolution, verbatim. Renders nothing until the document has posted (`ledger` is "posted" or
+ * "paid" — an attach row only exists after a successful push). Long text truncates with the
+ * full sentence in `title`, matching `StatusLine`'s own long-name/-reason convention. */
+export function AttachTrailing({ workspaceId, documentId, ledger, attachment, canPush, isOwner }: {
+  workspaceId: string
+  documentId: string
+  ledger?: string | null
+  attachment: DocumentAttachment
+  canPush: boolean
+  isOwner: boolean
+}) {
+  const [current, setCurrent] = useState(attachment)
+  const [retrying, setRetrying] = useState(false)
+  // The server re-passes `attachment` after `router.refresh()` (BillStatusTrack's onDone, one
+  // level up); useState's initializer only runs once, so without this the optimistic post-retry
+  // value would never pick up what the refresh actually found.
+  useEffect(() => setCurrent(attachment), [attachment])
+  if (ledger !== "posted" && ledger !== "paid") return null
+
+  const providerLabel = ATTACH_PROVIDER_LABELS[current?.provider ?? ""] ?? "the ledger"
+  const waitingReconnect = current?.status === "pending" && current.connection?.status === "needs_reconnect"
+  const permanent = current?.status === "failed" && !!current.errorCode && PERMANENT_ATTACH_ERROR_CODES.has(current.errorCode)
+
+  let text: string
+  let action: "retry" | "reconnect" | null = null
+  if (!current) text = "Source file not attached"
+  else if (current.status === "succeeded") text = "Source file attached"
+  else if (waitingReconnect) { text = `Source file waits for ${providerLabel} to be reconnected`; action = "reconnect" }
+  else if (current.status === "pending") text = "Attaching source file…"
+  else if (permanent) text = `Source file not attached — ${describeAttachError(current.errorCode!)}.`
+  else { text = `Source file not attached — ${providerLabel} didn't respond`; action = "retry" }
+
+  const longText = text.length > 60 ? text : null
+  const shownText = longText ? `${longText.slice(0, 59)}…` : text
+
+  const retry = async () => {
+    setRetrying(true)
+    try {
+      const res = await retryAttachingAction(workspaceId, documentId)
+      if (res.success && res.data) setCurrent((prev) => prev ? { ...prev, status: res.data!.status, errorCode: null } : prev)
+      else toast.error(res.error ?? "Could not retry attaching this file")
+    } finally {
+      setRetrying(false)
+    }
+  }
+
+  return <>
+    <span className="min-w-0 truncate" title={longText ?? undefined}>· {shownText}</span>
+    {action === "retry" && canPush && <Button id="retry-attaching" type="button" size="sm" variant="outline" disabled={retrying} onClick={() => void retry()}>
+      {retrying ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : null}Retry attaching
+    </Button>}
+    {action === "reconnect" && isOwner && <Link href={`/workspaces/${workspaceId}/admin/integrations`}
+      className="shrink-0 rounded-sm font-medium text-emerald-700 underline decoration-emerald-300 underline-offset-2 hover:text-emerald-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-1">
+      Integrations
+    </Link>}
+  </>
 }
 
 /** #361 step 4 (#355 Q5): the one footer verb `PaneFrame`'s sticky `actions` slot renders for a

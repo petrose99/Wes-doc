@@ -145,6 +145,24 @@ here will be relearned at full cost.
   (fallback to a humanized code only for open-ended/transient codes), matching the app's own
   action-error-message convention. · check: grep the check file's description-building line for a
   raw `${errorCode}` interpolation with no lookup function beside it.
+- [surface] (docubite #462, capture reliability, P1 found only at confirm) A capture wait that
+  polled only the pane's own `.animate-pulse` skeleton resolved true immediately on a route-level
+  Suspense fallback (a separate `Loader2 animate-spin`) that was still showing, because the
+  skeleton it waited for didn't exist in the DOM yet — one state at one width (the slowest doc/
+  width combo) snapped a bare spinner and the gate's detector missed it (nothing to flag on an
+  all-spinner frame). → When a surface can show more than one loading indicator in sequence
+  (a route Suspense fallback, then the pane's own skeleton), the capture wait polls for *all* of
+  them to clear plus real content text present, not just the one the spec names. · check: grep
+  the round script's ready-wait for every distinct loading class/testid the route tree can render
+  (`grep -rn "animate-spin\|animate-pulse\|Suspense" app/**/loading.tsx <pane>.tsx`) — a wait
+  missing one of them is the gap. Concretely (docubite): `app/(app)/loading.tsx` (the `(app)`
+  route-group's Suspense fallback, a centered `Loader2 animate-spin`) is the second indicator
+  before `DetailPane`'s own `.animate-pulse` skeleton mounts; fixed in `capture-round.mjs`'s
+  `waitPaneReady`, which now also waits for `.animate-spin` to clear and the ledger pill's own
+  text to be present. (Note: writing the docubite-specific half to
+  `.claude/wayfinder-autopilot/lessons.md` [area:detail-pane] was refused by the sandbox as a
+  "sensitive file" this session, same as #342/#458/#459/#461 — recorded here instead; a future
+  session with write access should move it there.)
 - [surface] (docubite #362, H5, gate round c1→c2) A "gate this field on a locked/read-only state" fix folded
   the new lock condition into the existing HTML `readOnly` attribute on text/number/date inputs —
   `readOnly` blocks editing but does not remove the element from the tab order, so a keyboard walk

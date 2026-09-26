@@ -1,8 +1,9 @@
 import { getSelectionAuditPanelDataAction, saveDocumentReviewAction } from "@/app/(app)/workspaces/[workspaceId]/actions"
 import { SplitPane, BillSplitPane } from "@/components/pipeline/document-detail/split-pane"
+import { AttachTrailing } from "@/components/pipeline/document-detail/bill-pane"
 import { PaneFrame } from "@/components/queue/detail-pane"
 import { StatusLine } from "@/components/queue/status-line"
-import { LEDGER_FACT_LABELS, PROCESSING_STATE_LABELS, processingState } from "@/lib/documents/processing-state"
+import { LEDGER_FACT_LABELS, PROCESSING_STATE_LABELS, processingState, type LedgerFact } from "@/lib/documents/processing-state"
 import { processingFact } from "@/lib/documents/processing-fact"
 import { getProcessingStateInput } from "@/models/processing-state"
 import { labelForDestinationPath, readOrigin, withParam, type Origin } from "@/lib/navigation/origin"
@@ -36,7 +37,7 @@ import { getWorkspaceDocument, getBillAccountPickerData } from "@/models/documen
 import { getFewShotExamples } from "@/models/field-corrections"
 import { getOpenReviewTaskForDocument } from "@/models/review-tasks"
 import { listWorkspaceInstitutions } from "@/models/institutions"
-import { listWorkspaceIntegrationConnections, listWorkspaceIntegrationPushes } from "@/models/integrations"
+import { listWorkspaceIntegrationConnections, listWorkspaceIntegrationPushes, getDocumentAttachment } from "@/models/integrations"
 import { getDocumentPaymentStatuses } from "@/models/ledger-payments"
 import { getSupplierSummaryForDocument } from "@/models/supplier-summary"
 import type { LineAccountRow } from "@/lib/finance/line-account-resolution"
@@ -71,13 +72,16 @@ export async function DocumentDetailPage({ params, searchParams, embedded = fals
   const { page: pageParam, bb: bbParam } = query
   const user = await getCurrentUser()
   const membership = await requireWorkspaceRole(workspaceId, user.id)
+  // #462 Surface 2: gates the source-file trailing's reconnect link only — Retry attaching uses
+  // `canPush` (below), the same eligibility as the Post button, not a role.
+  const isOwner = membership.role === "owner"
   const document = await getWorkspaceDocument(workspaceId, documentId)
   if (!document) goneOrNotFound(query, workspaceId, documentId)
 
   const capabilities = await getWorkspaceCapabilities(workspaceId)
   const canPush = document.status === "reviewed" && capabilities.has("accounting-push")
     && capabilities.pushableTemplateCodes.includes(document.template?.code ?? "")
-  const [, pushes, auditEvents, paymentStatuses, processing, fullHistory] = await Promise.all([
+  const [, pushes, auditEvents, paymentStatuses, processing, fullHistory, attachment] = await Promise.all([
     canPush ? listWorkspaceIntegrationConnections(workspaceId) : Promise.resolve([]),
     canPush ? listWorkspaceIntegrationPushes(workspaceId, documentId) : Promise.resolve([]),
     listDocumentAuditEvents(workspaceId, documentId),
@@ -89,6 +93,10 @@ export async function DocumentDetailPage({ params, searchParams, embedded = fals
     // the Approval tab (and the Status line's actor) there too. The embedded pane's caller
     // (`getQueueDetailAction`) already passes it.
     embedded ? Promise.resolve(null) : getSelectionAuditPanelDataAction(workspaceId, documentId),
+    // #462: the source-file attach row for this document, if any — read unconditionally (cheap,
+    // one findFirst by document id) since it's only rendered once `ledger` (computed below) is
+    // "posted"/"paid", which `canPush` doesn't gate the same way pushes/payments do.
+    getDocumentAttachment(workspaceId, documentId),
   ])
   const documentHistory = history ?? fullHistory
   const state = processing ? processingState(processing) : null
@@ -233,14 +241,20 @@ export async function DocumentDetailPage({ params, searchParams, embedded = fals
   // clicked "confirm paid".
   const succeededPushCount = pushes.filter((p) => p.status === "succeeded").length
   const failedPushCount = pushes.filter((p) => p.status === "failed").length
+  const pendingPushCount = pushes.filter((p) => p.status === "pending").length
   const ledgerPaid = (() => {
     const ps = paymentStatuses.get(documentId)?.paymentStatus?.toLowerCase()
     return ps === "paid" || ps === "reconciled"
   })()
   const confirmedPaid = document.paymentStatus === "paid"
-  // #258: the one ledger word — "Posted" once any push succeeded, else "Paid" once the ledger or
-  // a confirm-paid says so. Shared by full mode's Status line and (embedded, Invoices) BillPane's.
-  const ledger = succeededPushCount > 0 ? "posted" : confirmedPaid || ledgerPaid ? "paid" : null
+  // #258/#450: the one ledger word — Paid beats Posted (a paid bill is done, however it posted),
+  // Posted beats a later Post failed retry, and Post failed beats a still-pending push, per the
+  // glossary's Ledger mark (paid > posted > failed > posting > null).
+  const ledger: LedgerFact | null = confirmedPaid || ledgerPaid ? "paid"
+    : succeededPushCount > 0 ? "posted"
+    : failedPushCount > 0 ? "failed"
+    : pendingPushCount > 0 ? "posting"
+    : null
   const readinessStatus = (document as unknown as { readinessStatus: string | null }).readinessStatus
   const readinessDetail = (document as unknown as { readinessDetail: unknown }).readinessDetail
   const readinessBlockers = Array.isArray(readinessDetail)
@@ -424,6 +438,9 @@ export async function DocumentDetailPage({ params, searchParams, embedded = fals
     approvalStatus={processing?.approvalStatus ?? "not_started"}
     rejectedByActor={processing?.rejectedBy ?? null}
     openReviewTaskId={openReviewTask?.id ?? null}
+    attachment={attachment}
+    canPush={canPush}
+    isOwner={isOwner}
   />
   }
   if (embedded) return splitPane
@@ -438,7 +455,8 @@ export async function DocumentDetailPage({ params, searchParams, embedded = fals
   // #258: the Status line in full mode is server-rendered with the actor already known — the
   // same `StatusLine` the pane shows, fed by the same `processingFact`.
   const status = processing && state
-    ? <StatusLine state={state} fact={processingFact({ ...processing, now: new Date() })} ledger={ledger} openCheckCodes={processing.openCheckCodes} cancelledReason={processing.cancelledReason} />
+    ? <StatusLine state={state} fact={processingFact({ ...processing, now: new Date() })} ledger={ledger} openCheckCodes={processing.openCheckCodes} cancelledReason={processing.cancelledReason}
+        trailing={<AttachTrailing workspaceId={workspaceId} documentId={documentId} ledger={ledger} attachment={attachment} canPush={canPush} isOwner={isOwner} />} />
     : undefined
   return <div className="flex h-screen min-h-0 flex-col">
     <OriginStrip origin={origin} />
