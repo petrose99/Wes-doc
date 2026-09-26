@@ -330,6 +330,9 @@ describe("attemptIntegrationPush — Xero item-code-stripped warning (#459)", ()
     const update = prisma.integrationPush.update.mock.calls[0][0]
     expect(update.data.status).toBe("failed")
     expect(update.data.errorCode).toBe("xero_item_code_stripped")
+    // Close review P1: the bill genuinely posted at Xero (wrong-shaped) before the warning was
+    // read — losing its id here would make the bad bill unfindable, so a failed push keeps it.
+    expect(update.data.externalBillId).toBe("bill-1")
   })
 
   it("still succeeds on an unrelated Xero warning", async () => {

@@ -16,9 +16,15 @@ export class IntegrationAuthError extends Error {}
  * default expense account that was deleted at the provider, or a malformed request body). */
 export class IntegrationPermanentError extends Error {
   code: string
-  constructor(code: string) {
+  /** #459: a permanent failure discovered only after the provider already created something (the
+   * Xero item-code-stripped case — the bill posted, wrong-shaped, before the warning is read).
+   * Carrying the id lets the caller keep it on the failed push row instead of losing the only
+   * thing that would let a person go find and fix what actually posted. */
+  externalId?: string
+  constructor(code: string, externalId?: string) {
     super(code)
     this.code = code
+    this.externalId = externalId
   }
 }
 

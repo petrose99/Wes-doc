@@ -251,7 +251,7 @@ export async function attemptIntegrationPush(pushId: string, now = new Date()): 
         // account line at the ledger — never-silently-drop-data means that's a failed post, not
         // a succeeded-with-warning, even though Xero itself returned 200 and an InvoiceID.
         if (connection.provider === "xero" && bill.lineItems.some((line) => line.itemExternalId) && created.warnings.some(itemCodeStrippedWarning)) {
-          throw new IntegrationPermanentError("xero_item_code_stripped")
+          throw new IntegrationPermanentError("xero_item_code_stripped", created.id)
         }
         result = { success: true, errorCode: null, externalBillId: created.id }
         readBack = ledgerReadBackChecks(connection.provider, bill, created)
@@ -265,7 +265,10 @@ export async function attemptIntegrationPush(pushId: string, now = new Date()): 
           await pauseForReconnect(push.id, now)
           return
         } else if (error instanceof IntegrationPermanentError) {
-          result = { success: false, errorCode: error.code, externalBillId: null }
+          // #459: usually null (the provider never created anything), but xero_item_code_stripped
+          // carries the id of the bill that DID post at the provider before the warning was read —
+          // keep it so a person can find and fix it, never silently dropping the only handle to it.
+          result = { success: false, errorCode: error.code, externalBillId: error.externalId ?? null }
           forceTerminal = true
         } else {
           result = { success: false, errorCode: safeErrorCode(error), externalBillId: null }
