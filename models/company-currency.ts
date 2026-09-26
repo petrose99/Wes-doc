@@ -40,7 +40,7 @@ export async function recordCurrencyLock(workspaceId: string, cause: CurrencyLoc
   })
 }
 
-const unposted = (workspaceId: string) => ({ workspaceId, integrationPushes: { none: { status: "succeeded" } } })
+export const unposted = (workspaceId: string) => ({ workspaceId, integrationPushes: { none: { status: "succeeded" } } })
 
 /** Documents a currency change re-converts: everything not yet posted to a ledger. */
 export async function countUnpostedDocuments(workspaceId: string): Promise<number> {
