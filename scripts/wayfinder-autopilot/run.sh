@@ -371,6 +371,11 @@ model_for() {   # $1 ticket, $2 attempt number (1-based), $3 phase
 state()  { gh api "repos/$REPO/issues/$1" --jq .state; }
 title()  { gh api "repos/$REPO/issues/$1" --jq .title; }
 
+# Nothing that owed the closing bar stays closed below it: such a ticket is
+# reopened for measure → close before the frontier is read, so the tickets it
+# blocks wait for it (rescore.sh, bar.py).
+if [ "$DRY" = 1 ]; then "$AP/rescore.sh" "$MAP" --dry-run | sed 's/^/    would /'; else "$AP/rescore.sh" "$MAP" | sed 's/^/    /'; fi || true
+
 n=0; NEXT_T=""; declare -A DUDS
 while [ "$n" -lt "$MAX" ]; do
   if [ -n "$NEXT_T" ]; then
@@ -722,7 +727,16 @@ PY
 
   ATTEMPTS[$T]=$(( ${ATTEMPTS[$T]:-0} + 1 ))
   [ -n "$PHASE" ] && PHASE_RUNS[$T:$PHASE]=$(( ${PHASE_RUNS[$T:$PHASE]:-0} + 1 ))
-  if [ "$(state "$T")" = "closed" ]; then
+  if [ "$(state "$T")" = "closed" ] && ! BAR="$(cd "$WT" && python3 "$AP/bar.py" "$TOUT/$T.md" "$T")" && [ -n "$BAR" ]; then
+    # Closed below the bar (a close the token-guard hook did not see — `gh api`,
+    # the web UI, a hook failure): not resolved. Reopen, keep the lane, and send
+    # it back through the readers; nothing it blocks reaches the frontier.
+    gh issue reopen "$T" --repo "$REPO" >/dev/null 2>&1 || true
+    gh issue comment "$T" --repo "$REPO" --body "Autopilot: continue — closed below the closing bar: $BAR. Reopened: measure (if the hand-off has no \`milestone: measured\`), then close at the bar." >/dev/null 2>&1 || true
+    gh issue edit "$T" --repo "$REPO" --remove-assignee "$ME" >/dev/null 2>&1 || true
+    [ -n "$PHASE" ] && NEXT_T="$T"
+    OUTCOME="closed below the bar — reopened"
+  elif [ "$(state "$T")" = "closed" ]; then
     OUTCOME=resolved
   elif [ -n "$PHASE" ] && [ "$(phase_of "$T")" != "$PHASE" ]; then
     # The phase's exit milestone is on the hand-off: same ticket, next phase,
