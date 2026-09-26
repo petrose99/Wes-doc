@@ -19,3 +19,7 @@ Payments are dormant (map #445), so the only proof that a supplier was paid is a
 - When rails wake, a rail's Paid writes the same Payment record (ADR 0010), so remittance needs no change. Expense claims are excluded: the claimant sees the paid date in the app.
 - A bounce reported by the email provider marks the contact **Bounced**. The contact is skipped until an Owner edits it, and it shows on the record line, on Suppliers and in Health Checks. A failed send retries with backoff, then offers Retry.
 - The advice lists amounts in the Payment record's currency through the company-currency formatter (#457), and shows credits applied once Credit allocations exist (#463, ADR 0017). It carries no bank details, no link and no attachment.
+
+## Amendment (owner, 2026-09-26)
+
+Payments are no longer dormant: #421's rail resumes. The rule stands unchanged, because it was already written for both paths. Advice goes from a **Payment record**, whether Mark as paid wrote it or a rail's Paid did, and never earlier. The opening sentence's "payments are dormant" is context from when this was decided, not a condition of the rule.
