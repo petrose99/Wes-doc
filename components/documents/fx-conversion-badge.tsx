@@ -1,4 +1,5 @@
 import { InlineAdjustmentCard, InlineAdjustmentChip } from "@/components/documents/inline-adjustment"
+import { formatCurrency } from "@/lib/money"
 
 /** Compact panel shown on any foreign-currency document — inline in the review pane and, in
  * summary form, in the doc-library table. Always renders SOMETHING when the document's currency
@@ -30,10 +31,7 @@ export function FxConversionBadge({ docCurrency, docTotal, baseCurrency, baseCur
 }) {
   if (!docCurrency || docCurrency === baseCurrency) return null
 
-  const formatMoney = (amount: number, currency: string) => {
-    try { return new Intl.NumberFormat("en", { style: "currency", currency, maximumFractionDigits: 2 }).format(amount) }
-    catch { return `${amount.toFixed(2)} ${currency}` }
-  }
+  const formatMoney = (amount: number, currency: string) => formatCurrency(amount, currency)
 
   const pending = baseCurrencyTotal === null || fxRate === null
 

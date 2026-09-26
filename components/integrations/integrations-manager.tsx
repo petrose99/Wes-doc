@@ -25,10 +25,13 @@ import {
 import { NativeSelect } from "@/components/ui/native-select"
 import { AccountCorrectionDialog } from "@/components/integrations/account-correction-dialog"
 import { listAffectedBillsAction, type AffectedBillWithCheck } from "@/app/(app)/workspaces/[workspaceId]/account-correction-actions"
-import { Check, Copy, Landmark } from "lucide-react"
+import { AlertTriangle, Check, Copy, Landmark } from "lucide-react"
 import Nango, { AuthError } from "@nangohq/frontend"
 import { useRouter } from "next/navigation"
-import { useEffect, useState, useTransition } from "react"
+import { useEffect, useRef, useState, useTransition } from "react"
+import { ChangeCurrencyDialog } from "@/components/admin/change-currency-dialog"
+import type { CurrencyLockView } from "@/lib/admin/companies"
+import { ledgerCurrencyOutcome } from "@/lib/integrations/ledger-currency-outcome"
 import { toast } from "sonner"
 
 type ApiKey = { id: string; name: string; keyPrefix: string; lastUsedAt: Date | null; revokedAt: Date | null; createdAt: Date }
@@ -45,7 +48,10 @@ type IntegrationConnection = {
   defaultExpenseAccountGuessed: boolean
   createdAt: Date
   lastSyncedAt: Date | null
+  ledgerCurrency: string | null
 }
+/** #457 §5.4: what the card needs to compare the ledger's currency with the Company currency. */
+type CompanyCurrencyContext = { currency: string; country: string | null; lock: CurrencyLockView; unpostedCount: number }
 
 // Kept in sync with lib/finance/actions.ts's copy (that module can't import client components) —
 // this is the only client-side fork; both list the same providers.
@@ -56,15 +62,76 @@ const PROVIDER_TILES: { provider: string; description: string; live: boolean }[]
   { provider: "sage", description: "Sage Business Cloud Accounting", live: false },
 ]
 
-/** One connected-provider card: shows tenant/status, a default-expense-account picker (fetched live
- * from the provider on demand — the chart of accounts isn't cached), and Disconnect. */
-function AccountingConnectionCard({ workspaceId, connection, isOwner, onChanged }: {
+/** #457 §5.4: the line under the tenant row when the ledger's own currency (read on connect and
+ * before each push) is unread or differs from the Company currency. Equal says nothing (H8). The
+ * mismatch is amber with an icon, never colour alone, like "needs reconnect". */
+function LedgerCurrencyLine({ workspaceId, connection, isOwner, company, onChanged }: {
   workspaceId: string
   connection: IntegrationConnection
   isOwner: boolean
+  company: CompanyCurrencyContext
+  onChanged: () => void
+}) {
+  const [switching, setSwitching] = useState(false)
+  const switchRef = useRef<HTMLButtonElement>(null)
+  const provider = PROVIDER_LABELS[connection.provider] ?? connection.provider
+  const outcome = ledgerCurrencyOutcome({
+    provider: connection.provider,
+    ledgerCurrency: connection.ledgerCurrency,
+    companyCurrency: company.currency,
+    country: company.country,
+    locked: company.lock.locked,
+    isOwner,
+  })
+  if (outcome === "none") return null
+  if (outcome === "unread") {
+    return <p className="mt-1 text-sm text-slate-600">{`Couldn't read ${provider}'s currency yet. It's checked again before each bill is posted.`}</p>
+  }
+  const ledger = connection.ledgerCurrency!
+  const qbo = connection.provider === "quickbooks"
+  const books = qbo ? "home currency" : "base currency"
+  const ledgerFact = `${provider} keeps its books in ${ledger}; this company's currency is ${company.currency}.`
+  return (
+    <div className="mt-1 flex flex-wrap items-start gap-x-2 gap-y-1 text-sm text-amber-800">
+      <AlertTriangle aria-hidden className="mt-0.5 size-4 shrink-0" />
+      <p className="min-w-0 max-w-[65ch] flex-1">
+        {ledgerFact}{" "}
+        {outcome === "ask_owner" && "Ask an Owner to change the company currency."}
+        {outcome === "blocked" && `Bills won't post until they match. ${provider} doesn't let you change its ${books}, so connect a ${provider} ${qbo ? "company" : "organisation"} kept in ${company.currency}, or contact support.`}
+      </p>
+      {outcome === "switch" && (
+        <>
+          <Button ref={switchRef} type="button" size="sm" variant="outline" className="py-1.5 max-md:min-h-11" onClick={() => setSwitching(true)}>
+            Switch this company to {ledger}
+          </Button>
+          <ChangeCurrencyDialog open={switching} workspaceId={workspaceId} companyId={workspaceId} from={company.currency} to={ledger}
+            unpostedCount={company.unpostedCount} restoreFocusTo={switchRef}
+            onClose={() => setSwitching(false)} onChanged={onChanged} />
+        </>
+      )}
+    </div>
+  )
+}
+
+/** One connected-provider card: shows tenant/status, a default-expense-account picker (fetched live
+ * from the provider on demand — the chart of accounts isn't cached), and Disconnect. */
+function AccountingConnectionCard({ workspaceId, connection, isOwner, company, onChanged }: {
+  workspaceId: string
+  connection: IntegrationConnection
+  isOwner: boolean
+  company: CompanyCurrencyContext
   onChanged: () => void
 }) {
   const [pending, startTransition] = useTransition()
+  // #457 §9.9: after a Switch the mismatch line and its button unmount, so focus lands on the
+  // provider name once the refreshed Company currency arrives.
+  const nameRef = useRef<HTMLSpanElement>(null)
+  const focusNamePending = useRef(false)
+  useEffect(() => {
+    if (!focusNamePending.current) return
+    focusNamePending.current = false
+    nameRef.current?.focus()
+  }, [company.currency])
   const [accounts, setAccounts] = useState<{ id: string; name: string }[] | null>(null)
   const [loadingAccounts, setLoadingAccounts] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -129,7 +196,7 @@ function AccountingConnectionCard({ workspaceId, connection, isOwner, onChanged 
     <li className="rounded-md border border-hairline px-3 py-2">
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <span className="min-w-0 basis-full sm:basis-auto">
-          <span className="font-medium">{PROVIDER_LABELS[connection.provider] ?? connection.provider}</span>{" "}
+          <span ref={nameRef} tabIndex={-1} className="font-medium outline-none">{PROVIDER_LABELS[connection.provider] ?? connection.provider}</span>{" "}
           <span className="text-xs text-slate-600">{connection.tenantName || connection.externalTenantId}</span>
           {connection.status === "needs_reconnect" && <span className="ml-2 text-xs font-medium text-amber-700">needs reconnect</span>}
         </span>
@@ -150,6 +217,10 @@ function AccountingConnectionCard({ workspaceId, connection, isOwner, onChanged 
           </Button>
         )}
       </div>
+      {connection.status === "connected" && (
+        <LedgerCurrencyLine workspaceId={workspaceId} connection={connection} isOwner={isOwner} company={company}
+          onChanged={() => { focusNamePending.current = true; onChanged() }} />
+      )}
       {isOwner && connection.status === "connected" && (
         <p className={connection.lastSyncedAt ? "mt-1 text-xs text-slate-600" : "mt-1 text-xs font-medium text-slate-700"}>
           {connection.lastSyncedAt ? `Accounts last synced ${connection.lastSyncedAt.toLocaleString()}` : "Accounts not yet synced"}
@@ -392,7 +463,7 @@ function SecretReveal({ label, value, onDone }: { label: string; value: string; 
 }
 
 export function IntegrationsManager({
-  workspaceId, isOwner, eventTypes, apiKeys, endpoints, deliveries, nangoEnabled, connections,
+  workspaceId, isOwner, eventTypes, apiKeys, endpoints, deliveries, nangoEnabled, connections, company,
 }: {
   workspaceId: string
   isOwner: boolean
@@ -402,6 +473,7 @@ export function IntegrationsManager({
   deliveries: Delivery[]
   nangoEnabled: boolean
   connections: IntegrationConnection[]
+  company: CompanyCurrencyContext
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
@@ -451,6 +523,7 @@ export function IntegrationsManager({
                       workspaceId={workspaceId}
                       connection={connectionsByProvider.get(provider)!}
                       isOwner={isOwner}
+                      company={company}
                       onChanged={() => router.refresh()}
                     />
                   ))}

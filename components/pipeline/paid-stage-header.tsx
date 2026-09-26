@@ -1,6 +1,7 @@
 import type { PaidSummary } from "@/models/bills"
 import { Banknote, CalendarClock } from "lucide-react"
 import Link from "next/link"
+import { formatCurrency } from "@/lib/money"
 
 /** The Paid-stage twin of SyncedStageHeader. Synced's aging strip ("Current / 1-30 / 90+") asks
  * "what's still owed" — meaningless on a tab that's exclusively money already settled, so Paid
@@ -11,13 +12,7 @@ export function PaidStageHeader({ workspaceId, summary, currency }: {
   summary: PaidSummary
   currency: string
 }) {
-  const formatMoney = (value: number) => {
-    try {
-      return new Intl.NumberFormat("en", { style: "currency", currency, maximumFractionDigits: 0 }).format(value)
-    } catch {
-      return `${value.toFixed(0)} ${currency}`.trim()
-    }
-  }
+  const formatMoney = (value: number) => formatCurrency(value, currency, 0)
   if (summary.total.count === 0) return null
 
   return <div className="border-b border-slate-200 bg-slate-50 px-6 py-3">

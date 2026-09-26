@@ -159,6 +159,15 @@ export async function getBookCloseDate(realmId: string, connectionId: string): P
   return result.Preferences?.AccountingInfoPrefs?.BookCloseDate ?? null
 }
 
+/** The currency the QuickBooks company keeps its books in (`CurrencyPrefs.HomeCurrency` on
+ * `/preferences`), as an ISO code. Throws when the provider does not say — a push must never guess. */
+export async function getHomeCurrency(realmId: string, connectionId: string): Promise<string> {
+  const result = await apiRequest<{ Preferences?: { CurrencyPrefs?: { HomeCurrency?: { value?: string } } } }>(realmId, connectionId, "/preferences")
+  const code = result.Preferences?.CurrencyPrefs?.HomeCurrency?.value
+  if (!code) throw new Error("ledger_currency_missing")
+  return code
+}
+
 export type QuickBooksBillCorrectionCheck =
   | { offered: true }
   | { offered: false; reason: "book_closed" | "paid" }

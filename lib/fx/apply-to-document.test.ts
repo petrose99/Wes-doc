@@ -75,6 +75,20 @@ describe("applyFxToDocument", () => {
     expect(call.data.fxRateSource).toBe("frankfurter")
   })
 
+  it("re-converts after a Company currency change at the document's own rate date, not today's (#457)", async () => {
+    const usd = { ...document, reviewedData: { total: 100, currency_code: "USD", issue_date: "2026-08-03" } }
+    getHistoricalRate.mockResolvedValue({ base: "USD", quote: "ZAR", effectiveDate: "2026-08-03", rate: 18.2, source: "frankfurter+pegged_via_ZAR" })
+
+    documentFindUnique.mockResolvedValue({ ...usd, workspace: { baseCurrency: "LSL" } })
+    await applyFxToDocument("doc-1")
+    documentFindUnique.mockResolvedValue({ ...usd, workspace: { baseCurrency: "ZAR" } })
+    await applyFxToDocument("doc-1")
+
+    expect(getHistoricalRate.mock.calls.map((c) => [c[1], (c[2] as Date).toISOString().slice(0, 10)])).toEqual([["LSL", "2026-08-03"], ["ZAR", "2026-08-03"]])
+    const totals = documentUpdate.mock.calls.map((c) => (c[0] as { data: { baseCurrencyTotal: { value: number } } }).data.baseCurrencyTotal.value)
+    expect(totals[0]).toBe(totals[1])
+  })
+
   it("rounds JPY to whole units (zero-decimal currency)", async () => {
     documentFindUnique.mockResolvedValue({ ...document, workspace: { baseCurrency: "JPY" } })
     getHistoricalRate.mockResolvedValue({ base: "EUR", quote: "JPY", effectiveDate: "2024-03-15", rate: 162.34, source: "frankfurter" })

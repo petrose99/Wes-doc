@@ -15,6 +15,7 @@ import { getActiveIntegrationConnectionId, getLedgerConnectionBandStatus } from 
 import { ensureInboundEmailToken } from "@/models/inbound-email"
 import { getIntakeUpload } from "@/models/files"
 import config from "@/lib/config"
+import { formatCurrency } from "@/lib/money"
 
 const STATUSES = new Set(["queued", "needs_review", "ready_for_review", "reviewed", "failed"])
 
@@ -74,7 +75,7 @@ export async function DocumentQueuePage({ params, searchParams, docType, title, 
       status: document.status,
       receivedAt: document.receivedAt,
       supplier: review.supplier ?? (isBank ? accountHolder : null),
-      total: review.total ?? (isBank && closing !== null ? new Intl.NumberFormat("en", { style: "currency", currency: membership.workspace.baseCurrency ?? "USD", maximumFractionDigits: 0 }).format(closing) : null),
+      total: review.total ?? (isBank && closing !== null ? formatCurrency(closing, membership.workspace.baseCurrency, 0) : null),
       category: review.category,
       institution: isBank && document.institutionId ? institutionName.get(document.institutionId) ?? null : null,
       ...(docType === "purchase_order" ? (() => {

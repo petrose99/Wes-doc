@@ -10,6 +10,7 @@
 
 import { prisma } from "@/lib/db"
 import { writeAuditEvent } from "@/lib/audit"
+import { getCompanyCurrency } from "@/models/company-currency"
 import type { GateContext, GateRunner, GateVerdict } from "./types"
 import type { Prisma, PrismaClient, Gate } from "@/prisma/client"
 
@@ -23,7 +24,7 @@ export type GateRegistry = {
    * the Gate rows that were written or upserted, so the AP-inbound caller can decide whether to
    * hold the bill in the exception queue. An empty registry is a no-op and returns `[]`, which
    * is how `createIngestionItem` remains unchanged when this scaffolding lands. */
-  runOnArrival(ctx: GateContext, client?: PrismaLike): Promise<Gate[]>
+  runOnArrival(ctx: Omit<GateContext, "baseCurrency">, client?: PrismaLike): Promise<Gate[]>
 }
 
 export function createGateRegistry(): GateRegistry {
@@ -39,8 +40,9 @@ export function createGateRegistry(): GateRegistry {
     list() {
       return Array.from(runners.values())
     },
-    async runOnArrival(ctx, client = prisma) {
+    async runOnArrival(arrival, client = prisma) {
       if (runners.size === 0) return []
+      const ctx: GateContext = { ...arrival, baseCurrency: await getCompanyCurrency(arrival.workspaceId, client) }
       const written: Gate[] = []
       for (const runner of runners.values()) {
         // Each runner is isolated: a throw from one must not stop the others. A gate that

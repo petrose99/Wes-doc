@@ -2,6 +2,7 @@
 // caller-supplied ids, and the directive would publish them as forgeable endpoints. #285/#286/#287
 // call through their own "use server" actions, which resolve the caller's identity first.
 import { prisma } from "@/lib/db"
+import { companyCountryAndCurrency } from "@/lib/geo/company-currency"
 import { unscoped } from "@/lib/workspace-scope"
 import { cache } from "react"
 
@@ -185,14 +186,14 @@ export async function createOrganization(name: string, ownerId: string) {
  * the caller as its owner (WorkspaceMember) — organization admin alone does not carry entity
  * access, so this call is what actually grants it, same as any other workspace creation. */
 export async function addCompanyToOrganization(organizationId: string, ownerId: string, input: { name: string; country?: string; baseCurrency?: string }) {
+  const pair = companyCountryAndCurrency(input)
   return unscoped(() =>
     prisma.workspace.create({
       data: {
         name: input.name.trim(),
         kind: "team",
         industry: "finance",
-        country: input.country || "US",
-        baseCurrency: input.baseCurrency || "USD",
+        ...pair,
         organizationId,
         members: { create: { userId: ownerId, role: "owner" } },
       },

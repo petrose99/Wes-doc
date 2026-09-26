@@ -89,8 +89,8 @@ async function seedDevBypassOrganization() {
   const organization = await prisma.organization.findFirst({ where: { name: "Acme Advisory", members: { some: { userId: user.id } } } })
     ?? (await createOrganization("Acme Advisory", user.id))
   const ownedCompanies: { name: string; country: string; baseCurrency: string }[] = [
-    { name: "Riverside Bakery Co.", country: "US", baseCurrency: "USD" },
-    { name: "Harbor Lights Cafe", country: "GB", baseCurrency: "GBP" },
+    { name: "Riverside Bakery Co.", country: "LS", baseCurrency: "LSL" },
+    { name: "Harbor Lights Cafe", country: "ZA", baseCurrency: "ZAR" },
   ]
   for (const company of ownedCompanies) {
     const existing = await prisma.workspace.findFirst({ where: { organizationId: organization.id, name: company.name } })
@@ -113,7 +113,7 @@ async function seedDevBypassOrganization() {
   })
 
   const ungrouped = await prisma.workspace.findFirst({ where: { organizationId: null, kind: "team", name: "Pine Street Consulting", members: { some: { userId: user.id, role: "owner" } } } })
-  if (!ungrouped) await createWorkspaceForUser(user, { name: "Pine Street Consulting", kind: "team", country: "US", baseCurrency: "USD" })
+  if (!ungrouped) await createWorkspaceForUser(user, { name: "Pine Street Consulting", kind: "team", country: "LS", baseCurrency: "LSL" })
 }
 
 async function main() {

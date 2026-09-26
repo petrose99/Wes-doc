@@ -3,54 +3,10 @@
 import { createInitialWorkspaceAction } from "@/app/(app)/workspaces/new/actions"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { currencyForCountry } from "@/lib/geo/country-currency"
+import { CompanyCountryCurrencyFields } from "@/components/workspace/company-country-currency-fields"
+import { defaultCurrency, personalCountry } from "@/lib/geo/company-currency"
 import { useRouter } from "next/navigation"
-import { useEffect, useMemo, useRef, useState, useTransition } from "react"
-
-/** Every ISO 3166-1 alpha-2 region + its Intl display name, alphabetised. Built at module load
- * from Intl's own tables so the form covers every country the platform recognises without a
- * hand-maintained list drifting out of date. Falls back to a small hard-coded set if the runtime
- * doesn't expose `Intl.supportedValuesOf` (very old browsers). */
-function buildCountryList(): { value: string; label: string }[] {
-  try {
-    const names = new Intl.DisplayNames(["en"], { type: "region" })
-    // "region" is supported at runtime (ES2023+) but TS's lib.d.ts still restricts the literal
-    // union to the older values — the cast unblocks that without changing behaviour, and the try
-    // block catches any runtime rejection on an older engine.
-    return (Intl.supportedValuesOf as (key: string) => string[])("region")
-      .filter((code) => /^[A-Z]{2}$/.test(code))
-      .map((code) => ({ value: code, label: names.of(code) ?? code }))
-      .sort((a, b) => a.label.localeCompare(b.label))
-  } catch {
-    return [
-      { value: "US", label: "United States" }, { value: "GB", label: "United Kingdom" },
-      { value: "CA", label: "Canada" }, { value: "AU", label: "Australia" },
-      { value: "DE", label: "Germany" }, { value: "FR", label: "France" },
-      { value: "IN", label: "India" }, { value: "JP", label: "Japan" },
-      { value: "BR", label: "Brazil" }, { value: "ZA", label: "South Africa" },
-    ]
-  }
-}
-
-/** Every ISO 4217 currency + its Intl display name, alphabetised by code. Same story as the
- * country list — sourced from Intl so the dropdown stays complete without a hand-maintained
- * catalogue. */
-function buildCurrencyList(): { value: string; label: string }[] {
-  try {
-    const names = new Intl.DisplayNames(["en"], { type: "currency" })
-    return Intl.supportedValuesOf("currency")
-      .map((code) => ({ value: code, label: `${code} — ${names.of(code) ?? code}` }))
-      .sort((a, b) => a.value.localeCompare(b.value))
-  } catch {
-    return [
-      { value: "USD", label: "USD — US Dollar" }, { value: "EUR", label: "EUR — Euro" },
-      { value: "GBP", label: "GBP — British Pound" }, { value: "CAD", label: "CAD — Canadian Dollar" },
-      { value: "AUD", label: "AUD — Australian Dollar" }, { value: "JPY", label: "JPY — Japanese Yen" },
-      { value: "INR", label: "INR — Indian Rupee" }, { value: "BRL", label: "BRL — Brazilian Real" },
-      { value: "ZAR", label: "ZAR — South African Rand" },
-    ]
-  }
-}
+import { useEffect, useState, useTransition } from "react"
 
 const FISCAL_MONTHS = [
   { value: "january", label: "January" }, { value: "february", label: "February" },
@@ -77,23 +33,11 @@ export function NewWorkspaceForm({ defaultName, initialCountry }: {
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
-  const countries = useMemo(buildCountryList, [])
-  const currencies = useMemo(buildCurrencyList, [])
-  const currencyCodes = useMemo(() => new Set(currencies.map((c) => c.value)), [currencies])
-  const countryCodes = useMemo(() => new Set(countries.map((c) => c.value)), [countries])
-
-  const seededCountry = initialCountry && countryCodes.has(initialCountry) ? initialCountry : "US"
-  const seededCurrency = (initialCountry && currencyForCountry(initialCountry)) || "USD"
-
-  const [country, setCountry] = useState(seededCountry)
-  const [baseCurrency, setBaseCurrency] = useState(currencyCodes.has(seededCurrency) ? seededCurrency : "USD")
+  // #457: Lesotho or South Africa only — the detected country when it is one of them, else South
+  // Africa; changing the country resets the Company currency to the country's own.
+  const seeded = personalCountry(initialCountry)
+  const [company, setCompany] = useState<{ country: string; currency: string }>({ country: seeded, currency: defaultCurrency(seeded)! })
   const [timezone, setTimezone] = useState("UTC")
-
-  // The user hasn't picked a currency by hand yet — a country change (either from IP detection or
-  // from the country dropdown) may still auto-update the currency. Once they touch the currency
-  // select, this flips true and the auto-sync stops so an intentional pick isn't overwritten by a
-  // later country change.
-  const currencyTouched = useRef(false)
 
   useEffect(() => {
     try { setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone) } catch {}
@@ -110,34 +54,18 @@ export function NewWorkspaceForm({ defaultName, initialCountry }: {
         const data: { country?: string } = await res.json()
         const code = data.country?.toUpperCase()
         if (cancelled || !code || !/^[A-Z]{2}$/.test(code)) return
-        if (countryCodes.has(code)) setCountry(code)
-        if (!currencyTouched.current) {
-          const currency = currencyForCountry(code)
-          if (currency && currencyCodes.has(currency)) setBaseCurrency(currency)
-        }
+        const detected = personalCountry(code)
+        setCompany({ country: detected, currency: defaultCurrency(detected)! })
       } catch { /* offline / blocked / rate-limited — keep the form's own default */ }
     })()
     return () => { cancelled = true }
-  }, [initialCountry, countryCodes, currencyCodes])
-
-  const onCountryChange = (value: string) => {
-    setCountry(value)
-    if (!currencyTouched.current) {
-      const currency = currencyForCountry(value)
-      if (currency && currencyCodes.has(currency)) setBaseCurrency(currency)
-    }
-  }
-
-  const onCurrencyChange = (value: string) => {
-    currencyTouched.current = true
-    setBaseCurrency(value)
-  }
+  }, [initialCountry])
 
   return <form className="space-y-6" action={(formData) => startTransition(async () => {
     const result = await createInitialWorkspaceAction({
       name: String(formData.get("name") || ""),
-      country: String(formData.get("country") || "US"),
-      baseCurrency: String(formData.get("baseCurrency") || "USD"),
+      country: String(formData.get("country") || ""),
+      baseCurrency: String(formData.get("baseCurrency") || ""),
       timezone: String(formData.get("timezone") || "UTC"),
       fiscalYearStart: String(formData.get("fiscalYearStart") || "january"),
     })
@@ -150,21 +78,10 @@ export function NewWorkspaceForm({ defaultName, initialCountry }: {
         <Input id="ws-name" name="name" defaultValue={defaultName} required />
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label htmlFor="ws-country" className="mb-1.5 block text-sm font-medium text-slate-700">Country</label>
-          <select id="ws-country" name="country" value={country} onChange={(e) => onCountryChange(e.target.value)} className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring">
-            {countries.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-          </select>
-        </div>
-
-        <div>
-          <label htmlFor="ws-currency" className="mb-1.5 block text-sm font-medium text-slate-700">Base currency</label>
-          <select id="ws-currency" name="baseCurrency" value={baseCurrency} onChange={(e) => onCurrencyChange(e.target.value)} className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring">
-            {currencies.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-          </select>
-        </div>
-      </div>
+      <CompanyCountryCurrencyFields idPrefix="ws" country={company.country} currency={company.currency}
+        onChange={(value) => setCompany(value)}
+        labelClassName="mb-1.5 block text-sm font-medium text-slate-700"
+        selectClassName="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring" />
 
       <div className="grid grid-cols-2 gap-3">
         <div>
@@ -183,6 +100,6 @@ export function NewWorkspaceForm({ defaultName, initialCountry }: {
       <Button type="submit" className="w-full" disabled={pending}>{pending ? "Setting up…" : "Continue"}</Button>
     </div>
 
-    {error && <p className="text-center text-sm text-destructive">{error}</p>}
+    {error && <p role="alert" className="text-center text-sm text-destructive">{error}</p>}
   </form>
 }

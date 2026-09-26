@@ -7,6 +7,7 @@ import { recordAdminAudit } from "@/lib/auth-audit"
 import { archiveWorkspaceAuditEvents } from "@/lib/audit-archive"
 import { deleteDocumentSource } from "@/lib/document-storage"
 import { prisma } from "@/lib/db"
+import { companyCountryAndCurrency } from "@/lib/geo/company-currency"
 import { unscoped } from "@/lib/workspace-scope"
 import { deleteFiles } from "@/models/files"
 import { User } from "@/prisma/client"
@@ -106,8 +107,7 @@ export async function createWorkspaceForUser(user: Pick<User, "id" | "name" | "e
       name: options.name?.trim() || `${user.name || user.email}'s workspace`,
       kind: options.kind || "personal",
       industry: "finance",
-      country: options.country || "US",
-      baseCurrency: options.baseCurrency || "USD",
+      ...companyCountryAndCurrency(options),
       timezone: options.timezone || "UTC",
       fiscalYearStart: options.fiscalYearStart || "january",
       members: { create: { userId: user.id, role: "owner" } },

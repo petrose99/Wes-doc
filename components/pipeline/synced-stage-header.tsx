@@ -1,6 +1,7 @@
 import type { AgingBucket } from "@/lib/bills/due-date"
 import type { BillsSummary } from "@/models/bills"
 import Link from "next/link"
+import { formatCurrency } from "@/lib/money"
 
 /** Aging summary strip that lives above the Synced-stage document list. Six buckets, each showing
  * how many bills fall in it plus the total outstanding — the same summary the standalone Bills
@@ -27,13 +28,7 @@ export function SyncedStageHeader({ workspaceId, summary, currency, showLink = t
    * already being viewed. */
   showLink?: boolean
 }) {
-  const formatMoney = (value: number) => {
-    try {
-      return new Intl.NumberFormat("en", { style: "currency", currency, maximumFractionDigits: 0 }).format(value)
-    } catch {
-      return `${value.toFixed(0)} ${currency}`.trim()
-    }
-  }
+  const formatMoney = (value: number) => formatCurrency(value, currency, 0)
   const anyBills = BUCKETS.some((bucket) => summary[bucket].count > 0)
   if (!anyBills) return null
 

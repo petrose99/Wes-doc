@@ -28,8 +28,9 @@
 import { prisma } from "@/lib/db"
 import { resolveGate } from "@/lib/gates/actions"
 import { isComparedLink, poLinkKind, rankPoLinks, REJECTED_MATCH_STATUS } from "@/lib/matching/po-link"
+import { getCompanyCurrency } from "@/models/company-currency"
 import type { GateContext, GateRunner, GateVerdict } from "./types"
-import type { Prisma, PrismaClient, Gate, Document } from "@/prisma/client"
+import type { Prisma, PrismaClient } from "@/prisma/client"
 
 type PrismaLike = PrismaClient | Prisma.TransactionClient
 
@@ -146,8 +147,7 @@ export function createMatchVarianceGateRunner(deps: MatchVarianceDeps): GateRunn
       if (!link) return { blocked: false }
       if (!Number.isFinite(link.poTotal)) return { blocked: false }
 
-      const baseCurrency = (ctx.document as Partial<Document> & { baseCurrency?: string | null }).baseCurrency
-        ?? "USD"
+      const baseCurrency = ctx.baseCurrency
       const tolerance = await deps.getTolerance(ctx.workspaceId, baseCurrency)
       // A tolerance object whose floor is 0 AND percent is 0 would mean "no tolerance ever",
       // but the seed defends against that shape; still, if a workspace explicitly writes
@@ -279,6 +279,7 @@ export async function reevaluateMatchVarianceForDocument(
     workspaceId: input.workspaceId,
     documentId: input.documentId,
     document: doc as GateContext["document"],
+    baseCurrency: await getCompanyCurrency(input.workspaceId, client),
   })
   if (!verdict.blocked) {
     await resolveGate(

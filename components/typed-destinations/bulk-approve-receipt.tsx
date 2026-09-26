@@ -5,6 +5,7 @@ import { CheckCircle2, X } from "lucide-react"
 import Link from "next/link"
 import { Dialog } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
+import { formatCurrency } from "@/lib/money"
 
 /** #204 (map #177): the pre-action "Eligible for Approval (N of M)" strip and the post-action
  * itemized receipt modal, per #185's resolution. Shared by Invoices and Receipts — the only two
@@ -142,10 +143,5 @@ export function BulkApproveReceiptModal({ open, onClose, approved, heldBack, nex
 }
 
 export function formatMoney(amount: number, currency?: string | null): string {
-  const currencyCode = currency && /^[A-Z]{3}$/.test(currency) ? currency : "USD"
-  try {
-    return new Intl.NumberFormat("en", { style: "currency", currency: currencyCode, maximumFractionDigits: 0 }).format(amount)
-  } catch {
-    return `${amount.toFixed(0)} ${currency ?? ""}`.trim()
-  }
+  return formatCurrency(amount, currency)
 }

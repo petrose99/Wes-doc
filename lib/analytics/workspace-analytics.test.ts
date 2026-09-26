@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest"
 
 vi.mock("@/lib/db", () => ({ prisma: {} }))
-vi.mock("@/models/tax-profiles", () => ({ getTaxProfile: vi.fn() }))
 
 const {
   assignAgingBucket,
@@ -100,29 +99,22 @@ describe("fillMonthSeries", () => {
 })
 
 describe("resolveCurrency", () => {
-  it("prefers the tax profile currency over everything else", () => {
-    expect(resolveCurrency("ZAR", [{ currency: "USD", count: 5 }], "EUR")).toEqual({ baseCurrency: "ZAR", hasMultipleCurrencies: false })
-    expect(resolveCurrency("ZAR", [{ currency: "USD", count: 5 }, { currency: "GBP", count: 2 }], "EUR")).toEqual({ baseCurrency: "ZAR", hasMultipleCurrencies: true })
+  it("uses the company currency; the tax profile no longer picks it (#457 spec §4)", () => {
+    expect(resolveCurrency([{ currency: "USD", count: 5 }], "LSL")).toEqual({ baseCurrency: "LSL", hasMultipleCurrencies: false })
+    expect(resolveCurrency([], "ZAR")).toEqual({ baseCurrency: "ZAR", hasMultipleCurrencies: false })
+    expect(resolveCurrency([{ currency: "USD", count: 5 }, { currency: "GBP", count: 2 }], "EUR")).toEqual({ baseCurrency: "EUR", hasMultipleCurrencies: true })
   })
 
-  it("falls back to the workspace's picked base currency when there is no tax profile", () => {
-    // Regression: without this fallback the dashboard silently displayed USD on any workspace that
-    // hadn't extracted a document with a currency_code yet, regardless of what the owner chose at
-    // signup.
-    expect(resolveCurrency(null, [], "ZAR")).toEqual({ baseCurrency: "ZAR", hasMultipleCurrencies: false })
-    expect(resolveCurrency(null, [{ currency: "USD", count: 5 }], "ZAR")).toEqual({ baseCurrency: "ZAR", hasMultipleCurrencies: false })
-  })
-
-  it("falls back to the most common extracted currency when neither tax profile nor workspace base is set", () => {
-    expect(resolveCurrency(null, [{ currency: "USD", count: 5 }, { currency: "GBP", count: 1 }])).toEqual({ baseCurrency: "USD", hasMultipleCurrencies: true })
+  it("falls back to the most common extracted currency when the company currency is unset", () => {
+    expect(resolveCurrency([{ currency: "USD", count: 5 }, { currency: "GBP", count: 1 }])).toEqual({ baseCurrency: "USD", hasMultipleCurrencies: true })
   })
 
   it("reports no currency for an empty workspace with no configured base", () => {
-    expect(resolveCurrency(null, [])).toEqual({ baseCurrency: null, hasMultipleCurrencies: false })
+    expect(resolveCurrency([])).toEqual({ baseCurrency: null, hasMultipleCurrencies: false })
   })
 
   it("flags a single currency as not mixed", () => {
-    expect(resolveCurrency(null, [{ currency: "USD", count: 5 }])).toEqual({ baseCurrency: "USD", hasMultipleCurrencies: false })
+    expect(resolveCurrency([{ currency: "USD", count: 5 }])).toEqual({ baseCurrency: "USD", hasMultipleCurrencies: false })
   })
 })
 

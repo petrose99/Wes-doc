@@ -74,6 +74,15 @@ const BILLING_MESSAGES: Record<string, string> = {
   // #250: Match manually.
   po_match_not_found: "That purchase order link no longer exists. Reload the row and try again.",
   purchase_order_not_found: "That purchase order no longer exists.",
+  // #457 / ADR 0013: Company currency.
+  company_country_unsupported: "DocuBite works with companies in Lesotho and South Africa.",
+  company_currency_not_allowed: "A company in South Africa uses ZAR.",
+  company_currency_locked: "Couldn't change it: the company currency is locked because something was already posted in it.",
+  company_currency_push_in_flight: "A bill is being posted right now. Try again in a minute.",
+  // Push error codes (lib/integration-push.ts gateLedgerCurrency); the review task carries the
+  // provider and both currencies by name.
+  ledger_currency_differs: "Your ledger keeps its books in a different currency from this company.",
+  ledger_currency_unreadable: "Couldn't read your ledger's currency yet. It's checked again before each bill is posted.",
 }
 
 export const errorMessage = (error: unknown, fallback: string) => {

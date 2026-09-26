@@ -18,6 +18,7 @@ import { ReasonDialog } from "@/components/list-screen/reason-dialog-button"
 import type { Facet } from "@/components/queue/facet-filters"
 import { getQueueDetailAction } from "@/app/(app)/workspaces/[workspaceId]/queue-actions"
 import type { ExceptionResolution, ExceptionRow } from "@/models/exceptions"
+import { formatCurrency } from "@/lib/money"
 
 const RESOLUTIONS: Array<{ value: ExceptionResolution; label: string; description: string; placeholder: string }> = [
   { value: "corrected", label: "Corrected", description: "The document's field was wrong and has been fixed.", placeholder: "What was corrected?" },
@@ -36,12 +37,7 @@ const SORTS: SortOption<ExceptionRow>[] = [
 ]
 
 function formatAmount(amount: number | null, currencyCode: string | null): string {
-  if (amount === null) return "—"
-  try {
-    return new Intl.NumberFormat("en", { style: "currency", currency: currencyCode ?? "USD", maximumFractionDigits: 2 }).format(amount)
-  } catch {
-    return `${amount.toFixed(2)} ${currencyCode ?? ""}`.trim()
-  }
+  return formatCurrency(amount, currencyCode)
 }
 
 /** #210's Exceptions list on the Queue screen (#225). A row is one escalated check, not one

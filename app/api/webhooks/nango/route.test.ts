@@ -24,6 +24,8 @@ vi.mock("@/models/reminders", () => ({ resolveOwnerRecipients: (...args: unknown
 
 const syncAccountingEntities = vi.fn().mockResolvedValue(undefined)
 vi.mock("@/lib/integrations/sync", () => ({ syncAccountingEntities: (...args: unknown[]) => syncAccountingEntities(...args) }))
+const readLedgerCurrency = vi.fn().mockResolvedValue(null)
+vi.mock("@/lib/integrations/ledger-currency", () => ({ readLedgerCurrency: (...args: unknown[]) => readLedgerCurrency(...args) }))
 
 const { POST } = await import("@/app/api/webhooks/nango/route")
 
@@ -73,6 +75,8 @@ describe("POST /api/webhooks/nango", () => {
     // #429: chart sync (and the Default-account guess) fires right after a successful creation
     // once a tenant is known.
     expect(syncAccountingEntities).toHaveBeenCalledWith("conn-1")
+    // ADR 0013: the ledger's own currency is read at connect for the connection card.
+    expect(readLedgerCurrency).toHaveBeenCalledWith({ id: "conn-1", workspaceId: "ws-1", provider: "quickbooks", externalTenantId: "realm-1" })
   })
 
   it("skips the connection_config lookup for sage, which has no tenant field, and does not sync yet (#429)", async () => {
@@ -96,6 +100,7 @@ describe("POST /api/webhooks/nango", () => {
       endUser: { endUserId: "ws-1" },
     }))
     expect(response.status).toBe(200)
+    expect(readLedgerCurrency).toHaveBeenCalled()
   })
 
   it("rejects a creation with no endUserId", async () => {

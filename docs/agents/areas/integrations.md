@@ -51,10 +51,15 @@ not-connected · authorising (spinner, `aria-live="polite"`, no controls
 mid-poll) · connected (active) · connected-disconnect-confirm · needs
 reconnect (`status: "needs_reauth"`, red suffix). Connect/Reconnect gated
 server-side to owners; non-owners see static text, no control.
+Ledger currency line (#457, `LedgerCurrencyLine` in `integrations-manager.tsx`, outcome from
+`lib/integrations/ledger-currency-outcome.ts`): none (equal — renders nothing) · unread (grey
+fact) · switch (Owner, unlocked: amber + icon + "Switch this company to ‹ledger›" →
+`ChangeCurrencyDialog`) · ask_owner (non-Owner) · blocked (locked: honest copy, no control).
+The page-level "Only an owner can change this" banner is `admin-ui.tsx` (#252), not the card.
 
 ## Detector residue (report, do not chase)
-App-wide five (see `admin.md`) plus nothing integrations-specific as of
-#329's r0/r1 rounds — gate CLEAN both rounds, 19/19 keyboard probes pass.
+App-wide five (see `admin.md`) plus `line-length` ~117ch from the pre-existing
+empty-state provider rows (#457 residue.txt). Gate CLEAN at #329 and #457 m1.
 
 ## Capture
 Round script pattern: `docs/wayfinder-reports/226/logs/scratch-329/round-329.mjs`

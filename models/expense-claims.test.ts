@@ -25,6 +25,7 @@ beforeEach(() => {
   db.$transaction = vi.fn(async (operations: unknown[]) => operations)
   db.documentCheckResult = { findMany: vi.fn().mockResolvedValue([]) }
   db.reviewTask = { findMany: vi.fn().mockResolvedValue([]) }
+  db.workspace = { findUnique: vi.fn().mockResolvedValue({ baseCurrency: "ZAR" }) }
 })
 
 describe("createExpenseClaim", () => {

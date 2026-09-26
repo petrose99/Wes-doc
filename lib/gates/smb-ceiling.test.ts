@@ -46,8 +46,9 @@ const { overrideGate } = await import("@/lib/gates/actions")
 
 import type { GateContext } from "@/lib/gates/types"
 
-const invoiceCtx = (overrides: Partial<GateContext["document"]> = {}): GateContext => ({
+const invoiceCtx = (overrides: Partial<GateContext["document"]> = {}, baseCurrency = "USD"): GateContext => ({
   workspaceId: "w1",
+  baseCurrency,
   documentId: "d1",
   document: {
     id: "d1",
@@ -72,14 +73,11 @@ beforeEach(() => {
 
 describe("createSmbCeilingGateRunner", () => {
   const getMode = vi.fn<(workspaceId: string) => Promise<"firm" | "smb">>()
-  const getBaseCurrency = vi.fn<(workspaceId: string) => Promise<string>>()
-  const runner = createSmbCeilingGateRunner({ getMode, getBaseCurrency })
+  const runner = createSmbCeilingGateRunner({ getMode })
 
   beforeEach(() => {
     getMode.mockReset()
-    getBaseCurrency.mockReset()
     getMode.mockResolvedValue("smb")
-    getBaseCurrency.mockResolvedValue("USD")
   })
 
   it("silent-passes non-invoice documents without reading mode", async () => {
@@ -99,7 +97,6 @@ describe("createSmbCeilingGateRunner", () => {
     const ctx = invoiceCtx({ fieldSnapshot: { total: 999_999 } })
     await expect(runner.run(ctx)).resolves.toEqual({ blocked: false })
     expect(getMode).toHaveBeenCalledWith("w1")
-    expect(getBaseCurrency).not.toHaveBeenCalled()
   })
 
   it("blocks hard on SMB when total exceeds the 10,000 ceiling", async () => {
@@ -118,8 +115,7 @@ describe("createSmbCeilingGateRunner", () => {
   })
 
   it("uses the workspace base currency in the payload, not USD", async () => {
-    getBaseCurrency.mockResolvedValue("ZAR")
-    const ctx = invoiceCtx({ fieldSnapshot: { total: 11_000 } })
+    const ctx = invoiceCtx({ fieldSnapshot: { total: 11_000 } }, "ZAR")
     const verdict = await runner.run(ctx)
     if (!verdict.blocked) throw new Error("expected blocked")
     expect(verdict.payload).toMatchObject({ currency: "ZAR", total: 11_000 })
@@ -127,7 +123,6 @@ describe("createSmbCeilingGateRunner", () => {
 
   it("silent-passes with a warn when the bill's currency differs from workspace base — v1 does no FX", async () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
-    getBaseCurrency.mockResolvedValue("USD")
     const ctx = invoiceCtx({ fieldSnapshot: { total: 500_000, currency: "ZAR" } })
     await expect(runner.run(ctx)).resolves.toEqual({ blocked: false })
     expect(warnSpy).toHaveBeenCalled()
@@ -142,25 +137,13 @@ describe("createSmbCeilingGateRunner", () => {
 })
 
 describe("smbCeilingGateRunner (real DB wire-up)", () => {
-  it("reads mode from models/workspaces and baseCurrency from the workspace row", async () => {
+  it("reads mode from models/workspaces and the Company currency from the context", async () => {
     getWorkspaceModeMock.mockResolvedValue("smb")
-    workspaceFindUnique.mockResolvedValue({ baseCurrency: "EUR" })
-    const ctx = invoiceCtx({ fieldSnapshot: { total: 50_000 } })
+    const ctx = invoiceCtx({ fieldSnapshot: { total: 50_000 } }, "LSL")
     const verdict = await smbCeilingGateRunner.run(ctx)
     expect(getWorkspaceModeMock).toHaveBeenCalledWith("w1")
-    expect(workspaceFindUnique).toHaveBeenCalledWith({
-      where: { id: "w1" },
-      select: { baseCurrency: true },
-    })
-    expect(verdict).toMatchObject({ blocked: true, severity: "hard", payload: { currency: "EUR" } })
-  })
-
-  it("defaults to USD when the workspace row has no baseCurrency", async () => {
-    getWorkspaceModeMock.mockResolvedValue("smb")
-    workspaceFindUnique.mockResolvedValue(null)
-    const ctx = invoiceCtx({ fieldSnapshot: { total: 15_000 } })
-    const verdict = await smbCeilingGateRunner.run(ctx)
-    expect(verdict).toMatchObject({ blocked: true, payload: { currency: "USD" } })
+    expect(workspaceFindUnique).not.toHaveBeenCalled()
+    expect(verdict).toMatchObject({ blocked: true, severity: "hard", payload: { currency: "LSL" } })
   })
 })
 
@@ -215,7 +198,7 @@ describe("resolveOpenSmbCeilingGatesForWorkspace", () => {
 describe("reevaluateOpenSmbCeilingGatesForWorkspace", () => {
   it("upserts a fresh gate for every open bill above the ceiling", async () => {
     getWorkspaceModeMock.mockResolvedValue("smb")
-    workspaceFindUnique.mockResolvedValue({ baseCurrency: "USD" })
+    workspaceFindUnique.mockResolvedValue({ baseCurrency: "ZAR" })
     documentFindMany.mockResolvedValueOnce([
       { id: "d-big", workspaceId: "w1", docType: "invoice", fieldSnapshot: { total: 25_000 }, receivedAt: new Date() },
       { id: "d-small", workspaceId: "w1", docType: "invoice", fieldSnapshot: { total: 200 }, receivedAt: new Date() },
@@ -237,7 +220,7 @@ describe("reevaluateOpenSmbCeilingGatesForWorkspace", () => {
     expect(gateUpsert).toHaveBeenCalledTimes(1)
     const upsertArgs = gateUpsert.mock.calls[0][0] as { create: { documentId: string; payload: Record<string, unknown> } }
     expect(upsertArgs.create.documentId).toBe("d-big")
-    expect(upsertArgs.create.payload).toMatchObject({ ceiling: SMB_CEILING_AMOUNT, currency: "USD", total: 25_000 })
+    expect(upsertArgs.create.payload).toMatchObject({ ceiling: SMB_CEILING_AMOUNT, currency: "ZAR", total: 25_000 })
     // One gate.blocked audit row per new gate row.
     expect(auditCreate).toHaveBeenCalledTimes(1)
     const event = auditCreate.mock.calls[0][0] as { data: { type: string; payload: Record<string, unknown> } }

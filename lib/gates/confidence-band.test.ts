@@ -11,8 +11,11 @@ const documentFindUnique = vi.fn()
 const configFindUnique = vi.fn()
 const auditCreate = vi.fn()
 
+const workspaceFindUnique = vi.fn(async () => ({ baseCurrency: "ZAR" }))
+
 vi.mock("@/lib/db", () => ({
   prisma: {
+    workspace: { findUnique: workspaceFindUnique },
     gate: {
       findUnique: gateFindUnique,
       findMany: gateFindMany,
@@ -38,8 +41,9 @@ const {
 
 import type { GateContext } from "@/lib/gates/types"
 
-const invoiceCtx = (overrides: Partial<GateContext["document"]> = {}): GateContext => ({
+const invoiceCtx = (overrides: Partial<GateContext["document"]> = {}, baseCurrency = "ZAR"): GateContext => ({
   workspaceId: "w1",
+  baseCurrency,
   documentId: "d1",
   document: {
     id: "d1",
@@ -224,15 +228,14 @@ describe("createConfidenceBandGateRunner", () => {
     })
   })
 
-  it("uses baseCurrency when the document pins one", async () => {
+  it("reports in the Company currency", async () => {
     const ctx = invoiceCtx({
       fieldSnapshot: { total: 100 },
       confidence: { fieldConfidence: { total: 0.5 } },
-      baseCurrency: "ZAR",
-    } as unknown as Partial<GateContext["document"]>)
+    } as unknown as Partial<GateContext["document"]>, "LSL")
     const verdict = await runner.run(ctx)
     if (!verdict.blocked) throw new Error("expected blocked")
-    expect(verdict.payload).toMatchObject({ currency: "ZAR" })
+    expect(verdict.payload).toMatchObject({ currency: "LSL" })
   })
 
   it("silent-passes on a truncated bands table when amount exceeds the top band", async () => {

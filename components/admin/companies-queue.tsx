@@ -13,7 +13,9 @@ import { PaneMenuItem } from "@/components/queue/detail-pane"
 import type { Facet } from "@/components/queue/facet-filters"
 import { ReadOnlyBand } from "@/components/admin/admin-ui"
 import { CompanyDetail } from "@/components/admin/company-detail"
-import { buildCountryList, buildCurrencyList, countryName } from "@/lib/geo/iso-lists"
+import { countryName } from "@/lib/geo/iso-lists"
+import { CompanyCountryCurrencyFields } from "@/components/workspace/company-country-currency-fields"
+import { defaultCurrency, isAllowedPair } from "@/lib/geo/company-currency"
 import { adminPaths } from "@/lib/admin/paths"
 import type { CompanyRow, CompanyViewerRole } from "@/lib/admin/companies"
 import { companyActionErrorText } from "@/lib/admin/companies"
@@ -213,8 +215,10 @@ function OrganizationState({ workspaceId, state, viewerRole, owners, initialSele
   const loadDetail = useCallback(async (id: string) => {
     const result = await loadCompanyDetailAction(workspaceId, id)
     if (!result.success || !result.data) return null
-    return <CompanyDetail workspaceId={workspaceId} row={result.data} organizationName={organizationName} />
-  }, [workspaceId, organizationName])
+    // #457: a currency change re-selects the same row and refreshes, as afterMutation(id) does.
+    return <CompanyDetail workspaceId={workspaceId} row={result.data} organizationName={organizationName}
+      onChanged={() => { router.push(`/workspaces/${workspaceId}/admin/companies/${id}`); router.refresh() }} />
+  }, [workspaceId, organizationName, router])
 
   // Plain path with no carried-over query — clears the Your role facet and sort as spec §4.1
   // requires, so a fresh row is never left hidden behind a stale filter.
@@ -229,7 +233,7 @@ function OrganizationState({ workspaceId, state, viewerRole, owners, initialSele
       render: (row) => <span className="flex min-w-0 items-center gap-2"><span className="truncate">{row.name}</span>{row.isCurrent && <Badge variant="secondary" className="shrink-0">This company</Badge>}</span>,
     },
     { key: "country", label: "Country", phone: "subtitle", render: (row) => `${row.country} — ${countryName(row.country)}` },
-    { key: "currency", label: "Currency", phone: "subtitle", priority: "low", render: (row) => row.baseCurrency },
+    { key: "currency", label: "Company currency", phone: "subtitle", priority: "low", render: (row) => row.baseCurrency },
     { key: "jurisdiction", label: "Tax jurisdiction", priority: "low", render: (row) => row.jurisdictionCode ?? "—" },
     { key: "members", label: "Members", phone: "trailing", className: "text-right tabular-nums", render: (row) => String(row.memberCount) },
     { key: "role", label: "Your role", phone: "pill", render: (row) => ROLE_LABEL[row.viewerRole] },
@@ -297,11 +301,11 @@ function AddCompanyDialog({ open, onClose, workspaceId, organizationName, curren
   open: boolean; onClose: () => void; workspaceId: string; organizationName: string; currentRow?: CompanyRow
   onAdded: (id: string, name: string) => void
 }) {
-  const countries = useMemo(() => buildCountryList(), [])
-  const currencies = useMemo(() => buildCurrencyList(), [])
   const [name, setName] = useState("")
-  const [country, setCountry] = useState(currentRow?.country ?? "US")
-  const [currency, setCurrency] = useState(currentRow?.baseCurrency ?? "USD")
+  // #457: starts from the current company's pair when it is an allowed one, else South Africa/ZAR.
+  const [company, setCompany] = useState(currentRow && isAllowedPair(currentRow.country, currentRow.baseCurrency)
+    ? { country: currentRow.country, currency: currentRow.baseCurrency }
+    : { country: "ZA", currency: defaultCurrency("ZA")! })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const close = () => { if (busy) return; onClose(); setName(""); setError(null) }
@@ -311,7 +315,7 @@ function AddCompanyDialog({ open, onClose, workspaceId, organizationName, curren
       if (!name.trim()) return
       setBusy(true); setError(null)
       try {
-        const result = await addCompanyAction(workspaceId, { name: name.trim(), country, baseCurrency: currency })
+        const result = await addCompanyAction(workspaceId, { name: name.trim(), country: company.country, baseCurrency: company.currency })
         if (result.success && result.data) onAdded(result.data.workspaceId, result.data.name)
         else setError(companyActionErrorText(result.error ?? "failed", { name: name.trim(), org: organizationName }))
       } catch { setError("Couldn't add the company. Your entries are still here — try again.") }
@@ -323,22 +327,9 @@ function AddCompanyDialog({ open, onClose, workspaceId, organizationName, curren
           aria-describedby={error ? "add-company-error" : undefined}
           className="h-9 w-full rounded-md border border-slate-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600" />
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1">
-          <label htmlFor="add-company-country" className="text-sm font-medium text-slate-800">Country</label>
-          <select id="add-company-country" value={country} onChange={(event) => setCountry(event.target.value)}
-            className="h-9 w-full rounded-md border border-slate-300 px-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600">
-            {countries.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-          </select>
-        </div>
-        <div className="space-y-1">
-          <label htmlFor="add-company-currency" className="text-sm font-medium text-slate-800">Currency</label>
-          <select id="add-company-currency" value={currency} onChange={(event) => setCurrency(event.target.value)}
-            className="h-9 w-full rounded-md border border-slate-300 px-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600">
-            {currencies.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-          </select>
-        </div>
-      </div>
+      <CompanyCountryCurrencyFields idPrefix="add-company" country={company.country} currency={company.currency} onChange={setCompany}
+        labelClassName="text-sm font-medium text-slate-800"
+        selectClassName="h-9 w-full rounded-md border border-slate-300 px-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600" />
       <p className="text-xs leading-relaxed text-slate-600">Starts empty inside {organizationName}, with you as its owner. Nothing is shared between companies — suppliers, settings and members are set up per company.</p>
       {error && <p id="add-company-error" role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>}
       <div className="flex justify-end gap-2">

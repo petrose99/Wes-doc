@@ -14,6 +14,7 @@ vi.mock("@/lib/gates/smb-ceiling", () => ({
 const {
   acceptWorkspaceInvitation,
   createTeamWorkspace,
+  createWorkspaceForUser,
   createWorkspaceInvitation,
   deleteWorkspace,
   getPendingInvitationForEmail,
@@ -46,8 +47,17 @@ describe("createTeamWorkspace", () => {
 
     expect(workspace).toEqual({ id: "w-new", industry: "finance" })
     expect(db.workspace.create).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ name: "Team", kind: "team", industry: "finance" }),
+      data: expect.objectContaining({ name: "Team", kind: "team", industry: "finance", country: "ZA", baseCurrency: "ZAR" }),
     }))
+  })
+
+  it("refuses an unsupported company country or currency instead of defaulting to USD", async () => {
+    db.workspace = { create: vi.fn() }
+    const user = { id: "u1", name: "A", email: "a@example.com" }
+
+    await expect(createWorkspaceForUser(user, { country: "US" })).rejects.toThrow("company_country_unsupported")
+    await expect(createWorkspaceForUser(user, { country: "ZA", baseCurrency: "USD" })).rejects.toThrow("company_currency_not_allowed")
+    expect(db.workspace.create).not.toHaveBeenCalled()
   })
 })
 

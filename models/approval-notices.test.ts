@@ -5,7 +5,7 @@ vi.mock("@/lib/email", () => ({ isEmailConfigured: vi.fn(() => true), resend: { 
 vi.mock("@/lib/gates/list", () => ({ listOpenGatesForDocuments: vi.fn().mockResolvedValue(new Map()) }))
 vi.mock("@react-email/render", () => ({ render: vi.fn().mockResolvedValue("text") }))
 
-const { sendApprovalNotices, sendSentBackNotice } = await import("@/models/approval-notices")
+const { notifySentBack, sendApprovalNotices, sendSentBackNotice } = await import("@/models/approval-notices")
 const { prisma } = await import("@/lib/db")
 const { isEmailConfigured, resend } = await import("@/lib/email")
 
@@ -162,5 +162,15 @@ describe("sendSentBackNotice", () => {
     db.user.findUnique.mockResolvedValue(user("starter", { approvalNoticeEmails: false }))
     await sendSentBackNotice(input)
     expect(send).not.toHaveBeenCalled()
+  })
+})
+
+describe("notifySentBack", () => {
+  it("states an amount with no extracted currency in the Company currency, never USD", async () => {
+    db.workspace.findUnique.mockResolvedValue({ name: "Acme", baseCurrency: "LSL" })
+    db.document.findUnique.mockResolvedValue({ reviewedData: { vendor: "Northwind", total: 10 } })
+    await notifySentBack({ workspaceId: "w1", documentId: "d1", taskId: "t1", createdById: "starter", actorId: "alice", reason: "Wrong PO" })
+    expect(send).toHaveBeenCalledTimes(1)
+    expect(send.mock.calls[0][0].react.props.rows[0]).toMatchObject({ amount: 10, currency: "LSL" })
   })
 })

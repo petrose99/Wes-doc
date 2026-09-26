@@ -23,6 +23,8 @@ export type GateContext = {
   documentId: string
   document: Pick<Document, "id" | "workspaceId" | "docType" | "fieldSnapshot" | "receivedAt"> &
     Partial<Document>
+  /** The Company currency (Workspace.baseCurrency) — thresholds and payloads are in it. */
+  baseCurrency: string
 }
 
 /** What a runner returns. Two shapes: `{ blocked: false }` means the gate had nothing to say; the

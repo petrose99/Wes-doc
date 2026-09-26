@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 vi.mock("@/lib/db", () => ({ prisma: {} }))
 vi.mock("@/lib/audit", () => ({ recordSystemAudit: vi.fn().mockResolvedValue(undefined) }))
 vi.mock("@/models/bills", () => ({ listWorkspaceBills: vi.fn() }))
+vi.mock("@/models/company-currency", () => ({ recordCurrencyLock: vi.fn().mockResolvedValue(undefined) }))
 
 const { preparePaymentRun } = await import("@/models/payment-runs")
 const { prisma } = await import("@/lib/db")
@@ -36,6 +37,13 @@ describe("preparePaymentRun", () => {
     vi.mocked(listWorkspaceBills).mockResolvedValue({ bills: [bill()], summary: {} as never })
     const result = await preparePaymentRun({ workspaceId: "w1", actorId: "u1", documentIds: ["d1"] })
     expect(result.run.itemCount).toBe(1)
+  })
+
+  it("locks the Company currency when the first Payment batch is created (#457)", async () => {
+    const { recordCurrencyLock } = await import("@/models/company-currency")
+    vi.mocked(listWorkspaceBills).mockResolvedValue({ bills: [bill()], summary: {} as never })
+    await preparePaymentRun({ workspaceId: "w1", actorId: "u1", documentIds: ["d1"] })
+    expect(recordCurrencyLock).toHaveBeenCalledWith("w1", "payment_batch", null, expect.any(Date))
   })
 
   // #249: a payment run moves real money, so it can't pay an invoice that hasn't cleared Approval

@@ -1,13 +1,11 @@
 import type { ReactNode } from "react"
 import { PROCESSING_STATE_LABELS, LEDGER_FACT_LABELS, type ProcessingState, type LedgerFact } from "@/lib/documents/processing-state"
+import { formatCurrency } from "@/lib/money"
 
+/** #457: the queues' amount cell, `formatCurrency` (`ZAR 1,234.50`). A row without a currency
+ * prints the bare number rather than a guessed one. */
 export function formatMoney(amount: number, currency?: string | null): string {
-  const currencyCode = currency && /^[A-Z]{3}$/.test(currency) ? currency : "USD"
-  try {
-    return new Intl.NumberFormat("en", { style: "currency", currency: currencyCode, maximumFractionDigits: 0 }).format(amount)
-  } catch {
-    return `${amount.toFixed(0)} ${currency ?? ""}`.trim()
-  }
+  return formatCurrency(amount, currency)
 }
 
 export function formatDate(date: Date | null): string {

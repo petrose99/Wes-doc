@@ -88,3 +88,15 @@ export function formatMoney(amount: number | null | undefined, currencyCode?: st
   const fixed = amount.toFixed(2)
   return currencyCode ? `${fixed} ${currencyCode}` : fixed
 }
+
+/** #457 spec §4: the one display formatter for money, `LSL 1,234.50`. ISO code, a no-break
+ * space, `en` grouping, the minus after the code (`LSL -1,234.50`), 2 decimals (0 for summary
+ * totals). Any ISO code: a supplier document may be in USD while the company runs in LSL.
+ * ponytail: a missing or non-ISO code prints the bare number rather than guessing a currency;
+ * callers that know the company currency pass it as the fallback (`doc ?? company`). */
+export function formatCurrency(amount: number | null | undefined, code: string | null | undefined, digits: 0 | 2 = 2): string {
+  if (amount == null || !Number.isFinite(amount)) return "—"
+  const number = new Intl.NumberFormat("en", { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(amount)
+  const currency = code && /^[A-Za-z]{3}$/.test(code) ? code.toUpperCase() : null
+  return currency ? `${currency} ${number}` : number
+}

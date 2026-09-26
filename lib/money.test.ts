@@ -4,6 +4,7 @@ import {
   amountsEqualCents,
   decimalToNumber,
   decimalToNumberOrZero,
+  formatCurrency,
   formatMoney,
   fromCents,
   toCents,
@@ -87,6 +88,27 @@ describe("money", () => {
     it("returns - for null / non-finite", () => {
       expect(formatMoney(null)).toBe("-")
       expect(formatMoney(Number.NaN)).toBe("-")
+    })
+  })
+  describe("formatCurrency", () => {
+    const nb = "\u00A0"
+    it("prints the ISO code, a no-break space, en grouping and 2 decimals", () => {
+      expect(formatCurrency(1234.5, "LSL")).toBe(`LSL${nb}1,234.50`)
+      expect(formatCurrency(0, "zar")).toBe(`ZAR${nb}0.00`)
+    })
+    it("puts the minus after the code", () => {
+      expect(formatCurrency(-1234.5, "LSL")).toBe(`LSL${nb}-1,234.50`)
+    })
+    it("takes 0 decimals for summaries", () => {
+      expect(formatCurrency(1234.5, "USD", 0)).toBe(`USD${nb}1,235`)
+    })
+    it("prints the bare number when the currency is unknown", () => {
+      expect(formatCurrency(1234.5, null)).toBe("1,234.50")
+      expect(formatCurrency(1234.5, "dollars")).toBe("1,234.50")
+    })
+    it("returns an em dash for null / non-finite", () => {
+      expect(formatCurrency(null, "USD")).toBe("—")
+      expect(formatCurrency(Number.NaN, "USD")).toBe("—")
     })
   })
 })

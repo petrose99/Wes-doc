@@ -4,6 +4,7 @@ import { sendReminderEmail } from "@/lib/email"
 import { createIntegrationConnectionFromNango, markIntegrationConnectionNeedsReconnect } from "@/models/integrations"
 import { resolveOwnerRecipients } from "@/models/reminders"
 import { syncAccountingEntities } from "@/lib/integrations/sync"
+import { readLedgerCurrency } from "@/lib/integrations/ledger-currency"
 
 /** ADR 0005 step 3: the one authoritative signal for a connection's `connected`/`needs_reconnect`
  * state — DocuBite never marks itself connected off the frontend's resolved promise (#379). Nango
@@ -105,6 +106,9 @@ export async function POST(request: Request): Promise<Response> {
       } catch {
         // left for the Default row's retry state; nothing else to do with a webhook response.
       }
+      // ADR 0013: the connection card compares this with the Company currency. Never throws; a
+      // failed read is retried before each push.
+      await readLedgerCurrency({ id: connectionId, workspaceId, provider: providerConfigKey, externalTenantId })
     }
     return new Response("ok", { status: 200 })
   }

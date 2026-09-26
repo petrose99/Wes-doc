@@ -20,6 +20,7 @@ import { getOnboardingStateAction } from "../onboarding-actions"
 import { AlertTriangle, CheckCircle2, ChevronRight, FileText, SearchCheck } from "lucide-react"
 import Link from "next/link"
 import { notFound } from "next/navigation"
+import { formatCurrency } from "@/lib/money"
 
 export const dynamic = "force-dynamic"
 
@@ -83,10 +84,7 @@ export default async function WorkspaceDashboardPage({ params }: {
   const showFinancials = capabilities.has("finance-analytics")
   const today = new Date()
   const analytics = showFinancials ? await getWorkspaceAnalytics(workspaceId, resolvePeriod({ period: "12m" }, today), today) : null
-  const formatMoney = (value: number) => {
-    const currency = analytics?.currency.baseCurrency ?? membership.workspace.baseCurrency ?? "USD"
-    return new Intl.NumberFormat("en", { style: "currency", currency, maximumFractionDigits: 0 }).format(value)
-  }
+  const formatMoney = (value: number) => formatCurrency(value, analytics?.currency.baseCurrency ?? membership.workspace.baseCurrency, 0)
   const pipelineTemplates = await getFileTemplates(workspaceId, pipelineFile.id)
   const uploadTemplates: SheetTemplate[] = pipelineTemplates.flatMap((candidate) => {
     const version = candidate.versions[0]

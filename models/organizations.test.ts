@@ -103,10 +103,20 @@ describe("addCompanyToOrganization", () => {
       data: expect.objectContaining({
         name: "New Co",
         kind: "team",
+        country: "ZA",
+        baseCurrency: "ZAR",
         organizationId: "org1",
         members: { create: { userId: "user1", role: "owner" } },
       }),
     })
+  })
+
+  it("refuses an unsupported country or pair and creates nothing", async () => {
+    db.workspace = { create: vi.fn() }
+
+    await expect(addCompanyToOrganization("org1", "user1", { name: "US Co", country: "US", baseCurrency: "USD" })).rejects.toThrow("company_country_unsupported")
+    await expect(addCompanyToOrganization("org1", "user1", { name: "ZA Co", country: "ZA", baseCurrency: "LSL" })).rejects.toThrow("company_currency_not_allowed")
+    expect(db.workspace.create).not.toHaveBeenCalled()
   })
 })
 

@@ -25,8 +25,9 @@
 import { prisma } from "@/lib/db"
 import { normalizeSupplierName } from "@/lib/suppliers/normalize"
 import { resolveGate } from "@/lib/gates/actions"
+import { getCompanyCurrency } from "@/models/company-currency"
 import type { GateContext, GateRunner, GateVerdict } from "./types"
-import type { Prisma, PrismaClient, Gate, Document } from "@/prisma/client"
+import type { Prisma, PrismaClient } from "@/prisma/client"
 
 type PrismaLike = PrismaClient | Prisma.TransactionClient
 
@@ -115,9 +116,7 @@ export function createSupplierTrustGateRunner(deps: SupplierTrustDeps): GateRunn
       // confidence-band gate's problem, not this one.
       if (invoiceTotal === null) return { blocked: false }
 
-      const baseCurrency =
-        (ctx.document as Partial<Document> & { baseCurrency?: string | null }).baseCurrency ??
-        "USD"
+      const baseCurrency = ctx.baseCurrency
       const threshold = await deps.getThreshold(ctx.workspaceId, baseCurrency)
       const supplier = await deps.findSupplier({ workspaceId: ctx.workspaceId, normalizedKey })
 
@@ -269,6 +268,7 @@ export async function reevaluateSupplierTrustForDocument(
     workspaceId: input.workspaceId,
     documentId: input.documentId,
     document: doc as GateContext["document"],
+    baseCurrency: await getCompanyCurrency(input.workspaceId, client),
   })
   if (!verdict.blocked) {
     await resolveGate(

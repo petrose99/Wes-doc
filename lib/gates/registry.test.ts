@@ -6,11 +6,13 @@ vi.mock("next/headers", () => ({
 
 const gateUpsert = vi.fn()
 const auditCreate = vi.fn()
+const workspaceFindUnique = vi.fn()
 
 vi.mock("@/lib/db", () => ({
   prisma: {
     gate: { upsert: gateUpsert },
     auditEvent: { create: auditCreate },
+    workspace: { findUnique: workspaceFindUnique },
     // Referenced by writeAuditEvent's hasAuditEventModel check; the presence of `.auditEvent`
     // above is what actually satisfies it, but keeping the surface complete avoids a surprise if
     // another consumer of the mocked prisma is added later.
@@ -20,7 +22,7 @@ vi.mock("@/lib/db", () => ({
 const { createGateRegistry } = await import("@/lib/gates/registry")
 import type { GateRunner, GateContext } from "@/lib/gates/types"
 
-const ctx: GateContext = {
+const ctx: Omit<GateContext, "baseCurrency"> = {
   workspaceId: "w1",
   documentId: "d1",
   document: { id: "d1", workspaceId: "w1", docType: "invoice", fieldSnapshot: {}, receivedAt: new Date() },
@@ -36,6 +38,7 @@ const rowStub = (over: Partial<Record<string, unknown>> = {}) => ({
 beforeEach(() => {
   gateUpsert.mockReset()
   auditCreate.mockReset()
+  workspaceFindUnique.mockReset().mockResolvedValue({ baseCurrency: "LSL" })
 })
 
 describe("createGateRegistry", () => {
@@ -53,6 +56,16 @@ describe("createGateRegistry", () => {
     expect(() =>
       registry.register({ gateType: "duplicate", run: () => ({ blocked: false }) }),
     ).toThrow(/already registered/)
+  })
+
+  it("hands every runner the Company currency, read once per arrival — never a USD fallback", async () => {
+    const registry = createGateRegistry()
+    const seen: string[] = []
+    registry.register({ gateType: "duplicate", run: (c) => { seen.push(c.baseCurrency); return { blocked: false } } })
+    registry.register({ gateType: "match", run: (c) => { seen.push(c.baseCurrency); return { blocked: false } } })
+    await registry.runOnArrival(ctx)
+    expect(seen).toEqual(["LSL", "LSL"])
+    expect(workspaceFindUnique).toHaveBeenCalledTimes(1)
   })
 
   it("skips runners that return { blocked: false } — no row, no audit event", async () => {

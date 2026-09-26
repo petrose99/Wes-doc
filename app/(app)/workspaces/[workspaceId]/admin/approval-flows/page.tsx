@@ -8,6 +8,7 @@ import { getAdminContext } from "@/lib/admin/context"
 import { adminPaths } from "@/lib/admin/paths"
 import { decimalToNumber } from "@/lib/money"
 import { listApprovalWorkflows } from "@/models/approval-workflows"
+import { formatCurrency } from "@/lib/money"
 
 export const dynamic = "force-dynamic"
 
@@ -35,14 +36,8 @@ export default async function ApprovalFlowsPage({ params }: { params: Promise<{ 
     email: m.user.email ?? "",
     role: m.role === "owner" ? "owner" : "member",
   }))
-  const currency = membership.workspace.baseCurrency ?? "USD"
-  const formatThreshold = (value: number) => {
-    try {
-      return new Intl.NumberFormat("en", { style: "currency", currency, maximumFractionDigits: 0 }).format(value)
-    } catch {
-      return `${value.toFixed(0)} ${currency}`.trim()
-    }
-  }
+  const currency = membership.workspace.baseCurrency
+  const formatThreshold = (value: number) => formatCurrency(value, currency, 0)
 
   const defaultFlow = await getDefaultApprovalFlow(workspaceId)
   const flowSummaries: FlowSummary[] = workflows.map((workflow) => ({

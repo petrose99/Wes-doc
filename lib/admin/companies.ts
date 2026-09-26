@@ -17,7 +17,32 @@ export type CompanyRow = {
 
 /** The pane's row (spec §5.1) — the list row plus what only the detail view needs: owner names
  * for the "n · owners: A, B" line. Loaded fresh per pane open; never carried in `CompanyRow`. */
-export type CompanyDetailRow = CompanyRow & { owners: string[] }
+export type CompanyDetailRow = CompanyRow & {
+  owners: string[]
+  lock: CurrencyLockView
+  unpostedCount: number
+  allowedCurrencies: string[]
+}
+
+/** #457 §9.1: the recorded Company currency lock, serialised for the client (`at` is ISO). */
+export type CurrencyLockView =
+  | { locked: false }
+  | { locked: true; cause: "bill" | "bank_statement" | "payment_batch"; provider: string | null; at: string }
+
+const PROVIDER_NAMES: Record<string, string> = { quickbooks: "QuickBooks", xero: "Xero", sage: "Sage" }
+
+/** #457 §5.2, §9.2: the event that locked the currency — "the first bill was posted to Xero on
+ * 12 Sep 2026". The row prefixes "locked since", the Change dialog "locked when". */
+export function currencyLockEvent(lock: Extract<CurrencyLockView, { locked: true }>): string {
+  // Assembled by hand: en-GB "short" is "Sep" or "Sept" depending on the ICU build, and the server
+  // and the browser rendering different strings is a hydration mismatch.
+  const d = new Date(lock.at)
+  const on = `${d.getUTCDate()} ${d.toLocaleDateString("en-US", { month: "short", timeZone: "UTC" })} ${d.getUTCFullYear()}`
+  const to = lock.provider ? ` to ${PROVIDER_NAMES[lock.provider] ?? lock.provider}` : ""
+  if (lock.cause === "payment_batch") return `the first payment batch was created on ${on}`
+  const what = lock.cause === "bank_statement" ? "bank statement" : "bill"
+  return `the first ${what} was posted${to} on ${on}`
+}
 
 /** Every refusal an action can return. The actions never return prose; the UI maps here. */
 export type CompanyActionCode =
@@ -47,6 +72,8 @@ export function companyActionErrorText(code: string, context: { name?: string; o
     case "name_required": return "Enter a name."
     case "personal_workspace": return "A personal workspace can't join an organization."
     case "is_current": return "Switch to another company to remove this one."
+    case "company_country_unsupported": return "DocuBite works with companies in Lesotho and South Africa."
+    case "company_currency_not_allowed": return "A company in South Africa uses ZAR."
     case "last_owner_required": return "You're the only owner. Make someone else an owner on Users first."
     case "last_reviewer": return `You're the last reviewer — approvals in ${name} will wait until an owner assigns another.`
     default: return "Something went wrong. Your entries are still here — try again."
