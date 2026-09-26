@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db"
 import * as quickbooks from "@/lib/integrations/quickbooks/client"
 import * as xero from "@/lib/integrations/xero/client"
+import { readLedgerCapabilities } from "@/lib/integrations/ledger-capabilities"
 import { guessQuickBooksDefaultAccount } from "@/lib/integrations/quickbooks/default-account-guess"
 import { guessXeroDefaultAccount } from "@/lib/integrations/xero/default-account-guess"
 import { Prisma } from "@/prisma/client"
@@ -19,6 +20,9 @@ export async function syncAccountingEntities(connectionId: string): Promise<void
     select: { id: true, workspaceId: true, provider: true, externalTenantId: true, defaultExpenseAccountGuessed: true },
   })
   if (!connection.externalTenantId) throw new Error("integration_connection_not_ready")
+  // Fresh on connect and every sync: a plan or VAT setting changed in the ledger must reach the
+  // coding Checks before the next post (ADR 0014).
+  await readLedgerCapabilities(connection)
 
   const rows = await fetchProviderEntities(connection.provider, connection.externalTenantId, connection.id)
 

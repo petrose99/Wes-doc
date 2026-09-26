@@ -1,5 +1,26 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { findBillByDocNumber, listAccounts, voidBill } from "@/lib/integrations/quickbooks/client"
+import { findBillByDocNumber, getCompanyInfo, getPreferences, listAccounts, voidBill } from "@/lib/integrations/quickbooks/client"
+
+const jsonReply = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } })
+
+describe("ledger capability reads", () => {
+  const originalFetch = global.fetch
+  beforeEach(() => { vi.stubGlobal("fetch", vi.fn()) })
+  afterEach(() => { global.fetch = originalFetch })
+
+  it("getCompanyInfo returns the CompanyInfo row for the realm", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonReply({ CompanyInfo: { NameValue: [{ Name: "OfferingSku", Value: "QuickBooks Online Plus" }] } }))
+    await expect(getCompanyInfo("realm1", "token1")).resolves.toEqual({ NameValue: [{ Name: "OfferingSku", Value: "QuickBooks Online Plus" }] })
+    expect(decodeURIComponent(vi.mocked(fetch).mock.calls[0][0] as string)).toContain("/companyinfo/realm1")
+  })
+
+  it("getPreferences returns the Preferences row, empty when the provider sends none", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonReply({ Preferences: { TaxPrefs: { UsingSalesTax: true } } }))
+    await expect(getPreferences("realm1", "token1")).resolves.toEqual({ TaxPrefs: { UsingSalesTax: true } })
+    vi.mocked(fetch).mockResolvedValueOnce(jsonReply({}))
+    await expect(getPreferences("realm1", "token1")).resolves.toEqual({})
+  })
+})
 
 const jsonResponse = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } })
 

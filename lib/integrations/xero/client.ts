@@ -128,6 +128,21 @@ export async function getBaseCurrency(tenantId: string, connectionId: string): P
   return code
 }
 
+export type XeroTrackingCategory = { id: string; name: string; status: string; options: Array<{ id: string; name: string; status: string }> }
+
+/** Every tracking category with its options, archived ones included, in Xero's own order — the
+ * ledger capabilities keep the first two ACTIVE ones (Xero allows two on a line). */
+export async function listTrackingCategories(tenantId: string, connectionId: string): Promise<XeroTrackingCategory[]> {
+  type Wire = { TrackingCategoryID: string; Name: string; Status: string; Options?: Array<{ TrackingOptionID: string; Name: string; Status: string }> }
+  const result = await apiRequest<{ TrackingCategories?: Wire[] }>(tenantId, connectionId, "/TrackingCategories?includeArchived=true")
+  return (result.TrackingCategories ?? []).map((c) => ({
+    id: c.TrackingCategoryID,
+    name: c.Name,
+    status: c.Status,
+    options: (c.Options ?? []).map((o) => ({ id: o.TrackingOptionID, name: o.Name, status: o.Status })),
+  }))
+}
+
 /** The full invoice row this correction path needs: Status/AmountPaid to tell paid from unpaid,
  * and the current LineItems so the update can resend every line unchanged except the AccountCode
  * the caller is correcting (Xero deletes any line omitted from an update, per the spec's design

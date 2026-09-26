@@ -682,7 +682,7 @@ export async function resolveDocumentCodingItems(input: {
   }
   const normalizedVendor = input.vendorName ? normalizeSupplierName(input.vendorName) : ""
   const rule = normalizedVendor
-    ? await prisma.supplierAccountRule.findFirst({ where: { connectionId: connection.id, supplierName: normalizedVendor }, select: { accountExternalId: true } })
+    ? await prisma.supplierAccountRule.findFirst({ where: { workspaceId: input.workspaceId, connectionId: connection.id, supplierName: normalizedVendor }, select: { accountExternalId: true } })
     : null
   // #429 archived-account fallback: a supplier rule or the connection Default can point at an
   // AccountingEntity a person later deactivated in the provider. Check both candidates' activity
@@ -736,7 +736,7 @@ export async function getBillAccountPickerData(workspaceId: string, vendorName: 
   const [entities, rule] = await Promise.all([
     listAccountingEntities(workspaceId, "account"),
     normalizedVendor
-      ? prisma.supplierAccountRule.findFirst({ where: { connectionId: connection.id, supplierName: normalizedVendor }, select: { accountExternalId: true } })
+      ? prisma.supplierAccountRule.findFirst({ where: { workspaceId, connectionId: connection.id, supplierName: normalizedVendor }, select: { accountExternalId: true } })
       : Promise.resolve(null),
   ])
   return {

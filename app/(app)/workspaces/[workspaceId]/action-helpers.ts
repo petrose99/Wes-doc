@@ -83,6 +83,9 @@ const BILLING_MESSAGES: Record<string, string> = {
   // provider and both currencies by name.
   ledger_currency_differs: "Your ledger keeps its books in a different currency from this company.",
   ledger_currency_unreadable: "Couldn't read your ledger's currency yet. It's checked again before each bill is posted.",
+  // lib/integrations/ledger-capabilities.ts: the ledger didn't say whether VAT is on, so nothing is
+  // posted until it does.
+  ledger_capabilities_unreadable: "Couldn't read your ledger's VAT and tracking settings yet. Nothing is posted until they can be read; it tries again shortly.",
 }
 
 export const errorMessage = (error: unknown, fallback: string) => {

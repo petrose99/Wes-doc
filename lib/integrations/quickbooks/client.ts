@@ -168,6 +168,28 @@ export async function getHomeCurrency(realmId: string, connectionId: string): Pr
   return code
 }
 
+/** The parts of `/companyinfo` the ledger capabilities read: the plan rides in `NameValue` as
+ * `OfferingSku` ("QuickBooks Online Plus"). */
+export type QuickBooksCompanyInfo = { NameValue?: Array<{ Name?: string; Value?: string }> }
+
+/** The `/preferences` flags the ledger capabilities read. Any of them may be absent; the caller
+ * decides what an absence means (lib/integrations/ledger-capabilities.ts). */
+export type QuickBooksPreferences = {
+  TaxPrefs?: { UsingSalesTax?: boolean }
+  AccountingInfoPrefs?: { ClassTrackingPerTxnLine?: boolean; TrackDepartments?: boolean }
+  VendorAndPurchasesPrefs?: { BillableExpenseTracking?: boolean }
+}
+
+export async function getCompanyInfo(realmId: string, connectionId: string): Promise<QuickBooksCompanyInfo> {
+  const result = await apiRequest<{ CompanyInfo?: QuickBooksCompanyInfo }>(realmId, connectionId, `/companyinfo/${encodeURIComponent(realmId)}`)
+  return result.CompanyInfo ?? {}
+}
+
+export async function getPreferences(realmId: string, connectionId: string): Promise<QuickBooksPreferences> {
+  const result = await apiRequest<{ Preferences?: QuickBooksPreferences }>(realmId, connectionId, "/preferences")
+  return result.Preferences ?? {}
+}
+
 export type QuickBooksBillCorrectionCheck =
   | { offered: true }
   | { offered: false; reason: "book_closed" | "paid" }

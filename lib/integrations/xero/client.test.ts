@@ -1,5 +1,25 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { findBillByInvoiceNumber, voidBill } from "@/lib/integrations/xero/client"
+import { findBillByInvoiceNumber, listTrackingCategories, voidBill } from "@/lib/integrations/xero/client"
+
+const jsonReply = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } })
+
+describe("listTrackingCategories", () => {
+  const originalFetch = global.fetch
+  beforeEach(() => { vi.stubGlobal("fetch", vi.fn()) })
+  afterEach(() => { global.fetch = originalFetch })
+
+  it("returns every category with its status and options, archived included, in Xero's order", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonReply({ TrackingCategories: [
+      { TrackingCategoryID: "t1", Name: "Region", Status: "ACTIVE", Options: [{ TrackingOptionID: "o1", Name: "North", Status: "ACTIVE" }] },
+      { TrackingCategoryID: "t2", Name: "Old", Status: "ARCHIVED" },
+    ] }))
+    await expect(listTrackingCategories("tenant1", "token1")).resolves.toEqual([
+      { id: "t1", name: "Region", status: "ACTIVE", options: [{ id: "o1", name: "North", status: "ACTIVE" }] },
+      { id: "t2", name: "Old", status: "ARCHIVED", options: [] },
+    ])
+    expect(decodeURIComponent(vi.mocked(fetch).mock.calls[0][0] as string)).toContain("/TrackingCategories?includeArchived=true")
+  })
+})
 
 const jsonResponse = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } })
 

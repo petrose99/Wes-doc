@@ -12,8 +12,10 @@ vi.mock("@/lib/integrations/xero/client", () => ({
   listContacts: vi.fn(),
   listTaxRates: vi.fn(),
 }))
+vi.mock("@/lib/integrations/ledger-capabilities", () => ({ readLedgerCapabilities: vi.fn() }))
 
 const { syncAccountingEntities } = await import("@/lib/integrations/sync")
+const { readLedgerCapabilities } = await import("@/lib/integrations/ledger-capabilities")
 const { prisma } = await import("@/lib/db")
 const quickbooks = await import("@/lib/integrations/quickbooks/client")
 const xero = await import("@/lib/integrations/xero/client")
@@ -29,6 +31,18 @@ beforeEach(() => {
 })
 
 describe("syncAccountingEntities", () => {
+  it("reads and stores the ledger's capabilities fresh before any entity is synced", async () => {
+    const connection = { id: "c1", workspaceId: "w1", provider: "quickbooks", externalTenantId: "realm1" }
+    db.integrationConnection = { findUniqueOrThrow: vi.fn().mockResolvedValue(connection) }
+    vi.mocked(readLedgerCapabilities).mockRejectedValueOnce(new Error("ledger_capabilities_unreadable"))
+
+    await expect(syncAccountingEntities("c1")).rejects.toThrow("ledger_capabilities_unreadable")
+
+    expect(readLedgerCapabilities).toHaveBeenCalledWith(connection)
+    expect(quickbooks.listAccounts).not.toHaveBeenCalled()
+    expect(db.accountingEntity.upsert).not.toHaveBeenCalled()
+  })
+
   it("throws when the connection has no external tenant id yet", async () => {
     db.integrationConnection = { findUniqueOrThrow: vi.fn().mockResolvedValue({ id: "c1", workspaceId: "w1", provider: "quickbooks", externalTenantId: null }) }
     await expect(syncAccountingEntities("c1")).rejects.toThrow("integration_connection_not_ready")
