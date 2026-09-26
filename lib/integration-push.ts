@@ -53,7 +53,7 @@ export async function claimNextIntegrationPush(now = new Date()): Promise<string
  * throws: a lookup failure (network blip, transient provider error) must not block a push that
  * would otherwise succeed, so this swallows any error and reports "not a duplicate" rather than
  * risk false-blocking every push whenever the lookup itself is flaky. */
-async function ledgerHasDuplicate(provider: string, externalTenantId: string | null, connectionId: string, referenceNumber: string, direction: "payable" | "receivable" = "payable"): Promise<boolean> {
+async function ledgerHasDuplicate(provider: string, externalTenantId: string | null, connectionId: string, referenceNumber: string): Promise<boolean> {
   if (!externalTenantId) return false
   try {
     switch (provider) {
@@ -206,8 +206,7 @@ export async function attemptIntegrationPush(pushId: string, now = new Date()): 
     result = { success: false, errorCode: "integration_connection_disabled", externalBillId: null }
     forceTerminal = true
   } else {
-    const payloadRaw = push.payload as unknown as NormalizedBill & { expenseAccountId?: string; direction?: "payable" | "receivable"; documentType?: string }
-    const direction = payloadRaw.direction ?? (payloadRaw.documentType === "sale" ? "receivable" : "payable")
+    const payloadRaw = push.payload as unknown as NormalizedBill & { expenseAccountId?: string; documentType?: string }
     const expenseAccountId = payloadRaw.expenseAccountId ?? connection.defaultExpenseAccountId
     if (!connection.externalTenantId || !expenseAccountId) {
       result = { success: false, errorCode: "integration_default_account_not_configured", externalBillId: null }
@@ -222,7 +221,7 @@ export async function attemptIntegrationPush(pushId: string, now = new Date()): 
         if (payloadRaw.documentType !== "bank_statement") {
           await preflightAgainstCache(push, connection.id, expenseAccountId, bill.vendorName ?? null)
         }
-        const isDuplicate = bill.referenceNumber ? await ledgerHasDuplicate(connection.provider, connection.externalTenantId, connection.id, bill.referenceNumber, direction) : false
+        const isDuplicate = bill.referenceNumber ? await ledgerHasDuplicate(connection.provider, connection.externalTenantId, connection.id, bill.referenceNumber) : false
         if (isDuplicate) throw new IntegrationPermanentError("ledger_duplicate")
         let created: CreatedBill
         switch (connection.provider) {

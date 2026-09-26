@@ -66,7 +66,7 @@ export function checkLineCoding(input: LineCodingInput): CheckResult[] {
   const customers = linesWhere("customer", (line) => Boolean(line.customer))
   if (customers.length && !cap.customer) fail("ledger_cannot_take_customer", `${ledger} can't take a Customer`, "Save review to clear the Customer.", customers)
   const billable = linesWhere("billable", (line) => line.billable)
-  if (billable.length && !cap.billable) fail("billable_off_in_quickbooks", `Billable is off in ${ledger}`, `Turn on billable expenses in ${ledger} and sync accounts.`, billable)
+  if (billable.length && !cap.billable && input.provider === "quickbooks") fail("billable_off_in_quickbooks", "Billable is off in QuickBooks", "Turn on billable expenses in QuickBooks and sync accounts.", billable)
   const orphaned = linesWhere("billable", (line) => line.billable && !line.customer)
   if (orphaned.length) fail("billable_needs_customer", "Billable needs a Customer", "Save review to clear Billable.", orphaned)
 
@@ -86,6 +86,26 @@ export function checkLineCoding(input: LineCodingInput): CheckResult[] {
     }
   }
   return results
+}
+
+/** The same instructional text as `checkLineCoding`'s and `ledgerReadBackChecks`'s `detail.text`,
+ * generalised for the push-failure toast (action-helpers.ts BILLING_MESSAGES) which only has the
+ * error code — never the ledger/category/option names this module fills in per bill. Kept here,
+ * not copy-pasted, so the wording can only drift by editing this file. */
+export const LINE_CODING_FALLBACK_TEXT: Record<(typeof LINE_CODING_CHECK_CODES)[number] | "ledger_vat_differs" | "ledger_warnings", string> = {
+  vat_off_in_quickbooks: "Turn VAT on in QuickBooks and sync accounts, or save review to clear the Tax codes.",
+  tax_code_not_in_ledger: "Set a purchase tax code on the line's account in your ledger, sync accounts, then save review.",
+  tax_code_missing: "Set a default tax code on the line's account in your ledger, sync accounts, then save review.",
+  tracking_off_in_ledger: "Turn that tracking on in your ledger and sync accounts, or save review to clear it.",
+  tracking_option_not_in_ledger: "Restore that tracking option in your ledger and sync accounts, or save review to clear it.",
+  ledger_has_no_location: "Turn on Locations in your ledger and sync accounts, or save review to clear it.",
+  ledger_cannot_take_customer: "Save review to clear the Customer.",
+  billable_off_in_quickbooks: "Turn on billable expenses in QuickBooks and sync accounts.",
+  billable_needs_customer: "Save review to clear Billable.",
+  tax_basis_unclear: "Check the subtotal, VAT and total on the document match its lines, then save review.",
+  vat_mismatch_invoice: "Check the VAT on the document, and each line's account's tax code in your ledger.",
+  ledger_vat_differs: "Open the bill in your ledger and check each line's tax code against the invoice.",
+  ledger_warnings: "Open the bill in your ledger and check what it flagged.",
 }
 
 /** ADR 0014: what the ledger said back after a bill posted — its own VAT against the invoice's,

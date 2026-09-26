@@ -3,6 +3,7 @@
 // workspace-actions.ts need them. Extracting them here is the only way to share them.
 import { requireWorkspaceRole } from "@/models/workspaces"
 import { revalidatePath } from "next/cache"
+import { LINE_CODING_FALLBACK_TEXT } from "@/lib/checks/line-coding"
 
 /** `documents` is only the detail-page prefix — there is no document list page; the sheet is
  * the view of that data, so document mutations revalidate the file's `sheet`. */
@@ -86,21 +87,10 @@ const BILLING_MESSAGES: Record<string, string> = {
   // lib/integrations/ledger-capabilities.ts: the ledger didn't say whether VAT is on, so nothing is
   // posted until it does.
   ledger_capabilities_unreadable: "Couldn't read your ledger's VAT and tracking settings yet. Nothing is posted until they can be read; it tries again shortly.",
-  // Line coding Checks (lib/checks/line-coding.ts) as push errors; the review task names the
-  // ledger, the category and the option.
-  vat_off_in_quickbooks: "Turn VAT on in QuickBooks and sync accounts, or save review to clear the Tax codes.",
-  tax_code_not_in_ledger: "Set a purchase tax code on the line's account in your ledger, sync accounts, then save review.",
-  tax_code_missing: "Set a default tax code on the line's account in your ledger, sync accounts, then save review.",
-  tracking_off_in_ledger: "Turn that tracking on in your ledger and sync accounts, or save review to clear it.",
-  tracking_option_not_in_ledger: "Restore that tracking option in your ledger and sync accounts, or save review to clear it.",
-  ledger_has_no_location: "Turn on Locations in your ledger and sync accounts, or save review to clear it.",
-  ledger_cannot_take_customer: "Save review to clear the Customer.",
-  billable_off_in_quickbooks: "Turn on billable expenses in QuickBooks and sync accounts.",
-  billable_needs_customer: "Save review to clear Billable.",
-  tax_basis_unclear: "Check the subtotal, VAT and total on the document match its lines, then save review.",
-  vat_mismatch_invoice: "Check the VAT on the document, and each line's account's tax code in your ledger.",
-  ledger_vat_differs: "Open the bill in your ledger and check each line's tax code against the invoice.",
-  ledger_warnings: "Open the bill in your ledger and check what it flagged.",
+  // Line coding Checks (lib/checks/line-coding.ts) as push errors; the review task itself names
+  // the ledger, the category and the option — this fallback only has the code, so its wording is
+  // LINE_CODING_FALLBACK_TEXT, not a re-typed copy (a past copy-paste let the two drift).
+  ...LINE_CODING_FALLBACK_TEXT,
   quickbooks_feature_not_supported: "QuickBooks turned down a field this plan doesn't offer. Sync accounts, then check the bill.",
 }
 
