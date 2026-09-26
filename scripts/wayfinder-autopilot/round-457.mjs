@@ -61,7 +61,7 @@ await round({ out, base: `${W}/${RIVERSIDE}`, only, residue, ...(widths ? { widt
     await s.visible(change, 15000)
     await change.focus()
     await page.keyboard.press("Enter")
-    const dlg = s.dialog()
+    const dlg = page.getByRole("alertdialog")
     s.probe("dialog-open", await s.visible(dlg), "Enter on Change opened no dialog")
     s.probe("title", await s.visible(dlg.getByText("Change the company currency to ZAR?")), "title missing")
     s.probe("count-14", await s.visible(dlg.getByText(/14 unposted documents will be re-converted to ZAR/)), "count line missing")
@@ -96,7 +96,7 @@ await round({ out, base: `${W}/${RIVERSIDE}`, only, residue, ...(widths ? { widt
     await s.snap("", "card mismatch, Owner: Switch")
     await sw.focus()
     await page.keyboard.press("Enter")
-    const dlg = s.dialog()
+    const dlg = page.getByRole("alertdialog")
     s.probe("switch-opens-dialog", await s.visible(dlg), "Switch opened no dialog")
     await s.snap("dialog", "Change dialog from the card")
     await s.press("Escape")
@@ -121,7 +121,7 @@ await round({ out, base: `${W}/${RIVERSIDE}`, only, residue, ...(widths ? { widt
   })
 
   await state("S10-amount-surface", `${W}/${PERSONAL}/invoices`, async (page, s) => {
-    s.probe("lsl-amount", await s.visible(page.getByText(/LSL\s?[\d,]+\.\d\d/), 15000), "no LSL-formatted amount in the Invoices queue")
+    s.probe("lsl-amount", await s.visible(page.getByText(/LSL\s?[\d,]+\.\d\d/).filter({ visible: true }).first(), 15000), "no LSL-formatted amount in the Invoices queue")
     await s.snap("", "Invoices queue: LSL amounts beside a USD document")
   })
 })

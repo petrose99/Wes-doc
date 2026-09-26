@@ -94,14 +94,14 @@ function LedgerCurrencyLine({ workspaceId, connection, isOwner, company, onChang
   return (
     <div className="mt-1 flex flex-wrap items-start gap-x-2 gap-y-1 text-sm text-amber-800">
       <AlertTriangle aria-hidden className="mt-0.5 size-4 shrink-0" />
-      <p className="min-w-0 flex-1">
+      <p className="min-w-0 max-w-[65ch] flex-1">
         {ledgerFact}{" "}
         {outcome === "ask_owner" && "Ask an Owner to change the company currency."}
         {outcome === "blocked" && `Bills won't post until they match. ${provider} doesn't let you change its ${books}, so connect a ${provider} ${qbo ? "company" : "organisation"} kept in ${company.currency}, or contact support.`}
       </p>
       {outcome === "switch" && (
         <>
-          <Button ref={switchRef} type="button" size="sm" variant="outline" className="max-md:min-h-11" onClick={() => setSwitching(true)}>
+          <Button ref={switchRef} type="button" size="sm" variant="outline" className="py-1.5 max-md:min-h-11" onClick={() => setSwitching(true)}>
             Switch this company to {ledger}
           </Button>
           <ChangeCurrencyDialog open={switching} workspaceId={workspaceId} companyId={workspaceId} from={company.currency} to={ledger}

@@ -34,7 +34,10 @@ const PROVIDER_NAMES: Record<string, string> = { quickbooks: "QuickBooks", xero:
 /** #457 §5.2, §9.2: the event that locked the currency — "the first bill was posted to Xero on
  * 12 Sep 2026". The row prefixes "locked since", the Change dialog "locked when". */
 export function currencyLockEvent(lock: Extract<CurrencyLockView, { locked: true }>): string {
-  const on = new Date(lock.at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })
+  // Assembled by hand: en-GB "short" is "Sep" or "Sept" depending on the ICU build, and the server
+  // and the browser rendering different strings is a hydration mismatch.
+  const d = new Date(lock.at)
+  const on = `${d.getUTCDate()} ${d.toLocaleDateString("en-US", { month: "short", timeZone: "UTC" })} ${d.getUTCFullYear()}`
   const to = lock.provider ? ` to ${PROVIDER_NAMES[lock.provider] ?? lock.provider}` : ""
   if (lock.cause === "payment_batch") return `the first payment batch was created on ${on}`
   const what = lock.cause === "bank_statement" ? "bank statement" : "bill"
