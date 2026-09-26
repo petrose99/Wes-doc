@@ -21,6 +21,7 @@ import { taxMismatchCheck } from "@/lib/health/checks/tax-mismatch"
 import { taxConsistencyHealthCheck } from "@/lib/health/checks/tax-consistency"
 import { vatNumberFormatCheck } from "@/lib/health/checks/vat-number-format"
 import { missingTaxCheck } from "@/lib/health/checks/missing-tax"
+import { negativeTotalInvoicesCheck } from "@/lib/health/checks/negative-total-invoices"
 import { submissionVolumeCheck } from "@/lib/health/checks/submission-volume"
 import { automationRateCheck } from "@/lib/health/checks/automation-rate"
 import { processingTimeCheck } from "@/lib/health/checks/processing-time"
@@ -67,6 +68,9 @@ export const REGISTRY: CheckDefinition[] = [
   // existing BankMatch rows (lib/bank-match/matcher.ts), not synced ledger data, so it has
   // something to say even for a workspace with no accounting connection at all.
   bankReconciliationCheck,
+  // #463 Q19: negative-total invoices never converted to a credit note — also requiresLedger:
+  // false (works off extracted document data alone), same reasoning as bank reconciliation above.
+  hidden(negativeTotalInvoicesCheck),
   // Phase C: tax-category checks — every one declares requiresLedger: true, same reasoning as
   // Phase B's cleanup checks (see the comment above), plus the pushed-document join tax_mismatch
   // and missing_tax need only exists once a workspace has a real ledger to compare against.

@@ -268,25 +268,36 @@ export async function proposeAllocationOnApproval(input: { workspaceId: string; 
     const creditRemaining = (creditNote.total ?? 0) - creditAllocated
     if (creditRemaining <= 0) return
 
-    const openInvoices = await prisma.document.findMany({
-      where: { workspaceId: input.workspaceId, docType: "invoice", cancelledAt: null },
-      select: { id: true, reviewedData: true },
-    })
-    const candidates = await Promise.all(openInvoices.map(async (doc) => {
-      const values = (doc.reviewedData ?? {}) as Record<string, unknown>
-      const [records, allocated] = await Promise.all([
-        prisma.invoicePayment.findMany({ where: { workspaceId: input.workspaceId, documentId: doc.id, removedAt: null }, select: { amount: true } }),
-        liveAllocationsTotal(input.workspaceId, "invoiceId", doc.id),
-      ])
-      const recordedAmount = records.reduce((sum, record) => sum + (decimalToNumber(record.amount) ?? 0), 0)
-      const due = Math.max(0, (asNumber(values["total"]) ?? 0) - recordedAmount - allocated)
-      return { documentId: doc.id, invoiceNumber: asString(values["invoice_number"]), supplier: asString(values["vendor"]), due }
-    }))
-
+    const candidates = await loadOpenInvoiceCandidates(input.workspaceId)
     const proposal = proposeAllocation({ creditNote: { citedInvoiceNumber, supplier: creditNote.supplier, remaining: creditRemaining }, candidates })
     if (!proposal) return
     await createCreditAllocation({ workspaceId: input.workspaceId, creditNoteId: input.documentId, invoiceId: proposal.documentId, amount: proposal.amount, actorId: input.actorId })
   } catch (error) {
     console.error("[credits] propose-on-approval failed:", error instanceof Error ? error.message : error)
   }
+}
+
+/** Every open (uncancelled) invoice in the workspace, shaped for `proposeAllocation`'s exact
+ * supplier+invoice-number match — shared by the auto-propose-on-approval step above and
+ * `models/document-checks.ts`'s "credit exceeds invoice" / "no matching invoice" checks (#463
+ * Step 4), so both read the same due figure.
+ *
+ * ponytail: scans every open invoice in the workspace (fine at today's per-workspace invoice
+ * counts); if this becomes a hot path at scale, index by normalized supplier key the way
+ * `getSupplierCreditAvailable` does instead of loading every invoice. */
+export async function loadOpenInvoiceCandidates(workspaceId: string): Promise<Array<{ documentId: string; invoiceNumber: string | null; supplier: string | null; due: number }>> {
+  const openInvoices = await prisma.document.findMany({
+    where: { workspaceId, docType: "invoice", cancelledAt: null },
+    select: { id: true, reviewedData: true },
+  })
+  return Promise.all(openInvoices.map(async (doc) => {
+    const values = (doc.reviewedData ?? {}) as Record<string, unknown>
+    const [records, allocated] = await Promise.all([
+      prisma.invoicePayment.findMany({ where: { workspaceId, documentId: doc.id, removedAt: null }, select: { amount: true } }),
+      liveAllocationsTotal(workspaceId, "invoiceId", doc.id),
+    ])
+    const recordedAmount = records.reduce((sum, record) => sum + (decimalToNumber(record.amount) ?? 0), 0)
+    const due = Math.max(0, (asNumber(values["total"]) ?? 0) - recordedAmount - allocated)
+    return { documentId: doc.id, invoiceNumber: asString(values["invoice_number"]), supplier: asString(values["vendor"]), due }
+  }))
 }
