@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, type ReactNode, useContext, useMemo, useState } from "react"
+import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { CheckCircle2, ChevronDown, ExternalLink, XCircle, Loader2 } from "lucide-react"
 import { toast } from "sonner"
@@ -17,7 +17,7 @@ import { moveDocumentsToStageAction, updateDocumentNoteAction } from "@/app/(app
 import { postSelectedDocumentsAction } from "@/app/(app)/workspaces/[workspaceId]/post-selected-documents-actions"
 import { retryAttachingAction } from "@/app/(app)/workspaces/[workspaceId]/integration-attach-actions"
 import { checkAffectedByRuleChangeAction, type AffectedByRuleChange } from "@/app/(app)/workspaces/[workspaceId]/account-correction-actions"
-import { describeAttachError } from "@/lib/integrations/attach-errors"
+import { describeAttachError, ATTACH_PROVIDER_LABELS } from "@/lib/integrations/attach-errors"
 import { PERMANENT_ATTACH_ERROR_CODES } from "@/lib/integration-attach-policy"
 import { AccountCorrectionDialog } from "@/components/integrations/account-correction-dialog"
 import type { ProcessingState } from "@/lib/documents/processing-state"
@@ -170,10 +170,6 @@ export function BillStatusTrack({ workspaceId, openReviewTaskId, state, fact, le
   </div>
 }
 
-/** #450/#462: same provider map as `models/documents.ts`'s and `integrations-manager.tsx`'s own
- * `PROVIDER_LABELS` — kept local rather than shared, matching that existing duplication. */
-const ATTACH_PROVIDER_LABELS: Record<string, string> = { quickbooks: "QuickBooks", xero: "Xero", sage: "Sage" }
-
 export type DocumentAttachment = {
   status: string
   attempts: number
@@ -197,6 +193,10 @@ export function AttachTrailing({ workspaceId, documentId, ledger, attachment, ca
 }) {
   const [current, setCurrent] = useState(attachment)
   const [retrying, setRetrying] = useState(false)
+  // The server re-passes `attachment` after `router.refresh()` (BillStatusTrack's onDone, one
+  // level up); useState's initializer only runs once, so without this the optimistic post-retry
+  // value would never pick up what the refresh actually found.
+  useEffect(() => setCurrent(attachment), [attachment])
   if (ledger !== "posted" && ledger !== "paid") return null
 
   const providerLabel = ATTACH_PROVIDER_LABELS[current?.provider ?? ""] ?? "the ledger"

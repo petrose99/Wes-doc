@@ -21,4 +21,12 @@ describe("auditEventLabel", () => {
     )
     expect(auditEventLabel("document_reclassified", { toType: "invoice" })).toBe("Moved to Invoice")
   })
+
+  it("says why a source-file attach failed, on the Audit tab (#450/#462)", () => {
+    expect(auditEventLabel("integration_attach_failed", { errorCode: "attach_oversize" })).toBe(
+      "Source file not attached — the file is too large for the ledger to accept",
+    )
+    expect(auditEventLabel("integration_attach_failed")).toBe("Source file not attached")
+    expect(auditEventLabel("integration_attach_succeeded")).toBe("Source file attached")
+  })
 })

@@ -21,3 +21,10 @@ export const ATTACH_ERROR_SENTENCES: Record<string, string> = {
 export function describeAttachError(errorCode: string): string {
   return ATTACH_ERROR_SENTENCES[errorCode] ?? errorCode.replaceAll("_", " ")
 }
+
+/** CODING_STANDARDS #16: the one ledger-provider display-name map the attach surface uses
+ * (`bill-pane.tsx`'s AttachTrailing). `models/documents.ts` and `integrations-manager.tsx` each
+ * carry their own pre-existing copy of the same three names — untouched here, since consolidating
+ * those is a separate cleanup, not part of #462 — but a *new* call site reuses this one rather
+ * than adding a fourth. */
+export const ATTACH_PROVIDER_LABELS: Record<string, string> = { quickbooks: "QuickBooks", xero: "Xero", sage: "Sage" }
