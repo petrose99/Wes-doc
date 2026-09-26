@@ -4,6 +4,7 @@ import { recordDocumentAudit } from "@/lib/audit"
 import { decimalToNumber } from "@/lib/money"
 import { listBillPay, supplierHasBankAccount, rowId, rowPayeeName, CLAIM_ELIGIBILITY_COPY, type BillPayRow, type BillPayBillRow, type BillPayClaimRow } from "@/models/bill-pay"
 import { listWorkspaceBills } from "@/models/bills"
+import { recordCurrencyLock } from "@/models/company-currency"
 import { payerAccountLabel, type PayerAccountRow } from "@/models/payer-accounts"
 import { splitBatchName, splitIntoBatches, suggestBatchName } from "@/lib/payments/batch-split"
 import { batchView, LIVE_BATCH_STATUSES, type BatchStatus, type BatchView } from "@/lib/payments/batch-status"
@@ -364,6 +365,7 @@ export async function createPaymentBatches(input: {
       },
       select: { id: true },
     })
+    await recordCurrencyLock(input.workspaceId, "payment_batch", null, now, tx)
     await recordDocumentAudit({ workspaceId: input.workspaceId, actorId: input.actorId, type: "payment_batch.submitted", detail: { batchId: batch.id, name, billCount, claimCount, total, currencyCode: group.currencyCode, payFromAccountId: group.payFromAccountId, leftOut: leftOut.map((l) => ({ documentId: l.documentId, reason: l.reason })) } }, tx)
     for (const { candidate } of group.lines) {
       const row = candidate.row

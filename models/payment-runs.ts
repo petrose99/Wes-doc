@@ -2,6 +2,7 @@
 import { prisma } from "@/lib/db"
 import { recordSystemAudit } from "@/lib/audit"
 import { listWorkspaceBills } from "@/models/bills"
+import { recordCurrencyLock } from "@/models/company-currency"
 import { formatZaEftCsv, paymentRunFilename, totalsByCurrency, type PaymentInstruction } from "@/lib/payments/za-eft-csv"
 import { buildRemittanceAdvices, type RemittanceAdvice } from "@/lib/payments/remittance"
 import type { Prisma } from "@/prisma/client"
@@ -105,6 +106,7 @@ export async function preparePaymentRun(input: {
     },
     select: { id: true, filename: true, itemCount: true },
   })
+  await recordCurrencyLock(input.workspaceId, "payment_batch", null, now)
 
   await recordSystemAudit({
     workspaceId: input.workspaceId,

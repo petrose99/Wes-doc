@@ -126,8 +126,17 @@ model Workspace {
   /// "finance" (types/industry.ts) — the app is finance-only; kept as a string column rather than
   /// dropped outright since a handful of nav/AI-prompt code paths still key off it.
   industry                   String                      @default("finance")
-  country                    String                      @default("US")
-  baseCurrency               String                      @default("USD") @map("base_currency")
+  /// ADR 0013: a Company is in Lesotho or South Africa (lib/geo/company-currency.ts); rows from
+  /// before it keep whatever they had until scripts/migrate-company-currency.ts moves them.
+  country                    String                      @default("ZA")
+  baseCurrency               String                      @default("ZAR") @map("base_currency")
+  /// The Company currency lock (ADR 0013): set once, the first time anything in this currency
+  /// reached a ledger or a bank — a succeeded IntegrationPush (cause "bill" / "bank_statement",
+  /// with its provider) or a Payment batch ("payment_batch"). Recorded, not derived, so deleting
+  /// the push or batch that set it never reopens the currency. See models/company-currency.ts.
+  currencyLockedAt           DateTime?                   @map("currency_locked_at")
+  currencyLockCause          String?                     @map("currency_lock_cause")
+  currencyLockProvider       String?                     @map("currency_lock_provider")
   timezone                   String                      @default("UTC")
   fiscalYearStart            String                      @default("january") @map("fiscal_year_start")
   aiEnabled                  Boolean                     @default(true) @map("ai_enabled")
@@ -1331,6 +1340,11 @@ model IntegrationConnection {
   /// not silently treated as an Owner-confirmed choice.
   defaultExpenseAccountGuessed Boolean                  @default(true) @map("default_expense_account_guessed")
   status                       String                   @default("connected")
+  /// The ledger's own home/base currency as last read from the provider (QuickBooks
+  /// Preferences.HomeCurrency, Xero Organisation.BaseCurrency) — null until read or when the read
+  /// failed. A push is refused while it differs from the Company currency (ADR 0013).
+  ledgerCurrency               String?                  @map("ledger_currency")
+  ledgerCurrencyReadAt         DateTime?                @map("ledger_currency_read_at")
   createdById                  String?                  @map("created_by_id") @db.Uuid
   createdAt                    DateTime                 @default(now()) @map("created_at")
   updatedAt                    DateTime                 @updatedAt @map("updated_at")

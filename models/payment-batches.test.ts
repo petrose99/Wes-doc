@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 vi.mock("@/lib/db", () => ({ prisma: {} }))
 vi.mock("@/lib/audit", () => ({ recordDocumentAudit: vi.fn().mockResolvedValue(undefined) }))
+vi.mock("@/models/company-currency", () => ({ recordCurrencyLock: vi.fn().mockResolvedValue(undefined) }))
 
 const { rejectPaymentBatch } = await import("@/models/payment-batches")
 const { prisma } = await import("@/lib/db")

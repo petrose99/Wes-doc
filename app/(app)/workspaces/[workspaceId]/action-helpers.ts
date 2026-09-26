@@ -74,6 +74,11 @@ const BILLING_MESSAGES: Record<string, string> = {
   // #250: Match manually.
   po_match_not_found: "That purchase order link no longer exists. Reload the row and try again.",
   purchase_order_not_found: "That purchase order no longer exists.",
+  // #457 / ADR 0013: Company currency.
+  company_country_unsupported: "DocuBite works with companies in Lesotho and South Africa.",
+  company_currency_not_allowed: "A company in South Africa uses ZAR.",
+  company_currency_locked: "Couldn't change it: the company currency is locked because something was already posted in it.",
+  company_currency_push_in_flight: "A bill is being posted right now. Try again in a minute.",
 }
 
 export const errorMessage = (error: unknown, fallback: string) => {
