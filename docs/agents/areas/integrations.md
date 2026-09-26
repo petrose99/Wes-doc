@@ -57,9 +57,27 @@ fact) · switch (Owner, unlocked: amber + icon + "Switch this company to ‹ledg
 `ChangeCurrencyDialog`) · ask_owner (non-Owner) · blocked (locked: honest copy, no control).
 The page-level "Only an owner can change this" banner is `admin-ui.tsx` (#252), not the card.
 
+## Supplier accounts table (#458)
+`components/settings/supplier-accounts-table.tsx` (`SupplierAccountsTable`), on the Integrations
+page below the provider cards. Each row is a `SupplierAccountRule` — the account it pre-fills plus
+whichever of Tax code / Tracking (Class or Region+Department, connection-dependent) / Location it
+holds, per `LedgerCapabilities`. Held parts render as a `text-xs text-slate-600` detail line under
+the account (never hover-only); a stale ledger reference gets a plain-text, never colour-only,
+parenthetical. Non-owners get no Forget column (removed from tab order, not disabled-in-place).
+Forget opens the shared `ConfirmDialog`, naming the account and exactly the held parts that will
+stop being pre-filled; native `disabled` (not `aria-disabled`) on both buttons while pending; on
+success focus moves to the next row's Forget, falling back to the last row then the intro/empty
+paragraph (`tabIndex={-1}`) — never `body`.
+Push-failure toast text for the 11 `checkLineCoding` + 2 `ledgerReadBackChecks` codes is
+`LINE_CODING_FALLBACK_TEXT` (`lib/checks/line-coding.ts`), spread into `action-helpers.ts`'s
+`BILLING_MESSAGES` — a prior copy-paste of this wording between the two files was the #458 close
+review's one P1. Don't re-type any of these 13 strings a second time.
+
 ## Detector residue (report, do not chase)
 App-wide five (see `admin.md`) plus `line-length` ~117ch from the pre-existing
-empty-state provider rows (#457 residue.txt). Gate CLEAN at #329 and #457 m1.
+empty-state provider rows (#457 residue.txt). Gate CLEAN at #329, #457 and #458 (m1/close;
+`residue.txt` for #458 is the same app-wide five + the line-length item, no new residue from the
+supplier table's new columns/dialog).
 
 ## Capture
 Round script pattern: `docs/wayfinder-reports/226/logs/scratch-329/round-329.mjs`
