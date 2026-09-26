@@ -6,4 +6,5 @@ export const XERO_AUTHORIZE_URL = "https://login.xero.com/identity/connect/autho
 export const XERO_TOKEN_URL = "https://identity.xero.com/connect/token"
 export const XERO_CONNECTIONS_URL = "https://api.xero.com/connections"
 export const XERO_API_BASE = "https://api.xero.com/api.xro/2.0"
-export const XERO_SCOPES = "offline_access accounting.transactions accounting.contacts accounting.settings"
+export const XERO_SCOPES =
+  "offline_access accounting.transactions accounting.contacts accounting.settings accounting.attachments"

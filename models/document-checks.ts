@@ -16,6 +16,9 @@ import { checkTextLayerDivergence } from "@/lib/checks/text-layer-divergence"
 import { extractPdfTextLayer } from "@/lib/pdf/text-layer"
 import { checkSplitInvoices } from "@/lib/checks/split-invoices"
 import { checkVendorOnboarding } from "@/lib/checks/vendor-onboarding"
+import { checkAttachmentLimit } from "@/lib/checks/attachment-limit"
+import type { AttachProvider } from "@/lib/integrations/attach-limits"
+import { loadAttachmentRendition } from "@/lib/integration-attach-rendition"
 import { decimalToNumber } from "@/lib/money"
 import { documentStorageKey, readDocumentSource } from "@/lib/document-storage"
 import { resolveSupplier } from "@/lib/suppliers/alias"
@@ -63,7 +66,7 @@ export async function runDeterministicChecks(input: { workspaceId: string; docum
   try {
     const document = await prisma.document.findFirst({
       where: { id: input.documentId, workspaceId: input.workspaceId },
-      select: { id: true, templateId: true, reviewedData: true, codingData: true, mimeType: true, ocrText: true, docType: true, institutionId: true, template: { select: { code: true } } },
+      select: { id: true, templateId: true, reviewedData: true, codingData: true, mimeType: true, ocrText: true, docType: true, institutionId: true, sizeBytes: true, pageRange: true, storageKey: true, filename: true, template: { select: { code: true } } },
     })
     if (!document) return
     const docType = resolveDocType(document)
@@ -183,6 +186,11 @@ export async function runDeterministicChecks(input: { workspaceId: string; docum
       const anomaly = await checkAmountAnomalyAgainstHistory(input.workspaceId, document.templateId, document.id, identity, map)
       if (anomaly) results.push(anomaly)
     }
+
+    // #461: pre-post warn that the source file the connected ledger would attach after posting
+    // is over its size/type limit — known statically, before the post, per ADR 0016.
+    const attachLimit = await checkAttachmentLimitForDocument(input.workspaceId, document)
+    if (attachLimit) results.push(attachLimit)
 
     // A2.1: PDF forensic mismatches (DocInfo vs XMP dates/tools). Only meaningful for PDFs.
     const forensics = await runPdfForensicsCheck(input.workspaceId, document.id, document.mimeType ?? null)
@@ -479,6 +487,40 @@ async function runPdfForensicsCheck(workspaceId: string, documentId: string, mim
 /** A2.5 wiring: resolves the supplier through the A5 registry to read its documentCount, then
  * calls the pure onboarding checker. Silent on any registry hiccup (this is a warn-level check;
  * a check failure to run must not block the pipeline). */
+/** #461: only meaningful once a ledger is connected — no connection means no attach step ever
+ * runs, so there is nothing to warn about yet. Cheap path: the stored file's own size/type covers
+ * every case except a split child (its own page range cut from the parent's stored PDF) or a
+ * HEIC/WEBP image (converted to JPEG for the attach) — only those two need the actual rendered
+ * size, computed once here via the same pure rendition the attempt will use. Never throws past
+ * the caller (runDeterministicChecks already wraps the whole pass in try/catch, but this can run
+ * ahead of storage being available for a very old document, and a warn Check must never crash the
+ * whole run over a missing file). */
+async function checkAttachmentLimitForDocument(workspaceId: string, document: {
+  id: string
+  mimeType: string
+  sizeBytes: number
+  pageRange: string | null
+  storageKey: string | null
+  filename: string
+}): Promise<CheckResult | null> {
+  try {
+    const connection = await prisma.integrationConnection.findFirst({ where: { workspaceId, status: "connected" }, select: { provider: true } })
+    if (!connection) return null
+    const provider = connection.provider as AttachProvider
+
+    const needsRendition = Boolean(document.pageRange) || document.mimeType === "image/heic" || document.mimeType === "image/webp"
+    if (!needsRendition) {
+      return checkAttachmentLimit({ provider, contentType: document.mimeType, sizeBytes: document.sizeBytes })
+    }
+    if (!document.storageKey) return null
+    const rendition = await loadAttachmentRendition(document)
+    return checkAttachmentLimit({ provider, contentType: rendition.contentType, sizeBytes: rendition.buffer.length })
+  } catch (error) {
+    console.error("[checks] attachment limit check failed:", error instanceof Error ? error.message : error)
+    return null
+  }
+}
+
 async function checkVendorOnboardingForDocument(workspaceId: string, input: {
   supplierName: string
   paymentIban: string | null

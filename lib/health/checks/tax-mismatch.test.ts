@@ -25,7 +25,7 @@ function txn(overrides: Partial<LedgerTransactionSlice> = {}): LedgerTransaction
 function baseCtx(overrides: Partial<CheckContext> = {}): CheckContext {
   return {
     workspaceId: "ws1", dateRange: { from: now, to: now }, ledger: { transactions: [], accountingEntities: [], matchCandidateDocuments: [] },
-    documents: [], reviewTasks: [], pushHistory: [], automationRules: [], checkResults: [],
+    documents: [], reviewTasks: [], pushHistory: [], attachHistory: [], automationRules: [], checkResults: [],
     confidenceDrift: [], lowConfidenceFields: [], bankStatements: [],
     ...overrides,
   }

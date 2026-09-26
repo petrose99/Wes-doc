@@ -52,6 +52,9 @@ export const WORKSPACE_SCOPED_MODELS = new Set([
   // (see lib/integration-push.ts).
   "IntegrationConnection",
   "IntegrationPush",
+  // #461: source-file attach queue, drained across all workspaces exactly like IntegrationPush
+  // (see lib/integration-attach.ts).
+  "IntegrationAttachment",
   // Foundation phase 1 (WP4). TaxProfileVersion is reached only through its scoped parent, the
   // same DocumentTemplateVersion precedent, and stays unlisted.
   "TaxProfile",

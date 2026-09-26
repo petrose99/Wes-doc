@@ -119,6 +119,18 @@ export type CheckPushSlice = {
   updatedAt: Date
 }
 
+/** Same shape as CheckPushSlice, for IntegrationAttachment rows (#461) — kept as its own type
+ * rather than reused so the two queues can diverge in fields later without one check's slice
+ * silently picking up the other's. */
+export type CheckAttachSlice = {
+  id: string
+  documentId: string
+  status: string
+  attempts: number
+  errorCode: string | null
+  updatedAt: Date
+}
+
 export type CheckResultSlice = {
   documentId: string
   checkCode: string
@@ -169,6 +181,7 @@ export type CheckContext = {
   documents: CheckDocumentSlice[]
   reviewTasks: CheckReviewTaskSlice[]
   pushHistory: CheckPushSlice[]
+  attachHistory: CheckAttachSlice[]
   automationRules: AutomationRuleInput[]
   checkResults: CheckResultSlice[]
   confidenceDrift: ConfidenceDriftRow[]

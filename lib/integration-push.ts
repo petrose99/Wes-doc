@@ -22,6 +22,7 @@ import { preflightPush } from "@/lib/integration-preflight"
 import { createReviewTask } from "@/models/review-tasks"
 import { emitAccountsPayableEvent } from "@/lib/webhooks"
 import { kickWebhookDrain } from "@/lib/webhook-delivery"
+import { enqueueAttachmentForPush } from "@/lib/integration-attach"
 
 /** The push loop: claim a due IntegrationPush, resolve the vendor/contact + default expense account
  * at the provider, create the bill, and apply the pure policy's verdict (succeeded / retry-with-
@@ -298,6 +299,11 @@ export async function attemptIntegrationPush(pushId: string, now = new Date()): 
       workspaceId: push.workspaceId,
       type: "integration_push_succeeded",
       detail: { pushId: push.id, connectionId: connection.id, documentId: push.documentId, provider: connection.provider, externalBillId: result.externalBillId },
+    })
+    // #461/ADR 0016: queue the Source-file attach as its own row, best-effort — never throw past
+    // attemptIntegrationPush, same care as the webhook emit beside it.
+    await enqueueAttachmentForPush(push.id).catch((error) => {
+      console.error("[integration-push] attach enqueue failed:", error instanceof Error ? error.message : error)
     })
     // WP-AP1: bill.pushed webhook, best-effort — never throw past attemptIntegrationPush.
     const externalRecordKind = await prisma.integrationPush.findUnique({ where: { id: push.id }, select: { externalRecordKind: true } }).then((r) => r?.externalRecordKind ?? null).catch(() => null)

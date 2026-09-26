@@ -18,7 +18,7 @@ function baseCtx(transactions: LedgerTransactionSlice[], matchCandidateDocuments
   return {
     workspaceId: "ws1", dateRange: { from: now, to: now },
     ledger: { transactions, accountingEntities: [], matchCandidateDocuments },
-    documents: [], reviewTasks: [], pushHistory: [], automationRules: [], checkResults: [],
+    documents: [], reviewTasks: [], pushHistory: [], attachHistory: [], automationRules: [], checkResults: [],
     confidenceDrift: [], lowConfidenceFields: [], bankStatements: [],
   }
 }

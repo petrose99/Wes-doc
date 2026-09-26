@@ -8,7 +8,7 @@ function baseCtx(): CheckContext {
   return {
     workspaceId: "ws1", dateRange: { from: now, to: now },
     ledger: { transactions: [], accountingEntities: [{ id: "id1", externalId: "v1", entityType: "vendor", name: "Acme", active: true }], matchCandidateDocuments: [] },
-    documents: [], reviewTasks: [], pushHistory: [], automationRules: [], checkResults: [],
+    documents: [], reviewTasks: [], pushHistory: [], attachHistory: [], automationRules: [], checkResults: [],
     confidenceDrift: [], lowConfidenceFields: [], bankStatements: [],
   }
 }

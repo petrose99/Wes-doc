@@ -2,6 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const mockUpdateMany = vi.fn()
 const mockFindMany = vi.fn()
+const mockPushCount = vi.fn()
+const mockPushFindMany = vi.fn()
+const mockEnqueueAttachmentForPush = vi.fn()
+const mockKickIntegrationAttachDrain = vi.fn()
 
 vi.mock("@/lib/db", () => ({
   prisma: {
@@ -11,10 +15,22 @@ vi.mock("@/lib/db", () => ({
     accountingEntity: {
       findMany: (...args: unknown[]) => mockFindMany(...args),
     },
+    integrationPush: {
+      count: (...args: unknown[]) => mockPushCount(...args),
+      findMany: (...args: unknown[]) => mockPushFindMany(...args),
+    },
   },
 }))
 
-const { resolveAccountNames, setWorkspaceIntegrationTenant, setWorkspaceIntegrationDefaultAccount } = await import("@/models/integrations")
+vi.mock("@/lib/integration-attach", () => ({
+  enqueueAttachmentForPush: (...args: unknown[]) => mockEnqueueAttachmentForPush(...args),
+  kickIntegrationAttachDrain: (...args: unknown[]) => mockKickIntegrationAttachDrain(...args),
+}))
+
+const {
+  resolveAccountNames, setWorkspaceIntegrationTenant, setWorkspaceIntegrationDefaultAccount,
+  countBackfillableAttachments, queueBackfillAttachments,
+} = await import("@/models/integrations")
 
 beforeEach(() => { vi.clearAllMocks() })
 
@@ -66,5 +82,32 @@ describe("setWorkspaceIntegrationDefaultAccount", () => {
     await expect(
       setWorkspaceIntegrationDefaultAccount("ws1", "conn1", { id: "acc-1", name: "General Expenses" })
     ).rejects.toThrow("integration_connection_not_found")
+  })
+})
+
+describe("countBackfillableAttachments (#461)", () => {
+  it("counts succeeded pushes with no attachment row, scoped to the workspace", async () => {
+    mockPushCount.mockResolvedValue(3)
+    const count = await countBackfillableAttachments("ws1")
+    expect(count).toBe(3)
+    expect(mockPushCount).toHaveBeenCalledWith({ where: { workspaceId: "ws1", status: "succeeded", attachment: null } })
+  })
+})
+
+describe("queueBackfillAttachments (#461)", () => {
+  it("enqueues an attach for every backfillable push and kicks the drain once", async () => {
+    mockPushFindMany.mockResolvedValue([{ id: "push1" }, { id: "push2" }])
+    const queued = await queueBackfillAttachments("ws1")
+    expect(queued).toBe(2)
+    expect(mockEnqueueAttachmentForPush).toHaveBeenCalledWith("push1")
+    expect(mockEnqueueAttachmentForPush).toHaveBeenCalledWith("push2")
+    expect(mockKickIntegrationAttachDrain).toHaveBeenCalledTimes(1)
+  })
+
+  it("does not kick the drain when there is nothing to back-fill", async () => {
+    mockPushFindMany.mockResolvedValue([])
+    const queued = await queueBackfillAttachments("ws1")
+    expect(queued).toBe(0)
+    expect(mockKickIntegrationAttachDrain).not.toHaveBeenCalled()
   })
 })

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { createBill, findBillByInvoiceNumber, listAccounts, listItems, listTaxRates, listTrackingCategories, voidBill } from "@/lib/integrations/xero/client"
+import { attachFile, createBill, findBillByInvoiceNumber, listAccounts, listAttachments, listItems, listTaxRates, listTrackingCategories, voidBill } from "@/lib/integrations/xero/client"
 
 const jsonReply = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } })
 
@@ -63,6 +63,48 @@ describe("voidBill", () => {
   it("throws on a non-2xx response, same as createBill", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(new Response("", { status: 500 }))
     await expect(voidBill("tenant1", "token1", "abc")).rejects.toThrow()
+  })
+})
+
+describe("listAttachments", () => {
+  const originalFetch = global.fetch
+  beforeEach(() => { vi.stubGlobal("fetch", vi.fn()) })
+  afterEach(() => { global.fetch = originalFetch })
+
+  it("maps Attachments to attachmentId/fileName", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ Attachments: [{ AttachmentID: "a1", FileName: "invoice.pdf" }] }))
+    await expect(listAttachments("tenant1", "token1", "abc")).resolves.toEqual([{ attachmentId: "a1", fileName: "invoice.pdf" }])
+    expect(vi.mocked(fetch).mock.calls[0][0]).toContain("/Invoices/abc/Attachments")
+  })
+
+  it("returns an empty array when the invoice has none", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({}))
+    await expect(listAttachments("tenant1", "token1", "abc")).resolves.toEqual([])
+  })
+})
+
+describe("attachFile", () => {
+  const originalFetch = global.fetch
+  beforeEach(() => { vi.stubGlobal("fetch", vi.fn()) })
+  afterEach(() => { global.fetch = originalFetch })
+
+  it("PUTs the file bytes to Attachments/{fileName} with the tenant header and file's content-type", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ Attachments: [{ AttachmentID: "a1", FileName: "invoice.pdf" }] }))
+    const result = await attachFile("tenant1", "conn1", "abc", { buffer: Buffer.from("file-bytes"), contentType: "application/pdf", fileName: "invoice.pdf" })
+    expect(result).toEqual({ attachmentId: "a1", fileName: "invoice.pdf" })
+
+    const [url, init] = vi.mocked(fetch).mock.calls[0]
+    expect(url).toContain("/Invoices/abc/Attachments/invoice.pdf")
+    expect((init as RequestInit).method).toBe("PUT")
+    const headers = (init as RequestInit).headers as Record<string, string>
+    expect(headers["content-type"]).toBe("application/pdf")
+    expect(headers["xero-tenant-id"]).toBe("tenant1")
+    expect(Buffer.from((init as RequestInit).body as Uint8Array).toString("utf8")).toBe("file-bytes")
+  })
+
+  it("throws on a non-2xx response, same as createBill", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response("", { status: 500 }))
+    await expect(attachFile("tenant1", "conn1", "abc", { buffer: Buffer.from("x"), contentType: "application/pdf", fileName: "x.pdf" })).rejects.toThrow()
   })
 })
 

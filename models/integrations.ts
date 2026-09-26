@@ -7,6 +7,7 @@ import { assertUrlSafe } from "@/lib/url-safety"
 import { isWebhookEventType } from "@/lib/webhooks"
 import { getDocumentFieldValues } from "@/models/document-field-values"
 import { stageToStatusFilter, type PipelineStage } from "@/lib/documents/stages"
+import { enqueueAttachmentForPush, kickIntegrationAttachDrain } from "@/lib/integration-attach"
 
 /** There is no plan tier gating the integrations surface anymore — every workspace has it,
  * subject only to the deployment-level gate (config.integrations.enabled). */
@@ -415,4 +416,28 @@ export async function upsertWorkspaceIntegrationPush(
     },
     select: { id: true, status: true },
   })
+}
+
+/** #461: how many succeeded pushes in this workspace predate the attach feature and so have no
+ * `IntegrationAttachment` row at all — the owner-only one-time back-fill's count, shown before
+ * they commit to running it. A push with an attachment row (any status) is not counted, even a
+ * failed one — that one is retried through the ordinary Retry action, not re-enqueued here. */
+export async function countBackfillableAttachments(workspaceId: string): Promise<number> {
+  return prisma.integrationPush.count({
+    where: { workspaceId, status: "succeeded", attachment: null },
+  })
+}
+
+/** Enqueues an attach for every succeeded push in the workspace that has none yet, then kicks the
+ * drain once for the whole batch. Returns how many were queued. Safe to run more than once: a
+ * push already enqueued (by this call or the ordinary push-success path) is simply excluded by
+ * the same `attachment: null` filter next time. */
+export async function queueBackfillAttachments(workspaceId: string): Promise<number> {
+  const pushes = await prisma.integrationPush.findMany({
+    where: { workspaceId, status: "succeeded", attachment: null },
+    select: { id: true },
+  })
+  for (const push of pushes) await enqueueAttachmentForPush(push.id)
+  if (pushes.length) await kickIntegrationAttachDrain()
+  return pushes.length
 }

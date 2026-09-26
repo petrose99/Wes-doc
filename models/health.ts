@@ -8,7 +8,7 @@ import { buildConfidenceDriftSql } from "@/lib/health/checks/confidence-drift"
 import { REGISTRY, runnableChecks } from "@/lib/health/registry"
 import { computeHealthScore, projectHealthScore, type CheckScoreInput, type HealthScoreConfigInput, type HealthScoreResult, type ProjectedScoreResult } from "@/lib/health/score"
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
-import type { BankStatementSlice, CheckContext, CheckDocumentSlice, CheckPushSlice, CheckResultSlice, CheckReviewTaskSlice, ConfidenceDriftRow, HealthFinding, LedgerAccountingEntitySlice, LedgerContext, LedgerTransactionSlice, LowConfidenceFieldSlice } from "@/lib/health/types"
+import type { BankStatementSlice, CheckAttachSlice, CheckContext, CheckDocumentSlice, CheckPushSlice, CheckResultSlice, CheckReviewTaskSlice, ConfidenceDriftRow, HealthFinding, LedgerAccountingEntitySlice, LedgerContext, LedgerTransactionSlice, LowConfidenceFieldSlice } from "@/lib/health/types"
 import { prisma } from "@/lib/db"
 import { decimalToNumber } from "@/lib/money"
 import { getTaxProfile } from "@/models/tax-profiles"
@@ -108,6 +108,17 @@ async function loadPushHistory(workspaceId: string): Promise<CheckPushSlice[]> {
     take: CANDIDATE_CAP,
   })
   return pushes.map((push) => ({ id: push.id, documentId: push.documentId, status: push.status, attempts: push.attempts, errorCode: push.errorCode, updatedAt: push.updatedAt }))
+}
+
+/** #461: same shape and query pattern as loadPushHistory, over IntegrationAttachment. */
+async function loadAttachHistory(workspaceId: string): Promise<CheckAttachSlice[]> {
+  const attaches = await prisma.integrationAttachment.findMany({
+    where: { workspaceId },
+    select: { id: true, documentId: true, status: true, attempts: true, errorCode: true, updatedAt: true },
+    orderBy: { updatedAt: "desc" },
+    take: CANDIDATE_CAP,
+  })
+  return attaches.map((attach) => ({ id: attach.id, documentId: attach.documentId, status: attach.status, attempts: attach.attempts, errorCode: attach.errorCode, updatedAt: attach.updatedAt }))
 }
 
 async function loadAutomationRules(workspaceId: string): Promise<AutomationRuleInput[]> {
@@ -286,10 +297,11 @@ async function buildCheckContext(workspaceId: string, now: Date): Promise<CheckC
   // TaxProfile has no expectation of tax on anything, so missing-tax.ts must not flag every
   // untaxed document in a workspace that never set tax up in the first place.
   const taxProfile = await getTaxProfile(workspaceId)
-  const [documents, reviewTasks, pushHistory, automationRules, confidenceDrift, lowConfidenceFields, checkResults, ledger, bankStatements] = await Promise.all([
+  const [documents, reviewTasks, pushHistory, attachHistory, automationRules, confidenceDrift, lowConfidenceFields, checkResults, ledger, bankStatements] = await Promise.all([
     loadDocuments(workspaceId, taxProfile !== null),
     loadReviewTasks(workspaceId),
     loadPushHistory(workspaceId),
+    loadAttachHistory(workspaceId),
     loadAutomationRules(workspaceId),
     loadConfidenceDrift(workspaceId, now),
     loadLowConfidenceFields(workspaceId),
@@ -299,7 +311,7 @@ async function buildCheckContext(workspaceId: string, now: Date): Promise<CheckC
   ])
   return {
     workspaceId, dateRange: { from, to: now }, ledger,
-    documents, reviewTasks, pushHistory, automationRules, checkResults,
+    documents, reviewTasks, pushHistory, attachHistory, automationRules, checkResults,
     confidenceDrift, lowConfidenceFields, bankStatements,
   }
 }

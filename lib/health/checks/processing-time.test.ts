@@ -17,7 +17,7 @@ function doc(id: string, overrides: Partial<CheckDocumentSlice> = {}): CheckDocu
 function baseCtx(documents: CheckDocumentSlice[], pushHistory: CheckPushSlice[] = []): CheckContext {
   return {
     workspaceId: "ws1", dateRange: { from, to }, ledger: null,
-    documents, reviewTasks: [], pushHistory, automationRules: [], checkResults: [],
+    documents, reviewTasks: [], pushHistory, attachHistory: [], automationRules: [], checkResults: [],
     confidenceDrift: [], lowConfidenceFields: [], bankStatements: [],
   }
 }

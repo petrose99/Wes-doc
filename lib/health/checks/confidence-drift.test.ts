@@ -19,7 +19,7 @@ const now = new Date("2026-09-02T00:00:00.000Z")
 function baseCtx(overrides: Partial<CheckContext> = {}): CheckContext {
   return {
     workspaceId: "ws1", dateRange: { from: now, to: now }, ledger: null,
-    documents: [], reviewTasks: [], pushHistory: [], automationRules: [], checkResults: [],
+    documents: [], reviewTasks: [], pushHistory: [], attachHistory: [], automationRules: [], checkResults: [],
     confidenceDrift: [], lowConfidenceFields: [], bankStatements: [],
     ...overrides,
   }
