@@ -225,19 +225,47 @@ function buildQuickBooksUploadBody(boundary: string, billId: string, file: { buf
   return Buffer.concat([head, file.buffer, tail])
 }
 
-/** Uploads `file` and links it to the Bill in one call, QBO's documented `POST /upload` — unlike
- * Xero there is no separate link step and no idempotency token (commented deviation, CODING_
- * STANDARDS #3: the attach module's fixed-filename + listAttachments match stands in for one).
- * Throws exactly like createBill on any non-2xx response. */
+type QbAttachable = { Id: string; FileName: string; SyncToken?: string; AttachableRef?: Array<{ EntityRef?: { type?: string; value?: string } }> }
+
+/** Links an already-uploaded (but unlinked) Attachable to the Bill via QBO's sparse-update
+ * `POST /attachable` — the fallback half of "upload-then-link" (#450's resolution). Needs the
+ * Attachable's current `SyncToken` (QBO's optimistic-lock token); an upload response that omitted
+ * it (same metadata-part failure that dropped the link) defaults to "0", the value a just-created
+ * entity always carries. */
+async function linkAttachableToBill(realmId: string, connectionId: string, billId: string, attachable: QbAttachable): Promise<QuickBooksAttachment> {
+  const result = await apiRequest<{ AttachableResponse: Array<{ Attachable: { Id: string; FileName: string } }> }>(realmId, connectionId, "/attachable", {
+    method: "POST",
+    body: JSON.stringify({
+      Id: attachable.Id,
+      SyncToken: attachable.SyncToken ?? "0",
+      FileName: attachable.FileName,
+      AttachableRef: [{ EntityRef: { type: "Bill", value: billId } }],
+    }),
+  })
+  const linked = result.AttachableResponse[0].Attachable
+  return { attachmentId: linked.Id, fileName: linked.FileName }
+}
+
+/** Uploads `file` and links it to the Bill via QBO's documented `POST /upload` — unlike Xero there
+ * is no idempotency token (commented deviation, CODING_STANDARDS #3: the attach module's
+ * fixed-filename + listAttachments match stands in for one). Nango's binary proxy occasionally
+ * loses the `file_metadata_01` part's JSON content-type in transit (spec, #461): QBO then stores it
+ * as an opaque string instead of parsing out the `AttachableRef`, so the upload succeeds but comes
+ * back with no link to the Bill. That specific case — checked from the response, not guessed from
+ * an error shape — falls back to a second call that links the same uploaded Attachable explicitly
+ * (upload-then-link), rather than re-uploading and creating a duplicate file. Throws exactly like
+ * createBill on any non-2xx response. */
 export async function attachFile(realmId: string, connectionId: string, billId: string, file: { buffer: Buffer; contentType: string; fileName: string }): Promise<QuickBooksAttachment> {
   const boundary = `docubite-${randomUUID()}`
   const body = buildQuickBooksUploadBody(boundary, billId, file)
-  const result = await nangoProxyBinary<{ AttachableResponse: Array<{ Attachable: { Id: string; FileName: string } }> }>(
+  const result = await nangoProxyBinary<{ AttachableResponse: Array<{ Attachable: QbAttachable }> }>(
     connectionId, PROVIDER_CONFIG_KEY, `${quickbooksCompanyBase(realmId)}/upload`, body, `multipart/form-data; boundary=${boundary}`,
     { method: "POST" }, quickbooksApiError,
   )
   const attachable = result.AttachableResponse[0].Attachable
-  return { attachmentId: attachable.Id, fileName: attachable.FileName }
+  const linkedToBill = (attachable.AttachableRef ?? []).some((ref) => ref.EntityRef?.value === billId)
+  if (linkedToBill) return { attachmentId: attachable.Id, fileName: attachable.FileName }
+  return linkAttachableToBill(realmId, connectionId, billId, attachable)
 }
 
 // ---- #430: correcting posted bills' Accounts -----------------------------------------------

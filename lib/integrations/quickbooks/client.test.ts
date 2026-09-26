@@ -151,9 +151,10 @@ describe("attachFile", () => {
   afterEach(() => { global.fetch = originalFetch })
 
   it("POSTs a multipart body with the file metadata linking to the Bill and the file bytes, and returns the attachment id", async () => {
-    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ AttachableResponse: [{ Attachable: { Id: "a1", FileName: "invoice.pdf" } }] }))
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ AttachableResponse: [{ Attachable: { Id: "a1", FileName: "invoice.pdf", AttachableRef: [{ EntityRef: { type: "Bill", value: "42" } }] } }] }))
     const result = await attachFile("realm1", "conn1", "42", { buffer: Buffer.from("file-bytes"), contentType: "application/pdf", fileName: "invoice.pdf" })
     expect(result).toEqual({ attachmentId: "a1", fileName: "invoice.pdf" })
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1)
 
     const [url, init] = vi.mocked(fetch).mock.calls[0]
     expect(url).toContain("/upload")
@@ -168,6 +169,30 @@ describe("attachFile", () => {
   it("throws on a non-2xx upload response", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(new Response("", { status: 500 }))
     await expect(attachFile("realm1", "conn1", "42", { buffer: Buffer.from("x"), contentType: "application/pdf", fileName: "x.pdf" })).rejects.toThrow()
+  })
+
+  it("links the Attachable via POST /attachable when the upload response comes back unlinked (metadata part lost its JSON type)", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ AttachableResponse: [{ Attachable: { Id: "a1", FileName: "invoice.pdf", SyncToken: "0" } }] }))
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ AttachableResponse: [{ Attachable: { Id: "a1", FileName: "invoice.pdf" } }] }))
+    const result = await attachFile("realm1", "conn1", "42", { buffer: Buffer.from("file-bytes"), contentType: "application/pdf", fileName: "invoice.pdf" })
+    expect(result).toEqual({ attachmentId: "a1", fileName: "invoice.pdf" })
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(2)
+
+    const [linkUrl, linkInit] = vi.mocked(fetch).mock.calls[1]
+    expect(linkUrl).toContain("/attachable")
+    const linkBody = JSON.parse((linkInit as RequestInit).body as string)
+    expect(linkBody).toEqual({
+      Id: "a1",
+      SyncToken: "0",
+      FileName: "invoice.pdf",
+      AttachableRef: [{ EntityRef: { type: "Bill", value: "42" } }],
+    })
+  })
+
+  it("does not call /attachable a second time when the upload response already links the Bill", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ AttachableResponse: [{ Attachable: { Id: "a1", FileName: "invoice.pdf", AttachableRef: [{ EntityRef: { type: "Bill", value: "42" } }] } }] }))
+    await attachFile("realm1", "conn1", "42", { buffer: Buffer.from("file-bytes"), contentType: "application/pdf", fileName: "invoice.pdf" })
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1)
   })
 })
 
