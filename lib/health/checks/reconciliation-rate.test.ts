@@ -19,7 +19,7 @@ function baseCtx(transactions: LedgerTransactionSlice[]): CheckContext {
   return {
     workspaceId: "ws1", dateRange: { from, to },
     ledger: { transactions, accountingEntities: [], matchCandidateDocuments: [] },
-    documents: [], reviewTasks: [], pushHistory: [], automationRules: [], checkResults: [],
+    documents: [], reviewTasks: [], pushHistory: [], attachHistory: [], automationRules: [], checkResults: [],
     confidenceDrift: [], lowConfidenceFields: [], bankStatements: [],
   }
 }

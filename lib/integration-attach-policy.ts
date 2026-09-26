@@ -13,6 +13,19 @@ export const MAX_ATTACH_ATTEMPTS = 5
  * magnitude as PUSH_LEASE_MS: an attach is a listAttachments read plus one upload call. */
 export const ATTACH_LEASE_MS = 2 * 60 * 1000
 
+/** The five permanent (non-retryable) codes named in ADR 0016 — a failed attach carrying one of
+ * these can never succeed by retrying alone (the source is gone, the type/size/count is wrong, or
+ * the bill itself is gone); the Checks-tab Retry action refuses these so it never offers a retry
+ * that can only fail the same way again. Everything else that reaches `status: "failed"` got there
+ * by exhausting MAX_ATTACH_ATTEMPTS on a transient error, which IS worth retrying. */
+export const PERMANENT_ATTACH_ERROR_CODES = new Set([
+  "attach_source_missing",
+  "attach_invalid_type",
+  "attach_oversize",
+  "attach_over_count",
+  "attach_bill_gone",
+])
+
 export type AttachOutcome =
   | { status: "succeeded"; nextAttemptAt: null }
   | { status: "failed"; nextAttemptAt: null }

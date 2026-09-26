@@ -11,7 +11,7 @@ function baseCtx(overrides: Partial<CheckContext> = {}): CheckContext {
     ledger: null,
     documents: [],
     reviewTasks: [],
-    pushHistory: [],
+    pushHistory: [], attachHistory: [],
     automationRules: [],
     checkResults: [],
     confidenceDrift: [],

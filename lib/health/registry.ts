@@ -4,7 +4,7 @@ import { bankReconciliationCheck } from "@/lib/health/checks/bank-reconciliation
 import { benfordCheck } from "@/lib/health/checks/benford"
 import { coaDriftCheck } from "@/lib/health/checks/coa-drift"
 import { confidenceDriftCheck } from "@/lib/health/checks/confidence-drift"
-import { pushFailuresCheck } from "@/lib/health/checks/push-failures"
+import { attachFailuresCheck, pushFailuresCheck } from "@/lib/health/checks/push-failures"
 import { reviewBacklogCheck } from "@/lib/health/checks/review-backlog"
 import { ruleCoverageCheck } from "@/lib/health/checks/rule-coverage"
 import { staleDocumentsCheck } from "@/lib/health/checks/stale-documents"
@@ -38,6 +38,10 @@ const hidden = (check: CheckDefinition): CheckDefinition => ({ ...check, showInN
 export const REGISTRY: CheckDefinition[] = [
   reviewBacklogCheck,
   pushFailuresCheck,
+  // #461: source-file attach failures — its own checkCode, hidden from the nav (the push-
+  // failures entry already covers the ledger-post problem; a source-file attach failing is a
+  // narrower, lower-severity signal that still needs to feed the score and the Overview).
+  hidden(attachFailuresCheck),
   hidden(confidenceDriftCheck),
   hidden(uncorrectedLowConfidenceCheck),
   ruleCoverageCheck,

@@ -21,14 +21,19 @@ beforeEach(() => {
   db.reviewTask = { findFirst: vi.fn().mockResolvedValue(null), findMany: vi.fn().mockResolvedValue([]) }
   db.document = { findMany: vi.fn().mockResolvedValue([]) }
   db.ingestionItem = { findFirst: vi.fn().mockResolvedValue(null) }
+  // #461: no connected ledger by default — the attachment-limit Check skips silently, matching
+  // most of the existing fixtures below (none of them set up an integration connection).
+  db.integrationConnection = { findFirst: vi.fn().mockResolvedValue(null) }
 })
 
 const invoiceDocument = (reviewedData: Record<string, unknown>) => ({
   id: "d1", templateId: "t1", reviewedData, template: { code: "invoice" },
+  mimeType: "application/pdf", sizeBytes: 1024, pageRange: null, storageKey: "k1", filename: "invoice.pdf",
 })
 
 const receiptDocument = (reviewedData: Record<string, unknown>) => ({
   id: "d1", templateId: "t1", reviewedData, template: { code: "receipt" },
+  mimeType: "application/pdf", sizeBytes: 1024, pageRange: null, storageKey: "k1", filename: "receipt.pdf",
 })
 
 describe("refreshLineCodingChecks", () => {
@@ -201,6 +206,35 @@ describe("runDeterministicChecks", () => {
 
     expect(db.documentCheckResult.upsert).not.toHaveBeenCalledWith(expect.objectContaining({
       where: { documentId_checkCode: { documentId: "d1", checkCode: "vat_number_format" } },
+    }))
+  })
+})
+
+describe("attachment-limit check wiring (#461)", () => {
+  it("skips silently when no ledger is connected", async () => {
+    db.document = {
+      findFirst: vi.fn().mockResolvedValue(invoiceDocument({ vendor: "Acme", invoice_number: "INV-1", subtotal: 100, tax_total: 20, total: 120, currency_code: "USD" })),
+      findMany: vi.fn().mockResolvedValue([]),
+    }
+    await runDeterministicChecks({ workspaceId: "w1", documentId: "d1" })
+    expect(db.documentCheckResult.upsert).not.toHaveBeenCalledWith(expect.objectContaining({
+      where: { documentId_checkCode: { documentId: "d1", checkCode: "attachment_limit" } },
+    }))
+  })
+
+  it("warns on an oversize file for the connected provider, from the stored size directly", async () => {
+    db.integrationConnection = { findFirst: vi.fn().mockResolvedValue({ provider: "xero" }) }
+    db.document = {
+      findFirst: vi.fn().mockResolvedValue({
+        ...invoiceDocument({ vendor: "Acme", invoice_number: "INV-1", subtotal: 100, tax_total: 20, total: 120, currency_code: "USD" }),
+        sizeBytes: 11 * 1024 * 1024,
+      }),
+      findMany: vi.fn().mockResolvedValue([]),
+    }
+    await runDeterministicChecks({ workspaceId: "w1", documentId: "d1" })
+    expect(db.documentCheckResult.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      where: { documentId_checkCode: { documentId: "d1", checkCode: "attachment_limit" } },
+      create: expect.objectContaining({ status: "warn" }),
     }))
   })
 })

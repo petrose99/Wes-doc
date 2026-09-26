@@ -7,7 +7,7 @@ const now = new Date("2026-09-02T00:00:00.000Z")
 function baseCtx(checkResults: CheckResultSlice[]): CheckContext {
   return {
     workspaceId: "ws1", dateRange: { from: now, to: now }, ledger: { transactions: [], accountingEntities: [], matchCandidateDocuments: [] },
-    documents: [], reviewTasks: [], pushHistory: [], automationRules: [], checkResults,
+    documents: [], reviewTasks: [], pushHistory: [], attachHistory: [], automationRules: [], checkResults,
     confidenceDrift: [], lowConfidenceFields: [], bankStatements: [],
   }
 }
