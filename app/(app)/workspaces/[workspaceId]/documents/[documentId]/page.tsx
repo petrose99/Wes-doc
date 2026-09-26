@@ -2,7 +2,7 @@ import { getSelectionAuditPanelDataAction, saveDocumentReviewAction } from "@/ap
 import { SplitPane, BillSplitPane } from "@/components/pipeline/document-detail/split-pane"
 import { PaneFrame } from "@/components/queue/detail-pane"
 import { StatusLine } from "@/components/queue/status-line"
-import { LEDGER_FACT_LABELS, PROCESSING_STATE_LABELS, processingState } from "@/lib/documents/processing-state"
+import { LEDGER_FACT_LABELS, PROCESSING_STATE_LABELS, processingState, type LedgerFact } from "@/lib/documents/processing-state"
 import { processingFact } from "@/lib/documents/processing-fact"
 import { getProcessingStateInput } from "@/models/processing-state"
 import { labelForDestinationPath, readOrigin, withParam, type Origin } from "@/lib/navigation/origin"
@@ -233,14 +233,20 @@ export async function DocumentDetailPage({ params, searchParams, embedded = fals
   // clicked "confirm paid".
   const succeededPushCount = pushes.filter((p) => p.status === "succeeded").length
   const failedPushCount = pushes.filter((p) => p.status === "failed").length
+  const pendingPushCount = pushes.filter((p) => p.status === "pending").length
   const ledgerPaid = (() => {
     const ps = paymentStatuses.get(documentId)?.paymentStatus?.toLowerCase()
     return ps === "paid" || ps === "reconciled"
   })()
   const confirmedPaid = document.paymentStatus === "paid"
-  // #258: the one ledger word — "Posted" once any push succeeded, else "Paid" once the ledger or
-  // a confirm-paid says so. Shared by full mode's Status line and (embedded, Invoices) BillPane's.
-  const ledger = succeededPushCount > 0 ? "posted" : confirmedPaid || ledgerPaid ? "paid" : null
+  // #258/#450: the one ledger word — Paid beats Posted (a paid bill is done, however it posted),
+  // Posted beats a later Post failed retry, and Post failed beats a still-pending push, per the
+  // glossary's Ledger mark (paid > posted > failed > posting > null).
+  const ledger: LedgerFact | null = confirmedPaid || ledgerPaid ? "paid"
+    : succeededPushCount > 0 ? "posted"
+    : failedPushCount > 0 ? "failed"
+    : pendingPushCount > 0 ? "posting"
+    : null
   const readinessStatus = (document as unknown as { readinessStatus: string | null }).readinessStatus
   const readinessDetail = (document as unknown as { readinessDetail: unknown }).readinessDetail
   const readinessBlockers = Array.isArray(readinessDetail)
