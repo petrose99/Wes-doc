@@ -1,7 +1,7 @@
 #!/bin/bash
 # Decision functions of the Wayfinder driver, sourced by run.sh and by lib.test.ts.
-# They read the driver's globals (REPO, MAP, OUT, RUNLOG, ROOT, LANE_*, MODEL_*, SKIP,
-# PHASE_RUNS …) at call time; run.sh sets those before it calls any of them.
+# They read the driver's globals (REPO, MAP, OUT, LOGS, RUNLOG, ROOT, BASE_BRANCH, LANE_*, MODEL_*,
+# SKIP, PHASE_RUNS …) at call time; run.sh sets those before it calls any of them.
 
 frontier() {
   gh api "repos/$REPO/issues/$MAP/sub_issues" --paginate \
@@ -25,6 +25,34 @@ lane_root() {   # $1 ticket → where this ticket's tree lives (its lane if it h
 }
 handoff_of() { echo "$(lane_root "$1")/docs/wayfinder-reports/$MAP/$1.handoff.md"; }
 report_of()  { echo "$(lane_root "$1")/docs/wayfinder-reports/$MAP/$1.md"; }
+lane_open() {   # $1 ticket → creates the lane if lane mode; prints the session's working dir
+  [ "$LANE_MODE" = worktree ] || { echo "$ROOT"; return; }
+  local wt br p
+  wt="$(lane_dir "$1")"; br="$(lane_branch "$1")"
+  if [ ! -e "$wt/.git" ]; then
+    if git -C "$ROOT" show-ref --verify -q "refs/heads/$br"; then
+      git -C "$ROOT" worktree add -q "$wt" "$br" >&2
+    else
+      git -C "$ROOT" worktree add -q -b "$br" "$wt" "$BASE_BRANCH" >&2
+    fi
+    for p in $LANE_CLONES; do
+      [ -e "$ROOT/$p" ] && [ ! -e "$wt/$p" ] && { cp -al "$ROOT/$p" "$wt/$p" 2>/dev/null || cp -a "$ROOT/$p" "$wt/$p"; }
+    done
+    for p in $LANE_LINKS; do
+      [ -e "$ROOT/$p" ] && [ ! -e "$wt/$p" ] && { mkdir -p "$(dirname "$wt/$p")"; ln -s "$ROOT/$p" "$wt/$p"; }
+    done
+    ( cd "$wt" && git ls-files --others --exclude-standard --directory ) > "$LOGS/pre-untracked-$1.txt"
+    echo "    lane $wt on $br (from $BASE_BRANCH)" >&2
+  fi
+  mkdir -p "$wt/docs/wayfinder-reports/$MAP"
+  # The lane's logs dir is this checkout's: the brief names the scratch folder
+  # there, but a session in the lane writes the same path relative to its cwd,
+  # and the lane is removed at landing — #462 lost its captures, reader scores
+  # and close.md that way (only the preflight, written to the named path, was
+  # left). Ignored twice in .gitignore (dir and link) like .impeccable/live.
+  [ -e "$wt/docs/wayfinder-reports/$MAP/logs" ] || ln -s "$LOGS" "$wt/docs/wayfinder-reports/$MAP/logs"
+  echo "$wt"
+}
 
 blockers_landed() {   # $1 ticket → (review mode) no closed blocker still has an open lane PR
   [ "$LANE_MODE" = worktree ] && [ "$LANE_MERGE" = review ] || return 0

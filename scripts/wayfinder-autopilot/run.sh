@@ -152,28 +152,6 @@ BASE_BRANCH="$(git -C "$ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo HE
 untracked_of() {   # the owner's untracked files in that tree, never swept into a WIP commit
   if [ "$(lane_root "$1")" = "$ROOT" ]; then echo "$PRE_UNTRACKED"; else echo "$LOGS/pre-untracked-$1.txt"; fi
 }
-lane_open() {   # $1 ticket → creates the lane if lane mode; prints the session's working dir
-  [ "$LANE_MODE" = worktree ] || { echo "$ROOT"; return; }
-  local wt br p
-  wt="$(lane_dir "$1")"; br="$(lane_branch "$1")"
-  if [ ! -e "$wt/.git" ]; then
-    if git -C "$ROOT" show-ref --verify -q "refs/heads/$br"; then
-      git -C "$ROOT" worktree add -q "$wt" "$br" >&2
-    else
-      git -C "$ROOT" worktree add -q -b "$br" "$wt" "$BASE_BRANCH" >&2
-    fi
-    for p in $LANE_CLONES; do
-      [ -e "$ROOT/$p" ] && [ ! -e "$wt/$p" ] && { cp -al "$ROOT/$p" "$wt/$p" 2>/dev/null || cp -a "$ROOT/$p" "$wt/$p"; }
-    done
-    for p in $LANE_LINKS; do
-      [ -e "$ROOT/$p" ] && [ ! -e "$wt/$p" ] && { mkdir -p "$(dirname "$wt/$p")"; ln -s "$ROOT/$p" "$wt/$p"; }
-    done
-    ( cd "$wt" && git ls-files --others --exclude-standard --directory ) > "$LOGS/pre-untracked-$1.txt"
-    echo "    lane $wt on $br (from $BASE_BRANCH)" >&2
-  fi
-  mkdir -p "$wt/docs/wayfinder-reports/$MAP"
-  echo "$wt"
-}
 lane_publish() {   # $1 ticket, $2 title → push the lane branch; open a draft PR the first time
   [ "$LANE_MODE" = worktree ] || return 0
   local wt br pr

@@ -29,8 +29,10 @@
 #      impeccable critique/audit) are refused — phases/build.md says the gate
 #      steps run no critique/evaluate, and #380's G2 session ignored that at
 #      ~6K of skill text plus six re-scoring agents (2026-09-22).
-#   9. Spec phase: a whole read of either lessons file — `lessons.mjs`
-#      prints the ticket's share by its [kind]/[area:…] tags.
+#   9. A whole read of either lessons file, in any phase. Spec prints the
+#      ticket's share with `lessons.mjs` (by its [kind]/[area:…] tags); close
+#      appends with wc/grep/tail and an Edit or `cat >>` — #462's last two
+#      close sessions each read both files whole (~13K) to add one line.
 #  10. A new one-off script (round-N, tmp-, debug, probe, seed, fix) written
 #      into scripts/wayfinder-autopilot/ — it goes in the ticket's scratch folder.
 [ -n "${WAYFINDER_CTX_FILE:-}" ] || exit 0
@@ -51,7 +53,10 @@ ROUND = "ROUND SCRIPT: a ticket's round script only lists states and the clicks 
 def is_router(p): return "skills/intent/SKILL.md" in p or "skills/intent/intent/SKILL.md" in p
 MEASURE_SKILLS = re.compile(r"(autopilot/skills/(evaluate|include)\.md|skills/(evaluate|include)/SKILL\.md|impeccable/reference/(critique|audit)\.md)")
 LESSONS = "LESSONS: print this ticket's share with `node scripts/wayfinder-autopilot/lessons.mjs --kind <surface|backend|all> --area <primer>` instead of reading the lessons files whole — the filter keeps every untagged line, and the whole files are ~10K tokens every later turn re-reads (phases/spec.md step 2)."
-def spec_lessons(s): return os.environ.get("WAYFINDER_PHASE", "") == "spec" and bool(re.search(r"(^|/)lessons\.md\b", s)) and not re.search(r"lessons\.mjs", s) and not re.search(r"\bgrep\b", s)
+LESSONS_APPEND = "LESSONS: the two lessons files are ~13K tokens whole, re-read on every later turn. To add a line you need only `wc -l <file>`, `grep -n <keyword> <file>` for a line to merge with, `tail -n 20 <file>` for the format, then an Edit after a ranged Read (offset/limit) of that spot, or `cat >> <file> <<'EOF'`. To read a ticket's share: `node scripts/wayfinder-autopilot/lessons.mjs --kind <surface|backend|all> --area <primer>`."
+def is_lessons(s): return bool(re.search(r"(^|/)lessons\.md\b", s)) and not re.search(r"lessons\.mjs", s)
+def spec_lessons(s): return os.environ.get("WAYFINDER_PHASE", "") == "spec" and is_lessons(s) and not re.search(r"\bgrep\b", s)
+def whole_lessons_cat(c): return is_lessons(c) and bool(re.search(r"\b(cat|less|more)\b", c)) and not re.search(r">>\s*\S*lessons\.md", c)
 BUILD_ONLY = "BUILD PHASE: critique, evaluate, audit and include are the measure session's readers (phases/build.md: no critique, no evaluate, no include readers in any gate step). This phase runs the round script, gate.mjs and the detector, fixes what they list, and ends at `milestone: build-done`; the scores come from the next phase, on its own budget."
 def measure_skill(p): return os.environ.get("WAYFINDER_PHASE", "") == "build" and bool(MEASURE_SKILLS.search(p))
 # The same drift through a subagent: #380's G2 launched six scoring agents
@@ -102,6 +107,7 @@ def closing_bar(c):
         try: return subprocess.run(a, capture_output=True, text=True).stdout
         except Exception: return ""
     root = sh("git", "rev-parse", "--show-toplevel").strip()
+    base = os.environ.get("WAYFINDER_BASE_BRANCH", "")
     # only this ticket's own commits count: a range or the working tree would
     # pick up the other tickets interleaved on the branch
     # a ticket's commit names it in the subject as the thing being worked
@@ -140,7 +146,6 @@ def closing_bar(c):
     # next.config.ts to get round a lane defect and would have landed it. A
     # ticket closes only while the project's infra files match the integration
     # branch the driver started on — a change there is a ticket of its own.
-    base = os.environ.get("WAYFINDER_BASE_BRANCH", "")
     if base:
         infra = [f for f in sh("git", "diff", "--name-only", base, "--", "next.config.ts", "tsconfig.json", "package.json", "package-lock.json", "prisma/schema.prisma", ".claude/settings.json").split()
                  if not re.search(r"\b(schema|migration|dependency|package|config)\b", os.environ.get("WAYFINDER_TICKET_TITLE", ""), re.I)]
@@ -169,6 +174,7 @@ if tool == "Bash":
         deny("NO BACKGROUND COMMANDS: a headless session ends the moment a turn has no tool call, and everything it started dies with it. Run this in the foreground (`timeout` up to 600000 ms) and read its result in the same turn; a long capture round is one foreground call, not a wait.")
     if is_router(c): deny(ROUTER)
     if spec_lessons(c): deny(LESSONS)
+    if whole_lessons_cat(c): deny(LESSONS_APPEND)
     if measure_skill(c) and re.search(r"\b(cat|sed|head|tail|less|awk|grep|rg)\b", c): deny(BUILD_ONLY)
     # A capture round without a long tool timeout gets backgrounded by the
     # harness at 2 min, and the session then polls the task file turn after
@@ -208,7 +214,7 @@ if tool == "Read":
     p = inp.get("file_path", ""); ranged = "limit" in inp or "offset" in inp
     if CRAFT in p: mark_craft(); sys.exit(0)
     if is_router(p): deny(ROUTER)
-    if spec_lessons(p) and not ranged: deny(LESSONS)
+    if is_lessons(p) and not ranged: deny(LESSONS if os.environ.get("WAYFINDER_PHASE", "") == "spec" else LESSONS_APPEND)
     if measure_skill(p): deny(BUILD_ONLY)
     if "impeccable/reference/routing.md" in p: deny(MENU)
     if cont and "impeccable/reference/shape.md" in p and spec_done():

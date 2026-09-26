@@ -26,7 +26,18 @@
 // Options: widths [1440, 390] · detectUrl http://localhost:8400/detect.js ·
 // residue (regex of detector noise to exclude from realCount) · chromium (pass
 // Playwright's chromium when it cannot be resolved from the working directory)
-// · navTimeout 120000 · settle 500 (ms after each action before a screenshot).
+// · navTimeout 120000 · settle 500 (ms after each action before a screenshot)
+// · loadingSelector / readyTimeout 8000 / readyQuiet 500 (see snap() below).
+//
+// snap() first waits until no loading indicator (loadingSelector: skeletons,
+// spinners, aria-busy; 20 px or more on a side, so a queued row's inline
+// spinner does not count) has been visible for readyQuiet ms, up to readyTimeout.
+// #462's close lost two sessions to a blank "Post failed" capture: the pane
+// renders ~2 s after network idle, behind the route's Suspense spinner and
+// then — after a gap with neither on screen — its own skeleton; the quiet
+// window is what outlasts that gap. A state whose subject is a spinner
+// ("Posting…") is still captured at the timeout, marked `loading: true` in
+// detector.json; `s.snap(suffix, note, { ready: false })` skips the wait.
 //
 // Before the browser opens, round() checks that `base` and `detectUrl` answer
 // and throws naming `node scripts/dev/dev.mjs start <ws>` if not — a
@@ -78,6 +89,8 @@ async function preflight(base, detectUrl) {
 }
 
 const DEFAULT_RESIDUE = /workspace-switcher|avatar|overused-font|nextjs-portal|next-dev|dev-overlay/i
+// skeletons (Tailwind animate-pulse), spinners (animate-spin), and regions that say they are busy
+const DEFAULT_LOADING = ".animate-pulse, .animate-spin, [aria-busy=\"true\"]"
 
 async function loadChromium(given) {
   if (given) return given
@@ -89,6 +102,7 @@ export async function round(opts, body) {
   const {
     out, base, widths = [1440, 390], detectUrl = "http://localhost:8400/detect.js",
     residue = DEFAULT_RESIDUE, navTimeout = 120000, settle = 500, only = null,
+    loadingSelector = DEFAULT_LOADING, readyTimeout = 8000, readyQuiet = 500,
   } = opts
   if (!out || !base) throw new Error("round(): `out` and `base` are required")
   if (/^--/.test(out)) throw new Error(`round(): out dir is "${out}" — the script passed a flag as the positional arg; use roundArgs()`)
@@ -122,6 +136,19 @@ export async function round(opts, body) {
     } catch (e) { return [{ type: "detector-error", detail: String(e.message).slice(0, 160) }] }
   }
 
+  // true once no visible loadingSelector match has been seen for readyQuiet ms
+  const settled = (page) => page.waitForFunction(([sel, quiet]) => {
+    // an indicator counts from 20 px on a side: page and pane spinners, skeleton bars. A
+    // queued row's 16 px spinner or a recording dot is the state itself, not loading.
+    const busy = [...document.querySelectorAll(sel)].some((e) => {
+      const r = e.getBoundingClientRect()
+      return Math.max(r.width, r.height) >= 20 && getComputedStyle(e).visibility !== "hidden"
+    })
+    const now = performance.now()
+    if (busy || window.__roundQuietFrom === undefined) window.__roundQuietFrom = now
+    return !busy && now - window.__roundQuietFrom >= quiet
+  }, [loadingSelector, readyQuiet], { polling: 100, timeout: readyTimeout }).then(() => true, () => false)
+
   const focusedOf = (page) => page.evaluate(() => {
     const el = document.activeElement
     if (!el || el === document.body) return "body"
@@ -140,20 +167,25 @@ export async function round(opts, body) {
       page.on("pageerror", (e) => errors.push(String(e.message).slice(0, 200)))
       const s = {
         page, ctx, width,
-        async snap(suffix = "", note = "") {
+        async snap(suffix = "", note = "", { ready = true } = {}) {
           // Playwright's default mouse position is (0,0), which sits directly on this app's
           // collapsed left nav rail and triggers its hover-expand — every capture across every
           // ticket showed the rail permanently expanded over content until this moved the mouse
           // off it first (#258 close phase: misread as a real P0 occlusion).
           await page.mouse.move(width - 5, Math.round((width < 600 ? 844 : 900) / 2))
+          let loading = false
+          if (ready) {
+            await page.evaluate(() => { delete window.__roundQuietFrom }).catch(() => {})
+            loading = !(await settled(page))
+          }
           await page.waitForTimeout(settle)
           const label = suffix ? `${name}-${suffix}` : name
           const shot = `${OUT}/${label}-${width}.png`
           await page.screenshot({ path: shot, timeout: 90000 })
           const findings = await detect(page)
           const real = findings.filter((f) => !residue.test(f.type + f.sel + f.detail))
-          states.push({ name: label, width, note, findings, realCount: real.length, shot, pageErrors: errors.splice(0) })
-          console.log(`${label}@${width}: ${findings.length} findings (${real.length} non-residue)${note ? " " + note : ""}`)
+          states.push({ name: label, width, note, findings, realCount: real.length, shot, pageErrors: errors.splice(0), ...(loading && { loading }) })
+          console.log(`${label}@${width}: ${findings.length} findings (${real.length} non-residue)${note ? " " + note : ""}${loading ? ` — still loading after ${readyTimeout} ms, captured anyway` : ""}`)
         },
         focused: () => focusedOf(page),
         async focusIs(re) { const focused = await focusedOf(page); return { ok: re.test(focused), focused } },
