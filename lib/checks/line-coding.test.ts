@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { checkLineCoding, lineCodingInputFromBill, lineCodingInputFromDocument, type LineCodingInput } from "@/lib/checks/line-coding"
+import { checkLineCoding, firstLineCodingFail, lineCodingInputFromBill, lineCodingInputFromDocument, type LineCodingInput } from "@/lib/checks/line-coding"
 
 const ON = { vat: true, tracking: [{ id: "class", name: "Class" }], location: true, customer: true, billable: true }
 
@@ -117,5 +117,17 @@ describe("line coding inputs", () => {
       lineItems: [{ amount: 115, taxCode: "TAX15", tracking: [{ categoryId: "class", categoryName: "Class", optionId: "c1", optionName: "Retail" }], customer: null, billable: false }],
     })
     expect(value).toEqual({ lines: [{ amount: 115, tax_code: "TAX15", tracking: [{ category_id: "class", option_id: "c1" }], customer: null, billable: false }], bill: { location: null, tax_basis: "inclusive", tax_total: 15, currency: "ZAR" } })
+  })
+})
+
+describe("firstLineCodingFail", () => {
+  const { lines: _lines, bill: _bill, ...context } = input()
+  it("names only the document's first fail, judged over the context passed in", () => {
+    const doc = { codingData: { tax_basis: null, items: [{ tax_code: null, tracking: [] }] }, reviewedData: { line_items: [{ amount: 10 }] } }
+    expect(firstLineCodingFail(context, doc)?.checkCode).toBe("tax_code_missing")
+  })
+  it("is null with nothing resolved to judge, or before the ledger's capabilities were read", () => {
+    expect(firstLineCodingFail(context, { codingData: {}, reviewedData: {} })).toBeNull()
+    expect(firstLineCodingFail(null, { codingData: { items: [{ tax_code: null }] }, reviewedData: {} })).toBeNull()
   })
 })

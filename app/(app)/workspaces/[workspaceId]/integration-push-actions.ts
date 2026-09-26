@@ -15,6 +15,9 @@ import { BillMappingError, normalizeBillFromDocument } from "@/lib/integration-b
 import { attemptIntegrationPush, getActiveIntegrationConnectionId, kickIntegrationPushDrain } from "@/lib/integration-push"
 import { getWorkspaceDocument, listReadyToPushDocuments, touchSupplierAccountRuleUsage } from "@/models/documents"
 import { upsertWorkspaceIntegrationPush, workspaceIntegrationsPlanEnabled } from "@/models/integrations"
+import { loadLineCodingContext } from "@/models/accounting-entities"
+import { firstLineCodingFail } from "@/lib/checks/line-coding"
+import type { BillCoding } from "@/lib/finance/line-coding"
 import { prisma } from "@/lib/db"
 import { revalidatePath } from "next/cache"
 import { errorMessage, NO_ACCESS, requireMember } from "./action-helpers"
@@ -49,7 +52,7 @@ export async function pushDocumentToConnection(
   if (!isCategoryConfirmed(coding)) {
     throw new Error("Document category must be confirmed before pushing")
   }
-  const connection = await prisma.integrationConnection.findFirst({ where: { id: connectionId, workspaceId }, select: { id: true, provider: true, defaultExpenseAccountId: true } })
+  const connection = await prisma.integrationConnection.findFirst({ where: { id: connectionId, workspaceId }, select: { id: true, provider: true, defaultExpenseAccountId: true, ledgerCapabilities: true } })
   if (!connection) throw new Error("That connection no longer exists")
 
   const reviewedData = (document.reviewedData as Record<string, unknown> | null) ?? (document.rawExtraction as Record<string, unknown> | null) ?? {}
@@ -61,6 +64,10 @@ export async function pushDocumentToConnection(
   // per-push mapping resolution left to do here. The connection Default still backs
   // `payload.expenseAccountId`, read by the preflight cache check (lib/integration-push.ts).
   const codingItems = Array.isArray((coding as { items?: unknown }).items) ? (coding.items as Array<{ account_external_id: string | null }>) : null
+  // ADR 0014: judged fresh against what the ledger takes now; the code maps to its fix sentence.
+  const codingContext = await loadLineCodingContext(workspaceId, connection)
+  const codingFail = firstLineCodingFail(codingContext, { codingData: coding, reviewedData })
+  if (codingFail) throw new Error(codingFail.checkCode)
 
   // Ledger books everything in the workspace's base currency: if the document has been
   // converted, the bill body carries the converted total + base currency, NOT the extracted
@@ -70,7 +77,7 @@ export async function pushDocumentToConnection(
   const fxOverride = workspaceBase && document.baseCurrencyTotal !== null
     ? { total: Number(document.baseCurrencyTotal), currencyCode: workspaceBase }
     : null
-  const bill = normalizeBillFromDocument({ documentId: document.id, filename: document.filename, templateCode: document.template?.code ?? null, reviewedData, fxOverride, lineAccounts: codingItems })
+  const bill = normalizeBillFromDocument({ documentId: document.id, filename: document.filename, templateCode: document.template?.code ?? null, reviewedData, fxOverride, lineAccounts: codingItems, billCoding: coding as Partial<BillCoding>, names: codingContext?.names })
   const direction: "payable" | "receivable" = documentType === "sale" ? "receivable" : "payable"
   const payload: object = { ...bill, documentType, direction, ...(connection.defaultExpenseAccountId ? { expenseAccountId: connection.defaultExpenseAccountId } : {}), ...(category ? { category } : {}) }
 

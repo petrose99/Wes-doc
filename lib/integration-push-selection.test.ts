@@ -8,7 +8,7 @@ const baseDoc = {
   baseCurrencyTotal: 100,
   cancelledAt: null,
 }
-const opts = { alreadyPosted: false, workspaceBase: "USD", docCurrency: "USD" }
+const opts = { alreadyPosted: false, workspaceBase: "USD", docCurrency: "USD", lineCodingFail: null }
 
 describe("resolveSelectionEligibility", () => {
   it("is eligible when every criterion holds", () => {
@@ -32,6 +32,13 @@ describe("resolveSelectionEligibility", () => {
     expect(resolveSelectionEligibility({ ...baseDoc, codingData: { categoryConfirmed: true, items: [{ account_external_id: null, account_source: null }] } }, opts))
       .toEqual({ eligible: false, reason: "needs an Account" })
     expect(resolveSelectionEligibility({ ...baseDoc, codingData: { categoryConfirmed: true } }, opts))
+      .toEqual({ eligible: false, reason: "needs an Account" })
+  })
+
+  it("ADR 0014: is ineligible with the first line-coding fail's title as the reason", () => {
+    expect(resolveSelectionEligibility(baseDoc, { ...opts, lineCodingFail: "Tax code missing" })).toEqual({ eligible: false, reason: "Tax code missing" })
+    // An Account comes first: a line with no Account can't be judged for its Tax code yet.
+    expect(resolveSelectionEligibility({ ...baseDoc, codingData: { categoryConfirmed: true } }, { ...opts, lineCodingFail: "Tax code missing" }))
       .toEqual({ eligible: false, reason: "needs an Account" })
   })
 })

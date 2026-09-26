@@ -118,6 +118,15 @@ export function lineCodingInputFromDocument(doc: { codingData: unknown; reviewed
   }
 }
 
+/** The push path's fresh judgement (selection eligibility, a single push): the document's first
+ * fail over the ledger context loaded now, never the persisted Check rows a sync may have
+ * outdated. Null with no context (capabilities never read — the push gate reads them before
+ * anything posts) or nothing resolved to judge. */
+export function firstLineCodingFail(context: Omit<LineCodingInput, "lines" | "bill"> | null, doc: { codingData: unknown; reviewedData: unknown }): CheckResult | null {
+  const input = context && lineCodingInputFromDocument(doc)
+  return (context && input && checkLineCoding({ ...context, ...input })[0]) || null
+}
+
 /** The snapshot path: the persisted push payload (NormalizedBill) read back into the same shape. */
 export function lineCodingInputFromBill(bill: {
   taxBasis: TaxBasis | null; location: string | null; taxTotal: number | null; currencyCode: string | null

@@ -4,6 +4,8 @@ import { attemptIntegrationPush, kickIntegrationPushDrain } from "@/lib/integrat
 import { getWorkspaceCapabilities } from "@/lib/modules/capabilities"
 import { prisma } from "@/lib/db"
 import { recordSystemAudit } from "@/lib/audit"
+import type { BillCoding } from "@/lib/finance/line-coding"
+import { loadLineCodingContext } from "@/models/accounting-entities"
 import { listCategoryAccountMappings, resolveCategoryAccount } from "@/models/category-account-mappings"
 import { getCategoryAccountMap, upsertWorkspaceIntegrationPush } from "@/models/integrations"
 
@@ -48,7 +50,11 @@ async function enqueuePush(
   const fxOverride = workspaceBase && (document.baseCurrencyTotal ?? null) !== null
     ? { total: Number(document.baseCurrencyTotal), currencyCode: workspaceBase }
     : null
-  const bill = normalizeBillFromDocument({ documentId: document.id, filename: document.filename, templateCode: document.template?.code ?? null, reviewedData, fxOverride })
+  // Per-line accounts and the ADR 0014 coding set were resolved at Save review; the push gate
+  // (lib/integration-push.ts gateLineCoding) refuses anything the ledger can't take.
+  const lineAccounts = Array.isArray(coding.items) ? (coding.items as Array<{ account_external_id: string | null }>) : null
+  const names = (await loadLineCodingContext(workspaceId, connection))?.names
+  const bill = normalizeBillFromDocument({ documentId: document.id, filename: document.filename, templateCode: document.template?.code ?? null, reviewedData, fxOverride, lineAccounts, billCoding: coding as Partial<BillCoding>, names })
   const direction: "payable" | "receivable" = documentType === "sale" ? "receivable" : "payable"
   const payload = { ...bill, documentType, direction, ...(resolvedAccountId ? { expenseAccountId: resolvedAccountId } : {}), ...(category ? { category } : {}) }
 

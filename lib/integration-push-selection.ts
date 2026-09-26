@@ -18,7 +18,8 @@ export function resolveSelectionEligibility(
     baseCurrencyTotal: unknown
     cancelledAt: Date | null
   },
-  opts: { alreadyPosted: boolean; workspaceBase: string | null; docCurrency: string | null }
+  /** lineCodingFail: the first line-coding fail's title (lib/checks/line-coding.ts), computed fresh by the caller. */
+  opts: { alreadyPosted: boolean; workspaceBase: string | null; docCurrency: string | null; lineCodingFail: string | null }
 ): SelectionEligibility {
   if (doc.cancelledAt) return { eligible: false, reason: "Cancelled" }
   if (opts.alreadyPosted) return { eligible: false, reason: "Already posted" }
@@ -35,5 +36,6 @@ export function resolveSelectionEligibility(
   if (!items || items.length === 0 || items.some((item) => !item.account_external_id)) {
     return { eligible: false, reason: "needs an Account" }
   }
+  if (opts.lineCodingFail) return { eligible: false, reason: opts.lineCodingFail }
   return { eligible: true }
 }

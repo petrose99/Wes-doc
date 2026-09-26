@@ -242,7 +242,9 @@ export async function refreshLineCodingChecksForConnection(workspaceId: string, 
   }
 }
 
-async function persistLineCodingChecks(workspaceId: string, connection: { id: string; provider: string; ledgerCapabilities: Prisma.JsonValue | null }, documents: LineCodingDocument[]): Promise<void> {
+type LineCodingConnection = { id: string; provider: string; ledgerCapabilities: Prisma.JsonValue | null }
+
+async function persistLineCodingChecks(workspaceId: string, connection: LineCodingConnection, documents: LineCodingDocument[]): Promise<void> {
   const context = await loadLineCodingContext(workspaceId, connection)
   if (!context) return
   for (const document of documents) {
