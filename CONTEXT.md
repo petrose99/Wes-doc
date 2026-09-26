@@ -68,6 +68,14 @@ _Avoid_: Credit payment, offset, applied payment
 The part of a Credit note not yet allocated to any invoice. It stays with that supplier until a person allocates it.
 _Avoid_: Credit balance (ambiguous with a ledger balance), store credit
 
+**Recurring invoice**:
+A supplier's invoice that a person has confirmed arrives on a regular cadence (weekly, monthly, quarterly or yearly) at a usual amount, either fixed or varying within a stated percentage — rent, a utility, a service contract. DocuBite suggests one when a supplier's invoice history shows the pattern, and a reviewer accepts, adjusts or dismisses it on that invoice; a reviewer can also state one from an invoice, and an Owner can add one for a supplier with no invoice yet. It is never assumed and never ended by DocuBite, applies to invoices only, and never makes a document or a ledger record of its own. An invoice whose amount falls outside it is an Unusual amount.
+_Avoid_: Recurring bill, repeating bill, recurring transaction (the ledgers' template names), standing invoice
+
+**Expected invoice**:
+One period's invoice that a Recurring invoice predicts, dated from the supplier's issue date. It is met by the supplier's invoice issued in that period, skipped when a person marks it Not expected this period, and reads Not received once its grace period passes with neither. It is never a row in a queue and never a document.
+_Avoid_: Missing bill, ghost invoice, placeholder bill
+
 **Purchase Order**:
 The typed destination for a purchase order, paired with Invoices for matching and cumulative line-item comparison against what has already been invoiced against it.
 
