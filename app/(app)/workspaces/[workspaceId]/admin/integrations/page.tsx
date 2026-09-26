@@ -10,6 +10,7 @@ import { formatUnresolvedAccountId } from "@/lib/finance/line-account-resolution
 import { WEBHOOK_EVENT_TYPES } from "@/lib/webhooks"
 import { getLastSyncedAt, listAccountingEntities, listAccountingEntitiesIncludingInactive } from "@/models/accounting-entities"
 import { listCategoryAccountMappings } from "@/models/category-account-mappings"
+import { countUnpostedDocuments, getCurrencyLock } from "@/models/company-currency"
 import { findAccountCorrectionReminders } from "@/models/documents"
 import { listWorkspaceApiKeys, listWorkspaceIntegrationConnections, listWorkspaceWebhookDeliveries, listWorkspaceWebhookEndpoints, resolveAccountNames } from "@/models/integrations"
 import { listLibraryFacets } from "@/models/library-facets"
@@ -34,12 +35,21 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ w
     return <AdminPage title="Integrations"><p className="text-sm text-slate-600">Integrations are off on this deployment.</p></AdminPage>
   }
 
-  const [apiKeys, endpoints, deliveries, connections] = await Promise.all([
+  const [apiKeys, endpoints, deliveries, connections, lock, unpostedCount] = await Promise.all([
     listWorkspaceApiKeys(workspaceId),
     listWorkspaceWebhookEndpoints(workspaceId),
     listWorkspaceWebhookDeliveries(workspaceId, 50),
     listWorkspaceIntegrationConnections(workspaceId),
+    getCurrencyLock(workspaceId),
+    countUnpostedDocuments(workspaceId),
   ])
+  // #457 §5.4: the card compares the ledger's own currency with the Company currency.
+  const company = {
+    currency: context.workspace.baseCurrency,
+    country: context.workspace.country,
+    lock: lock.locked ? { ...lock, at: lock.at.toISOString() } : lock,
+    unpostedCount,
+  }
   const connectionsWithSync = await Promise.all(connections.map(async (connection) => ({ ...connection, lastSyncedAt: await getLastSyncedAt(workspaceId, connection.id) })))
 
   const activeConnection = connections.find((c) => c.status === "connected")
@@ -88,6 +98,7 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ w
       deliveries={deliveries}
       nangoEnabled={config.integrations.nango.enabled}
       connections={connectionsWithSync}
+      company={company}
     />
 
     <Panel title="Account mapping" note="Which expense or income account a document category posts to. A category with no row uses the connection's default expense account.">
@@ -108,7 +119,7 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ w
             isOwner={owner}
             reminders={reminders}
           />
-        : <p className="text-sm text-slate-600">Connect a ledger to see suppliers' usual accounts.</p>}
+        : <p className="text-sm text-slate-600">{"Connect a ledger to see suppliers' usual accounts."}</p>}
     </Panel>
   </AdminPage>
 }

@@ -188,6 +188,7 @@ export async function listWorkspaceIntegrationConnections(workspaceId: string) {
     select: {
       id: true, provider: true, externalTenantId: true, tenantName: true, status: true,
       defaultExpenseAccountId: true, defaultExpenseAccountName: true, defaultExpenseAccountGuessed: true, createdAt: true,
+      ledgerCurrency: true,
     },
   })
 }
