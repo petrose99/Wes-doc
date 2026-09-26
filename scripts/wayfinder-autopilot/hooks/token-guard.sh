@@ -29,6 +29,10 @@
 #      impeccable critique/audit) are refused — phases/build.md says the gate
 #      steps run no critique/evaluate, and #380's G2 session ignored that at
 #      ~6K of skill text plus six re-scoring agents (2026-09-22).
+#   9. Spec phase: a whole read of either lessons file — `lessons.mjs`
+#      prints the ticket's share by its [kind]/[area:…] tags.
+#  10. A new one-off script (round-N, tmp-, debug, probe, seed, fix) written
+#      into scripts/wayfinder-autopilot/ — it goes in the ticket's scratch folder.
 [ -n "${WAYFINDER_CTX_FILE:-}" ] || exit 0
 IN="$(cat)"
 python3 - "$IN" <<'PY'
@@ -42,10 +46,12 @@ def deny(reason):
           "permissionDecision": "deny", "permissionDecisionReason": reason}})); sys.exit(0)
 ROUTER = "AUTOPILOT: the `intent` router is not loaded here — the phase brief is the router (15K tokens per load, paid on every later turn). Read the named skill's file instead (the *Skill files* list in the system prompt): specify, fortify, articulate, include for a spec; evaluate, journey, organize, strategize where the brief names them. Project context comes from CONTEXT.md and the map's Notes."
 MENU = "AUTOPILOT: impeccable's routing menu is not needed — the phase brief names the sub-command; read its reference file directly (reference/shape.md, layout.md, typeset.md, clarify.md at spec; polish.md, critique.md, audit.md, adapt.md at close)."
-DEVSRV = "DEV SERVER: one command brings up everything a round needs — `node .impeccable/live/dev.mjs start <ws>` starts the heap-capped Next dev server on :3000 AND the impeccable live-server on :8400 (the in-page detector), waits until both answer, and preps the workspace (jurisdiction etc.). `dev.mjs stop` stops both; `status` shows the ports. Never start either by hand: `npm run dev`, nohup, setsid, disown, trailing `&`, `impeccable live-server` and per-ticket livesrv/start-live-server scripts all die with the turn, hang it, or are denied by the sandbox."
+DEVSRV = "DEV SERVER: one command brings up everything a round needs — `node scripts/dev/dev.mjs start <ws>` starts the heap-capped Next dev server on :3000 AND the impeccable live-server on :8400 (the in-page detector), waits until both answer, and preps the workspace (jurisdiction etc.). `dev.mjs stop` stops both; `status` shows the ports. Never start either by hand: `npm run dev`, nohup, setsid, disown, trailing `&`, `impeccable live-server` and per-ticket livesrv/start-live-server scripts all die with the turn, hang it, or are denied by the sandbox."
 ROUND = "ROUND SCRIPT: a ticket's round script only lists states and the clicks between them — it imports `round`/`roundArgs` from scripts/wayfinder-autopilot/capture-round.mjs and uses the shared probes on `s` (focusIs, visible, hidden, count(selector, within), dialog, waitFor, probe, uniqueFile, tabWalk, press). Own probe code (document.activeElement reads, hand-rolled focus/visible/count helpers, argv parsing) is where #266 lost two sessions to harness bugs; the shared ones are tested. See the header of capture-round.mjs."
 def is_router(p): return "skills/intent/SKILL.md" in p or "skills/intent/intent/SKILL.md" in p
 MEASURE_SKILLS = re.compile(r"(autopilot/skills/(evaluate|include)\.md|skills/(evaluate|include)/SKILL\.md|impeccable/reference/(critique|audit)\.md)")
+LESSONS = "LESSONS: print this ticket's share with `node scripts/wayfinder-autopilot/lessons.mjs --kind <surface|backend|all> --area <primer>` instead of reading the lessons files whole — the filter keeps every untagged line, and the whole files are ~10K tokens every later turn re-reads (phases/spec.md step 2)."
+def spec_lessons(s): return os.environ.get("WAYFINDER_PHASE", "") == "spec" and bool(re.search(r"(^|/)lessons\.md\b", s)) and not re.search(r"lessons\.mjs", s) and not re.search(r"\bgrep\b", s)
 BUILD_ONLY = "BUILD PHASE: critique, evaluate, audit and include are the measure session's readers (phases/build.md: no critique, no evaluate, no include readers in any gate step). This phase runs the round script, gate.mjs and the detector, fixes what they list, and ends at `milestone: build-done`; the scores come from the next phase, on its own budget."
 def measure_skill(p): return os.environ.get("WAYFINDER_PHASE", "") == "build" and bool(MEASURE_SKILLS.search(p))
 # The same drift through a subagent: #380's G2 launched six scoring agents
@@ -162,6 +168,7 @@ if tool == "Bash":
     if inp.get("run_in_background"):
         deny("NO BACKGROUND COMMANDS: a headless session ends the moment a turn has no tool call, and everything it started dies with it. Run this in the foreground (`timeout` up to 600000 ms) and read its result in the same turn; a long capture round is one foreground call, not a wait.")
     if is_router(c): deny(ROUTER)
+    if spec_lessons(c): deny(LESSONS)
     if measure_skill(c) and re.search(r"\b(cat|sed|head|tail|less|awk|grep|rg)\b", c): deny(BUILD_ONLY)
     # A capture round without a long tool timeout gets backgrounded by the
     # harness at 2 min, and the session then polls the task file turn after
@@ -201,6 +208,7 @@ if tool == "Read":
     p = inp.get("file_path", ""); ranged = "limit" in inp or "offset" in inp
     if CRAFT in p: mark_craft(); sys.exit(0)
     if is_router(p): deny(ROUTER)
+    if spec_lessons(p) and not ranged: deny(LESSONS)
     if measure_skill(p): deny(BUILD_ONLY)
     if "impeccable/reference/routing.md" in p: deny(MENU)
     if cont and "impeccable/reference/shape.md" in p and spec_done():
@@ -235,6 +243,11 @@ if tool in ("Write", "Edit") and hand and os.path.abspath(inp.get("file_path", "
         except Exception: n = 0
     if n > hmax: deny(too_long(n))
     sys.exit(0)
+# One-off per-ticket scripts (round-429.mjs, tmp-q429b.ts, debug430.mjs) were
+# committed into the tool's own folder and outlived their tickets; they belong
+# in the ticket's scratch folder, which is gitignored.
+if tool == "Write" and re.search(r"scripts/wayfinder-autopilot/(round-\d|tmp-|debug|probe|seed|fix)[^/]*\.(mjs|js|ts|mts)$", inp.get("file_path", "")) and not os.path.exists(inp.get("file_path", "")):
+    deny("SCRATCH: per-ticket scripts (round, seed, probe, tmp, debug) go in the ticket's scratch folder named under 'This run' in your system prompt (gitignored), not in scripts/wayfinder-autopilot/ — that folder is the tool, and one-offs there outlive their tickets. A seed that later tickets need goes in scripts/dev/seed-<name>.ts.")
 if tool in ("Write", "Edit") and re.search(r"round[-\w]*\.mjs$", inp.get("file_path", "")):
     body = inp.get("content", "") if tool == "Write" else inp.get("new_string", "")
     whole = body

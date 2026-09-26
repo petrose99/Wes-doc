@@ -67,7 +67,7 @@ if t0 and hand and not touched(hand) and not touched(rep):
 pidf = os.path.join(root, ".impeccable", "live", "dev-server.pid")
 try:
     pid = int(open(pidf).read().split()[0]); os.kill(pid, 0)
-    owed.append("the dev/live servers are still up — run `node .impeccable/live/dev.mjs stop`")
+    owed.append("the dev/live servers are still up — run `node scripts/dev/dev.mjs stop`")
 except Exception: pass
 if not owed: sys.exit(0)
 try: open(cf, "w").write(str(n + 1))

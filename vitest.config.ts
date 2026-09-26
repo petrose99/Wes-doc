@@ -25,6 +25,8 @@ export default defineConfig({
       // #361 (map #353): the Bill takeover shell's own components follow the same rendered-markup
       // pattern (react-dom/server, no DOM) as components/queue above.
       "components/pipeline/document-detail/**/*.test.tsx",
+      // The Wayfinder driver's routing decisions (lib.sh, run under bash with `gh` stubbed).
+      "scripts/wayfinder-autopilot/**/*.test.ts",
     ],
     // SECRETS_ENCRYPTION_KEY is a fixed test-only key (never used outside vitest) so tests that
     // round-trip lib/secret-crypto.ts (webhook secrets, integration OAuth tokens) don't each need

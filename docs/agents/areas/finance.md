@@ -20,7 +20,7 @@ that says so lives in `components/queue/{document,invoice,receipt}-queue.tsx`, n
 
 ## Seed, dev server, capture
 - Same dev workspace/DB/server recipe as Admin (`docs/agents/areas/admin.md`) — `DEV_AUTH_BYPASS`,
-  `node .impeccable/live/dev.mjs start <ws>|stop` (dev server and the in-page detector
+  `node scripts/dev/dev.mjs start <ws>|stop` (dev server and the in-page detector
   together). Stop both before `tsc`/`eslint`/full suite/`next build`.
 - The page is one Panel with one disabled button — no connected-state seed row is needed to
   capture it; there is no connected state to render yet.

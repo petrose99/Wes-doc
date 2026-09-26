@@ -26,13 +26,14 @@ set -euo pipefail
 # Portable: this folder can live anywhere (a repo's scripts/, or ~/.claude/wayfinder-autopilot).
 # The project is whatever git repo you run it from; the tracker repo comes from gh.
 AP="$(cd "$(dirname "$0")" && pwd)"                       # driver, brief, generic lessons
+source "$AP/lib.sh"                                        # decision functions (tested: lib.test.ts)
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"  # the project being worked
 REPO="${WAYFINDER_REPO:-$(gh repo view --json nameWithOwner --jq .nameWithOwner)}"
 BRIEF="$AP/brief.md"
 GENERIC_LESSONS="$AP/lessons.md"                           # travels with the tool
 PROJECT_LESSONS="$ROOT/.claude/wayfinder-autopilot/lessons.md"   # stays with the repo
 mkdir -p "$(dirname "$PROJECT_LESSONS")"
-[ -f "$PROJECT_LESSONS" ] || printf '# Project lessons — %s\n\nWhat first passes missed *in this codebase* (its shell, tokens, components, seed data, dev-server recipe). Generic, product-agnostic lessons go to the tool'"'"'s own lessons.md instead.\n\n' "$REPO" > "$PROJECT_LESSONS"
+[ -f "$PROJECT_LESSONS" ] || printf '# Project lessons — %s\n\nWhat first passes missed *in this codebase* (its shell, tokens, components, seed data, dev-server recipe). Generic, product-agnostic lessons go to the tool'"'"'s own lessons.md instead. Each line opens with `[surface|backend|any]` and, for one area only, `[area:<primer>]`.\n\n' "$REPO" > "$PROJECT_LESSONS"
 export WAYFINDER_GENERIC_LESSONS="$GENERIC_LESSONS" WAYFINDER_PROJECT_LESSONS="$PROJECT_LESSONS"
 export TZ="${TZ:-Africa/Johannesburg}"   # the sessions stamp hand-offs and reports in local time
 ALLOWED_TOOLS=(
@@ -95,21 +96,6 @@ fi
 # sub-issue order. Tickets that failed earlier this run are skipped.
 declare -A SKIP=() ATTEMPTS=()
 MAX_ATTEMPTS=3   # consecutive sessions on one ticket with no progress before it is parked; progress resets it
-frontier() {
-  gh api "repos/$REPO/issues/$MAP/sub_issues" --paginate \
-    --jq '.[] | select(.state=="open" and .assignee==null) | .number' |
-  while read -r n; do
-    [ -n "${SKIP[$n]:-}" ] && continue
-    # Tickets only the owner can close (sign-offs on removals) are never taken:
-    # a session would spend its start-up just to post "blocked". Left for the human.
-    if [[ "$(title "$n")" =~ ^(Owner sign-off|Sign off|Sign-off) ]]; then SKIP[$n]=1; continue; fi
-    open_blockers="$(gh api graphql -f query="{ repository(owner:\"${REPO%/*}\",name:\"${REPO#*/}\") { issue(number:$n) { blockedBy(first:50){ nodes{ state } } } } }" \
-      --jq '[.data.repository.issue.blockedBy.nodes[] | select(.state=="OPEN")] | length')"
-    [ "$open_blockers" = "0" ] || continue
-    blockers_landed "$n" || { echo "    #$n held: a blocker's PR is not merged yet (LANE_MERGE=review)" >&2; continue; }
-    echo "$n"
-  done
-}
 
 # Tear down whatever a finished session left running so memory is returned
 # before the next ticket: first its whole process group, then any dev server /
@@ -163,13 +149,6 @@ LANE_CLONES="${LANE_CLONES:-node_modules}"
 LANE_LINKS="${LANE_LINKS:-.env .impeccable/live .claude/settings.local.json}"
 BASE_BRANCH="$(git -C "$ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo HEAD)"
 [ "$LANE_MODE" = worktree ] && mkdir -p "$LANES_DIR"
-lane_dir()    { echo "$LANES_DIR/$MAP-$1"; }
-lane_branch() { echo "wf/$MAP-$1"; }
-lane_root() {   # $1 ticket → where this ticket's tree lives (its lane if it has one, else this checkout)
-  if [ "$LANE_MODE" = worktree ] && [ -e "$(lane_dir "$1")/.git" ]; then lane_dir "$1"; else echo "$ROOT"; fi
-}
-handoff_of() { echo "$(lane_root "$1")/docs/wayfinder-reports/$MAP/$1.handoff.md"; }
-report_of()  { echo "$(lane_root "$1")/docs/wayfinder-reports/$MAP/$1.md"; }
 untracked_of() {   # the owner's untracked files in that tree, never swept into a WIP commit
   if [ "$(lane_root "$1")" = "$ROOT" ]; then echo "$PRE_UNTRACKED"; else echo "$LOGS/pre-untracked-$1.txt"; fi
 }
@@ -227,14 +206,6 @@ lane_land() {   # $1 ticket, $2 title → the ticket closed: PR ready; auto: mer
     echo "    could not land #$1: merging $br into $BASE_BRANCH conflicts with this checkout — PR #${pr:-?} left open, lane kept at $wt"
   fi
 }
-blockers_landed() {   # $1 ticket → (review mode) no closed blocker still has an open lane PR
-  [ "$LANE_MODE" = worktree ] && [ "$LANE_MERGE" = review ] || return 0
-  local b
-  for b in $(gh api graphql -f query="{ repository(owner:\"${REPO%/*}\",name:\"${REPO#*/}\") { issue(number:$1) { blockedBy(first:50){ nodes{ number } } } } }" --jq '.data.repository.issue.blockedBy.nodes[].number' 2>/dev/null); do
-    [ -n "$(gh pr list --repo "$REPO" --head "$(lane_branch "$b")" --state open --json number --jq '.[0].number' 2>/dev/null)" ] && return 1
-  done
-  return 0
-}
 MODEL_MEASURE="${WAYFINDER_MODEL_MEASURE:-${MODEL_MEASURE:-}}"   # optional: the measure phase's first session (plumbing only)
 # EFFORT (optional, per-project or WAYFINDER_EFFORT): pinned per session with
 # --effort so the autopilot never inherits whatever the user's own /model
@@ -274,22 +245,6 @@ progress_mark() {   # a fingerprint of "did this session move the work": HEAD + 
 # `Build:` too — map #445 titles every build that way, and all of them ran
 # unphased (one session doing spec→close, measure never on MODEL_MEASURE).
 PHASED_TITLE_RE="${PHASED_TITLE_RE:-^Build[: ]}"
-# A phase never moves backwards. The hand-off file is rewritten by every
-# session and one build session dropped the `milestone: spec-done` line, so
-# the driver read "spec" again and re-ran a finished phase (#259, 11:55). The
-# driver therefore keeps its own high-water mark in <ticket>.phase and takes
-# the later of the two.
-phase_rank() { case "$1" in spec) echo 1;; build) echo 2;; measure) echo 3;; close) echo 4;; *) echo 0;; esac; }
-phase_of() {   # $1 ticket → "" (single session) | spec | build | close
-  local labels; labels="$(gh api "repos/$REPO/issues/$1" --jq '[.labels[].name]|join(",")')"
-  [[ "$labels" == *wayfinder:task* ]] && [[ "$(title "$1")" =~ $PHASED_TITLE_RE ]] || { echo ""; return; }
-  local h m=spec f=spec; h="$(handoff_of "$1")"
-  if [ -f "$h" ] && grep -q '^milestone: measured' "$h"; then m=close
-  elif [ -f "$h" ] && grep -q '^milestone: build-done' "$h"; then m=measure
-  elif [ -f "$h" ] && grep -q '^milestone: spec-done' "$h"; then m=build; fi
-  [ -f "$OUT/$1.phase" ] && f="$(cat "$OUT/$1.phase")"
-  if [ "$(phase_rank "$m")" -ge "$(phase_rank "$f")" ]; then echo "$m"; else echo "$f"; fi
-}
 declare -A PHASE_RUNS=()   # "ticket:phase" → sessions already spent on that phase
 # CLOSE_RESUME=1 (config, default off): a close session that handed off at
 # the context line is *resumed* (`--resume`) by the next close session on the
@@ -302,10 +257,6 @@ declare -A PHASE_RUNS=()   # "ticket:phase" → sessions already spent on that p
 CLOSE_RESUME="${WAYFINDER_CLOSE_RESUME:-${CLOSE_RESUME:-0}}"
 CLOSE_RESUME_MAX_TOKENS="${WAYFINDER_CLOSE_RESUME_MAX_TOKENS:-${CLOSE_RESUME_MAX_TOKENS:-400000}}"
 declare -A CLOSE_SID=()    # ticket → session id of its last close session that handed off at the line
-last_no_progress() {   # $1 ticket → the ticket's last run-log row was a no-progress session
-  [ -f "$RUNLOG" ] || return 1
-  grep -F "[#$1](" "$RUNLOG" | tail -1 | grep -q "no progress"
-}
 load_tokens() {   # $1 log → tokens the first main assistant turn paid before any work (read + created + input)
   python3 - "$1" 2>/dev/null <<'PY'
 import json,sys
@@ -331,47 +282,7 @@ PY
 HARD_AFTER="${WAYFINDER_HARD_AFTER:-${HARD_AFTER:-2}}"
 MODEL_HARD="${WAYFINDER_MODEL_HARD:-${MODEL_HARD:-$MODEL_STRONG}}"
 EFFORT_HARD="${WAYFINDER_EFFORT_HARD:-${EFFORT_HARD:-$EFFORT}}"
-sessions_on() {   # $1 ticket → no-progress run-log rows since the phase last advanced
-  [ -f "$RUNLOG" ] || { echo 0; return; }
-  awk -v t="[#$1](" 'index($0,t){ if (index($0,"no progress")) n++; if ($0 ~ /\| phase [a-z]+ done → [a-z]+ next/) n=0 } END{ print n+0 }' "$RUNLOG"
-}
-hard_ticket() { [ -n "$MODEL_HARD" ] && [ "${HARD_AFTER:-0}" -gt 0 ] && [ "$(sessions_on "$1")" -ge "$HARD_AFTER" ]; }
-model_for() {   # $1 ticket, $2 attempt number (1-based), $3 phase
-  [ -n "${WAYFINDER_MODEL:-}" ] && { echo "$WAYFINDER_MODEL"; return; }
-  hard_ticket "$1" && { echo "$MODEL_HARD"; return; }
-  local labels title attempt="${2:-1}" phase="${3:-}"
-  labels="$(gh api "repos/$REPO/issues/$1" --jq '[.labels[].name]|join(",")')"
-  title="$(title "$1")"
-  if [ -n "$phase" ]; then
-    # spec is judgement → strong. build and close are execution from the
-    # tables → the exec model, and it *stays* the exec model while the
-    # sessions progress (a build runs one step per session by design; a
-    # close that commits a fix batch is moving). Escalation is on evidence:
-    # the last session on this ticket made no progress → strong; HARD_AFTER
-    # of them → MODEL_HARD. Switching models between sessions also throws
-    # away the cached base prompt (~20K per switch, per the run-log load
-    # column), so a switch has to buy something.
-    # measure is plumbing (servers, the round script, the reader agents,
-    # raw scores onto the hand-off; the triage is the close session's) →
-    # MODEL_MEASURE when set, for its first session only.
-    if [ "$phase" = measure ] && [ -n "${MODEL_MEASURE:-}" ] && [ "${PHASE_RUNS[$1:$phase]:-0}" -eq 0 ]; then echo "$MODEL_MEASURE"; return; fi
-    if [ "$phase" = spec ] || [ -z "${MODEL_EXEC_FIRST:-}" ] || last_no_progress "$1"; then echo "$MODEL_STRONG"; else echo "$MODEL_EXEC_FIRST"; fi
-    return
-  fi
-  # A continuation (a hand-off file exists from an earlier session) always runs
-  # on the strong model: the cheap first pass has had its turn.
-  [ -f "$(handoff_of "$1")" ] && { echo "$MODEL_STRONG"; return; }
-  if [[ "$labels" == *wayfinder:research* ]] || [[ "$title" =~ [Pp]olish|[Bb]ring\ .*\ to\ the\ (autopilot\ )?bar ]]; then
-    echo "$MODEL_CHEAP"
-  elif [[ "$labels" == *wayfinder:task* ]] && [ -n "${MODEL_EXEC_FIRST:-}" ] && [ "$attempt" = 1 ]; then
-    echo "$MODEL_EXEC_FIRST"
-  else
-    echo "$MODEL_STRONG"
-  fi
-}
 
-state()  { gh api "repos/$REPO/issues/$1" --jq .state; }
-title()  { gh api "repos/$REPO/issues/$1" --jq .title; }
 
 # Nothing that owed the closing bar stays closed below it: such a ticket is
 # reopened for measure → close before the frontier is read, so the tickets it

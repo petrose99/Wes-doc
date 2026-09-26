@@ -19,7 +19,7 @@ Server actions in `app/(app)/workspaces/[workspaceId]/actions.ts` (owner-only vi
 ## Seed, dev server, capture
 - Dev workspace `af91555d-7450-4b21-a8ac-73db092617c8`, `DEV_AUTH_BYPASS=true` in `.env`, devdb container `docubite-devdb` on `127.0.0.1:55433` (`docker start` after a reboot).
 - Seed: `npx tsx --env-file .env scripts/dev/db253.ts <cmd>` (flows, default flow, approvers, inactive default), `scripts/dev/seed-*.ts` for queues.
-- Servers (the `impeccable` launcher is denied under the driver): `node .impeccable/live/dev.mjs start <ws>|stop|status|log` — `start` brings up the dev server and the :8400 detector live-server together. Stop the dev server before `tsc`, `eslint`, the full suite or `next build` — the box cannot run them beside it.
+- Servers (the `impeccable` launcher is denied under the driver): `node scripts/dev/dev.mjs start <ws>|stop|status|log` — `start` brings up the dev server and the :8400 detector live-server together. Stop the dev server before `tsc`, `eslint`, the full suite or `next build` — the box cannot run them beside it.
 - Capture runner: `.impeccable/live/admin253.mjs` (copy to `/tmp/scratch229/` — it resolves Playwright from its own folder; `cp`/`cd` there are blocked, use `node -e "fs.copyFileSync(...)"`) — every state × 1440/390, detector JSON per state, keyboard probes. Then one contact sheet: `node /tmp/scratch229/contact-sheet.mjs <shots-dir> --out sheet.png`.
 - Chained shell (`&&`, `;`, `$(…)`) is blocked for sub-agents: multi-step work goes in a `.mjs`/`.py` file.
 

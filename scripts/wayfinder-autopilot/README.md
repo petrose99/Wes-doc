@@ -32,7 +32,7 @@ scripts/wayfinder-autopilot/stop.sh <map>                     # stop cleanly: ru
 ```
 
 Watch: `tail -f docs/wayfinder-reports/<map>/detached.out`.
-Stop: `kill <driver pid>` (current ticket finishes, nothing new starts).
+Stop: `stop.sh <map>` (WIP commit + hand-off, resumable). `kill <driver pid>` also works: the current ticket finishes, nothing new starts.
 
 Path-based design gate: the spec phase marks every plan step `kind: surface|backend` from the files it touches (`app/**`/`components/**` rendering files → surface); only surface steps owe the Intent/Impeccable pass and the detector, and `token-guard.sh` refuses an Edit/Write of a rendering file until `craft-floor.md` has been read in that session. Backend paths are never design-gated; they carry the backend floor instead (`CODING_STANDARDS.md`): seams + red-first tests per step, `simplify`, `/code-review` at close. The hook refuses a commit of `lib/`/`models/`/`worker/` logic without a `.test.ts` (escape `no-test: <reason>`) and a close without `review: P0=0 P1=0` on the report.
 
@@ -68,7 +68,10 @@ so the driver passes it as the `-p` prompt, which counts as a user invocation.
   continuation of tickets left open (`Autopilot: continue —`, a cap, or an
   exit without close: WIP committed, hand-off posted, ticket back on the
   frontier; parked only after `MAX_ATTEMPTS` consecutive sessions with no
-  progress), claim release on failure.
+  progress), claim release on failure. Its routing decisions (frontier,
+  phase, model ladder, lanes) live in `lib.sh`, sourced by `run.sh` and
+  tested by `lib.test.ts` with `gh` stubbed (`test-fixtures/gh`); run
+  `npx vitest run scripts/wayfinder-autopilot` after changing either.
 - `scoreboard.py` — per-session scores (from each report's `scores:` line)
   beside cost (turns, context, images, subagents, from the stream log). The
   driver regenerates `docs/wayfinder-reports/<map>/scoreboard.md` after every
@@ -82,8 +85,11 @@ so the driver passes it as the `-p` prompt, which counts as a user invocation.
 - `contact-sheet.mjs` — tiles a capture round into one PNG (Playwright) so a
   reader opens one image per round instead of one per state.
 - `lessons.md` — generic lessons (any product): what earlier first passes
-  missed → what to put in the spec. Read whole each session, appended at
-  close, capped ~80 lines by merging. The project's own
+  missed → what to put in the spec. Each entry is tagged
+  `[surface|backend|any] [area:<primer>]`; the spec phase reads its share
+  through `lessons.mjs --kind … --area …` (a backend ticket reads ~1.4K of
+  ~7K words), and the hook refuses a whole read there. Appended at close,
+  capped ~80 lines by merging. The project's own
   `.claude/wayfinder-autopilot/lessons.md` holds codebase-specific ones.
 - `brief.md` + `phases/{spec,build,measure,close,single}.md` — appended system prompt (core + one phase brief per session); measure is plumbing (raw scores only, MODEL_MEASURE), close triages: standing delegation (take the
   recommended answer, never AskUserQuestion, never remove a feature without

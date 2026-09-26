@@ -1,0 +1,23 @@
+#!/usr/bin/env node
+// Stand-in for `gh` in lib.test.ts: answers the calls lib.sh makes from the
+// GH_FIXTURE JSON ({ subIssues: [n…], issues: { n: { title, labels, state,
+// assignee, blockers: ["OPEN"|"CLOSED"…] } } }), already shaped as the --jq
+// filter would print it.
+const { readFileSync } = process.getBuiltinModule("node:fs")
+const fx = JSON.parse(readFileSync(process.env.GH_FIXTURE, "utf8"))
+const args = process.argv.slice(2)
+const jq = args[args.indexOf("--jq") + 1] || ""
+const out = (v) => { process.stdout.write(v + "\n"); process.exit(0) }
+if (args[0] === "api" && args[1] === "graphql") {
+  const n = args.join(" ").match(/issue\(number:(\d+)\)/)[1]
+  out(String((fx.issues[n].blockers || []).filter((s) => s === "OPEN").length))
+}
+if (args[0] === "api") {
+  const m = args[1].match(/issues\/(\d+)(\/sub_issues)?$/)
+  if (m[2]) out(fx.subIssues.filter((n) => fx.issues[n].state === "open" && !fx.issues[n].assignee).join("\n"))
+  const i = fx.issues[m[1]]
+  if (jq === ".title") out(i.title)
+  if (jq === ".state") out(i.state)
+  if (jq.includes("labels")) out((i.labels || []).join(","))
+}
+process.stderr.write(`gh stub: unhandled ${args.join(" ")}\n`); process.exit(1)

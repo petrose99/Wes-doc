@@ -60,7 +60,7 @@ gate as a single step ran 66 minutes and crossed the hand-off line; as
 three it fits. The plan ends with:
 
 - `step: G1 — round script` — servers up with **one** call, `node
-  .impeccable/live/dev.mjs start <ws>` (dev server :3000 + the :8400
+  scripts/dev/dev.mjs start <ws>` (dev server :3000 + the :8400
   in-page detector, waits for both, preps the workspace), then the seed
   script the area primer names; `dev.mjs stop` at the end. Never `npm run
   dev`, `nohup`, `setsid`, a background call, `impeccable live-server` or

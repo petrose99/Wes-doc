@@ -59,10 +59,13 @@ properly, not skimmed:
    read `.claude/skills/impeccable/reference/craft-floor.md`; read the stored
    critique of the nearest shipped surface (`.impeccable/critique/`) and the
    resolution's Action Summary.
-   **Read both lessons files in full, in one Bash call** (paths are in the
-   system prompt after this brief): the generic one is what every earlier
-   first pass missed in any project; the project one is what this codebase
-   in particular trips on.
+   **Print this ticket's lessons, in one Bash call:** `node
+   scripts/wayfinder-autopilot/lessons.mjs --kind <surface|backend|all>
+   --area <primer>` (`all` when the plan has both kinds of step; `--area`
+   is the area primer's file name, comma-separated for several). It filters
+   both lessons files by their `[kind]`/`[area:…]` tags: the generic one is
+   what every earlier first pass missed in any project; the project one is
+   what this codebase in particular trips on. Don't read the files whole.
    Each lesson that applies to this surface becomes a line in the spec now;
    the pre-flight cites it.
 3. **Read the area primer** for the ticket's surface family in
