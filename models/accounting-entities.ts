@@ -8,7 +8,7 @@ import { parseLedgerCapabilities } from "@/lib/integrations/ledger-capabilities"
 import { decimalToNumber } from "@/lib/money"
 import type { Prisma } from "@/prisma/client"
 
-export type AccountingEntityType = "account" | "vendor" | "tax_rate" | "tracking_option" | "location" | "customer"
+export type AccountingEntityType = "account" | "vendor" | "tax_rate" | "tracking_option" | "location" | "customer" | "item"
 
 export const listAccountingEntities = cache(async (workspaceId: string, entityType: AccountingEntityType) => prisma.accountingEntity.findMany({
   where: { workspaceId, entityType, active: true },

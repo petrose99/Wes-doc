@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { checkLineCoding, firstLineCodingFail, ledgerReadBackChecks, lineCodingInputFromBill, lineCodingInputFromDocument, type LineCodingInput } from "@/lib/checks/line-coding"
 
-const ON = { vat: true, tracking: [{ id: "class", name: "Class" }], location: true, customer: true, billable: true }
+const ON = { vat: true, tracking: [{ id: "class", name: "Class" }], location: true, customer: true, billable: true, itemLines: false }
 
 function input(over: Partial<LineCodingInput> = {}, line: Partial<LineCodingInput["lines"][number]> = {}, bill: Partial<LineCodingInput["bill"]> = {}): LineCodingInput {
   return {

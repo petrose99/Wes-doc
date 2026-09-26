@@ -16,12 +16,13 @@ export type LedgerCapabilities = {
   location: boolean
   customer: boolean
   billable: boolean
+  itemLines: boolean
 }
 
 /** A push reuses a stored read this recent; sync and the 5030 retry always read fresh. */
 export const LEDGER_CAPABILITIES_REUSE_MS = 24 * 60 * 60 * 1000
 
-const NONE: LedgerCapabilities = { vat: false, tracking: [], location: false, customer: false, billable: false }
+const NONE: LedgerCapabilities = { vat: false, tracking: [], location: false, customer: false, billable: false, itemLines: false }
 
 /** Null when the company does not say its plan or whether VAT is on — never posted to on a guess. */
 export function deriveQuickBooksCapabilities(companyInfo: QuickBooksCompanyInfo, preferences: QuickBooksPreferences): LedgerCapabilities | null {
@@ -35,19 +36,20 @@ export function deriveQuickBooksCapabilities(companyInfo: QuickBooksCompanyInfo,
     location: plus && preferences.AccountingInfoPrefs?.TrackDepartments === true,
     customer: true,
     billable: plus && preferences.VendorAndPurchasesPrefs?.BillableExpenseTracking === true,
+    itemLines: plus,
   }
 }
 
 export function deriveXeroCapabilities(trackingCategories: XeroTrackingCategory[]): LedgerCapabilities {
   const tracking = trackingCategories.filter((c) => c.status === "ACTIVE").slice(0, 2).map((c) => ({ id: c.id, name: c.name }))
-  return { ...NONE, vat: true, tracking }
+  return { ...NONE, vat: true, tracking, itemLines: true }
 }
 
 /** The stored JSON back as capabilities; anything that isn't exactly that shape is null. */
 export function parseLedgerCapabilities(json: unknown): LedgerCapabilities | null {
   if (!json || typeof json !== "object") return null
   const value = json as Record<string, unknown>
-  const flags = ["vat", "location", "customer", "billable"] as const
+  const flags = ["vat", "location", "customer", "billable", "itemLines"] as const
   if (!flags.every((key) => typeof value[key] === "boolean")) return null
   if (!Array.isArray(value.tracking) || !value.tracking.every((t) => t && typeof t.id === "string" && typeof t.name === "string")) return null
   return {
@@ -56,6 +58,7 @@ export function parseLedgerCapabilities(json: unknown): LedgerCapabilities | nul
     location: value.location as boolean,
     customer: value.customer as boolean,
     billable: value.billable as boolean,
+    itemLines: value.itemLines as boolean,
   }
 }
 

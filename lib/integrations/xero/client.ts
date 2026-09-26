@@ -62,6 +62,27 @@ export async function listTaxRates(tenantId: string, connectionId: string): Prom
   return (result.TaxRates ?? []).map((rate) => ({ taxType: rate.TaxType, name: rate.Name, percent: rate.EffectiveRate ?? 0, canApplyToExpenses: rate.CanApplyToExpenses === true, active: rate.Status === "ACTIVE" }))
 }
 
+export type XeroSyncedItem = {
+  id: string; code: string | null; name: string; itemType: "tracked" | "untracked"; trackedInventory: boolean
+  active: boolean; accountExternalId: string | null; taxCodeExternalId: string | null
+}
+
+/** Only items purchasable on a bill (`IsPurchased`). Xero item lines are always available (no plan
+ * gate), unlike QuickBooks. */
+export async function listItems(tenantId: string, connectionId: string): Promise<XeroSyncedItem[]> {
+  const result = await apiRequest<{ Items?: Array<{
+    ItemID: string; Code?: string; Name: string; IsPurchased?: boolean; IsTrackedAsInventory?: boolean; Status?: string
+    PurchaseDetails?: { AccountCode?: string; TaxType?: string }
+  }> }>(tenantId, connectionId, "/Items")
+  return (result.Items ?? []).filter((i) => i.IsPurchased === true).map((i) => {
+    const trackedInventory = i.IsTrackedAsInventory === true
+    return {
+      id: i.ItemID, code: i.Code ?? null, name: i.Name, itemType: trackedInventory ? "tracked" : "untracked", trackedInventory,
+      active: i.Status !== "ARCHIVED", accountExternalId: i.PurchaseDetails?.AccountCode ?? null, taxCodeExternalId: i.PurchaseDetails?.TaxType ?? null,
+    }
+  })
+}
+
 /** Finds a contact by exact Name, or creates one. No fuzzy dedup, per scope. */
 export async function findOrCreateContact(tenantId: string, connectionId: string, name: string): Promise<string> {
   const found = await apiRequest<{ Contacts?: Array<{ ContactID: string }> }>(

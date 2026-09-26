@@ -74,6 +74,7 @@ function guessDefaultAccount(provider: string, rows: SyncRow[]): SyncRow | null 
 type SyncRow = {
   entityType: AccountingEntityType; externalId: string; code: string | null; name: string; active: boolean; raw: unknown
   parentExternalId?: string; parentName?: string; taxRatePercent?: number | null; forPurchases?: boolean; defaultTaxCode?: string | null
+  itemType?: string | null; trackedInventory?: boolean; purchaseAccountExternalId?: string | null
 }
 
 function fetchProviderEntities(provider: string, externalTenantId: string, connectionId: string, capabilities: LedgerCapabilities): Promise<SyncRow[]> {
@@ -91,14 +92,15 @@ const none = Promise.resolve([])
 
 async function fetchQuickBooksEntities(realmId: string, connectionId: string, capabilities: LedgerCapabilities): Promise<SyncRow[]> {
   // Class and Department lists only exist on the plans that have them; asking a plan without them
-  // for either is at best an empty page, so the capability read decides.
-  const [accounts, vendors, taxCodes, classes, departments, customers] = await Promise.all([
+  // for either is at best an empty page, so the capability read decides. Item is the same gate.
+  const [accounts, vendors, taxCodes, classes, departments, customers, items] = await Promise.all([
     quickbooks.listAccounts(realmId, connectionId),
     quickbooks.listVendors(realmId, connectionId),
     quickbooks.listTaxCodes(realmId, connectionId),
     capabilities.tracking.length ? quickbooks.listClasses(realmId, connectionId) : none,
     capabilities.location ? quickbooks.listDepartments(realmId, connectionId) : none,
     quickbooks.listCustomers(realmId, connectionId),
+    capabilities.itemLines ? quickbooks.listItems(realmId, connectionId) : none,
   ])
   const item = (entityType: AccountingEntityType) => (row: quickbooks.QuickBooksSyncedListItem): SyncRow => ({ entityType, externalId: row.id, code: null, name: row.name, active: row.active, raw: row })
   return [
@@ -108,15 +110,21 @@ async function fetchQuickBooksEntities(realmId: string, connectionId: string, ca
     ...classes.map((c): SyncRow => ({ ...item("tracking_option")(c), parentExternalId: "class", parentName: "Class" })),
     ...departments.map(item("location")),
     ...customers.map(item("customer")),
+    ...(items as quickbooks.QuickBooksSyncedItem[]).map((i): SyncRow => ({
+      entityType: "item", externalId: i.id, code: i.code, name: i.name, active: i.active, raw: i,
+      itemType: i.itemType, trackedInventory: i.trackedInventory, purchaseAccountExternalId: i.accountExternalId, defaultTaxCode: i.taxCodeExternalId,
+    })),
   ]
 }
 
 async function fetchXeroEntities(tenantId: string, connectionId: string): Promise<SyncRow[]> {
-  const [accounts, contacts, taxRates, trackingCategories] = await Promise.all([
+  // Xero item lines have no plan gate — always synced.
+  const [accounts, contacts, taxRates, trackingCategories, items] = await Promise.all([
     xero.listAccounts(tenantId, connectionId),
     xero.listContacts(tenantId, connectionId),
     xero.listTaxRates(tenantId, connectionId),
     xero.listTrackingCategories(tenantId, connectionId),
+    xero.listItems(tenantId, connectionId),
   ])
   return [
     ...accounts.map((a): SyncRow => ({ entityType: "account", externalId: a.code, code: a.code, name: a.name, active: a.active, raw: a, defaultTaxCode: a.taxType })),
@@ -128,5 +136,9 @@ async function fetchXeroEntities(tenantId: string, connectionId: string): Promis
       entityType: "tracking_option", externalId: o.id, code: null, name: o.name, raw: o,
       active: o.status === "ACTIVE" && category.status === "ACTIVE", parentExternalId: category.id, parentName: category.name,
     }))),
+    ...items.map((i): SyncRow => ({
+      entityType: "item", externalId: i.id, code: i.code, name: i.name, active: i.active, raw: i,
+      itemType: i.itemType, trackedInventory: i.trackedInventory, purchaseAccountExternalId: i.accountExternalId, defaultTaxCode: i.taxCodeExternalId,
+    })),
   ]
 }

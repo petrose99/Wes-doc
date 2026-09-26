@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import { inferTaxBasis, resolveBillCoding, resolveLineCoding, type CodingReferences, type CodingRule } from "@/lib/finance/line-coding"
 import type { LedgerCapabilities } from "@/lib/integrations/ledger-capabilities"
 
-const caps: LedgerCapabilities = { vat: true, tracking: [{ id: "region", name: "Region" }], location: true, customer: true, billable: true }
+const caps: LedgerCapabilities = { vat: true, tracking: [{ id: "region", name: "Region" }], location: true, customer: true, billable: true, itemLines: false }
 const refs: CodingReferences = {
   taxCodes: new Set(["INPUT", "EXEMPT"]),
   trackingOptions: new Set(["region:north", "region:south"]),

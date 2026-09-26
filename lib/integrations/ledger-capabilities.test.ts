@@ -21,17 +21,17 @@ const allOnPrefs = {
   AccountingInfoPrefs: { ClassTrackingPerTxnLine: true, TrackDepartments: true },
   VendorAndPurchasesPrefs: { BillableExpenseTracking: true },
 }
-const off = { vat: false, tracking: [], location: false, customer: false, billable: false }
+const off = { vat: false, tracking: [], location: false, customer: false, billable: false, itemLines: false }
 
 describe("deriveQuickBooksCapabilities", () => {
-  it("Plus with every preference on reads VAT, Class tracking, Location, Customer and Billable", () => {
+  it("Plus with every preference on reads VAT, Class tracking, Location, Customer, Billable and item lines", () => {
     expect(deriveQuickBooksCapabilities(plusCompany, allOnPrefs)).toEqual({
-      vat: true, tracking: [{ id: "class", name: "Class" }], location: true, customer: true, billable: true,
+      vat: true, tracking: [{ id: "class", name: "Class" }], location: true, customer: true, billable: true, itemLines: true,
     })
   })
 
-  it("a plan below Plus has no Class, Location or Billable even when the preferences say on", () => {
-    expect(deriveQuickBooksCapabilities(essentialsCompany, allOnPrefs)).toEqual({ vat: true, tracking: [], location: false, customer: true, billable: false })
+  it("a plan below Plus has no Class, Location, Billable or item lines even when the preferences say on", () => {
+    expect(deriveQuickBooksCapabilities(essentialsCompany, allOnPrefs)).toEqual({ vat: true, tracking: [], location: false, customer: true, billable: false, itemLines: false })
   })
 
   it("Advanced counts as Plus", () => {
@@ -40,7 +40,7 @@ describe("deriveQuickBooksCapabilities", () => {
   })
 
   it("a missing tracking, location or billable flag reads false, never a guess of true", () => {
-    expect(deriveQuickBooksCapabilities(plusCompany, { TaxPrefs: { UsingSalesTax: false } })).toEqual({ vat: false, tracking: [], location: false, customer: true, billable: false })
+    expect(deriveQuickBooksCapabilities(plusCompany, { TaxPrefs: { UsingSalesTax: false } })).toEqual({ vat: false, tracking: [], location: false, customer: true, billable: false, itemLines: true })
   })
 
   it("a missing VAT setting is unreadable — null, so nothing is posted on a guess", () => {
@@ -61,7 +61,7 @@ describe("deriveXeroCapabilities", () => {
       { id: "t4", name: "Extra", status: "ACTIVE", options: [] },
     ]
     expect(deriveXeroCapabilities(categories)).toEqual({
-      vat: true, tracking: [{ id: "t2", name: "Department" }, { id: "t3", name: "Project" }], location: false, customer: false, billable: false,
+      vat: true, tracking: [{ id: "t2", name: "Department" }, { id: "t3", name: "Project" }], location: false, customer: false, billable: false, itemLines: true,
     })
   })
 
@@ -72,11 +72,11 @@ describe("deriveXeroCapabilities", () => {
 
 describe("parseLedgerCapabilities", () => {
   it("round-trips a stored value", () => {
-    const value = { vat: true, tracking: [{ id: "class", name: "Class" }], location: true, customer: true, billable: false }
+    const value = { vat: true, tracking: [{ id: "class", name: "Class" }], location: true, customer: true, billable: false, itemLines: true }
     expect(parseLedgerCapabilities(JSON.parse(JSON.stringify(value)))).toEqual(value)
   })
 
-  it.each([null, undefined, "x", {}, { vat: "yes", tracking: [], location: false, customer: false, billable: false }, { vat: true, tracking: [{ id: 1 }], location: false, customer: false, billable: false }])(
+  it.each([null, undefined, "x", {}, { vat: "yes", tracking: [], location: false, customer: false, billable: false, itemLines: false }, { vat: true, tracking: [{ id: 1 }], location: false, customer: false, billable: false, itemLines: false }, { vat: true, tracking: [], location: false, customer: false, billable: false }])(
     "returns null for a shape it does not recognise (%j), never throws",
     (value) => { expect(parseLedgerCapabilities(value)).toBeNull() },
   )
@@ -117,7 +117,7 @@ describe("readLedgerCapabilities", () => {
   })
 
   it("reuses a stored read inside the reuse window without a provider call", async () => {
-    const stored = { vat: true, tracking: [], location: false, customer: true, billable: false }
+    const stored = { vat: true, tracking: [], location: false, customer: true, billable: false, itemLines: false }
     const fresh = { ...connection, ledgerCapabilities: stored, ledgerCapabilitiesReadAt: new Date(now.getTime() - 60_000) }
     await expect(readLedgerCapabilities(fresh, now, LEDGER_CAPABILITIES_REUSE_MS)).resolves.toEqual(stored)
     expect(quickbooks.getPreferences).not.toHaveBeenCalled()
@@ -126,7 +126,7 @@ describe("readLedgerCapabilities", () => {
   it("reads afresh when the stored value is past the window or unparseable", async () => {
     vi.mocked(quickbooks.getCompanyInfo).mockResolvedValue(plusCompany)
     vi.mocked(quickbooks.getPreferences).mockResolvedValue(allOnPrefs)
-    const stale = { ...connection, ledgerCapabilities: { vat: true, tracking: [], location: false, customer: true, billable: false }, ledgerCapabilitiesReadAt: new Date(now.getTime() - LEDGER_CAPABILITIES_REUSE_MS - 1) }
+    const stale = { ...connection, ledgerCapabilities: { vat: true, tracking: [], location: false, customer: true, billable: false, itemLines: false }, ledgerCapabilitiesReadAt: new Date(now.getTime() - LEDGER_CAPABILITIES_REUSE_MS - 1) }
     await readLedgerCapabilities(stale, now, LEDGER_CAPABILITIES_REUSE_MS)
     await readLedgerCapabilities({ ...connection, ledgerCapabilities: { junk: 1 }, ledgerCapabilitiesReadAt: now }, now, LEDGER_CAPABILITIES_REUSE_MS)
     expect(quickbooks.getPreferences).toHaveBeenCalledTimes(2)

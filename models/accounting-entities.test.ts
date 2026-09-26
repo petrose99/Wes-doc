@@ -36,7 +36,7 @@ describe("listAccountingEntities", () => {
 })
 
 describe("loadLineCodingContext", () => {
-  const capabilities = { vat: true, tracking: [{ id: "class", name: "Class" }], location: false, customer: true, billable: false }
+  const capabilities = { vat: true, tracking: [{ id: "class", name: "Class" }], location: false, customer: true, billable: false, itemLines: false }
 
   it("is null until the ledger's capabilities have been read", async () => {
     expect(await loadLineCodingContext("ws1", { id: "conn1", provider: "quickbooks", ledgerCapabilities: null })).toBeNull()

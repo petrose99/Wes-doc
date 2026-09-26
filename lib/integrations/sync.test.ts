@@ -9,12 +9,14 @@ vi.mock("@/lib/integrations/quickbooks/client", () => ({
   listClasses: vi.fn(),
   listDepartments: vi.fn(),
   listCustomers: vi.fn(),
+  listItems: vi.fn(),
 }))
 vi.mock("@/lib/integrations/xero/client", () => ({
   listAccounts: vi.fn(),
   listContacts: vi.fn(),
   listTaxRates: vi.fn(),
   listTrackingCategories: vi.fn(),
+  listItems: vi.fn(),
 }))
 vi.mock("@/lib/integrations/ledger-capabilities", () => ({ readLedgerCapabilities: vi.fn() }))
 vi.mock("@/models/document-checks", () => ({ refreshLineCodingChecksForConnection: vi.fn() }))
@@ -34,9 +36,10 @@ beforeEach(() => {
   for (const key of Object.keys(db)) delete db[key]
   db.accountingEntity = { upsert: vi.fn(), updateMany: vi.fn() }
   db.$transaction = vi.fn((ops: unknown[]) => Promise.all(ops))
-  vi.mocked(readLedgerCapabilities).mockResolvedValue({ vat: true, tracking: [], location: false, customer: true, billable: false })
+  vi.mocked(readLedgerCapabilities).mockResolvedValue({ vat: true, tracking: [], location: false, customer: true, billable: false, itemLines: false })
   vi.mocked(quickbooks.listCustomers).mockResolvedValue([])
   vi.mocked(xero.listTrackingCategories).mockResolvedValue([])
+  vi.mocked(xero.listItems).mockResolvedValue([])
 })
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -120,13 +123,14 @@ describe("syncAccountingEntities", () => {
 
   it("upserts QuickBooks classes, locations, customers and widened tax codes when the plan has them", async () => {
     db.integrationConnection = { findUniqueOrThrow: vi.fn().mockResolvedValue({ id: "c1", workspaceId: "w1", provider: "quickbooks", externalTenantId: "realm1" }) }
-    vi.mocked(readLedgerCapabilities).mockResolvedValue({ vat: true, tracking: [{ id: "class", name: "Class" }], location: true, customer: true, billable: true })
+    vi.mocked(readLedgerCapabilities).mockResolvedValue({ vat: true, tracking: [{ id: "class", name: "Class" }], location: true, customer: true, billable: true, itemLines: true })
     vi.mocked(quickbooks.listAccounts).mockResolvedValue([{ id: "a1", name: "Fuel", active: true, accountType: "Expense", taxCodeId: "3" }])
     vi.mocked(quickbooks.listVendors).mockResolvedValue([])
     vi.mocked(quickbooks.listTaxCodes).mockResolvedValue([{ id: "3", name: "Standard", active: true, forPurchases: true, percent: 15 }])
     vi.mocked(quickbooks.listClasses).mockResolvedValue([{ id: "k1", name: "Retail", active: true }])
     vi.mocked(quickbooks.listDepartments).mockResolvedValue([{ id: "d1", name: "Cape Town", active: true }])
     vi.mocked(quickbooks.listCustomers).mockResolvedValue([{ id: "cu1", name: "Brightside", active: true }])
+    vi.mocked(quickbooks.listItems).mockResolvedValue([{ id: "i1", code: "SKU1", name: "Widget", itemType: "Inventory", trackedInventory: true, active: true, accountExternalId: "a1", taxCodeExternalId: "3" }])
 
     await syncAccountingEntities("c1")
 
@@ -135,9 +139,10 @@ describe("syncAccountingEntities", () => {
     expect(upserted("customer", "cu1").create).toMatchObject({ name: "Brightside" })
     expect(upserted("tax_rate", "3").create).toMatchObject({ taxRatePercent: 15, forPurchases: true })
     expect(upserted("account", "a1").create).toMatchObject({ defaultTaxCode: "3" })
+    expect(upserted("item", "i1").create).toMatchObject({ code: "SKU1", name: "Widget", trackedInventory: true, purchaseAccountExternalId: "a1", defaultTaxCode: "3", itemType: "Inventory" })
   })
 
-  it("does not read QuickBooks classes or locations the plan does not have", async () => {
+  it("does not read QuickBooks classes, locations or items the plan does not have", async () => {
     db.integrationConnection = { findUniqueOrThrow: vi.fn().mockResolvedValue({ id: "c1", workspaceId: "w1", provider: "quickbooks", externalTenantId: "realm1" }) }
     vi.mocked(quickbooks.listAccounts).mockResolvedValue([])
     vi.mocked(quickbooks.listVendors).mockResolvedValue([])
@@ -147,7 +152,21 @@ describe("syncAccountingEntities", () => {
 
     expect(quickbooks.listClasses).not.toHaveBeenCalled()
     expect(quickbooks.listDepartments).not.toHaveBeenCalled()
+    expect(quickbooks.listItems).not.toHaveBeenCalled()
     expect(quickbooks.listCustomers).toHaveBeenCalled()
+  })
+
+  it("always syncs Xero items — no plan gate", async () => {
+    db.integrationConnection = { findUniqueOrThrow: vi.fn().mockResolvedValue({ id: "c2", workspaceId: "w1", provider: "xero", externalTenantId: "tenant1" }) }
+    vi.mocked(xero.listAccounts).mockResolvedValue([])
+    vi.mocked(xero.listContacts).mockResolvedValue([])
+    vi.mocked(xero.listTaxRates).mockResolvedValue([])
+    vi.mocked(xero.listItems).mockResolvedValue([{ id: "i1", code: null, name: "Consulting", itemType: "untracked", trackedInventory: false, active: true, accountExternalId: "400", taxCodeExternalId: "INPUT2" }])
+
+    await syncAccountingEntities("c2")
+
+    expect(xero.listItems).toHaveBeenCalledWith("tenant1", "c2")
+    expect(upserted("item", "i1").create).toMatchObject({ name: "Consulting", trackedInventory: false, purchaseAccountExternalId: "400", defaultTaxCode: "INPUT2" })
   })
 
   it("guesses the Default account off the freshly-synced chart when still guessed (#429)", async () => {

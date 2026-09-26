@@ -251,6 +251,7 @@ model Workspace {
   sheetPlacements            DocumentSheetPlacement[]
   categoryAccountMappings    CategoryAccountMapping[]
   supplierAccountRules       SupplierAccountRule[]
+  supplierItemPairings       SupplierItemPairing[]
   categoryNatures            CategoryNature[]
   agentVerdicts              AgentVerdict[]
   automationConfig           WorkspaceAutomationConfig?
@@ -1365,6 +1366,7 @@ model IntegrationConnection {
   ledgerTransactions           LedgerTransaction[]
   categoryAccountMappings      CategoryAccountMapping[]
   supplierAccountRules         SupplierAccountRule[]
+  supplierItemPairings         SupplierItemPairing[]
 
   @@unique([workspaceId, provider])
   @@map("integration_connections")
@@ -2198,8 +2200,17 @@ model AccountingEntity {
   /// forPurchases codes are ever offered or pre-filled.
   taxRatePercent   Decimal?              @map("tax_rate_percent") @db.Decimal(7, 4)
   forPurchases     Boolean?              @map("for_purchases")
-  /// account only: the Tax code the ledger applies to this account by default.
+  /// account only: the Tax code this account defaults to; item only: the item's purchase tax code.
   defaultTaxCode   String?               @map("default_tax_code")
+  /// item only: raw provider value (QBO "Service"|"NonInventory"|"Inventory", Xero "tracked"|
+  /// "untracked") — display/debug only, never branched on for behaviour.
+  itemType         String?               @map("item_type")
+  /// item only: the flag Checks/mappers key off — true only for a QBO Inventory item or a Xero
+  /// item with IsTrackedAsInventory true.
+  trackedInventory Boolean?              @map("tracked_inventory")
+  /// item only: the item's own purchase account (QBO ExpenseAccountRef/AssetAccountRef, Xero
+  /// PurchaseDetails.AccountCode).
+  purchaseAccountExternalId String?      @map("purchase_account_external_id")
   workspace        Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   connection       IntegrationConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
 
@@ -2253,6 +2264,28 @@ model SupplierAccountRule {
   @@unique([connectionId, supplierName])
   @@index([workspaceId])
   @@map("supplier_account_rules")
+}
+
+/// #459: a supplier's usual Item for one line, learned the same way SupplierAccountRule learns an
+/// account — keyed by (connection, supplier, matchKey) rather than supplier alone, since one
+/// supplier can bill several distinct items. matchKey is the supplier's own code when the line
+/// carries one, else the normalized description — an exact key, never a fuzzy match (ADR 0015).
+model SupplierItemPairing {
+  id             String                @id @default(uuid()) @db.Uuid
+  workspaceId    String                @map("workspace_id") @db.Uuid
+  connectionId   String                @map("connection_id") @db.Uuid
+  supplierName   String                @map("supplier_name")
+  matchKey       String                @map("match_key")
+  itemExternalId String                @map("item_external_id")
+  lastUsedAt     DateTime              @map("last_used_at")
+  createdAt      DateTime              @default(now()) @map("created_at")
+  updatedAt      DateTime              @updatedAt @map("updated_at")
+  workspace      Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  connection     IntegrationConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@unique([connectionId, supplierName, matchKey])
+  @@index([workspaceId])
+  @@map("supplier_item_pairings")
 }
 
 /// #83: workspace-scoped goods-vs-services classification for the free-form category strings on
