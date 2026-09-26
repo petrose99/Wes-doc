@@ -31,6 +31,7 @@ import crypto from "crypto"
 import path from "path"
 import { randomUUID } from "crypto"
 import { cache } from "react"
+import { formatCurrency } from "@/lib/money"
 
 const SUPPORTED_DOCUMENT_TYPES = new Set(["application/pdf", "image/jpeg", "image/png", "image/webp", "image/heic"])
 /** "dictation" is an audio recording rather than a scan; it takes the transcribe path instead of
@@ -1109,15 +1110,7 @@ export function summarizeDocumentForReview(doc: { reviewedData: unknown; codingD
 }
 
 function formatDocumentTotal(value: number, currencyCode: string | null): string {
-  if (currencyCode) {
-    try {
-      return new Intl.NumberFormat("en-US", { style: "currency", currency: currencyCode, maximumFractionDigits: 0 }).format(value)
-    } catch {
-      // A currency code the model read off the document but Intl doesn't recognise — fall through
-      // to a plain number rather than throwing the whole list.
-    }
-  }
-  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(value)
+  return formatCurrency(value, currencyCode, 0)
 }
 
 export async function getDocumentsStatus(workspaceId: string, documentIds: string[]) {

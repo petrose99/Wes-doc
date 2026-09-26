@@ -9,6 +9,7 @@ import {
   type UpdateSelectedBillsResult,
 } from "@/app/(app)/workspaces/[workspaceId]/account-correction-actions"
 import { useMemo, useState, useTransition } from "react"
+import { formatCurrency } from "@/lib/money"
 
 /** #430 Screen 1 — "N bills already posted" dialog. Fired by the caller once
  * `listAffectedBillsAction` already found ≥1 affected bill (the caller owns the
@@ -38,8 +39,7 @@ function ledgerBillUrl(provider: string, externalBillId: string | null): string 
 }
 
 function formatAmount(total: number, currencyCode: string | null): string {
-  try { return new Intl.NumberFormat("en", { style: "currency", currency: currencyCode ?? "USD", maximumFractionDigits: 2 }).format(total) }
-  catch { return total.toFixed(2) }
+  return formatCurrency(total, currencyCode)
 }
 
 export function AccountCorrectionDialog({

@@ -1,7 +1,6 @@
 import { EXPENSE_DOC_TYPES, docTypeToLegacyTemplateCode } from "@/lib/doc-types"
 import { prisma } from "@/lib/db"
 import { SUPPLIER_COLD_START_COUNT, SUPPLIER_TRUST_STREAK, supplierThreshold } from "@/lib/readiness/supplier-thresholds"
-import { getTaxProfile } from "@/models/tax-profiles"
 
 /** Workspace-scoped finance analytics: spend by category, cash-flow trend, and AP aging, read
  * straight from the structured document_field_values projection (never ProductEvent, which is a
@@ -165,18 +164,13 @@ export function fillMonthSeries(
   })
 }
 
-/** The workspace's base currency, in priority order:
- *   1. The tax profile's configured currency, if one exists — the most specific signal, since it's
- *      explicitly set for tax handling.
- *   2. Workspace.baseCurrency — what the owner picked when creating the workspace. Without this
- *      fallback the dashboard silently displayed USD on any workspace that hadn't extracted a
- *      document with a currency_code yet, regardless of what the owner chose at signup.
- *   3. The most common currency actually seen across extracted documents.
+/** The workspace's base currency: the company currency (Workspace.baseCurrency, #457), else the
+ * most common currency seen across extracted documents. The tax profile's currency no longer
+ * competes (#457 spec §4) — one company, one currency.
  *
  * `hasMultipleCurrencies` flags when totals get summed across currencies with no conversion — the
  * UI's amber banner reads off this rather than re-deriving it. */
-export function resolveCurrency(taxCurrency: string | null, inventory: { currency: string; count: number }[], workspaceBase: string | null = null): CurrencyContext {
-  if (taxCurrency) return { baseCurrency: taxCurrency, hasMultipleCurrencies: inventory.length > 1 }
+export function resolveCurrency(inventory: { currency: string; count: number }[], workspaceBase: string | null = null): CurrencyContext {
   if (workspaceBase) return { baseCurrency: workspaceBase, hasMultipleCurrencies: inventory.length > 1 }
   if (!inventory.length) return { baseCurrency: null, hasMultipleCurrencies: false }
   return { baseCurrency: inventory[0].currency, hasMultipleCurrencies: inventory.length > 1 }
@@ -391,14 +385,13 @@ export async function getWorkspaceAnalytics(workspaceId: string, period: Period,
   const unpaidSql = buildUnpaidInvoicesSql(workspaceId)
   const currencySql = buildCurrencyInventorySql(workspaceId)
 
-  const [spendRows, vendorSpendRows, docOutflowRows, bankFlowRows, unpaidRows, currencyRows, taxProfile, openReviewTasks, workspaceRow] = await Promise.all([
+  const [spendRows, vendorSpendRows, docOutflowRows, bankFlowRows, unpaidRows, currencyRows, openReviewTasks, workspaceRow] = await Promise.all([
     prisma.$queryRawUnsafe<SpendRow[]>(spendSql.text, ...spendSql.params),
     prisma.$queryRawUnsafe<VendorSpendSqlRow[]>(vendorSpendSql.text, ...vendorSpendSql.params),
     prisma.$queryRawUnsafe<DocOutflowRow[]>(docOutflowSql.text, ...docOutflowSql.params),
     prisma.$queryRawUnsafe<BankFlowRow[]>(bankFlowSql.text, ...bankFlowSql.params),
     prisma.$queryRawUnsafe<UnpaidInvoiceSqlRow[]>(unpaidSql.text, ...unpaidSql.params),
     prisma.$queryRawUnsafe<CurrencyRow[]>(currencySql.text, ...currencySql.params),
-    getTaxProfile(workspaceId),
     prisma.reviewTask.count({ where: { workspaceId, status: "open" } }),
     prisma.workspace.findUnique({ where: { id: workspaceId }, select: { baseCurrency: true } }),
   ])
@@ -423,7 +416,7 @@ export async function getWorkspaceAnalytics(workspaceId: string, period: Period,
     return { documentId: row.documentId, fileId: row.fileId, filename: row.filename, vendor: row.vendor, total, dueDate: row.dueDate, bucket }
   })
 
-  const currency = resolveCurrency(taxProfile?.config.currency ?? null, currencyRows, workspaceRow?.baseCurrency ?? null)
+  const currency = resolveCurrency(currencyRows, workspaceRow?.baseCurrency ?? null)
   const totalOutstanding = AGING_BUCKET_KEYS.reduce((sum, key) => sum + buckets[key].total, 0)
   const totalSpend = spend.reduce((sum, row) => sum + row.totalSpend, 0)
   const netCashFlow = cashFlow.reduce((sum, month) => sum + month.net, 0)
