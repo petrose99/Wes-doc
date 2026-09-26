@@ -2,6 +2,11 @@
 // workspaceId it is handed. Writes happen only in lib/integrations/sync.ts's syncAccountingEntities.
 import { prisma } from "@/lib/db"
 import { cache } from "react"
+import type { LineCodingInput } from "@/lib/checks/line-coding"
+import { codingReferencesFrom } from "@/lib/finance/line-coding"
+import { parseLedgerCapabilities } from "@/lib/integrations/ledger-capabilities"
+import { decimalToNumber } from "@/lib/money"
+import type { Prisma } from "@/prisma/client"
 
 export type AccountingEntityType = "account" | "vendor" | "tax_rate" | "tracking_option" | "location" | "customer"
 
@@ -42,3 +47,26 @@ export const getEntityCounts = cache(async (workspaceId: string, connectionId: s
   ])
   return { accounts, vendors }
 })
+
+export type LineCodingContext = Pick<LineCodingInput, "provider" | "capabilities" | "references" | "taxRates" | "names">
+
+/** ADR 0014: what the line-coding Check reads about one ledger connection — its stored
+ * capabilities (or `capabilities` passed in, a fresh read at push time), the references a bill can
+ * use now, each Tax code's purchase rate, and Tracking names (inactive options included, so a
+ * vanished option is still named). Null when the capabilities were never read: nothing can be
+ * judged yet, and the push gate reads them before anything posts. */
+export async function loadLineCodingContext(
+  workspaceId: string,
+  connection: { id: string; provider: string; ledgerCapabilities?: Prisma.JsonValue | null },
+  capabilities = parseLedgerCapabilities(connection.ledgerCapabilities),
+): Promise<LineCodingContext | null> {
+  if (!capabilities) return null
+  const entities = await prisma.accountingEntity.findMany({
+    where: { workspaceId, connectionId: connection.id, entityType: { in: ["tax_rate", "tracking_option", "location"] } },
+    select: { entityType: true, externalId: true, parentExternalId: true, forPurchases: true, active: true, name: true, taxRatePercent: true },
+  })
+  const names: Record<string, string> = Object.fromEntries(capabilities.tracking.map((category) => [category.id, category.name]))
+  for (const option of entities.filter((entity) => entity.entityType === "tracking_option")) names[`${option.parentExternalId}:${option.externalId}`] = option.name
+  const taxRates = Object.fromEntries(entities.filter((entity) => entity.entityType === "tax_rate").map((code) => [code.externalId, decimalToNumber(code.taxRatePercent)]))
+  return { provider: connection.provider, capabilities, references: codingReferencesFrom(entities), taxRates, names }
+}

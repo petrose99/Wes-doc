@@ -45,6 +45,19 @@ export type CodingReferences = {
   locations: ReadonlySet<string>
 }
 
+type ReferenceRow = { entityType: string; externalId: string; parentExternalId: string | null; forPurchases: boolean | null; active?: boolean }
+
+/** The ledger's synced AccountingEntity rows as the references a bill can use now — inactive rows
+ * (kept for their names) are left out. */
+export function codingReferencesFrom(entities: ReferenceRow[]): CodingReferences {
+  const active = (type: string) => entities.filter((entity) => entity.entityType === type && entity.active !== false)
+  return {
+    taxCodes: new Set(active("tax_rate").filter((code) => code.forPurchases === true).map((code) => code.externalId)),
+    trackingOptions: new Set(active("tracking_option").map((option) => `${option.parentExternalId}:${option.externalId}`)),
+    locations: new Set(active("location").map((location) => location.externalId)),
+  }
+}
+
 /** Which way the invoice's line amounts read against its totals: summing to the subtotal with tax
  * on top is exclusive, summing to the total with tax inside is inclusive, no tax is none. Null
  * when it can't tell (the Tax basis unclear Check). A document with no lines reads as one line of

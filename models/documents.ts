@@ -11,7 +11,7 @@ import { LOW_CONFIDENCE, PIPELINE_STAGES, type PipelineStage } from "@/lib/docum
 import { applyFxToDocument } from "@/lib/fx/apply-to-document"
 import { normalizeBillFromDocument } from "@/lib/integration-bill-mapping"
 import { resolveDocumentLineAccounts, resolveLineAccount, usesLegacyAccountChain, type LineAccountRow } from "@/lib/finance/line-account-resolution"
-import { inferTaxBasis, resolveBillCoding, resolveLineCoding, type BillCoding, type CodingReferences, type CodingRule, type LineCoding } from "@/lib/finance/line-coding"
+import { codingReferencesFrom, inferTaxBasis, resolveBillCoding, resolveLineCoding, type BillCoding, type CodingRule, type LineCoding } from "@/lib/finance/line-coding"
 import { parseLedgerCapabilities } from "@/lib/integrations/ledger-capabilities"
 import { normalizeSupplierName } from "@/lib/suppliers/normalize"
 import { unscoped } from "@/lib/workspace-scope"
@@ -698,11 +698,7 @@ export async function resolveDocumentCodingItems(input: {
   ])
   const rule: CodingRule | null = ruleRow ? { accountExternalId: ruleRow.accountExternalId, taxCodeExternalId: ruleRow.taxCodeExternalId ?? null, tracking: parseRuleTracking(ruleRow.tracking), locationExternalId: ruleRow.locationExternalId ?? null } : null
   const of = (type: string) => entities.filter((entity) => entity.entityType === type)
-  const references: CodingReferences = {
-    taxCodes: new Set(of("tax_rate").filter((code) => code.forPurchases === true).map((code) => code.externalId)),
-    trackingOptions: new Set(of("tracking_option").map((option) => `${option.parentExternalId}:${option.externalId}`)),
-    locations: new Set(of("location").map((location) => location.externalId)),
-  }
+  const references = codingReferencesFrom(entities)
   const accountDefaults = Object.fromEntries(of("account").map((account) => [account.externalId, account.defaultTaxCode]))
   const capabilities = parseLedgerCapabilities(connection.ledgerCapabilities)
   const prior = input.priorCoding ?? {}
