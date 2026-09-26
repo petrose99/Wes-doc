@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache"
 import type { ActionState } from "@/lib/actions"
 import { adminPaths } from "@/lib/admin/paths"
-import type { CompanyDetailRow, CompanyViewerRole } from "@/lib/admin/companies"
+import type { CompanyDetailRow, CompanyViewerRole, CurrencyLockView } from "@/lib/admin/companies"
 import { getCurrentUser } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { unscoped } from "@/lib/workspace-scope"
@@ -16,7 +16,8 @@ import {
   removeWorkspaceFromOrganization,
   renameOrganization,
 } from "@/models/organizations"
-import { changeCompanyCurrency } from "@/models/company-currency"
+import { changeCompanyCurrency, countUnpostedDocuments, getCurrencyLock } from "@/models/company-currency"
+import { allowedCurrencies } from "@/lib/geo/company-currency"
 import { getWorkspaceMembership } from "@/models/workspaces"
 
 /** #285 spec §2 gating rule. Header writes (create organization, add, move) need *owner of the
@@ -78,6 +79,7 @@ export async function loadCompanyDetailAction(workspaceId: string, targetId: str
     }),
   )
   if (!target) return { success: false, error: "not_found" }
+  const [lock, unpostedCount] = await unscoped(() => Promise.all([getCurrencyLock(target.id), countUnpostedDocuments(target.id)]))
   return {
     success: true,
     data: {
@@ -91,6 +93,9 @@ export async function loadCompanyDetailAction(workspaceId: string, targetId: str
       isCurrent: target.id === workspaceId,
       createdAt: target.createdAt.toISOString(),
       owners: target.members.map((member) => member.user.name || member.user.email),
+      lock: lock.locked ? { ...lock, at: lock.at.toISOString() } : lock,
+      unpostedCount,
+      allowedCurrencies: allowedCurrencies(target.country),
     },
   }
 }
@@ -185,7 +190,7 @@ export async function removeCompanyFromOrganizationAction(workspaceId: string, t
  * (Admin › Integrations' Switch) or a company in the route's organization (Companies pane). The
  * lock, the pair and a push in flight are re-checked under the row lock in the model; each refusal
  * is a named code (`company_currency_*`, mapped in action-helpers.ts). */
-export async function changeCompanyCurrencyAction(workspaceId: string, companyId: string, currency: string): Promise<ActionState<{ count: number }>> {
+export async function changeCompanyCurrencyAction(workspaceId: string, companyId: string, currency: string): Promise<ActionState<{ count: number; requeued: number; lock?: CurrencyLockView }>> {
   const user = await getCurrentUser()
   if (companyId !== workspaceId) {
     const [route, target] = await Promise.all([headFor(workspaceId), headFor(companyId)])
@@ -198,7 +203,13 @@ export async function changeCompanyCurrencyAction(workspaceId: string, companyId
     revalidatePath(`${adminPaths(workspaceId).companies}/${companyId}`)
     revalidatePath(adminPaths(companyId).integrations)
     return { success: true, data: result }
-  } catch (error) { return { success: false, error: code(error, "failed") } }
+  } catch (error) {
+    const refusal = code(error, "failed")
+    if (refusal !== "company_currency_locked") return { success: false, error: refusal }
+    // Locked since the dialog opened: hand back the recorded cause so the dialog can name it.
+    const lock = await unscoped(() => getCurrencyLock(companyId))
+    return { success: false, error: refusal, data: { count: 0, requeued: 0, lock: lock.locked ? { ...lock, at: lock.at.toISOString() } : lock } }
+  }
 }
 
 /* --------------------------------------------------------------------------- org admin --- */
