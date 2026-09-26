@@ -151,6 +151,19 @@ describe("attemptIntegrationAttachment", () => {
     expect(update.data.errorCode).toBe("attach_oversize")
   })
 
+  it("rewraps a provider 404 (bill deleted at the provider) as attach_bill_gone, not the raw http_404", async () => {
+    quickbooks.listAttachments.mockRejectedValueOnce(new IntegrationPermanentError("http_404"))
+    const attachment = makeAttachment()
+    const prisma = makePrisma(attachment)
+    db.prisma = prisma
+
+    await attemptIntegrationAttachment("att-1", now)
+
+    const update = prisma.integrationAttachment.update.mock.calls[0][0]
+    expect(update.data.status).toBe("failed")
+    expect(update.data.errorCode).toBe("attach_bill_gone")
+  })
+
   it("waits retryably when the attach's push has not actually succeeded yet", async () => {
     const attachment = makeAttachment({ push: { status: "pending", externalBillId: null } })
     const prisma = makePrisma(attachment)

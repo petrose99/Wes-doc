@@ -177,7 +177,13 @@ export async function attemptIntegrationAttachment(attachmentId: string, now = n
         await pauseForReconnect(attachment.id, now)
         return
       } else if (error instanceof IntegrationPermanentError) {
-        result = { success: false, errorCode: error.code, externalAttachmentId: null }
+        // A provider-side 404 (listProviderAttachments/uploadProviderAttachment hitting a bill
+        // that's since been deleted at the provider) reaches here as classifyHttpStatus's generic
+        // "http_404", not "attach_bill_gone" — but it means the same thing as the local-Document-
+        // missing case just above, so PERMANENT_ATTACH_ERROR_CODES's Retry-refusal must see it as
+        // "attach_bill_gone" too, not fall through as an unrecognized (retryable-looking) code.
+        const code = error.code === "http_404" ? "attach_bill_gone" : error.code
+        result = { success: false, errorCode: code, externalAttachmentId: null }
         forceTerminal = true
       } else {
         result = { success: false, errorCode: safeErrorCode(error), externalAttachmentId: null }
