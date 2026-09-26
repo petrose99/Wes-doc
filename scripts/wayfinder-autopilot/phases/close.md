@@ -104,7 +104,11 @@ means a Part B row was filled optimistically; say which.
   the lessons files change only through it.
 - **Write the lessons back — to the right file, each with its `check:`.**
   One line per correction the fix loop made that the pre-build should have
-  caught. Generic (holds in any product) → the generic file; codebase-only →
+  caught, opening with its tags: `- [surface|backend|any] [area:<primer>]
+  (…)` — the kind of step it applies to, and an area only when it holds for
+  that primer's surfaces alone. The spec phase reads lessons through
+  `lessons.mjs`, which filters on these tags; an untagged line is always
+  shown. Generic (holds in any product) → the generic file; codebase-only →
   the project file. Merge with an existing line when it is the same lesson;
   keep each file under ~80 lines — they are read whole by the spec phase.
   Commit the project file with the ticket.

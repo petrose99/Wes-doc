@@ -80,7 +80,7 @@ along with the stored source file. This cannot be undone." — never soften this
 
 ## Seed, dev server, capture
 Same as [approvals](approvals.md): dev workspace `af91555d-7450-4b21-a8ac-73db092617c8`,
-`DEV_AUTH_BYPASS=true`, `node .impeccable/live/dev.mjs start <ws>` (dev server :3000 and the
+`DEV_AUTH_BYPASS=true`, `node scripts/dev/dev.mjs start <ws>` (dev server :3000 and the
 detector live-server :8400 together, waits for both; `dev.mjs stop` at the end — a plain shell `&`
 gets killed with the parent). Capture with the shared runner:
 `scripts/wayfinder-autopilot/capture-round.mjs` (`round({out, base}, async ({width, state, keyboard}) => ...)`)

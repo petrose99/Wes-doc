@@ -1,6 +1,6 @@
 // Make a dev workspace fit for a capture round, idempotently:
 //   npx tsx --env-file .env scripts/dev/prep-workspace.ts <workspaceId>
-// (or `node .impeccable/live/dev.mjs prep <ws>` / `start <ws>`).
+// (or `node scripts/dev/dev.mjs prep <ws>` / `start <ws>`).
 // #266 G2: the dev workspace's jurisdictionCode was null, every upload failed,
 // and two sessions chased the failing probes before finding it.
 import { prisma } from "@/lib/db"

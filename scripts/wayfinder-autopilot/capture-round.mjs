@@ -29,7 +29,7 @@
 // · navTimeout 120000 · settle 500 (ms after each action before a screenshot).
 //
 // Before the browser opens, round() checks that `base` and `detectUrl` answer
-// and throws naming `node .impeccable/live/dev.mjs start <ws>` if not — a
+// and throws naming `node scripts/dev/dev.mjs start <ws>` if not — a
 // missing live-server used to surface as `detector-error` on every state,
 // read as real findings (#266 G2).
 //
@@ -72,7 +72,7 @@ async function preflight(base, detectUrl) {
   const check = async (url, what) => {
     try { const r = await fetch(url, { redirect: "manual", signal: AbortSignal.timeout(15000) }); if (r.status < 500) return }
     catch {}
-    throw new Error(`round(): ${what} is not answering at ${url} — run \`node .impeccable/live/dev.mjs start <ws>\` (brings up :3000 and the :8400 live-server, waits for both) before the round`)
+    throw new Error(`round(): ${what} is not answering at ${url} — run \`node scripts/dev/dev.mjs start <ws>\` (brings up :3000 and the :8400 live-server, waits for both) before the round`)
   }
   await check(base, "the dev server"); await check(detectUrl, "the impeccable live-server (in-page detector)")
 }
