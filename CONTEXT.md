@@ -289,6 +289,14 @@ _Avoid_: Pay From (Vic's column label is fine on screen; the concept is the paye
 A supplier's net days and, when offered, an early-payment discount: the percent and the days within which it applies, shown as "2/10 net 30". A supplier without a discount shows no discount claim and no discount countdown.
 _Avoid_: Terms code, "2-10-30"
 
+**Planned pay date**:
+The day a person intends to pay an invoice, set by anyone who can build a Payment batch and cleared freely; shown as *Pay on*. It only moves the invoice to that week in Due by week, marked Planned. It sends nothing, creates no Payment line and changes no paid state, so a planned invoice is not Scheduled. A date after the due date is allowed and says so.
+_Avoid_: Scheduled (an open Payment line), scheduled payment, pay date (unqualified)
+
+**Due by week**:
+What the company has to pay, week by week in the company currency: Overdue, this week, the next five weeks, Later and No due date. It counts each unpaid invoice's amount due in the week of its Planned pay date, else its due date, and keeps approved invoices, invoices not yet approved and Expected invoices as separate layers, never one number. Scheduled and Sent invoices are still counted, since the money has not left. An open discount shows as a marker in its deadline's week, and Supplier credit shows as a note, never subtracted. Foreign-currency invoices count at their invoice-date rate; one without a rate is listed, not summed. It shows no receipts, no bank balance and no forecast.
+_Avoid_: Cash flow, cash forecast, cash position (it shows only what goes out)
+
 **Payment record**:
 A DocuBite-side fact that an amount was paid against an invoice on a date: written when a Payment line settles Paid, or by hand (Mark as paid) for a payment made outside DocuBite. An invoice's paid state is derived from the ledger when it confirms payment, otherwise from its payment records. A payment record can be removed with a reason.
 _Avoid_: Mark as paid (the action, not the record), settlement, ledger payment (that is the ledger's own line)
