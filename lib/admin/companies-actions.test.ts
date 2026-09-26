@@ -7,6 +7,11 @@ vi.mock("@/lib/auth", () => ({ getCurrentUser: vi.fn().mockResolvedValue({ id: "
 vi.mock("@/lib/db", () => ({ prisma: { workspace: { findUnique: vi.fn(), findFirst: vi.fn() } } }))
 vi.mock("@/lib/workspace-scope", () => ({ unscoped: (fn: () => unknown) => fn() }))
 vi.mock("@/models/workspaces", () => ({ getWorkspaceMembership: vi.fn() }))
+vi.mock("@/models/company-currency", () => ({
+  changeCompanyCurrency: vi.fn(),
+  countUnpostedDocuments: vi.fn().mockResolvedValue(0),
+  getCurrencyLock: vi.fn().mockResolvedValue({ locked: false }),
+}))
 vi.mock("@/models/organizations", () => ({
   addCompanyToOrganization: vi.fn(),
   createOrganization: vi.fn(),

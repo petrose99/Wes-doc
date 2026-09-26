@@ -6,7 +6,7 @@ import { NormalizedBill } from "@/lib/integration-bill-mapping"
 import { IntegrationAuthError, IntegrationPermanentError, IntegrationRetryableError, safeErrorCode } from "@/lib/integrations/errors"
 import { checkLedgerCurrency } from "@/lib/checks/ledger-currency"
 import { LEDGER_CURRENCY_REUSE_MS, readLedgerCurrency } from "@/lib/integrations/ledger-currency"
-import { getCompanyCurrency, recordCurrencyLock } from "@/models/company-currency"
+import { readCompanyCurrencyForPush, recordCurrencyLock } from "@/models/company-currency"
 import * as quickbooks from "@/lib/integrations/quickbooks/client"
 import { toQuickBooksBillBody } from "@/lib/integrations/quickbooks/bill-mapper"
 import * as xero from "@/lib/integrations/xero/client"
@@ -120,7 +120,7 @@ async function failPreflight(push: { workspaceId: string; documentId: string }, 
 async function gateLedgerCurrency(push: { workspaceId: string; documentId: string }, connection: { id: string; provider: string; externalTenantId: string | null; ledgerCurrency: string | null; ledgerCurrencyReadAt: Date | null }, now: Date): Promise<void> {
   const ledgerCurrency = await readLedgerCurrency({ ...connection, workspaceId: push.workspaceId }, now, LEDGER_CURRENCY_REUSE_MS)
   if (!ledgerCurrency) throw new IntegrationRetryableError("ledger_currency_unreadable")
-  const check = checkLedgerCurrency({ provider: connection.provider, ledgerCurrency, companyCurrency: await getCompanyCurrency(push.workspaceId) })
+  const check = checkLedgerCurrency({ provider: connection.provider, ledgerCurrency, companyCurrency: await readCompanyCurrencyForPush(push.workspaceId) })
   if (check.status === "fail") await failPreflight(push, check.checkCode, String(check.detail?.text))
 }
 

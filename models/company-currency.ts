@@ -27,6 +27,15 @@ export async function getCompanyCurrency(workspaceId: string, client: Client = p
   return row.baseCurrency
 }
 
+/** The push gate's read (ADR 0013): FOR SHARE, so a push claimed while changeCompanyCurrency holds
+ * the row FOR UPDATE waits for it and judges the ledger against the committed currency. A push
+ * leased before the change began is refused by the change instead (company_currency_push_in_flight). */
+export async function readCompanyCurrencyForPush(workspaceId: string): Promise<string> {
+  const rows = await prisma.$queryRaw<{ base_currency: string }[]>`SELECT base_currency FROM workspaces WHERE id = ${workspaceId}::uuid FOR SHARE`
+  if (!rows[0]) throw new Error("workspace_not_found")
+  return rows[0].base_currency
+}
+
 export async function getCurrencyLock(workspaceId: string, client: Client = prisma): Promise<CurrencyLock> {
   return toLock(await client.workspace.findUniqueOrThrow({ where: { id: workspaceId }, select: lockSelect }))
 }

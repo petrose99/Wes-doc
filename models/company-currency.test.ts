@@ -7,7 +7,7 @@ vi.mock("@/lib/fx/apply-to-document", () => ({ applyFxToDocument: vi.fn().mockRe
 
 vi.mock("@/lib/integrations/ledger-currency", () => ({ requeueLedgerCurrencyFailures: vi.fn().mockResolvedValue(3) }))
 
-const { changeCompanyCurrency, countUnpostedDocuments, getCurrencyLock, recordCurrencyLock } = await import("@/models/company-currency")
+const { changeCompanyCurrency, countUnpostedDocuments, getCurrencyLock, readCompanyCurrencyForPush, recordCurrencyLock } = await import("@/models/company-currency")
 const { requeueLedgerCurrencyFailures } = await import("@/lib/integrations/ledger-currency")
 const { prisma } = await import("@/lib/db")
 const { recordDocumentAudit } = await import("@/lib/audit")
@@ -26,6 +26,20 @@ beforeEach(() => {
   db.workspace = { findUniqueOrThrow: vi.fn().mockResolvedValue(unlocked), update: vi.fn().mockResolvedValue({}), updateMany: vi.fn().mockResolvedValue({ count: 1 }) }
   db.integrationPush = { count: vi.fn().mockResolvedValue(0) }
   db.document = { findMany: vi.fn().mockResolvedValue([{ id: "d1" }, { id: "d2" }]), count: vi.fn().mockResolvedValue(2) }
+})
+
+describe("readCompanyCurrencyForPush", () => {
+  it("reads the currency FOR SHARE, so a push waits for a currency change in progress and sees its result", async () => {
+    db.$queryRaw.mockResolvedValue([{ base_currency: "ZAR" }])
+    await expect(readCompanyCurrencyForPush("w1")).resolves.toBe("ZAR")
+    const sql = (db.$queryRaw.mock.calls[0][0] as string[]).join("?")
+    expect(sql).toMatch(/FROM workspaces WHERE id = \?::uuid FOR SHARE/)
+  })
+
+  it("throws for a missing workspace rather than judge the push in another currency", async () => {
+    db.$queryRaw.mockResolvedValue([])
+    await expect(readCompanyCurrencyForPush("w1")).rejects.toThrow("workspace_not_found")
+  })
 })
 
 describe("getCurrencyLock", () => {

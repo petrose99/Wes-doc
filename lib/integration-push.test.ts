@@ -24,7 +24,7 @@ vi.mock("@/lib/integrations/xero/client", () => ({
 }))
 vi.mock("@/lib/integrations/xero/bill-mapper", () => ({ toXeroBillBody: vi.fn().mockReturnValue({}) }))
 vi.mock("@/lib/integrations/ledger-currency", () => ({ LEDGER_CURRENCY_REUSE_MS: 60_000, readLedgerCurrency: vi.fn().mockResolvedValue("USD") }))
-vi.mock("@/models/company-currency", () => ({ getCompanyCurrency: vi.fn().mockResolvedValue("USD"), recordCurrencyLock: vi.fn().mockResolvedValue(undefined) }))
+vi.mock("@/models/company-currency", () => ({ readCompanyCurrencyForPush: vi.fn().mockResolvedValue("USD"), recordCurrencyLock: vi.fn().mockResolvedValue(undefined) }))
 
 const { attemptIntegrationPush, getLedgerConnectionBandStatus } = await import("./integration-push")
 const { IntegrationAuthError } = await import("./integrations/errors")
@@ -128,12 +128,12 @@ describe("attemptIntegrationPush — ledger currency (ADR 0013)", () => {
     db.prisma = prisma
     await attemptIntegrationPush("push-1", now)
     expect(ledger.readLedgerCurrency).toHaveBeenCalledWith(expect.objectContaining({ id: "conn-1", workspaceId: "w1", provider: "quickbooks" }), now, 60_000)
-    expect(companyCurrency.getCompanyCurrency).toHaveBeenCalledWith("w1")
+    expect(companyCurrency.readCompanyCurrencyForPush).toHaveBeenCalledWith("w1")
   })
 
   it("refuses a push whose ledger keeps its books in another currency: terminal, one review task, nothing posted", async () => {
     ledger.readLedgerCurrency.mockResolvedValueOnce("ZAR")
-    companyCurrency.getCompanyCurrency.mockResolvedValueOnce("LSL")
+    companyCurrency.readCompanyCurrencyForPush.mockResolvedValueOnce("LSL")
     companyCurrency.recordCurrencyLock.mockClear()
     const prisma = makePrisma(makePush({ connection: { ...makePush().connection, provider: "xero" } }))
     db.prisma = prisma
